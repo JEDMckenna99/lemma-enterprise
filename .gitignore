@@ -48,6 +48,12 @@ instance/
 *.p12
 *.pfx
 
+# Lemma Enterprise specific
+.lemma_enterprise/
+lemma_test_credential_*.json
+deployment_config.json
+lemma-enterprise.zip
+
 # Logs
 logs/
 *.log

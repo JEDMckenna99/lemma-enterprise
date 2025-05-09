@@ -1,6 +1,23 @@
 # Lemma Enterprise: Human Verification System
 
+*The essential proof of humanness for digital trust*
+
 A secure, modular, enterprise-grade implementation for verifying humans with minimal data collection and strong cryptographic standards.
+
+---
+
+## Our Ethos
+
+Lemma exists to solve one fundamental problem in the digital world: **proving that a user is a unique human being, nothing more and nothing less**.
+
+We believe:
+
+- **Privacy is paramount**: We collect only what's necessary to verify humanness, protecting user data while enabling trust.
+- **Simplicity is powerful**: A focused solution that does one thing exceptionally well creates more value than complex systems that do many things adequately.
+- **Offline verification matters**: By enabling credential verification without requiring an active internet connection, we create a more resilient digital ecosystem.
+- **Bots undermine digital trust**: When nearly 40% of internet traffic is non-human, businesses need a reliable way to ensure they're interacting with real people.
+
+Lemma provides the simple proof that allows larger business functions to operate smoothly in a world increasingly challenged by sophisticated bots and automated systems.
 
 ---
 
@@ -13,6 +30,8 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 - **Cross-Page Verification:** Demonstrates how verification works across different pages.
 - **W3C Standards:** Issues standard Verifiable Credentials and Presentations.
 - **Privacy by Design:** Credentials are stored in the user's browser, not in a central database.
+- **Offline Verification:** Credentials can be verified without requiring an active internet connection.
+- **Bot Prevention:** Fundamentally cuts bots at their core by making it impossible to generate valid credentials without human verification.
 
 ---
 
