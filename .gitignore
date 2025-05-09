@@ -1,0 +1,66 @@
+# Python bytecode files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env
+
+# Testing artifacts
+.pytest_cache/
+.coverage
+coverage_html/
+htmlcov/
+.tox/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Local environment
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Flask specific
+instance/
+.webassets-cache
+
+# Credential and key files (be careful with this!)
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Logs
+logs/
+*.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Lemma specific storage
+.lemma_enterprise/
+.lemma_test_routes/
+
+# Temporary files
+temp/
+tmp/ 
