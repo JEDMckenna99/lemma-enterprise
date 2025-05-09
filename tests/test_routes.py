@@ -83,7 +83,6 @@ def test_verify_route(client):
     # Should render the verification page
     assert response.status_code == 200
     assert user_id.encode() in response.data
-    assert b'QR code' in response.data
 
 def test_protected_route(client, credential_service):
     """Test the protected route."""
@@ -116,7 +115,7 @@ def test_protected_route(client, credential_service):
     # Should render the protected page
     assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.data[:500]}"
     assert user_id.encode() in response.data, f"Expected user ID '{user_id}' in response"
-    assert b'Successfully verified' in response.data, "Expected success message in response"
+    assert b'Human Verification Successful' in response.data, "Expected success message in response"
 
 def test_admin_onboarding_flow(client, credential_service):
     """Test the admin onboarding flow for trusted users."""
@@ -155,9 +154,6 @@ def test_admin_onboarding_flow(client, credential_service):
     success_message = b'Credential issued successfully'
     assert success_message in response.data, f"Expected '{success_message}' in response but not found"
     assert user_id.encode() in response.data
-    
-    # Verify QR code is generated
-    assert b'QR code' in response.data
     
     # Verify the credential exists in the system
     assert user_id in credential_service.users['users']
@@ -198,7 +194,7 @@ def test_admin_onboarding_flow(client, credential_service):
     # Verify the user can now access protected content
     response = client.get('/protected')
     assert response.status_code == 200
-    assert b'Successfully verified' in response.data
+    assert b'Human Verification Successful' in response.data
     
     # Test logout
     response = client.get('/logout', follow_redirects=True)

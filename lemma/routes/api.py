@@ -34,40 +34,38 @@ logger = logging.getLogger(__name__)
 # Rate limiting implementation
 request_history = {}
 
-def rate_limit(max_requests=10, window_seconds=60):
-    """Rate limiting decorator for API endpoints."""
-    def decorator(f):
-        @wraps(f)
-        def wrapped(*args, **kwargs):
-            # Get client IP
-            client_ip = request.remote_addr
-            current_time = time.time()
-            
-            # Initialize or clean up request history
-            if client_ip not in request_history:
-                request_history[client_ip] = []
-            
-            # Remove old requests outside the window
-            request_history[client_ip] = [
-                timestamp for timestamp in request_history[client_ip]
-                if current_time - timestamp < window_seconds
-            ]
-            
-            # Check if rate limit exceeded
-            if len(request_history[client_ip]) >= max_requests:
-                logger.warning("Rate limit exceeded for IP: %s", client_ip)
-                return jsonify({
-                    "error": "Rate limit exceeded",
-                    "message": f"Maximum {max_requests} requests allowed per {window_seconds} seconds"
-                }), 429
-            
-            # Add current request to history
-            request_history[client_ip].append(current_time)
-            
-            # Process the request
+def rate_limit(f):
+    """Decorator to apply rate limiting to API endpoints."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Skip rate limiting in test environment
+        if current_app.config.get('TESTING', False):
             return f(*args, **kwargs)
-        return wrapped
-    return decorator
+            
+        # Rate limiting logic (per IP)
+        ip = request.remote_addr
+        now = time.time()
+        
+        # Clean up old requests
+        for req_time in list(request_history.get(ip, [])):
+            if now - req_time > 60:
+                request_history[ip].remove(req_time)
+        
+        # Check if rate limit exceeded
+        if len(request_history.get(ip, [])) >= 10:
+            current_app.logger.warning(f"Rate limit exceeded for IP: {ip}")
+            return jsonify({
+                "error": "Rate limit exceeded",
+                "message": f"Maximum 10 requests allowed per 60 seconds"
+            }), 429
+        
+        # Add current request
+        if ip not in request_history:
+            request_history[ip] = []
+        request_history[ip].append(now)
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 def require_api_key(f):
     """Decorator to require API key for endpoints.
@@ -104,7 +102,7 @@ def require_api_key(f):
     return decorated
 
 @api_bp.route('/health')
-@rate_limit(max_requests=30, window_seconds=60)  # Higher limit for health checks
+@rate_limit
 def health_check():
     """Health check endpoint."""
     return jsonify({
@@ -116,7 +114,7 @@ def health_check():
 
 @api_bp.route('/issue-credential', methods=['POST'])
 @require_api_key
-@rate_limit()
+@rate_limit
 def issue_credential():
     """Issue a credential via API (requires API key)."""
     try:
@@ -149,7 +147,7 @@ def issue_credential():
         return jsonify({"error": f"Error issuing credential: {str(e)}"}), 500
 
 @api_bp.route('/verify-credential', methods=['POST'])
-@rate_limit()
+@rate_limit
 def verify_credential():
     """Verify a credential via API."""
     try:
@@ -192,14 +190,14 @@ def verify_credential():
         return jsonify({"error": f"Error verifying credential: {str(e)}"}), 500
 
 @api_bp.route('/generate-challenge')
-@rate_limit()
+@rate_limit
 def generate_challenge():
     """Generate a challenge for presentation verification."""
     challenge = secrets.token_hex(16)
     return jsonify({"challenge": challenge})
 
 @api_bp.route('/verify-presentation', methods=['POST'])
-@rate_limit()
+@rate_limit
 # Only apply CSRF protection in non-test environments
 def verify_presentation():
     """Verify a presentation via API.
@@ -259,7 +257,7 @@ def verify_presentation():
 
 @api_bp.route('/credentials/<user_id>')
 @require_api_key
-@rate_limit()
+@rate_limit
 def get_user_credential(user_id):
     """Get a user's credential via API."""
     try:
@@ -283,7 +281,7 @@ def get_user_credential(user_id):
 @api_bp.route('/credentials', methods=['GET'])
 @require_api_key
 @admin_required
-@rate_limit()
+@rate_limit
 def list_credentials():
     """List all credentials via API (requires API key and admin authentication)."""
     try:

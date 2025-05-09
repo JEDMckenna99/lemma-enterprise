@@ -154,7 +154,7 @@
             <p>This content is only accessible to verified humans. Your credential has been successfully verified.</p>
             
             <div class="user-info">
-                <strong>User ID:</strong> <span id="userId">{{ session.get('user_id', 'Unknown') }}</span><br>
+                <strong>User ID:</strong> <span id="userId">{{ user_id }}</span><br>
                 <strong>Verification Status:</strong> Verified Human<br>
                 <strong>Access Level:</strong> Full Access
             </div>
@@ -201,7 +201,11 @@
             const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
             if (credentials.length > 0) {
                 const userId = credentials[0].replace('lemma_credential_', '');
-                document.getElementById('userId').textContent = userId;
+                // Only update if the element doesn't already have server-provided content
+                const userIdElement = document.getElementById('userId');
+                if (userIdElement.textContent === "" || userIdElement.textContent === "Unknown") {
+                    userIdElement.textContent = userId;
+                }
             }
         }
         

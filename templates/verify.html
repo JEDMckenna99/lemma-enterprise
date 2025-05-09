@@ -260,8 +260,18 @@
                 <div class="field-name">Status</div>
                 <div class="field-value">{{ credential.status }}</div>
             </div>
+            <div class="field">
+                <div class="field-name">Verification Status</div>
+                <div class="field-value">Verified</div>
+            </div>
             {% endif %}
             <p style="margin-top: 20px; color: #333;">Check your phone for a verification link sent via SMS. Only links sent by the admin are valid for onboarding.</p>
+            {% if verification_url %}
+            <div class="field">
+                <div class="field-name">Verification Link (for admin/testing):</div>
+                <div class="field-value"><a href="{{ verification_url }}">{{ verification_url }}</a></div>
+            </div>
+            {% endif %}
         </div>
         {% else %}
         <div class="card">

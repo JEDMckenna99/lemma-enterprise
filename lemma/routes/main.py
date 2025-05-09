@@ -9,7 +9,6 @@ from flask import (
     url_for, session, jsonify, abort, flash, current_app
 )
 from lemma.core.credential_service import get_credential_service
-from lemma.utils.qr_generator import generate_qr_code_base64
 
 # Create blueprint
 main_bp = Blueprint('main', __name__)
@@ -34,20 +33,18 @@ def verify():
     credential_service = get_credential_service()
     credential = credential_service.get_user_credential(user_id)
     
-    # Generate QR code for mobile scanning
-    verification_url = url_for('main.verify', user_id=user_id, _external=True)
-    qr_code = generate_qr_code_base64(verification_url)
-    
     # Generate a challenge for presentation verification
     challenge = secrets.token_hex(16)
     session['verification_challenge'] = challenge
+    
+    verification_url = url_for('main.verify', user_id=user_id, _external=True)
     
     return render_template(
         'verify.html', 
         user_id=user_id, 
         has_credential=credential is not None,
         credential=credential,
-        qr_code=qr_code,
+        verification_url=verification_url,
         challenge=challenge
     )
 
