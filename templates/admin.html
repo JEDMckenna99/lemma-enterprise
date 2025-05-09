@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Lemma</title>
+    <style>
+        :root {
+            --primary-color: #6B3FA0;
+            --secondary-color: #4A2C71;
+            --accent-color: #8F6BC1;
+            --text-color: #333333;
+            --light-bg: #F8F9FA;
+            --white: #FFFFFF;
+            --success: #28A745;
+            --error: #DC3545;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--light-bg);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo-title {
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo {
+            width: 40px;
+            height: 40px;
+            background-color: var(--primary-color);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+        }
+        
+        .logo span {
+            color: var(--white);
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            font-size: 24px;
+        }
+        
+        .user-controls {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .button {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: var(--primary-color);
+            color: var(--white);
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        
+        .button:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        .button.secondary {
+            background-color: var(--white);
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+        }
+        
+        .button.secondary:hover {
+            background-color: var(--light-bg);
+        }
+        
+        .card {
+            background-color: var(--white);
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 20px;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(107, 63, 160, 0.2);
+        }
+        
+        .result-area {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .result-success {
+            padding: 15px;
+            background-color: #E3F9E5;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            color: #0A6B40;
+        }
+        
+        .result-error {
+            padding: 15px;
+            background-color: #FDE8EC;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            color: #CD3D64;
+        }
+        
+        .credential-link {
+            display: block;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f7f7f7;
+            border-radius: 6px;
+            word-break: break-all;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        
+        .tab.active {
+            background-color: var(--white);
+            border-bottom: 3px solid var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #f7f7f7;
+            font-weight: 600;
+        }
+        
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-valid {
+            background-color: #E3F9E5;
+            color: #0A6B40;
+        }
+        
+        .status-revoked {
+            background-color: #FDE8EC;
+            color: #CD3D64;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+        }
+        
+        footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-title">
+                <div class="logo">
+                    <span>L</span>
+                </div>
+                <h1>Lemma Admin Dashboard</h1>
+            </div>
+            
+            <div class="user-controls">
+                <a href="/" class="button secondary">Home</a>
+                <a href="/admin/logout" class="button">Logout</a>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="issue">Issue Credentials</div>
+            <div class="tab" data-tab="manage">Manage Credentials</div>
+        </div>
+        
+        <div class="tab-content active" id="issue-tab">
+            <div class="card">
+                <h2 class="card-title">Issue Human Verification Credential</h2>
+                <p>Use this form to issue a credential to a trusted human. This will bypass any automated verification and directly issue a credential that verifies the user is human.</p>
+                
+                <form id="issueForm">
+                    <div class="form-group">
+                        <label for="userId">User ID</label>
+                        <input type="text" id="userId" name="userId" placeholder="Enter user ID or leave blank for random" required>
+                    </div>
+                    
+                    <button type="submit" class="button">Issue Credential</button>
+                </form>
+                
+                <div id="issueResult" class="result-area">
+                    <div id="issueSuccess" class="result-success"></div>
+                    <div id="issueError" class="result-error"></div>
+                    
+                    <div id="credentialInfo">
+                        <h3>Credential Information</h3>
+                        <p><strong>User ID:</strong> <span id="resultUserId"></span></p>
+                        <p><strong>Credential ID:</strong> <span id="resultCredentialId"></span></p>
+                        <p><strong>Verification Link:</strong></p>
+                        <div id="verifyLink" class="credential-link"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="manage-tab">
+            <div class="card">
+                <h2 class="card-title">Manage Credentials</h2>
+                <p>View and manage all issued credentials.</p>
+                
+                <table id="credentialsTable">
+                    <thead>
+                        <tr>
+                            <th>Credential ID</th>
+                            <th>User ID</th>
+                            <th>Issued Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="credentialsTableBody">
+                        <!-- Table rows will be added dynamically -->
+                        <tr>
+                            <td colspan="5">Loading credentials...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Lemma Human Network &copy; 2025 | <a href="https://github.com/JEDMckenna99/lemma">GitHub</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Tab functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                // Remove active class from all tabs
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                this.classList.add('active');
+                
+                // Hide all tab content
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                
+                // Show the corresponding tab content
+                const tabId = this.getAttribute('data-tab');
+                document.getElementById(tabId + '-tab').classList.add('active');
+            });
+        });
+        
+        // Issue credential form
+        document.getElementById('issueForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const userId = document.getElementById('userId').value.trim() || 'user_' + Math.random().toString(36).substring(2, 10);
+            
+            try {
+                // Show loading state
+                document.getElementById('issueResult').style.display = 'none';
+                
+                // Issue the credential
+                const response = await fetch('/admin/issue', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: userId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // Show result
+                document.getElementById('issueResult').style.display = 'block';
+                
+                if (result.success) {
+                    document.getElementById('issueSuccess').style.display = 'block';
+                    document.getElementById('issueSuccess').textContent = 'Credential issued successfully!';
+                    document.getElementById('issueError').style.display = 'none';
+                    
+                    document.getElementById('credentialInfo').style.display = 'block';
+                    document.getElementById('resultUserId').textContent = userId;
+                    document.getElementById('resultCredentialId').textContent = result.credential.id;
+                    
+                    const baseUrl = window.location.origin;
+                    const verifyUrl = `${baseUrl}${result.verify_url}`;
+                    document.getElementById('verifyLink').textContent = verifyUrl;
+                    document.getElementById('verifyLink').innerHTML += `<br><a href="${verifyUrl}" target="_blank" class="button secondary" style="margin-top: 10px;">Open Verification Page</a>`;
+                } else {
+                    document.getElementById('issueSuccess').style.display = 'none';
+                    document.getElementById('issueError').style.display = 'block';
+                    document.getElementById('issueError').textContent = 'Error: ' + (result.error || 'Unknown error');
+                    document.getElementById('credentialInfo').style.display = 'none';
+                }
+            } catch (e) {
+                console.error('Error issuing credential:', e);
+                document.getElementById('issueSuccess').style.display = 'none';
+                document.getElementById('issueError').style.display = 'block';
+                document.getElementById('issueError').textContent = 'Error: ' + e.message;
+                document.getElementById('credentialInfo').style.display = 'none';
+            }
+        });
+        
+        // Load credentials for management tab
+        async function loadCredentials() {
+            try {
+                // In a real implementation, you would fetch this from an API
+                // For this demo, we'll use localStorage to simulate
+                const credentials = [];
+                
+                // Check if any credentials exist in localStorage
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('lemma_credential_')) {
+                        try {
+                            const credential = JSON.parse(localStorage.getItem(key));
+                            credentials.push({
+                                id: credential.id,
+                                user_id: key.replace('lemma_credential_', ''),
+                                issued_at: credential.issuanceDate,
+                                status: 'valid'
+                            });
+                        } catch (e) {
+                            console.error('Error parsing credential:', e);
+                        }
+                    }
+                }
+                
+                // Update the table
+                const tableBody = document.getElementById('credentialsTableBody');
+                
+                if (credentials.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="5">No credentials found</td></tr>';
+                    return;
+                }
+                
+                tableBody.innerHTML = '';
+                
+                credentials.forEach(cred => {
+                    const row = document.createElement('tr');
+                    
+                    const idCell = document.createElement('td');
+                    idCell.textContent = cred.id;
+                    
+                    const userIdCell = document.createElement('td');
+                    userIdCell.textContent = cred.user_id;
+                    
+                    const issuedCell = document.createElement('td');
+                    issuedCell.textContent = new Date(cred.issued_at).toLocaleString();
+                    
+                    const statusCell = document.createElement('td');
+                    const statusBadge = document.createElement('span');
+                    statusBadge.classList.add('status-badge');
+                    statusBadge.classList.add(cred.status === 'valid' ? 'status-valid' : 'status-revoked');
+                    statusBadge.textContent = cred.status === 'valid' ? 'Valid' : 'Revoked';
+                    statusCell.appendChild(statusBadge);
+                    
+                    const actionsCell = document.createElement('td');
+                    const viewLink = document.createElement('a');
+                    viewLink.href = `/verify?user=${cred.user_id}`;
+                    viewLink.target = '_blank';
+                    viewLink.classList.add('button', 'secondary');
+                    viewLink.style.marginRight = '10px';
+                    viewLink.textContent = 'View';
+                    
+                    const revokeButton = document.createElement('button');
+                    revokeButton.classList.add('button');
+                    revokeButton.textContent = 'Revoke';
+                    revokeButton.addEventListener('click', () => {
+                        if (confirm(`Are you sure you want to revoke the credential for ${cred.user_id}?`)) {
+                            // In a real implementation, you would call an API to revoke
+                            alert('Credential revocation would happen here in a real implementation');
+                        }
+                    });
+                    
+                    actionsCell.appendChild(viewLink);
+                    actionsCell.appendChild(revokeButton);
+                    
+                    row.appendChild(idCell);
+                    row.appendChild(userIdCell);
+                    row.appendChild(issuedCell);
+                    row.appendChild(statusCell);
+                    row.appendChild(actionsCell);
+                    
+                    tableBody.appendChild(row);
+                });
+            } catch (e) {
+                console.error('Error loading credentials:', e);
+                document.getElementById('credentialsTableBody').innerHTML = '<tr><td colspan="5">Error loading credentials: ' + e.message + '</td></tr>';
+            }
+        }
+        
+        // Load credentials when the manage tab is clicked
+        document.querySelector('.tab[data-tab="manage"]').addEventListener('click', loadCredentials);
+    </script>
+</body>
+</html>

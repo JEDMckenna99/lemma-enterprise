@@ -1,0 +1,194 @@
+# Lemma Enterprise: Human Verification System
+
+A secure, modular, enterprise-grade implementation for verifying humans with minimal data collection and strong cryptographic standards.
+
+---
+
+## Overview
+
+Lemma Enterprise provides a complete solution for trusted admin onboarding of verified humans to the Lemma network. The system focuses on:
+
+- **Minimal Data Collection:** Only verifies that a user is human—no additional personal information is collected.
+- **Strong Encryption:** Uses Ed25519 signatures and DID-based identifiers for cryptographic security.
+- **Cross-Page Verification:** Demonstrates how verification works across different pages.
+- **W3C Standards:** Issues standard Verifiable Credentials and Presentations.
+- **Privacy by Design:** Credentials are stored in the user's browser, not in a central database.
+
+---
+
+## Key Features
+
+- **Modular Architecture:** Clean separation of concerns for maintainability.
+- **Enhanced Security:** Password hashing, CSRF protection, secure cookies, encrypted storage, and rate limiting.
+- **Comprehensive Testing:** Full test coverage for all critical paths.
+- **Improved UX:** Auto-redirects, QR codes, and detailed error feedback.
+- **Docker & Azure Support:** Easy deployment with Docker, docker-compose, and Azure Web Apps.
+- **Audit Logging:** Comprehensive logging for security events.
+
+---
+
+## Architecture & Components
+
+### Core Backend
+- **`app.py`:** Main Flask application and entry point.
+- **`lemma/__init__.py`:** Application factory and configuration.
+- **`lemma/core/credential_service.py`:** Credential issuance and verification logic.
+- **`lemma/auth/security.py`:** Authentication and security features.
+- **`lemma/routes/`:** Modular route handlers.
+- **`lemma/utils/`:** Utility functions.
+- **`lemma/models/`:** Data models.
+- **`tests/`:** Comprehensive test suite.
+
+### Templates
+- **`templates/index.html`:** Landing page.
+- **`templates/verify.html`:** Credential verification and storage page.
+- **`templates/protected.html`:** Content requiring human verification.
+- **`templates/admin_login.html`:** Secure admin login.
+- **`templates/admin.html`:** Admin dashboard for issuing credentials.
+
+### Storage System
+- **`.lemma_enterprise/`:** (Created automatically) Contains cryptographic keys and credential registry:
+  - `keys.json`: Ed25519 keys
+  - `registry.json`: Issued credentials
+  - `users.json`: User IDs (no personal data)
+
+---
+
+## Flows
+
+### Admin Onboarding Flow
+1. **Admin Authentication:** Secure login at `/admin/login` (password hashing, CSRF protection).
+2. **Credential Issuance:** Admin enters a user ID at `/admin/issue` to issue a credential.
+3. **Verification Link:** System generates a shareable verification link and QR code.
+4. **User Verification:** User receives the link to `/verify?user_id={user_id}` to store their credential.
+5. **Local Storage:** Credential is stored in the user's browser.
+6. **Cross-Page Access:** User can access protected content at `/protected` using their credential.
+
+### User Verification Flow
+1. **Link Access:** User opens the verification link.
+2. **Credential Retrieval:** System provides the credential.
+3. **Local Storage:** Credential is stored in browser local storage.
+4. **Presentation Creation:** System creates a verifiable presentation.
+
+### Cross-Page Verification Flow
+1. **Protected Access:** User attempts to access protected content.
+2. **Credential Check:** System checks for a stored credential.
+3. **Presentation Verification:** System verifies the presentation.
+4. **Access Grant:** User is granted access to protected content.
+
+---
+
+## Installation & Deployment
+
+### Prerequisites
+- Python 3.9+
+- pip
+- Docker (optional)
+
+### Local Development
+```bash
+# Clone the repository
+git clone <repository-url>
+cd lemma-enterprise-package
+
+# Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set environment variables
+export LEMMA_ADMIN_USER=admin
+export LEMMA_ADMIN_PASS=secure_password_change_me
+export LEMMA_SECRET_KEY=your_secret_key_here
+export LEMMA_API_KEY=your_api_key_here
+
+# Run the application
+python app.py
+```
+
+### Docker Deployment
+```bash
+# Build and run with Docker Compose
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+```
+
+### Azure Deployment
+1. **Create an Azure Web App:**
+   ```bash
+   az webapp create --resource-group YourResourceGroup --plan YourAppServicePlan --name LemmaHumanVerification --runtime "PYTHON:3.9"
+   ```
+2. **Set Environment Variables:**
+   ```bash
+   az webapp config appsettings set --resource-group YourResourceGroup --name LemmaHumanVerification --settings LEMMA_ADMIN_USER="your_admin_username" LEMMA_ADMIN_PASS="your_secure_password" LEMMA_SECRET_KEY="your_random_secret"
+   ```
+3. **Deploy the Code:**
+   ```bash
+   az webapp deployment source config-zip --resource-group YourResourceGroup --name LemmaHumanVerification --src lemma-enterprise.zip
+   ```
+
+---
+
+## API Documentation
+
+### Authentication
+All API endpoints that modify data require an API key:
+```
+X-API-Key: your_api_key_here
+```
+
+### Endpoints
+- **GET /api/health:** Health check endpoint
+- **POST /api/issue-credential:** Issue a credential (requires API key)
+- **POST /api/verify-credential:** Verify a credential
+- **GET /api/generate-challenge:** Generate a challenge for presentation verification
+- **POST /api/verify-presentation:** Verify a presentation
+- **GET /api/credentials/{user_id}:** Get a user's credential (requires API key)
+- **GET /api/credentials:** List all credentials (requires API key and admin authentication)
+
+---
+
+## Security Considerations
+
+- **Admin Credentials:** Set strong admin credentials via environment variables.
+- **Session Secret:** Use a strong random value for `LEMMA_SECRET_KEY`.
+- **API Key:** Set a strong API key for external integrations.
+- **Key Protection:** The `.lemma_enterprise` directory contains cryptographic keys—keep it secure.
+- **HTTPS:** Always use HTTPS in production for secure credential transmission.
+- **Rate Limiting:** API endpoints are protected against abuse.
+- **Password Hashing:** Admin passwords are securely hashed.
+- **CSRF Protection:** All forms are protected against CSRF attacks.
+- **Encrypted Storage:** Sensitive data is encrypted at rest.
+- **Minimal Data Collection:** Only stores that a user is human—no personal information.
+
+---
+
+## Customization
+
+- Modify the HTML templates to match your branding.
+- Adjust the credential expiration in the credential service or `app.py` (default: 1 year).
+- Add additional protected pages by following the pattern in `protected.html`.
+- Customize security settings in `lemma/__init__.py`.
+
+---
+
+## Testing
+
+The system includes comprehensive tests for all critical paths:
+```bash
+# Run all tests with coverage report
+python run_tests.py
+
+# Or use pytest directly
+pytest -v --cov=lemma
+```
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details. 

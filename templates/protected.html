@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protected Content - Lemma</title>
+    <style>
+        :root {
+            --primary-color: #6B3FA0;
+            --secondary-color: #4A2C71;
+            --accent-color: #8F6BC1;
+            --text-color: #333333;
+            --light-bg: #F8F9FA;
+            --white: #FFFFFF;
+            --success: #28A745;
+            --error: #DC3545;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--light-bg);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            width: 40px;
+            height: 40px;
+            background-color: var(--primary-color);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+        }
+        
+        .logo span {
+            color: var(--white);
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            font-size: 24px;
+        }
+        
+        .card {
+            background-color: var(--white);
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .success-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 15px 0;
+            background-color: #E3F9E5;
+            color: #0A6B40;
+        }
+        
+        .content-section {
+            margin-top: 30px;
+        }
+        
+        .content-section h2 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+        
+        .content-section p {
+            margin-bottom: 15px;
+        }
+        
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: var(--white);
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            margin-top: 20px;
+        }
+        
+        .button:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        .user-info {
+            background-color: #f0f7ff;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            border-left: 4px solid #4285f4;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+        }
+        
+        footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <span>L</span>
+            </div>
+            <h1>Protected Content</h1>
+        </header>
+
+        <div class="card">
+            <div class="success-badge">✓ Human Verification Successful</div>
+            
+            <h2>Welcome to the Exclusive Human-Only Area</h2>
+            <p>This content is only accessible to verified humans. Your credential has been successfully verified.</p>
+            
+            <div class="user-info">
+                <strong>User ID:</strong> <span id="userId">{{ session.get('user_id', 'Unknown') }}</span><br>
+                <strong>Verification Status:</strong> Verified Human<br>
+                <strong>Access Level:</strong> Full Access
+            </div>
+            
+            <div class="content-section">
+                <h2>Why Human Verification Matters</h2>
+                <p>In an age of increasing automation and AI, verifying that users are human helps maintain the integrity of online communities and services. Lemma's approach focuses on privacy and minimal data collection.</p>
+                <p>Unlike traditional verification systems that collect extensive personal information, Lemma only verifies your humanity - nothing more.</p>
+            </div>
+            
+            <div class="content-section">
+                <h2>How Lemma's Verification Works Across Sites</h2>
+                <p>Your Lemma credential is stored locally in your browser and can be presented to any site that accepts Lemma verification. This means:</p>
+                <ul style="margin-left: 20px; margin-bottom: 15px;">
+                    <li>You only need to be verified once</li>
+                    <li>No central database stores your personal information</li>
+                    <li>Each site can verify your humanity without knowing anything else about you</li>
+                    <li>The verification uses cryptographic proofs that can't be forged</li>
+                </ul>
+                <p>This demonstration shows how your credential can be used to access protected content across different pages or even different websites.</p>
+            </div>
+            
+            <a href="/" class="button">Return to Home</a>
+        </div>
+        
+        <footer>
+            <p>Lemma Human Network &copy; 2025 | <a href="/verify">Verification Page</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Check if credential exists in local storage
+        function checkCredential() {
+            const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+            if (credentials.length === 0) {
+                // No credential found, redirect to verification page
+                alert('No human verification credential found. Redirecting to verification page...');
+                window.location.href = '/verify';
+            }
+        }
+        
+        // Display user information
+        function displayUserInfo() {
+            const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+            if (credentials.length > 0) {
+                const userId = credentials[0].replace('lemma_credential_', '');
+                document.getElementById('userId').textContent = userId;
+            }
+        }
+        
+        // Run on page load
+        window.addEventListener('load', function() {
+            checkCredential();
+            displayUserInfo();
+        });
+    </script>
+</body>
+</html>
