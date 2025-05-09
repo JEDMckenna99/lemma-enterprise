@@ -120,16 +120,15 @@ def test_protected_route(client, credential_service):
 
 def test_admin_onboarding_flow(client, credential_service):
     """Test the admin onboarding flow for trusted users."""
-    # Set up a test CSRF token
-    with client.session_transaction() as session:
-        session['csrf_token'] = 'test-csrf-token'
-    
-    # Login as admin with CSRF token
+    # Login as admin (CSRF token is automatically added by our FlaskClient)
     response = client.post('/admin/login', data={
         'username': 'test_admin',
-        'password': 'test_password',
-        'csrf_token': 'test-csrf-token'
+        'password': 'test_password'
     }, follow_redirects=True)
+    
+    # Print response for debugging
+    print(f"Login response status: {response.status_code}")
+    print(f"Login response data: {response.data[:500]}")
     
     # Check login successful
     assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.data[:500]}"
@@ -138,17 +137,18 @@ def test_admin_onboarding_flow(client, credential_service):
     # Issue a credential to a trusted user
     user_id = 'trusted_human_user'
     
-    # Ensure CSRF token is in session
+    # Ensure admin is authenticated
     with client.session_transaction() as session:
-        session['csrf_token'] = 'test-csrf-token'
-        # Ensure admin is authenticated
         session['admin_authenticated'] = True
     
-    # Issue credential with CSRF token
+    # Issue credential (CSRF token is automatically added by our FlaskClient)
     response = client.post('/admin/issue', data={
-        'user_id': user_id,
-        'csrf_token': 'test-csrf-token'
+        'user_id': user_id
     }, follow_redirects=True)
+    
+    # Print response for debugging
+    print(f"Issue credential response status: {response.status_code}")
+    print(f"Issue credential response data: {response.data[:500]}")
     
     # Check credential issuance successful
     assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.data[:500]}"

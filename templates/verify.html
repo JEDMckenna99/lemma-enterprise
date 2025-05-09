@@ -243,35 +243,25 @@
         {% if user_id %}
         <div class="card">
             <div class="status valid">✓ Valid Human Credential</div>
-            
             <div class="field">
                 <div class="field-name">User ID</div>
                 <div class="field-value">{{ user_id }}</div>
             </div>
-            
             {% if credential %}
             <div class="field">
                 <div class="field-name">Credential ID</div>
                 <div class="field-value">{{ credential.id }}</div>
             </div>
-            
             <div class="field">
                 <div class="field-name">Issued Date</div>
                 <div class="field-value">{{ credential.issued_at }}</div>
             </div>
-            
             <div class="field">
                 <div class="field-name">Status</div>
                 <div class="field-value">{{ credential.status }}</div>
             </div>
             {% endif %}
-            
-            <button id="storeBtn" class="button">Store Credential</button>
-            <button id="verifyBtn" class="button secondary">Verify Credential</button>
-            <button id="accessBtn" class="button secondary">Access Protected Content</button>
-            <button id="showJsonBtn" class="button secondary">Show Raw Credential</button>
-            
-            <div id="jsonView" class="json-view"></div>
+            <p style="margin-top: 20px; color: #333;">Check your phone for a verification link sent via SMS. Only links sent by the admin are valid for onboarding.</p>
         </div>
         {% else %}
         <div class="card">

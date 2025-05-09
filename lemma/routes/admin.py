@@ -4,18 +4,19 @@ Handles admin authentication and credential management with enhanced security.
 """
 import secrets
 import time
-from flask import (
-    Blueprint, render_template, request, redirect, 
-    url_for, session, jsonify, flash, current_app
-)
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, current_app, abort, jsonify
+import json
+import logging
+from datetime import datetime
+
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, HiddenField, validators
-from lemma.auth.security import (
-    authenticate_admin, login_admin, logout_admin, 
-    admin_required, generate_csrf_token
-)
+from wtforms import StringField, PasswordField, SubmitField, validators
+from lemma.auth.security import check_password_hash, generate_password_hash, authenticate_admin, login_admin, logout_admin
+from lemma.auth.decorators import admin_required
+from lemma.auth.csrf_config import csrf_protect, generate_csrf_token
+
 from lemma.core.credential_service import get_credential_service
-from lemma.utils.qr_generator import generate_qr_code_base64
+import os
 
 # Create blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -35,6 +36,39 @@ class IssueCredentialForm(FlaskForm):
 @admin_bp.context_processor
 def inject_csrf_token():
     return {'csrf_token': generate_csrf_token()}
+
+# --- Twilio SMS Integration ---
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
+TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '+19193483060')  # Use your Twilio number
+
+def send_sms(to_number: str, message: str) -> bool:
+    try:
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        client.messages.create(
+            body=message,
+            from_=TWILIO_PHONE_NUMBER,
+            to=to_number
+        )
+        return True
+    except Exception as e:
+        print(f"Failed to send SMS: {e}")
+        return False
+
+# --- New endpoint for sending SMS ---
+@admin_bp.route('/send_sms', methods=['POST'])
+def send_sms_route():
+    data = request.get_json()
+    phone = data.get('phone')
+    link = data.get('link')
+    if not phone or not link:
+        return jsonify({'success': False, 'error': 'Missing phone or link'}), 400
+    message = f"You have been invited to join Lemma. Click to verify: {link}"
+    success = send_sms(phone, message)
+    if success:
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'error': 'Failed to send SMS'}), 500
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -115,16 +149,14 @@ def issue_credential():
             credential_service = get_credential_service()
             credential = credential_service.issue_credential(user_id)
             
-            # Generate verification URL and QR code
+            # Generate verification URL for secure link-based onboarding
             verification_url = url_for('main.verify', user_id=user_id, _external=True)
-            qr_code = generate_qr_code_base64(verification_url)
             
             flash(f"Credential issued successfully for user {user_id}", "success")
             return render_template(
                 'credential_issued.html',
                 user_id=user_id,
                 verification_url=verification_url,
-                qr_code=qr_code,
                 credential=credential
             )
         except Exception as e:

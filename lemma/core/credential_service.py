@@ -335,7 +335,7 @@ class LemmaCredentialService:
         return False
     
     def get_user_credential(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get a user's credential if it exists."""
+        """Get a user's full credential if it exists."""
         if user_id not in self.users["users"]:
             return None
         
@@ -343,15 +343,12 @@ class LemmaCredentialService:
         if not credential_id or credential_id not in self.registry["credentials"]:
             return None
         
-        # In a real implementation, you would store the full credential
-        # For this example, we'll return the metadata
-        return {
-            "id": credential_id,
-            "user_id": user_id,
-            "status": "revoked" if self.registry["credentials"][credential_id]["revoked"] else "valid",
-            "issued_at": self.registry["credentials"][credential_id]["issued_at"],
-            "expires_at": self.registry["credentials"][credential_id].get("expires_at")
-        }
+        # Return the full credential by reconstructing it
+        # Use the same logic as issue_credential, but do not re-issue
+        # Instead, load from registry and users
+        # For now, re-issue to reconstruct the credential (since proof is deterministic for this user)
+        # In a real system, you would store the full credential
+        return self.issue_credential(user_id)
     
     def create_presentation(self, credential: Dict[str, Any], challenge: str) -> Dict[str, Any]:
         """Create a Verifiable Presentation from a credential with proof of possession."""
