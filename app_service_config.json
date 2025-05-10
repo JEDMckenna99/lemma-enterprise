@@ -1,0 +1,10 @@
+{
+  "appSettings": {
+    "WEBSITE_PYTHON_VERSION": "3.9",
+    "SCM_DO_BUILD_DURING_DEPLOYMENT": "true",
+    "PYTHON_ENABLE_WORKER_EXTENSIONS": "1",
+    "WEBSITE_HTTPLOGGING_RETENTION_DAYS": "7",
+    "WEBSITE_RUN_FROM_PACKAGE": "0"
+  },
+  "linuxFxVersion": "PYTHON|3.9"
+}
