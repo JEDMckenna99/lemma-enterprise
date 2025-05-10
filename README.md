@@ -1,4 +1,4 @@
-# Lemma Enterprise: Human Verification System
+# Lemma: A Network of Verified Humans
 
 *The essential proof of humanness for digital trust*
 
