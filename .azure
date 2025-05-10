@@ -1,0 +1,3 @@
+PYTHON_VERSION=3.9
+STARTUP_FILE=app.py
+STARTUP_COMMAND=gunicorn --bind=0.0.0.0:8000 app:app --log-level debug
