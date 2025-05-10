@@ -39,10 +39,3 @@ jobs:
         app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         package: lemma-enterprise.zip
-        
-    - name: Configure Azure Web App
-      uses: azure/CLI@v1
-      with:
-        inlineScript: |
-          az webapp config set --name ${{ secrets.AZURE_WEBAPP_NAME }} --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --startup-file "gunicorn --bind=0.0.0.0:8000 app:app"
-          az webapp config appsettings set --name ${{ secrets.AZURE_WEBAPP_NAME }} --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --settings SCM_DO_BUILD_DURING_DEPLOYMENT=true PYTHON_ENABLE_WORKER_EXTENSIONS=1 WEBSITE_PYTHON_VERSION=3.9
