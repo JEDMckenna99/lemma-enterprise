@@ -216,19 +216,31 @@ def main():
             pres_verify_result = test_presentation_verification(presentation_data)
             human_verify_result = test_human_verification(presentation_data)
     
-    print_header("TEST SUMMARY")
-    print("Your verified human network API endpoints are functioning properly.")
-    print("\nTo fully test the SMS invitation functionality:")
-    print("1. Configure your Twilio credentials in the .env file")
-    print("2. Use the admin interface to issue credentials and send SMS invitations")
-    print("3. Deploy your system using the deployment script: python deploy_to_azure.py")
+    # Print summary and suggestions
+    print("\n=== TEST SUMMARY ===")
     
-    print("\nVerification URL for testing:")
-    if isinstance(credential, dict) and 'subject' in credential:
-        user_id = credential['subject'].split(':')[-1]
-        print(f"{BASE_URL}/verify?user={user_id}")
+    results = {
+        "Home Page": home_result,
+        "Admin Login Page": admin_result,
+        "Verification Page": verify_result,
+        "Credential Issuance": credential is not None,
+        "Credential Verification": verify_result,
+        "Presentation Creation": presentation_data is not None,
+        "Presentation Verification": pres_verify_result,
+        "Human Verification": human_verify_result
+    }
     
-    return True
+    for endpoint, result in results.items():
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"{endpoint}: {status}")
+    
+    print("\n=== NEXT STEPS ===")
+    print("1. If all tests passed, you can deploy with confidence")
+    print("2. For any failures, review the error messages and fix the issues")
+    print("3. After fixes, run the tests again with:")
+    print("   python test_api_endpoints.py")
+    
+    return all(results.values())
 
 if __name__ == "__main__":
     main()

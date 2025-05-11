@@ -145,50 +145,47 @@ python deploy_to_azure.py
    - Admin credentials
    - Twilio credentials (if using SMS)
 
-## Post-Deployment Verification
+## Post-Deployment
 
-After deploying to Azure, verify that:
+### Verification
 
-1. The admin interface is accessible at `https://your-app-name.azurewebsites.net/admin`
-2. You can log in with your admin credentials
-3. You can issue credentials to users
-4. Users can verify their credentials
-5. Users can access protected resources
+After deployment, verify the system works:
 
-## Security Considerations for Production
+1. Navigate to the application URL
+2. Log in to the admin area with your configured credentials
+3. Issue a test credential 
+4. Verify that the credential works by accessing protected content
 
-Before using in production, ensure:
+### Monitoring & Logs
 
-1. **Strong Admin Credentials**: Set strong admin credentials via environment variables
-2. **Secure Secret Key**: Use a strong random value for `LEMMA_SECRET_KEY`
-3. **HTTPS Enforcement**: Ensure all traffic uses HTTPS
-4. **Rate Limiting**: Consider implementing rate limiting for API endpoints
-5. **Logging**: Enable comprehensive logging for security events
-6. **Backup**: Regularly backup the credential registry
+Azure provides several tools for monitoring:
 
-## Stripe Identity Integration
+1. **Application Insights**: Set up Application Insights for detailed monitoring
+2. **Logs**: View logs in the Azure portal under the "Logs" section
+3. **Metrics**: Monitor CPU, memory, and network usage
 
-To integrate Stripe Identity for proof of humanness in the future:
+### Maintenance
 
-1. Sign up for a Stripe account and enable Stripe Identity
-2. Add the Stripe Identity SDK to your application
-3. Create a verification session when a user needs to be verified
-4. Redirect the user to the Stripe Identity verification flow
-5. Handle the verification webhook to issue a credential when verification is successful
+For ongoing maintenance:
 
-## SMS Onboarding
-
-The system is already configured to send SMS invitations using Twilio. Ensure:
-
-1. **Twilio Credentials**: Set the `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER` environment variables
-2. **SMS Template**: Customize the SMS message template in `lemma/routes/admin.py` if needed
-3. **Phone Number Format**: Ensure phone numbers are in E.164 format (e.g., +1234567890)
+1. **Updates**: Update dependencies periodically with security patches
+2. **Backups**: Enable automatic backups of your Web App
+3. **Scaling**: If usage increases, scale up/out your App Service Plan
 
 ## Troubleshooting
 
-If you encounter issues during deployment:
+Common deployment issues and solutions:
 
-1. **Check Logs**: Use `az webapp log tail` to view real-time logs
-2. **Environment Variables**: Verify all required environment variables are set
+1. **500 Internal Server Error**: Check the logs for Python exceptions
+2. **Missing Modules**: Verify requirements.txt is correctly formatted
 3. **CSRF Issues**: For testing, temporarily disable CSRF protection
 4. **Restart App**: Sometimes a simple restart resolves issues: `az webapp restart`
+
+### Required Environment Variables
+
+For any deployment, set these environment variables:
+
+- `LEMMA_ADMIN_USER`: Username for admin access
+- `LEMMA_ADMIN_PASS`: Password for admin access
+- `LEMMA_SECRET_KEY`: Secret key for session management
+- `LEMMA_API_KEY`: API key for external integrations

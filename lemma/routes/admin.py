@@ -18,9 +18,6 @@ from lemma.auth.csrf_config import csrf_protect, generate_csrf_token
 from lemma.core.credential_service import get_credential_service
 import os
 
-# Twilio SMS integration enabled
-from twilio.rest import Client
-
 # Create blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -39,46 +36,6 @@ class IssueCredentialForm(FlaskForm):
 @admin_bp.context_processor
 def inject_csrf_token():
     return {'csrf_token': generate_csrf_token()}
-
-# --- Twilio SMS Integration ---
-TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
-TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
-TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '+19193483060')  # Use your Twilio number
-
-def send_sms(to_number: str, message: str) -> bool:
-    """Send SMS using Twilio API."""
-    if not TWILIO_ACCOUNT_SID or not TWILIO_AUTH_TOKEN:
-        # Fallback to simulation if credentials not set
-        print(f"Would send SMS to {to_number}: {message}")
-        return True  # Simulate success for testing
-    
-    try:
-        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        client.messages.create(
-            body=message,
-            from_=TWILIO_PHONE_NUMBER,
-            to=to_number
-        )
-        print(f"SMS sent successfully to {to_number}")
-        return True
-    except Exception as e:
-        print(f"Failed to send SMS: {e}")
-        return False
-
-# --- New endpoint for sending SMS ---
-@admin_bp.route('/send_sms', methods=['POST'])
-def send_sms_route():
-    data = request.get_json()
-    phone = data.get('phone')
-    link = data.get('link')
-    if not phone or not link:
-        return jsonify({'success': False, 'error': 'Missing phone or link'}), 400
-    message = f"You have been invited to join Lemma. Click to verify: {link}"
-    success = send_sms(phone, message)
-    if success:
-        return jsonify({'success': True})
-    else:
-        return jsonify({'success': False, 'error': 'Failed to send SMS'}), 500
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():

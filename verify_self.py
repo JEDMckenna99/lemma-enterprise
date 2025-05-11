@@ -2,8 +2,7 @@
 """
 Self-Verification Script for Lemma Enterprise
 
-This script allows you to verify yourself as a human in the Lemma system
-without requiring SMS verification.
+This script allows you to verify yourself as a human in the Lemma system.
 """
 import os
 import sys
@@ -150,7 +149,7 @@ def main():
     
     print("\n🎉 Self-verification process completed!")
     print("You can now use this credential to access the protected areas of your Lemma system.")
-    print("To onboard others, you can use the SMS invitation functionality.")
+    print("To onboard others, you can use the invitation functionality.")
     
     return True
 

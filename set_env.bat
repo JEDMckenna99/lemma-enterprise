@@ -1,21 +1,18 @@
 @echo off
-REM Set environment variables for Lemma Enterprise testing
+REM Set environment variables for local development
 
-REM Admin credentials
+echo Setting up environment for Lemma Enterprise...
+
+REM Core settings
 set LEMMA_ADMIN_USER=admin
 set LEMMA_ADMIN_PASS=password
-set LEMMA_SECRET_KEY=test-secret-key-for-development-only
+set LEMMA_SECRET_KEY=dev_secret_key_change_in_production
+set LEMMA_API_KEY=dev_api_key_change_in_production
 
 REM Flask settings
-set FLASK_DEBUG=True
 set FLASK_APP=app.py
+set FLASK_ENV=development
 
-REM Uncomment and set these with your Twilio credentials to enable SMS
-REM set TWILIO_ACCOUNT_SID=your_account_sid
-REM set TWILIO_AUTH_TOKEN=your_auth_token
-REM set TWILIO_PHONE_NUMBER=your_twilio_phone_number
-
-echo Environment variables set for Lemma Enterprise testing
-echo.
-echo To enable SMS functionality, edit this file and add your Twilio credentials.
-echo.
+echo Environment variables set up successfully!
+echo .
+echo You can now run the application with 'python app.py'

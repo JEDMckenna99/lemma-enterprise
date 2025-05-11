@@ -2,165 +2,219 @@
 """
 Deployment Preparation Script for Lemma Enterprise
 
-This script prepares the Lemma Human Verification System for deployment
-by creating a deployment package and setting up the necessary configuration.
+This script prepares the application for deployment by checking
+dependencies, environment variables, and other configuration settings.
 """
 import os
 import sys
 import json
 import shutil
-import tempfile
-from dotenv import load_dotenv
+from pathlib import Path
+import secrets
+import string
 
-# Load environment variables
-load_dotenv()
+# Required environment variables
+REQUIRED_ENV_VARS = {
+    "LEMMA_ADMIN_USER": os.environ.get("LEMMA_ADMIN_USER", "admin"),
+    "LEMMA_ADMIN_PASS": os.environ.get("LEMMA_ADMIN_PASS", ""),
+    "LEMMA_SECRET_KEY": os.environ.get("LEMMA_SECRET_KEY", ""),
+    "LEMMA_API_KEY": os.environ.get("LEMMA_API_KEY", "")
+}
 
-def print_header(title):
-    """Print a formatted header."""
-    print("\n" + "=" * 60)
-    print(f" {title}")
-    print("=" * 60)
+# Optional environment variables with defaults
+OPTIONAL_ENV_VARS = {
+    "LEMMA_SESSION_TIMEOUT": os.environ.get("LEMMA_SESSION_TIMEOUT", "3600"),
+    "LEMMA_RATE_LIMIT": os.environ.get("LEMMA_RATE_LIMIT", "100/hour")
+}
 
 def check_environment_variables():
-    """Check if all required environment variables are set."""
-    print_header("Checking Environment Variables")
+    """Check if required environment variables are set."""
+    print("Checking environment variables...")
     
-    required_vars = {
-        "LEMMA_ADMIN_USER": os.environ.get("LEMMA_ADMIN_USER", "admin"),
-        "LEMMA_ADMIN_PASS": os.environ.get("LEMMA_ADMIN_PASS", "password"),
-        "LEMMA_SECRET_KEY": os.environ.get("LEMMA_SECRET_KEY", "default-secret-key-for-development")
-    }
+    missing_vars = []
+    for var_name, var_value in REQUIRED_ENV_VARS.items():
+        if not var_value:
+            missing_vars.append(var_name)
     
-    optional_vars = {
-        "TWILIO_ACCOUNT_SID": os.environ.get("TWILIO_ACCOUNT_SID", ""),
-        "TWILIO_AUTH_TOKEN": os.environ.get("TWILIO_AUTH_TOKEN", ""),
-        "TWILIO_PHONE_NUMBER": os.environ.get("TWILIO_PHONE_NUMBER", "")
-    }
-    
-    # Check required variables
-    all_required_set = True
-    for var_name, var_value in required_vars.items():
-        if var_value:
-            print(f"✅ {var_name} is set")
-        else:
-            print(f"❌ {var_name} is not set")
-            all_required_set = False
-    
-    # Check optional variables
-    sms_enabled = all([optional_vars["TWILIO_ACCOUNT_SID"], 
-                      optional_vars["TWILIO_AUTH_TOKEN"], 
-                      optional_vars["TWILIO_PHONE_NUMBER"]])
-    
-    if sms_enabled:
-        print("\n✅ SMS functionality is enabled with Twilio credentials")
-    else:
-        print("\n⚠️ SMS functionality will be disabled in deployment")
-        print("To enable SMS, set the following environment variables:")
-        for var_name in optional_vars:
-            if not optional_vars[var_name]:
-                print(f"  - {var_name}")
-    
-    return all_required_set, required_vars, optional_vars
-
-def create_deployment_config(required_vars, optional_vars):
-    """Create a deployment configuration file."""
-    print_header("Creating Deployment Configuration")
-    
-    config = {
-        "app_name": "LemmaHumanVerification",
-        "environment_variables": {
-            **required_vars,
-            **{k: v for k, v in optional_vars.items() if v}  # Only include set optional vars
-        },
-        "sms_enabled": all([optional_vars["TWILIO_ACCOUNT_SID"], 
-                           optional_vars["TWILIO_AUTH_TOKEN"], 
-                           optional_vars["TWILIO_PHONE_NUMBER"]])
-    }
-    
-    config_file = "deployment_config.json"
-    with open(config_file, "w") as f:
-        json.dump(config, f, indent=2)
-    
-    print(f"✅ Deployment configuration saved to: {config_file}")
-    return config_file
-
-def create_deployment_package():
-    """Create a deployment package (zip file) from the source directory."""
-    print_header("Creating Deployment Package")
-    
-    source_dir = os.getcwd()
-    print(f"Source directory: {source_dir}")
-    
-    # Create a temporary directory for the package
-    temp_dir = tempfile.mkdtemp()
-    package_dir = os.path.join(temp_dir, "lemma-enterprise-package")
-    os.makedirs(package_dir)
-    
-    # Copy all files except .git, __pycache__, etc.
-    ignore_patterns = ['.git', '__pycache__', '.pytest_cache', '.vscode', 'venv', 'env', '.env', 
-                      '*.zip', '*.pyc', 'deployment_config.json', 'lemma_test_credential_*.json']
-    
-    for item in os.listdir(source_dir):
-        skip = False
-        for pattern in ignore_patterns:
-            if pattern.startswith('*'):
-                if item.endswith(pattern[1:]):
-                    skip = True
-                    break
-            elif item == pattern or (pattern.startswith('.') and item.startswith(pattern)):
-                skip = True
-                break
+    if missing_vars:
+        print("\n❌ Missing required environment variables:")
+        for var_name in missing_vars:
+            print(f"  - {var_name}")
         
-        if skip:
-            continue
+        # Generate secure defaults
+        secure_defaults = {}
+        if "LEMMA_SECRET_KEY" in missing_vars:
+            secure_defaults["LEMMA_SECRET_KEY"] = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
         
-        source_item = os.path.join(source_dir, item)
-        dest_item = os.path.join(package_dir, item)
+        if "LEMMA_API_KEY" in missing_vars:
+            secure_defaults["LEMMA_API_KEY"] = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
         
-        if os.path.isdir(source_item):
-            shutil.copytree(source_item, dest_item, ignore=shutil.ignore_patterns(*ignore_patterns))
-        else:
-            shutil.copy2(source_item, dest_item)
-    
-    # Create a zip file
-    zip_file = os.path.join(os.getcwd(), "lemma-enterprise.zip")
-    shutil.make_archive(os.path.splitext(zip_file)[0], 'zip', package_dir)
-    
-    # Clean up temporary directory
-    shutil.rmtree(temp_dir)
-    
-    print(f"✅ Deployment package created: {zip_file}")
-    print(f"   Package size: {os.path.getsize(zip_file) / (1024*1024):.2f} MB")
-    return zip_file
-
-def main():
-    """Main function to prepare for deployment."""
-    print_header("LEMMA ENTERPRISE DEPLOYMENT PREPARATION")
-    
-    # Check environment variables
-    all_required_set, required_vars, optional_vars = check_environment_variables()
-    
-    if not all_required_set:
-        print("\n❌ Some required environment variables are not set.")
-        print("Please set them before proceeding with deployment.")
+        # Write to .env.production.template
+        with open(".env.production.template", "w") as f:
+            for var_name, var_value in REQUIRED_ENV_VARS.items():
+                if var_name in secure_defaults:
+                    f.write(f"{var_name}={secure_defaults[var_name]}\n")
+                elif var_value:
+                    f.write(f"{var_name}={var_value}\n")
+                else:
+                    f.write(f"{var_name}=CHANGE_ME\n")
+            
+            for var_name, var_value in OPTIONAL_ENV_VARS.items():
+                f.write(f"{var_name}={var_value}\n")
+        
+        print("\n⚠️ Created .env.production.template with secure defaults.")
+        print("Please update this file with your values before deployment.")
         return False
     
-    # Create deployment configuration
-    config_file = create_deployment_config(required_vars, optional_vars)
+    print("✅ All required environment variables are set.")
     
-    # Create deployment package
-    zip_file = create_deployment_package()
+    # Write deployment config
+    deployment_config = {
+        "required_vars": REQUIRED_ENV_VARS,
+        "optional_vars": OPTIONAL_ENV_VARS
+    }
     
-    print_header("DEPLOYMENT PREPARATION COMPLETE")
-    print("Your Lemma Human Verification System is ready for deployment!")
-    print("\nTo deploy to Azure, run:")
-    print("  python deploy_to_azure.py")
-    print("\nThe deployment script will use the configuration in:")
-    print(f"  {config_file}")
-    print("\nThe deployment package is:")
-    print(f"  {zip_file}")
+    with open("deployment_config.json", "w") as f:
+        json.dump(deployment_config, f, indent=2)
+    
+    print("✅ Deployment configuration written to deployment_config.json")
+    return True
+
+def check_dependencies():
+    """Check if required dependencies are installed."""
+    print("\nChecking dependencies...")
+    
+    try:
+        with open("requirements.txt", "r") as f:
+            requirements = f.read().splitlines()
+        
+        import pkg_resources
+        
+        missing_deps = []
+        for req in requirements:
+            if req and not req.startswith('#'):
+                try:
+                    pkg_resources.require(req)
+                except (pkg_resources.DistributionNotFound, pkg_resources.VersionConflict):
+                    missing_deps.append(req)
+        
+        if missing_deps:
+            print(f"❌ Missing {len(missing_deps)} dependencies:")
+            for dep in missing_deps[:5]:
+                print(f"  - {dep}")
+            
+            if len(missing_deps) > 5:
+                print(f"  - and {len(missing_deps) - 5} more...")
+            
+            print("\nRun: pip install -r requirements.txt")
+            return False
+        
+        print("✅ All dependencies are installed.")
+        return True
+    except Exception as e:
+        print(f"❌ Error checking dependencies: {e}")
+        return False
+
+def prepare_deployment_package():
+    """Prepare the deployment package."""
+    print("\nPreparing deployment package...")
+    
+    # List of files to exclude
+    exclude_patterns = [
+        "__pycache__",
+        "*.pyc",
+        ".git",
+        ".env",
+        ".vscode",
+        ".DS_Store",
+        "*.zip",
+        "venv",
+        "env",
+        ".pytest_cache",
+        "*.sqlite",
+        "*.db",
+        ".coverage",
+        "htmlcov",
+        "temp",
+        "tmp"
+    ]
+    
+    # List of test files to exclude
+    test_files = [
+        "test_*.py",
+        "*_test.py"
+    ]
+    
+    try:
+        # Create output directory
+        os.makedirs("deployment", exist_ok=True)
+        
+        # Create a list of all files
+        all_files = []
+        for root, dirs, files in os.walk("."):
+            # Check if directory should be excluded
+            if any(exclude in root for exclude in exclude_patterns):
+                continue
+            
+            # Add non-excluded files
+            for file in files:
+                # Skip excluded patterns
+                if any(file.endswith(exc.replace("*", "")) for exc in exclude_patterns if "*" in exc):
+                    continue
+                
+                # Skip test files
+                if any(file.startswith(test.replace("*", "")) or file.endswith(test.replace("*", "")) for test in test_files if "*" in test):
+                    continue
+                
+                file_path = os.path.join(root, file)
+                if file_path.startswith("./") or file_path.startswith(".\\"):
+                    file_path = file_path[2:]
+                
+                all_files.append(file_path)
+        
+        print(f"✅ Found {len(all_files)} files to include in the package.")
+        
+        # Copy files to deployment directory
+        for file_path in all_files:
+            dest_path = os.path.join("deployment", file_path)
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+            shutil.copy2(file_path, dest_path)
+        
+        print("✅ Files copied to deployment directory.")
+        
+        # Create deployment zip
+        shutil.make_archive("lemma-enterprise", "zip", "deployment")
+        
+        print("✅ Deployment package created: lemma-enterprise.zip")
+        return True
+    except Exception as e:
+        print(f"❌ Error preparing deployment package: {e}")
+        return False
+
+def main():
+    """Main function to prepare deployment."""
+    print("=== LEMMA ENTERPRISE DEPLOYMENT PREPARATION ===\n")
+    
+    env_check = check_environment_variables()
+    dep_check = check_dependencies()
+    
+    if not env_check or not dep_check:
+        print("\n⚠️ Please fix the issues above before proceeding with deployment.")
+        return False
+    
+    package_result = prepare_deployment_package()
+    
+    if not package_result:
+        print("\n⚠️ Failed to create deployment package.")
+        return False
+    
+    print("\n🎉 Deployment preparation complete!")
+    print("\nNext steps:")
+    print("1. Deploy the application using the generated lemma-enterprise.zip package")
+    print("2. Set the environment variables on your hosting platform")
+    print("3. Verify that the application is running correctly")
     
     return True
 
 if __name__ == "__main__":
-    main()
+    sys.exit(0 if main() else 1)

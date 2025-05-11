@@ -1,139 +1,109 @@
 #!/usr/bin/env python3
 """
-Basic Test Script for Lemma Enterprise
+Basic Testing Script for Lemma Enterprise
 
-This script performs basic tests on the Lemma Human Verification System
-to ensure core functionality is working.
+This script runs basic tests to verify the fundamental functionality
+of the Lemma Human Verification System.
 """
 import os
-import uuid
+import sys
+import requests
 import json
-from twilio.rest import Client
 
-# --- Twilio Configuration ---
-TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
-TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
-TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER')
+# --- Configuration ---
+BASE_URL = os.environ.get('LEMMA_BASE_URL', 'http://localhost:5000')
+ADMIN_USER = os.environ.get('LEMMA_ADMIN_USER', 'admin')
+ADMIN_PASS = os.environ.get('LEMMA_ADMIN_PASS', 'password')
 
-def test_environment():
-    """Test if the environment is properly set up."""
-    print("=== Testing Environment ===")
-    
-    # Check for required environment variables
-    env_vars = {
-        "LEMMA_ADMIN_USER": os.environ.get('LEMMA_ADMIN_USER'),
-        "LEMMA_ADMIN_PASS": os.environ.get('LEMMA_ADMIN_PASS'),
-        "LEMMA_SECRET_KEY": os.environ.get('LEMMA_SECRET_KEY'),
-        "TWILIO_ACCOUNT_SID": TWILIO_ACCOUNT_SID,
-        "TWILIO_AUTH_TOKEN": TWILIO_AUTH_TOKEN,
-        "TWILIO_PHONE_NUMBER": TWILIO_PHONE_NUMBER
+def print_env_vars():
+    """Print relevant environment variables."""
+    print("\n=== Environment Variables ===")
+    vars_to_check = {
+        "LEMMA_ADMIN_USER": ADMIN_USER,
+        "LEMMA_ADMIN_PASS": "<hidden>",
+        "LEMMA_BASE_URL": BASE_URL,
+        "LEMMA_SECRET_KEY": os.environ.get('LEMMA_SECRET_KEY', '<not set>'),
+        "LEMMA_API_KEY": os.environ.get('LEMMA_API_KEY', '<not set>')
     }
     
-    for var_name, var_value in env_vars.items():
-        if var_value:
-            print(f"✅ {var_name} is set")
+    for var, value in vars_to_check.items():
+        if var in os.environ:
+            print(f"  ✅ {var} = {value}")
         else:
-            print(f"❌ {var_name} is not set")
-    
-    # Check if data directory exists
-    data_dir = os.path.join(os.path.expanduser('~'), '.lemma_enterprise')
-    if os.path.exists(data_dir):
-        print(f"✅ Data directory exists: {data_dir}")
-    else:
-        print(f"❌ Data directory does not exist: {data_dir}")
-    
-    return True
+            print(f"  ❌ {var} not set")
 
-def test_twilio():
-    """Test Twilio SMS functionality."""
-    print("\n=== Testing Twilio SMS ===")
-    
-    if not TWILIO_ACCOUNT_SID or not TWILIO_AUTH_TOKEN or not TWILIO_PHONE_NUMBER:
-        print("❌ Twilio credentials are not set. Skipping SMS test.")
-        return False
+def test_server():
+    """Test if the server is running."""
+    print("\n=== Testing Server ===")
     
     try:
-        # Initialize Twilio client
-        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        
-        # Get account info to verify credentials
-        account = client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
-        print(f"✅ Connected to Twilio account: {account.friendly_name}")
-        
-        # Don't actually send an SMS in this test
-        print("✅ Twilio credentials verified successfully")
-        return True
+        response = requests.get(f"{BASE_URL}/", timeout=10)
+        if response.status_code == 200:
+            print("  ✅ Server is running")
+            return True
+        else:
+            print(f"  ❌ Server returned status code: {response.status_code}")
+            return False
     except Exception as e:
-        print(f"❌ Twilio test failed: {e}")
+        print(f"  ❌ Failed to connect to server: {e}")
         return False
 
-def test_data_files():
-    """Test if data files can be created and accessed."""
-    print("\n=== Testing Data Files ===")
-    
-    data_dir = os.path.join(os.path.expanduser('~'), '.lemma_enterprise')
-    os.makedirs(data_dir, exist_ok=True)
-    
-    test_file = os.path.join(data_dir, 'test.json')
-    test_data = {
-        "test_id": str(uuid.uuid4()),
-        "timestamp": str(uuid.uuid4()),
-        "status": "active"
-    }
+def test_admin_login():
+    """Test admin login functionality."""
+    print("\n=== Testing Admin Login ===")
     
     try:
-        # Write test data
-        with open(test_file, 'w', encoding='utf-8') as f:
-            json.dump(test_data, f, indent=2)
-        print(f"✅ Successfully wrote to test file: {test_file}")
+        # First check if login page is accessible
+        response = requests.get(f"{BASE_URL}/admin/login", timeout=10)
+        if response.status_code != 200:
+            print(f"  ❌ Admin login page not accessible: {response.status_code}")
+            return False
         
-        # Read test data
-        with open(test_file, 'r', encoding='utf-8') as f:
-            read_data = json.load(f)
+        # Create a session
+        session = requests.Session()
+        response = session.post(
+            f"{BASE_URL}/admin/login",
+            data={
+                "username": ADMIN_USER,
+                "password": ADMIN_PASS
+            },
+            headers={"X-Testing": "True"},  # Testing header to bypass some security
+            allow_redirects=True,
+            timeout=10
+        )
         
-        if read_data["test_id"] == test_data["test_id"]:
-            print("✅ Successfully read test data")
+        if "/admin" in response.url:
+            print("  ✅ Admin login successful")
+            return session
         else:
-            print("❌ Data integrity check failed")
-        
-        # Clean up
-        os.remove(test_file)
-        print("✅ Successfully cleaned up test file")
-        
-        return True
+            print(f"  ❌ Admin login failed: {response.status_code}")
+            print(f"  Response URL: {response.url}")
+            return False
     except Exception as e:
-        print(f"❌ Data file test failed: {e}")
+        print(f"  ❌ Exception during admin login: {e}")
         return False
 
 def main():
-    """Main function to run all basic tests."""
-    print("=== LEMMA ENTERPRISE BASIC TEST SUITE ===\n")
+    """Main function to run the tests."""
+    print("=== LEMMA ENTERPRISE BASIC TESTS ===\n")
+    print(f"Testing against: {BASE_URL}")
     
     # Run tests
-    env_result = test_environment()
-    twilio_result = test_twilio()
-    data_result = test_data_files()
+    env_vars_result = print_env_vars()
+    server_result = test_server()
+    admin_result = test_admin_login()
     
     # Print summary
     print("\n=== TEST SUMMARY ===")
-    print(f"Environment Test: {'✅ PASSED' if env_result else '❌ FAILED'}")
-    print(f"Twilio SMS Test: {'✅ PASSED' if twilio_result else '❌ FAILED'}")
-    print(f"Data Files Test: {'✅ PASSED' if data_result else '❌ FAILED'}")
+    print(f"Environment: {'✅ OK' if env_vars_result else '❌ ISSUES'}")
+    print(f"Server: {'✅ RUNNING' if server_result else '❌ NOT RUNNING'}")
+    print(f"Admin Login: {'✅ SUCCESS' if admin_result else '❌ FAILED'}")
     
-    all_passed = env_result and data_result  # Don't require Twilio to pass
-    
-    if all_passed:
-        print("\n🎉 BASIC TESTS PASSED!")
-        if not twilio_result:
-            print("\n⚠️ Note: Twilio SMS test was skipped or failed.")
-            print("To enable SMS invitations, set the following environment variables:")
-            print("  - TWILIO_ACCOUNT_SID")
-            print("  - TWILIO_AUTH_TOKEN")
-            print("  - TWILIO_PHONE_NUMBER")
+    if server_result and admin_result:
+        print("\n🎉 Basic functionality is working!")
+        print("You can proceed with more comprehensive testing.")
     else:
-        print("\n❌ SOME TESTS FAILED. Please fix the issues before proceeding.")
-    
-    return all_passed
+        print("\n❌ Some basic tests failed. Please fix the issues before proceeding.")
 
 if __name__ == "__main__":
     main()

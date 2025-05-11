@@ -1,63 +1,70 @@
 #!/usr/bin/env python3
 """
-Environment Setup for Lemma Enterprise Testing
+Environment Setup for Lemma Enterprise Tests
 
-This script sets up the necessary environment variables for testing the Lemma system.
+This script creates a suitable test environment by setting up necessary
+environment variables for testing the Lemma Human Verification System.
 """
 import os
 import sys
-import subprocess
+import json
+from uuid import uuid4
 
-def setup_test_environment():
+# Default environment variables for testing
+DEFAULT_ENV_VARS = {
+    # Core settings
+    "LEMMA_ADMIN_USER": "admin",
+    "LEMMA_ADMIN_PASS": "password",
+    "LEMMA_SECRET_KEY": "test_secret_key",
+    "LEMMA_BASE_URL": "http://localhost:5000",
+    "LEMMA_API_KEY": str(uuid4()),
+    
+    # Storage settings
+    "LEMMA_STORAGE_DIR": "./.lemma_enterprise",
+    
+    # Security settings
+    "LEMMA_SESSION_TIMEOUT": "3600",
+    "LEMMA_RATE_LIMIT": "100/hour",
+    
+    # Testing flags
+    "TESTING": "True",
+    "VERIFY_TLS": "False"
+}
+
+def setup_test_env():
     """Set up environment variables for testing."""
-    env_vars = {
-        # Admin credentials
-        "LEMMA_ADMIN_USER": "admin",
-        "LEMMA_ADMIN_PASS": "password",
-        "LEMMA_SECRET_KEY": "test-secret-key-for-development-only",
-        
-        # Flask settings
-        "FLASK_DEBUG": "True",
-        "FLASK_APP": "app.py",
-        
-        # Twilio settings (these will be empty by default)
-        "TWILIO_ACCOUNT_SID": "",
-        "TWILIO_AUTH_TOKEN": "",
-        "TWILIO_PHONE_NUMBER": "",
-    }
+    print("Setting up test environment...")
+    
+    # Start with defaults
+    env_vars = DEFAULT_ENV_VARS.copy()
+    
+    # Load any existing .env file
+    if os.path.exists(".env"):
+        with open(".env", "r") as f:
+            for line in f.readlines():
+                if "=" in line and not line.startswith("#"):
+                    key, value = line.strip().split("=", 1)
+                    env_vars[key] = value
     
     # Set environment variables
     for key, value in env_vars.items():
         os.environ[key] = value
-        print(f"Set {key}={value}")
+        print(f"✅ Set {key}")
+    
+    print("\n✅ Test environment set up successfully!")
+    print(f"Admin User: {env_vars['LEMMA_ADMIN_USER']}")
+    print(f"Admin Password: {env_vars['LEMMA_ADMIN_PASS']}")
+    print(f"Base URL: {env_vars['LEMMA_BASE_URL']}")
+    
+    # Create .env file if it doesn't exist
+    if not os.path.exists(".env"):
+        with open(".env", "w") as f:
+            for key, value in env_vars.items():
+                f.write(f"{key}={value}\n")
+        print("\n✅ Created .env file with test settings")
     
     return env_vars
 
-def main():
-    """Main function to set up the test environment."""
-    print("=== Setting Up Test Environment ===")
-    
-    # Set up environment variables
-    env_vars = setup_test_environment()
-    
-    # Ask for Twilio credentials if needed
-    if not env_vars["TWILIO_ACCOUNT_SID"] or not env_vars["TWILIO_AUTH_TOKEN"]:
-        print("\n📱 Would you like to set up Twilio for SMS testing?")
-        setup_twilio = input("Enter 'y' to set up Twilio, any other key to skip: ").strip().lower() == 'y'
-        
-        if setup_twilio:
-            account_sid = input("Twilio Account SID: ").strip()
-            auth_token = input("Twilio Auth Token: ").strip()
-            phone_number = input("Twilio Phone Number: ").strip()
-            
-            os.environ["TWILIO_ACCOUNT_SID"] = account_sid
-            os.environ["TWILIO_AUTH_TOKEN"] = auth_token
-            os.environ["TWILIO_PHONE_NUMBER"] = phone_number
-            
-            print("Twilio credentials set up successfully!")
-    
-    print("\n✅ Test environment set up successfully!")
-    print("You can now run the tests with the configured environment.")
-
 if __name__ == "__main__":
-    main()
+    setup_test_env()
+    print("\n🚀 You can now run tests with the configured environment.")

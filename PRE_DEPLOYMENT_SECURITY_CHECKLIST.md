@@ -10,9 +10,9 @@ Before deploying the Lemma Enterprise system to a live environment, ensure the f
 - `LEMMA_ADMIN_USER`
 - `LEMMA_ADMIN_PASS`
 - `LEMMA_SECRET_KEY`
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_PHONE_NUMBER`
+- `LEMMA_API_KEY`
+- `LEMMA_SESSION_TIMEOUT`
+- `LEMMA_RATE_LIMIT`
 
 ### 2. Git Repository Cleanup
 
@@ -72,12 +72,12 @@ grep -r "password\|secret\|key\|token\|sid\|auth" --include="*.py" --include="*.
 
 2. Create a fresh `.env` file for production with strong credentials:
 ```
-LEMMA_ADMIN_USER=admin
-LEMMA_ADMIN_PASS=[strong-password]
-LEMMA_SECRET_KEY=[random-32-character-string]
-TWILIO_ACCOUNT_SID=[your-twilio-sid]
-TWILIO_AUTH_TOKEN=[your-twilio-token]
-TWILIO_PHONE_NUMBER=[your-twilio-number]
+LEMMA_ADMIN_USER=[your-admin-username]
+LEMMA_ADMIN_PASS=[your-admin-password]
+LEMMA_SECRET_KEY=[your-secure-secret-key]
+LEMMA_API_KEY=[your-api-key]
+LEMMA_SESSION_TIMEOUT=3600
+LEMMA_RATE_LIMIT=100/hour
 ```
 
 3. Test the application with the production environment variables:
@@ -102,3 +102,27 @@ After deployment, verify:
 2. SMS invitations can be sent successfully
 3. Users can verify their credentials
 4. Protected resources are accessible only to verified humans
+
+## Environment Variables
+
+Ensure all of these environment variables are set with proper values:
+
+- `LEMMA_ADMIN_USER` - Username for admin access (not "admin" in production)
+- `LEMMA_ADMIN_PASS` - Strong password for admin (rotate periodically)
+- `LEMMA_SECRET_KEY` - Strong random value (16+ bytes of entropy)
+- `LEMMA_API_KEY` - Strong API key for external integrations
+- `LEMMA_SESSION_TIMEOUT` - Session timeout in seconds (3600 or less)
+- `LEMMA_RATE_LIMIT` - Rate limit for API endpoints (100/hour recommended)
+
+## Production Configuration
+
+Verify the deployment configurations in `.env.production`:
+
+```
+LEMMA_ADMIN_USER=[your-admin-username]
+LEMMA_ADMIN_PASS=[your-admin-password]
+LEMMA_SECRET_KEY=[your-secure-secret-key]
+LEMMA_API_KEY=[your-api-key]
+LEMMA_SESSION_TIMEOUT=3600
+LEMMA_RATE_LIMIT=100/hour
+```

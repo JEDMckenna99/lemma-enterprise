@@ -3,7 +3,7 @@
 Invitation Workflow Testing Script for Lemma Enterprise
 
 This script tests the complete invitation workflow for the Lemma Human Verification System,
-including credential issuance, SMS invitation, and verification.
+including credential issuance and verification.
 """
 import os
 import sys
@@ -55,34 +55,14 @@ def issue_credential(session, user_id):
         print(f"❌ Failed to issue credential: {response.status_code}")
         return False
 
-def send_invitation(session, phone, user_id):
-    """Send SMS invitation to a user."""
-    print(f"📱 Sending SMS invitation to: {phone}")
+def get_verification_link(user_id):
+    """Get verification link for a user."""
+    print(f"🔗 Creating verification link for user: {user_id}")
     
     # Create verification link
     verification_link = urljoin(BASE_URL, f'/verify?user={user_id}')
-    
-    # Send SMS via the admin API
-    sms_url = urljoin(BASE_URL, '/admin/send_sms')
-    sms_data = {
-        'phone': phone,
-        'link': verification_link
-    }
-    
-    response = session.post(sms_url, json=sms_data)
-    
-    try:
-        result = response.json()
-        if result.get('success'):
-            print("✅ SMS invitation sent successfully")
-            print(f"🔗 Verification link: {verification_link}")
-            return True
-        else:
-            print(f"❌ Failed to send SMS: {result.get('error')}")
-            return False
-    except Exception as e:
-        print(f"❌ Error processing SMS response: {e}")
-        return False
+    print(f"✅ Verification link created: {verification_link}")
+    return verification_link
 
 def verify_credential(user_id):
     """Verify a user's credential."""
@@ -122,19 +102,11 @@ def main():
     """Main function to test the invitation workflow."""
     print("=== Lemma Enterprise Invitation Workflow Testing ===")
     
-    if len(sys.argv) < 2:
-        print("Usage: python test_invite_workflow.py <phone_number>")
-        print("Example: python test_invite_workflow.py +12345678901")
-        return
-    
-    phone_number = sys.argv[1]
-    
     # Generate a unique user ID for testing
     user_id = f"test-{uuid.uuid4().hex[:8]}"
     
     print(f"📋 Testing invitation workflow:")
     print(f"  - User ID: {user_id}")
-    print(f"  - Phone: {phone_number}")
     print(f"  - Base URL: {BASE_URL}")
     print("-" * 50)
     
@@ -147,9 +119,8 @@ def main():
     if not issue_credential(session, user_id):
         return
     
-    # Step 3: Send invitation
-    if not send_invitation(session, phone_number, user_id):
-        return
+    # Step 3: Get verification link
+    verification_link = get_verification_link(user_id)
     
     # Step 4: Verify credential
     verify_credential(user_id)
@@ -157,7 +128,7 @@ def main():
     print("-" * 50)
     print("🎉 Workflow test completed!")
     print(f"👤 User ID: {user_id}")
-    print(f"🔗 Verification URL: {urljoin(BASE_URL, f'/verify?user={user_id}')}")
+    print(f"🔗 Verification URL: {verification_link}")
     print("✅ You can now test the verification process by opening the URL in a browser")
 
 if __name__ == "__main__":

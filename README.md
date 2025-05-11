@@ -40,7 +40,7 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 - **Modular Architecture:** Clean separation of concerns for maintainability.
 - **Enhanced Security:** Password hashing, CSRF protection, secure cookies, encrypted storage, and rate limiting.
 - **Comprehensive Testing:** Full test coverage for all critical paths.
-- **Improved UX:** Auto-redirects, SMS verification, and detailed error feedback.
+- **Improved UX:** Auto-redirects and detailed error feedback.
 - **Docker & Azure Support:** Easy deployment with Docker, docker-compose, and Azure Web Apps.
 - **Audit Logging:** Comprehensive logging for security events.
 
@@ -78,8 +78,8 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 ### Admin Onboarding Flow
 1. **Admin Authentication:** Secure login at `/admin/login` (password hashing, CSRF protection).
 2. **Credential Issuance:** Admin enters a user ID at `/admin/issue` to issue a credential.
-3. **Verification Link:** System generates a shareable verification link for SMS delivery.
-4. **User Verification:** User receives the link via SMS to `/verify?user_id={user_id}` to store their credential.
+3. **Verification Link:** System generates a shareable verification link.
+4. **User Verification:** User opens the verification link to `/verify?user_id={user_id}` to store their credential.
 5. **Local Storage:** Credential is stored in the user's browser.
 6. **Cross-Page Access:** User can access protected content at `/protected` using their credential.
 
@@ -192,7 +192,6 @@ X-API-Key: your_api_key_here
 - Adjust the credential expiration in the credential service or `app.py` (default: 1 year).
 - Add additional protected pages by following the pattern in `protected.html`.
 - Customize security settings in `lemma/__init__.py`.
-- Configure SMS delivery by updating the Twilio credentials in `admin.py` and uncommenting the relevant code.
 
 ---
 
@@ -226,25 +225,6 @@ These integrations will enable:
 - Simple cross-device transfer
 - Increased security through device-level authentication
 - Familiar user interfaces for credential management
-
----
-
-## SMS Integration
-
-The system is designed to send verification links via SMS using Twilio:
-
-1. **Set Environment Variables:**
-   ```bash
-   export TWILIO_ACCOUNT_SID=your_twilio_account_sid
-   export TWILIO_AUTH_TOKEN=your_twilio_auth_token
-   export TWILIO_PHONE_NUMBER=your_twilio_phone_number
-   ```
-
-2. **Enable SMS Integration:**
-   Uncomment the Twilio import and SMS sending code in `lemma/routes/admin.py`.
-
-3. **Send SMS:**
-   Use the admin interface to issue credentials and send verification links via SMS.
 
 ---
 
