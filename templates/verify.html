@@ -440,20 +440,31 @@
     <script>
         // Get CSRF token from cookie (used by multiple API calls)
         function getCSRFToken() {
-            // Try to get CSRF token from any available source
-            const tokenMeta = document.querySelector('meta[name="csrf-token"]');
-            if (tokenMeta) {
-                return tokenMeta.getAttribute('content');
-            }
-            
-            // If meta tag not available, generate one via fetch
-            return fetch('/api/generate-csrf-token')
-                .then(response => response.json())
-                .then(data => data.csrf_token)
-                .catch(error => {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    // Try to get CSRF token from any available source
+                    const tokenMeta = document.querySelector('meta[name="csrf-token"]');
+                    if (tokenMeta && tokenMeta.getAttribute('content')) {
+                        return resolve(tokenMeta.getAttribute('content'));
+                    }
+                    
+                    // If meta tag not available, generate one via fetch
+                    const response = await fetch('/api/generate-csrf-token');
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch CSRF token: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    if (!data.csrf_token) {
+                        throw new Error('No CSRF token in response');
+                    }
+                    
+                    resolve(data.csrf_token);
+                } catch (error) {
                     console.error('Error fetching CSRF token:', error);
-                    return '';
-                });
+                    reject(error);
+                }
+            });
         }
         
         // Store credential in browser storage
@@ -464,6 +475,9 @@
                 
                 // Fetch the credential from the API
                 const response = await fetch(`/api/credential/{{ user_id }}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch credential: ${response.status}`);
+                }
                 const credential = await response.json();
                 
                 // Store in localStorage
@@ -488,6 +502,10 @@
                     })
                 });
                 
+                if (!presResponse.ok) {
+                    throw new Error(`Failed to create presentation: ${presResponse.status}`);
+                }
+                
                 const presentation = await presResponse.json();
                 localStorage.setItem('lemma_presentation_{{ user_id }}', JSON.stringify(presentation));
                 
@@ -496,50 +514,8 @@
                 document.getElementById('jsonView').style.display = 'block';
                 document.getElementById('showJsonBtn').textContent = 'Hide Raw Credential';
                 
-                // Show the Download button
-                document.getElementById('downloadBtn').style.display = 'block';
-                
-                // Auto-verify and immediately access protected content
-                const verifyResponse = await fetch('/api/verify', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': csrfToken
-                    },
-                    body: JSON.stringify({
-                        credential: credential,
-                        csrf_token: csrfToken
-                    })
-                });
-                
-                const verifyResult = await verifyResponse.json();
-                
-                if (verifyResult.valid) {
-                    // Valid credential, proceed to access
-                    const accessResponse = await fetch('/api/verify-human', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-Token': csrfToken
-                        },
-                        body: JSON.stringify({
-                            presentation: presentation,
-                            challenge: challenge,
-                            csrf_token: csrfToken
-                        })
-                    });
-                    
-                    const accessResult = await accessResponse.json();
-                    
-                    if (accessResult.success) {
-                        alert('Credential stored and verified successfully! Redirecting to protected content...');
-                        window.location.href = accessResult.redirect || '/protected';
-                    } else {
-                        alert('Credential stored successfully, but access was denied: ' + (accessResult.error || 'Verification failed'));
-                    }
-                } else {
-                    alert('Credential stored successfully! You can now access protected content.');
-                }
+                // Show success message
+                alert('Credential stored successfully!');
             } catch (e) {
                 console.error('Error storing credential:', e);
                 alert('Error storing credential: ' + e.message);
@@ -600,7 +576,7 @@
                     localStorage.setItem('lemma_challenge', challenge);
                     
                     // Create a presentation with the imported credential
-                    fetch('/api/presentation', {
+                    const presResponse = await fetch('/api/presentation', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -611,22 +587,22 @@
                             challenge: challenge,
                             csrf_token: csrfToken
                         })
-                    }).then(response => response.json())
-                      .then(presentation => {
-                          localStorage.setItem('lemma_presentation_{{ user_id }}', JSON.stringify(presentation));
-                          
-                          // Show the JSON
-                          document.getElementById('jsonView').textContent = JSON.stringify(credential, null, 2);
-                          document.getElementById('jsonView').style.display = 'block';
-                          document.getElementById('showJsonBtn').textContent = 'Hide Raw Credential';
-                          document.getElementById('downloadBtn').style.display = 'block';
-                          
-                          alert('Credential imported successfully! You can now access protected content.');
-                      })
-                      .catch(error => {
-                          console.error('Error creating presentation:', error);
-                          alert('Error creating presentation: ' + error.message);
-                      });
+                    });
+                    
+                    if (!presResponse.ok) {
+                        throw new Error(`Failed to create presentation: ${presResponse.status}`);
+                    }
+                    
+                    const presentation = await presResponse.json();
+                    localStorage.setItem('lemma_presentation_{{ user_id }}', JSON.stringify(presentation));
+                    
+                    // Show the imported credential
+                    document.getElementById('jsonView').textContent = JSON.stringify(credential, null, 2);
+                    document.getElementById('jsonView').style.display = 'block';
+                    document.getElementById('showJsonBtn').textContent = 'Hide Raw Credential';
+                    
+                    // Show success message
+                    alert('Credential imported successfully!');
                 } catch (e) {
                     console.error('Error importing credential:', e);
                     alert('Error importing credential: ' + e.message);
@@ -676,6 +652,10 @@
                     })
                 });
                 
+                if (!presResponse.ok) {
+                    throw new Error(`Failed to create presentation: ${presResponse.status}`);
+                }
+                
                 const presentation = await presResponse.json();
                 
                 // Store the latest presentation and challenge for testing
@@ -683,20 +663,16 @@
                 localStorage.setItem('lemma_challenge', challenge);
                 
                 // Check if we already have a demo container
-                let demoContainer = document.getElementById('customerSiteDemo');
+                let demoContainer = document.getElementById('demoContainer');
+                
+                // If no container exists, create one
                 if (!demoContainer) {
-                    // Create a demo container if it doesn't exist
                     demoContainer = document.createElement('div');
-                    demoContainer.id = 'customerSiteDemo';
-                    demoContainer.className = 'customer-site-demo';
-                    demoContainer.style.backgroundColor = '#f8f9fa';
-                    demoContainer.style.border = '1px solid #dee2e6';
-                    demoContainer.style.borderRadius = '5px';
-                    demoContainer.style.padding = '20px';
-                    demoContainer.style.marginTop = '20px';
+                    demoContainer.id = 'demoContainer';
+                    demoContainer.className = 'mt-4 p-4 border rounded bg-light';
                     
-                    // Insert after the actions div
-                    const actionsDiv = document.querySelector('.actions');
+                    // Add it to the page
+                    const actionsDiv = document.querySelector('.form-group');
                     actionsDiv.parentNode.insertBefore(demoContainer, actionsDiv.nextSibling);
                 } else {
                     // Toggle visibility if it exists
@@ -706,43 +682,51 @@
                     }
                 }
                 
-                // Display the demonstration
+                // Set up and display the demo content
                 demoContainer.style.display = 'block';
+                setupDemoContainer(demoContainer, presentation, challenge, csrfToken);
+            } catch (e) {
+                console.error('Error in verification demo:', e);
+                alert('Error creating verification demo: ' + e.message);
+            }
+        });
+        
+        // Function to set up the demo container with proper content
+        function setupDemoContainer(container, presentation, challenge, csrfToken) {
+            // Create the content for the demo
+            container.innerHTML = `
+                <h3>Customer Site Integration Demo</h3>
+                <p>This demonstrates how a customer site would verify a human credential.</p>
                 
-                // Create the content for the demo
-                demoContainer.innerHTML = `
-                    <h3>Customer Site Integration Demo</h3>
-                    <p>This demonstrates how a customer site would verify a human credential.</p>
-                    
-                    <div class="demo-step">
-                        <h4>Step 1: Generate a Challenge</h4>
-                        <p>The customer site generates a random challenge to prevent replay attacks:</p>
-                        <pre style="background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto;">${challenge}</pre>
+                <div class="demo-step">
+                    <h4>Step 1: Generate a Challenge</h4>
+                    <p>The customer site generates a random challenge to prevent replay attacks:</p>
+                    <pre style="background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto;">${challenge}</pre>
+                </div>
+                
+                <div class="demo-step">
+                    <h4>Step 2: User Creates a Verifiable Presentation</h4>
+                    <p>The credential stored in the browser is used to create a presentation with the challenge:</p>
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        <pre style="background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(presentation, null, 2)}</pre>
                     </div>
-                    
-                    <div class="demo-step">
-                        <h4>Step 2: User Creates a Verifiable Presentation</h4>
-                        <p>The credential stored in the browser is used to create a presentation with the challenge:</p>
-                        <div style="max-height: 200px; overflow-y: auto;">
-                            <pre style="background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(presentation, null, 2)}</pre>
-                        </div>
-                    </div>
-                    
-                    <div class="demo-step">
-                        <h4>Step 3: Verify the Presentation</h4>
-                        <p>The customer site verifies the presentation by:</p>
-                        <ol>
-                            <li>Checking that the challenge matches what was sent</li>
-                            <li>Verifying the cryptographic proof on the presentation</li>
-                            <li>Verifying the included credential is valid</li>
-                        </ol>
-                        <button id="verifyDemoBtn" class="btn btn-success">Simulate Verification</button>
-                        <div id="verifyResult" style="margin-top: 10px;"></div>
-                    </div>
-                    
-                    <div class="demo-step">
-                        <h4>Integration Code Example</h4>
-                        <pre style="background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto;">// Sample JavaScript integration code
+                </div>
+                
+                <div class="demo-step">
+                    <h4>Step 3: Verify the Presentation</h4>
+                    <p>The customer site verifies the presentation by:</p>
+                    <ol>
+                        <li>Checking that the challenge matches what was sent</li>
+                        <li>Verifying the cryptographic proof on the presentation</li>
+                        <li>Verifying the included credential is valid</li>
+                    </ol>
+                    <button id="verifyDemoBtn" class="btn btn-success">Simulate Verification</button>
+                    <div id="verifyResult" style="margin-top: 10px;"></div>
+                </div>
+                
+                <div class="demo-step">
+                    <h4>Integration Code Example</h4>
+                    <pre style="background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto;">// Sample JavaScript integration code
 async function verifyHuman() {
   // 1. Generate a challenge
   const challenge = generateRandomChallenge();
@@ -771,14 +755,12 @@ async function verifyHuman() {
     return { valid: false, reason: result.reason };
   }
 }</pre>
-                    </div>
-                `;
-                
-                // Add event listener for the verify demo button
-                document.getElementById('verifyDemoBtn').addEventListener('click', async function() {
-                    // Ensure we have a valid CSRF token
-                    const csrfToken = await getCSRFToken();
-                    
+                </div>
+            `;
+            
+            // Add event listener for the verify demo button
+            document.getElementById('verifyDemoBtn').addEventListener('click', async function() {
+                try {
                     // Verify presentation through your API
                     const verifyResponse = await fetch('/api/verify-presentation', {
                         method: 'POST',
@@ -792,6 +774,11 @@ async function verifyHuman() {
                             csrf_token: csrfToken  // Include token in the request body as well
                         })
                     });
+                    
+                    if (!verifyResponse.ok) {
+                        const errorText = await verifyResponse.text();
+                        throw new Error(`Verification failed: ${verifyResponse.status} - ${errorText}`);
+                    }
                     
                     const verifyResult = await verifyResponse.json();
                     
@@ -808,17 +795,21 @@ async function verifyHuman() {
                         resultDiv.innerHTML = `
                             <div class="alert alert-danger">
                                 ❌ Verification Failed<br>
-                                Reason: ${verifyResult.reason || 'Unknown error'}
+                                Reason: ${verifyResult.reason || verifyResult.error || 'Unknown error'}
                             </div>
                         `;
                     }
-                });
-                
-            } catch (e) {
-                console.error('Error in verification demo:', e);
-                alert('Error creating verification demo: ' + e.message);
-            }
-        });
+                } catch (e) {
+                    console.error('Error verifying presentation:', e);
+                    document.getElementById('verifyResult').innerHTML = `
+                        <div class="alert alert-danger">
+                            ❌ Verification Error<br>
+                            Error: ${e.message}
+                        </div>
+                    `;
+                }
+            });
+        }
         
         // Toggle JSON view
         document.getElementById('showJsonBtn').addEventListener('click', function() {
