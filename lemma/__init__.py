@@ -78,4 +78,18 @@ def create_app(test_config=None):
     from lemma.core.credential_service import init_credential_service
     init_credential_service(app)
     
+    # Add template global for CSRF token
+    @app.template_global()
+    def csrf_token():
+        """Generate a CSRF token for templates.
+        
+        This function makes the CSRF token available in templates via {{ csrf_token() }}.
+        It uses the token from session, or generates a new one if needed.
+        
+        Returns:
+            str: The CSRF token.
+        """
+        from lemma.auth.csrf_config import generate_csrf_token
+        return generate_csrf_token()
+    
     return app

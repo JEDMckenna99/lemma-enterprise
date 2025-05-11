@@ -298,3 +298,26 @@ def list_credentials():
     except Exception as e:
         logger.error("Error listing credentials: %s", str(e))
         return jsonify({"error": f"Error listing credentials: {str(e)}"}), 500
+
+# Add CSRF token generation endpoint
+@api_bp.route('/generate-csrf-token', methods=['GET'])
+def generate_csrf_token():
+    """Generate a CSRF token for client-side JavaScript.
+    
+    This endpoint provides a CSRF token that can be used by client-side JavaScript
+    for API requests. It ensures proper CSRF protection for AJAX requests.
+    
+    Returns:
+        A JSON object containing the CSRF token.
+    """
+    try:
+        from lemma.auth.csrf_config import generate_csrf_token as get_csrf
+        
+        # Get or generate a CSRF token
+        token = get_csrf()
+        
+        # Return the token in JSON format
+        return jsonify({'csrf_token': token})
+    except Exception as e:
+        logger.error("Error generating CSRF token: %s", str(e))
+        return jsonify({'error': 'Error generating CSRF token'}), 500

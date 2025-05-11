@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Verify Human Credential - Lemma</title>
     <style>
         :root {
@@ -14,6 +15,8 @@
             --white: #FFFFFF;
             --success: #28A745;
             --error: #DC3545;
+            --info: #17A2B8;
+            --warning: #FFC107;
         }
         
         * {
@@ -142,6 +145,97 @@
         
         .button.secondary:hover {
             background-color: var(--light-bg);
+        }
+        
+        /* Bootstrap-style buttons */
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .btn {
+            display: inline-block;
+            font-weight: 500;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: middle;
+            user-select: none;
+            border: 1px solid transparent;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            border-radius: 0.25rem;
+            transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            color: var(--white);
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+        
+        .btn-secondary {
+            color: var(--white);
+            background-color: #6c757d;
+            border-color: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #5a6268;
+            border-color: #5a6268;
+        }
+        
+        .btn-success {
+            color: var(--white);
+            background-color: var(--success);
+            border-color: var(--success);
+        }
+        
+        .btn-success:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
+        }
+        
+        .btn-info {
+            color: var(--white);
+            background-color: var(--info);
+            border-color: var(--info);
+        }
+        
+        .btn-info:hover {
+            background-color: #138496;
+            border-color: #117a8b;
+        }
+        
+        .btn-warning {
+            color: #212529;
+            background-color: var(--warning);
+            border-color: var(--warning);
+        }
+        
+        .btn-warning:hover {
+            background-color: #e0a800;
+            border-color: #d39e00;
+        }
+        
+        .btn-outline-secondary {
+            color: #6c757d;
+            background-color: transparent;
+            border-color: #6c757d;
+        }
+        
+        .btn-outline-secondary:hover {
+            color: var(--white);
+            background-color: #6c757d;
+            border-color: #6c757d;
         }
         
         .json-view {
@@ -303,9 +397,30 @@
 
     {% if user_id %}
     <script>
+        // Get CSRF token from cookie (used by multiple API calls)
+        function getCSRFToken() {
+            // Try to get CSRF token from any available source
+            const tokenMeta = document.querySelector('meta[name="csrf-token"]');
+            if (tokenMeta) {
+                return tokenMeta.getAttribute('content');
+            }
+            
+            // If meta tag not available, generate one via fetch
+            return fetch('/api/generate-csrf-token')
+                .then(response => response.json())
+                .then(data => data.csrf_token)
+                .catch(error => {
+                    console.error('Error fetching CSRF token:', error);
+                    return '';
+                });
+        }
+        
         // Store credential in browser storage
         document.getElementById('storeBtn').addEventListener('click', async function() {
             try {
+                // Get CSRF token
+                const csrfToken = await getCSRFToken();
+                
                 // Fetch the credential from the API
                 const response = await fetch(`/api/credential/{{ user_id }}`);
                 const credential = await response.json();
@@ -322,11 +437,13 @@
                 const presResponse = await fetch('/api/presentation', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
                     },
                     body: JSON.stringify({
                         credential: credential,
-                        challenge: challenge
+                        challenge: challenge,
+                        csrf_token: csrfToken
                     })
                 });
                 
@@ -376,13 +493,16 @@
             document.getElementById('importFile').click();
         });
 
-        document.getElementById('importFile').addEventListener('change', function(event) {
+        document.getElementById('importFile').addEventListener('change', async function(event) {
             const file = event.target.files[0];
             if (!file) return;
             
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
+                    // Get CSRF token
+                    const csrfToken = await getCSRFToken();
+                    
                     const credential = JSON.parse(e.target.result);
                     
                     // Basic validation to ensure this is a Lemma credential
@@ -402,11 +522,13 @@
                     fetch('/api/presentation', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
                         },
                         body: JSON.stringify({
                             credential: credential,
-                            challenge: challenge
+                            challenge: challenge,
+                            csrf_token: csrfToken
                         })
                     }).then(response => response.json())
                       .then(presentation => {
@@ -443,6 +565,9 @@
         // Verify the credential
         document.getElementById('verifyBtn').addEventListener('click', async function() {
             try {
+                // Get CSRF token
+                const csrfToken = await getCSRFToken();
+                
                 // Get the credential from localStorage
                 const credentialJson = localStorage.getItem('lemma_credential_{{ user_id }}');
                 if (!credentialJson) {
@@ -456,10 +581,12 @@
                 const response = await fetch('/api/verify', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
                     },
                     body: JSON.stringify({
-                        credential: credential
+                        credential: credential,
+                        csrf_token: csrfToken
                     })
                 });
                 
@@ -476,44 +603,52 @@
             }
         });
         
-        // Access protected content
-        document.getElementById('accessBtn').addEventListener('click', async function() {
-            try {
-                // Get the presentation from localStorage
-                const presentationJson = localStorage.getItem('lemma_presentation_{{ user_id }}');
-                const challenge = localStorage.getItem('lemma_challenge');
-                
-                if (!presentationJson || !challenge) {
-                    alert('No presentation found. Please store the credential first.');
-                    return;
+        // Access protected content (handling the case when accessBtn might not exist)
+        const accessBtn = document.getElementById('accessBtn');
+        if (accessBtn) {
+            accessBtn.addEventListener('click', async function() {
+                try {
+                    // Get CSRF token
+                    const csrfToken = await getCSRFToken();
+                    
+                    // Get the presentation from localStorage
+                    const presentationJson = localStorage.getItem('lemma_presentation_{{ user_id }}');
+                    const challenge = localStorage.getItem('lemma_challenge');
+                    
+                    if (!presentationJson || !challenge) {
+                        alert('No presentation found. Please store the credential first.');
+                        return;
+                    }
+                    
+                    const presentation = JSON.parse(presentationJson);
+                    
+                    // Verify the presentation and get access
+                    const response = await fetch('/api/verify-human', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
+                        },
+                        body: JSON.stringify({
+                            presentation: presentation,
+                            challenge: challenge,
+                            csrf_token: csrfToken
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        window.location.href = result.redirect || '/protected';
+                    } else {
+                        alert('Access denied: ' + (result.error || 'Verification failed'));
+                    }
+                } catch (e) {
+                    console.error('Error accessing protected content:', e);
+                    alert('Error accessing protected content: ' + e.message);
                 }
-                
-                const presentation = JSON.parse(presentationJson);
-                
-                // Verify the presentation and get access
-                const response = await fetch('/api/verify-human', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        presentation: presentation,
-                        challenge: challenge
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    window.location.href = result.redirect || '/protected';
-                } else {
-                    alert('Access denied: ' + (result.error || 'Verification failed'));
-                }
-            } catch (e) {
-                console.error('Error accessing protected content:', e);
-                alert('Error accessing protected content: ' + e.message);
-            }
-        });
+            });
+        }
         
         // Toggle JSON view
         document.getElementById('showJsonBtn').addEventListener('click', function() {
@@ -593,6 +728,9 @@
                     
                     <h4>User Agent:</h4>
                     <p>${navigator.userAgent}</p>
+                    
+                    <h4>Cookies Enabled:</h4>
+                    <p>${navigator.cookieEnabled ? '✅ Enabled' : '❌ Disabled'}</p>
                     
                     <h4>Storage Limits:</h4>
                     <p>Estimated available space: ${estimateStorageSpace()} MB</p>
