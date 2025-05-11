@@ -496,6 +496,12 @@ def create_presentation():
 @app.route('/api/verify-presentation', methods=['POST'])
 def verify_presentation():
     """API endpoint to verify a presentation."""
+    # Check for CSRF token - this is important for security
+    csrf_token = request.headers.get('X-CSRF-Token') or request.json.get('csrf_token')
+    if not csrf_token and not app.config.get('TESTING', False):
+        app.logger.warning("CSRF token missing from verify-presentation request from IP: %s", request.remote_addr)
+        return jsonify({"valid": False, "error": "CSRF validation failed"}), 400
+    
     data = request.get_json()
     presentation = data.get('presentation')
     challenge = data.get('challenge')

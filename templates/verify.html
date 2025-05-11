@@ -776,6 +776,9 @@ async function verifyHuman() {
                 
                 // Add event listener for the verify demo button
                 document.getElementById('verifyDemoBtn').addEventListener('click', async function() {
+                    // Ensure we have a valid CSRF token
+                    const csrfToken = await getCSRFToken();
+                    
                     // Verify presentation through your API
                     const verifyResponse = await fetch('/api/verify-presentation', {
                         method: 'POST',
@@ -786,7 +789,7 @@ async function verifyHuman() {
                         body: JSON.stringify({
                             presentation: presentation,
                             challenge: challenge,
-                            csrf_token: csrfToken
+                            csrf_token: csrfToken  // Include token in the request body as well
                         })
                     });
                     
