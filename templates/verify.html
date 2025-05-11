@@ -226,6 +226,17 @@
             border-color: #d39e00;
         }
         
+        .btn-danger {
+            color: var(--white);
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+        }
+        
         .btn-outline-secondary {
             color: #6c757d;
             background-color: transparent;
@@ -366,6 +377,7 @@
                 <button id="showJsonBtn" class="btn btn-info">Show Raw Credential</button>
                 <button id="downloadBtn" class="btn btn-success" style="display: none;">Download Credential</button>
                 <button id="importBtn" class="btn btn-warning">Import Credential</button>
+                <button id="clearBtn" class="btn btn-danger">Clear Credentials</button>
                 <input type="file" id="importFile" style="display: none;" accept=".json">
                 <button id="debugBtn" class="btn btn-outline-secondary">Debug Storage</button>
             </div>
@@ -795,6 +807,42 @@
                 return 'Unable to estimate';
             }
         }
+
+        // Add the clear credentials button event handler in the JavaScript section
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            try {
+                // Ask for confirmation 
+                if (!confirm('Are you sure you want to clear all Lemma credentials from your browser storage? This action cannot be undone.')) {
+                    return;
+                }
+                
+                // Find all Lemma-related items in localStorage
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('lemma_')) {
+                        keysToRemove.push(key);
+                    }
+                }
+                
+                // Remove each item
+                keysToRemove.forEach(key => {
+                    localStorage.removeItem(key);
+                });
+                
+                // Update UI state
+                document.getElementById('downloadBtn').style.display = 'none';
+                document.getElementById('jsonView').textContent = '';
+                document.getElementById('jsonView').style.display = 'none';
+                document.getElementById('showJsonBtn').textContent = 'Show Raw Credential';
+                
+                // Show confirmation
+                alert(`Cleared ${keysToRemove.length} Lemma credential items from your browser storage.`);
+            } catch (e) {
+                console.error('Error clearing credentials:', e);
+                alert('Error clearing credentials: ' + e.message);
+            }
+        });
     </script>
     {% endif %}
 </body>
