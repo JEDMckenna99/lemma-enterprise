@@ -462,8 +462,6 @@
                 const presentation = await presResponse.json();
                 localStorage.setItem('lemma_presentation_{{ user_id }}', JSON.stringify(presentation));
                 
-                alert('Credential stored successfully! You can now access protected content.');
-                
                 // Show the JSON
                 document.getElementById('jsonView').textContent = JSON.stringify(credential, null, 2);
                 document.getElementById('jsonView').style.display = 'block';
@@ -471,6 +469,48 @@
                 
                 // Show the Download button
                 document.getElementById('downloadBtn').style.display = 'block';
+                
+                // Auto-verify and immediately access protected content
+                const verifyResponse = await fetch('/api/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({
+                        credential: credential,
+                        csrf_token: csrfToken
+                    })
+                });
+                
+                const verifyResult = await verifyResponse.json();
+                
+                if (verifyResult.valid) {
+                    // Valid credential, proceed to access
+                    const accessResponse = await fetch('/api/verify-human', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
+                        },
+                        body: JSON.stringify({
+                            presentation: presentation,
+                            challenge: challenge,
+                            csrf_token: csrfToken
+                        })
+                    });
+                    
+                    const accessResult = await accessResponse.json();
+                    
+                    if (accessResult.success) {
+                        alert('Credential stored and verified successfully! Redirecting to protected content...');
+                        window.location.href = accessResult.redirect || '/protected';
+                    } else {
+                        alert('Credential stored successfully, but access was denied: ' + (accessResult.error || 'Verification failed'));
+                    }
+                } else {
+                    alert('Credential stored successfully! You can now access protected content.');
+                }
             } catch (e) {
                 console.error('Error storing credential:', e);
                 alert('Error storing credential: ' + e.message);
@@ -589,58 +629,56 @@
                 
                 const credential = JSON.parse(credentialJson);
                 
-                // Verify the credential
-                const response = await fetch('/api/verify', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': csrfToken
-                    },
-                    body: JSON.stringify({
-                        credential: credential,
-                        csrf_token: csrfToken
-                    })
-                });
+                // Get or generate presentation
+                let presentationJson = localStorage.getItem(`lemma_presentation_{{ user_id }}`);
+                let challenge = localStorage.getItem('lemma_challenge');
                 
-                const result = await response.json();
-                
-                if (result.valid) {
-                    // Successful verification - now get access to protected content
-
-                    // Get the presentation from localStorage
-                    const presentationJson = localStorage.getItem(`lemma_presentation_{{ user_id }}`);
-                    const challenge = localStorage.getItem('lemma_challenge');
+                if (!presentationJson || !challenge) {
+                    // Generate a new challenge and presentation if needed
+                    challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                        .map(b => b.toString(16).padStart(2, '0')).join('');
+                    localStorage.setItem('lemma_challenge', challenge);
                     
-                    if (!presentationJson || !challenge) {
-                        alert('Credential verified successfully, but no presentation found. Please store the credential first to generate a presentation.');
-                        return;
-                    }
-                    
-                    const presentation = JSON.parse(presentationJson);
-                    
-                    // Verify the presentation and get access
-                    const accessResponse = await fetch('/api/verify-human', {
+                    const presResponse = await fetch('/api/presentation', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRF-Token': csrfToken
                         },
                         body: JSON.stringify({
-                            presentation: presentation,
+                            credential: credential,
                             challenge: challenge,
                             csrf_token: csrfToken
                         })
                     });
                     
-                    const accessResult = await accessResponse.json();
-                    
-                    if (accessResult.success) {
-                        window.location.href = accessResult.redirect || '/protected';
-                    } else {
-                        alert('Credential verified, but access was denied: ' + (accessResult.error || 'Verification failed'));
-                    }
+                    const presentation = await presResponse.json();
+                    localStorage.setItem(`lemma_presentation_{{ user_id }}`, JSON.stringify(presentation));
+                    presentationJson = JSON.stringify(presentation);
+                }
+                
+                const presentation = JSON.parse(presentationJson);
+                
+                // Verify the presentation and get access
+                const accessResponse = await fetch('/api/verify-human', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({
+                        presentation: presentation,
+                        challenge: challenge,
+                        csrf_token: csrfToken
+                    })
+                });
+                
+                const accessResult = await accessResponse.json();
+                
+                if (accessResult.success) {
+                    window.location.href = accessResult.redirect || '/protected';
                 } else {
-                    alert('Credential verification failed: ' + (result.reason || 'Unknown reason'));
+                    alert('Access denied: ' + (accessResult.error || 'Verification failed'));
                 }
             } catch (e) {
                 console.error('Error verifying credential:', e);

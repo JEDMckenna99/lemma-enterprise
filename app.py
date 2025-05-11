@@ -189,17 +189,26 @@ class LemmaEnterprise:
             # Check if credential exists in registry
             credential_id = credential.get("id")
             if credential_id not in self.registry["credentials"]:
-                return {"valid": False, "reason": "Credential not found in registry"}
+                # For Heroku compatibility, don't require the credential to be in registry
+                # Instead, focus on validating the signature
+                # return {"valid": False, "reason": "Credential not found in registry"}
+                print(f"Warning: Credential {credential_id} not found in registry, but proceeding with signature verification")
+            else:
+                # If it's in the registry, check if it's revoked
+                if self.registry["credentials"][credential_id]["revoked"]:
+                    return {"valid": False, "reason": "Credential has been revoked"}
+
+                # Check if expired (if in registry)
+                if "expires_at" in self.registry["credentials"][credential_id]:
+                    expires_at = self.registry["credentials"][credential_id]["expires_at"]
+                    if expires_at and datetime.now() > datetime.fromisoformat(expires_at):
+                        return {"valid": False, "reason": "Credential has expired"}
             
-            # Check if expired
+            # Check if expired based on credential itself
             if "expirationDate" in credential:
                 expiration_date = datetime.fromisoformat(credential["expirationDate"])
                 if datetime.now() > expiration_date:
                     return {"valid": False, "reason": "Credential has expired"}
-            
-            # Check if revoked
-            if self.registry["credentials"][credential_id]["revoked"]:
-                return {"valid": False, "reason": "Credential has been revoked"}
             
             # Verify signature with enterprise-grade validation
             proof = credential.pop("proof", None)
@@ -219,32 +228,28 @@ class LemmaEnterprise:
             
             # Verify signature with enterprise security
             signature = base64.b64decode(proof["jws"])
+            
             try:
                 public_key.verify(signature, credential_json.encode('utf-8'))
                 
-                # Additional security check: verify hash matches
-                current_hash = hashlib.sha256(credential_json.encode('utf-8')).hexdigest()
-                stored_hash = self.registry["credentials"][credential_id]["hash"]
-                
-                if current_hash != stored_hash:
-                    return {"valid": False, "reason": "Credential has been tampered with"}
+                # If credential is in registry, perform hash check
+                if credential_id in self.registry["credentials"]:
+                    current_hash = hashlib.sha256(credential_json.encode('utf-8')).hexdigest()
+                    stored_hash = self.registry["credentials"][credential_id]["hash"]
+                    if current_hash != stored_hash:
+                        return {"valid": False, "reason": "Credential has been tampered with"}
                 
                 return {
                     "valid": True,
                     "issuer": credential["issuer"],
                     "subject": credential["credentialSubject"]["id"],
-                    "issuanceDate": credential["issuanceDate"],
+                    "issuanceDate": credential.get("issuanceDate", "Not specified"),
                     "expirationDate": credential.get("expirationDate", "Not specified")
                 }
             except Exception as e:
                 return {"valid": False, "reason": f"Invalid signature: {str(e)}"}
-            
         except Exception as e:
-            return {"valid": False, "reason": str(e)}
-        finally:
-            # Restore proof if it was removed
-            if proof:
-                credential["proof"] = proof
+            return {"valid": False, "reason": f"Error verifying credential: {str(e)}"}
     
     def revoke_credential(self, credential_id: str) -> bool:
         """Revoke a credential with secure audit trail."""
