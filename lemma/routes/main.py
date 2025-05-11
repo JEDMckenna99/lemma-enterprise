@@ -51,17 +51,25 @@ def verify():
 @main_bp.route('/protected')
 def protected():
     """Render the protected page that requires human verification."""
-    # Check if user has a valid credential in session
+    # Check if user has valid verification in session
     user_id = session.get('verified_user_id')
     credential_data = session.get('verified_credential')
+    is_verified_human = session.get('verified_human', False)
     
-    if not user_id or not credential_data:
+    # Strict verification check - require both user_id and credentials
+    if not user_id or not credential_data or not is_verified_human:
+        # Log the unauthorized access attempt
+        current_app.logger.warning(f"Unauthorized protected page access attempt. Session data: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}")
+        
         # Redirect to verification page with a clear message
         flash("Please verify you are human to access this page", "warning")
         return redirect(url_for('main.verify'))
     
-    # Additional verification could be performed here
-    credential_service = get_credential_service()
+    # For more security, you could verify the credential again here
+    # credential_service = get_credential_service()
+    # if not credential_service.verify_credential(credential_data).get('valid', False):
+    #     flash("Your human verification has expired. Please verify again.", "warning")
+    #     return redirect(url_for('main.verify'))
     
     # For demonstration, we'll just pass the credential data to the template
     return render_template(

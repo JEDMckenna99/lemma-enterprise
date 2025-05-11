@@ -378,6 +378,7 @@
                 <button id="downloadBtn" class="btn btn-success" style="display: none;">Download Credential</button>
                 <button id="importBtn" class="btn btn-warning">Import Credential</button>
                 <button id="clearBtn" class="btn btn-danger">Clear Credentials</button>
+                <button id="accessBtn" class="btn btn-primary">Access Protected Content</button>
                 <input type="file" id="importFile" style="display: none;" accept=".json">
                 <button id="debugBtn" class="btn btn-outline-secondary">Debug Storage</button>
             </div>
@@ -837,10 +838,65 @@
                 document.getElementById('showJsonBtn').textContent = 'Show Raw Credential';
                 
                 // Show confirmation
-                alert(`Cleared ${keysToRemove.length} Lemma credential items from your browser storage.`);
+                alert(`Cleared ${keysToRemove.length} Lemma credential items from your browser storage. Redirecting to home page.`);
+                
+                // Redirect to main page
+                window.location.href = '/';
             } catch (e) {
                 console.error('Error clearing credentials:', e);
                 alert('Error clearing credentials: ' + e.message);
+            }
+        });
+
+        // Access protected content button handler
+        document.getElementById('accessBtn').addEventListener('click', async function() {
+            try {
+                // Get CSRF token
+                const csrfToken = await getCSRFToken();
+                
+                // Get the presentation from localStorage
+                const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+                if (credentials.length === 0) {
+                    alert('No human verification credential found. Please store a credential first.');
+                    return;
+                }
+                
+                const credentialKey = credentials[0];
+                const userId = credentialKey.replace('lemma_credential_', '');
+                const presentationJson = localStorage.getItem(`lemma_presentation_${userId}`);
+                const challenge = localStorage.getItem('lemma_challenge');
+                
+                if (!presentationJson || !challenge) {
+                    alert('No presentation found. Please store the credential first.');
+                    return;
+                }
+                
+                const presentation = JSON.parse(presentationJson);
+                
+                // Verify the presentation and get access
+                const response = await fetch('/api/verify-human', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({
+                        presentation: presentation,
+                        challenge: challenge,
+                        csrf_token: csrfToken
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    window.location.href = result.redirect || '/protected';
+                } else {
+                    alert('Access denied: ' + (result.error || 'Verification failed'));
+                }
+            } catch (e) {
+                console.error('Error accessing protected content:', e);
+                alert('Error accessing protected content: ' + e.message);
             }
         });
     </script>

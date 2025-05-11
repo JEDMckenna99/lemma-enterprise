@@ -321,3 +321,83 @@ def generate_csrf_token():
     except Exception as e:
         logger.error("Error generating CSRF token: %s", str(e))
         return jsonify({'error': 'Error generating CSRF token'}), 500
+
+@api_bp.route('/verify-human', methods=['POST'])
+@rate_limit
+def verify_human():
+    """Verify a human presentation and set session for protected content access.
+    
+    This endpoint verifies a presentation, and if valid, sets session variables 
+    indicating the user is a verified human, allowing access to protected content.
+    
+    Returns:
+        JSON response with success status and redirect URL if successful,
+        or error message if verification fails.
+    """
+    try:
+        # Skip CSRF check in testing environment if configured
+        if not current_app.config.get('TESTING', False) or not current_app.config.get('SKIP_AUTH_IN_TESTS', False):
+            # Check for CSRF token
+            csrf_token = request.headers.get('X-CSRF-Token') or request.json.get('csrf_token')
+            if not csrf_token:
+                current_app.logger.warning("CSRF token missing from human verification request from IP: %s", request.remote_addr)
+                return jsonify({"success": False, "error": "CSRF validation failed"}), 400
+        
+        data = request.get_json()
+        if not data or 'presentation' not in data or 'challenge' not in data:
+            return jsonify({"success": False, "error": "Presentation and challenge are required"}), 400
+        
+        presentation = data['presentation']
+        challenge = data['challenge']
+        
+        # Verify the presentation
+        credential_service = get_credential_service()
+        verification_result = credential_service.verify_presentation(presentation, challenge)
+        
+        if not verification_result.get('valid', False):
+            logger.info("Invalid human verification attempt: %s", verification_result.get('reason'))
+            return jsonify({
+                "success": False, 
+                "error": verification_result.get('reason', 'Verification failed')
+            })
+        
+        # Extract DID from the holder
+        holder = verification_result.get('holder', '')
+        user_id = holder.split(':')[-1] if ':' in holder else holder
+        
+        # Set session variables for protected content access
+        from flask import session
+        session['verified_human'] = True
+        session['verified_user_id'] = user_id
+        session['verified_presentation'] = presentation
+        
+        # Get credential info from the presentation
+        if 'verifiableCredential' in presentation and presentation['verifiableCredential']:
+            credential = presentation['verifiableCredential'][0] if isinstance(presentation['verifiableCredential'], list) else presentation['verifiableCredential']
+            session['verified_credential'] = credential
+            
+            # Set issuance and expiry times if available
+            if 'issuanceDate' in credential:
+                session['verification_time'] = credential['issuanceDate']
+            if 'expirationDate' in credential:
+                session['verification_expiry'] = credential['expirationDate']
+        
+        # Log successful verification
+        logger.info("Human verification successful for holder: %s", holder)
+        
+        return jsonify({
+            "success": True,
+            "message": "Human verification successful",
+            "redirect": "/protected",
+            "user_id": user_id
+        })
+    
+    except ValueError as e:
+        logger.error("Invalid presentation format in human verification: %s", str(e))
+        return jsonify({"success": False, "error": f"Invalid presentation format: {str(e)}"}), 400
+    except KeyError as e:
+        logger.error("Missing required field in human verification: %s", str(e))
+        return jsonify({"success": False, "error": f"Missing required field: {str(e)}"}), 400
+    except Exception as e:
+        logger.error("Error verifying human: %s", str(e))
+        return jsonify({"success": False, "error": f"Error verifying human: {str(e)}"}), 500
