@@ -672,8 +672,19 @@
                     demoContainer.className = 'mt-4 p-4 border rounded bg-light';
                     
                     // Add it to the page
-                    const actionsDiv = document.querySelector('.form-group');
-                    actionsDiv.parentNode.insertBefore(demoContainer, actionsDiv.nextSibling);
+                    const actionsDiv = document.querySelector('.actions');
+                    if (actionsDiv) {
+                        actionsDiv.parentNode.insertBefore(demoContainer, actionsDiv.nextSibling);
+                    } else {
+                        // Fallback if .actions not found
+                        const card = document.querySelector('.card');
+                        if (card) {
+                            card.appendChild(demoContainer);
+                        } else {
+                            // Last resort fallback
+                            document.querySelector('.container').appendChild(demoContainer);
+                        }
+                    }
                 } else {
                     // Toggle visibility if it exists
                     if (demoContainer.style.display === 'block') {
