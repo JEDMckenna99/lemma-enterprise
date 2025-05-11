@@ -352,8 +352,11 @@
             <div class="logo">
                 <span>L</span>
             </div>
-            <h1>Human Verification</h1>
+            <h1>Lemma Human Verification</h1>
         </header>
+        
+        <!-- Hidden CSRF token for JavaScript use -->
+        <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
 
         <!-- Flash messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -450,7 +453,15 @@
                         return resolve(token);
                     }
                     
-                    // If meta tag not available, generate one via fetch
+                    // If meta tag not available, try to get it from a hidden input field
+                    const tokenInput = document.querySelector('input[name="csrf_token"]');
+                    if (tokenInput && tokenInput.value) {
+                        const token = tokenInput.value;
+                        console.log("Using CSRF token from form input:", token.substring(0, 10) + "...");
+                        return resolve(token);
+                    }
+                    
+                    // If form input not available, generate one via fetch
                     console.log("Fetching fresh CSRF token from API...");
                     const response = await fetch('/api/generate-csrf-token');
                     if (!response.ok) {
@@ -784,6 +795,15 @@ async function verifyHuman() {
                     const csrfToken = await getCSRFToken();
                     console.log("Using CSRF token for verification:", csrfToken);
                     
+                    // Create the request data
+                    const requestData = {
+                        presentation: presentation,
+                        challenge: challenge,
+                        csrf_token: csrfToken
+                    };
+                    
+                    console.log("Sending verification request with CSRF token:", csrfToken.substring(0, 10) + "...");
+                    
                     // Verify presentation through your API
                     const verifyResponse = await fetch('/api/verify-presentation', {
                         method: 'POST',
@@ -791,11 +811,7 @@ async function verifyHuman() {
                             'Content-Type': 'application/json',
                             'X-CSRF-Token': csrfToken
                         },
-                        body: JSON.stringify({
-                            presentation: presentation,
-                            challenge: challenge,
-                            csrf_token: csrfToken  // Include token in the request body as well
-                        })
+                        body: JSON.stringify(requestData)
                     });
                     
                     if (!verifyResponse.ok) {

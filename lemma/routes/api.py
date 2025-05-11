@@ -209,10 +209,23 @@ def verify_presentation():
     if not current_app.config.get('TESTING', False) or not current_app.config.get('SKIP_AUTH_IN_TESTS', False):
         # Check for CSRF token
         try:
-            csrf_token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+            # Check token in multiple locations
+            csrf_token = request.headers.get('X-CSRF-Token')
+            if not csrf_token and request.is_json:
+                csrf_token = request.json.get('csrf_token')
+            if not csrf_token and request.form:
+                csrf_token = request.form.get('csrf_token')
+                
+            # Log CSRF token for debugging
+            current_app.logger.info(f"CSRF token in request: {csrf_token[:10] if csrf_token else 'None'}")
+            
+            # Check if token exists at all
             if not csrf_token:
                 current_app.logger.warning("CSRF token missing from request from IP: %s", request.remote_addr)
                 return jsonify({"error": "CSRF validation failed", "message": "CSRF token missing"}), 400
+                
+            # In a real production system, we'd validate against session token here
+            # This is simplified for now
         except Exception as e:
             current_app.logger.error("CSRF validation error: %s", str(e))
             # In production, we would abort here, but in tests we allow it to continue
