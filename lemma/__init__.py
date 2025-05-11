@@ -36,6 +36,11 @@ def create_app(test_config=None):
         PERMANENT_SESSION_LIFETIME=7200,  # 2 hours
         SKIP_AUTH_IN_TESTS=False,  # Default to not skipping auth in tests
         WTF_CSRF_ENABLED=True,  # Enable CSRF protection by default
+        # Heroku-specific session configuration
+        SESSION_TYPE='filesystem',
+        SESSION_FILE_DIR=os.environ.get('TEMP_DIR', '/tmp'),
+        SESSION_FILE_THRESHOLD=500,
+        SESSION_FILE_MODE=384,  # 0600 in octal
     )
     
     # Override with test config if provided

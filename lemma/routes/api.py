@@ -18,12 +18,11 @@ except ImportError:
 # Import security and CSRF modules
 try:
     from lemma.auth.security import admin_required
-    # We no longer need csrf_protect as we're implementing CSRF checks directly
-    # from lemma.auth.csrf_config import csrf_protect
+    from lemma.auth.csrf_config import csrf_protect, generate_csrf_token
 except ImportError:
     # Fallback to wherever these modules are actually located
     from lemma.security import admin_required
-    # from lemma.csrf_config import csrf_protect
+    from lemma.csrf_config import csrf_protect, generate_csrf_token
 
 # Create blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -53,7 +52,7 @@ def rate_limit(f):
         
         # Check if rate limit exceeded
         if len(request_history.get(ip, [])) >= 10:
-            current_app.logger.warning(f"Rate limit exceeded for IP: {ip}")
+            current_app.logger.warning("Rate limit exceeded for IP: %s", ip)
             return jsonify({
                 "error": "Rate limit exceeded",
                 "message": f"Maximum 10 requests allowed per 60 seconds"
@@ -198,37 +197,16 @@ def generate_challenge():
 
 @api_bp.route('/verify-presentation', methods=['POST'])
 @rate_limit
-# Only apply CSRF protection in non-test environments
+@csrf_protect
 def verify_presentation():
     """Verify a presentation via API.
     
     This endpoint verifies a presentation and updates the session with the verification result.
     It includes CSRF protection for session-modifying operations in production environments.
     """
-    # Skip CSRF check in testing environment if configured
-    if not current_app.config.get('TESTING', False) or not current_app.config.get('SKIP_AUTH_IN_TESTS', False):
-        # Check for CSRF token
-        try:
-            # Check token in multiple locations
-            csrf_token = request.headers.get('X-CSRF-Token')
-            if not csrf_token and request.is_json:
-                csrf_token = request.json.get('csrf_token')
-            if not csrf_token and request.form:
-                csrf_token = request.form.get('csrf_token')
-                
-            # Log CSRF token for debugging
-            current_app.logger.info(f"CSRF token in request: {csrf_token[:10] if csrf_token else 'None'}")
-            
-            # Check if token exists at all
-            if not csrf_token:
-                current_app.logger.warning("CSRF token missing from request from IP: %s", request.remote_addr)
-                return jsonify({"error": "CSRF validation failed", "message": "CSRF token missing"}), 400
-                
-            # In a real production system, we'd validate against session token here
-            # This is simplified for now
-        except Exception as e:
-            current_app.logger.error("CSRF validation error: %s", str(e))
-            # In production, we would abort here, but in tests we allow it to continue
+    # CSRF protection is now handled by the @csrf_protect decorator
+    # Log that we're processing a presentation verification request
+    current_app.logger.info("Processing presentation verification request from IP: %s", request.remote_addr)
     try:
         data = request.get_json()
         if not data or 'presentation' not in data or 'challenge' not in data:
@@ -313,8 +291,8 @@ def list_credentials():
         return jsonify({"error": f"Error listing credentials: {str(e)}"}), 500
 
 # Add CSRF token generation endpoint
-@api_bp.route('/generate-csrf-token', methods=['GET'])
-def generate_csrf_token():
+@api_bp.route('/get-csrf-token', methods=['GET'])
+def get_csrf_token():
     """Generate a CSRF token for client-side JavaScript.
     
     This endpoint provides a CSRF token that can be used by client-side JavaScript
@@ -324,10 +302,8 @@ def generate_csrf_token():
         A JSON object containing the CSRF token.
     """
     try:
-        from lemma.auth.csrf_config import generate_csrf_token as get_csrf
-        
         # Get or generate a CSRF token
-        token = get_csrf()
+        token = generate_csrf_token()
         
         # Return the token in JSON format
         return jsonify({'csrf_token': token})
@@ -337,6 +313,7 @@ def generate_csrf_token():
 
 @api_bp.route('/verify-human', methods=['POST'])
 @rate_limit
+@csrf_protect
 def verify_human():
     """Verify a human presentation and set session for protected content access.
     
@@ -348,14 +325,6 @@ def verify_human():
         or error message if verification fails.
     """
     try:
-        # Skip CSRF check in testing environment if configured
-        if not current_app.config.get('TESTING', False) or not current_app.config.get('SKIP_AUTH_IN_TESTS', False):
-            # Check for CSRF token
-            csrf_token = request.headers.get('X-CSRF-Token') or request.json.get('csrf_token')
-            if not csrf_token:
-                current_app.logger.warning("CSRF token missing from human verification request from IP: %s", request.remote_addr)
-                return jsonify({"success": False, "error": "CSRF validation failed"}), 400
-        
         data = request.get_json()
         if not data or 'presentation' not in data or 'challenge' not in data:
             return jsonify({"success": False, "error": "Presentation and challenge are required"}), 400
