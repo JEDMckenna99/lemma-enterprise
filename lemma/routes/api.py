@@ -55,7 +55,7 @@ def rate_limit(f):
             current_app.logger.warning("Rate limit exceeded for IP: %s", ip)
             return jsonify({
                 "error": "Rate limit exceeded",
-                "message": f"Maximum 10 requests allowed per 60 seconds"
+                "message": "Maximum 10 requests allowed per 60 seconds"
             }), 429
         
         # Add current request
@@ -197,14 +197,26 @@ def generate_challenge():
 
 @api_bp.route('/verify-presentation', methods=['POST'])
 @rate_limit
-@csrf_protect
 def verify_presentation():
     """Verify a presentation via API.
     
     This endpoint verifies a presentation and updates the session with the verification result.
     It includes CSRF protection for session-modifying operations in production environments.
     """
-    # CSRF protection is now handled by the @csrf_protect decorator
+    # Manual CSRF validation
+    if not current_app.config.get('TESTING', False) or not current_app.config.get('SKIP_AUTH_IN_TESTS', False):
+        csrf_token = request.headers.get('X-CSRF-Token')
+        if not csrf_token and request.is_json:
+            csrf_token = request.json.get('csrf_token')
+        if not csrf_token and request.form:
+            csrf_token = request.form.get('csrf_token')
+            
+        # Check if token exists and validate it
+        from flask import session
+        if not csrf_token or csrf_token != session.get('_csrf_token'):
+            current_app.logger.warning("CSRF validation failed for request from IP: %s", request.remote_addr)
+            return jsonify({"valid": False, "error": "CSRF validation failed"}), 400
+    
     # Log that we're processing a presentation verification request
     current_app.logger.info("Processing presentation verification request from IP: %s", request.remote_addr)
     try:
@@ -313,7 +325,6 @@ def get_csrf_token():
 
 @api_bp.route('/verify-human', methods=['POST'])
 @rate_limit
-@csrf_protect
 def verify_human():
     """Verify a human presentation and set session for protected content access.
     
@@ -325,6 +336,21 @@ def verify_human():
         or error message if verification fails.
     """
     try:
+        # Manual CSRF validation
+        if not current_app.config.get('TESTING', False) or not current_app.config.get('SKIP_AUTH_IN_TESTS', False):
+            csrf_token = request.headers.get('X-CSRF-Token')
+            if not csrf_token and request.is_json:
+                csrf_token = request.json.get('csrf_token')
+            if not csrf_token and request.form:
+                csrf_token = request.form.get('csrf_token')
+                
+            # Check if token exists and validate it
+            from flask import session
+            if not csrf_token or csrf_token != session.get('_csrf_token'):
+                current_app.logger.warning("CSRF validation failed for human verification request from IP: %s", request.remote_addr)
+                return jsonify({"success": False, "error": "CSRF validation failed"}), 400
+        
+        current_app.logger.info("Processing human verification request from IP: %s", request.remote_addr)
         data = request.get_json()
         if not data or 'presentation' not in data or 'challenge' not in data:
             return jsonify({"success": False, "error": "Presentation and challenge are required"}), 400
