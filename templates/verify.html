@@ -445,10 +445,13 @@
                     // Try to get CSRF token from any available source
                     const tokenMeta = document.querySelector('meta[name="csrf-token"]');
                     if (tokenMeta && tokenMeta.getAttribute('content')) {
-                        return resolve(tokenMeta.getAttribute('content'));
+                        const token = tokenMeta.getAttribute('content');
+                        console.log("Using CSRF token from meta tag:", token.substring(0, 10) + "...");
+                        return resolve(token);
                     }
                     
                     // If meta tag not available, generate one via fetch
+                    console.log("Fetching fresh CSRF token from API...");
                     const response = await fetch('/api/generate-csrf-token');
                     if (!response.ok) {
                         throw new Error(`Failed to fetch CSRF token: ${response.status}`);
@@ -459,6 +462,7 @@
                         throw new Error('No CSRF token in response');
                     }
                     
+                    console.log("Received fresh CSRF token:", data.csrf_token.substring(0, 10) + "...");
                     resolve(data.csrf_token);
                 } catch (error) {
                     console.error('Error fetching CSRF token:', error);
@@ -622,9 +626,6 @@
         // Verify the credential
         document.getElementById('verifyBtn').addEventListener('click', async function() {
             try {
-                // Get CSRF token
-                const csrfToken = await getCSRFToken();
-                
                 // Get the credential from localStorage
                 const credentialJson = localStorage.getItem('lemma_credential_{{ user_id }}');
                 if (!credentialJson) {
@@ -637,6 +638,10 @@
                 // Generate a new challenge for presentation (simulating what a customer site would do)
                 const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
                     .map(b => b.toString(16).padStart(2, '0')).join('');
+                
+                // Get a fresh CSRF token
+                const csrfToken = await getCSRFToken();
+                console.log("Using CSRF token for presentation:", csrfToken.substring(0, 10) + "...");
                 
                 // Create a presentation with the new challenge
                 const presResponse = await fetch('/api/presentation', {
@@ -695,7 +700,7 @@
                 
                 // Set up and display the demo content
                 demoContainer.style.display = 'block';
-                setupDemoContainer(demoContainer, presentation, challenge, csrfToken);
+                setupDemoContainer(demoContainer, presentation, challenge);
             } catch (e) {
                 console.error('Error in verification demo:', e);
                 alert('Error creating verification demo: ' + e.message);
@@ -703,7 +708,7 @@
         });
         
         // Function to set up the demo container with proper content
-        function setupDemoContainer(container, presentation, challenge, csrfToken) {
+        function setupDemoContainer(container, presentation, challenge) {
             // Create the content for the demo
             container.innerHTML = `
                 <h3>Customer Site Integration Demo</h3>
@@ -754,10 +759,13 @@ async function verifyHuman() {
     challenge
   );
   
-  // 4. Verify with Lemma service
-  const result = await verifyPresentation(presentation, challenge);
+  // 4. Get CSRF token for API request
+  const csrfToken = await getCSRFToken();
   
-  // 5. Grant access based on result
+  // 5. Verify with Lemma service
+  const result = await verifyPresentation(presentation, challenge, csrfToken);
+  
+  // 6. Grant access based on result
   if (result.valid) {
     // User is verified human - grant access
     return { valid: true, userId: result.holder };
@@ -772,6 +780,10 @@ async function verifyHuman() {
             // Add event listener for the verify demo button
             document.getElementById('verifyDemoBtn').addEventListener('click', async function() {
                 try {
+                    // Always get a fresh CSRF token for this request
+                    const csrfToken = await getCSRFToken();
+                    console.log("Using CSRF token for verification:", csrfToken);
+                    
                     // Verify presentation through your API
                     const verifyResponse = await fetch('/api/verify-presentation', {
                         method: 'POST',
@@ -788,10 +800,12 @@ async function verifyHuman() {
                     
                     if (!verifyResponse.ok) {
                         const errorText = await verifyResponse.text();
+                        console.error("Verification API error:", verifyResponse.status, errorText);
                         throw new Error(`Verification failed: ${verifyResponse.status} - ${errorText}`);
                     }
                     
                     const verifyResult = await verifyResponse.json();
+                    console.log("Verification result:", verifyResult);
                     
                     // Display the result
                     const resultDiv = document.getElementById('verifyResult');
