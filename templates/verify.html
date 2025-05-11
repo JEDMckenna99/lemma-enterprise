@@ -265,13 +265,16 @@
                 <div class="field-value">Verified</div>
             </div>
             {% endif %}
-            <p style="margin-top: 20px; color: #333;">Check your phone for a verification link sent via SMS. Only links sent by the admin are valid for onboarding.</p>
-            {% if verification_url %}
-            <div class="field">
-                <div class="field-name">Verification Link (for admin/testing):</div>
-                <div class="field-value"><a href="{{ verification_url }}">{{ verification_url }}</a></div>
-            </div>
-            {% endif %}
+            
+            <button id="storeBtn" class="button">Store Credential</button>
+            <button id="downloadBtn" class="button secondary" style="display: none;">Download Credential</button>
+            <button id="importBtn" class="button secondary">Import Credential</button>
+            <input type="file" id="importFile" accept="application/json" style="display:none;">
+            <button id="verifyBtn" class="button secondary">Verify Credential</button>
+            <button id="accessBtn" class="button secondary">Access Protected Content</button>
+            <button id="showJsonBtn" class="button secondary">Show Raw Credential</button>
+            
+            <pre id="jsonView" class="json-view"></pre>
         </div>
         {% else %}
         <div class="card">
@@ -332,9 +335,104 @@
                 document.getElementById('jsonView').textContent = JSON.stringify(credential, null, 2);
                 document.getElementById('jsonView').style.display = 'block';
                 document.getElementById('showJsonBtn').textContent = 'Hide Raw Credential';
+                
+                // Show the Download button
+                document.getElementById('downloadBtn').style.display = 'block';
             } catch (e) {
                 console.error('Error storing credential:', e);
                 alert('Error storing credential: ' + e.message);
+            }
+        });
+        
+        // Download credential as JSON
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            try {
+                const credentialJson = localStorage.getItem('lemma_credential_{{ user_id }}');
+                if (!credentialJson) {
+                    alert('No credential found. Please store the credential first.');
+                    return;
+                }
+                
+                const credential = JSON.parse(credentialJson);
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(credential, null, 2));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", "lemma-credential-{{ user_id }}.json");
+                document.body.appendChild(downloadAnchor); // Required for Firefox
+                downloadAnchor.click();
+                downloadAnchor.remove();
+            } catch (e) {
+                console.error('Error downloading credential:', e);
+                alert('Error downloading credential: ' + e.message);
+            }
+        });
+        
+        // Import credential from JSON file
+        document.getElementById('importBtn').addEventListener('click', function() {
+            document.getElementById('importFile').click();
+        });
+
+        document.getElementById('importFile').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const credential = JSON.parse(e.target.result);
+                    
+                    // Basic validation to ensure this is a Lemma credential
+                    if (!credential.id || !credential.type || !credential.credentialSubject || !credential.proof) {
+                        throw new Error("Invalid credential format");
+                    }
+                    
+                    // Store in localStorage
+                    localStorage.setItem('lemma_credential_{{ user_id }}', JSON.stringify(credential));
+                    
+                    // Generate a random challenge for presentation
+                    const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                        .map(b => b.toString(16).padStart(2, '0')).join('');
+                    localStorage.setItem('lemma_challenge', challenge);
+                    
+                    // Create a presentation with the imported credential
+                    fetch('/api/presentation', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            credential: credential,
+                            challenge: challenge
+                        })
+                    }).then(response => response.json())
+                      .then(presentation => {
+                          localStorage.setItem('lemma_presentation_{{ user_id }}', JSON.stringify(presentation));
+                          
+                          // Show the JSON
+                          document.getElementById('jsonView').textContent = JSON.stringify(credential, null, 2);
+                          document.getElementById('jsonView').style.display = 'block';
+                          document.getElementById('showJsonBtn').textContent = 'Hide Raw Credential';
+                          document.getElementById('downloadBtn').style.display = 'block';
+                          
+                          alert('Credential imported successfully! You can now access protected content.');
+                      })
+                      .catch(error => {
+                          console.error('Error creating presentation:', error);
+                          alert('Error creating presentation: ' + error.message);
+                      });
+                } catch (e) {
+                    console.error('Error importing credential:', e);
+                    alert('Error importing credential: ' + e.message);
+                }
+            };
+            reader.readAsText(file);
+        });
+        
+        // Check if credential is already stored and show download button
+        window.addEventListener('load', function() {
+            const credentialJson = localStorage.getItem('lemma_credential_{{ user_id }}');
+            if (credentialJson) {
+                document.getElementById('downloadBtn').style.display = 'block';
             }
         });
         

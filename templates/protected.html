@@ -157,6 +157,10 @@
                 <strong>User ID:</strong> <span id="userId">{{ user_id }}</span><br>
                 <strong>Verification Status:</strong> Verified Human<br>
                 <strong>Access Level:</strong> Full Access
+                <div style="margin-top: 15px;">
+                    <button id="importBtn" class="button" style="margin-top: 5px; font-size: 14px; padding: 8px 12px;">Import Credential</button>
+                    <input type="file" id="importFile" accept="application/json" style="display:none;">
+                </div>
             </div>
             
             <div class="content-section">
@@ -208,6 +212,70 @@
                 }
             }
         }
+        
+        // Import credential from JSON file
+        document.getElementById('importBtn').addEventListener('click', function() {
+            document.getElementById('importFile').click();
+        });
+        
+        document.getElementById('importFile').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const credential = JSON.parse(e.target.result);
+                    
+                    // Basic validation to ensure this is a Lemma credential
+                    if (!credential.id || !credential.type || !credential.credentialSubject || !credential.proof) {
+                        throw new Error("Invalid credential format");
+                    }
+                    
+                    // Extract user ID from credential
+                    const userId = credential.credentialSubject.id.replace('did:user:', '');
+                    
+                    // Store in localStorage
+                    localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(credential));
+                    
+                    // Generate a random challenge for presentation
+                    const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                        .map(b => b.toString(16).padStart(2, '0')).join('');
+                    localStorage.setItem('lemma_challenge', challenge);
+                    
+                    // Create a presentation with the imported credential
+                    fetch('/api/presentation', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            credential: credential,
+                            challenge: challenge
+                        })
+                    }).then(response => response.json())
+                      .then(presentation => {
+                          localStorage.setItem(`lemma_presentation_${userId}`, JSON.stringify(presentation));
+                          
+                          // Update displayed user ID
+                          document.getElementById('userId').textContent = userId;
+                          
+                          alert('Credential imported successfully!');
+                          
+                          // Refresh the page to reflect the new credential
+                          window.location.reload();
+                      })
+                      .catch(error => {
+                          console.error('Error creating presentation:', error);
+                          alert('Error creating presentation: ' + error.message);
+                      });
+                } catch (e) {
+                    console.error('Error importing credential:', e);
+                    alert('Error importing credential: ' + e.message);
+                }
+            };
+            reader.readAsText(file);
+        });
         
         // Run on page load
         window.addEventListener('load', function() {

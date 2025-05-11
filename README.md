@@ -196,6 +196,39 @@ X-API-Key: your_api_key_here
 
 ---
 
+## Credential Storage and Cross-Device Support
+
+Lemma uses a combination of approaches to help users manage their Verifiable Credentials across devices.
+
+### Current Implementation
+
+The system currently supports:
+
+- **Browser LocalStorage**: Credentials are automatically stored in the browser's localStorage for seamless use on a single device.
+- **Downloadable JSON Backup**: Users can download their credential as a JSON file which can be backed up or transferred to other devices.
+- **Import Functionality**: Users can import previously downloaded JSON credentials on any device, enabling cross-device credential use.
+
+This implementation ensures users can:
+1. Use their credential automatically on the device where they initially verified
+2. Backup their credential to prevent data loss
+3. Transfer their credential to other devices (desktop or mobile) manually
+
+### Future Plans
+
+We're planning to integrate with digital wallet solutions for improved user experience:
+
+- **Apple Wallet Integration**: Future versions will support adding Lemma credentials to Apple Wallet as passes.
+- **Google Wallet Integration**: Support for Google Wallet will be added as Google expands their digital ID capabilities.
+- **W3C Standards Compliance**: All wallet integrations will maintain compliance with W3C Verifiable Credentials standards.
+
+These integrations will enable:
+- One-tap credential storage
+- Simple cross-device transfer
+- Increased security through device-level authentication
+- Familiar user interfaces for credential management
+
+---
+
 ## SMS Integration
 
 The system is designed to send verification links via SMS using Twilio:
