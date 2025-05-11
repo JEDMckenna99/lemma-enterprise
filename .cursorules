@@ -1,0 +1,76 @@
+{
+  "name": "Lemma Enterprise Rules",
+  "description": "Rules for the Lemma enterprise identity verification system",
+  "lintRules": {
+    "python": {
+      "maxLineLength": 100,
+      "indentation": 4,
+      "namingConventions": {
+        "classes": "PascalCase",
+        "functions": "snake_case",
+        "constants": "UPPER_CASE"
+      },
+      "docstrings": "required"
+    }
+  },
+  "allowedPatterns": [
+    "from cryptography.hazmat.primitives.asymmetric import ed25519",
+    "import base64",
+    "def _load_or_create_keys",
+    "ED25519_PRIVATE_KEY",
+    "@app.route",
+    "session['verified_human']"
+  ],
+  "disallowedPatterns": [
+    "print\\(.*\\)",
+    "phone_number =",
+    "SSN",
+    "social_security",
+    "PASSWORD",
+    "SECRET_KEY = '[a-zA-Z0-9]+'",
+    "DEBUG = True"
+  ],
+  "architecture": {
+    "components": {
+      "routes": "HTTP endpoints in /lemma/routes/",
+      "core": "Business logic in /lemma/core/",
+      "auth": "Authentication logic in /lemma/auth/",
+      "utils": "Utility functions in /lemma/utils/",
+      "models": "Data models in /lemma/models/"
+    }
+  },
+  "priorities": [
+    "Core verification flow",
+    "W3C VC issuance",
+    "Browser wallet storage",
+    "Presentation/verification",
+    "Session management"
+  ],
+  "securityRules": [
+    "No PII storage",
+    "Environment variables for secrets",
+    "Input validation required",
+    "CSRF protection for all forms",
+    "Escape user-generated content",
+    "Rate limiting for API endpoints"
+  ],
+  "didFormat": "did:lemma:<uuid>",
+  "vcStructure": {
+    "issuer": "Lemma's DID",
+    "subject": "User ID (not PII)",
+    "type": ["VerifiableCredential", "LemmaCredential", "HumanCredential"],
+    "proof": "Ed25519 signature"
+  },
+  "deploymentVars": {
+    "ED25519_PRIVATE_KEY": "Base64-encoded private key",
+    "DID": "Custom DID (optional)",
+    "LEMMA_ADMIN_USER": "Admin username",
+    "LEMMA_ADMIN_PASS": "Admin password"
+  },
+  "testing": {
+    "unitTestsRequired": true,
+    "integrationTestsRequired": true,
+    "coverageThreshold": 80,
+    "command": "python run_tests.py"
+  }
+} 

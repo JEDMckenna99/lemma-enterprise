@@ -2,7 +2,11 @@
 CSRF Protection Configuration for Lemma Enterprise.
 Provides enhanced CSRF protection for enterprise-grade security.
 """
-from flask import request, abort, current_app
+import logging
+from flask import request, abort, current_app, session
+import secrets
+
+logger = logging.getLogger(__name__)
 
 # Try to import Flask-WTF CSRF protection
 try:
@@ -14,17 +18,46 @@ except ImportError:
     # Define fallback classes for environments without Flask-WTF
     class CSRFProtect:
         def init_app(self, app):
-            pass
+            app.config.setdefault('WTF_CSRF_ENABLED', True)
+            app.config.setdefault('WTF_CSRF_SECRET_KEY', app.config.get('SECRET_KEY', 'csrf-key'))
+            app.config.setdefault('WTF_CSRF_METHODS', ['POST', 'PUT', 'PATCH', 'DELETE'])
+            
+            # Register a function to generate and set CSRF token in session
+            @app.before_request
+            def csrf_protect():
+                if not app.config.get('WTF_CSRF_ENABLED', True):
+                    return
+                
+                # Skip for exempt routes
+                for exempt_route in getattr(self, '_exempt_routes', []):
+                    if request.path.startswith(exempt_route):
+                        return
+                
+                # Generate CSRF token if not in session
+                if '_csrf_token' not in session:
+                    session['_csrf_token'] = secrets.token_hex(16)
+                
+                # Check CSRF token for state-changing requests
+                if request.method in app.config.get('WTF_CSRF_METHODS', ['POST', 'PUT', 'PATCH', 'DELETE']):
+                    token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+                    if not token or token != session.get('_csrf_token'):
+                        # Log the error but don't block in development
+                        logger.warning("CSRF validation failed for %s", request.path)
+                        if app.config.get('ENV') == 'production' and not app.config.get('TESTING'):
+                            abort(400, "CSRF validation failed")
             
         def exempt(self, view_or_route):
-            pass
+            if not hasattr(self, '_exempt_routes'):
+                self._exempt_routes = []
+            self._exempt_routes.append(view_or_route)
             
         def generate_csrf(self):
-            import secrets
-            return secrets.token_hex(16)
+            if '_csrf_token' not in session:
+                session['_csrf_token'] = secrets.token_hex(16)
+            return session.get('_csrf_token')
             
         def validate_csrf(self, token):
-            return True
+            return token and token == session.get('_csrf_token')
     
     class CSRFError(Exception):
         def __init__(self, description=None):
@@ -33,6 +66,7 @@ except ImportError:
     # Initialize with the fallback
     csrf = CSRFProtect()
     FLASK_WTF_AVAILABLE = False
+    logger.warning("Flask-WTF not available, using fallback CSRF implementation")
 
 # List of exempt routes (paths that don't require CSRF protection)
 # By default, exempt API endpoints that use API key authentication
@@ -44,6 +78,10 @@ CSRF_EXEMPT_ROUTES = [
     '/api/generate-challenge',
     '/api/credentials',
     '/api/store-credential',
+    '/api/credential/',
+    '/api/presentation',
+    '/api/verify',
+    '/api/verify-human',
     '/admin/login',
     '/admin/issue',
     '/admin/revoke',
@@ -96,25 +134,6 @@ def configure_csrf(app):
     if testing_mode and skip_auth:
         app.logger.info("CSRF protection disabled for testing")
         csrf.exempt("*")
-    
-    # Add CSRF token to all responses
-    @app.after_request
-    def add_csrf_cookie(response):
-        """Add CSRF token to cookies for JavaScript access."""
-        # Only add the cookie for HTML responses and if not already present
-        if response.mimetype == 'text/html' and not request.cookies.get('csrf_token'):
-            try:
-                token = csrf.generate_csrf()
-                response.set_cookie(
-                    'csrf_token',
-                    token,
-                    httponly=False,  # Needs to be accessible by JavaScript
-                    secure=app.config.get('SESSION_COOKIE_SECURE', True),
-                    samesite=app.config.get('SESSION_COOKIE_SAMESITE', 'Lax')
-                )
-            except Exception as e:
-                app.logger.warning("Could not set CSRF cookie: %s", str(e))
-        return response
     
     return app
 

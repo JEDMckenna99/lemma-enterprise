@@ -266,15 +266,19 @@
             </div>
             {% endif %}
             
-            <button id="storeBtn" class="button">Store Credential</button>
-            <button id="downloadBtn" class="button secondary" style="display: none;">Download Credential</button>
-            <button id="importBtn" class="button secondary">Import Credential</button>
-            <input type="file" id="importFile" accept="application/json" style="display:none;">
-            <button id="verifyBtn" class="button secondary">Verify Credential</button>
-            <button id="accessBtn" class="button secondary">Access Protected Content</button>
-            <button id="showJsonBtn" class="button secondary">Show Raw Credential</button>
+            <div class="actions">
+                <button id="storeBtn" class="btn btn-primary">Store Credential</button>
+                <button id="verifyBtn" class="btn btn-secondary">Verify Credential</button>
+                <button id="showJsonBtn" class="btn btn-info">Show Raw Credential</button>
+                <button id="downloadBtn" class="btn btn-success" style="display: none;">Download Credential</button>
+                <button id="importBtn" class="btn btn-warning">Import Credential</button>
+                <input type="file" id="importFile" style="display: none;" accept=".json">
+                <button id="debugBtn" class="btn btn-outline-secondary">Debug Storage</button>
+            </div>
             
-            <pre id="jsonView" class="json-view"></pre>
+            <div id="jsonView" class="json-view"></div>
+
+            <div id="debugInfo" class="debug-info" style="display: none; margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;"></div>
         </div>
         {% else %}
         <div class="card">
@@ -551,6 +555,108 @@
         window.addEventListener('load', function() {
             checkMobile();
         });
+
+        // Debug function to check localStorage status
+        document.getElementById('debugBtn').addEventListener('click', function() {
+            try {
+                // Check localStorage access
+                const testKey = 'lemma_test_' + Date.now();
+                localStorage.setItem(testKey, 'test');
+                const testValue = localStorage.getItem(testKey);
+                localStorage.removeItem(testKey);
+                
+                // Get all Lemma-related items
+                const lemmaItems = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('lemma_')) {
+                        lemmaItems.push({
+                            key: key,
+                            size: localStorage.getItem(key).length
+                        });
+                    }
+                }
+                
+                // Display the results
+                let debugInfo = `
+                    <h4>LocalStorage Access Test</h4>
+                    <p>Test write/read: ${testValue === 'test' ? '✅ Success' : '❌ Failed'}</p>
+                    
+                    <h4>Browser Storage Info:</h4>
+                    <p>Total items in localStorage: ${localStorage.length}</p>
+                    <p>Lemma-related items: ${lemmaItems.length}</p>
+                    
+                    <h4>Lemma Items:</h4>
+                    <ul>
+                        ${lemmaItems.map(item => `<li>${item.key} (${item.size} bytes)</li>`).join('')}
+                    </ul>
+                    
+                    <h4>User Agent:</h4>
+                    <p>${navigator.userAgent}</p>
+                    
+                    <h4>Storage Limits:</h4>
+                    <p>Estimated available space: ${estimateStorageSpace()} MB</p>
+                `;
+                
+                // Create modal or display in page
+                const debugDisplay = document.getElementById('debugInfo');
+                debugDisplay.innerHTML = debugInfo;
+                debugDisplay.style.display = 'block';
+            } catch (e) {
+                alert('Error accessing localStorage: ' + e.message);
+                console.error('LocalStorage access error:', e);
+            }
+        });
+
+        // Estimate available localStorage space
+        function estimateStorageSpace() {
+            try {
+                // Calculate remaining space by filling localStorage until it fails
+                let testKey = 'lemma_space_test_';
+                let testString = '0123456789'.repeat(100); // 1KB string
+                let i = 0;
+                let prevStorageItems = [];
+                
+                // Save existing items
+                for (let j = 0; j < localStorage.length; j++) {
+                    const key = localStorage.key(j);
+                    prevStorageItems.push({
+                        key: key,
+                        value: localStorage.getItem(key)
+                    });
+                }
+                
+                // Clear storage
+                localStorage.clear();
+                
+                // Fill storage
+                try {
+                    for (i = 0; i < 10000; i++) { // Limit to prevent infinite loop
+                        localStorage.setItem(testKey + i, testString);
+                        // Increase size as we go to speed up the test
+                        if (i > 100) testString = testString + testString;
+                    }
+                } catch (e) {
+                    // Storage is full
+                }
+                
+                // Calculate space
+                const usedSpace = i * (testString.length * 2 / 1024 / 1024); // Approximate MB used
+                
+                // Clean up
+                localStorage.clear();
+                
+                // Restore previous items
+                for (const item of prevStorageItems) {
+                    localStorage.setItem(item.key, item.value);
+                }
+                
+                return usedSpace.toFixed(2);
+            } catch (e) {
+                console.error('Error estimating storage space:', e);
+                return 'Unable to estimate';
+            }
+        }
     </script>
     {% endif %}
 </body>
