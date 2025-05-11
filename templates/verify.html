@@ -315,6 +315,35 @@
             color: #b71c1c;
             border-left: 4px solid #f44336;
         }
+        
+        /* Alert styles for demo */
+        .alert {
+            padding: 12px 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .alert-success {
+            background-color: #e8f5e9;
+            color: #1b5e20;
+            border-left: 4px solid #4caf50;
+        }
+        
+        .alert-danger {
+            background-color: #ffebee;
+            color: #b71c1c;
+            border-left: 4px solid #f44336;
+        }
+        
+        /* Demo step styles */
+        .demo-step {
+            margin-bottom: 25px;
+        }
+        
+        .demo-step h4 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -629,60 +658,162 @@
                 
                 const credential = JSON.parse(credentialJson);
                 
-                // Get or generate presentation
-                let presentationJson = localStorage.getItem(`lemma_presentation_{{ user_id }}`);
-                let challenge = localStorage.getItem('lemma_challenge');
+                // Generate a new challenge for presentation (simulating what a customer site would do)
+                const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                    .map(b => b.toString(16).padStart(2, '0')).join('');
                 
-                if (!presentationJson || !challenge) {
-                    // Generate a new challenge and presentation if needed
-                    challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-                        .map(b => b.toString(16).padStart(2, '0')).join('');
-                    localStorage.setItem('lemma_challenge', challenge);
-                    
-                    const presResponse = await fetch('/api/presentation', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-Token': csrfToken
-                        },
-                        body: JSON.stringify({
-                            credential: credential,
-                            challenge: challenge,
-                            csrf_token: csrfToken
-                        })
-                    });
-                    
-                    const presentation = await presResponse.json();
-                    localStorage.setItem(`lemma_presentation_{{ user_id }}`, JSON.stringify(presentation));
-                    presentationJson = JSON.stringify(presentation);
-                }
-                
-                const presentation = JSON.parse(presentationJson);
-                
-                // Verify the presentation and get access
-                const accessResponse = await fetch('/api/verify-human', {
+                // Create a presentation with the new challenge
+                const presResponse = await fetch('/api/presentation', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': csrfToken
                     },
                     body: JSON.stringify({
-                        presentation: presentation,
+                        credential: credential,
                         challenge: challenge,
                         csrf_token: csrfToken
                     })
                 });
                 
-                const accessResult = await accessResponse.json();
+                const presentation = await presResponse.json();
                 
-                if (accessResult.success) {
-                    window.location.href = accessResult.redirect || '/protected';
+                // Store the latest presentation and challenge for testing
+                localStorage.setItem('lemma_presentation_{{ user_id }}', JSON.stringify(presentation));
+                localStorage.setItem('lemma_challenge', challenge);
+                
+                // Check if we already have a demo container
+                let demoContainer = document.getElementById('customerSiteDemo');
+                if (!demoContainer) {
+                    // Create a demo container if it doesn't exist
+                    demoContainer = document.createElement('div');
+                    demoContainer.id = 'customerSiteDemo';
+                    demoContainer.className = 'customer-site-demo';
+                    demoContainer.style.backgroundColor = '#f8f9fa';
+                    demoContainer.style.border = '1px solid #dee2e6';
+                    demoContainer.style.borderRadius = '5px';
+                    demoContainer.style.padding = '20px';
+                    demoContainer.style.marginTop = '20px';
+                    
+                    // Insert after the actions div
+                    const actionsDiv = document.querySelector('.actions');
+                    actionsDiv.parentNode.insertBefore(demoContainer, actionsDiv.nextSibling);
                 } else {
-                    alert('Access denied: ' + (accessResult.error || 'Verification failed'));
+                    // Toggle visibility if it exists
+                    if (demoContainer.style.display === 'block') {
+                        demoContainer.style.display = 'none';
+                        return;
+                    }
                 }
+                
+                // Display the demonstration
+                demoContainer.style.display = 'block';
+                
+                // Create the content for the demo
+                demoContainer.innerHTML = `
+                    <h3>Customer Site Integration Demo</h3>
+                    <p>This demonstrates how a customer site would verify a human credential.</p>
+                    
+                    <div class="demo-step">
+                        <h4>Step 1: Generate a Challenge</h4>
+                        <p>The customer site generates a random challenge to prevent replay attacks:</p>
+                        <pre style="background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto;">${challenge}</pre>
+                    </div>
+                    
+                    <div class="demo-step">
+                        <h4>Step 2: User Creates a Verifiable Presentation</h4>
+                        <p>The credential stored in the browser is used to create a presentation with the challenge:</p>
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            <pre style="background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(presentation, null, 2)}</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="demo-step">
+                        <h4>Step 3: Verify the Presentation</h4>
+                        <p>The customer site verifies the presentation by:</p>
+                        <ol>
+                            <li>Checking that the challenge matches what was sent</li>
+                            <li>Verifying the cryptographic proof on the presentation</li>
+                            <li>Verifying the included credential is valid</li>
+                        </ol>
+                        <button id="verifyDemoBtn" class="btn btn-success">Simulate Verification</button>
+                        <div id="verifyResult" style="margin-top: 10px;"></div>
+                    </div>
+                    
+                    <div class="demo-step">
+                        <h4>Integration Code Example</h4>
+                        <pre style="background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto;">// Sample JavaScript integration code
+async function verifyHuman() {
+  // 1. Generate a challenge
+  const challenge = generateRandomChallenge();
+  
+  // 2. Retrieve user's credential from localStorage
+  const credentialJson = localStorage.getItem('lemma_credential_user_id');
+  if (!credentialJson) {
+    return { valid: false, reason: 'No credential found' };
+  }
+  
+  // 3. Create a presentation
+  const presentation = await createPresentation(
+    JSON.parse(credentialJson), 
+    challenge
+  );
+  
+  // 4. Verify with Lemma service
+  const result = await verifyPresentation(presentation, challenge);
+  
+  // 5. Grant access based on result
+  if (result.valid) {
+    // User is verified human - grant access
+    return { valid: true, userId: result.holder };
+  } else {
+    // Verification failed
+    return { valid: false, reason: result.reason };
+  }
+}</pre>
+                    </div>
+                `;
+                
+                // Add event listener for the verify demo button
+                document.getElementById('verifyDemoBtn').addEventListener('click', async function() {
+                    // Verify presentation through your API
+                    const verifyResponse = await fetch('/api/verify-presentation', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
+                        },
+                        body: JSON.stringify({
+                            presentation: presentation,
+                            challenge: challenge,
+                            csrf_token: csrfToken
+                        })
+                    });
+                    
+                    const verifyResult = await verifyResponse.json();
+                    
+                    // Display the result
+                    const resultDiv = document.getElementById('verifyResult');
+                    if (verifyResult.valid) {
+                        resultDiv.innerHTML = `
+                            <div class="alert alert-success">
+                                ✅ Verification Successful!<br>
+                                User is a verified human with ID: ${verifyResult.holder.split(':').pop()}
+                            </div>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="alert alert-danger">
+                                ❌ Verification Failed<br>
+                                Reason: ${verifyResult.reason || 'Unknown error'}
+                            </div>
+                        `;
+                    }
+                });
+                
             } catch (e) {
-                console.error('Error verifying credential:', e);
-                alert('Error verifying credential: ' + e.message);
+                console.error('Error in verification demo:', e);
+                alert('Error creating verification demo: ' + e.message);
             }
         });
         
