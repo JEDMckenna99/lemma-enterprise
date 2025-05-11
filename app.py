@@ -47,57 +47,30 @@ class LemmaEnterprise:
         print(f"Lemma Enterprise initialized with issuer DID: {self.keys['did']}")
     
     def _load_or_create_keys(self) -> Dict[str, Any]:
-        """Load existing keys or create new ones with enterprise-grade security."""
-        if os.path.exists(KEYS_FILE):
-            with open(KEYS_FILE, 'r', encoding='utf-8') as f:
-                keys_data = json.load(f)
-                # Convert stored key to actual key object for runtime use
-                private_key_bytes = base64.b64decode(keys_data['private_key'])
-                private_key = ed25519.Ed25519PrivateKey.from_private_bytes(private_key_bytes)
-                keys_data['private_key_obj'] = private_key
-                return keys_data
-        
-        # Create new keys with strong entropy
-        private_key = ed25519.Ed25519PrivateKey.generate()
-        public_key = private_key.public_key()
-        
-        # Create DID with method-specific identifier
-        did_uuid = uuid.uuid4().hex
-        did_method = "lemma"
-        did = f"did:{did_method}:{did_uuid}"
-        
-        # Serialize keys for storage with secure encoding
-        private_bytes = private_key.private_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PrivateFormat.Raw,
-            encryption_algorithm=serialization.NoEncryption()
-        )
-        public_bytes = public_key.public_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PublicFormat.Raw
-        )
-        
-        # Create key data with additional security metadata
-        keys_data = {
-            'did': did,
-            'did_method': did_method,
-            'did_id': did_uuid,
-            'private_key': base64.b64encode(private_bytes).decode('ascii'),
-            'public_key': base64.b64encode(public_bytes).decode('ascii'),
-            'created_at': datetime.now().isoformat(),
-            'key_type': 'Ed25519',
-            'private_key_obj': private_key  # Not stored, just for runtime use
-        }
-        
-        # Save keys with pretty formatting for readability
-        with open(KEYS_FILE, 'w', encoding='utf-8') as f:
-            # Don't write the actual key object
-            save_data = keys_data.copy()
-            del save_data['private_key_obj']
-            json.dump(save_data, f, indent=2)
-        
-        print(f"Generated new DID with enterprise security: {did}")
-        return keys_data
+        """Load Ed25519 keys from environment variable only. Fail if not set."""
+        env_private_key = os.environ.get('ED25519_PRIVATE_KEY')
+        env_did = os.environ.get('DID')
+        if env_private_key:
+            private_key_bytes = base64.b64decode(env_private_key)
+            private_key = ed25519.Ed25519PrivateKey.from_private_bytes(private_key_bytes)
+            public_key = private_key.public_key()
+            public_bytes = public_key.public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw
+            )
+            keys_data = {
+                'did': env_did if env_did else 'did:lemma:env',
+                'did_method': 'lemma',
+                'did_id': 'env',
+                'private_key': env_private_key,
+                'public_key': base64.b64encode(public_bytes).decode('ascii'),
+                'created_at': datetime.now().isoformat(),
+                'key_type': 'Ed25519',
+                'private_key_obj': private_key
+            }
+            print(f"Loaded Ed25519 private key from environment variable. DID: {keys_data['did']}")
+            return keys_data
+        raise RuntimeError("ED25519_PRIVATE_KEY environment variable must be set and valid base64.")
     
     def _load_registry(self) -> Dict[str, Any]:
         """Load credential registry or create if it doesn't exist."""
