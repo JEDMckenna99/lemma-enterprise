@@ -28,68 +28,65 @@ def create_app(test_config=None):
     # Load default configuration
     app.config.from_mapping(
         SECRET_KEY=os.environ.get('LEMMA_SECRET_KEY', secrets.token_hex(32)),
+        STORAGE_DIR=os.environ.get('LEMMA_STORAGE_DIR', '.lemma_enterprise'),
         ADMIN_USER=os.environ.get('LEMMA_ADMIN_USER', 'admin'),
-        ADMIN_PASS=os.environ.get('LEMMA_ADMIN_PASS', 'password'),
-        API_KEY=os.environ.get('LEMMA_API_KEY', 'api-key'),
-        TESTING=False,
-        SKIP_AUTH_IN_TESTS=False,
-        DEBUG=False,
-        ENABLE_HARDWARE_SECURITY=os.environ.get('LEMMA_HARDWARE_SECURITY', 'false').lower() == 'true',
+        ADMIN_PASS=os.environ.get('LEMMA_ADMIN_PASS', 'changeme'),
+        API_KEY=os.environ.get('LEMMA_API_KEY', 'dev_api_key'),
+        DID_METHOD=os.environ.get('DID_METHOD', 'lemma'),
+        DID=os.environ.get('DID', None),
         ENABLE_P2P=os.environ.get('LEMMA_ENABLE_P2P', 'false').lower() == 'true',
-        CREDENTIAL_EXPIRY_DAYS=int(os.environ.get('LEMMA_CREDENTIAL_EXPIRY_DAYS', '365')),
-        MAX_CREDENTIALS_PER_USER=int(os.environ.get('LEMMA_MAX_CREDENTIALS_PER_USER', '1')),
-        DID_METHOD=os.environ.get('DID_METHOD', 'key'),
-        DID=os.environ.get('DID', 'did:lemma:local'),
-        TRUSTED_ISSUERS=[os.environ.get('DID', 'did:lemma:local')],
-        PEERS=os.environ.get('LEMMA_PEERS', '').split(',') if os.environ.get('LEMMA_PEERS') else [],
-        MAX_VERIFICATION_ATTEMPTS=int(os.environ.get('LEMMA_MAX_VERIFICATION_ATTEMPTS', '10')),
-        RATE_LIMIT_ENABLED=os.environ.get('LEMMA_RATE_LIMIT', 'true').lower() == 'true',
+        P2P_PEERS=os.environ.get('LEMMA_P2P_PEERS', '').split(',') if os.environ.get('LEMMA_P2P_PEERS') else [],
+        TRUSTED_ISSUERS=os.environ.get('LEMMA_TRUSTED_ISSUERS', '').split(',') if os.environ.get('LEMMA_TRUSTED_ISSUERS') else [],
+        HARDWARE_SECURITY=os.environ.get('LEMMA_HARDWARE_SECURITY', 'false').lower() == 'true',
         # Enhanced security settings
-        PERMANENT_SESSION_LIFETIME=int(os.environ.get('LEMMA_SESSION_LIFETIME', '3600')),  # 1 hour
         SESSION_COOKIE_SECURE=True,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE='Lax',  # Set to 'Lax' for better UX across site navigation
-        REMEMBER_COOKIE_SECURE=True,
-        REMEMBER_COOKIE_HTTPONLY=True,
-        REMEMBER_COOKIE_SAMESITE='Lax',
         # CSRF Configuration
         WTF_CSRF_ENABLED=True,
-        WTF_CSRF_TIME_LIMIT=int(os.environ.get('LEMMA_CSRF_TIME_LIMIT', '3600')),  # 1 hour
-        WTF_CSRF_SSL_STRICT=True,
-        # Audit logging
-        AUDIT_LOGGING_ENABLED=os.environ.get('LEMMA_AUDIT_LOGGING', 'true').lower() == 'true',
-        # Content Security Policy
-        CSP_ENABLED=os.environ.get('LEMMA_CSP_ENABLED', 'true').lower() == 'true',
-        # Hardware security
-        HARDWARE_SECURITY=os.environ.get('LEMMA_HARDWARE_SECURITY', 'false').lower() == 'true',
-        # P2P settings
-        P2P_DISCOVERY_ENABLED=os.environ.get('LEMMA_P2P_DISCOVERY', 'false').lower() == 'true',
     )
     
-    # Override configuration with test config if provided
-    if test_config:
-        app.config.update(test_config)
+    # Override with test config if provided
+    if test_config is not None:
+        app.config.from_mapping(test_config)
         
-    # Ensure the instance folder exists
-    try:
-        os.makedirs(app.instance_path, exist_ok=True)
-    except OSError:
-        pass
-    
-    # Configure logging
-    configure_logging(app)
-    
-    # Register security-related extensions
-    register_security_extensions(app)
+    # Ensure the instance and storage folders exist
+    os.makedirs(app.instance_path, exist_ok=True)
+    os.makedirs(app.config['STORAGE_DIR'], exist_ok=True)
+
+    # Set up logging
+    if not app.debug:
+        log_dir = os.path.join(app.instance_path, 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+        
+        file_handler = RotatingFileHandler(
+            os.path.join(log_dir, 'lemma.log'),
+            maxBytes=10485760,  # 10MB
+            backupCount=10
+        )
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        ))
+        file_handler.setLevel(logging.INFO)
+        app.logger.addHandler(file_handler)
+        
+        app.logger.setLevel(logging.INFO)
+        app.logger.info('Lemma startup')
+
+    # Initialize components
+    _init_components(app)
     
     # Register blueprints
-    register_blueprints(app)
-    
-    # Register error handlers
-    register_error_handlers(app)
-    
-    # Create credential service and storage directory
-    init_credential_service(app)
+    from lemma.routes import main_bp, admin_bp, api_bp
+    app.register_blueprint(main_bp)
+    app.register_blueprint(admin_bp, url_prefix='/admin')
+    app.register_blueprint(api_bp, url_prefix='/api')
+
+    # Clean up resources at the end of requests
+    @app.teardown_appcontext
+    def teardown_db(exception):
+        # Clean up any resources here
+        pass
     
     # Fix for working with reverse proxies
     @app.before_request
