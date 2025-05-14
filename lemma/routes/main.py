@@ -93,12 +93,13 @@ def get_credential(user_id):
     credential = credential_service.get_user_credential(user_id)
     
     if not credential:
-        return jsonify({"error": "No credential found for this user"}), 404
+        # If no credential exists, issue a new one
+        current_app.logger.info(f"No existing credential found for user {user_id}, issuing new one")
+        credential = credential_service.issue_credential(user_id)
     
     # Get the full credential for the user
     try:
-        full_credential = credential_service.issue_credential(user_id)
-        return jsonify(full_credential)
+        return jsonify(credential)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
