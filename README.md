@@ -41,7 +41,7 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 - **Enhanced Security:** Password hashing, CSRF protection, secure cookies, encrypted storage, and rate limiting.
 - **Comprehensive Testing:** Full test coverage for all critical paths.
 - **Improved UX:** Auto-redirects and detailed error feedback.
-- **Docker & Azure Support:** Easy deployment with Docker, docker-compose, and Azure Web Apps.
+- **Multiple Deployment Options:** Easy deployment with Docker, Heroku, or Azure Web Apps.
 - **Audit Logging:** Comprehensive logging for security events.
 
 ---
@@ -59,7 +59,7 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 - **`tests/`:** Comprehensive test suite.
 
 ### Templates
-- **`templates/index.html`:** Landing page.
+- **`templates/index.html`:** Landing page with "Verify Lemma" button.
 - **`templates/verify.html`:** Credential verification and storage page.
 - **`templates/protected.html`:** Content requiring human verification.
 - **`templates/admin_login.html`:** Secure admin login.
@@ -84,16 +84,18 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 6. **Cross-Page Access:** User can access protected content at `/protected` using their credential.
 
 ### User Verification Flow
-1. **Link Access:** User opens the verification link.
-2. **Credential Retrieval:** System provides the credential.
+1. **Link Access:** User opens the verification link or clicks "Verify Lemma" on the homepage.
+2. **Credential Retrieval:** System provides the credential (auto-issues if not found).
 3. **Local Storage:** Credential is stored in browser local storage.
 4. **Presentation Creation:** System creates a verifiable presentation.
+5. **Verification Status:** User can see their verification status and manage credentials.
 
 ### Cross-Page Verification Flow
-1. **Protected Access:** User attempts to access protected content.
-2. **Credential Check:** System checks for a stored credential.
+1. **Protected Access:** User attempts to access protected content via "Access Protected Content".
+2. **Credential Check:** System checks for a stored Lemma credential.
 3. **Presentation Verification:** System verifies the presentation.
-4. **Access Grant:** User is granted access to protected content.
+4. **Access Grant:** User is granted access to protected content if verification passes.
+5. **Redirect:** If no valid credential is found, user is redirected to the verification page.
 
 ---
 
@@ -102,13 +104,13 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 ### Prerequisites
 - Python 3.9+
 - pip
-- Docker (optional)
+- Git
 
 ### Local Development
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd lemma-enterprise-package
+cd lemma-enterprise
 
 # Create and activate a virtual environment
 python -m venv venv
@@ -122,6 +124,7 @@ export LEMMA_ADMIN_USER=admin
 export LEMMA_ADMIN_PASS=secure_password_change_me
 export LEMMA_SECRET_KEY=your_secret_key_here
 export LEMMA_API_KEY=your_api_key_here
+export DID=did:lemma:local
 
 # Run the application
 python app.py
@@ -136,6 +139,28 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
+### Heroku Deployment
+```bash
+# Login to Heroku
+heroku login
+
+# Create a new Heroku app
+heroku create lemma-enterprise-app
+
+# Set required environment variables
+heroku config:set LEMMA_ADMIN_USER=admin
+heroku config:set LEMMA_ADMIN_PASS=secure_password_change_me
+heroku config:set LEMMA_SECRET_KEY=your_secret_key_here
+heroku config:set LEMMA_API_KEY=your_api_key_here
+heroku config:set DID=did:lemma:heroku
+
+# Deploy the application
+git push heroku main
+
+# Open the application
+heroku open
+```
+
 ### Azure Deployment
 1. **Create an Azure Web App:**
    ```bash
@@ -143,7 +168,7 @@ docker-compose logs -f
    ```
 2. **Set Environment Variables:**
    ```bash
-   az webapp config appsettings set --resource-group YourResourceGroup --name LemmaHumanVerification --settings LEMMA_ADMIN_USER="your_admin_username" LEMMA_ADMIN_PASS="your_secure_password" LEMMA_SECRET_KEY="your_random_secret"
+   az webapp config appsettings set --resource-group YourResourceGroup --name LemmaHumanVerification --settings LEMMA_ADMIN_USER="your_admin_username" LEMMA_ADMIN_PASS="your_secure_password" LEMMA_SECRET_KEY="your_random_secret" DID="did:lemma:azure"
    ```
 3. **Deploy the Code:**
    ```bash
@@ -166,8 +191,11 @@ X-API-Key: your_api_key_here
 - **POST /api/verify-credential:** Verify a credential
 - **GET /api/generate-challenge:** Generate a challenge for presentation verification
 - **POST /api/verify-presentation:** Verify a presentation
+- **GET /api/credential/{user_id}:** Get a user's credential (auto-issues if not found)
 - **GET /api/credentials/{user_id}:** Get a user's credential (requires API key)
 - **GET /api/credentials:** List all credentials (requires API key and admin authentication)
+- **POST /api/presentation:** Create a presentation from a credential
+- **POST /api/verify-human:** Verify a human presentation and set session
 
 ---
 
