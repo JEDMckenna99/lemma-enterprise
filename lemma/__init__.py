@@ -76,8 +76,11 @@ def create_app(test_config=None):
     # Initialize components
     _init_components(app)
     
-    # Register blueprints
-    from lemma.routes import main_bp, admin_bp, api_bp
+    # Register blueprints directly from their modules
+    from lemma.routes.main import main_bp
+    from lemma.routes.admin import admin_bp 
+    from lemma.routes.api import api_bp
+    
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(api_bp, url_prefix='/api')
