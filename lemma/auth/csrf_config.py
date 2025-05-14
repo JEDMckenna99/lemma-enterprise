@@ -79,13 +79,25 @@ CSRF_EXEMPT_ROUTES = [
     '/api/credentials',
     '/api/store-credential',
     '/api/credential/',
-    '/api/presentation',
-    '/api/verify',
-    '/api/verify-human',
     '/admin/login',
     '/admin/issue',
     '/admin/revoke',
-    '/admin/logout'
+    '/admin/logout',
+    '/api/node_info',
+    '/api/peers',
+    '/api/peers/add',
+    '/api/peers/remove/',
+    '/api/peers/discover',
+    '/api/peers/health',
+    '/api/peers/sync/',
+    '/api/revocation/status',
+    '/api/revocation/sync',
+    '/api/revocation/import',
+    '/api/revocation/issuers',
+    '/api/revocation/issuer/',
+    '/api/revocation/data/',
+    '/api/revocation/check/',
+    '/api/revocation/add_peer'
 ]
 
 def configure_csrf(app):

@@ -482,6 +482,7 @@
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': csrfToken
                     },
+                    credentials: 'include', // Ensure cookies are sent with the request
                     body: JSON.stringify({
                         credential: credential,
                         challenge: challenge,
@@ -505,6 +506,7 @@
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': csrfToken
                     },
+                    credentials: 'include', // Ensure cookies are sent with the request
                     body: JSON.stringify({
                         presentation: presentation,
                         challenge: challenge,
@@ -553,7 +555,9 @@
                     
                     // If form input not available, generate one via fetch
                     console.log("Fetching fresh CSRF token from API...");
-                    const response = await fetch('/api/generate-csrf-token');
+                    const response = await fetch('/api/generate-csrf-token', {
+                        credentials: 'include' // Ensure cookies are sent with the request
+                    });
                     if (!response.ok) {
                         throw new Error(`Failed to fetch CSRF token: ${response.status}`);
                     }
@@ -579,7 +583,9 @@
                 const csrfToken = await getCSRFToken();
                 
                 // Fetch the credential from the API
-                const response = await fetch(`/api/get-credential/{{ user_id }}`);
+                const response = await fetch(`/api/get-credential/{{ user_id }}`, {
+                    credentials: 'include' // Ensure cookies are sent with the request
+                });
                 if (!response.ok) {
                     throw new Error(`Failed to fetch credential: ${response.status}`);
                 }
@@ -600,6 +606,7 @@
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': csrfToken
                     },
+                    credentials: 'include', // Ensure cookies are sent with the request
                     body: JSON.stringify({
                         credential: credential,
                         challenge: challenge,
@@ -690,6 +697,7 @@
                             'Content-Type': 'application/json',
                             'X-CSRF-Token': csrfToken
                         },
+                        credentials: 'include', // Ensure cookies are sent with the request
                         body: JSON.stringify({
                             credential: credential,
                             challenge: challenge,
@@ -755,6 +763,7 @@
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': csrfToken
                     },
+                    credentials: 'include', // Ensure cookies are sent with the request
                     body: JSON.stringify({
                         credential: credential,
                         challenge: challenge,
@@ -909,6 +918,7 @@ async function verifyHuman() {
                             'Content-Type': 'application/json',
                             'X-CSRF-Token': csrfToken
                         },
+                        credentials: 'include', // Ensure cookies are sent with the request
                         body: JSON.stringify(requestData)
                     });
                     
