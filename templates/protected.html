@@ -147,6 +147,9 @@
             <h1>Protected Content</h1>
         </header>
 
+        <!-- Hidden field to store session verification status -->
+        <input type="hidden" id="sessionVerified" value="{{ 'true' if session.get('verified_human', False) else 'false' }}">
+
         <div class="card">
             <div class="success-badge">✓ Human Verification Successful</div>
             
@@ -193,7 +196,9 @@
         // Check if credential exists in local storage
         function checkCredential() {
             const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
-            if (credentials.length === 0) {
+            // If no credential found and user isn't verified via session, redirect to verification page
+            const sessionVerified = document.getElementById('sessionVerified').value === 'true';
+            if (credentials.length === 0 && !sessionVerified) {
                 // No credential found, redirect to verification page
                 alert('No human verification credential found. Redirecting to verification page...');
                 window.location.href = '/verify';
@@ -207,7 +212,7 @@
                 const userId = credentials[0].replace('lemma_credential_', '');
                 // Only update if the element doesn't already have server-provided content
                 const userIdElement = document.getElementById('userId');
-                if (userIdElement.textContent === "" || userIdElement.textContent === "Unknown") {
+                if (userIdElement && (userIdElement.textContent === "" || userIdElement.textContent === "Unknown")) {
                     userIdElement.textContent = userId;
                 }
             }
@@ -218,13 +223,18 @@
             document.getElementById('importFile').click();
         });
         
-        document.getElementById('importFile').addEventListener('change', function(event) {
+        document.getElementById('importFile').addEventListener('change', async function(event) {
             const file = event.target.files[0];
             if (!file) return;
             
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
+                    // Get CSRF token
+                    const csrfResponse = await fetch('/api/generate-csrf-token');
+                    const csrfData = await csrfResponse.json();
+                    const csrfToken = csrfData.csrf_token;
+                    
                     const credential = JSON.parse(e.target.result);
                     
                     // Basic validation to ensure this is a Lemma credential
@@ -244,31 +254,52 @@
                     localStorage.setItem('lemma_challenge', challenge);
                     
                     // Create a presentation with the imported credential
-                    fetch('/api/presentation', {
+                    const presResponse = await fetch('/api/presentation', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
                         },
                         body: JSON.stringify({
                             credential: credential,
-                            challenge: challenge
+                            challenge: challenge,
+                            csrf_token: csrfToken
                         })
-                    }).then(response => response.json())
-                      .then(presentation => {
-                          localStorage.setItem(`lemma_presentation_${userId}`, JSON.stringify(presentation));
-                          
-                          // Update displayed user ID
-                          document.getElementById('userId').textContent = userId;
-                          
-                          alert('Credential imported successfully!');
-                          
-                          // Refresh the page to reflect the new credential
-                          window.location.reload();
-                      })
-                      .catch(error => {
-                          console.error('Error creating presentation:', error);
-                          alert('Error creating presentation: ' + error.message);
-                      });
+                    });
+                    
+                    if (!presResponse.ok) {
+                        throw new Error(`Failed to create presentation: ${presResponse.status}`);
+                    }
+                    
+                    const presentation = await presResponse.json();
+                    localStorage.setItem(`lemma_presentation_${userId}`, JSON.stringify(presentation));
+                    
+                    // Verify the presentation to authenticate the user
+                    const verifyResponse = await fetch('/api/verify-presentation', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
+                        },
+                        body: JSON.stringify({
+                            presentation: presentation,
+                            challenge: challenge,
+                            csrf_token: csrfToken
+                        })
+                    });
+                    
+                    if (!verifyResponse.ok) {
+                        const errorData = await verifyResponse.json();
+                        throw new Error(`Verification failed: ${errorData.error || errorData.reason || 'Unknown error'}`);
+                    }
+                    
+                    // Update displayed user ID
+                    document.getElementById('userId').textContent = userId;
+                    
+                    alert('Credential imported successfully!');
+                    
+                    // Refresh the page to reflect the new credential
+                    window.location.reload();
                 } catch (e) {
                     console.error('Error importing credential:', e);
                     alert('Error importing credential: ' + e.message);

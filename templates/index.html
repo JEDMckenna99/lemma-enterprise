@@ -302,7 +302,7 @@
                 <p>Lemma is a privacy-focused, one-time proof-of-humanness system built on W3C Verifiable Credentials.</p>
                 <div class="cta-buttons">
                     <a href="/verify" class="button primary">Verify Your Humanity</a>
-                    <a href="/protected" class="button secondary">Access Protected Content</a>
+                    <a href="#" id="accessProtectedBtn" class="button secondary">Access Protected Content</a>
                 </div>
             </section>
 
@@ -354,5 +354,92 @@
             </div>
         </footer>
     </div>
+
+    <script>
+        // Handle the "Access Protected Content" button click
+        document.getElementById('accessProtectedBtn').addEventListener('click', async function(e) {
+            e.preventDefault();
+            
+            // Check if any credentials exist in local storage
+            const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+            
+            if (credentials.length === 0) {
+                // No credential found, redirect to verification page
+                alert('No human verification credential found. Redirecting to verification page...');
+                window.location.href = '/verify';
+                return;
+            }
+            
+            try {
+                // Get the first credential (user might have multiple)
+                const credentialKey = credentials[0];
+                const credentialJson = localStorage.getItem(credentialKey);
+                const credential = JSON.parse(credentialJson);
+                
+                // Generate a random challenge for presentation
+                const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                    .map(b => b.toString(16).padStart(2, '0')).join('');
+                localStorage.setItem('lemma_challenge', challenge);
+                
+                // Get CSRF token
+                const csrfResponse = await fetch('/api/generate-csrf-token');
+                const csrfData = await csrfResponse.json();
+                const csrfToken = csrfData.csrf_token;
+                
+                // Create a presentation
+                const presResponse = await fetch('/api/presentation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({
+                        credential: credential,
+                        challenge: challenge,
+                        csrf_token: csrfToken
+                    })
+                });
+                
+                if (!presResponse.ok) {
+                    throw new Error(`Failed to create presentation: ${presResponse.status}`);
+                }
+                
+                const presentation = await presResponse.json();
+                
+                // Verify the presentation to authenticate the user
+                const verifyResponse = await fetch('/api/verify-presentation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({
+                        presentation: presentation,
+                        challenge: challenge,
+                        csrf_token: csrfToken
+                    })
+                });
+                
+                if (!verifyResponse.ok) {
+                    const errorData = await verifyResponse.json();
+                    throw new Error(`Verification failed: ${errorData.error || errorData.reason || 'Unknown error'}`);
+                }
+                
+                const verifyResult = await verifyResponse.json();
+                
+                // If verification successful, redirect to protected content
+                if (verifyResult.success) {
+                    window.location.href = verifyResult.redirect || '/protected';
+                } else {
+                    throw new Error('Verification failed: ' + (verifyResult.error || 'Unknown error'));
+                }
+                
+            } catch (error) {
+                console.error('Error accessing protected content:', error);
+                alert(`Error: ${error.message || 'Unknown error'}. Please try verifying again.`);
+                window.location.href = '/verify';
+            }
+        });
+    </script>
 </body>
 </html>
