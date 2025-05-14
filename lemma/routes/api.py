@@ -6,7 +6,7 @@ import secrets
 import time
 import logging
 from functools import wraps
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, session
 
 # Import credential service from the correct location
 try:
@@ -67,18 +67,7 @@ def rate_limit(f):
     return decorated_function
 
 def require_api_key(f):
-    """Decorator to require API key for endpoints.
-    
-    This decorator checks for a valid API key in the X-API-Key header.
-    In test environments, the API key check can be bypassed using the
-    SKIP_AUTH_IN_TESTS or SKIP_API_KEY_CHECK configuration options.
-    
-    Args:
-        f: The function to decorate
-        
-    Returns:
-        The decorated function
-    """
+    """Decorator to require API key for endpoints."""
     @wraps(f)
     def decorated(*args, **kwargs):
         # Skip API key check in testing environment if configured
@@ -198,11 +187,7 @@ def generate_challenge():
 @api_bp.route('/verify-presentation', methods=['POST'])
 @rate_limit
 def verify_presentation():
-    """Verify a presentation via API.
-    
-    This endpoint verifies a presentation and updates the session with the verification result.
-    It includes CSRF protection for session-modifying operations in production environments.
-    """
+    """Verify a presentation via API."""
     # Manual CSRF validation with more flexibility
     if not current_app.config.get('TESTING', False) or not current_app.config.get('SKIP_AUTH_IN_TESTS', False):
         # Try to get CSRF token from various places
@@ -219,7 +204,6 @@ def verify_presentation():
             # In production, validate the token if present
             if csrf_token:
                 # Try to validate against various session keys where Flask-WTF might store the token
-                from flask import session
                 valid = False
                 
                 # Check against different possible session keys
@@ -333,17 +317,9 @@ def list_credentials():
         logger.error("Error listing credentials: %s", str(e))
         return jsonify({"error": f"Error listing credentials: {str(e)}"}), 500
 
-# Add CSRF token generation endpoint
 @api_bp.route('/get-csrf-token', methods=['GET'])
 def get_csrf_token():
-    """Generate a CSRF token for client-side JavaScript.
-    
-    This endpoint provides a CSRF token that can be used by client-side JavaScript
-    for API requests. It ensures proper CSRF protection for AJAX requests.
-    
-    Returns:
-        A JSON object containing the CSRF token.
-    """
+    """Generate a CSRF token for client-side JavaScript."""
     try:
         # Get or generate a CSRF token
         token = generate_csrf_token()
@@ -357,15 +333,7 @@ def get_csrf_token():
 @api_bp.route('/verify-human', methods=['POST'])
 @rate_limit
 def verify_human():
-    """Verify a human presentation and set session for protected content access.
-    
-    This endpoint verifies a presentation, and if valid, sets session variables 
-    indicating the user is a verified human, allowing access to protected content.
-    
-    Returns:
-        JSON response with success status and redirect URL if successful,
-        or error message if verification fails.
-    """
+    """Verify a human presentation and set session for protected content access."""
     try:
         # Manual CSRF validation with more flexibility
         if not current_app.config.get('TESTING', False) or not current_app.config.get('SKIP_AUTH_IN_TESTS', False):
@@ -375,15 +343,13 @@ def verify_human():
                 csrf_token = request.json.get('csrf_token')
             if not csrf_token and request.form:
                 csrf_token = request.form.get('csrf_token')
-                
+            
             # For development and debugging, allow requests without CSRF tokens
             if current_app.config.get('ENV') != 'production':
                 current_app.logger.warning("CSRF validation skipped in development mode")
             else:
                 # In production, validate the token if present
                 if csrf_token:
-                    # Try to validate against various session keys where Flask-WTF might store the token
-                    from flask import session
                     valid = False
                     
                     # Check against different possible session keys
@@ -413,6 +379,7 @@ def verify_human():
                     return jsonify({"success": False, "error": "CSRF token missing"}), 400
         
         current_app.logger.info("Processing human verification request from IP: %s", request.remote_addr)
+        
         data = request.get_json()
         if not data or 'presentation' not in data or 'challenge' not in data:
             return jsonify({"success": False, "error": "Presentation and challenge are required"}), 400
@@ -426,8 +393,9 @@ def verify_human():
         
         if not verification_result.get('valid', False):
             logger.info("Invalid human verification attempt: %s", verification_result.get('reason'))
+            
             return jsonify({
-                "success": False, 
+                "success": False,
                 "error": verification_result.get('reason', 'Verification failed')
             })
         
@@ -436,7 +404,6 @@ def verify_human():
         user_id = holder.split(':')[-1] if ':' in holder else holder
         
         # Set session variables for protected content access
-        from flask import session
         session['verified_human'] = True
         session['verified_user_id'] = user_id
         session['verified_presentation'] = presentation
@@ -461,7 +428,7 @@ def verify_human():
             "redirect": "/protected",
             "user_id": user_id
         })
-    
+        
     except ValueError as e:
         logger.error("Invalid presentation format in human verification: %s", str(e))
         return jsonify({"success": False, "error": f"Invalid presentation format: {str(e)}"}), 400
@@ -471,3 +438,41 @@ def verify_human():
     except Exception as e:
         logger.error("Error verifying human: %s", str(e))
         return jsonify({"success": False, "error": f"Error verifying human: {str(e)}"}), 500
+
+@api_bp.route('/credential/<user_id>', methods=['GET'])
+def get_credential(user_id):
+    """Get a credential for a specific user ID."""
+    try:
+        credential_service = get_credential_service()
+        credential = credential_service.get_user_credential(user_id)
+        
+        if not credential:
+            return jsonify({"error": "No credential found for this user"}), 404
+        
+        return jsonify(credential)
+    except Exception as e:
+        logger.error("Error retrieving credential: %s", str(e))
+        return jsonify({"error": f"Error retrieving credential: {str(e)}"}), 500
+
+@api_bp.route('/presentation', methods=['POST'])
+def create_presentation():
+    """Create a presentation from a credential."""
+    try:
+        data = request.get_json()
+        if not data or 'credential' not in data or 'challenge' not in data:
+            return jsonify({"error": "Credential and challenge are required"}), 400
+        
+        credential = data['credential']
+        challenge = data['challenge']
+        
+        # Create the presentation
+        credential_service = get_credential_service()
+        presentation = credential_service.create_presentation(credential, challenge)
+        
+        return jsonify(presentation)
+    except ValueError as e:
+        logger.error("Invalid credential format: %s", str(e))
+        return jsonify({"error": f"Invalid credential format: {str(e)}"}), 400
+    except Exception as e:
+        logger.error("Error creating presentation: %s", str(e))
+        return jsonify({"error": f"Error creating presentation: {str(e)}"}), 500
