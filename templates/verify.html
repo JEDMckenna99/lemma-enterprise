@@ -495,8 +495,11 @@
                 
                 const presentation = await presResponse.json();
                 
-                // Verify the presentation to authenticate the user
-                const verifyResponse = await fetch('/api/verify-presentation', {
+                // Store the presentation for later use
+                localStorage.setItem(`lemma_presentation_${userId}`, JSON.stringify(presentation));
+                
+                // Use verify-human endpoint to set session state
+                const verifyResponse = await fetch('/api/verify-human', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -511,7 +514,7 @@
                 
                 if (!verifyResponse.ok) {
                     const errorData = await verifyResponse.json();
-                    throw new Error(`Verification failed: ${errorData.error || errorData.reason || 'Unknown error'}`);
+                    throw new Error(`Verification failed: ${verifyResponse.status} - ${JSON.stringify(errorData)}`);
                 }
                 
                 const verifyResult = await verifyResponse.json();
@@ -576,7 +579,7 @@
                 const csrfToken = await getCSRFToken();
                 
                 // Fetch the credential from the API
-                const response = await fetch(`/api/credential/{{ user_id }}`);
+                const response = await fetch(`/api/get-credential/{{ user_id }}`);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch credential: ${response.status}`);
                 }
@@ -618,6 +621,9 @@
                 
                 // Show success message
                 alert('Credential stored successfully!');
+                
+                // Enable the download button
+                document.getElementById('downloadBtn').style.display = 'block';
             } catch (e) {
                 console.error('Error storing credential:', e);
                 alert('Error storing credential: ' + e.message);
@@ -736,6 +742,7 @@
                 // Generate a new challenge for presentation (simulating what a customer site would do)
                 const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
                     .map(b => b.toString(16).padStart(2, '0')).join('');
+                localStorage.setItem('lemma_challenge', challenge);
                 
                 // Get a fresh CSRF token
                 const csrfToken = await getCSRFToken();
@@ -890,9 +897,13 @@ async function verifyHuman() {
                     };
                     
                     console.log("Sending verification request with CSRF token:", csrfToken.substring(0, 10) + "...");
+                    console.log("Using challenge:", challenge);
+                    
+                    // Store challenge in localStorage for consistency
+                    localStorage.setItem('lemma_challenge', challenge);
                     
                     // Verify presentation through your API
-                    const verifyResponse = await fetch('/api/verify-presentation', {
+                    const verifyResponse = await fetch('/api/verify-human', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -947,7 +958,7 @@ async function verifyHuman() {
             if (jsonView.style.display === 'none' || jsonView.style.display === '') {
                 // If no credential is stored yet, fetch it
                 if (jsonView.textContent === '') {
-                    fetch(`/api/credential/{{ user_id }}`)
+                    fetch(`/api/get-credential/{{ user_id }}`)
                         .then(response => response.json())
                         .then(credential => {
                             jsonView.textContent = JSON.stringify(credential, null, 2);

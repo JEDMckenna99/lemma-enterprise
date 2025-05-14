@@ -68,7 +68,7 @@ def protected():
         current_app.logger.warning(f"Unauthorized protected page access attempt. Session data: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}")
         
         # Redirect to verification page with a clear message
-        flash("Please verify you are human to access this page", "warning")
+        flash("Please verify your Lemma to access this page", "warning")
         return redirect(url_for('main.verify'))
     
     # For more security, you could verify the credential again here

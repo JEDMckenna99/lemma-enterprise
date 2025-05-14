@@ -1,0 +1,29 @@
+digraph LemmaFlow {
+  rankdir=LR;
+  nodesep=1.2;
+  ranksep=1.0;
+  splines=true;
+  overlap=false;
+
+  node [shape=rectangle, style=filled, fontname="Arial", fontsize=12, margin=0.2];
+  edge [fontname="Arial", fontsize=11];
+
+  User      [label="User Device", shape=ellipse, fillcolor="#FFE082"];
+  Stripe    [label="Stripe Identity", fillcolor="#90CAF9"];
+  Lemma     [label="Lemma Backend", fillcolor="#A5D6A7"];
+  Customer  [label="Customer Site", fillcolor="#CE93D8"];
+
+  User -> Stripe   [label="1. Start “Prove Human”", color="#1565C0", penwidth=2,
+                    labeldistance=1.5, labelangle=25];
+  Stripe -> Lemma  [label="2. Issue VC",              color="#1565C0", penwidth=2,
+                    labeldistance=1.5, labelangle=-25];
+  Lemma -> User    [label="3. Store VC Locally",      color="#1565C0", penwidth=2,
+                    labeldistance=1.5, labelangle=90];
+
+  User -> Customer [label="4. Present VC",            color="#2E7D32", penwidth=2,
+                    labeldistance=1.2, labelangle=0];
+  Customer -> Lemma[label="5. Verify VC",             color="#2E7D32", penwidth=2,
+                    labeldistance=1.2, labelangle=0];
+  Customer -> Lemma[label="6. Revoke VC",             style="dashed", color="#C62828", penwidth=2,
+                    labeldistance=1.2, labelangle=-45];
+}

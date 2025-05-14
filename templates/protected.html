@@ -200,7 +200,7 @@
             const sessionVerified = document.getElementById('sessionVerified').value === 'true';
             if (credentials.length === 0 && !sessionVerified) {
                 // No credential found, redirect to verification page
-                alert('No human verification credential found. Redirecting to verification page...');
+                alert('No Lemma credential found. Redirecting to verification page...');
                 window.location.href = '/verify';
             }
         }
@@ -275,7 +275,7 @@
                     localStorage.setItem(`lemma_presentation_${userId}`, JSON.stringify(presentation));
                     
                     // Verify the presentation to authenticate the user
-                    const verifyResponse = await fetch('/api/verify-presentation', {
+                    const verifyResponse = await fetch('/api/verify-human', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -290,7 +290,7 @@
                     
                     if (!verifyResponse.ok) {
                         const errorData = await verifyResponse.json();
-                        throw new Error(`Verification failed: ${errorData.error || errorData.reason || 'Unknown error'}`);
+                        throw new Error(`Verification failed: ${verifyResponse.status} - ${JSON.stringify(errorData)}`);
                     }
                     
                     // Update displayed user ID

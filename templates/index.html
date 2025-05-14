@@ -301,7 +301,7 @@
                 <h2>Verify Once, Prove Anywhere</h2>
                 <p>Lemma is a privacy-focused, one-time proof-of-humanness system built on W3C Verifiable Credentials.</p>
                 <div class="cta-buttons">
-                    <a href="/verify" class="button primary">Verify Your Humanity</a>
+                    <a href="/verify" class="button primary">Verify Lemma</a>
                     <a href="#" id="accessProtectedBtn" class="button secondary">Access Protected Content</a>
                 </div>
             </section>
@@ -365,7 +365,7 @@
             
             if (credentials.length === 0) {
                 // No credential found, redirect to verification page
-                alert('No human verification credential found. Redirecting to verification page...');
+                alert('No Lemma credential found. Redirecting to verification page...');
                 window.location.href = '/verify';
                 return;
             }
@@ -406,8 +406,11 @@
                 
                 const presentation = await presResponse.json();
                 
+                // Store the presentation for future use
+                localStorage.setItem(`lemma_presentation_${credential.credentialSubject.id.split(':').pop()}`, JSON.stringify(presentation));
+                
                 // Verify the presentation to authenticate the user
-                const verifyResponse = await fetch('/api/verify-presentation', {
+                const verifyResponse = await fetch('/api/verify-human', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -422,7 +425,7 @@
                 
                 if (!verifyResponse.ok) {
                     const errorData = await verifyResponse.json();
-                    throw new Error(`Verification failed: ${errorData.error || errorData.reason || 'Unknown error'}`);
+                    throw new Error(`Verification failed: ${verifyResponse.status} - ${JSON.stringify(errorData)}`);
                 }
                 
                 const verifyResult = await verifyResponse.json();
