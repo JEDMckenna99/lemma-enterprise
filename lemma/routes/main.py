@@ -23,7 +23,9 @@ def index():
 @main_bp.route('/verify')
 def verify():
     """Render the verification page."""
-    user_id = request.args.get('user_id')
+    # Check for user_id parameter - try both user_id and user for backward compatibility
+    user_id = request.args.get('user_id') or request.args.get('user')
+    
     if not user_id:
         # Generate a random user ID if none provided
         user_id = f"user_{secrets.token_hex(8)}"
@@ -39,13 +41,17 @@ def verify():
     
     verification_url = url_for('main.verify', user_id=user_id, _external=True)
     
+    # Check if the user is already verified in the session
+    is_verified = session.get('verified_user_id') == user_id and session.get('verified_human', False)
+    
     return render_template(
         'verify.html', 
         user_id=user_id, 
         has_credential=credential is not None,
         credential=credential,
         verification_url=verification_url,
-        challenge=challenge
+        challenge=challenge,
+        is_verified=is_verified
     )
 
 @main_bp.route('/protected')

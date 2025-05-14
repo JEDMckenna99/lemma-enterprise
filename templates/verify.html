@@ -426,7 +426,7 @@
             <form action="/verify" method="get">
                 <div class="field">
                     <div class="field-name">User ID</div>
-                    <input type="text" name="user" class="field-value" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <input type="text" name="user_id" class="field-value" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
                 
                 <button type="submit" class="button">Verify</button>
@@ -441,6 +441,93 @@
 
     {% if user_id %}
     <script>
+        // Check if credential exists in browser storage on page load
+        window.addEventListener('load', function() {
+            // Check if this is a direct access to the verification page
+            const urlParams = new URLSearchParams(window.location.search);
+            const userIdParam = urlParams.get('user_id');
+            
+            if (userIdParam) {
+                // If we have a user_id parameter, check if we already have a credential for this user
+                const storedCredential = localStorage.getItem(`lemma_credential_${userIdParam}`);
+                
+                if (!storedCredential) {
+                    console.log("No stored credential found for this user, proceeding with verification flow");
+                    // We don't have a credential yet, so we'll continue with the verification flow
+                } else {
+                    console.log("Credential already exists for this user, redirecting to protected content");
+                    // We already have a credential, so verify it and redirect to protected content
+                    verifyExistingCredential(userIdParam, storedCredential);
+                }
+            }
+        });
+        
+        // Function to verify an existing credential and redirect to protected content
+        async function verifyExistingCredential(userId, credentialJson) {
+            try {
+                const credential = JSON.parse(credentialJson);
+                
+                // Get CSRF token
+                const csrfToken = await getCSRFToken();
+                
+                // Generate a random challenge for presentation
+                const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                    .map(b => b.toString(16).padStart(2, '0')).join('');
+                localStorage.setItem('lemma_challenge', challenge);
+                
+                // Create a presentation
+                const presResponse = await fetch('/api/presentation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({
+                        credential: credential,
+                        challenge: challenge,
+                        csrf_token: csrfToken
+                    })
+                });
+                
+                if (!presResponse.ok) {
+                    throw new Error(`Failed to create presentation: ${presResponse.status}`);
+                }
+                
+                const presentation = await presResponse.json();
+                
+                // Verify the presentation to authenticate the user
+                const verifyResponse = await fetch('/api/verify-presentation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({
+                        presentation: presentation,
+                        challenge: challenge,
+                        csrf_token: csrfToken
+                    })
+                });
+                
+                if (!verifyResponse.ok) {
+                    const errorData = await verifyResponse.json();
+                    throw new Error(`Verification failed: ${errorData.error || errorData.reason || 'Unknown error'}`);
+                }
+                
+                const verifyResult = await verifyResponse.json();
+                
+                // If verification successful, redirect to protected content
+                if (verifyResult.success) {
+                    window.location.href = verifyResult.redirect || '/protected';
+                } else {
+                    throw new Error('Verification failed: ' + (verifyResult.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error verifying existing credential:', error);
+                // Continue with normal verification flow if verification fails
+            }
+        }
+
         // Get CSRF token from cookie (used by multiple API calls)
         function getCSRFToken() {
             return new Promise(async (resolve, reject) => {
