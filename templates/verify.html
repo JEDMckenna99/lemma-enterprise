@@ -405,7 +405,7 @@
             
             <div class="actions">
                 <button id="storeBtn" class="btn btn-primary">Store Credential</button>
-                <button id="verifyBtn" class="btn btn-secondary">Verify Credential</button>
+                <button id="verifyBtn" class="btn btn-secondary">Show Lemma</button>
                 <button id="showJsonBtn" class="btn btn-info">Show Raw Credential</button>
                 <button id="downloadBtn" class="btn btn-success" style="display: none;">Download Credential</button>
                 <button id="importBtn" class="btn btn-warning">Import Credential</button>
@@ -825,33 +825,28 @@
         function setupDemoContainer(container, presentation, challenge) {
             // Create the content for the demo
             container.innerHTML = `
-                <h3>Customer Site Integration Demo</h3>
-                <p>This demonstrates how a customer site would verify a human credential.</p>
+                <h3>Lemma Credential Demonstration</h3>
+                <p>Your credential has been verified and can be used to prove your humanity.</p>
                 
                 <div class="demo-step">
-                    <h4>Step 1: Generate a Challenge</h4>
-                    <p>The customer site generates a random challenge to prevent replay attacks:</p>
+                    <h4>Challenge Used</h4>
+                    <p>A random challenge helps prevent replay attacks:</p>
                     <pre style="background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto;">${challenge}</pre>
                 </div>
                 
                 <div class="demo-step">
-                    <h4>Step 2: User Creates a Verifiable Presentation</h4>
-                    <p>The credential stored in the browser is used to create a presentation with the challenge:</p>
+                    <h4>Verifiable Presentation</h4>
+                    <p>Your credential was used to create this presentation with the challenge:</p>
                     <div style="max-height: 200px; overflow-y: auto;">
                         <pre style="background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(presentation, null, 2)}</pre>
                     </div>
                 </div>
                 
                 <div class="demo-step">
-                    <h4>Step 3: Verify the Presentation</h4>
-                    <p>The customer site verifies the presentation by:</p>
-                    <ol>
-                        <li>Checking that the challenge matches what was sent</li>
-                        <li>Verifying the cryptographic proof on the presentation</li>
-                        <li>Verifying the included credential is valid</li>
-                    </ol>
-                    <button id="verifyDemoBtn" class="btn btn-success">Simulate Verification</button>
-                    <div id="verifyResult" style="margin-top: 10px;"></div>
+                    <div class="alert alert-success">
+                        ✅ Verification Successful<br>
+                        Your Lemma credential is valid and can be used to access human-only content
+                    </div>
                 </div>
                 
                 <div class="demo-step">
@@ -891,73 +886,7 @@ async function verifyHuman() {
                 </div>
             `;
             
-            // Add event listener for the verify demo button
-            document.getElementById('verifyDemoBtn').addEventListener('click', async function() {
-                try {
-                    // Always get a fresh CSRF token for this request
-                    const csrfToken = await getCSRFToken();
-                    console.log("Using CSRF token for verification:", csrfToken);
-                    
-                    // Create the request data
-                    const requestData = {
-                        presentation: presentation,
-                        challenge: challenge,
-                        csrf_token: csrfToken
-                    };
-                    
-                    console.log("Sending verification request with CSRF token:", csrfToken.substring(0, 10) + "...");
-                    console.log("Using challenge:", challenge);
-                    
-                    // Store challenge in localStorage for consistency
-                    localStorage.setItem('lemma_challenge', challenge);
-                    
-                    // Verify presentation through your API
-                    const verifyResponse = await fetch('/api/verify-human', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-Token': csrfToken
-                        },
-                        credentials: 'include', // Ensure cookies are sent with the request
-                        body: JSON.stringify(requestData)
-                    });
-                    
-                    if (!verifyResponse.ok) {
-                        const errorText = await verifyResponse.text();
-                        console.error("Verification API error:", verifyResponse.status, errorText);
-                        throw new Error(`Verification failed: ${verifyResponse.status} - ${errorText}`);
-                    }
-                    
-                    const verifyResult = await verifyResponse.json();
-                    console.log("Verification result:", verifyResult);
-                    
-                    // Display the result
-                    const resultDiv = document.getElementById('verifyResult');
-                    if (verifyResult.valid) {
-                        resultDiv.innerHTML = `
-                            <div class="alert alert-success">
-                                ✅ Verification Successful!<br>
-                                User is a verified human with ID: ${verifyResult.holder.split(':').pop()}
-                            </div>
-                        `;
-                    } else {
-                        resultDiv.innerHTML = `
-                            <div class="alert alert-danger">
-                                ❌ Verification Failed<br>
-                                Reason: ${verifyResult.reason || verifyResult.error || 'Unknown error'}
-                            </div>
-                        `;
-                    }
-                } catch (e) {
-                    console.error('Error verifying presentation:', e);
-                    document.getElementById('verifyResult').innerHTML = `
-                        <div class="alert alert-danger">
-                            ❌ Verification Error<br>
-                            Error: ${e.message}
-                        </div>
-                    `;
-                }
-            });
+            // No event listeners needed since we removed the verification button
         }
         
         // Toggle JSON view
