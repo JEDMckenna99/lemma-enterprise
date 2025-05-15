@@ -10,9 +10,15 @@ from flask import (
     url_for, session, jsonify, abort, flash, current_app
 )
 from lemma.core.credential_service import get_credential_service
+from lemma.auth.csrf_config import generate_csrf_token
 
 # Create blueprint
 main_bp = Blueprint('main', __name__)
+
+# Add CSRF token to all templates
+@main_bp.context_processor
+def inject_csrf_token():
+    return {'csrf_token': generate_csrf_token()}
 
 @main_bp.route('/')
 def index():

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Verify Human Credential - Lemma</title>
     <style>
         :root {
@@ -356,7 +356,7 @@
         </header>
         
         <!-- Hidden CSRF token for JavaScript use -->
-        <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token }}">
 
         <!-- Flash messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
