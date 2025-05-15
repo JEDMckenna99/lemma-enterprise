@@ -4,6 +4,7 @@ Handles public-facing pages and verification flows.
 """
 import secrets
 import json
+import os
 from flask import (
     Blueprint, render_template, request, redirect, 
     url_for, session, jsonify, abort, flash, current_app
@@ -18,7 +19,17 @@ def index():
     """Render the landing page."""
     # Check if user is already verified and show appropriate message
     is_verified = session.get('verified_user_id') is not None
-    return render_template('index.html', is_verified=is_verified)
+    
+    try:
+        current_app.logger.info(f"Rendering index.html template. Template path: {current_app.template_folder}")
+        return render_template('index.html', is_verified=is_verified)
+    except Exception as e:
+        current_app.logger.error(f"Error rendering index.html: {str(e)}")
+        current_app.logger.error(f"Template folder: {current_app.template_folder}")
+        current_app.logger.error(f"Template folder exists: {os.path.exists(current_app.template_folder)}")
+        if os.path.exists(current_app.template_folder):
+            current_app.logger.error(f"Template folder contents: {os.listdir(current_app.template_folder)}")
+        return f"Error loading template: {str(e)}", 500
 
 @main_bp.route('/verify')
 def verify():
@@ -44,15 +55,24 @@ def verify():
     # Check if the user is already verified in the session
     is_verified = session.get('verified_user_id') == user_id and session.get('verified_human', False)
     
-    return render_template(
-        'verify.html', 
-        user_id=user_id, 
-        has_credential=credential is not None,
-        credential=credential,
-        verification_url=verification_url,
-        challenge=challenge,
-        is_verified=is_verified
-    )
+    try:
+        current_app.logger.info(f"Rendering verify.html template. Template path: {current_app.template_folder}")
+        return render_template(
+            'verify.html', 
+            user_id=user_id, 
+            has_credential=credential is not None,
+            credential=credential,
+            verification_url=verification_url,
+            challenge=challenge,
+            is_verified=is_verified
+        )
+    except Exception as e:
+        current_app.logger.error(f"Error rendering verify.html: {str(e)}")
+        current_app.logger.error(f"Template folder: {current_app.template_folder}")
+        current_app.logger.error(f"Template folder exists: {os.path.exists(current_app.template_folder)}")
+        if os.path.exists(current_app.template_folder):
+            current_app.logger.error(f"Template folder contents: {os.listdir(current_app.template_folder)}")
+        return f"Error loading template: {str(e)}", 500
 
 @main_bp.route('/protected')
 def protected():
@@ -78,13 +98,22 @@ def protected():
     #     return redirect(url_for('main.verify'))
     
     # For demonstration, we'll just pass the credential data to the template
-    return render_template(
-        'protected.html',
-        user_id=user_id,
-        credential=credential_data,
-        verification_time=session.get('verification_time'),
-        verification_expiry=session.get('verification_expiry')
-    )
+    try:
+        current_app.logger.info(f"Rendering protected.html template. Template path: {current_app.template_folder}")
+        return render_template(
+            'protected.html',
+            user_id=user_id,
+            credential=credential_data,
+            verification_time=session.get('verification_time'),
+            verification_expiry=session.get('verification_expiry')
+        )
+    except Exception as e:
+        current_app.logger.error(f"Error rendering protected.html: {str(e)}")
+        current_app.logger.error(f"Template folder: {current_app.template_folder}")
+        current_app.logger.error(f"Template folder exists: {os.path.exists(current_app.template_folder)}")
+        if os.path.exists(current_app.template_folder):
+            current_app.logger.error(f"Template folder contents: {os.listdir(current_app.template_folder)}")
+        return f"Error loading template: {str(e)}", 500
 
 @main_bp.route('/api/credential-lookup/<user_id>')
 def get_credential(user_id):

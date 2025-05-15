@@ -4,6 +4,7 @@ Handles admin authentication and credential management with enhanced security.
 """
 import secrets
 import time
+import os
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, current_app, abort, jsonify
 import json
 import logging
@@ -76,7 +77,16 @@ def login():
             if not is_testing:
                 time.sleep(1)
     
-    return render_template('admin_login.html', form=form)
+    try:
+        current_app.logger.info(f"Rendering admin_login.html template. Template path: {current_app.template_folder}")
+        return render_template('admin_login.html', form=form)
+    except Exception as e:
+        current_app.logger.error(f"Error rendering admin_login.html: {str(e)}")
+        current_app.logger.error(f"Template folder: {current_app.template_folder}")
+        current_app.logger.error(f"Template folder exists: {os.path.exists(current_app.template_folder)}")
+        if os.path.exists(current_app.template_folder):
+            current_app.logger.error(f"Template folder contents: {os.listdir(current_app.template_folder)}")
+        return f"Error loading template: {str(e)}", 500
 
 @admin_bp.route('/logout')
 def logout():
@@ -95,12 +105,21 @@ def dashboard():
     # Create a new form for issuing credentials
     form = IssueCredentialForm()
     
-    return render_template(
-        'admin.html',
-        credentials=credentials,
-        admin_username=session.get('admin_username'),
-        form=form
-    )
+    try:
+        current_app.logger.info(f"Rendering admin.html template. Template path: {current_app.template_folder}")
+        return render_template(
+            'admin.html',
+            credentials=credentials,
+            admin_username=session.get('admin_username'),
+            form=form
+        )
+    except Exception as e:
+        current_app.logger.error(f"Error rendering admin.html: {str(e)}")
+        current_app.logger.error(f"Template folder: {current_app.template_folder}")
+        current_app.logger.error(f"Template folder exists: {os.path.exists(current_app.template_folder)}")
+        if os.path.exists(current_app.template_folder):
+            current_app.logger.error(f"Template folder contents: {os.listdir(current_app.template_folder)}")
+        return f"Error loading template: {str(e)}", 500
 
 @admin_bp.route('/issue', methods=['POST'])
 @admin_required
@@ -120,12 +139,22 @@ def issue_credential():
             verification_url = url_for('main.verify', user_id=user_id, _external=True)
             
             flash(f"Credential issued successfully for user {user_id}", "success")
-            return render_template(
-                'credential_issued.html',
-                user_id=user_id,
-                verification_url=verification_url,
-                credential=credential
-            )
+            
+            try:
+                current_app.logger.info(f"Rendering credential_issued.html template. Template path: {current_app.template_folder}")
+                return render_template(
+                    'credential_issued.html',
+                    user_id=user_id,
+                    verification_url=verification_url,
+                    credential=credential
+                )
+            except Exception as e:
+                current_app.logger.error(f"Error rendering credential_issued.html: {str(e)}")
+                current_app.logger.error(f"Template folder: {current_app.template_folder}")
+                current_app.logger.error(f"Template folder exists: {os.path.exists(current_app.template_folder)}")
+                if os.path.exists(current_app.template_folder):
+                    current_app.logger.error(f"Template folder contents: {os.listdir(current_app.template_folder)}")
+                return f"Error loading template: {str(e)}", 500
         except Exception as e:
             flash(f"Error issuing credential: {str(e)}", "error")
     else:

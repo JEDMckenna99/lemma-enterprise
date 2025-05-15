@@ -12,6 +12,7 @@ from flask import Flask, request, session, g
 from werkzeug.middleware.proxy_fix import ProxyFix
 from logging.handlers import RotatingFileHandler
 import socket
+import shutil
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -24,25 +25,25 @@ def create_app(test_config=None):
     is_heroku = 'DYNO' in os.environ
     
     # Determine template and static folders based on environment
-    if is_heroku:
-        # On Heroku, use absolute paths and ensure they're correctly set
-        template_dir = os.path.join(cwd, 'templates')
-        static_dir = os.path.join(cwd, 'static')
-        logger.info(f"Running on Heroku, using template_dir: {template_dir}")
-        
-        # List the contents of the app directory to debug
-        try:
-            logger.info(f"App directory contents: {os.listdir(cwd)}")
-            if os.path.exists(template_dir):
-                logger.info(f"Template directory contents: {os.listdir(template_dir)}")
-            else:
-                logger.error(f"Template directory {template_dir} does not exist!")
-        except Exception as e:
-            logger.error(f"Error listing directories: {str(e)}")
-    else:
-        # Local development
-        template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
-        static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static'))
+    # We'll use absolute paths for everything for consistency
+    template_dir = os.path.abspath(os.path.join(cwd, 'templates'))
+    static_dir = os.path.abspath(os.path.join(cwd, 'static'))
+    
+    # Log directory information for debugging
+    logger.info(f"Running with cwd: {cwd}")
+    logger.info(f"Is Heroku: {is_heroku}")
+    logger.info(f"Using template_dir: {template_dir}")
+    logger.info(f"Using static_dir: {static_dir}")
+    
+    # List the contents of the app directory
+    try:
+        logger.info(f"App directory contents: {os.listdir(cwd)}")
+        if os.path.exists(template_dir):
+            logger.info(f"Template directory contents: {os.listdir(template_dir)}")
+        else:
+            logger.error(f"Template directory {template_dir} does not exist!")
+    except Exception as e:
+        logger.error(f"Error listing directories: {str(e)}")
     
     # Make sure the template directory exists
     if not os.path.exists(template_dir):
@@ -52,13 +53,41 @@ def create_app(test_config=None):
     # Make sure the static directory exists
     if not os.path.exists(static_dir):
         os.makedirs(static_dir, exist_ok=True)
-        logger.warning(f"Had to create static directory at {static_dir}")
+        # Create an empty CSS file to make Flask happy
+        try:
+            with open(os.path.join(static_dir, 'dummy.css'), 'w') as f:
+                f.write('/* Placeholder file */')
+            logger.warning(f"Had to create static directory at {static_dir} with dummy file")
+        except Exception as e:
+            logger.error(f"Error creating dummy static file: {str(e)}")
     
-    # Create the Flask app with explicit template folder
+    # Create the Flask app with explicit template and static folders
     app = Flask(__name__, 
-                instance_relative_config=True, 
                 template_folder=template_dir,
-                static_folder=static_dir)
+                static_folder=static_dir,
+                instance_relative_config=True)
+    
+    # Override Jinja loader to handle potential issues 
+    from flask.templating import DispatchingJinjaLoader
+    from jinja2 import FileSystemLoader, ChoiceLoader
+    
+    # Create a choice loader that will try multiple possible locations for templates
+    template_dirs = [
+        template_dir,  # First try the specified location
+        os.path.join(cwd, 'templates'),  # Then try project root/templates
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates'),  # Then package parent/templates
+    ]
+    
+    # Log the template search paths
+    logger.info(f"Template search paths: {template_dirs}")
+    
+    # Create a choice loader with multiple possible paths
+    choice_loader = ChoiceLoader([
+        FileSystemLoader(template_dirs),
+        app.jinja_loader  # Keep the default loader as fallback
+    ])
+    
+    app.jinja_loader = choice_loader
     
     # Enable trusted proxy support
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
