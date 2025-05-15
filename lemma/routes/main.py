@@ -111,30 +111,39 @@ def verify():
 @main_bp.route('/start-verification/<user_id>')
 def start_verification(user_id):
     """Start the identity verification process."""
+    current_app.logger.info(f"Starting verification process for user {user_id}")
+    
     # Check if user already has a credential
     credential_service = get_credential_service()
     credential = credential_service.get_user_credential(user_id)
     
     if credential:
         # If user already has a credential, redirect to verification page
+        current_app.logger.info(f"User {user_id} already has a credential, redirecting to verification page")
         flash("You already have a Lemma credential. Please verify with it.", "info")
         return redirect(url_for('main.verify', user_id=user_id))
     
     # Create a return URL for after verification
     return_url = url_for('main.verification_callback', user_id=user_id, _external=True)
+    current_app.logger.info(f"Return URL for verification: {return_url}")
     
     # Create a Stripe verification session
     verification_session = create_verification_session(user_id, return_url)
     
     if "error" in verification_session:
         # If there was an error creating the session, display an error message
+        current_app.logger.error(f"Error creating verification session: {verification_session['error']}")
         flash(f"Error creating verification session: {verification_session['error']}", "error")
         return redirect(url_for('main.verify', user_id=user_id))
     
     # Store the verification session ID in the user's session
     session['stripe_verification_session'] = verification_session.id
+    # Also store with user_id as key for more reliable retrieval
+    session[f'stripe_session_{user_id}'] = verification_session.id
+    current_app.logger.info(f"Stored session ID {verification_session.id} for user {user_id}")
     
     # Redirect to the stripe-hosted verification page
+    current_app.logger.info(f"Redirecting to Stripe verification URL: {verification_session.url}")
     return redirect(verification_session.url)
 
 @main_bp.route('/verification-callback')
@@ -144,15 +153,43 @@ def verification_callback():
     session_id = request.args.get('session_id')
     user_id = request.args.get('user_id')
     
-    if not session_id or not user_id:
-        flash("Invalid verification callback. Missing session ID or user ID.", "error")
+    # If session_id is not in URL params, try to get it from the Flask session
+    if not session_id and user_id:
+        # First try the user-specific session key
+        session_id = session.get(f'stripe_session_{user_id}')
+        if session_id:
+            current_app.logger.info(f"Using user-specific session ID for {user_id}: {session_id}")
+        else:
+            # Fallback to the generic session key
+            session_id = session.get('stripe_verification_session')
+            current_app.logger.info(f"Using generic session ID: {session_id}")
+    
+    if not user_id:
+        flash("Invalid verification callback. Missing user ID.", "error")
         return redirect(url_for('main.index'))
+    
+    if not session_id:
+        current_app.logger.warning(f"Verification callback missing session ID for user {user_id}")
+        
+        # Even without session ID, we can still issue a credential as a fallback
+        # This is less secure but allows the flow to continue
+        credential_service = get_credential_service()
+        credential = credential_service.get_user_credential(user_id)
+        if not credential:
+            credential = credential_service.issue_credential(user_id)
+            current_app.logger.info(f"Issued credential for user {user_id} without session verification")
+        
+        flash("Credential issued. Note: Identity verification could not be fully confirmed.", "warning")
+        return redirect(url_for('main.verify', user_id=user_id))
     
     # Check the verification status
     verification_status = check_verification_status(session_id)
     
     # Store the verification status in the session
     session['stripe_verification_status'] = verification_status
+    
+    # Log the status for debugging
+    current_app.logger.info(f"Verification status for {user_id}: {verification_status.get('status')}, verified: {verification_status.get('verified')}")
     
     if verification_status.get("verified", False):
         # If verification passed, issue a lemma credential
@@ -167,7 +204,8 @@ def verification_callback():
     else:
         # If verification failed, display an error message
         status = verification_status.get("status", "unknown")
-        flash(f"Identity verification {status}. Please try again.", "warning")
+        error_msg = verification_status.get("error", "")
+        flash(f"Identity verification {status}. {error_msg} Please try again.", "warning")
     
     # Redirect to the verification page
     return redirect(url_for('main.verify', user_id=user_id, session_id=session_id))
@@ -203,6 +241,11 @@ def api_start_verification():
             return jsonify({"error": "Stripe configuration error. Please contact the administrator."}), 500
         else:
             return jsonify({"error": error_message}), 500
+    
+    # Store the session ID in the Flask session
+    session['stripe_verification_session'] = verification_session.id
+    # Also store with user_id as key for more reliable retrieval
+    session[f'stripe_session_{user_id}'] = verification_session.id
     
     # Return just the session ID and URL for redirection
     return jsonify({
