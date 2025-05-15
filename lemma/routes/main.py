@@ -204,17 +204,10 @@ def api_start_verification():
         else:
             return jsonify({"error": error_message}), 500
     
-    # Return the verification session details with publishable key
-    stripe_publishable_key = os.environ.get('STRIPE_PUBLISHABLE_KEY') or current_app.config.get('STRIPE_PUBLISHABLE_KEY')
-    
-    if not stripe_publishable_key:
-        current_app.logger.warning("STRIPE_PUBLISHABLE_KEY not configured - UI verification will not work")
-        
+    # Return just the session ID and URL for redirection
     return jsonify({
         "id": verification_session.id,
-        "url": verification_session.url,
-        "client_secret": verification_session.client_secret,
-        "publishable_key": stripe_publishable_key
+        "url": verification_session.url
     })
 
 @main_bp.route('/protected')
