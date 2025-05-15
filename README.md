@@ -4,6 +4,8 @@
 
 A secure, modular, enterprise-grade implementation for verifying humans with minimal data collection and strong cryptographic standards.
 
+**Latest Version: 2.1.0** (Updated May 2025)
+
 ---
 
 ## Our Ethos
@@ -38,6 +40,19 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 
 ---
 
+## What's New in Version 2.1.0
+
+- **Enhanced Home Page Flow**: The "Verify Lemma" button now automatically issues, stores, and verifies credentials locally without redirects.
+- **Improved User Feedback**: The "Access Protected Content" button now displays a clear error message on the same page when no lemma is found instead of redirecting.
+- **Protected Content Enhancements**: Users can now view their Lemma credential details directly on the protected page.
+- **Credential Management**: Added ability to clear Lemma credentials directly from the protected page.
+- **Better Error Handling**: Improved error messages and feedback throughout the verification flow.
+- **Fixed CSRF Issues**: Resolved CSRF token handling for more reliable deployment, especially on Heroku.
+- **Local Storage Integration**: Improved integration with browser's local storage for seamless credential persistence.
+- **Auto-Hiding Messages**: Error notifications now automatically hide after a few seconds for better UX.
+
+---
+
 ## Key Features
 
 - **Modular Architecture:** Clean separation of concerns for maintainability.
@@ -68,9 +83,9 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 - **`tests/`:** Comprehensive test suite.
 
 ### Templates
-- **`templates/index.html`:** Landing page with "Verify Lemma" button.
+- **`templates/index.html`:** Landing page with "Verify Lemma" and "Access Protected Content" buttons.
 - **`templates/verify.html`:** Credential verification and storage page.
-- **`templates/protected.html`:** Content requiring human verification.
+- **`templates/protected.html`:** Content requiring human verification with credential management.
 - **`templates/admin_login.html`:** Secure admin login.
 - **`templates/admin.html`:** Admin dashboard for issuing credentials.
 
@@ -129,7 +144,21 @@ Lemma now includes a fully decentralized identity system that addresses 8 key go
 
 ---
 
-## Flows
+## User Flows
+
+### Home Page Flow (New)
+1. **Initial Entry:** User visits the home page with two main actions: "Verify Lemma" and "Access Protected Content".
+2. **Lemma Verification:** Clicking "Verify Lemma" automatically:
+   - Generates a unique user ID
+   - Issues a new credential
+   - Stores the credential in browser's local storage
+   - Creates a verification presentation
+   - Redirects to the protected page upon successful verification
+3. **Protected Access:** Clicking "Access Protected Content":
+   - Checks if a Lemma credential exists in local storage
+   - If no credential exists, displays an error message on the home page
+   - If a credential exists, creates a presentation and verifies it
+   - Redirects to protected content upon successful verification
 
 ### Admin Onboarding Flow
 1. **Admin Authentication:** Secure login at `/admin/login` (password hashing, CSRF protection).
@@ -139,19 +168,11 @@ Lemma now includes a fully decentralized identity system that addresses 8 key go
 5. **Local Storage:** Credential is stored in the user's browser.
 6. **Cross-Page Access:** User can access protected content at `/protected` using their credential.
 
-### User Verification Flow
-1. **Link Access:** User opens the verification link or clicks "Verify Lemma" on the homepage.
-2. **Credential Retrieval:** System provides the credential (auto-issues if not found).
-3. **Local Storage:** Credential is stored in browser local storage.
-4. **Presentation Creation:** System creates a verifiable presentation.
-5. **Verification Status:** User can see their verification status and manage credentials.
-
-### Cross-Page Verification Flow
-1. **Protected Access:** User attempts to access protected content via "Access Protected Content".
-2. **Credential Check:** System checks for a stored Lemma credential.
-3. **Presentation Verification:** System verifies the presentation.
-4. **Access Grant:** User is granted access to protected content if verification passes.
-5. **Redirect:** If no valid credential is found, user is redirected to the verification page.
+### Protected Content Management (New)
+1. **View Credential:** Users can view their Lemma credential details directly on the protected page.
+2. **Credential Management:** Users can clear their stored credential using the "Clear Lemma" button.
+3. **Import Functionality:** Users can import a previously downloaded credential.
+4. **Session-Based Access:** Access is maintained via both browser storage and server session.
 
 ### Zero-Knowledge Verification Flow
 1. **Minimal Proof Creation:** User creates a zero-knowledge proof that only reveals they're human.
@@ -232,6 +253,26 @@ git push heroku main
 heroku open
 ```
 
+#### Troubleshooting Heroku Deployment
+
+If you encounter CSRF token errors when deploying to Heroku (such as "csrf_token is undefined" in the verify.html template), we've implemented the following fixes:
+
+1. Added a context processor to inject the CSRF token into all templates rendered by the main blueprint:
+   ```python
+   # In lemma/routes/main.py
+   @main_bp.context_processor
+   def inject_csrf_token():
+       return {'csrf_token': generate_csrf_token()}
+   ```
+
+2. Updated the templates to access the token as a variable instead of a function call:
+   ```html
+   <!-- In templates like verify.html -->
+   <meta name="csrf-token" content="{{ csrf_token }}">
+   ```
+
+This solution ensures that CSRF tokens are properly available in templates when deployed to Heroku's environment, preventing 500 errors during the verification process.
+
 ### Azure Deployment
 1. **Create an Azure Web App:**
    ```bash
@@ -262,13 +303,15 @@ X-API-Key: your_api_key_here
 - **POST /api/verify-credential:** Verify a credential
 - **GET /api/generate-challenge:** Generate a challenge for presentation verification
 - **POST /api/verify-presentation:** Verify a presentation
-- **GET /api/credential/{user_id}:** Get a user's credential (auto-issues if not found)
-- **GET /api/credentials/{user_id}:** Get a user's credential (requires API key)
+- **GET /api/credential-lookup/{user_id}:** Get a user's credential (auto-issues if not found)
+- **GET /api/user-credential/{user_id}:** Get a user's credential (requires API key)
 - **GET /api/credentials:** List all credentials (requires API key and admin authentication)
 - **POST /api/presentation:** Create a presentation from a credential
 - **POST /api/verify-human:** Verify a human presentation and set session
+- **POST /api/logout:** Clear the verification session
+- **GET /api/generate-csrf-token:** Generate a CSRF token for secure form submission
 
-### New Decentralized Identity Endpoints
+### Decentralized Identity Endpoints
 - **POST /api/create-minimal-proof:** Create a minimal zero-knowledge proof
 - **POST /api/verify-minimal-proof:** Verify a minimal zero-knowledge proof
 - **POST /api/create-selective-disclosure:** Create a selective disclosure
@@ -294,6 +337,28 @@ X-API-Key: your_api_key_here
 
 ---
 
+## User Experience Enhancements
+
+### Home Page
+- One-click verification with the "Verify Lemma" button
+- Clear feedback with inline error messages for "Access Protected Content"
+- Auto-hiding notifications for better user experience
+- Mobile-responsive design with optimized button layout
+
+### Protected Content Page
+- View Lemma credential details with the "View Lemma" button
+- Clear stored credentials with the "Clear Lemma" button 
+- Import functionality for cross-device credential management
+- Clear verification status indicators
+
+### Credential Management
+- Secure local storage of credentials in the browser
+- Import/export functionality for credential portability
+- Password-protected credential backups
+- Session-based verification for seamless browsing
+
+---
+
 ## Customization
 
 - Modify the HTML templates to match your branding.
@@ -302,6 +367,7 @@ X-API-Key: your_api_key_here
 - Customize security settings in `lemma/__init__.py`.
 - Configure preferred DID methods using environment variables.
 - Set up P2P peers for decentralized revocation.
+- Style error messages and notifications to match your design system.
 
 ---
 
