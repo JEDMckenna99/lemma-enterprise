@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lemma Human Network</title>
+    <script src="https://js.stripe.com/v3/"></script>
     <style>
         :root {
             --primary-color: #6B3FA0;
@@ -365,8 +366,112 @@
                 const userId = `user_${Array.from(crypto.getRandomValues(new Uint8Array(8)))
                     .map(b => b.toString(16).padStart(2, '0')).join('')}`;
                 
-                // Redirect to start the Stripe verification flow
-                window.location.href = `/start-verification/${userId}`;
+                // Get CSRF token
+                const csrfResponse = await fetch('/api/generate-csrf-token', {
+                    credentials: 'include'
+                });
+                const csrfData = await csrfResponse.json();
+                const csrfToken = csrfData.csrf_token;
+                
+                // Create verification session via API
+                const sessionResponse = await fetch('/api/start-verification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        user_id: userId,
+                        csrf_token: csrfToken
+                    })
+                });
+                
+                if (!sessionResponse.ok) {
+                    throw new Error(`Failed to create verification session: ${sessionResponse.status}`);
+                }
+                
+                const sessionData = await sessionResponse.json();
+                
+                // Create Stripe instance
+                const stripe = Stripe(sessionData.publishable_key || 'pk_test_add_your_key_here');
+                
+                // Create modal container for Stripe Elements
+                const modalContainer = document.createElement('div');
+                modalContainer.id = 'stripe-identity-modal';
+                modalContainer.style.position = 'fixed';
+                modalContainer.style.top = '0';
+                modalContainer.style.left = '0';
+                modalContainer.style.width = '100%';
+                modalContainer.style.height = '100%';
+                modalContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
+                modalContainer.style.zIndex = '1000';
+                modalContainer.style.display = 'flex';
+                modalContainer.style.justifyContent = 'center';
+                modalContainer.style.alignItems = 'center';
+                
+                const modalContent = document.createElement('div');
+                modalContent.style.backgroundColor = 'white';
+                modalContent.style.padding = '20px';
+                modalContent.style.borderRadius = '10px';
+                modalContent.style.width = '90%';
+                modalContent.style.maxWidth = '600px';
+                modalContent.style.maxHeight = '90vh';
+                modalContent.style.overflow = 'auto';
+                
+                const closeButton = document.createElement('button');
+                closeButton.textContent = '✕';
+                closeButton.style.float = 'right';
+                closeButton.style.border = 'none';
+                closeButton.style.background = 'none';
+                closeButton.style.fontSize = '20px';
+                closeButton.style.cursor = 'pointer';
+                closeButton.onclick = function() {
+                    document.body.removeChild(modalContainer);
+                };
+                
+                const modalHeader = document.createElement('h3');
+                modalHeader.textContent = 'Verify your identity';
+                modalHeader.style.marginBottom = '20px';
+                modalHeader.style.color = '#6B3FA0';
+                
+                const modalBody = document.createElement('div');
+                modalBody.id = 'stripe-identity-element';
+                
+                modalContent.appendChild(closeButton);
+                modalContent.appendChild(modalHeader);
+                modalContent.appendChild(modalBody);
+                modalContainer.appendChild(modalContent);
+                document.body.appendChild(modalContainer);
+                
+                // Mount the Identity Element to the container
+                const identityElement = stripe.elements().create('identity', {
+                    clientSecret: sessionData.client_secret
+                });
+                
+                identityElement.mount('#stripe-identity-element');
+                
+                // Handle verification completion
+                identityElement.on('change', async function(event) {
+                    if (event.collapsed) {
+                        // The user has completed the verification flow
+                        document.body.removeChild(modalContainer);
+                        
+                        // Check verification status
+                        const statusCheckInterval = setInterval(async () => {
+                            const statusResponse = await fetch(`/api/verification/status/${sessionData.id}`);
+                            const statusData = await statusResponse.json();
+                            
+                            if (statusData.status === 'verified') {
+                                clearInterval(statusCheckInterval);
+                                window.location.href = `/verify?user_id=${userId}&session_id=${sessionData.id}`;
+                            } else if (statusData.status !== 'processing' && statusData.status !== 'requires_input') {
+                                clearInterval(statusCheckInterval);
+                                alert(`Verification ${statusData.status}. Please try again.`);
+                            }
+                        }, 2000);
+                    }
+                });
             } catch (error) {
                 console.error('Error starting verification process:', error);
                 alert(`Error: ${error.message}. Please try again.`);

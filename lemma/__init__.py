@@ -107,6 +107,7 @@ def create_app(test_config=None):
         HARDWARE_SECURITY=os.environ.get('LEMMA_HARDWARE_SECURITY', 'false').lower() == 'true',
         # Stripe Identity verification
         STRIPE_API_KEY=os.environ.get('STRIPE_API_KEY'),
+        STRIPE_PUBLISHABLE_KEY=os.environ.get('STRIPE_PUBLISHABLE_KEY'),
         # Enhanced security settings
         SESSION_COOKIE_SECURE=True,
         SESSION_COOKIE_HTTPONLY=True,
