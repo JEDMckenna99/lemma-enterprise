@@ -330,3 +330,34 @@ def generate_csrf_token():
     except Exception as e:
         current_app.logger.error("Error generating CSRF token: %s", str(e))
         return jsonify({'error': 'Error generating CSRF token'}), 500
+
+@main_bp.route('/api/logout', methods=['GET', 'POST'])
+def api_logout():
+    """API endpoint for logging out and clearing the session.
+    
+    This endpoint can be called from client-side JavaScript to logout and clear 
+    the user's session. It returns a JSON response indicating success.
+    
+    Returns:
+        A JSON object with the logout result.
+    """
+    try:
+        # Clear all verification-related session data
+        session.pop('verified_user_id', None)
+        session.pop('verified_credential', None)
+        session.pop('verified_presentation', None)
+        session.pop('verification_time', None)
+        session.pop('verification_expiry', None)
+        session.pop('verification_challenge', None)
+        session.pop('verified_human', None)
+        
+        return jsonify({
+            "success": True,
+            "message": "Successfully logged out"
+        })
+    except Exception as e:
+        current_app.logger.error("Error during API logout: %s", str(e))
+        return jsonify({
+            "success": False,
+            "error": "Error during logout process"
+        }), 500

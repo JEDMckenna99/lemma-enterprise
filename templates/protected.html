@@ -163,7 +163,18 @@
                 <div style="margin-top: 15px;">
                     <button id="importBtn" class="button" style="margin-top: 5px; font-size: 14px; padding: 8px 12px;">Import Credential</button>
                     <input type="file" id="importFile" accept="application/json" style="display:none;">
+                    <button id="viewLemmaBtn" class="button" style="margin-top: 5px; font-size: 14px; padding: 8px 12px; margin-left: 10px; background-color: #4A2C71;">View Lemma</button>
+                    <button id="clearLemmaBtn" class="button" style="margin-top: 5px; font-size: 14px; padding: 8px 12px; margin-left: 10px; background-color: #DC3545;">Clear Lemma</button>
                 </div>
+            </div>
+            
+            <!-- Lemma Credential Viewer (Hidden by default) -->
+            <div id="lemmaViewer" class="content-section" style="display: none; margin-top: 20px; background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                <h3 style="margin-bottom: 10px; color: var(--primary-color);">Your Lemma Credential</h3>
+                <div style="background-color: white; padding: 10px; border-radius: 6px; border: 1px solid #eee; max-height: 300px; overflow-y: auto;">
+                    <pre id="lemmaContent" style="white-space: pre-wrap; word-break: break-all; font-size: 12px;"></pre>
+                </div>
+                <button id="closeLemmaBtn" class="button" style="margin-top: 10px; font-size: 14px; padding: 8px 12px; background-color: #6c757d;">Close</button>
             </div>
             
             <div class="content-section">
@@ -309,6 +320,52 @@
                 }
             };
             reader.readAsText(file);
+        });
+        
+        // View Lemma Credential
+        document.getElementById('viewLemmaBtn').addEventListener('click', function() {
+            const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+            if (credentials.length > 0) {
+                const credentialKey = credentials[0];
+                const credentialJson = localStorage.getItem(credentialKey);
+                try {
+                    // Format the JSON for better readability
+                    const credential = JSON.parse(credentialJson);
+                    document.getElementById('lemmaContent').textContent = JSON.stringify(credential, null, 2);
+                    document.getElementById('lemmaViewer').style.display = 'block';
+                } catch (e) {
+                    alert('Error parsing credential: ' + e.message);
+                }
+            } else {
+                alert('No Lemma credential found in browser storage.');
+            }
+        });
+        
+        // Close Lemma Viewer
+        document.getElementById('closeLemmaBtn').addEventListener('click', function() {
+            document.getElementById('lemmaViewer').style.display = 'none';
+        });
+        
+        // Clear Lemma Credential
+        document.getElementById('clearLemmaBtn').addEventListener('click', function() {
+            if (confirm('Are you sure you want to clear your Lemma credential? You will need to verify again to access protected content.')) {
+                // Clear all lemma-related items from localStorage
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('lemma_credential_') || key.startsWith('lemma_presentation_') || key === 'lemma_challenge') {
+                        localStorage.removeItem(key);
+                    }
+                });
+                
+                // Clear session cookie by redirecting to logout endpoint
+                fetch('/api/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                })
+                .finally(() => {
+                    alert('Lemma credential cleared. Redirecting to home page...');
+                    window.location.href = '/';
+                });
+            }
         });
         
         // Run on page load
