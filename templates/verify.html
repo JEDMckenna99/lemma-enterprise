@@ -583,7 +583,7 @@
                 const csrfToken = await getCSRFToken();
                 
                 // Fetch the credential from the API
-                const response = await fetch(`/api/get-credential/{{ user_id }}`, {
+                const response = await fetch(`/api/credential-lookup/{{ user_id }}`, {
                     credentials: 'include' // Ensure cookies are sent with the request
                 });
                 if (!response.ok) {
@@ -897,7 +897,7 @@ async function verifyHuman() {
             if (jsonView.style.display === 'none' || jsonView.style.display === '') {
                 // If no credential is stored yet, fetch it
                 if (jsonView.textContent === '') {
-                    fetch(`/api/get-credential/{{ user_id }}`)
+                    fetch(`/api/credential-lookup/{{ user_id }}`)
                         .then(response => response.json())
                         .then(credential => {
                             jsonView.textContent = JSON.stringify(credential, null, 2);

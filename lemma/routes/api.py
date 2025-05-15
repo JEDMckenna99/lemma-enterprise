@@ -135,6 +135,7 @@ def issue_credential():
         return jsonify({"error": f"Error issuing credential: {str(e)}"}), 500
 
 @api_bp.route('/verify-credential', methods=['POST'])
+@csrf_protect()
 @rate_limit
 def verify_credential():
     """Verify a credential via API."""
@@ -185,55 +186,10 @@ def generate_challenge():
     return jsonify({"challenge": challenge})
 
 @api_bp.route('/verify-presentation', methods=['POST'])
+@csrf_protect()
 @rate_limit
 def verify_presentation():
     """Verify a presentation via API."""
-    # Manual CSRF validation with more flexibility
-    if not current_app.config.get('TESTING', False) or not current_app.config.get('SKIP_AUTH_IN_TESTS', False):
-        # Try to get CSRF token from various places
-        csrf_token = request.headers.get('X-CSRF-Token')
-        if not csrf_token and request.is_json:
-            csrf_token = request.json.get('csrf_token')
-        if not csrf_token and request.form:
-            csrf_token = request.form.get('csrf_token')
-            
-        # For development and debugging, allow requests without CSRF tokens
-        if current_app.config.get('ENV') != 'production':
-            current_app.logger.warning("CSRF validation skipped in development mode")
-        else:
-            # In production, validate the token if present
-            if csrf_token:
-                # Try to validate against various session keys where Flask-WTF might store the token
-                valid = False
-                
-                # Check against different possible session keys
-                for key in ['_csrf_token', 'csrf_token', 'csrf']:
-                    if key in session and csrf_token == session[key]:
-                        valid = True
-                        break
-                
-                # If using Flask-WTF, try its validation method
-                try:
-                    from flask_wtf.csrf import validate_csrf
-                    try:
-                        validate_csrf(csrf_token)
-                        valid = True
-                    except Exception:
-                        pass  # Fall back to our manual validation
-                except ImportError:
-                    pass  # Flask-WTF not available
-                
-                if not valid:
-                    current_app.logger.warning("CSRF validation failed for request from IP: %s", request.remote_addr)
-                    # Log token details for debugging
-                    current_app.logger.debug("Received token: %s", csrf_token[:10] if csrf_token else None)
-                    return jsonify({"valid": False, "error": "CSRF validation failed"}), 400
-            elif not csrf_token:
-                current_app.logger.warning("No CSRF token found in request from IP: %s", request.remote_addr)
-                return jsonify({"valid": False, "error": "CSRF token missing"}), 400
-    
-    # Log that we're processing a presentation verification request
-    current_app.logger.info("Processing presentation verification request from IP: %s", request.remote_addr)
     try:
         data = request.get_json()
         if not data or 'presentation' not in data or 'challenge' not in data:
@@ -273,7 +229,7 @@ def verify_presentation():
         logger.error("Error verifying presentation: %s", str(e))
         return jsonify({"error": f"Error verifying presentation: {str(e)}"}), 500
 
-@api_bp.route('/credentials/<user_id>')
+@api_bp.route('/user-credential/<user_id>')
 @require_api_key
 @rate_limit
 def get_user_credential(user_id):
@@ -319,65 +275,24 @@ def list_credentials():
 
 @api_bp.route('/get-csrf-token', methods=['GET'])
 def get_csrf_token():
-    """Generate a CSRF token for client-side JavaScript."""
+    """Generate a CSRF token for client-side JavaScript and set it as a cookie."""
     try:
         # Get or generate a CSRF token
         token = generate_csrf_token()
-        
-        # Return the token in JSON format
-        return jsonify({'csrf_token': token})
+        response = jsonify({'csrf_token': token})
+        # Set the CSRF token as a cookie (modern best practice)
+        response.set_cookie('csrf_token', token, httponly=False, secure=True, samesite='Lax')
+        return response
     except Exception as e:
         logger.error("Error generating CSRF token: %s", str(e))
         return jsonify({'error': 'Error generating CSRF token'}), 500
 
 @api_bp.route('/verify-human', methods=['POST'])
+@csrf_protect()
 @rate_limit
 def verify_human():
     """Verify a human presentation and set session for protected content access."""
     try:
-        # Manual CSRF validation with more flexibility
-        if not current_app.config.get('TESTING', False) or not current_app.config.get('SKIP_AUTH_IN_TESTS', False):
-            # Try to get CSRF token from various places
-            csrf_token = request.headers.get('X-CSRF-Token')
-            if not csrf_token and request.is_json:
-                csrf_token = request.json.get('csrf_token')
-            if not csrf_token and request.form:
-                csrf_token = request.form.get('csrf_token')
-            
-            # For development and debugging, allow requests without CSRF tokens
-            if current_app.config.get('ENV') != 'production':
-                current_app.logger.warning("CSRF validation skipped in development mode")
-            else:
-                # In production, validate the token if present
-                if csrf_token:
-                    valid = False
-                    
-                    # Check against different possible session keys
-                    for key in ['_csrf_token', 'csrf_token', 'csrf']:
-                        if key in session and csrf_token == session[key]:
-                            valid = True
-                            break
-                    
-                    # If using Flask-WTF, try its validation method
-                    try:
-                        from flask_wtf.csrf import validate_csrf
-                        try:
-                            validate_csrf(csrf_token)
-                            valid = True
-                        except Exception:
-                            pass  # Fall back to our manual validation
-                    except ImportError:
-                        pass  # Flask-WTF not available
-                    
-                    if not valid:
-                        current_app.logger.warning("CSRF validation failed for human verification request from IP: %s", request.remote_addr)
-                        # Log token details for debugging
-                        current_app.logger.debug("Received token: %s", csrf_token[:10] if csrf_token else None)
-                        return jsonify({"success": False, "error": "CSRF validation failed"}), 400
-                elif not csrf_token:
-                    current_app.logger.warning("No CSRF token found in human verification request from IP: %s", request.remote_addr)
-                    return jsonify({"success": False, "error": "CSRF token missing"}), 400
-        
         current_app.logger.info("Processing human verification request from IP: %s", request.remote_addr)
         
         data = request.get_json()
@@ -439,24 +354,8 @@ def verify_human():
         logger.error("Error verifying human: %s", str(e))
         return jsonify({"success": False, "error": f"Error verifying human: {str(e)}"}), 500
 
-@api_bp.route('/credential/<user_id>', methods=['GET'])
-def get_credential(user_id):
-    """Get a credential for a specific user ID."""
-    try:
-        credential_service = get_credential_service()
-        credential = credential_service.get_user_credential(user_id)
-        
-        if not credential:
-            # If no credential exists, issue a new one
-            logger.info(f"No existing credential found for user {user_id}, issuing new one")
-            credential = credential_service.issue_credential(user_id)
-        
-        return jsonify(credential)
-    except Exception as e:
-        logger.error("Error retrieving credential: %s", str(e))
-        return jsonify({"error": f"Error retrieving credential: {str(e)}"}), 500
-
 @api_bp.route('/presentation', methods=['POST'])
+@csrf_protect()
 def create_presentation():
     """Create a presentation from a credential."""
     try:
@@ -478,3 +377,640 @@ def create_presentation():
     except Exception as e:
         logger.error("Error creating presentation: %s", str(e))
         return jsonify({"error": f"Error creating presentation: {str(e)}"}), 500
+
+@api_bp.route('/create-minimal-proof', methods=['POST'])
+@rate_limit
+def create_minimal_proof():
+    """Create a minimal zero-knowledge proof that only reveals the user is human."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        # Get credential and challenge
+        credential = data.get('credential')
+        challenge = data.get('challenge')
+        
+        if not credential or not challenge:
+            return jsonify({"error": "Credential and challenge are required"}), 400
+            
+        # Import ZKProof utilities
+        try:
+            from lemma.utils.zero_knowledge import ZKProof
+        except ImportError:
+            return jsonify({"error": "Zero-knowledge proof functionality not available"}), 500
+            
+        # Create the proof
+        try:
+            proof = ZKProof.create_human_proof(credential, challenge)
+            return jsonify(proof)
+        except Exception as e:
+            return jsonify({"error": f"Error creating proof: {str(e)}"}), 400
+            
+    except Exception as e:
+        logger.error(f"Error in create_minimal_proof: {str(e)}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+
+@api_bp.route('/verify-minimal-proof', methods=['POST'])
+@rate_limit
+def verify_minimal_proof():
+    """Verify a minimal zero-knowledge proof."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        # Get proof and challenge
+        proof = data.get('proof')
+        challenge = data.get('challenge')
+        
+        if not proof or not challenge:
+            return jsonify({"error": "Proof and challenge are required"}), 400
+            
+        # Import ZKProof utilities
+        try:
+            from lemma.utils.zero_knowledge import ZKProof
+        except ImportError:
+            return jsonify({"error": "Zero-knowledge proof functionality not available"}), 500
+            
+        # Verify the proof
+        try:
+            result = ZKProof.verify_human_proof(proof, challenge)
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({"error": f"Error verifying proof: {str(e)}"}), 400
+            
+    except Exception as e:
+        logger.error(f"Error in verify_minimal_proof: {str(e)}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+
+@api_bp.route('/create-selective-disclosure', methods=['POST'])
+@rate_limit
+def create_selective_disclosure():
+    """Create a selective disclosure that only reveals specific attributes."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        # Get credential and attributes
+        credential = data.get('credential')
+        attributes = data.get('attributes', ['isHuman'])
+        
+        if not credential:
+            return jsonify({"error": "Credential is required"}), 400
+            
+        # Import SelectiveDisclosure utilities
+        try:
+            from lemma.utils.zero_knowledge import SelectiveDisclosure
+        except ImportError:
+            return jsonify({"error": "Selective disclosure functionality not available"}), 500
+            
+        # Create the disclosure
+        try:
+            disclosure = SelectiveDisclosure.create_disclosure(credential, attributes)
+            return jsonify(disclosure)
+        except Exception as e:
+            return jsonify({"error": f"Error creating disclosure: {str(e)}"}), 400
+            
+    except Exception as e:
+        logger.error(f"Error in create_selective_disclosure: {str(e)}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+
+@api_bp.route('/verify-selective-disclosure', methods=['POST'])
+@rate_limit
+def verify_selective_disclosure():
+    """Verify a selective disclosure."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        # Get disclosure
+        disclosure = data.get('disclosure')
+        
+        if not disclosure:
+            return jsonify({"error": "Disclosure is required"}), 400
+            
+        # Get trusted issuers from config
+        trusted_issuers = current_app.config.get('TRUSTED_ISSUERS')
+        
+        # Import SelectiveDisclosure utilities
+        try:
+            from lemma.utils.zero_knowledge import SelectiveDisclosure
+        except ImportError:
+            return jsonify({"error": "Selective disclosure functionality not available"}), 500
+            
+        # Verify the disclosure
+        try:
+            result = SelectiveDisclosure.verify_disclosure(disclosure, trusted_issuers)
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({"error": f"Error verifying disclosure: {str(e)}"}), 400
+            
+    except Exception as e:
+        logger.error(f"Error in verify_selective_disclosure: {str(e)}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+
+@api_bp.route('/verify-with-hardware', methods=['POST'])
+@rate_limit
+def verify_with_hardware():
+    """Verify a credential using hardware-backed security if available."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        # Get credential
+        credential = data.get('credential')
+        
+        if not credential:
+            return jsonify({"error": "Credential is required"}), 400
+            
+        # Check if hardware security is enabled
+        if not current_app.config.get('HARDWARE_SECURITY', False):
+            # Fall back to regular verification
+            credential_service = get_credential_service()
+            result = credential_service.verify_credential(credential)
+            return jsonify(result)
+            
+        # Attempt to use hardware-backed verification
+        try:
+            from lemma.utils.secure_storage import get_secure_storage
+            storage = get_secure_storage()
+            
+            # For now, this just delegates to the regular verification
+            # In a real implementation, this would use hardware security features
+            credential_service = get_credential_service()
+            result = credential_service.verify_credential(credential)
+            
+            # Add hardware security indicator to the result
+            if result.get('valid'):
+                result['hardware_verified'] = storage.secure_hardware_available
+                
+            return jsonify(result)
+        except ImportError:
+            # Fall back to regular verification
+            credential_service = get_credential_service()
+            result = credential_service.verify_credential(credential)
+            return jsonify(result)
+            
+    except Exception as e:
+        logger.error(f"Error in verify_with_hardware: {str(e)}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+
+# Add the following API endpoints for P2P revocation synchronization
+
+@api_bp.route('/revocation/status', methods=['GET'])
+@require_api_key
+def revocation_status():
+    """Get revocation status for the local node."""
+    try:
+        # Check if P2P revocation is enabled
+        if not current_app.config.get('ENABLE_P2P', False):
+            return jsonify({"error": "P2P revocation not enabled on this node"}), 400
+            
+        # Get the P2P network from app config
+        p2p_network = current_app.config.get('P2P_NETWORK')
+        if not p2p_network:
+            return jsonify({"error": "P2P network not configured"}), 500
+            
+        # Get sync status
+        status = p2p_network.get_sync_status()
+        return jsonify(status)
+        
+    except Exception as e:
+        logger.error(f"Error getting revocation status: {str(e)}")
+        return jsonify({"error": f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/revocation/sync', methods=['POST'])
+@require_api_key
+def sync_revocation():
+    """Manually trigger synchronization with peer nodes."""
+    try:
+        # Check if P2P revocation is enabled
+        if not current_app.config.get('ENABLE_P2P', False):
+            return jsonify({"error": "P2P revocation not enabled on this node"}), 400
+            
+        # Get the P2P network from app config
+        p2p_network = current_app.config.get('P2P_NETWORK')
+        if not p2p_network:
+            return jsonify({"error": "P2P network not configured"}), 500
+            
+        # Sync with peers
+        results = p2p_network.sync_with_peers()
+        return jsonify({"status": "success", "results": results})
+        
+    except Exception as e:
+        logger.error(f"Error syncing revocation data: {str(e)}")
+        return jsonify({"error": f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/revocation/import', methods=['POST'])
+@require_api_key
+def import_revocation_data():
+    """Import revocation data from a peer node."""
+    try:
+        # Get revocation registry
+        from lemma.core.revocation import get_revocation_registry
+        registry = get_revocation_registry()
+        if not registry:
+            return jsonify({"error": "Revocation registry not available"}), 500
+            
+        # Get the data from the request
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        # Validate basic structure
+        if "issuer_id" not in data:
+            return jsonify({"error": "Invalid revocation data format"}), 400
+            
+        # Import the data
+        success = registry.import_revocation_data(data)
+        
+        return jsonify({
+            "status": "success" if success else "no_update",
+            "message": "Data imported successfully" if success else "Local data is newer, no update needed"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error importing revocation data: {str(e)}")
+        return jsonify({"error": f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/revocation/issuers', methods=['GET'])
+@require_api_key
+def list_revocation_issuers():
+    """List all issuers in the revocation registry."""
+    try:
+        # Get revocation registry
+        from lemma.core.revocation import get_revocation_registry
+        registry = get_revocation_registry()
+        if not registry:
+            return jsonify({"error": "Revocation registry not available"}), 500
+            
+        # Get the list of issuers
+        issuers = list(registry.revocation_data.keys())
+        
+        return jsonify({
+            "issuers": issuers,
+            "count": len(issuers)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing revocation issuers: {str(e)}")
+        return jsonify({"error": f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/revocation/issuer/<issuer_id>', methods=['GET'])
+@require_api_key
+def get_issuer_metadata(issuer_id):
+    """Get metadata for an issuer's revocation data."""
+    try:
+        # Get revocation registry
+        from lemma.core.revocation import get_revocation_registry
+        registry = get_revocation_registry()
+        if not registry:
+            return jsonify({"error": "Revocation registry not available"}), 500
+            
+        # Get the revocation data for this issuer
+        revocation_data = registry.get_revocation_data(issuer_id)
+        if not revocation_data:
+            return jsonify({"error": f"No revocation data for issuer {issuer_id}"}), 404
+            
+        # Return only the metadata
+        return jsonify({
+            "issuer_id": revocation_data["issuer_id"],
+            "last_updated": revocation_data["last_updated"],
+            "revoked_count": revocation_data["revoked_count"]
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting issuer metadata: {str(e)}")
+        return jsonify({"error": f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/revocation/data/<issuer_id>', methods=['GET'])
+@require_api_key
+def get_issuer_revocation_data(issuer_id):
+    """Get the full revocation data for an issuer."""
+    try:
+        # Get revocation registry
+        from lemma.core.revocation import get_revocation_registry
+        registry = get_revocation_registry()
+        if not registry:
+            return jsonify({"error": "Revocation registry not available"}), 500
+            
+        # Get the revocation data for this issuer
+        revocation_data = registry.get_revocation_data(issuer_id)
+        if not revocation_data:
+            return jsonify({"error": f"No revocation data for issuer {issuer_id}"}), 404
+            
+        # Return the full data
+        return jsonify(revocation_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting issuer revocation data: {str(e)}")
+        return jsonify({"error": f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/revocation/check/<issuer_id>/<credential_id>', methods=['GET'])
+def check_revocation_status(issuer_id, credential_id):
+    """Check if a credential is revoked."""
+    try:
+        # Get revocation registry
+        from lemma.core.revocation import get_revocation_registry
+        registry = get_revocation_registry()
+        if not registry:
+            return jsonify({"error": "Revocation registry not available"}), 500
+            
+        # Check if the credential is revoked
+        is_revoked = registry.is_revoked(issuer_id, credential_id)
+        
+        return jsonify({
+            "issuer_id": issuer_id,
+            "credential_id": credential_id,
+            "revoked": is_revoked,
+            "timestamp": time.time()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error checking revocation status: {str(e)}")
+        return jsonify({"error": f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/revocation/add_peer', methods=['POST'])
+@require_api_key
+def add_revocation_peer():
+    """Add a peer to the P2P revocation network."""
+    try:
+        # Check if P2P revocation is enabled
+        if not current_app.config.get('ENABLE_P2P', False):
+            return jsonify({"error": "P2P revocation not enabled on this node"}), 400
+            
+        # Get the P2P network from app config
+        p2p_network = current_app.config.get('P2P_NETWORK')
+        if not p2p_network:
+            return jsonify({"error": "P2P network not configured"}), 500
+            
+        # Get peer info from the request
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        peer_id = data.get('peer_id')
+        peer_url = data.get('peer_url')
+        
+        if not peer_id or not peer_url:
+            return jsonify({"error": "Both peer_id and peer_url are required"}), 400
+            
+        # Add the peer
+        p2p_network.add_peer(peer_id, peer_url)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Peer {peer_id} added successfully",
+            "peer_count": len(p2p_network.peers)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error adding revocation peer: {str(e)}")
+        return jsonify({"error": f"Internal error: {str(e)}"}), 500
+
+# Add API endpoints for peer discovery and network information
+
+@api_bp.route('/node_info', methods=['GET'])
+def get_node_info():
+    """Get information about this node."""
+    try:
+        # Get node ID (DID) from config
+        node_id = current_app.config.get('DID', 'unknown')
+        node_url = request.host_url.rstrip('/')
+        
+        # Determine supported features
+        features = []
+        
+        if current_app.config.get('ENABLE_P2P', False):
+            features.append('revocation')
+            
+        try:
+            from lemma.core.did_resolver import get_did_resolver
+            features.append('did_resolver')
+        except ImportError:
+            pass
+            
+        try:
+            from lemma.utils.zero_knowledge import ZKProof
+            features.append('zero_knowledge')
+        except ImportError:
+            pass
+            
+        try:
+            from lemma.utils.secure_storage import get_secure_storage
+            features.append('hardware_security')
+        except ImportError:
+            pass
+        
+        network = current_app.config.get('NETWORK', 'main')
+        
+        return jsonify({
+            'node_id': node_id,
+            'url': node_url,
+            'features': features,
+            'network': network,
+            'version': current_app.config.get('VERSION', '1.0'),
+            'timestamp': time.time()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting node info: {str(e)}")
+        return jsonify({'error': f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/peers', methods=['GET'])
+@require_api_key
+def get_peers():
+    """Get the list of peers in the network."""
+    try:
+        # Check if peer discovery is enabled
+        try:
+            from lemma.utils.network_utilities import get_peer_discovery
+        except ImportError:
+            return jsonify({'error': 'Peer discovery not available'}), 500
+            
+        discovery = get_peer_discovery()
+        if not discovery:
+            return jsonify({'error': 'Peer discovery not initialized'}), 500
+            
+        # Get include_stats parameter
+        include_stats = request.args.get('include_stats', 'false').lower() == 'true'
+        
+        # Get the peer list
+        peer_list = discovery.get_peer_list(include_stats)
+        return jsonify(peer_list)
+        
+    except Exception as e:
+        logger.error(f"Error getting peers: {str(e)}")
+        return jsonify({'error': f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/peers/add', methods=['POST'])
+@require_api_key
+def add_peer():
+    """Add a peer to the network."""
+    try:
+        # Check if peer discovery is enabled
+        try:
+            from lemma.utils.network_utilities import get_peer_discovery
+        except ImportError:
+            return jsonify({'error': 'Peer discovery not available'}), 500
+            
+        discovery = get_peer_discovery()
+        if not discovery:
+            return jsonify({'error': 'Peer discovery not initialized'}), 500
+            
+        # Get peer data from request
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        peer_id = data.get('peer_id')
+        peer_url = data.get('peer_url')
+        status = data.get('status', 'discovered')
+        features = data.get('features', [])
+        network = data.get('network', 'main')
+        
+        if not peer_id or not peer_url:
+            return jsonify({'error': 'Both peer_id and peer_url are required'}), 400
+            
+        # Add the peer
+        added = discovery.add_peer(peer_id, peer_url, status, features, network)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f"Peer {'added' if added else 'updated'} successfully",
+            'peer_id': peer_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error adding peer: {str(e)}")
+        return jsonify({'error': f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/peers/remove/<peer_id>', methods=['POST'])
+@require_api_key
+def remove_peer(peer_id):
+    """Remove a peer from the network."""
+    try:
+        # Check if peer discovery is enabled
+        try:
+            from lemma.utils.network_utilities import get_peer_discovery
+        except ImportError:
+            return jsonify({'error': 'Peer discovery not available'}), 500
+            
+        discovery = get_peer_discovery()
+        if not discovery:
+            return jsonify({'error': 'Peer discovery not initialized'}), 500
+            
+        # Remove the peer
+        removed = discovery.remove_peer(peer_id)
+        
+        if removed:
+            return jsonify({
+                'status': 'success',
+                'message': f"Peer {peer_id} removed successfully"
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': f"Peer {peer_id} not found"
+            }), 404
+        
+    except Exception as e:
+        logger.error(f"Error removing peer: {str(e)}")
+        return jsonify({'error': f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/peers/discover', methods=['POST'])
+@require_api_key
+def discover_peers():
+    """Discover peers on the local network."""
+    try:
+        # Check if peer discovery is enabled
+        try:
+            from lemma.utils.network_utilities import get_peer_discovery
+        except ImportError:
+            return jsonify({'error': 'Peer discovery not available'}), 500
+            
+        discovery = get_peer_discovery()
+        if not discovery:
+            return jsonify({'error': 'Peer discovery not initialized'}), 500
+            
+        # Get parameters from request
+        data = request.get_json() or {}
+        port = data.get('port', 5000)
+        timeout = data.get('timeout', 2)
+        
+        # Discover peers
+        discovered = discovery.discover_local_network(port, timeout)
+        
+        return jsonify({
+            'status': 'success',
+            'discovered': discovered,
+            'count': len(discovered),
+            'timestamp': time.time()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error discovering peers: {str(e)}")
+        return jsonify({'error': f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/peers/health', methods=['GET'])
+@require_api_key
+def check_peers_health():
+    """Check the health of all known peers."""
+    try:
+        # Check if peer discovery is enabled
+        try:
+            from lemma.utils.network_utilities import get_peer_discovery
+        except ImportError:
+            return jsonify({'error': 'Peer discovery not available'}), 500
+            
+        discovery = get_peer_discovery()
+        if not discovery:
+            return jsonify({'error': 'Peer discovery not initialized'}), 500
+            
+        # Check single peer or all peers
+        peer_id = request.args.get('peer_id')
+        
+        if peer_id:
+            # Check specific peer
+            health = discovery.check_peer_health(peer_id)
+            return jsonify(health)
+        else:
+            # Check all peers
+            health = discovery.check_all_peers_health()
+            return jsonify({
+                'peers': health,
+                'count': len(health),
+                'timestamp': time.time()
+            })
+        
+    except Exception as e:
+        logger.error(f"Error checking peers health: {str(e)}")
+        return jsonify({'error': f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/peers/sync/<peer_id>', methods=['POST'])
+@require_api_key
+def sync_with_peer(peer_id):
+    """Synchronize peer list with a trusted peer."""
+    try:
+        # Check if peer discovery is enabled
+        try:
+            from lemma.utils.network_utilities import get_peer_discovery
+        except ImportError:
+            return jsonify({'error': 'Peer discovery not available'}), 500
+            
+        discovery = get_peer_discovery()
+        if not discovery:
+            return jsonify({'error': 'Peer discovery not initialized'}), 500
+            
+        # Sync with the peer
+        result = discovery.sync_with_trusted_peer(peer_id)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error syncing with peer: {str(e)}")
+        return jsonify({'error': f"Internal error: {str(e)}"}), 500

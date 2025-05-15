@@ -19,8 +19,36 @@ logger = logging.getLogger(__name__)
 def create_app(test_config=None):
     """Create and configure the Flask application."""
     
-    # Create the Flask app
-    app = Flask(__name__, instance_relative_config=True)
+    # Get the current working directory and determine if running on Heroku
+    cwd = os.getcwd()
+    is_heroku = 'DYNO' in os.environ
+    
+    # Determine template and static folders based on environment
+    if is_heroku:
+        # On Heroku, we need to use absolute paths
+        template_dir = os.path.join(cwd, 'templates')
+        static_dir = os.path.join(cwd, 'static')
+        logger.info(f"Running on Heroku, using template_dir: {template_dir}")
+    else:
+        # Local development
+        template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
+        static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static'))
+    
+    # Make sure the template directory exists
+    if not os.path.exists(template_dir):
+        os.makedirs(template_dir, exist_ok=True)
+        logger.warning(f"Had to create templates directory at {template_dir}")
+    
+    # Make sure the static directory exists
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir, exist_ok=True)
+        logger.warning(f"Had to create static directory at {static_dir}")
+    
+    # Create the Flask app with explicit template folder
+    app = Flask(__name__, 
+                instance_relative_config=True, 
+                template_folder=template_dir,
+                static_folder=static_dir)
     
     # Enable trusted proxy support
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -71,7 +99,7 @@ def create_app(test_config=None):
         app.logger.addHandler(file_handler)
         
         app.logger.setLevel(logging.INFO)
-        app.logger.info('Lemma startup')
+        app.logger.info(f'Lemma startup in {cwd}. Template dir: {template_dir}')
 
     # Initialize components
     _init_components(app)

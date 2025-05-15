@@ -149,7 +149,6 @@ def main():
     
     print("\n🎉 Self-verification process completed!")
     print("You can now use this credential to access the protected areas of your Lemma system.")
-    print("To onboard others, you can use the invitation functionality.")
     
     return True
 

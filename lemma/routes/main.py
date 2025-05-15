@@ -86,7 +86,7 @@ def protected():
         verification_expiry=session.get('verification_expiry')
     )
 
-@main_bp.route('/api/get-credential/<user_id>')
+@main_bp.route('/api/credential-lookup/<user_id>')
 def get_credential(user_id):
     """API endpoint to get a user's credential."""
     credential_service = get_credential_service()
@@ -135,8 +135,8 @@ def store_credential():
         "redirect": url_for('main.protected')
     })
 
-@main_bp.route('/api/verify-presentation', methods=['POST'])
-def verify_presentation():
+@main_bp.route('/api/main-verify-presentation', methods=['POST'])
+def main_verify_presentation():
     """API endpoint to verify a presentation.
     
     This endpoint verifies a presentation and updates the session with the verification result.

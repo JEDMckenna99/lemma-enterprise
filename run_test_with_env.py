@@ -113,10 +113,6 @@ def main():
     if all_passed:
         print("\n🎉 ALL TESTS PASSED!")
         print("\nYour verified human network is functioning properly and ready for deployment.")
-        print("To deploy with SMS invitation capability:")
-        print("1. Set up your Twilio account and get your credentials")
-        print("2. Add your Twilio credentials to the environment variables when deploying")
-        print("3. Run the deployment script: python deploy_to_azure.py")
     else:
         print("\n❌ SOME TESTS FAILED. Please fix the issues before deploying.")
     

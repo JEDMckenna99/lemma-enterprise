@@ -5,6 +5,7 @@ Provides enhanced CSRF protection for enterprise-grade security.
 import logging
 from flask import request, abort, current_app, session
 import secrets
+from functools import wraps, update_wrapper
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,7 @@ def csrf_protect():
         A decorator function that wraps the view function
     """
     def decorator(view_function):
+        @wraps(view_function)
         def wrapped_view(*args, **kwargs):
             # Skip CSRF check in testing environment if configured
             if current_app.config.get('TESTING', False) and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
@@ -177,6 +179,14 @@ def csrf_protect():
                 abort(400, "CSRF validation failed")
             
             return view_function(*args, **kwargs)
+        
+        # Update the name of the wrapped function to include the original function's name
+        # This will help avoid endpoint conflicts
+        wrapped_view.__name__ = f"csrf_protected_{view_function.__name__}"
+        
+        # Make sure the blueprint endpoint routing works correctly
+        update_wrapper(wrapped_view, view_function)
+        
         return wrapped_view
     return decorator
 
@@ -215,7 +225,6 @@ def validate_csrf_token(token=None):
         return False
         
     # Get stored token from session
-    from flask import session
     stored_token = session.get('_csrf_token')
     if not stored_token:
         current_app.logger.warning("No CSRF token found in session")
@@ -248,7 +257,9 @@ def generate_csrf_token():
     # Use Flask-WTF's CSRF token generation
     try:
         return csrf.generate_csrf()
-    except AttributeError:
-        # Fallback for tests or if Flask-WTF is not configured properly
-        import secrets
-        return secrets.token_hex(16)
+    except Exception as e:
+        current_app.logger.warning(f"Error generating CSRF token: {e}")
+        # Fallback to session-based token
+        if '_csrf_token' not in session:
+            session['_csrf_token'] = secrets.token_hex(16)
+        return session.get('_csrf_token')

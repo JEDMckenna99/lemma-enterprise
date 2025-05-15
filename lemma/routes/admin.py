@@ -116,7 +116,7 @@ def issue_credential():
             credential_service = get_credential_service()
             credential = credential_service.issue_credential(user_id)
             
-            # Generate verification URL for secure link-based onboarding
+            # Generate verification URL for user to access their credential
             verification_url = url_for('main.verify', user_id=user_id, _external=True)
             
             flash(f"Credential issued successfully for user {user_id}", "success")

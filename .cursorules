@@ -28,7 +28,16 @@
     "social_security",
     "PASSWORD",
     "SECRET_KEY = '[a-zA-Z0-9]+'",
-    "DEBUG = True"
+    "DEBUG = True",
+    "os.environ\\['ED25519_PRIVATE_KEY'\\] = ",
+    "os.environ\\['DID'\\] = ",
+    "os.environ\\['LEMMA_ADMIN_USER'\\] = ",
+    "os.environ\\['LEMMA_ADMIN_PASS'\\] = ",
+    "os.environ\\['LEMMA_SECRET_KEY'\\] = ",
+    "os.environ\\['LEMMA_API_KEY'\\] = ",
+    "os.environ.set\\(",
+    "$env:",
+    "export[\\s]+ED25519|export[\\s]+DID|export[\\s]+LEMMA_"
   ],
   "architecture": {
     "components": {
@@ -52,7 +61,8 @@
     "Input validation required",
     "CSRF protection for all forms",
     "Escape user-generated content",
-    "Rate limiting for API endpoints"
+    "Rate limiting for API endpoints",
+    "No automatic setting of environment variables"
   ],
   "didFormat": "did:lemma:<uuid>",
   "vcStructure": {
@@ -62,10 +72,10 @@
     "proof": "Ed25519 signature"
   },
   "deploymentVars": {
-    "ED25519_PRIVATE_KEY": "Base64-encoded private key",
-    "DID": "Custom DID (optional)",
-    "LEMMA_ADMIN_USER": "Admin username",
-    "LEMMA_ADMIN_PASS": "Admin password"
+    "ED25519_PRIVATE_KEY": "Base64-encoded private key (already set in Heroku)",
+    "DID": "Custom DID (already set in Heroku)",
+    "LEMMA_ADMIN_USER": "Admin username (already set in Heroku)",
+    "LEMMA_ADMIN_PASS": "Admin password (already set in Heroku)"
   },
   "testing": {
     "unitTestsRequired": true,

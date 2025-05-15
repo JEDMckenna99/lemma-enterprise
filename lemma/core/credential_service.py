@@ -16,6 +16,12 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import Fernet
 from flask import current_app, g
 
+try:
+    from lemma.core.did_resolver import get_did_resolver
+except ImportError:
+    # Fallback for tests or when the module is not yet available
+    get_did_resolver = lambda: None
+
 # Global credential service instance
 _credential_service = None
 
@@ -51,6 +57,9 @@ class LemmaCredentialService:
         self.keys = self._load_or_create_keys()
         self.registry = self._load_registry()
         self.users = self._load_users()
+        
+        # Get access to the DID resolver
+        self.did_resolver = get_did_resolver()
     
     def _get_or_create_encryption_key(self):
         """Get or create a key for encrypting sensitive data."""
@@ -92,13 +101,15 @@ class LemmaCredentialService:
                 keys_data['private_key_obj'] = private_key
                 return keys_data
         
+        # Get DID method from environment or configuration
+        did_method = os.environ.get("DID_METHOD", "lemma")
+        
         # Create new keys with strong entropy
         private_key = ed25519.Ed25519PrivateKey.generate()
         public_key = private_key.public_key()
         
         # Create DID with method-specific identifier
         did_uuid = uuid.uuid4().hex
-        did_method = "lemma"
         did = f"did:{did_method}:{did_uuid}"
         
         # Serialize keys for storage with secure encoding
@@ -116,6 +127,13 @@ class LemmaCredentialService:
         private_key_str = base64.b64encode(private_bytes).decode('ascii')
         encrypted_private_key = self._encrypt_data(private_key_str)
         
+        # Encode the public key for JWK format (required for DID documents)
+        public_key_jwk = {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": base64.urlsafe_b64encode(public_bytes).decode('ascii').rstrip('=')
+        }
+        
         # Create key data with additional security metadata
         keys_data = {
             'did': did,
@@ -123,6 +141,7 @@ class LemmaCredentialService:
             'did_id': did_uuid,
             'private_key': encrypted_private_key,  # Encrypted
             'public_key': base64.b64encode(public_bytes).decode('ascii'),
+            'public_key_jwk': public_key_jwk,
             'created_at': datetime.now().isoformat(),
             'key_type': 'Ed25519',
             'private_key_obj': private_key  # Not stored, just for runtime use
@@ -197,7 +216,7 @@ class LemmaCredentialService:
         self._save_users()
         return user_data
     
-    def issue_credential(self, user_id: str) -> Dict[str, Any]:
+    def issue_credential(self, user_id: str, did_method: str = None) -> Dict[str, Any]:
         """Issue a minimal verifiable credential that only verifies the user is human."""
         # Ensure user exists
         self.create_user(user_id)
@@ -206,6 +225,13 @@ class LemmaCredentialService:
         credential_id = f"vc_{uuid.uuid4().hex}"
         issuance_date = datetime.now().isoformat()
         expiration_date = (datetime.now() + timedelta(days=365)).isoformat()
+        
+        # Use specified DID method or default to the user's preference
+        if not did_method:
+            did_method = "user"  # Default to 'user' method
+            
+        # User subject with their choice of DID method
+        subject_id = f"did:{did_method}:{user_id}"
         
         # Create credential in W3C Verifiable Credential format with MINIMAL data
         # Only store that this is a verified human - nothing else
@@ -220,7 +246,7 @@ class LemmaCredentialService:
             "issuanceDate": issuance_date,
             "expirationDate": expiration_date,
             "credentialSubject": {
-                "id": f"did:user:{user_id}",
+                "id": subject_id,
                 "type": "Person",
                 "isHuman": True,
                 "verifiedBy": "admin"
@@ -259,67 +285,10 @@ class LemmaCredentialService:
         
         return credential
     
-    def verify_credential(self, credential: Dict[str, Any]) -> Dict[str, bool]:
-        """Verify a credential's signature and status with enterprise security checks."""
-        # Make a copy of the credential to avoid modifying the original
-        credential_copy = credential.copy()
-        
-        # Check if credential exists in registry
-        credential_id = credential_copy.get("id")
-        if credential_id not in self.registry["credentials"]:
-            return {"valid": False, "reason": "Credential not found in registry"}
-
-        # Check if expired
-        if "expirationDate" in credential_copy:
-            expiration_date = datetime.fromisoformat(credential_copy["expirationDate"])
-            if datetime.now() > expiration_date:
-                return {"valid": False, "reason": "Credential has expired"}
-
-        # Check if revoked
-        if self.registry["credentials"][credential_id]["revoked"]:
-            return {"valid": False, "reason": "Credential has been revoked"}
-
-        # Verify signature with enterprise-grade validation
-        proof = credential_copy.pop("proof", None)
-        if not proof:
-            return {"valid": False, "reason": "No proof found"}
-
-        # Verify proof type
-        if proof.get("type") != "Ed25519Signature2020":
-            return {"valid": False, "reason": "Unsupported proof type"}
-
-        # Recreate the credential JSON that was signed
-        credential_json = json.dumps(credential_copy, sort_keys=True)
-
-        # Get public key
-        public_key_bytes = base64.b64decode(self.keys["public_key"])
-        public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
-
-        try:
-            # Verify signature with enterprise security
-            signature = base64.b64decode(proof["jws"])
-            public_key.verify(signature, credential_json.encode('utf-8'))
-
-            # Additional security check: verify hash matches
-            current_hash = hashlib.sha256(credential_json.encode('utf-8')).hexdigest()
-            stored_hash = self.registry["credentials"][credential_id]["hash"]
-
-            if current_hash != stored_hash:
-                return {"valid": False, "reason": "Credential has been tampered with"}
-
-            return {
-                "valid": True,
-                "issuer": credential_copy["issuer"],
-                "subject": credential_copy["credentialSubject"]["id"],
-                "issuanceDate": credential_copy["issuanceDate"],
-                "expirationDate": credential_copy.get("expirationDate", "Not specified")
-            }
-        except Exception as e:
-            return {"valid": False, "reason": f"Invalid signature: {str(e)}"}
-    
     def revoke_credential(self, credential_id: str) -> bool:
-        """Revoke a credential with secure audit trail."""
+        """Revoke a credential with secure audit trail and P2P broadcasting."""
         if credential_id in self.registry["credentials"]:
+            # Mark as revoked in local registry
             self.registry["credentials"][credential_id]["revoked"] = True
             self.registry["credentials"][credential_id]["revoked_at"] = datetime.now().isoformat()
             self.registry["credentials"][credential_id]["revoked_by"] = "admin"
@@ -331,8 +300,97 @@ class LemmaCredentialService:
             
             self._save_registry()
             self._save_users()
+            
+            # If revocation registry is available, use it for P2P revocation
+            try:
+                from lemma.core.revocation import get_revocation_registry
+                revocation_registry = get_revocation_registry()
+                if revocation_registry:
+                    # Add to the decentralized revocation registry
+                    revocation_registry.revoke_credential(self.keys["did"], credential_id)
+            except ImportError:
+                # Fallback if the revocation module is not available
+                pass
+                
             return True
         return False
+    
+    def verify_credential(self, credential: Dict[str, Any]) -> Dict[str, bool]:
+        """Verify a credential's signature and status with decentralized validation."""
+        # Make a copy of the credential to avoid modifying the original
+        credential_copy = credential.copy()
+        
+        # Get credential ID and issuer
+        credential_id = credential_copy.get("id")
+        issuer_did = credential_copy.get("issuer")
+        
+        if not credential_id or not issuer_did:
+            return {"valid": False, "reason": "Missing credential ID or issuer"}
+        
+        # Check revocation status using the decentralized revocation registry
+        try:
+            from lemma.core.revocation import get_revocation_registry
+            revocation_registry = get_revocation_registry()
+            if revocation_registry and revocation_registry.is_revoked(issuer_did, credential_id):
+                return {"valid": False, "reason": "Credential has been revoked in the network"}
+        except ImportError:
+            # Fallback to local registry if the revocation module is not available
+            if credential_id in self.registry["credentials"] and self.registry["credentials"][credential_id]["revoked"]:
+                return {"valid": False, "reason": "Credential has been revoked locally"}
+        
+        # Check if expired
+        if "expirationDate" in credential_copy:
+            expiration_date = datetime.fromisoformat(credential_copy["expirationDate"])
+            if datetime.now() > expiration_date:
+                return {"valid": False, "reason": "Credential has expired"}
+
+        # Verify signature with enterprise-grade validation
+        proof = credential_copy.pop("proof", None)
+        if not proof:
+            return {"valid": False, "reason": "No proof found"}
+
+        # Verify proof type
+        if proof.get("type") != "Ed25519VerificationKey2020" and proof.get("type") != "Ed25519Signature2020":
+            return {"valid": False, "reason": f"Unsupported proof type: {proof.get('type')}"}
+
+        # Recreate the credential JSON that was signed
+        credential_json = json.dumps(credential_copy, sort_keys=True)
+
+        # Extract verification method from proof
+        verification_method = proof.get("verificationMethod")
+        if not verification_method:
+            verification_method = f"{issuer_did}#keys-1"  # Default verification method
+
+        # Get the public key using the DID resolver
+        try:
+            # If this is a local DID issued by this service
+            if issuer_did == self.keys["did"]:
+                # Use local key for verification
+                public_key_bytes = base64.b64decode(self.keys["public_key"])
+                public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
+            elif self.did_resolver:
+                # Use DID resolver to get the public key
+                public_key = self.did_resolver.get_public_key(issuer_did, verification_method)
+                if not public_key:
+                    return {"valid": False, "reason": f"Could not resolve DID: {issuer_did}"}
+            else:
+                # Fallback to local verification if resolver not available
+                # This is less secure but prevents complete failure
+                return {"valid": False, "reason": "DID resolver not available"}
+
+            # Verify signature
+            signature = base64.b64decode(proof["jws"])
+            public_key.verify(signature, credential_json.encode('utf-8'))
+
+            return {
+                "valid": True,
+                "issuer": credential_copy["issuer"],
+                "subject": credential_copy["credentialSubject"]["id"],
+                "issuanceDate": credential_copy["issuanceDate"],
+                "expirationDate": credential_copy.get("expirationDate", "Not specified")
+            }
+        except Exception as e:
+            return {"valid": False, "reason": f"Invalid signature: {str(e)}"}
     
     def get_user_credential(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get a user's full credential if it exists."""
@@ -386,8 +444,18 @@ class LemmaCredentialService:
         return presentation
     
     def verify_presentation(self, presentation: Dict[str, Any], expected_challenge: str) -> Dict[str, bool]:
-        """Verify a presentation with enterprise-grade security checks."""
+        """Verify a presentation with enhanced security and zero-knowledge support."""
         try:
+            # Check if this is a zero-knowledge human proof
+            if "humanAssurance" in presentation:
+                try:
+                    from lemma.utils.zero_knowledge import ZKProof
+                    return ZKProof.verify_human_proof(presentation, expected_challenge)
+                except ImportError:
+                    # Fallback if zero_knowledge module is not available
+                    return {"valid": False, "reason": "Zero-knowledge proof verification not available"}
+            
+            # Regular presentation verification flow
             # Check presentation structure
             if "verifiableCredential" not in presentation or not presentation["verifiableCredential"]:
                 return {"valid": False, "reason": "No credentials in presentation"}

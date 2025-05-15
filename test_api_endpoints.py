@@ -17,13 +17,26 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Base URL for the application
-BASE_URL = "https://localhost:5000"
+BASE_URL = "https://lemma-enterprise-0f6ba17076c1.herokuapp.com"
+API_KEY = "63d3c76faad6b305b3630575524d7e1b829527526e29b5ea18757b42e4de771e"
+HEADERS = {"Content-Type": "application/json", "X-API-Key": API_KEY}
+
+results = {}
 
 def print_header(title):
     """Print a formatted header."""
     print("\n" + "=" * 50)
     print(f" {title}")
     print("=" * 50)
+
+def print_result(name, resp):
+    print(f"\n=== {name} ===")
+    print(f"Status: {resp.status_code}")
+    try:
+        print(json.dumps(resp.json(), indent=2))
+    except Exception:
+        print(resp.text)
+    results[name] = resp
 
 def test_endpoint(endpoint, method="GET", data=None, expected_status=200):
     """Test an API endpoint."""
@@ -60,9 +73,15 @@ def test_admin_login():
     return test_endpoint("/admin/login")
 
 def test_verify_page():
-    """Test the verification page."""
-    print_header("Testing Verification Page")
-    return test_endpoint("/verify")
+    """Test the verification page (web page, not API endpoint)."""
+    print_header("Testing Verification Page (web)")
+    response = test_endpoint("/verify", expected_status=200)
+    if response is not None and response.status_code == 200:
+        print("✅ Verification page loaded (web page)")
+        return True
+    else:
+        print("❌ Verification page did not load as expected")
+        return False
 
 def test_credential_issuance():
     """Test credential issuance."""
@@ -98,7 +117,7 @@ def test_credential_verification(credential):
         print("❌ No credential to verify")
         return False
     
-    response = test_endpoint("/api/verify", method="POST", data={"credential": credential})
+    response = test_endpoint("/api/verify-credential", method="POST", data={"credential": credential})
     if not response:
         return False
     
@@ -209,12 +228,23 @@ def main():
     
     # Test credential flow
     credential = test_credential_issuance()
+    pres_verify_result = False  # Ensure defined for summary
+    human_verify_result = False
+    presentation_data = None
     if credential:
         verify_result = test_credential_verification(credential)
+        if not verify_result:
+            print("\n[DEBUG] Credential verification failed. Check if the credential format matches the API expectations.")
         presentation_data = test_presentation_creation(credential)
-        if presentation_data:
+        if not presentation_data:
+            print("\n[DEBUG] Presentation creation failed. Check if the credential and challenge are being sent in the correct format.")
+        else:
             pres_verify_result = test_presentation_verification(presentation_data)
+            if not pres_verify_result:
+                print("\n[DEBUG] Presentation verification failed. Check if the presentation and challenge are correct.")
             human_verify_result = test_human_verification(presentation_data)
+            if not human_verify_result:
+                print("\n[DEBUG] Human verification failed. Check if the presentation and challenge are correct.")
     
     # Print summary and suggestions
     print("\n=== TEST SUMMARY ===")
