@@ -1,12 +1,24 @@
 """
 WSGI entry point for Heroku deployment
 """
-from app import app
+import os
+import logging
+from lemma import create_app
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Create the application instance with Heroku-specific settings
+logger.info("Starting Lemma Enterprise on Heroku")
+logger.info(f"Current working directory: {os.getcwd()}")
+logger.info(f"Directory contents: {os.listdir(os.getcwd())}")
+
+app = create_app()
 
 # This is the WSGI entry point that Heroku will look for
 if __name__ == '__main__':
     # Get port from environment or use default
-    import os
     port = int(os.environ.get('PORT', 5000))
     
     # Run the application

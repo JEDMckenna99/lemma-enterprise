@@ -25,10 +25,20 @@ def create_app(test_config=None):
     
     # Determine template and static folders based on environment
     if is_heroku:
-        # On Heroku, we need to use absolute paths
+        # On Heroku, use absolute paths and ensure they're correctly set
         template_dir = os.path.join(cwd, 'templates')
         static_dir = os.path.join(cwd, 'static')
         logger.info(f"Running on Heroku, using template_dir: {template_dir}")
+        
+        # List the contents of the app directory to debug
+        try:
+            logger.info(f"App directory contents: {os.listdir(cwd)}")
+            if os.path.exists(template_dir):
+                logger.info(f"Template directory contents: {os.listdir(template_dir)}")
+            else:
+                logger.error(f"Template directory {template_dir} does not exist!")
+        except Exception as e:
+            logger.error(f"Error listing directories: {str(e)}")
     else:
         # Local development
         template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
