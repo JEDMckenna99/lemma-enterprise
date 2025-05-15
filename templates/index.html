@@ -387,14 +387,47 @@
                     })
                 });
                 
+                // Handle potential API errors
                 if (!sessionResponse.ok) {
-                    throw new Error(`Failed to create verification session: ${sessionResponse.status}`);
+                    const errorData = await sessionResponse.json();
+                    const errorMsg = errorData.error || `Server error (${sessionResponse.status})`;
+                    
+                    // Create error message element
+                    let errorElement = document.getElementById('verifyErrorMessage');
+                    if (!errorElement) {
+                        errorElement = document.createElement('div');
+                        errorElement.id = 'verifyErrorMessage';
+                        errorElement.style.color = '#e74c3c';
+                        errorElement.style.fontWeight = 'bold';
+                        errorElement.style.padding = '10px';
+                        errorElement.style.marginTop = '15px';
+                        errorElement.style.borderRadius = '5px';
+                        errorElement.style.backgroundColor = 'rgba(231, 76, 60, 0.1)';
+                        errorElement.style.border = '1px solid #e74c3c';
+                        document.querySelector('.cta-buttons').insertAdjacentElement('afterend', errorElement);
+                    }
+                    
+                    errorElement.textContent = `Verification error: ${errorMsg}. Please try again later.`;
+                    errorElement.style.display = 'block';
+                    
+                    // Auto-hide the message after 10 seconds
+                    setTimeout(() => {
+                        errorElement.style.display = 'none';
+                    }, 10000);
+                    
+                    console.error('Verification session creation failed:', errorMsg);
+                    return;
                 }
                 
                 const sessionData = await sessionResponse.json();
                 
+                // Ensure we have a publishable key
+                if (!sessionData.publishable_key) {
+                    throw new Error("Stripe publishable key is missing");
+                }
+                
                 // Create Stripe instance
-                const stripe = Stripe(sessionData.publishable_key || 'pk_test_add_your_key_here');
+                const stripe = Stripe(sessionData.publishable_key);
                 
                 // Create modal container for Stripe Elements
                 const modalContainer = document.createElement('div');

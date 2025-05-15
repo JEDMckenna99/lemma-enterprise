@@ -193,12 +193,23 @@ def api_start_verification():
     # Create a Stripe verification session
     verification_session = create_verification_session(user_id, return_url)
     
-    if "error" in verification_session:
-        return jsonify({"error": verification_session["error"]}), 500
+    # Check if there was an error creating the session
+    if isinstance(verification_session, dict) and "error" in verification_session:
+        error_message = verification_session["error"]
+        current_app.logger.error(f"Error creating verification session: {error_message}")
+        
+        # Check for specific Stripe errors and provide helpful responses
+        if "API key" in error_message:
+            return jsonify({"error": "Stripe configuration error. Please contact the administrator."}), 500
+        else:
+            return jsonify({"error": error_message}), 500
     
     # Return the verification session details with publishable key
     stripe_publishable_key = os.environ.get('STRIPE_PUBLISHABLE_KEY') or current_app.config.get('STRIPE_PUBLISHABLE_KEY')
     
+    if not stripe_publishable_key:
+        current_app.logger.warning("STRIPE_PUBLISHABLE_KEY not configured - UI verification will not work")
+        
     return jsonify({
         "id": verification_session.id,
         "url": verification_session.url,

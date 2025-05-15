@@ -13,7 +13,14 @@ logger = logging.getLogger(__name__)
 
 def init_stripe():
     """Initialize the Stripe API client."""
+    # Make sure to use the secret key for server-side operations
     stripe_api_key = os.environ.get('STRIPE_API_KEY') or current_app.config.get('STRIPE_API_KEY')
+    
+    # Verify that we're not accidentally using a publishable key
+    if stripe_api_key and stripe_api_key.startswith('pk_'):
+        logger.error("Cannot use publishable key (pk_) for server-side Stripe operations. Please set STRIPE_API_KEY to your secret key (sk_).")
+        return False
+    
     if not stripe_api_key:
         logger.warning("Stripe API key not found in environment or configuration")
         return False
