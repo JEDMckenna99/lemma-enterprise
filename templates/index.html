@@ -445,17 +445,40 @@
         document.getElementById('accessProtectedBtn').addEventListener('click', async function(e) {
             e.preventDefault();
             
+            // Add error message element if it doesn't exist
+            let errorMessage = document.getElementById('accessErrorMessage');
+            if (!errorMessage) {
+                errorMessage = document.createElement('div');
+                errorMessage.id = 'accessErrorMessage';
+                errorMessage.style.color = '#e74c3c';
+                errorMessage.style.fontWeight = 'bold';
+                errorMessage.style.padding = '10px';
+                errorMessage.style.marginTop = '15px';
+                errorMessage.style.borderRadius = '5px';
+                errorMessage.style.backgroundColor = 'rgba(231, 76, 60, 0.1)';
+                errorMessage.style.border = '1px solid #e74c3c';
+                errorMessage.style.display = 'none';
+                document.querySelector('.cta-buttons').insertAdjacentElement('afterend', errorMessage);
+            }
+            
             // Check if any credentials exist in local storage
             const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
             
             if (credentials.length === 0) {
-                // No credential found, redirect to verification page
-                alert('No Lemma credential found. Redirecting to verification page...');
-                window.location.href = '/verify';
+                // No credential found, show error message
+                errorMessage.textContent = 'Access denied. Please verify Lemma.';
+                errorMessage.style.display = 'block';
+                // Auto-hide the message after 5 seconds
+                setTimeout(() => {
+                    errorMessage.style.display = 'none';
+                }, 5000);
                 return;
             }
             
             try {
+                // Hide error message if showing
+                errorMessage.style.display = 'none';
+                
                 // Get the first credential (user might have multiple)
                 const credentialKey = credentials[0];
                 const credentialJson = localStorage.getItem(credentialKey);
@@ -528,8 +551,14 @@
                 
             } catch (error) {
                 console.error('Error accessing protected content:', error);
-                alert(`Error: ${error.message || 'Unknown error'}. Please try verifying again.`);
-                window.location.href = '/verify';
+                // Display error message instead of redirecting
+                const errorMessage = document.getElementById('accessErrorMessage');
+                errorMessage.textContent = `Error: ${error.message || 'Unknown error'}. Please try verifying again.`;
+                errorMessage.style.display = 'block';
+                // Auto-hide the message after 5 seconds
+                setTimeout(() => {
+                    errorMessage.style.display = 'none';
+                }, 5000);
             }
         });
     </script>
