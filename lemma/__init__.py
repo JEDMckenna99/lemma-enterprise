@@ -105,6 +105,8 @@ def create_app(test_config=None):
         P2P_PEERS=os.environ.get('LEMMA_P2P_PEERS', '').split(',') if os.environ.get('LEMMA_P2P_PEERS') else [],
         TRUSTED_ISSUERS=os.environ.get('LEMMA_TRUSTED_ISSUERS', '').split(',') if os.environ.get('LEMMA_TRUSTED_ISSUERS') else [],
         HARDWARE_SECURITY=os.environ.get('LEMMA_HARDWARE_SECURITY', 'false').lower() == 'true',
+        # Stripe Identity verification
+        STRIPE_API_KEY=os.environ.get('STRIPE_API_KEY'),
         # Enhanced security settings
         SESSION_COOKIE_SECURE=True,
         SESSION_COOKIE_HTTPONLY=True,
@@ -184,6 +186,20 @@ def _init_components(app):
         app.logger.info('Initialized DID resolver')
     except ImportError:
         app.logger.warning('DID resolver module not available')
+    
+    # Initialize Stripe Identity if API key is configured
+    try:
+        stripe_api_key = os.environ.get('STRIPE_API_KEY') or app.config.get('STRIPE_API_KEY')
+        if stripe_api_key:
+            from lemma.utils.stripe_service import init_stripe
+            if init_stripe():
+                app.logger.info('Initialized Stripe Identity verification')
+            else:
+                app.logger.warning('Failed to initialize Stripe Identity verification')
+        else:
+            app.logger.warning('Stripe API key not configured, Identity verification will be unavailable')
+    except ImportError:
+        app.logger.warning('Stripe integration not available')
     
     # Initialize revocation registry if enabled
     if app.config.get('ENABLE_P2P', False):

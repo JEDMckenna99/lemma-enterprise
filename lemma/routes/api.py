@@ -302,16 +302,40 @@ def verify_human():
         presentation = data['presentation']
         challenge = data['challenge']
         
+        # Basic input validation
+        if not isinstance(presentation, dict):
+            logger.error("Invalid presentation format: not a dictionary")
+            return jsonify({"success": False, "error": "Invalid presentation format"}), 400
+            
+        if not isinstance(challenge, str) or len(challenge) < 8:
+            logger.error("Invalid challenge format")
+            return jsonify({"success": False, "error": "Invalid challenge format"}), 400
+        
         # Verify the presentation
-        credential_service = get_credential_service()
-        verification_result = credential_service.verify_presentation(presentation, challenge)
+        try:
+            credential_service = get_credential_service()
+            verification_result = credential_service.verify_presentation(presentation, challenge)
+        except Exception as ve:
+            logger.error("Exception during presentation verification: %s", str(ve))
+            return jsonify({"success": False, "error": f"Verification error: {str(ve)}"}), 500
         
         if not verification_result.get('valid', False):
-            logger.info("Invalid human verification attempt: %s", verification_result.get('reason'))
+            reason = verification_result.get('reason', 'Verification failed')
+            logger.info("Invalid human verification attempt: %s", reason)
+            
+            # Include more details for debugging in development
+            if current_app.config.get('DEBUG', False):
+                error_details = {
+                    "success": False,
+                    "error": reason,
+                    "challenge": challenge[:5] + "...", # Show part of the challenge for debugging
+                    "debug_info": "Verification failed in verify_presentation function"
+                }
+                return jsonify(error_details)
             
             return jsonify({
                 "success": False,
-                "error": verification_result.get('reason', 'Verification failed')
+                "error": reason
             })
         
         # Extract DID from the holder

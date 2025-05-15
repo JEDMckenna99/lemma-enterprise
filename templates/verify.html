@@ -379,29 +379,28 @@
 
         {% if user_id %}
         <div class="card">
+            {% if credential %}
             <div class="status valid">✓ Valid Human Credential</div>
             <div class="field">
                 <div class="field-name">User ID</div>
                 <div class="field-value">{{ user_id }}</div>
             </div>
-            {% if credential %}
             <div class="field">
                 <div class="field-name">Credential ID</div>
                 <div class="field-value">{{ credential.id }}</div>
             </div>
             <div class="field">
                 <div class="field-name">Issued Date</div>
-                <div class="field-value">{{ credential.issued_at }}</div>
+                <div class="field-value">{{ credential.issuanceDate or credential.issued_at }}</div>
             </div>
             <div class="field">
                 <div class="field-name">Status</div>
-                <div class="field-value">{{ credential.status }}</div>
+                <div class="field-value">{{ credential.status or 'Active' }}</div>
             </div>
             <div class="field">
                 <div class="field-name">Verification Status</div>
                 <div class="field-value">Verified</div>
             </div>
-            {% endif %}
             
             <div class="actions">
                 <button id="storeBtn" class="btn btn-primary">Store Credential</button>
@@ -413,9 +412,74 @@
                 <input type="file" id="importFile" style="display: none;" accept=".json">
                 <button id="debugBtn" class="btn btn-outline-secondary">Debug Storage</button>
             </div>
+            {% elif stripe_verification and stripe_verification.verified %}
+            <div class="status valid">✓ Identity Verified</div>
+            <div class="alert alert-success">
+                Your identity has been verified successfully! A Lemma credential has been issued.
+            </div>
+            <div class="field">
+                <div class="field-name">User ID</div>
+                <div class="field-value">{{ user_id }}</div>
+            </div>
+            <div class="field">
+                <div class="field-name">Verification ID</div>
+                <div class="field-value">{{ stripe_verification.id }}</div>
+            </div>
+            <div class="field">
+                <div class="field-name">Status</div>
+                <div class="field-value">{{ stripe_verification.status }}</div>
+            </div>
+            
+            <div class="actions" style="margin-top: 20px;">
+                <button id="getCredentialBtn" class="btn btn-primary">Get Your Lemma Credential</button>
+            </div>
+            {% elif stripe_verification %}
+            <div class="status invalid">✗ Verification {{ stripe_verification.status }}</div>
+            <div class="alert alert-warning">
+                Your identity verification is {{ stripe_verification.status }}. 
+                {% if stripe_verification.status == 'requires_input' %}
+                Please complete the verification process.
+                {% elif stripe_verification.status == 'processing' %}
+                Your verification is being processed. Please check back later.
+                {% else %}
+                Please try again.
+                {% endif %}
+            </div>
+            <div class="field">
+                <div class="field-name">User ID</div>
+                <div class="field-value">{{ user_id }}</div>
+            </div>
+            <div class="field">
+                <div class="field-name">Verification ID</div>
+                <div class="field-value">{{ stripe_verification.id }}</div>
+            </div>
+            
+            <div class="actions" style="margin-top: 20px;">
+                <a href="/start-verification/{{ user_id }}" class="btn btn-primary">Try Again</a>
+            </div>
+            {% else %}
+            <h2>Verify Your Identity</h2>
+            <p>To get a Lemma credential, you need to verify your identity first.</p>
+            
+            <div class="demo-step">
+                <h4>How it works:</h4>
+                <ol style="padding-left: 20px; margin-bottom: 20px;">
+                    <li>Verify your identity with our secure identity verification process</li>
+                    <li>We'll issue a Lemma credential that proves you're human</li>
+                    <li>Use your Lemma to access human-only content with privacy</li>
+                </ol>
+            </div>
+            
+            <div class="actions" style="margin-top: 20px;">
+                <a href="/start-verification/{{ user_id }}" class="btn btn-primary">Start Identity Verification</a>
+            </div>
+            
+            <div style="margin-top: 20px; font-size: 12px; color: #666;">
+                <p>Identity verification is powered by Stripe Identity. Your information is securely processed and not stored longer than necessary.</p>
+            </div>
+            {% endif %}
             
             <div id="jsonView" class="json-view"></div>
-
             <div id="debugInfo" class="debug-info" style="display: none; margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;"></div>
         </div>
         {% else %}
@@ -441,11 +505,15 @@
 
     {% if user_id %}
     <script>
+        // Get the user ID from the template
+        const userId = "{{ user_id }}";
+        
         // Check if credential exists in browser storage on page load
         window.addEventListener('load', function() {
             // Check if this is a direct access to the verification page
             const urlParams = new URLSearchParams(window.location.search);
             const userIdParam = urlParams.get('user_id');
+            const sessionId = urlParams.get('session_id');
             
             if (userIdParam) {
                 // If we have a user_id parameter, check if we already have a credential for this user
@@ -454,13 +522,133 @@
                 if (!storedCredential) {
                     console.log("No stored credential found for this user, proceeding with verification flow");
                     // We don't have a credential yet, so we'll continue with the verification flow
+                    
+                    // If we have a session ID, check the verification status periodically
+                    if (sessionId) {
+                        checkVerificationStatus(sessionId);
+                    }
                 } else {
                     console.log("Credential already exists for this user, redirecting to protected content");
                     // We already have a credential, so verify it and redirect to protected content
                     verifyExistingCredential(userIdParam, storedCredential);
                 }
             }
+            
+            // Setup event listener for getCredentialBtn if it exists
+            const getCredentialBtn = document.getElementById('getCredentialBtn');
+            if (getCredentialBtn) {
+                getCredentialBtn.addEventListener('click', function() {
+                    fetchAndStoreCredential(userId);
+                });
+            }
         });
+        
+        // Function to fetch verification status periodically
+        function checkVerificationStatus(sessionId) {
+            // Only poll if we're in a processing state
+            if ("{{ stripe_verification and stripe_verification.status }}" === "processing") {
+                console.log("Checking verification status for session:", sessionId);
+                
+                // Poll every 5 seconds
+                const statusCheckInterval = setInterval(async () => {
+                    try {
+                        const response = await fetch(`/api/verification/status/${sessionId}`);
+                        const status = await response.json();
+                        
+                        console.log("Verification status:", status);
+                        
+                        // If the status has changed, reload the page
+                        if (status.status !== "processing") {
+                            clearInterval(statusCheckInterval);
+                            window.location.reload();
+                        }
+                    } catch (error) {
+                        console.error("Error checking verification status:", error);
+                        clearInterval(statusCheckInterval);
+                    }
+                }, 5000);
+            }
+        }
+        
+        // Function to fetch and store a credential
+        async function fetchAndStoreCredential(userId) {
+            try {
+                // Get CSRF token
+                const csrfToken = await getCSRFToken();
+                
+                // Fetch the credential from the API
+                const response = await fetch(`/api/credential-lookup/${userId}`, {
+                    credentials: 'include' // Ensure cookies are sent with the request
+                });
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch credential: ${response.status}`);
+                }
+                const credential = await response.json();
+                
+                // Store in localStorage
+                localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(credential));
+                
+                // Generate a random challenge for presentation
+                const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                    .map(b => b.toString(16).padStart(2, '0')).join('');
+                localStorage.setItem('lemma_challenge', challenge);
+                
+                // Create a presentation
+                const presResponse = await fetch('/api/presentation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    credentials: 'include', // Ensure cookies are sent with the request
+                    body: JSON.stringify({
+                        credential: credential,
+                        challenge: challenge,
+                        csrf_token: csrfToken
+                    })
+                });
+                
+                if (!presResponse.ok) {
+                    throw new Error(`Failed to create presentation: ${presResponse.status}`);
+                }
+                
+                const presentation = await presResponse.json();
+                localStorage.setItem(`lemma_presentation_${userId}`, JSON.stringify(presentation));
+                
+                // Redirect to protected content
+                const verifyResponse = await fetch('/api/verify-human', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    credentials: 'include', // Ensure cookies are sent with the request
+                    body: JSON.stringify({
+                        presentation: presentation,
+                        challenge: challenge,
+                        csrf_token: csrfToken
+                    })
+                });
+                
+                if (!verifyResponse.ok) {
+                    const errorData = await verifyResponse.json();
+                    throw new Error(`Verification failed: ${verifyResponse.status} - ${JSON.stringify(errorData)}`);
+                }
+                
+                const verifyResult = await verifyResponse.json();
+                
+                // If verification successful, redirect to protected content
+                if (verifyResult.success) {
+                    window.location.href = verifyResult.redirect || '/protected';
+                } else {
+                    throw new Error('Verification failed: ' + (verifyResult.error || 'Unknown error'));
+                }
+                
+            } catch (error) {
+                console.error('Error fetching and storing credential:', error);
+                alert('Error: ' + error.message);
+            }
+        }
         
         // Function to verify an existing credential and redirect to protected content
         async function verifyExistingCredential(userId, credentialJson) {
@@ -500,23 +688,50 @@
                 localStorage.setItem(`lemma_presentation_${userId}`, JSON.stringify(presentation));
                 
                 // Use verify-human endpoint to set session state
-                const verifyResponse = await fetch('/api/verify-human', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': csrfToken
-                    },
-                    credentials: 'include', // Ensure cookies are sent with the request
-                    body: JSON.stringify({
-                        presentation: presentation,
-                        challenge: challenge,
-                        csrf_token: csrfToken
-                    })
-                });
+                let verifyResponse;
+                let retryCount = 0;
+                const maxRetries = 2;
                 
-                if (!verifyResponse.ok) {
-                    const errorData = await verifyResponse.json();
-                    throw new Error(`Verification failed: ${verifyResponse.status} - ${JSON.stringify(errorData)}`);
+                while (retryCount <= maxRetries) {
+                    try {
+                        // Get a fresh CSRF token for each attempt
+                        const freshToken = retryCount > 0 ? await getCSRFToken() : csrfToken;
+                        
+                        verifyResponse = await fetch('/api/verify-human', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': freshToken
+                            },
+                            credentials: 'include', // Ensure cookies are sent with the request
+                            body: JSON.stringify({
+                                presentation: presentation,
+                                challenge: challenge,
+                                csrf_token: freshToken
+                            })
+                        });
+                        
+                        // If successful, break out of the retry loop
+                        if (verifyResponse.ok) {
+                            break;
+                        }
+                        
+                        // If we're out of retries, throw the error
+                        if (retryCount >= maxRetries) {
+                            const errorData = await verifyResponse.json();
+                            throw new Error(`Verification failed after retries: ${verifyResponse.status} - ${JSON.stringify(errorData)}`);
+                        }
+                        
+                        // Wait a short time before retrying
+                        await new Promise(resolve => setTimeout(resolve, 300 * (retryCount + 1)));
+                        retryCount++;
+                    } catch (retryError) {
+                        console.warn(`Verification attempt ${retryCount + 1} failed:`, retryError);
+                        if (retryCount >= maxRetries) {
+                            throw retryError;
+                        }
+                        retryCount++;
+                    }
                 }
                 
                 const verifyResult = await verifyResponse.json();
@@ -525,7 +740,12 @@
                 if (verifyResult.success) {
                     window.location.href = verifyResult.redirect || '/protected';
                 } else {
-                    throw new Error('Verification failed: ' + (verifyResult.error || 'Unknown error'));
+                    // If verification fails but we have a reason, display it
+                    console.error('Verification failed:', verifyResult.error);
+                    alert(`Verification failed: ${verifyResult.error || 'Unknown error'}`);
+                    
+                    // We could retry with a fresh credential here
+                    // For now, just continue with the normal verification flow
                 }
             } catch (error) {
                 console.error('Error verifying existing credential:', error);
@@ -583,7 +803,7 @@
                 const csrfToken = await getCSRFToken();
                 
                 // Fetch the credential from the API
-                const response = await fetch(`/api/credential-lookup/{{ user_id }}`, {
+                const response = await fetch(`/api/credential-lookup/${user_id}`, {
                     credentials: 'include' // Ensure cookies are sent with the request
                 });
                 if (!response.ok) {
@@ -592,7 +812,7 @@
                 const credential = await response.json();
                 
                 // Store in localStorage
-                localStorage.setItem('lemma_credential_{{ user_id }}', JSON.stringify(credential));
+                localStorage.setItem('lemma_credential_' + user_id, JSON.stringify(credential));
                 
                 // Generate a random challenge for presentation
                 const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
@@ -619,7 +839,7 @@
                 }
                 
                 const presentation = await presResponse.json();
-                localStorage.setItem('lemma_presentation_{{ user_id }}', JSON.stringify(presentation));
+                localStorage.setItem('lemma_presentation_' + user_id, JSON.stringify(presentation));
                 
                 // Show the JSON
                 document.getElementById('jsonView').textContent = JSON.stringify(credential, null, 2);
@@ -640,7 +860,7 @@
         // Download credential as JSON
         document.getElementById('downloadBtn').addEventListener('click', function() {
             try {
-                const credentialJson = localStorage.getItem('lemma_credential_{{ user_id }}');
+                const credentialJson = localStorage.getItem('lemma_credential_' + user_id);
                 if (!credentialJson) {
                     alert('No credential found. Please store the credential first.');
                     return;
@@ -650,7 +870,7 @@
                 const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(credential, null, 2));
                 const downloadAnchor = document.createElement('a');
                 downloadAnchor.setAttribute("href", dataStr);
-                downloadAnchor.setAttribute("download", "lemma-credential-{{ user_id }}.json");
+                downloadAnchor.setAttribute("download", "lemma-credential-" + user_id + ".json");
                 document.body.appendChild(downloadAnchor); // Required for Firefox
                 downloadAnchor.click();
                 downloadAnchor.remove();
@@ -683,7 +903,7 @@
                     }
                     
                     // Store in localStorage
-                    localStorage.setItem('lemma_credential_{{ user_id }}', JSON.stringify(credential));
+                    localStorage.setItem('lemma_credential_' + user_id, JSON.stringify(credential));
                     
                     // Generate a random challenge for presentation
                     const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
@@ -710,7 +930,7 @@
                     }
                     
                     const presentation = await presResponse.json();
-                    localStorage.setItem('lemma_presentation_{{ user_id }}', JSON.stringify(presentation));
+                    localStorage.setItem('lemma_presentation_' + user_id, JSON.stringify(presentation));
                     
                     // Show the imported credential
                     document.getElementById('jsonView').textContent = JSON.stringify(credential, null, 2);
@@ -729,7 +949,7 @@
         
         // Check if credential is already stored and show download button
         window.addEventListener('load', function() {
-            const credentialJson = localStorage.getItem('lemma_credential_{{ user_id }}');
+            const credentialJson = localStorage.getItem('lemma_credential_' + user_id);
             if (credentialJson) {
                 document.getElementById('downloadBtn').style.display = 'block';
             }
@@ -739,7 +959,7 @@
         document.getElementById('verifyBtn').addEventListener('click', async function() {
             try {
                 // Get the credential from localStorage
-                const credentialJson = localStorage.getItem('lemma_credential_{{ user_id }}');
+                const credentialJson = localStorage.getItem('lemma_credential_' + user_id);
                 if (!credentialJson) {
                     alert('No credential found. Please store the credential first.');
                     return;
@@ -778,7 +998,7 @@
                 const presentation = await presResponse.json();
                 
                 // Store the latest presentation and challenge for testing
-                localStorage.setItem('lemma_presentation_{{ user_id }}', JSON.stringify(presentation));
+                localStorage.setItem('lemma_presentation_' + user_id, JSON.stringify(presentation));
                 localStorage.setItem('lemma_challenge', challenge);
                 
                 // Check if we already have a demo container
@@ -897,7 +1117,7 @@ async function verifyHuman() {
             if (jsonView.style.display === 'none' || jsonView.style.display === '') {
                 // If no credential is stored yet, fetch it
                 if (jsonView.textContent === '') {
-                    fetch(`/api/credential-lookup/{{ user_id }}`)
+                    fetch(`/api/credential-lookup/${user_id}`)
                         .then(response => response.json())
                         .then(credential => {
                             jsonView.textContent = JSON.stringify(credential, null, 2);

@@ -222,14 +222,22 @@ class ZKProof:
             
             # If a public key is provided, verify the signature cryptographically
             if public_key_bytes:
+                # Validate public key before attempting verification
+                if len(public_key_bytes) != 32:
+                    # Ed25519 public keys must be exactly 32 bytes
+                    # Fall back to hash verification if key size is incorrect
+                    expected_hash = hashlib.sha256(f"{message}.{challenge}".encode()).digest()
+                    return signature == expected_hash
+                    
                 try:
                     public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
                     public_key.verify(signature, message)
                     return True
                 except InvalidSignature:
+                    # Signature is invalid with the provided key
                     return False
                 except Exception as e:
-                    print(f"Warning: Failed to verify EdDSA signature: {e}")
+                    # Any other cryptographic exceptions
                     # Fall back to hash verification
                     expected_hash = hashlib.sha256(f"{message}.{challenge}".encode()).digest()
                     return signature == expected_hash

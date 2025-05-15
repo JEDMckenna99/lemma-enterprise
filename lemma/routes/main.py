@@ -11,6 +11,20 @@ from flask import (
 )
 from lemma.core.credential_service import get_credential_service
 from lemma.auth.csrf_config import generate_csrf_token
+try:
+    from lemma.utils.stripe_service import (
+        create_verification_session, 
+        check_verification_status,
+        get_verification_client_secret
+    )
+except ImportError:
+    # Mock functions for environments where Stripe is not available
+    def create_verification_session(user_id, return_url=None):
+        return {"error": "Stripe integration not available"}
+    def check_verification_status(session_id):
+        return {"error": "Stripe integration not available"}
+    def get_verification_client_secret(session_id):
+        return ""
 
 # Create blueprint
 main_bp = Blueprint('main', __name__)
@@ -61,6 +75,19 @@ def verify():
     # Check if the user is already verified in the session
     is_verified = session.get('verified_user_id') == user_id and session.get('verified_human', False)
     
+    # Check if this is a Stripe Identity verification callback
+    stripe_session = request.args.get('session_id')
+    verification_status = None
+    
+    if stripe_session:
+        # Check the verification status
+        verification_status = check_verification_status(stripe_session)
+        if verification_status.get("verified", False):
+            # If verification passed, issue a lemma credential
+            if not credential:
+                credential = credential_service.issue_credential(user_id)
+                current_app.logger.info(f"Issued credential for verified user {user_id}")
+    
     try:
         current_app.logger.info(f"Rendering verify.html template. Template path: {current_app.template_folder}")
         return render_template(
@@ -70,7 +97,8 @@ def verify():
             credential=credential,
             verification_url=verification_url,
             challenge=challenge,
-            is_verified=is_verified
+            is_verified=is_verified,
+            stripe_verification=verification_status
         )
     except Exception as e:
         current_app.logger.error(f"Error rendering verify.html: {str(e)}")
@@ -79,6 +107,101 @@ def verify():
         if os.path.exists(current_app.template_folder):
             current_app.logger.error(f"Template folder contents: {os.listdir(current_app.template_folder)}")
         return f"Error loading template: {str(e)}", 500
+
+@main_bp.route('/start-verification/<user_id>')
+def start_verification(user_id):
+    """Start the identity verification process."""
+    # Check if user already has a credential
+    credential_service = get_credential_service()
+    credential = credential_service.get_user_credential(user_id)
+    
+    if credential:
+        # If user already has a credential, redirect to verification page
+        flash("You already have a Lemma credential. Please verify with it.", "info")
+        return redirect(url_for('main.verify', user_id=user_id))
+    
+    # Create a return URL for after verification
+    return_url = url_for('main.verification_callback', user_id=user_id, _external=True)
+    
+    # Create a Stripe verification session
+    verification_session = create_verification_session(user_id, return_url)
+    
+    if "error" in verification_session:
+        # If there was an error creating the session, display an error message
+        flash(f"Error creating verification session: {verification_session['error']}", "error")
+        return redirect(url_for('main.verify', user_id=user_id))
+    
+    # Store the verification session ID in the user's session
+    session['stripe_verification_session'] = verification_session.id
+    
+    # Redirect to the stripe-hosted verification page
+    return redirect(verification_session.url)
+
+@main_bp.route('/verification-callback')
+def verification_callback():
+    """Handle the callback from Stripe Identity verification."""
+    # Get the verification session ID from the query parameters
+    session_id = request.args.get('session_id')
+    user_id = request.args.get('user_id')
+    
+    if not session_id or not user_id:
+        flash("Invalid verification callback. Missing session ID or user ID.", "error")
+        return redirect(url_for('main.index'))
+    
+    # Check the verification status
+    verification_status = check_verification_status(session_id)
+    
+    # Store the verification status in the session
+    session['stripe_verification_status'] = verification_status
+    
+    if verification_status.get("verified", False):
+        # If verification passed, issue a lemma credential
+        credential_service = get_credential_service()
+        credential = credential_service.get_user_credential(user_id)
+        if not credential:
+            credential = credential_service.issue_credential(user_id)
+            current_app.logger.info(f"Issued credential for verified user {user_id}")
+        
+        # Set success message
+        flash("Identity verified successfully! Your Lemma credential has been issued.", "success")
+    else:
+        # If verification failed, display an error message
+        status = verification_status.get("status", "unknown")
+        flash(f"Identity verification {status}. Please try again.", "warning")
+    
+    # Redirect to the verification page
+    return redirect(url_for('main.verify', user_id=user_id, session_id=session_id))
+
+@main_bp.route('/api/verification/status/<session_id>')
+def api_verification_status(session_id):
+    """API endpoint to check the status of a verification session."""
+    verification_status = check_verification_status(session_id)
+    return jsonify(verification_status)
+
+@main_bp.route('/api/start-verification', methods=['POST'])
+def api_start_verification():
+    """API endpoint to start a verification session."""
+    data = request.get_json()
+    if not data or 'user_id' not in data:
+        return jsonify({"error": "User ID is required"}), 400
+    
+    user_id = data['user_id']
+    
+    # Create a return URL for after verification
+    return_url = url_for('main.verification_callback', user_id=user_id, _external=True)
+    
+    # Create a Stripe verification session
+    verification_session = create_verification_session(user_id, return_url)
+    
+    if "error" in verification_session:
+        return jsonify({"error": verification_session["error"]}), 500
+    
+    # Return the verification session details
+    return jsonify({
+        "id": verification_session.id,
+        "url": verification_session.url,
+        "client_secret": verification_session.client_secret
+    })
 
 @main_bp.route('/protected')
 def protected():
