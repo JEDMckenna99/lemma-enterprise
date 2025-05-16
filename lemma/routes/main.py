@@ -344,23 +344,49 @@ def protected():
     #     flash("Your human verification has expired. Please verify again.", "warning")
     #     return redirect(url_for('main.verify'))
     
-    # For demonstration, we'll just pass the credential data to the template
-    try:
-        current_app.logger.info(f"Rendering protected.html template. Template path: {current_app.template_folder}")
-        return render_template(
-            'protected.html',
-            user_id=user_id,
-            credential=credential_data,
-            verification_time=session.get('verification_time'),
-            verification_expiry=session.get('verification_expiry')
-        )
-    except Exception as e:
-        current_app.logger.error(f"Error rendering protected.html: {str(e)}")
-        current_app.logger.error(f"Template folder: {current_app.template_folder}")
-        current_app.logger.error(f"Template folder exists: {os.path.exists(current_app.template_folder)}")
-        if os.path.exists(current_app.template_folder):
-            current_app.logger.error(f"Template folder contents: {os.listdir(current_app.template_folder)}")
-        return f"Error loading template: {str(e)}", 500
+    # Ensure credential is properly serializable
+    if credential_data and isinstance(credential_data, dict):
+        # Log credential ID for debugging
+        current_app.logger.info(f"Credential ID being passed to template: {credential_data.get('id', 'no-id')}")
+        
+        # Convert any non-serializable values to strings
+        try:
+            import json
+            # Test serialization to catch any issues before template rendering
+            # First try to serialize as-is
+            try:
+                json_string = json.dumps(credential_data)
+                current_app.logger.info("Credential JSON serialization test successful")
+            except TypeError as json_error:
+                current_app.logger.warning(f"Credential contains non-serializable data: {str(json_error)}")
+                # Make a copy to avoid modifying the session data
+                credential_data = credential_data.copy()
+                # Ensure all values are JSON serializable
+                for key, value in credential_data.items():
+                    if not isinstance(value, (str, int, float, bool, list, dict, type(None))):
+                        credential_data[key] = str(value)
+                
+                # Try JSON serialization again
+                json_string = json.dumps(credential_data)
+                current_app.logger.info("Successfully converted credential to JSON-serializable format")
+        except Exception as e:
+            current_app.logger.error(f"Failed to serialize credential: {str(e)}")
+            credential_data = {"error": "Invalid credential format", "id": credential_data.get('id', 'unknown')}
+    else:
+        current_app.logger.warning(f"Invalid credential data format: {type(credential_data)}")
+        credential_data = None  # Prevent template rendering errors
+        
+    # Ensure proper serialization for template
+    session_credential = json.dumps(credential_data) if credential_data else None
+    
+    return render_template(
+        'protected.html',
+        user_id=user_id,
+        credential=credential_data,
+        session_credential=session_credential,
+        verification_time=session.get('verification_time'),
+        verification_expiry=session.get('verification_expiry')
+    )
 
 @main_bp.route('/api/credential-lookup/<user_id>')
 def get_credential(user_id):
@@ -549,7 +575,7 @@ def logout():
     return redirect(url_for('main.index'))
 
 @main_bp.route('/api/generate-csrf-token', methods=['GET'])
-def generate_csrf_token():
+def get_csrf_token():
     """Generate a CSRF token for client-side JavaScript.
     
     This endpoint provides a CSRF token that can be used by client-side JavaScript

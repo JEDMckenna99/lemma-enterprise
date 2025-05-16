@@ -6,6 +6,8 @@
     <title>Protected Content - Lemma</title>
     <!-- Include the Lemma wallet initializer -->
     <script src="/static/js/lemma-wallet-init.js"></script>
+    <!-- Debug script -->
+    <script src="/static/js/debug-wallet.js"></script>
     <style>
         :root {
             --primary-color: #6B3FA0;
@@ -151,6 +153,9 @@
 
         <!-- Hidden field to store session verification status -->
         <input type="hidden" id="sessionVerified" value="{{ session.get('verified_human', False)|string|lower }}">
+        <!-- Hidden field to store credential data for wallet initialization -->
+        <input type="hidden" id="sessionCredential" value="{{ session_credential if session_credential else '' }}">
+        <input type="hidden" id="sessionUserId" value="{{ user_id }}">
 
         <div class="card">
             <div class="success-badge">✓ Human Verification Successful</div>
@@ -295,10 +300,95 @@
             }
         }
         
-        // Start checking after page load
-        window.addEventListener('load', function() {
-            checkCredential();
-            displayUserInfo();
+        // Wait for the wallet to initialize
+        async function waitForWallet() {
+            let attempts = 0;
+            const maxAttempts = 20;
+            
+            while (attempts < maxAttempts) {
+                if (window.lemmaWallet) {
+                    return window.lemmaWallet;
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 500));
+                attempts++;
+            }
+            
+            console.error('Wallet failed to initialize after multiple attempts');
+            return null;
+        }
+        
+        // Auto-store session credential in wallet when page loads
+        async function storeSessionCredential() {
+            const sessionCredentialElement = document.getElementById('sessionCredential');
+            const sessionUserIdElement = document.getElementById('sessionUserId');
+            
+            if (!sessionCredentialElement || !sessionCredentialElement.value) {
+                console.log('No session credential to store');
+                return;
+            }
+            
+            try {
+                const credential = JSON.parse(sessionCredentialElement.value);
+                console.log('Found credential in session, will store in wallet:', credential);
+                
+                if (!credential || !credential.id) {
+                    console.warn('Invalid credential format');
+                    return;
+                }
+                
+                // Get user ID
+                const userId = sessionUserIdElement?.value || 'unknown';
+                
+                // Wait for wallet to initialize
+                const wallet = await waitForWallet();
+                if (!wallet) {
+                    console.error('Could not access wallet for credential storage');
+                    return;
+                }
+                
+                // Check if this credential is already in the wallet
+                const existingCredentials = await wallet.getAllCredentials();
+                const exists = existingCredentials.some(c => 
+                    c.credential.id === credential.id || 
+                    (c.wallet_metadata && c.wallet_metadata.holder_id === userId)
+                );
+                
+                if (exists) {
+                    console.log('Credential already exists in wallet');
+                    return;
+                }
+                
+                // Format for wallet storage
+                const walletCredential = {
+                    credential: credential,
+                    wallet_metadata: {
+                        added_at: new Date().toISOString(),
+                        holder_id: userId,
+                        status: "active",
+                        display_name: "Lemma Human Verification",
+                        fingerprint: credential.id || `fingerprint-${Date.now()}`
+                    }
+                };
+                
+                // Store in wallet
+                await wallet.storeCredential(walletCredential);
+                console.log('Successfully stored credential in wallet:', credential.id);
+            } catch (error) {
+                console.error('Error storing session credential in wallet:', error);
+            }
+        }
+        
+        // Check for credentials immediately when page loads
+        window.addEventListener('load', async function() {
+            console.log('Protected page loaded, checking credentials');
+            try {
+                await checkCredential();
+                // Store session credential in wallet if available
+                await storeSessionCredential();
+            } catch (error) {
+                console.error('Error during credential check:', error);
+            }
         });
         
         // Import credential from JSON file
@@ -440,9 +530,5 @@
             }
         });
     </script>
-    
-    <!-- Hidden fields for session data -->
-    <input type="hidden" id="sessionUserId" value="{{ session.get('verified_user_id', '') }}">
-    <input type="hidden" id="sessionCredential" value="{{ session.get('verified_credential', {})|tojson|safe }}">
 </body>
 </html>

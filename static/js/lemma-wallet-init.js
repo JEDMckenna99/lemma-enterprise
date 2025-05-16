@@ -122,7 +122,48 @@ document.addEventListener('DOMContentLoaded', function() {
       if (sessionCredential && sessionCredential.value) {
         try {
           console.log("Found credential in session field, adding to wallet");
-          const credential = JSON.parse(sessionCredential.value);
+          // Debug the value to see what's being received
+          const credentialValue = sessionCredential.value.trim();
+          console.log("Raw credential value:", credentialValue);
+          
+          // Handle possible HTML entity encoding or extra quotes
+          let jsonToProcess = credentialValue;
+          
+          // Try to parse the JSON
+          let credential;
+          try {
+            // The server should have already serialized this properly, so this should work
+            credential = JSON.parse(jsonToProcess);
+            console.log("Successfully parsed credential JSON directly");
+          } catch (jsonError) {
+            console.error("Initial JSON parse error:", jsonError);
+            
+            // Check if the value might have extra quotes or double encoding
+            if (jsonToProcess.startsWith('"') && jsonToProcess.endsWith('"')) {
+              try {
+                // Try to parse the inner string (handle potential double encoding)
+                const innerJson = jsonToProcess.slice(1, -1).replace(/\\"/g, '"');
+                console.log("Attempting to parse inner JSON:", innerJson);
+                credential = JSON.parse(innerJson);
+                console.log("Successfully parsed inner JSON");
+              } catch (innerError) {
+                console.error("Inner JSON parse error:", innerError);
+                
+                // Last attempt - try with HTML entity decoding
+                try {
+                  const decodedJson = decodeURIComponent(jsonToProcess).replace(/&quot;/g, '"');
+                  console.log("Attempting to parse decoded JSON:", decodedJson);
+                  credential = JSON.parse(decodedJson);
+                  console.log("Successfully parsed decoded JSON");
+                } catch (decodeError) {
+                  console.error("Decode JSON parse error:", decodeError);
+                  throw new Error("Unable to parse credential JSON");
+                }
+              }
+            } else {
+              throw jsonError;
+            }
+          }
           
           if (!credential || !credential.id) {
             console.warn("Invalid credential format in session field");
@@ -140,28 +181,53 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           }
           
-          const walletCredential = {
-            credential: credential,
-            wallet_metadata: {
-              added_at: new Date().toISOString(),
-              holder_id: userId,
-              status: "active",
-              display_name: "Lemma Human Verification",
-              fingerprint: credential.id
-            }
-          };
-          
-          // Store in wallet only
-          wallet.storeCredential(walletCredential)
-            .then(() => {
-              console.log('Added credential to wallet from session:', credential.id);
-              // Refresh UI if available
-              if (window.lemmaWalletUI) {
-                window.lemmaWalletUI.refreshCredentialList();
+          // First check if this credential already exists in the wallet
+          wallet.getAllCredentials()
+            .then(existingCredentials => {
+              // Check if credential with same ID or holder already exists
+              const exists = existingCredentials.some(cred => 
+                cred.credential.id === credential.id || 
+                (cred.wallet_metadata && cred.wallet_metadata.holder_id === userId)
+              );
+              
+              if (exists) {
+                console.log('Credential already exists in wallet, skipping import');
+                return;
               }
+              
+              // Format for wallet storage
+              const walletCredential = {
+                credential: credential,
+                wallet_metadata: {
+                  added_at: new Date().toISOString(),
+                  holder_id: userId,
+                  status: "active",
+                  display_name: "Lemma Human Verification",
+                  fingerprint: credential.id
+                }
+              };
+              
+              // Store in wallet with better error handling
+              return wallet.storeCredential(walletCredential)
+                .then(() => {
+                  console.log('Added credential to wallet from session:', credential.id);
+                  // Refresh UI if available
+                  if (window.lemmaWalletUI) {
+                    window.lemmaWalletUI.refreshCredentialList();
+                  }
+                })
+                .catch(error => {
+                  console.error("Failed to add credential from session:", error);
+                  // Try again after a delay (might be timing issue)
+                  setTimeout(() => {
+                    wallet.storeCredential(walletCredential)
+                      .then(() => console.log('Successfully added credential on retry'))
+                      .catch(retryError => console.error('Failed on retry:', retryError));
+                  }, 1000);
+                });
             })
             .catch(error => {
-              console.error("Failed to add credential from session:", error);
+              console.error("Error checking existing credentials:", error);
             });
         } catch (error) {
           console.error("Failed to process credential from session:", error);
