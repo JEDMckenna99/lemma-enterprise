@@ -7,10 +7,19 @@ import json
 import os
 from flask import (
     Blueprint, render_template, request, redirect, 
-    url_for, session, jsonify, abort, flash, current_app
+    url_for, session, jsonify, abort, flash, current_app, make_response
 )
 from lemma.core.credential_service import get_credential_service
 from lemma.auth.csrf_config import generate_csrf_token
+try:
+    from lemma.utils.wallet import LemmaWallet
+except ImportError:
+    # Mock class if the wallet module is not available
+    class LemmaWallet:
+        @staticmethod
+        def format_for_wallet(credential, user_id):
+            return credential
+
 try:
     from lemma.utils.stripe_service import (
         create_verification_session, 
@@ -104,8 +113,21 @@ def verify():
             if 'expirationDate' in credential:
                 session['verification_expiry'] = credential['expirationDate']
             
-            # Redirect to protected page
-            return redirect(url_for('main.protected'))
+            # Create response with wallet cookie and redirect to protected page
+            response = make_response(redirect(url_for('main.protected')))
+            
+            # Set cookie to enable the wallet
+            secure = not current_app.config.get('TESTING', False)  # Secure in production, not in testing
+            response.set_cookie(
+                'lemma_wallet_enabled', 
+                'true', 
+                max_age=31536000,  # 1 year
+                secure=secure, 
+                httponly=False,  # JavaScript needs access
+                samesite='Lax'
+            )
+            
+            return response
     
     try:
         current_app.logger.info(f"Rendering verify.html template. Template path: {current_app.template_folder}")
@@ -232,8 +254,21 @@ def verification_callback():
         # Set success message
         flash("Identity verified successfully! Your Lemma credential has been issued.", "success")
         
-        # Redirect to the protected page
-        return redirect(url_for('main.protected'))
+        # Create response with wallet cookie and redirect to protected page
+        response = make_response(redirect(url_for('main.protected')))
+        
+        # Set cookie to enable the wallet
+        secure = not current_app.config.get('TESTING', False)  # Secure in production, not in testing
+        response.set_cookie(
+            'lemma_wallet_enabled', 
+            'true', 
+            max_age=31536000,  # 1 year
+            secure=secure, 
+            httponly=False,  # JavaScript needs access
+            samesite='Lax'
+        )
+        
+        return response
     else:
         # If verification failed, display an error message
         status = verification_status.get("status", "unknown")

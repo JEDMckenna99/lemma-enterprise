@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Verify Human Credential - Lemma</title>
+    
+    <!-- Include the Lemma wallet JavaScript -->
+    <script src="/static/js/lemma-wallet.js"></script>
+    
     <style>
         :root {
             --primary-color: #6B3FA0;
@@ -520,39 +524,96 @@
             try {
                 // Server has a credential for this user, store it in localStorage
                 const serverCredential = JSON.parse('{{ credential|tojson|safe }}');
-                console.log("Server provided credential, storing in localStorage");
+                console.log("Received credential from server:", serverCredential);
+                
+                // Store in localStorage
                 localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(serverCredential));
-            } catch (e) {
-                console.error("Error storing server credential:", e);
+                
+                // Add to wallet if wallet is enabled
+                if (document.cookie.includes('lemma_wallet_enabled=true') && window.LemmaWallet) {
+                    (async function() {
+                        try {
+                            const wallet = new LemmaWallet();
+                            
+                            // Create wallet credential format
+                            const walletCredential = {
+                                credential: serverCredential,
+                                wallet_metadata: {
+                                    added_at: new Date().toISOString(),
+                                    holder_id: userId,
+                                    status: "active",
+                                    display_name: "Lemma Human Verification",
+                                    fingerprint: serverCredential.id
+                                }
+                            };
+                            
+                            await wallet.storeCredential(walletCredential);
+                            console.log('Added credential to wallet:', serverCredential.id);
+                        } catch (error) {
+                            console.error('Failed to add credential to wallet:', error);
+                        }
+                    })();
+                }
+                
+                // Update the UI
+                document.getElementById('verificationStatus').textContent = "Verified! ✓";
+                document.getElementById('verificationStatus').style.backgroundColor = "#d4edda";
+                document.getElementById('verificationStatus').style.borderColor = "#c3e6cb";
+                document.getElementById('verificationStatus').style.color = "#155724";
+                
+                // Show the success section
+                document.getElementById('verification-success').style.display = 'block';
+                document.getElementById('verification-pending').style.display = 'none';
+                
+                // Enable the access button
+                document.getElementById('accessProtectedBtn').disabled = false;
+                
+            } catch (error) {
+                console.error("Error parsing credential from server:", error);
+            }
+            {% else %}
+            // No credential from server, check localStorage
+            const credentialKey = `lemma_credential_${userId}`;
+            const storedCredential = localStorage.getItem(credentialKey);
+            
+            if (storedCredential) {
+                try {
+                    const credential = JSON.parse(storedCredential);
+                    console.log("Using stored credential:", credential);
+                    
+                    // Update the UI for a verified user
+                    document.getElementById('verificationStatus').textContent = "Verified from local storage! ✓";
+                    document.getElementById('verificationStatus').style.backgroundColor = "#d4edda";
+                    document.getElementById('verificationStatus').style.borderColor = "#c3e6cb";
+                    document.getElementById('verificationStatus').style.color = "#155724";
+                    
+                    // Show the success section
+                    document.getElementById('verification-success').style.display = 'block';
+                    document.getElementById('verification-pending').style.display = 'none';
+                    
+                    // Enable the access button
+                    document.getElementById('accessProtectedBtn').disabled = false;
+                    
+                } catch (error) {
+                    console.error("Error parsing stored credential:", error);
+                    // Remove invalid credential
+                    localStorage.removeItem(credentialKey);
+                }
             }
             {% endif %}
             
-            if (userIdParam) {
-                // If we have a user_id parameter, check if we already have a credential for this user
-                const storedCredential = localStorage.getItem(`lemma_credential_${userIdParam}`);
-                
-                if (!storedCredential) {
-                    console.log("No stored credential found for this user, proceeding with verification flow");
-                    // We don't have a credential yet, so we'll continue with the verification flow
-                    
-                    // If we have a session ID, check the verification status periodically
-                    if (sessionId) {
-                        checkVerificationStatus(sessionId);
-                    }
-                } else {
-                    console.log("Credential already exists for this user, redirecting to protected content");
-                    // We already have a credential, so verify it and redirect to protected content
-                    verifyExistingCredential(userIdParam, storedCredential);
-                }
-            }
-            
-            // Setup event listener for getCredentialBtn if it exists
-            const getCredentialBtn = document.getElementById('getCredentialBtn');
-            if (getCredentialBtn) {
-                getCredentialBtn.addEventListener('click', function() {
-                    fetchAndStoreCredential(userId);
-                });
-            }
+            // Handle Stripe verification status if available
+            {% if stripe_verification and stripe_verification.get('verified') %}
+            document.getElementById('stripeVerificationStatus').textContent = "Identity Verified ✓";
+            document.getElementById('stripeVerificationStatus').style.backgroundColor = "#d4edda";
+            document.getElementById('stripeVerificationStatus').style.borderColor = "#c3e6cb";
+            document.getElementById('stripeVerificationStatus').style.color = "#155724";
+            {% elif stripe_verification %}
+            const stripeStatus = "{{ stripe_verification.get('status', 'unknown') }}";
+            const stripeError = "{{ stripe_verification.get('error', '') }}";
+            document.getElementById('stripeVerificationStatus').textContent = 
+                `Verification ${stripeStatus}${stripeError ? ': ' + stripeError : ''}`;
+            {% endif %}
         });
         
         // Function to fetch verification status periodically
