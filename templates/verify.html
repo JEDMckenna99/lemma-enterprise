@@ -515,6 +515,18 @@
             const userIdParam = urlParams.get('user_id');
             const sessionId = urlParams.get('session_id');
             
+            // Check if server provided a credential
+            {% if credential %}
+            try {
+                // Server has a credential for this user, store it in localStorage
+                const serverCredential = JSON.parse('{{ credential|tojson|safe }}');
+                console.log("Server provided credential, storing in localStorage");
+                localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(serverCredential));
+            } catch (e) {
+                console.error("Error storing server credential:", e);
+            }
+            {% endif %}
+            
             if (userIdParam) {
                 // If we have a user_id parameter, check if we already have a credential for this user
                 const storedCredential = localStorage.getItem(`lemma_credential_${userIdParam}`);

@@ -62,6 +62,14 @@ def verify():
         user_id = f"user_{secrets.token_hex(8)}"
         return redirect(url_for('main.verify', user_id=user_id))
     
+    # Check if the user is already verified in the session
+    is_verified = session.get('verified_user_id') == user_id and session.get('verified_human', False)
+    
+    # If user is already verified, redirect them to the protected page
+    if is_verified:
+        current_app.logger.info(f"User {user_id} is already verified, redirecting to protected page")
+        return redirect(url_for('main.protected'))
+    
     # Check if user has a credential
     credential_service = get_credential_service()
     credential = credential_service.get_user_credential(user_id)
@@ -71,9 +79,6 @@ def verify():
     session['verification_challenge'] = challenge
     
     verification_url = url_for('main.verify', user_id=user_id, _external=True)
-    
-    # Check if the user is already verified in the session
-    is_verified = session.get('verified_user_id') == user_id and session.get('verified_human', False)
     
     # Check if this is a Stripe Identity verification callback
     stripe_session = request.args.get('session_id')
@@ -87,6 +92,20 @@ def verify():
             if not credential:
                 credential = credential_service.issue_credential(user_id)
                 current_app.logger.info(f"Issued credential for verified user {user_id}")
+            
+            # Set session variables for protected content access
+            session['verified_human'] = True
+            session['verified_user_id'] = user_id
+            session['verified_credential'] = credential
+            
+            # Set issuance and expiry times if available in the credential
+            if 'issuanceDate' in credential:
+                session['verification_time'] = credential['issuanceDate']
+            if 'expirationDate' in credential:
+                session['verification_expiry'] = credential['expirationDate']
+            
+            # Redirect to protected page
+            return redirect(url_for('main.protected'))
     
     try:
         current_app.logger.info(f"Rendering verify.html template. Template path: {current_app.template_folder}")
@@ -199,16 +218,30 @@ def verification_callback():
             credential = credential_service.issue_credential(user_id)
             current_app.logger.info(f"Issued credential for verified user {user_id}")
         
+        # Set session variables for protected content access
+        session['verified_human'] = True
+        session['verified_user_id'] = user_id
+        session['verified_credential'] = credential
+        
+        # Set issuance and expiry times if available in the credential
+        if 'issuanceDate' in credential:
+            session['verification_time'] = credential['issuanceDate']
+        if 'expirationDate' in credential:
+            session['verification_expiry'] = credential['expirationDate']
+            
         # Set success message
         flash("Identity verified successfully! Your Lemma credential has been issued.", "success")
+        
+        # Redirect to the protected page
+        return redirect(url_for('main.protected'))
     else:
         # If verification failed, display an error message
         status = verification_status.get("status", "unknown")
         error_msg = verification_status.get("error", "")
         flash(f"Identity verification {status}. {error_msg} Please try again.", "warning")
     
-    # Redirect to the verification page
-    return redirect(url_for('main.verify', user_id=user_id, session_id=session_id))
+        # Redirect to the verification page
+        return redirect(url_for('main.verify', user_id=user_id, session_id=session_id))
 
 @main_bp.route('/api/verification/status/<session_id>')
 def api_verification_status(session_id):
