@@ -206,30 +206,100 @@
     </div>
 
     <script>
-        // Check if credential exists in local storage
-        function checkCredential() {
-            const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
-            // If no credential found and user isn't verified via session, redirect to verification page
+        // Check if credential exists in the wallet or session
+        async function checkCredential() {
             const sessionVerified = document.getElementById('sessionVerified').value === 'true';
-            if (credentials.length === 0 && !sessionVerified) {
-                // No credential found, redirect to verification page
-                alert('No Lemma credential found. Redirecting to verification page...');
-                window.location.href = '/verify';
-            }
-        }
-        
-        // Display user information
-        function displayUserInfo() {
-            const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
-            if (credentials.length > 0) {
-                const userId = credentials[0].replace('lemma_credential_', '');
-                // Only update if the element doesn't already have server-provided content
-                const userIdElement = document.getElementById('userId');
-                if (userIdElement && (userIdElement.textContent === "" || userIdElement.textContent === "Unknown")) {
-                    userIdElement.textContent = userId;
+            
+            // If user isn't verified via session, check wallet
+            if (!sessionVerified) {
+                // Wait for wallet to initialize
+                await waitForWallet();
+                
+                // If wallet is available, check for credentials
+                if (window.lemmaWallet) {
+                    try {
+                        const credentials = await window.lemmaWallet.getAllCredentials();
+                        if (credentials.length === 0) {
+                            // No credential found, redirect to verification page
+                            alert('No Lemma credential found. Redirecting to verification page...');
+                            window.location.href = '/verify';
+                        }
+                    } catch (error) {
+                        console.error('Error checking wallet credentials:', error);
+                        // Redirect on error
+                        alert('Error accessing Lemma wallet. Redirecting to verification page...');
+                        window.location.href = '/verify';
+                    }
+                } else {
+                    // Fallback to localStorage check for backward compatibility
+                    const legacyCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+                    if (legacyCredentials.length === 0) {
+                        // No credential found, redirect to verification page
+                        alert('No Lemma credential found. Redirecting to verification page...');
+                        window.location.href = '/verify';
+                    }
                 }
             }
         }
+        
+        // Helper function to wait for wallet to initialize
+        function waitForWallet(timeout = 2000) {
+            return new Promise((resolve) => {
+                if (window.lemmaWallet) {
+                    resolve();
+                    return;
+                }
+                
+                const startTime = Date.now();
+                const checkInterval = setInterval(() => {
+                    if (window.lemmaWallet) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    } else if (Date.now() - startTime > timeout) {
+                        // Timeout
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+        
+        // Display user information from wallet or session
+        async function displayUserInfo() {
+            // Wait for wallet to initialize
+            await waitForWallet();
+            
+            const userIdElement = document.getElementById('userId');
+            
+            // Only update if element doesn't have server-provided content
+            if (userIdElement && (userIdElement.textContent === "" || userIdElement.textContent === "Unknown")) {
+                if (window.lemmaWallet) {
+                    try {
+                        const credentials = await window.lemmaWallet.getAllCredentials();
+                        if (credentials.length > 0) {
+                            const firstCredential = credentials[0];
+                            const userId = firstCredential.wallet_metadata.holder_id;
+                            userIdElement.textContent = userId;
+                        }
+                    } catch (error) {
+                        console.error('Error getting credentials from wallet:', error);
+                    }
+                } else {
+                    // Fallback to localStorage check for backward compatibility
+                    const legacyCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+                    if (legacyCredentials.length > 0) {
+                        const userId = legacyCredentials[0].replace('lemma_credential_', '');
+                        userIdElement.textContent = userId;
+                    }
+                }
+            }
+        }
+        
+        // Start checking after page load
+        window.addEventListener('load', function() {
+            checkCredential();
+            displayUserInfo();
+        });
         
         // Import credential from JSON file
         document.getElementById('importBtn').addEventListener('click', function() {
@@ -368,12 +438,6 @@
                     window.location.href = '/';
                 });
             }
-        });
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            checkCredential();
-            displayUserInfo();
         });
     </script>
     

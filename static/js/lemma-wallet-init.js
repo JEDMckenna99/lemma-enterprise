@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Or check if the URL contains Lemma-specific paths
     window.location.pathname.includes('/verify') || 
     window.location.pathname.includes('/protected') ||
-    // Or check if localStorage contains Lemma credentials
+    // Or check if localStorage contains Lemma credentials (legacy check)
     Object.keys(localStorage).some(key => key.startsWith('lemma_'));
   
   // Automatically set the cookie if page has Lemma integration
@@ -68,11 +68,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const addCredentialsToWallet = function(wallet) {
       console.log("Checking for credentials to add to wallet");
       
-      // Check localStorage for credentials
+      // Check localStorage for credentials (legacy support - migrate them to wallet)
       const storageCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
       
       if (storageCredentials.length > 0) {
-        console.log(`Found ${storageCredentials.length} credentials in localStorage`);
+        console.log(`Found ${storageCredentials.length} credentials in localStorage, migrating to wallet`);
         
         storageCredentials.forEach(function(key) {
           try {
@@ -100,14 +100,16 @@ document.addEventListener('DOMContentLoaded', function() {
             // Store in wallet
             wallet.storeCredential(walletCredential)
               .then(() => {
-                console.log('Added credential to wallet:', credential.id);
+                console.log('Migrated credential to wallet:', credential.id);
+                // Remove from localStorage after successful migration to wallet
+                localStorage.removeItem(key);
                 // Refresh UI if available
                 if (window.lemmaWalletUI) {
                   window.lemmaWalletUI.refreshCredentialList();
                 }
               })
               .catch(error => {
-                console.error(`Failed to add credential ${credential.id}:`, error);
+                console.error(`Failed to migrate credential ${credential.id}:`, error);
               });
           } catch (error) {
             console.error(`Failed to process credential from key ${key}:`, error);
@@ -149,12 +151,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           };
           
-          // Store in wallet
+          // Store in wallet only
           wallet.storeCredential(walletCredential)
             .then(() => {
               console.log('Added credential to wallet from session:', credential.id);
-              // Also update localStorage for future use
-              localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(credential));
               // Refresh UI if available
               if (window.lemmaWalletUI) {
                 window.lemmaWalletUI.refreshCredentialList();
