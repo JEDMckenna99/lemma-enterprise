@@ -1,0 +1,19 @@
+<!-- Include the Lemma wallet JavaScript library -->
+<script src="/static/js/lemma-wallet.js"></script>
+<script>
+  // Initialize wallet if cookie is set
+  document.addEventListener('DOMContentLoaded', function() {
+    if (document.cookie.includes('lemma_wallet_enabled=true')) {
+      console.log('Initializing Lemma wallet from layout template');
+      if (!window.lemmaWallet) {
+        const wallet = new LemmaWallet();
+        const walletUI = new LemmaWalletUI(wallet);
+        walletUI.init();
+        
+        // Store the wallet instances in the window object
+        window.lemmaWallet = wallet;
+        window.lemmaWalletUI = walletUI;
+      }
+    }
+  });
+</script> 

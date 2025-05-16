@@ -50,14 +50,17 @@ class LemmaWallet {
             const request = window.indexedDB.open(this.dbName, this.dbVersion);
             
             request.onerror = (event) => {
-                reject(new Error('Failed to open wallet database: ' + event.target.errorCode));
+                console.error('IndexedDB error:', event.target.error);
+                reject(new Error('Failed to open wallet database: ' + event.target.error));
             };
             
             request.onsuccess = (event) => {
+                console.log('IndexedDB connection opened successfully');
                 resolve(event.target.result);
             };
             
             request.onupgradeneeded = (event) => {
+                console.log('IndexedDB upgrade needed, creating stores');
                 const db = event.target.result;
                 
                 // Create credential store
@@ -83,32 +86,73 @@ class LemmaWallet {
     async storeCredential(credential) {
         await this.init();
         
-        // Make sure the credential has a wallet-friendly format
-        if (!credential.credential || !credential.wallet_metadata) {
-            throw new Error('Invalid credential format for wallet storage');
+        console.log('Attempting to store credential:', credential);
+        
+        // Attempt to fix credential format if it doesn't match expected structure
+        let walletCredential = credential;
+        
+        // If this is a raw credential, format it for wallet storage
+        if (!credential.credential && !credential.wallet_metadata) {
+            console.log('Converting raw credential to wallet format');
+            // Try to determine the user ID from the credential
+            let userId = 'unknown';
+            if (credential.credentialSubject && credential.credentialSubject.id) {
+                userId = credential.credentialSubject.id.replace('did:user:', '');
+            }
+            
+            walletCredential = {
+                credential: credential,
+                wallet_metadata: {
+                    added_at: new Date().toISOString(),
+                    holder_id: userId,
+                    status: "active",
+                    display_name: "Lemma Human Verification",
+                    fingerprint: credential.id || `fingerprint-${Date.now()}`
+                }
+            };
+        }
+        
+        // Validate the credential has required fields
+        if (!walletCredential.credential) {
+            console.error('Invalid credential format - missing credential property', walletCredential);
+            throw new Error('Invalid credential format for wallet storage: missing credential property');
+        }
+        
+        if (!walletCredential.wallet_metadata) {
+            console.error('Invalid credential format - missing wallet_metadata property', walletCredential);
+            throw new Error('Invalid credential format for wallet storage: missing wallet_metadata property');
         }
         
         // Use the credential ID as the store key
-        const id = credential.credential.id;
+        const id = walletCredential.credential.id;
         if (!id) {
+            console.error('Credential must have an ID', walletCredential.credential);
             throw new Error('Credential must have an ID');
         }
         
-        credential.id = id;
+        walletCredential.id = id;
         
         return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([this.credentialStore], 'readwrite');
-            const store = transaction.objectStore(this.credentialStore);
-            
-            const request = store.put(credential);
-            
-            request.onsuccess = () => {
-                resolve(credential);
-            };
-            
-            request.onerror = (event) => {
-                reject(new Error('Failed to store credential: ' + event.target.errorCode));
-            };
+            try {
+                const transaction = this.db.transaction([this.credentialStore], 'readwrite');
+                const store = transaction.objectStore(this.credentialStore);
+                
+                console.log('Storing credential with ID:', id);
+                const request = store.put(walletCredential);
+                
+                request.onsuccess = () => {
+                    console.log('Successfully stored credential:', id);
+                    resolve(walletCredential);
+                };
+                
+                request.onerror = (event) => {
+                    console.error('Failed to store credential:', event.target.error);
+                    reject(new Error('Failed to store credential: ' + event.target.error));
+                };
+            } catch (error) {
+                console.error('Exception during credential storage:', error);
+                reject(error);
+            }
         });
     }
     

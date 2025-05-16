@@ -6,8 +6,8 @@
     <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Verify Human Credential - Lemma</title>
     
-    <!-- Include the Lemma wallet JavaScript -->
-    <script src="/static/js/lemma-wallet.js"></script>
+    <!-- Include the Lemma wallet initializer -->
+    <script src="/static/js/lemma-wallet-init.js"></script>
     
     <style>
         :root {
@@ -530,10 +530,30 @@
                 localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(serverCredential));
                 
                 // Add to wallet if wallet is enabled
-                if (document.cookie.includes('lemma_wallet_enabled=true') && window.LemmaWallet) {
+                if (document.cookie.includes('lemma_wallet_enabled=true')) {
                     (async function() {
                         try {
-                            const wallet = new LemmaWallet();
+                            // Initialize wallet if not already initialized
+                            let wallet;
+                            
+                            if (window.lemmaWallet) {
+                                wallet = window.lemmaWallet;
+                                console.log("Using existing wallet instance");
+                            } else if (window.LemmaWallet) {
+                                console.log("Creating new LemmaWallet instance");
+                                wallet = new LemmaWallet();
+                                window.lemmaWallet = wallet;
+                                
+                                const walletUI = new LemmaWalletUI(wallet);
+                                await walletUI.init();
+                                window.lemmaWalletUI = walletUI;
+                            } else {
+                                console.error("LemmaWallet class not found");
+                                return;
+                            }
+                            
+                            // Wait for wallet to initialize
+                            await new Promise(resolve => setTimeout(resolve, 500));
                             
                             // Create wallet credential format
                             const walletCredential = {
@@ -547,12 +567,40 @@
                                 }
                             };
                             
-                            await wallet.storeCredential(walletCredential);
-                            console.log('Added credential to wallet:', serverCredential.id);
+                            console.log("Storing credential in wallet:", walletCredential);
+                            
+                            try {
+                                // First attempt to store
+                                await wallet.storeCredential(walletCredential);
+                                console.log('Added credential to wallet:', serverCredential.id);
+                            } catch (storeError) {
+                                console.error('First attempt to store credential failed:', storeError);
+                                
+                                // Wait a bit and retry
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                
+                                try {
+                                    await wallet.storeCredential(walletCredential);
+                                    console.log('Successfully added credential to wallet on second attempt:', serverCredential.id);
+                                } catch (retryError) {
+                                    console.error('Failed to add credential to wallet after retry:', retryError);
+                                }
+                            }
+                            
+                            // If UI exists, refresh the display
+                            if (window.lemmaWalletUI) {
+                                try {
+                                    await window.lemmaWalletUI.refreshCredentialList();
+                                } catch (uiError) {
+                                    console.error('Error refreshing wallet UI:', uiError);
+                                }
+                            }
                         } catch (error) {
                             console.error('Failed to add credential to wallet:', error);
                         }
                     })();
+                } else {
+                    console.log("Wallet not enabled, skipping adding credential to wallet");
                 }
                 
                 // Update the UI

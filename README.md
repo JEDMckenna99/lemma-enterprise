@@ -42,6 +42,7 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 
 ## What's New in Version 2.1.0
 
+- **Lemma Wallet Integration**: Added a built-in wallet that automatically appears on any Lemma-integrated page, allowing users to manage multiple credentials.
 - **Enhanced Home Page Flow**: The "Verify Lemma" button now automatically issues, stores, and verifies credentials locally without redirects.
 - **Improved User Feedback**: The "Access Protected Content" button now displays a clear error message on the same page when no lemma is found instead of redirecting.
 - **Protected Content Enhancements**: Users can now view their Lemma credential details directly on the protected page.
@@ -64,6 +65,7 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 - **Decentralized Verification:** No central authority needed for credential verification.
 - **Hardware-Backed Security:** Support for TPM, Secure Enclave, and Android Keystore.
 - **P2P Revocation:** Decentralized credential revocation broadcast system.
+- **Portable Wallet:** Client-side credential wallet that can be integrated into any website.
 
 ---
 
@@ -82,12 +84,17 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 - **`lemma/models/`:** Data models.
 - **`tests/`:** Comprehensive test suite.
 
+### Frontend Components
+- **`static/js/lemma-wallet.js`:** Client-side wallet for storing and managing Lemma credentials.
+- **`static/js/lemma-wallet-init.js`:** Automatic wallet initialization for Lemma-integrated pages.
+
 ### Templates
 - **`templates/index.html`:** Landing page with "Verify Lemma" and "Access Protected Content" buttons.
 - **`templates/verify.html`:** Credential verification and storage page.
 - **`templates/protected.html`:** Content requiring human verification with credential management.
 - **`templates/admin_login.html`:** Secure admin login.
 - **`templates/admin.html`:** Admin dashboard for issuing credentials.
+- **`templates/layout.html`:** Common layout template with wallet integration.
 
 ### Storage System
 - **`.lemma_enterprise/`:** (Created automatically) Contains cryptographic keys and credential registry:
@@ -180,6 +187,89 @@ Lemma now includes a fully decentralized identity system that addresses 8 key go
 3. **Privacy-Preserving Verification:** System verifies the proof without seeing the full credential.
 4. **Selective Attribute Sharing:** User can choose which credential attributes to reveal.
 5. **Hardware-Backed Verification:** When available, verification leverages secure hardware.
+
+---
+
+## Customer Site Integration
+
+Lemma is designed to be easily integrated into customer sites, allowing them to verify users as humans without collecting personal data.
+
+### Basic Integration
+```html
+<!-- Add these scripts to your website -->
+<script src="https://your-lemma-instance.com/static/js/lemma-wallet.js"></script>
+<script src="https://your-lemma-instance.com/static/js/lemma-wallet-init.js"></script>
+
+<!-- Add this attribute to enable the wallet on your page -->
+<div data-lemma="true">
+  <!-- Your protected content goes here -->
+</div>
+```
+
+### JavaScript API Integration
+```javascript
+// Verify a user with Lemma
+async function verifyWithLemma() {
+  // Check if wallet is available
+  if (window.lemmaWallet) {
+    // Get the first credential from the wallet
+    const credential = await window.lemmaWallet.getFirstCredential();
+    
+    if (credential) {
+      // Generate a random challenge
+      const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      // Create a verification request to your backend
+      const result = await fetch('/api/verify-lemma', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          credential: credential,
+          challenge: challenge
+        })
+      }).then(res => res.json());
+      
+      if (result.verified) {
+        // User is a verified human
+        showProtectedContent();
+      }
+    } else {
+      // Redirect to Lemma verification
+      window.location.href = "https://your-lemma-instance.com/verify";
+    }
+  }
+}
+```
+
+### Backend Verification
+On your server, you'll need to verify the Lemma credential presentation:
+
+```python
+# Example using the Python requests library
+import requests
+
+def verify_lemma_credential(credential, challenge):
+    # Send to your Lemma instance for verification
+    response = requests.post(
+        'https://your-lemma-instance.com/api/verify-human',
+        json={
+            'presentation': credential,
+            'challenge': challenge
+        }
+    )
+    
+    if response.status_code == 200:
+        result = response.json()
+        if result.get('success'):
+            # User is verified human
+            return True
+    
+    # Verification failed
+    return False
+```
+
+The Lemma wallet is designed to be portable and work across websites, which is core to providing "verify once, use anywhere" functionality.
 
 ---
 

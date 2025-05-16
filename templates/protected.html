@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Protected Content - Lemma</title>
-    <!-- Include the Lemma wallet JavaScript library -->
-    <script src="/static/js/lemma-wallet.js"></script>
+    <!-- Include the Lemma wallet initializer -->
+    <script src="/static/js/lemma-wallet-init.js"></script>
     <style>
         :root {
             --primary-color: #6B3FA0;
@@ -141,7 +141,7 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container" data-lemma="true">
         <header>
             <div class="logo">
                 <span>L</span>
@@ -150,7 +150,7 @@
         </header>
 
         <!-- Hidden field to store session verification status -->
-        <input type="hidden" id="sessionVerified" value="{{ 'true' if session.get('verified_human', False) else 'false' }}">
+        <input type="hidden" id="sessionVerified" value="{{ session.get('verified_human', False)|string|lower }}">
 
         <div class="card">
             <div class="success-badge">✓ Human Verification Successful</div>
@@ -206,61 +206,6 @@
     </div>
 
     <script>
-        // Enable wallet functionality
-        function enableWallet() {
-            // Set the wallet cookie if not already set
-            if (!document.cookie.includes('lemma_wallet_enabled=true')) {
-                document.cookie = "lemma_wallet_enabled=true; max-age=31536000; path=/; samesite=Lax";
-            }
-            
-            // Initialize the wallet if it's not already initialized
-            if (window.lemmaWallet === undefined) {
-                console.log('Initializing Lemma wallet');
-                const wallet = new LemmaWallet();
-                const walletUI = new LemmaWalletUI(wallet);
-                walletUI.init();
-                
-                // Store the wallet instances in the window object
-                window.lemmaWallet = wallet;
-                window.lemmaWalletUI = walletUI;
-                
-                // Try to add the credential to the wallet
-                addCredentialToWallet();
-            }
-        }
-        
-        // Add credential to wallet
-        async function addCredentialToWallet() {
-            // Check if we have a credential in localStorage
-            const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
-            if (credentials.length > 0) {
-                const key = credentials[0];
-                try {
-                    const credentialJson = localStorage.getItem(key);
-                    const credential = JSON.parse(credentialJson);
-                    
-                    // Create wallet metadata
-                    const userId = key.replace('lemma_credential_', '');
-                    const walletCredential = {
-                        credential: credential,
-                        wallet_metadata: {
-                            added_at: new Date().toISOString(),
-                            holder_id: userId,
-                            status: "active",
-                            display_name: "Lemma Human Verification",
-                            fingerprint: credential.id
-                        }
-                    };
-                    
-                    // Store in wallet
-                    await window.lemmaWallet.storeCredential(walletCredential);
-                    console.log('Added credential to wallet:', credential.id);
-                } catch (error) {
-                    console.error('Failed to add credential to wallet:', error);
-                }
-            }
-        }
-        
         // Check if credential exists in local storage
         function checkCredential() {
             const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
@@ -429,8 +374,11 @@
         document.addEventListener('DOMContentLoaded', function() {
             checkCredential();
             displayUserInfo();
-            enableWallet();
         });
     </script>
+    
+    <!-- Hidden fields for session data -->
+    <input type="hidden" id="sessionUserId" value="{{ session.get('verified_user_id', '') }}">
+    <input type="hidden" id="sessionCredential" value="{{ session.get('verified_credential', {})|tojson|safe }}">
 </body>
 </html>
