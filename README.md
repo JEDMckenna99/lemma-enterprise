@@ -46,7 +46,7 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 - **Enhanced Home Page Flow**: The "Verify Lemma" button now automatically issues, stores, and verifies credentials locally without redirects.
 - **Improved User Feedback**: The "Access Protected Content" button now displays a clear error message on the same page when no lemma is found instead of redirecting.
 - **Protected Content Enhancements**: Users can now view their Lemma credential details directly on the protected page.
-- **Architecture Plan Access**: Added an interactive, paginated view of the Lemma Architecture Plan for verified humans on the protected page.
+- **Lemma Network Access**: Added an interactive, paginated view of the Lemma Network for verified humans on the protected page.
 - **Credential Management**: Added ability to clear Lemma credentials directly from the protected page.
 - **Better Error Handling**: Improved error messages and feedback throughout the verification flow.
 - **Fixed CSRF Issues**: Resolved CSRF token handling for more reliable deployment, especially on Heroku.
@@ -88,8 +88,8 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 ### Frontend Components
 - **`static/js/lemma-wallet.js`:** Client-side wallet for storing and managing Lemma credentials.
 - **`static/js/lemma-wallet-init.js`:** Automatic wallet initialization for Lemma-integrated pages.
-- **`static/js/lemma-plan.js`:** Interactive, paginated display of the Lemma Architecture Plan for verified users.
-- **`static/js/lemma-plan.css`:** Styling for the Lemma Architecture Plan display.
+- **`static/js/lemma-plan.js`:** Interactive, paginated display of the Lemma Network for verified users.
+- **`static/js/lemma-plan.css`:** Styling for the Lemma Network display.
 
 ### Templates
 - **`templates/index.html`:** Landing page with "Verify Lemma" and "Access Protected Content" buttons.
@@ -182,7 +182,7 @@ Lemma now includes a fully decentralized identity system that addresses 8 key go
 1. **View Credential:** Users can view their Lemma credential details directly on the protected page.
 2. **Credential Management:** Users can clear their stored credential using the "Clear Lemma" button.
 3. **Import Functionality:** Users can import a previously downloaded credential.
-4. **Architecture Plan Access:** Users can view the detailed Lemma Architecture Plan with an interactive, paginated interface.
+4. **Lemma Network Access:** Users can view the detailed Lemma Network with an interactive, paginated interface.
 5. **Session-Based Access:** Access is maintained via both browser storage and server session.
 
 ### Zero-Knowledge Verification Flow

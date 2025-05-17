@@ -1,4 +1,4 @@
-// lemma-plan.js - Displays the Lemma Architecture Plan content
+// lemma-plan.js - Displays the Lemma Network content
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize variables

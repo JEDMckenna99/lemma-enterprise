@@ -188,12 +188,12 @@
                 <button id="closeLemmaBtn" class="button" style="margin-top: 10px; font-size: 14px; padding: 8px 12px; background-color: #6c757d;">Close</button>
             </div>
             
-            <!-- Lemma Architecture Plan Toggle -->
+            <!-- Lemma Network Toggle -->
             <div class="content-section">
-                <button id="togglePlanBtn" class="toggle-plan-button">View Lemma Architecture Plan</button>
+                <button id="togglePlanBtn" class="toggle-plan-button">View Lemma Network</button>
             </div>
             
-            <!-- Lemma Architecture Plan (Hidden by default) -->
+            <!-- Lemma Network (Hidden by default) -->
             <div id="lemma-plan-section" style="display: none;">
                 <div id="lemma-plan-container" class="plan-container"></div>
                 <div id="lemma-plan-pagination" class="plan-pagination"></div>
@@ -550,10 +550,10 @@
             const planSection = document.getElementById('lemma-plan-section');
             if (planSection.style.display === 'none') {
                 planSection.style.display = 'block';
-                this.textContent = 'Hide Lemma Architecture Plan';
+                this.textContent = 'Hide Lemma Network';
             } else {
                 planSection.style.display = 'none';
-                this.textContent = 'View Lemma Architecture Plan';
+                this.textContent = 'View Lemma Network';
             }
         });
     </script>
