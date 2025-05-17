@@ -359,13 +359,15 @@
             
             <div class="content-section">
                 <h2>How Lemma's Verification Works Across Sites</h2>
-                <p>Your Lemma credential is stored locally in your browser and can be presented to any site that accepts Lemma verification. This means:</p>
+                <p>Your Lemma credential is stored securely in your digital wallet and can be presented to any site that accepts Lemma verification. This means:</p>
                 <ul style="margin-left: 20px; margin-bottom: 15px;">
                     <li>You only need to be verified once</li>
+                    <li>Your credentials travel with you across devices via your wallet</li>
                     <li>No central database stores your personal information</li>
                     <li>Each site can verify your humanity without knowing anything else about you</li>
                     <li>The verification uses cryptographic proofs that can't be forged</li>
                 </ul>
+                <p>The wallet implementation enables seamless credential management, backup, and cross-device usage, providing a more robust solution than traditional browser storage.</p>
                 <p>This demonstration shows how your credential can be used to access protected content across different pages or even different websites.</p>
             </div>
             
@@ -684,6 +686,28 @@
                         localStorage.removeItem(key);
                     }
                 });
+                
+                // Clear credentials from wallet if available
+                if (window.lemmaWallet) {
+                    try {
+                        window.lemmaWallet.getAllCredentials()
+                            .then(credentials => {
+                                const deletePromises = credentials.map(cred => 
+                                    window.lemmaWallet.deleteCredential(cred.id)
+                                );
+                                
+                                return Promise.all(deletePromises);
+                            })
+                            .then(() => {
+                                console.log('All credentials deleted from wallet');
+                            })
+                            .catch(error => {
+                                console.error('Error deleting credentials from wallet:', error);
+                            });
+                    } catch (error) {
+                        console.error('Error accessing wallet to clear credentials:', error);
+                    }
+                }
                 
                 // Clear session cookie by redirecting to logout endpoint
                 fetch('/api/logout', {

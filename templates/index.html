@@ -363,6 +363,77 @@
             e.preventDefault();
             
             try {
+                // First check if user already has a credential in the wallet
+                let hasExistingCredential = false;
+                
+                // Wait for wallet to initialize
+                if (typeof window.lemmaWallet !== 'undefined') {
+                    try {
+                        const allCredentials = await window.lemmaWallet.getAllCredentials();
+                        hasExistingCredential = allCredentials && allCredentials.length > 0;
+                        
+                        if (hasExistingCredential) {
+                            // Create or update info message element
+                            let infoElement = document.getElementById('verifyInfoMessage');
+                            if (!infoElement) {
+                                infoElement = document.createElement('div');
+                                infoElement.id = 'verifyInfoMessage';
+                                infoElement.style.color = '#2980b9';
+                                infoElement.style.fontWeight = 'bold';
+                                infoElement.style.padding = '10px';
+                                infoElement.style.marginTop = '15px';
+                                infoElement.style.borderRadius = '5px';
+                                infoElement.style.backgroundColor = 'rgba(41, 128, 185, 0.1)';
+                                infoElement.style.border = '1px solid #2980b9';
+                                document.querySelector('.cta-buttons').insertAdjacentElement('afterend', infoElement);
+                            }
+                            
+                            infoElement.textContent = 'You already have a Lemma credential in your wallet. Use "Access Protected Content" to proceed.';
+                            infoElement.style.display = 'block';
+                            
+                            // Auto-hide the message after 10 seconds
+                            setTimeout(() => {
+                                infoElement.style.display = 'none';
+                            }, 10000);
+                            
+                            return;
+                        }
+                    } catch (walletError) {
+                        console.error('Error checking wallet for credentials:', walletError);
+                        // Continue with verification if wallet check fails
+                    }
+                } else {
+                    // Also check localStorage for backward compatibility
+                    const legacyCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+                    
+                    if (legacyCredentials.length > 0) {
+                        // Create or update info message element
+                        let infoElement = document.getElementById('verifyInfoMessage');
+                        if (!infoElement) {
+                            infoElement = document.createElement('div');
+                            infoElement.id = 'verifyInfoMessage';
+                            infoElement.style.color = '#2980b9';
+                            infoElement.style.fontWeight = 'bold';
+                            infoElement.style.padding = '10px';
+                            infoElement.style.marginTop = '15px';
+                            infoElement.style.borderRadius = '5px';
+                            infoElement.style.backgroundColor = 'rgba(41, 128, 185, 0.1)';
+                            infoElement.style.border = '1px solid #2980b9';
+                            document.querySelector('.cta-buttons').insertAdjacentElement('afterend', infoElement);
+                        }
+                        
+                        infoElement.textContent = 'You already have a Lemma credential. Use "Access Protected Content" to proceed.';
+                        infoElement.style.display = 'block';
+                        
+                        // Auto-hide the message after 10 seconds
+                        setTimeout(() => {
+                            infoElement.style.display = 'none';
+                        }, 10000);
+                        
+                        return;
+                    }
+                }
+                
                 // Generate a random user ID
                 const userId = `user_${Array.from(crypto.getRandomValues(new Uint8Array(8)))
                     .map(b => b.toString(16).padStart(2, '0')).join('')}`;
