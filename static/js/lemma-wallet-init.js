@@ -97,6 +97,9 @@ document.addEventListener('DOMContentLoaded', function() {
               }
             };
             
+            // Debug log the wallet credential structure
+            console.log('Wallet credential structure:', JSON.stringify(walletCredential));
+            
             // Store in wallet
             wallet.storeCredential(walletCredential)
               .then(() => {

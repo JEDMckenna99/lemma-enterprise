@@ -383,6 +383,7 @@
         // Check if credential exists in the wallet or session
         async function checkCredential() {
             const sessionVerified = document.getElementById('sessionVerified').value === 'true';
+            console.log('Session verification status:', sessionVerified);
             
             // If user isn't verified via session, check wallet
             if (!sessionVerified) {
@@ -393,9 +394,100 @@
                 if (window.lemmaWallet) {
                     try {
                         const credentials = await window.lemmaWallet.getAllCredentials();
+                        console.log('Found credentials in wallet:', credentials.length);
+                        
                         if (credentials.length === 0) {
                             // No credential found, redirect to verification page
+                            console.error('No Lemma credential found in wallet');
                             alert('No Lemma credential found. Redirecting to verification page...');
+                            window.location.href = '/verify';
+                            return;
+                        }
+                        
+                        // If we have a credential, use it to set up a session
+                        const credential = credentials[0].credential;
+                        const userId = credentials[0].wallet_metadata.holder_id;
+                        
+                        console.log('Using wallet credential:', credential.id);
+                        
+                        // Generate a challenge
+                        const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                            .map(b => b.toString(16).padStart(2, '0')).join('');
+                        
+                        // Get CSRF token
+                        const csrfResponse = await fetch('/api/generate-csrf-token', {
+                            credentials: 'include'
+                        });
+                        const csrfData = await csrfResponse.json();
+                        const csrfToken = csrfData.csrf_token;
+                        
+                        // Create a presentation
+                        try {
+                            console.log('Creating presentation from wallet credential');
+                            const presResponse = await fetch('/api/presentation', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-Token': csrfToken
+                                },
+                                credentials: 'include',
+                                body: JSON.stringify({
+                                    credential: credential,
+                                    challenge: challenge,
+                                    csrf_token: csrfToken
+                                })
+                            });
+                            
+                            if (!presResponse.ok) {
+                                const errorText = await presResponse.text();
+                                console.error('Error creating presentation:', presResponse.status, errorText);
+                                alert('Error creating presentation from wallet credential. Redirecting to verification page...');
+                                window.location.href = '/verify';
+                                return;
+                            }
+                            
+                            const presentation = await presResponse.json();
+                            
+                            // Verify the presentation
+                            console.log('Verifying presentation with backend');
+                            const verifyResponse = await fetch('/api/verify-human', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-Token': csrfToken
+                                },
+                                credentials: 'include',
+                                body: JSON.stringify({
+                                    presentation: presentation,
+                                    challenge: challenge,
+                                    csrf_token: csrfToken
+                                })
+                            });
+                            
+                            if (!verifyResponse.ok) {
+                                const errorText = await verifyResponse.text();
+                                console.error('Error verifying presentation:', verifyResponse.status, errorText);
+                                alert('Error verifying wallet credential. Redirecting to verification page...');
+                                window.location.href = '/verify';
+                                return;
+                            }
+                            
+                            const verifyResult = await verifyResponse.json();
+                            
+                            if (!verifyResult.success) {
+                                console.error('Verification failed:', verifyResult.error);
+                                alert('Verification failed. Redirecting to verification page...');
+                                window.location.href = '/verify';
+                                return;
+                            }
+                            
+                            console.log('Wallet credential verified successfully');
+                            // No need to redirect, we're already on the protected page
+                            // The session should now be set correctly
+                            
+                        } catch (error) {
+                            console.error('Error verifying wallet credential:', error);
+                            alert('Error verifying wallet credential. Redirecting to verification page...');
                             window.location.href = '/verify';
                         }
                     } catch (error) {
@@ -407,8 +499,11 @@
                 } else {
                     // Fallback to localStorage check for backward compatibility
                     const legacyCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+                    console.log('Checking localStorage for legacy credentials:', legacyCredentials.length);
+                    
                     if (legacyCredentials.length === 0) {
                         // No credential found, redirect to verification page
+                        console.error('No legacy credentials found in localStorage');
                         alert('No Lemma credential found. Redirecting to verification page...');
                         window.location.href = '/verify';
                     }

@@ -525,28 +525,86 @@
                 document.querySelector('.cta-buttons').insertAdjacentElement('afterend', errorMessage);
             }
             
-            // Check if any credentials exist in local storage
-            const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+            // First check wallet for credentials (preferred method)
+            let hasCredential = false;
+            let credential = null;
+            let userId = null;
             
-            if (credentials.length === 0) {
-                // No credential found, show error message
-                errorMessage.textContent = 'Access denied. Please verify Lemma.';
-                errorMessage.style.display = 'block';
-                // Auto-hide the message after 5 seconds
-                setTimeout(() => {
-                    errorMessage.style.display = 'none';
-                }, 5000);
-                return;
+            // Wait for wallet to initialize
+            const waitForWallet = async (timeout = 2000) => {
+                return new Promise((resolve) => {
+                    if (window.lemmaWallet) {
+                        resolve(window.lemmaWallet);
+                        return;
+                    }
+                    
+                    const startTime = Date.now();
+                    const checkInterval = setInterval(() => {
+                        if (window.lemmaWallet) {
+                            clearInterval(checkInterval);
+                            resolve(window.lemmaWallet);
+                        } else if (Date.now() - startTime > timeout) {
+                            // Timeout
+                            clearInterval(checkInterval);
+                            resolve(null);
+                        }
+                    }, 100);
+                });
+            };
+            
+            // Try to get credential from wallet
+            const wallet = await waitForWallet();
+            if (wallet) {
+                try {
+                    const walletCredentials = await wallet.getAllCredentials();
+                    console.log('Wallet credentials found:', walletCredentials.length);
+                    
+                    if (walletCredentials && walletCredentials.length > 0) {
+                        // Get the first credential from wallet
+                        hasCredential = true;
+                        credential = walletCredentials[0].credential;
+                        userId = walletCredentials[0].wallet_metadata.holder_id;
+                        console.log('Found credential in wallet:', credential.id);
+                        console.log('Wallet credential format:', JSON.stringify({
+                            type: credential.type,
+                            id: credential.id,
+                            issuer: credential.issuer,
+                            subject: credential.credentialSubject?.id
+                        }));
+                    }
+                } catch (walletError) {
+                    console.error('Error checking wallet for credentials:', walletError);
+                    // Fall back to localStorage check
+                }
+            }
+            
+            // If no credential in wallet, check localStorage as fallback
+            if (!hasCredential) {
+                const storageCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+                
+                if (storageCredentials.length === 0) {
+                    // No credential found anywhere, show error message
+                    errorMessage.textContent = 'Access denied. Please verify Lemma.';
+                    errorMessage.style.display = 'block';
+                    // Auto-hide the message after 5 seconds
+                    setTimeout(() => {
+                        errorMessage.style.display = 'none';
+                    }, 5000);
+                    return;
+                } else {
+                    // Get the first credential from localStorage
+                    const credentialKey = storageCredentials[0];
+                    const credentialJson = localStorage.getItem(credentialKey);
+                    credential = JSON.parse(credentialJson);
+                    userId = credentialKey.replace('lemma_credential_', '');
+                    hasCredential = true;
+                    console.log('Found credential in localStorage:', credentialKey);
+                }
             }
             
             try {
                 // Hide error message if showing
                 errorMessage.style.display = 'none';
-                
-                // Get the first credential (user might have multiple)
-                const credentialKey = credentials[0];
-                const credentialJson = localStorage.getItem(credentialKey);
-                const credential = JSON.parse(credentialJson);
                 
                 // Generate a random challenge for presentation
                 const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
@@ -559,6 +617,15 @@
                 });
                 const csrfData = await csrfResponse.json();
                 const csrfToken = csrfData.csrf_token;
+                
+                // Try direct access first if using wallet credential
+                if (wallet && hasCredential) {
+                    console.log('Attempting direct protected content access with wallet credential');
+                    
+                    // Redirect to protected page
+                    window.location.href = '/protected';
+                    return;
+                }
                 
                 // Create a presentation
                 const presResponse = await fetch('/api/presentation', {
@@ -575,8 +642,16 @@
                     })
                 });
                 
+                // Log presentation request and response for debugging
+                console.log('Presentation request payload:', {
+                    credential_id: credential.id,
+                    challenge: challenge.substring(0, 8) + '...'
+                });
+                
                 if (!presResponse.ok) {
-                    throw new Error(`Failed to create presentation: ${presResponse.status}`);
+                    const errorText = await presResponse.text();
+                    console.error('Presentation creation failed:', presResponse.status, errorText);
+                    throw new Error(`Failed to create presentation: ${presResponse.status} - ${errorText}`);
                 }
                 
                 const presentation = await presResponse.json();
