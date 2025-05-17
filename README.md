@@ -46,6 +46,7 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 - **Enhanced Home Page Flow**: The "Verify Lemma" button now automatically issues, stores, and verifies credentials locally without redirects.
 - **Improved User Feedback**: The "Access Protected Content" button now displays a clear error message on the same page when no lemma is found instead of redirecting.
 - **Protected Content Enhancements**: Users can now view their Lemma credential details directly on the protected page.
+- **Architecture Plan Access**: Added an interactive, paginated view of the Lemma Architecture Plan for verified humans on the protected page.
 - **Credential Management**: Added ability to clear Lemma credentials directly from the protected page.
 - **Better Error Handling**: Improved error messages and feedback throughout the verification flow.
 - **Fixed CSRF Issues**: Resolved CSRF token handling for more reliable deployment, especially on Heroku.
@@ -87,6 +88,8 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 ### Frontend Components
 - **`static/js/lemma-wallet.js`:** Client-side wallet for storing and managing Lemma credentials.
 - **`static/js/lemma-wallet-init.js`:** Automatic wallet initialization for Lemma-integrated pages.
+- **`static/js/lemma-plan.js`:** Interactive, paginated display of the Lemma Architecture Plan for verified users.
+- **`static/js/lemma-plan.css`:** Styling for the Lemma Architecture Plan display.
 
 ### Templates
 - **`templates/index.html`:** Landing page with "Verify Lemma" and "Access Protected Content" buttons.
@@ -179,7 +182,8 @@ Lemma now includes a fully decentralized identity system that addresses 8 key go
 1. **View Credential:** Users can view their Lemma credential details directly on the protected page.
 2. **Credential Management:** Users can clear their stored credential using the "Clear Lemma" button.
 3. **Import Functionality:** Users can import a previously downloaded credential.
-4. **Session-Based Access:** Access is maintained via both browser storage and server session.
+4. **Architecture Plan Access:** Users can view the detailed Lemma Architecture Plan with an interactive, paginated interface.
+5. **Session-Based Access:** Access is maintained via both browser storage and server session.
 
 ### Zero-Knowledge Verification Flow
 1. **Minimal Proof Creation:** User creates a zero-knowledge proof that only reveals they're human.
@@ -187,6 +191,53 @@ Lemma now includes a fully decentralized identity system that addresses 8 key go
 3. **Privacy-Preserving Verification:** System verifies the proof without seeing the full credential.
 4. **Selective Attribute Sharing:** User can choose which credential attributes to reveal.
 5. **Hardware-Backed Verification:** When available, verification leverages secure hardware.
+
+### Detailed Verification Workflows
+
+#### Stripe Identity Verification to Credential Issuance
+The Lemma system uses Stripe Identity for robust human verification before issuing credentials:
+
+1. **Initiation:** User clicks "Verify Lemma" on the home page or visits `/start-verification/{user_id}`.
+2. **Identity Verification:**
+   - Lemma creates a Stripe Identity verification session
+   - User is redirected to Stripe's hosted verification UI
+   - User completes the identity verification process (ID document + selfie)
+3. **Callback Processing:**
+   - Stripe redirects back to `/verification-callback?user_id={user_id}`
+   - Lemma checks verification status via Stripe API
+   - If verification passes, a Verifiable Credential (VC) is issued
+4. **Credential Storage:**
+   - Credential is stored in the session
+   - Credential is passed to the template for client-side storage
+   - The Lemma wallet (IndexedDB-based) automatically detects and stores the credential
+   - The wallet UI makes the credential accessible across the Lemma ecosystem
+5. **Result:** User is redirected to the protected page with their new human verification credential
+
+This secure workflow ensures only real humans receive credentials while collecting minimal personal data, as the ID verification occurs within Stripe's secure environment.
+
+#### Verifiable Presentation Creation and Verification
+For third-party sites integrating with Lemma, this workflow enables credential verification:
+
+1. **Integration Setup:**
+   - Customer site receives a unique DID (Decentralized Identifier) via the Lemma API
+   - Customer integrates the Lemma wallet JavaScript components
+2. **Presentation Request:**
+   - When a user visits the customer site, it checks for a Lemma credential
+   - Site generates a random challenge to prevent replay attacks
+   - Site requests a Verifiable Presentation from the user's wallet
+3. **Presentation Creation:**
+   - Wallet creates a Verifiable Presentation (VP) containing:
+     - The user's human verification credential
+     - Proof of possession (signature over the challenge)
+     - Minimum necessary claims (typically just `isHuman: true`)
+4. **Verification Process:**
+   - Customer site sends the VP to their backend
+   - Backend verifies the VP against Lemma's verification API
+   - API validates the cryptographic proof and credential status
+   - API returns verification result to the customer backend
+5. **Authorization:** If verification succeeds, the customer site grants access to protected content
+
+This workflow enables a "verify once, use anywhere" model where users don't need to repeatedly prove their humanity across different sites in the Lemma network.
 
 ---
 

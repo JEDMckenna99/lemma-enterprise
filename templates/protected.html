@@ -8,6 +8,10 @@
     <script src="/static/js/lemma-wallet-init.js"></script>
     <!-- Debug script -->
     <script src="/static/js/debug-wallet.js"></script>
+    <!-- Lemma Plan Script -->
+    <script src="/static/js/lemma-plan.js"></script>
+    <!-- Lemma Plan CSS -->
+    <link rel="stylesheet" href="/static/js/lemma-plan.css">
     <style>
         :root {
             --primary-color: #6B3FA0;
@@ -182,6 +186,17 @@
                     <pre id="lemmaContent" style="white-space: pre-wrap; word-break: break-all; font-size: 12px;"></pre>
                 </div>
                 <button id="closeLemmaBtn" class="button" style="margin-top: 10px; font-size: 14px; padding: 8px 12px; background-color: #6c757d;">Close</button>
+            </div>
+            
+            <!-- Lemma Architecture Plan Toggle -->
+            <div class="content-section">
+                <button id="togglePlanBtn" class="toggle-plan-button">View Lemma Architecture Plan</button>
+            </div>
+            
+            <!-- Lemma Architecture Plan (Hidden by default) -->
+            <div id="lemma-plan-section" style="display: none;">
+                <div id="lemma-plan-container" class="plan-container"></div>
+                <div id="lemma-plan-pagination" class="plan-pagination"></div>
             </div>
             
             <div class="content-section">
@@ -527,6 +542,18 @@
                     alert('Lemma credential cleared. Redirecting to home page...');
                     window.location.href = '/';
                 });
+            }
+        });
+        
+        // Plan toggle functionality
+        document.getElementById('togglePlanBtn').addEventListener('click', function() {
+            const planSection = document.getElementById('lemma-plan-section');
+            if (planSection.style.display === 'none') {
+                planSection.style.display = 'block';
+                this.textContent = 'Hide Lemma Architecture Plan';
+            } else {
+                planSection.style.display = 'none';
+                this.textContent = 'View Lemma Architecture Plan';
             }
         });
     </script>

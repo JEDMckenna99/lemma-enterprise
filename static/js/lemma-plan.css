@@ -1,0 +1,102 @@
+/* Lemma Plan CSS */
+
+.plan-container {
+    background-color: var(--white);
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-top: 20px;
+}
+
+.plan-section {
+    margin-bottom: 30px;
+}
+
+.plan-title {
+    color: var(--primary-color);
+    font-size: 24px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--accent-color);
+}
+
+.plan-section-heading {
+    color: var(--secondary-color);
+    font-size: 20px;
+    margin-top: 25px;
+    margin-bottom: 15px;
+}
+
+.plan-section-content {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text-color);
+}
+
+.plan-section-content ul, 
+.plan-section-content ol {
+    padding-left: 25px;
+    margin-bottom: 15px;
+}
+
+.plan-section-content li {
+    margin-bottom: 8px;
+}
+
+.plan-section-content p {
+    margin-bottom: 15px;
+}
+
+/* Pagination controls */
+.plan-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.pagination-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.pagination-button:hover:not(:disabled) {
+    background-color: var(--secondary-color);
+}
+
+.pagination-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.page-indicator {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+/* Toggle button for plan */
+.toggle-plan-button {
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    margin-top: 20px;
+    display: inline-block;
+}
+
+.toggle-plan-button:hover {
+    background-color: var(--accent-color);
+} 
