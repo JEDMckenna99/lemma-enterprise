@@ -10,8 +10,12 @@
     <script src="/static/js/debug-wallet.js"></script>
     <!-- Lemma Plan Script -->
     <script src="/static/js/lemma-plan.js"></script>
+    <!-- Lemma Pricing Script -->
+    <script src="/static/js/lemma-pricing.js"></script>
     <!-- Lemma Plan CSS -->
     <link rel="stylesheet" href="/static/js/lemma-plan.css">
+    <!-- Lemma Pricing CSS -->
+    <link rel="stylesheet" href="/static/js/lemma-pricing.css">
     <style>
         :root {
             --primary-color: #6B3FA0;
@@ -144,6 +148,84 @@
         footer a:hover {
             text-decoration: underline;
         }
+        
+        /* Pricing section styles */
+        .pricing-container {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: var(--light-bg);
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .pricing-graph {
+            margin: 20px 0;
+            background-color: white;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+        
+        .pricing-calculator {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+        
+        .calculator-row {
+            display: flex;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        
+        .calculator-label {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .calculator-input {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        .calculator-result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .math-formula {
+            font-family: "Times New Roman", Times, serif;
+            font-style: italic;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: inline-block;
+        }
+        
+        .toggle-plan-button, .toggle-pricing-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: var(--white);
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        .toggle-plan-button:hover, .toggle-pricing-button:hover {
+            background-color: var(--secondary-color);
+        }
     </style>
 </head>
 <body>
@@ -188,15 +270,84 @@
                 <button id="closeLemmaBtn" class="button" style="margin-top: 10px; font-size: 14px; padding: 8px 12px; background-color: #6c757d;">Close</button>
             </div>
             
-            <!-- Lemma Network Toggle -->
+            <!-- Toggle buttons for different sections -->
             <div class="content-section">
                 <button id="togglePlanBtn" class="toggle-plan-button">View Lemma Network</button>
+                <button id="togglePricingBtn" class="toggle-pricing-button" onclick="togglePricingSection()">View Pricing Model</button>
             </div>
             
             <!-- Lemma Network (Hidden by default) -->
             <div id="lemma-plan-section" style="display: none;">
                 <div id="lemma-plan-container" class="plan-container"></div>
                 <div id="lemma-plan-pagination" class="plan-pagination"></div>
+            </div>
+            
+            <!-- Pricing Model Section (Hidden by default) -->
+            <div id="pricing-section" class="content-section" style="display: none;">
+                <h2>Lemma Network Pricing Model</h2>
+                
+                <p>Lemma's innovative pricing approach is designed to create a network effect - the more organizations that join the Lemma network, the more affordable it becomes for everyone.</p>
+                
+                <h3 style="margin-top: 20px; color: var(--secondary-color);">One-Time Onboarding Fee</h3>
+                <p>A modest one-time verification fee ($1-$2 per user) covers the cost of identity verification through Stripe Identity. This fee is charged only once per unique human in the network, regardless of how many sites they access with their Lemma credential.</p>
+                
+                <h3 style="margin-top: 20px; color: var(--secondary-color);">Network-Driven Monthly Pricing</h3>
+                <p>Our revolutionary monthly per-user fee <strong>decreases automatically</strong> as more organizations join the network. This is represented by the mathematical formula:</p>
+                
+                <div class="math-formula">
+                    p(N) = p₀e⁻ᵅᴺ
+                </div>
+                
+                <p>Where:</p>
+                <ul style="margin-left: 20px; margin-bottom: 15px;">
+                    <li><strong>p₀</strong> is the base monthly per-user fee (e.g., $0.50)</li>
+                    <li><strong>α</strong> is the decay constant that controls how quickly the price drops</li>
+                    <li><strong>N</strong> is the total number of organizations using Lemma</li>
+                </ul>
+                
+                <p>As more organizations join, the price per user decreases exponentially for everyone in the network:</p>
+                
+                <div class="pricing-graph">
+                    <canvas id="pricing-curve" width="700" height="400"></canvas>
+                </div>
+                
+                <p>For example, with a base price of $0.50 per user per month:</p>
+                <ul style="margin-left: 20px; margin-bottom: 15px;">
+                    <li>With 5 organizations: ~$0.35 per user/month</li>
+                    <li>With 10 organizations: ~$0.25 per user/month</li>
+                    <li>With 20 organizations: ~$0.125 per user/month</li>
+                </ul>
+                
+                <div class="pricing-calculator">
+                    <h3 style="margin-top: 0; color: var(--secondary-color);">Pricing Calculator</h3>
+                    <p>Estimate your Lemma costs based on network size and user count:</p>
+                    
+                    <div class="calculator-row">
+                        <div class="calculator-label">Number of organizations in the network:</div>
+                        <input type="number" id="num-sites" class="calculator-input" value="5" min="1" max="100">
+                    </div>
+                    
+                    <div class="calculator-row">
+                        <div class="calculator-label">Number of monthly active users:</div>
+                        <input type="number" id="num-users" class="calculator-input" value="1000" min="1">
+                    </div>
+                    
+                    <div class="calculator-result">
+                        <div><strong>Estimated price per user:</strong> <span id="per-user-price">$0.35</span>/month</div>
+                        <div><strong>Total monthly cost:</strong> <span id="monthly-total">$350.00</span></div>
+                    </div>
+                </div>
+                
+                <h3 style="margin-top: 20px; color: var(--secondary-color);">Advantages Over Traditional Pricing</h3>
+                <p>Unlike traditional identity and security services that charge a fixed per-user rate regardless of network size, Lemma's network-effect pricing creates shared value:</p>
+                <ul style="margin-left: 20px; margin-bottom: 15px;">
+                    <li>Early adopters benefit as the network grows</li>
+                    <li>The cost of maintaining unique human verification is distributed across all participants</li>
+                    <li>As adoption increases, costs decrease while the value of the network increases</li>
+                    <li>Pricing aligns with the value received - you only pay for active users who benefit from Lemma verification</li>
+                </ul>
+                
+                <p>This pricing approach reflects Lemma's fundamental belief that maintaining a network of verified humans should become more affordable as it becomes more universal.</p>
             </div>
             
             <div class="content-section">
@@ -551,6 +702,9 @@
             if (planSection.style.display === 'none') {
                 planSection.style.display = 'block';
                 this.textContent = 'Hide Lemma Network';
+                // Hide pricing section if it's open
+                document.getElementById('pricing-section').style.display = 'none';
+                document.getElementById('togglePricingBtn').textContent = 'View Pricing Model';
             } else {
                 planSection.style.display = 'none';
                 this.textContent = 'View Lemma Network';

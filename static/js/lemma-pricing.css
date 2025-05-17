@@ -1,0 +1,154 @@
+/* Lemma Pricing Model CSS */
+
+.pricing-section {
+    background-color: var(--white);
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-top: 20px;
+}
+
+.pricing-title {
+    color: var(--primary-color);
+    font-size: 24px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--accent-color);
+}
+
+.pricing-section-heading {
+    color: var(--secondary-color);
+    font-size: 20px;
+    margin-top: 25px;
+    margin-bottom: 15px;
+}
+
+.pricing-section-content {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text-color);
+}
+
+.pricing-graph {
+    margin: 25px 0;
+    background-color: white;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.pricing-calculator {
+    margin: 25px 0;
+    padding: 20px;
+    background-color: white;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.calculator-row {
+    display: flex;
+    margin-bottom: 12px;
+    align-items: center;
+}
+
+.calculator-label {
+    flex: 1;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.calculator-input {
+    width: 120px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.calculator-input:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(107, 63, 160, 0.2);
+}
+
+.calculator-result {
+    margin-top: 25px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 6px;
+    border-left: 4px solid var(--primary-color);
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.calculator-result div {
+    margin-bottom: 8px;
+}
+
+.math-formula {
+    font-family: "Times New Roman", Times, serif;
+    font-style: italic;
+    padding: 12px 20px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    margin: 15px 0;
+    display: inline-block;
+    font-size: 20px;
+    color: var(--secondary-color);
+}
+
+.pricing-note {
+    font-style: italic;
+    color: #666;
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f8f8;
+    border-radius: 4px;
+    border-left: 3px solid #ccc;
+}
+
+.toggle-pricing-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: var(--primary-color);
+    color: var(--white);
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-right: 10px;
+    transition: background-color 0.2s;
+}
+
+.toggle-pricing-button:hover {
+    background-color: var(--secondary-color);
+}
+
+.price-highlight {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.advantage-list {
+    margin-left: 20px;
+    margin-bottom: 20px;
+}
+
+.advantage-list li {
+    margin-bottom: 10px;
+    position: relative;
+    padding-left: 5px;
+}
+
+.advantage-list li:before {
+    content: "•";
+    color: var(--primary-color);
+    font-weight: bold;
+    display: inline-block;
+    width: 1em;
+    margin-left: -1em;
+} 
