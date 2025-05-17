@@ -388,6 +388,34 @@ def protected():
         verification_expiry=session.get('verification_expiry')
     )
 
+@main_bp.route('/math-appendix')
+def math_appendix():
+    """Render the mathematical appendix page with formal notation and technical details."""
+    # Check if user has valid verification in session (same security as protected page)
+    user_id = session.get('verified_user_id')
+    credential_data = session.get('verified_credential')
+    is_verified_human = session.get('verified_human', False)
+    
+    # Strict verification check - require both user_id and credentials
+    if not user_id or not credential_data or not is_verified_human:
+        # Log the unauthorized access attempt
+        current_app.logger.warning(f"Unauthorized math appendix access attempt. Session data: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}")
+        
+        # Redirect to verification page with a clear message
+        flash("Please verify your Lemma to access this page", "warning")
+        return redirect(url_for('main.verify'))
+    
+    # Ensure proper serialization for template
+    session_credential = json.dumps(credential_data) if credential_data and isinstance(credential_data, dict) else None
+    
+    return render_template(
+        'math_appendix.html',
+        user_id=user_id,
+        session_credential=session_credential,
+        verification_time=session.get('verification_time'),
+        verification_expiry=session.get('verification_expiry')
+    )
+
 @main_bp.route('/api/credential-lookup/<user_id>')
 def get_credential(user_id):
     """API endpoint to get a user's credential."""
