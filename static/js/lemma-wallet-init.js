@@ -172,9 +172,19 @@ document.addEventListener('DOMContentLoaded', function() {
               holder_id: userId,
               status: "active",
               display_name: "Lemma Human Verification",
-              fingerprint: credential.id
+              fingerprint: credential.id,
+              // Add key format information
+              key_type: credential.proof?.type || "Ed25519Signature2020",
+              key_format: "raw"
             }
           };
+          
+          // Ensure the proof is properly formatted for Ed25519
+          if (credential.proof && credential.proof.jws) {
+            // Ensure the JWS is properly padded for base64
+            const jws = credential.proof.jws;
+            credential.proof.jws = jws.padEnd(Math.ceil(jws.length / 4) * 4, '=');
+          }
           
           // Check if credential already exists
           wallet.getAllCredentials()
