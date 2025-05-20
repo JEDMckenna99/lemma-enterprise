@@ -656,3 +656,31 @@ def api_logout():
             "success": False,
             "error": "Error during logout process"
         }), 500
+
+@main_bp.route('/api-docs')
+def api_docs():
+    """Render the API documentation page that requires human verification."""
+    # Check if user has valid verification in session
+    user_id = session.get('verified_user_id')
+    credential_data = session.get('verified_credential')
+    is_verified_human = session.get('verified_human', False)
+    
+    # Strict verification check - require both user_id and credentials
+    if not user_id or not credential_data or not is_verified_human:
+        # Log the unauthorized access attempt
+        current_app.logger.warning(f"Unauthorized API docs access attempt. Session data: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}")
+        
+        # Redirect to verification page with a clear message
+        flash("Please verify your Lemma to access the API documentation", "warning")
+        return redirect(url_for('main.verify'))
+    
+    # Ensure proper serialization for template
+    session_credential = json.dumps(credential_data) if credential_data and isinstance(credential_data, dict) else None
+    
+    return render_template(
+        'api_docs.html',
+        user_id=user_id,
+        session_credential=session_credential,
+        verification_time=session.get('verification_time'),
+        verification_expiry=session.get('verification_expiry')
+    )
