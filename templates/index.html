@@ -552,149 +552,111 @@
                 });
             };
             
-            // Try to get credential from wallet
-            const wallet = await waitForWallet();
-            if (wallet) {
-                try {
-                    const walletCredentials = await wallet.getAllCredentials();
-                    console.log('Wallet credentials found:', walletCredentials.length);
-                    
-                    if (walletCredentials && walletCredentials.length > 0) {
-                        // Get the first credential from wallet
-                        hasCredential = true;
-                        credential = walletCredentials[0].credential;
-                        userId = walletCredentials[0].wallet_metadata.holder_id;
-                        console.log('Found credential in wallet:', credential.id);
-                        console.log('Wallet credential format:', JSON.stringify({
-                            type: credential.type,
-                            id: credential.id,
-                            issuer: credential.issuer,
-                            subject: credential.credentialSubject?.id
-                        }));
-                    }
-                } catch (walletError) {
-                    console.error('Error checking wallet for credentials:', walletError);
-                    // Fall back to localStorage check
-                }
-            }
-            
-            // If no credential in wallet, check localStorage as fallback
-            if (!hasCredential) {
-                const storageCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
-                
-                if (storageCredentials.length === 0) {
-                    // No credential found anywhere, show error message
-                    errorMessage.textContent = 'Access denied. Please verify Lemma.';
-                    errorMessage.style.display = 'block';
-                    // Auto-hide the message after 5 seconds
-                    setTimeout(() => {
-                        errorMessage.style.display = 'none';
-                    }, 5000);
-                    return;
-                } else {
-                    // Get the first credential from localStorage
-                    const credentialKey = storageCredentials[0];
-                    const credentialJson = localStorage.getItem(credentialKey);
-                    credential = JSON.parse(credentialJson);
-                    userId = credentialKey.replace('lemma_credential_', '');
-                    hasCredential = true;
-                    console.log('Found credential in localStorage:', credentialKey);
-                }
-            }
-            
             try {
-                // Hide error message if showing
-                errorMessage.style.display = 'none';
-                
-                // Generate a random challenge for presentation
-                const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-                    .map(b => b.toString(16).padStart(2, '0')).join('');
-                localStorage.setItem('lemma_challenge', challenge);
-                
-                // Get CSRF token
+                // Get CSRF token first
                 const csrfResponse = await fetch('/api/generate-csrf-token', {
-                    credentials: 'include' // Ensure cookies are sent with the request
+                    credentials: 'include'
                 });
                 const csrfData = await csrfResponse.json();
                 const csrfToken = csrfData.csrf_token;
+
+                // Try to get credential from wallet
+                const wallet = await waitForWallet();
+                if (wallet) {
+                    try {
+                        const walletCredentials = await wallet.getAllCredentials();
+                        console.log('Wallet credentials found:', walletCredentials.length);
+                        
+                        if (walletCredentials && walletCredentials.length > 0) {
+                            hasCredential = true;
+                            credential = walletCredentials[0].credential;
+                            userId = walletCredentials[0].wallet_metadata.holder_id;
+                        }
+                    } catch (walletError) {
+                        console.error('Error checking wallet for credentials:', walletError);
+                        // Fall back to localStorage check
+                    }
+                }
                 
-                // Try direct access first if using wallet credential
-                if (wallet && hasCredential) {
-                    console.log('Attempting direct protected content access with wallet credential');
+                // If no credential in wallet, check localStorage as fallback
+                if (!hasCredential) {
+                    const storageCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
                     
-                    // Redirect to protected page
-                    window.location.href = '/protected';
-                    return;
+                    if (storageCredentials.length > 0) {
+                        const credentialKey = storageCredentials[0];
+                        const credentialJson = localStorage.getItem(credentialKey);
+                        credential = JSON.parse(credentialJson);
+                        userId = credentialKey.replace('lemma_credential_', '');
+                        hasCredential = true;
+                    }
                 }
                 
-                // Create a presentation
-                const presResponse = await fetch('/api/presentation', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': csrfToken
-                    },
-                    credentials: 'include', // Ensure cookies are sent with the request
-                    body: JSON.stringify({
-                        credential: credential,
-                        challenge: challenge,
-                        csrf_token: csrfToken
-                    })
-                });
-                
-                // Log presentation request and response for debugging
-                console.log('Presentation request payload:', {
-                    credential_id: credential.id,
-                    challenge: challenge.substring(0, 8) + '...'
-                });
-                
-                if (!presResponse.ok) {
-                    const errorText = await presResponse.text();
-                    console.error('Presentation creation failed:', presResponse.status, errorText);
-                    throw new Error(`Failed to create presentation: ${presResponse.status} - ${errorText}`);
-                }
-                
-                const presentation = await presResponse.json();
-                
-                // Store the presentation for future use
-                localStorage.setItem(`lemma_presentation_${credential.credentialSubject.id.split(':').pop()}`, JSON.stringify(presentation));
-                
-                // Verify the presentation to authenticate the user
-                const verifyResponse = await fetch('/api/verify-human', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': csrfToken
-                    },
-                    credentials: 'include', // Ensure cookies are sent with the request
-                    body: JSON.stringify({
-                        presentation: presentation,
-                        challenge: challenge,
-                        csrf_token: csrfToken
-                    })
-                });
-                
-                if (!verifyResponse.ok) {
-                    const errorData = await verifyResponse.json();
-                    throw new Error(`Verification failed: ${verifyResponse.status} - ${JSON.stringify(errorData)}`);
-                }
-                
-                const verifyResult = await verifyResponse.json();
-                
-                // If verification successful, redirect to protected content
-                if (verifyResult.success) {
-                    window.location.href = verifyResult.redirect || '/protected';
+                if (hasCredential && credential) {
+                    // Generate a challenge for verification
+                    const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                        .map(b => b.toString(16).padStart(2, '0')).join('');
+                    
+                    // Create a presentation with the credential
+                    const presentationResponse = await fetch('/api/presentation', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            credential: credential,
+                            challenge: challenge,
+                            csrf_token: csrfToken
+                        })
+                    });
+
+                    if (!presentationResponse.ok) {
+                        throw new Error('Failed to create presentation');
+                    }
+
+                    const presentation = await presentationResponse.json();
+
+                    // Verify the presentation
+                    const verifyResponse = await fetch('/api/verify-human', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            presentation: presentation,
+                            challenge: challenge,
+                            csrf_token: csrfToken
+                        })
+                    });
+
+                    if (!verifyResponse.ok) {
+                        const errorData = await verifyResponse.json();
+                        throw new Error(errorData.error || 'Verification failed');
+                    }
+
+                    const verifyResult = await verifyResponse.json();
+
+                    if (verifyResult.success) {
+                        // Verification successful, redirect to protected page
+                        window.location.href = verifyResult.redirect || '/protected';
+                    } else {
+                        throw new Error(verifyResult.error || 'Invalid credential');
+                    }
                 } else {
-                    throw new Error('Verification failed: ' + (verifyResult.error || 'Unknown error'));
+                    // No credential found anywhere, show error message
+                    errorMessage.textContent = 'Access denied. Please verify Lemma first.';
+                    errorMessage.style.display = 'block';
+                    setTimeout(() => {
+                        errorMessage.style.display = 'none';
+                    }, 5000);
                 }
-                
             } catch (error) {
-                console.error('Error accessing protected content:', error);
-                // Display error message instead of redirecting
-                const errorMessage = document.getElementById('accessErrorMessage');
-                errorMessage.textContent = `Error: ${error.message || 'Unknown error'}. Please try verifying again.`;
+                console.error('Error verifying credential:', error);
+                errorMessage.textContent = `Error: ${error.message || 'Failed to verify credential'}. Please try verifying again.`;
                 errorMessage.style.display = 'block';
-                // Auto-hide the message after 5 seconds
                 setTimeout(() => {
                     errorMessage.style.display = 'none';
                 }, 5000);
