@@ -565,3 +565,20 @@ pytest -v --cov=lemma
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for details. 
+
+### Security Features
+
+- **HTTPS Enforcement:** All OIDC4VP implementations enforce HTTPS in production environments:
+  - Strict HTTPS redirection for all requests
+  - HTTP Strict Transport Security (HSTS) headers
+  - Secure cookie settings with SameSite=Strict
+  - SSL/TLS required for all credential operations
+- **Enhanced Security Headers:**
+  - X-Content-Type-Options: nosniff
+  - X-Frame-Options: SAMEORIGIN
+  - X-XSS-Protection: 1; mode=block
+  - Strict-Transport-Security with includeSubDomains
+- **Session Security:**
+  - 30-minute session lifetime
+  - Secure and HttpOnly cookie flags
+  - CSRF protection with SSL enforcement

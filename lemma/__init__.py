@@ -8,7 +8,7 @@ import os
 import sys
 import secrets
 import logging
-from flask import Flask, request, session, g
+from flask import Flask, request, session, g, redirect
 from werkzeug.middleware.proxy_fix import ProxyFix
 from logging.handlers import RotatingFileHandler
 import socket
@@ -108,12 +108,21 @@ def create_app(test_config=None):
         # Stripe Identity verification
         STRIPE_API_KEY=os.environ.get('STRIPE_API_KEY'),
         STRIPE_PUBLISHABLE_KEY=os.environ.get('STRIPE_PUBLISHABLE_KEY'),
-        # Enhanced security settings
+        # Enhanced security settings for OIDC4VP compliance
         SESSION_COOKIE_SECURE=True,
         SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE='Lax',  # Set to 'Lax' for better UX across site navigation
+        SESSION_COOKIE_SAMESITE='Strict',  # Changed from 'Lax' to 'Strict' for OIDC4VP
+        PERMANENT_SESSION_LIFETIME=1800,  # 30 minutes
         # CSRF Configuration
         WTF_CSRF_ENABLED=True,
+        WTF_CSRF_SSL_STRICT=True,  # Enforce HTTPS for CSRF tokens
+        # Security headers
+        SECURE_HEADERS={
+            'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'SAMEORIGIN',
+            'X-XSS-Protection': '1; mode=block',
+        }
     )
     
     # Override with test config if provided
@@ -173,6 +182,28 @@ def create_app(test_config=None):
     def add_request_id():
         g.request_id = request.headers.get('X-Request-ID', secrets.token_hex(8))
     
+    # Force HTTPS in production for OIDC4VP compliance
+    @app.before_request
+    def force_https():
+        if not app.debug and not app.testing:
+            if request.headers.get('X-Forwarded-Proto', 'http') != 'https':
+                url = request.url.replace('http://', 'https://', 1)
+                return redirect(url, code=301)
+
+    # Enable HSTS in production
+    @app.after_request
+    def add_security_headers(response):
+        if not app.debug and not app.testing:
+            # Enable HTTP Strict Transport Security (HSTS)
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+            # Prevent MIME type sniffing
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+            # Enable XSS protection
+            response.headers['X-XSS-Protection'] = '1; mode=block'
+            # Prevent clickjacking
+            response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        return response
+
     return app
 
 def _init_components(app):
