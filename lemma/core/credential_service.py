@@ -503,12 +503,24 @@ class LemmaCredentialService:
             # Verify the presentation signature
             presentation_json = json.dumps(presentation_copy, sort_keys=True)
             
-            # Get public key
-            public_key_bytes = base64.b64decode(self.keys["public_key"])
+            # Get public key with proper base64 padding
+            public_key_str = self.keys["public_key"]
+            if len(public_key_str) % 4:
+                public_key_str += '=' * (4 - len(public_key_str) % 4)
+            public_key_bytes = base64.b64decode(public_key_str)
+            
+            # Ensure the key is exactly 32 bytes
+            if len(public_key_bytes) != 32:
+                return {"valid": False, "reason": "Invalid public key length"}
+            
             public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
             
-            # Verify signature
-            signature = base64.b64decode(proof["jws"])
+            # Verify signature with proper base64 padding
+            jws = proof["jws"]
+            if len(jws) % 4:
+                jws += '=' * (4 - len(jws) % 4)
+            signature = base64.b64decode(jws)
+            
             try:
                 public_key.verify(signature, presentation_json.encode('utf-8'))
                 return {
