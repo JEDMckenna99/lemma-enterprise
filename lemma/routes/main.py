@@ -87,8 +87,6 @@ def verify():
     challenge = secrets.token_hex(16)
     session['verification_challenge'] = challenge
     
-    verification_url = url_for('main.verify', user_id=user_id, _external=True)
-    
     # Check if this is a Stripe Identity verification callback
     stripe_session = request.args.get('session_id')
     verification_status = None
@@ -127,7 +125,29 @@ def verify():
                 samesite='Lax'
             )
             
+            # Store credential in localStorage for immediate access
+            response.set_cookie(
+                f'lemma_credential_{user_id}',
+                json.dumps({
+                    'credential': credential,
+                    'wallet_metadata': {
+                        'added_at': credential.get('issuanceDate', ''),
+                        'holder_id': user_id,
+                        'status': 'active',
+                        'display_name': 'Lemma Human Verification',
+                        'fingerprint': credential.get('id', '')
+                    }
+                }),
+                max_age=31536000,  # 1 year
+                secure=secure,
+                httponly=False,  # JavaScript needs access
+                samesite='Lax'
+            )
+            
             return response
+    
+    # Check for wallet cookie - if present, we should try to use wallet credentials
+    has_wallet = request.cookies.get('lemma_wallet_enabled') == 'true'
     
     try:
         current_app.logger.info(f"Rendering verify.html template. Template path: {current_app.template_folder}")
@@ -136,10 +156,10 @@ def verify():
             user_id=user_id, 
             has_credential=credential is not None,
             credential=credential,
-            verification_url=verification_url,
             challenge=challenge,
             is_verified=is_verified,
-            stripe_verification=verification_status
+            stripe_verification=verification_status,
+            has_wallet=has_wallet
         )
     except Exception as e:
         current_app.logger.error(f"Error rendering verify.html: {str(e)}")
