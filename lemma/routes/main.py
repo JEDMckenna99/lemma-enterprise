@@ -240,6 +240,18 @@ def verification_callback():
             credential = credential_service.issue_credential(user_id)
             current_app.logger.info(f"Issued credential for verified user {user_id}")
         
+        # Format credential for wallet storage
+        wallet_credential = {
+            'credential': credential,
+            'wallet_metadata': {
+                'added_at': credential.get('issuanceDate', ''),
+                'holder_id': user_id,
+                'status': 'active',
+                'display_name': 'Lemma Human Verification',
+                'fingerprint': credential.get('id', '')
+            }
+        }
+        
         # Set session variables for protected content access
         session['verified_human'] = True
         session['verified_user_id'] = user_id
@@ -264,6 +276,16 @@ def verification_callback():
             'true', 
             max_age=31536000,  # 1 year
             secure=secure, 
+            httponly=False,  # JavaScript needs access
+            samesite='Lax'
+        )
+        
+        # Store credential in localStorage for immediate access
+        response.set_cookie(
+            f'lemma_credential_{user_id}',
+            json.dumps(wallet_credential),
+            max_age=31536000,  # 1 year
+            secure=secure,
             httponly=False,  # JavaScript needs access
             samesite='Lax'
         )

@@ -64,15 +64,48 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     };
     
-    // Add any available credentials to the wallet
+    // Add credentials to wallet after initialization
     const addCredentialsToWallet = function(wallet) {
       console.log("Checking for credentials to add to wallet");
       
-      // Check localStorage for credentials (legacy support - migrate them to wallet)
+      // First check for credentials in cookies (new method)
+      const cookies = document.cookie.split(';');
+      const credentialCookies = cookies.filter(cookie => cookie.trim().startsWith('lemma_credential_'));
+      
+      if (credentialCookies.length > 0) {
+        console.log(`Found ${credentialCookies.length} credentials in cookies`);
+        
+        credentialCookies.forEach(function(cookie) {
+          try {
+            const [key, value] = cookie.trim().split('=');
+            const walletCredential = JSON.parse(decodeURIComponent(value));
+            
+            if (!walletCredential || !walletCredential.credential || !walletCredential.credential.id) {
+              console.warn(`Invalid credential format in cookie ${key}`);
+              return;
+            }
+            
+            // Store in wallet
+            wallet.storeCredential(walletCredential)
+              .then(() => {
+                console.log('Stored credential from cookie:', walletCredential.credential.id);
+                // Remove cookie after successful storage
+                document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+              })
+              .catch(error => {
+                console.error(`Failed to store credential from cookie:`, error);
+              });
+          } catch (error) {
+            console.error(`Failed to process credential cookie:`, error);
+          }
+        });
+      }
+      
+      // Check localStorage for credentials (legacy support)
       const storageCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
       
       if (storageCredentials.length > 0) {
-        console.log(`Found ${storageCredentials.length} credentials in localStorage, migrating to wallet`);
+        console.log(`Found ${storageCredentials.length} credentials in localStorage`);
         
         storageCredentials.forEach(function(key) {
           try {
@@ -97,143 +130,77 @@ document.addEventListener('DOMContentLoaded', function() {
               }
             };
             
-            // Debug log the wallet credential structure
-            console.log('Wallet credential structure:', JSON.stringify(walletCredential));
-            
             // Store in wallet
             wallet.storeCredential(walletCredential)
               .then(() => {
                 console.log('Migrated credential to wallet:', credential.id);
-                // Remove from localStorage after successful migration to wallet
+                // Remove from localStorage after successful migration
                 localStorage.removeItem(key);
-                // Refresh UI if available
-                if (window.lemmaWalletUI) {
-                  window.lemmaWalletUI.refreshCredentialList();
-                }
               })
               .catch(error => {
                 console.error(`Failed to migrate credential ${credential.id}:`, error);
               });
           } catch (error) {
-            console.error(`Failed to process credential from key ${key}:`, error);
+            console.error(`Failed to process credential from localStorage:`, error);
           }
         });
       }
       
-      // Check if there's a credential in a hidden field (from server-side)
+      // Check if there's a credential in a hidden field
       const sessionCredential = document.getElementById('sessionCredential');
-      if (sessionCredential && sessionCredential.value) {
+      const sessionUserId = document.getElementById('sessionUserId');
+      
+      if (sessionCredential && sessionCredential.value && sessionUserId && sessionUserId.value) {
         try {
-          console.log("Found credential in session field, adding to wallet");
-          // Debug the value to see what's being received
+          console.log("Found credential in session field");
           const credentialValue = sessionCredential.value.trim();
-          console.log("Raw credential value:", credentialValue);
+          const userId = sessionUserId.value;
           
-          // Handle possible HTML entity encoding or extra quotes
-          let jsonToProcess = credentialValue;
-          
-          // Try to parse the JSON
-          let credential;
-          try {
-            // The server should have already serialized this properly, so this should work
-            credential = JSON.parse(jsonToProcess);
-            console.log("Successfully parsed credential JSON directly");
-          } catch (jsonError) {
-            console.error("Initial JSON parse error:", jsonError);
-            
-            // Check if the value might have extra quotes or double encoding
-            if (jsonToProcess.startsWith('"') && jsonToProcess.endsWith('"')) {
-              try {
-                // Try to parse the inner string (handle potential double encoding)
-                const innerJson = jsonToProcess.slice(1, -1).replace(/\\"/g, '"');
-                console.log("Attempting to parse inner JSON:", innerJson);
-                credential = JSON.parse(innerJson);
-                console.log("Successfully parsed inner JSON");
-              } catch (innerError) {
-                console.error("Inner JSON parse error:", innerError);
-                
-                // Last attempt - try with HTML entity decoding
-                try {
-                  const decodedJson = decodeURIComponent(jsonToProcess).replace(/&quot;/g, '"');
-                  console.log("Attempting to parse decoded JSON:", decodedJson);
-                  credential = JSON.parse(decodedJson);
-                  console.log("Successfully parsed decoded JSON");
-                } catch (decodeError) {
-                  console.error("Decode JSON parse error:", decodeError);
-                  throw new Error("Unable to parse credential JSON");
-                }
-              }
-            } else {
-              throw jsonError;
-            }
-          }
+          // Parse the credential
+          let credential = JSON.parse(credentialValue);
           
           if (!credential || !credential.id) {
             console.warn("Invalid credential format in session field");
             return;
           }
           
-          // Get user ID from credential subject or from session field
-          let userId = 'unknown';
-          if (credential.credentialSubject && credential.credentialSubject.id) {
-            userId = credential.credentialSubject.id.replace('did:user:', '');
-          } else {
-            const sessionUserId = document.getElementById('sessionUserId');
-            if (sessionUserId && sessionUserId.value) {
-              userId = sessionUserId.value;
+          // Create wallet credential
+          const walletCredential = {
+            credential: credential,
+            wallet_metadata: {
+              added_at: credential.issuanceDate || new Date().toISOString(),
+              holder_id: userId,
+              status: "active",
+              display_name: "Lemma Human Verification",
+              fingerprint: credential.id
             }
-          }
+          };
           
-          // First check if this credential already exists in the wallet
+          // Check if credential already exists
           wallet.getAllCredentials()
             .then(existingCredentials => {
-              // Check if credential with same ID or holder already exists
               const exists = existingCredentials.some(cred => 
                 cred.credential.id === credential.id || 
                 (cred.wallet_metadata && cred.wallet_metadata.holder_id === userId)
               );
               
-              if (exists) {
-                console.log('Credential already exists in wallet, skipping import');
-                return;
+              if (!exists) {
+                // Store in wallet
+                return wallet.storeCredential(walletCredential);
+              } else {
+                console.log('Credential already exists in wallet');
               }
-              
-              // Format for wallet storage
-              const walletCredential = {
-                credential: credential,
-                wallet_metadata: {
-                  added_at: new Date().toISOString(),
-                  holder_id: userId,
-                  status: "active",
-                  display_name: "Lemma Human Verification",
-                  fingerprint: credential.id
-                }
-              };
-              
-              // Store in wallet with better error handling
-              return wallet.storeCredential(walletCredential)
-                .then(() => {
-                  console.log('Added credential to wallet from session:', credential.id);
-                  // Refresh UI if available
-                  if (window.lemmaWalletUI) {
-                    window.lemmaWalletUI.refreshCredentialList();
-                  }
-                })
-                .catch(error => {
-                  console.error("Failed to add credential from session:", error);
-                  // Try again after a delay (might be timing issue)
-                  setTimeout(() => {
-                    wallet.storeCredential(walletCredential)
-                      .then(() => console.log('Successfully added credential on retry'))
-                      .catch(retryError => console.error('Failed on retry:', retryError));
-                  }, 1000);
-                });
+            })
+            .then(() => {
+              if (window.lemmaWalletUI) {
+                window.lemmaWalletUI.refreshCredentialList();
+              }
             })
             .catch(error => {
-              console.error("Error checking existing credentials:", error);
+              console.error('Failed to process session credential:', error);
             });
         } catch (error) {
-          console.error("Failed to process credential from session:", error);
+          console.error('Failed to process session credential:', error);
         }
       }
     };
