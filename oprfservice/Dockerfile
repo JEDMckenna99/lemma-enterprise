@@ -16,6 +16,9 @@ RUN rm temp.go
 # Copy the rest of the source code
 COPY . .
 
+# Run go mod tidy again after copying all files
+RUN go mod tidy
+
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o oprf-service
 
