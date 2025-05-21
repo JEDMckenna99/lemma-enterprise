@@ -78,13 +78,7 @@ class LemmaWidget {
 
     async getCsrfToken() {
         try {
-            // First try to get the token from the cookie
-            const cookieToken = document.cookie.split('; ').find(row => row.startsWith('_csrf_token='));
-            if (cookieToken) {
-                return decodeURIComponent(cookieToken.split('=')[1]);
-            }
-
-            // If no cookie, fetch a new token
+            // Always fetch a fresh token
             const response = await fetch('/api/generate-csrf', {
                 method: 'GET',
                 credentials: 'include',
@@ -98,9 +92,6 @@ class LemmaWidget {
             }
             
             const data = await response.json();
-            
-            // The token will be automatically set in the cookie by the server
-            // Return the token from the response
             return data.csrf_token;
         } catch (error) {
             console.error('Error getting CSRF token:', error);

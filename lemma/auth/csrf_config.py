@@ -105,14 +105,19 @@ def get_csrf_response(token=None):
     if token is None:
         token = generate_csrf()
     
+    # Create the response
     response = make_response(jsonify({'csrf_token': token}))
+    
+    # Set the token in both session and cookie
+    session['_csrf_token'] = token
     response.set_cookie(
         '_csrf_token',
         token,
         httponly=False,  # JavaScript needs access
-        secure=not current_app.config.get('TESTING', False),  # Secure in production
-        samesite='Strict',  # Match the session cookie setting
-        path='/'  # Available across all paths
+        secure=True,     # Always use secure in production
+        samesite='Lax',  # Allow cross-origin on top-level navigation
+        path='/',        # Available across all paths
+        max_age=3600     # 1 hour expiry
     )
     
     return response

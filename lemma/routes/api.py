@@ -279,10 +279,15 @@ def get_csrf():
     """Generate a CSRF token for client-side JavaScript and set it as a cookie."""
     try:
         from lemma.auth.csrf_config import get_csrf_response
-        return get_csrf_response()
+        response = get_csrf_response()
+        current_app.logger.info("Generated new CSRF token")
+        return response
     except Exception as e:
         current_app.logger.error("Error generating CSRF token: %s", str(e))
-        return jsonify({'error': 'Error generating CSRF token', 'details': str(e)}), 500
+        return jsonify({
+            'error': 'Error generating CSRF token',
+            'details': str(e)
+        }), 500
 
 @api_bp.route('/verify-human', methods=['POST'])
 @csrf_protect()
