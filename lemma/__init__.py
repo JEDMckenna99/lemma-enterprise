@@ -15,6 +15,7 @@ import socket
 import shutil
 from flask_wtf.csrf import CSRFProtect
 from flask_cors import CORS
+from flask_session import Session
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -71,10 +72,14 @@ def create_app(test_config=None):
         STRIPE_API_KEY=os.environ.get('STRIPE_API_KEY'),
         STRIPE_PUBLISHABLE_KEY=os.environ.get('STRIPE_PUBLISHABLE_KEY'),
         # Enhanced security settings for OIDC4VP compliance
-        SESSION_COOKIE_SECURE=True,
-        SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE='Strict',  # Changed from 'Lax' to 'Strict' for OIDC4VP
+        SESSION_COOKIE_SECURE=not app.debug,  # Only send over HTTPS in production
+        SESSION_COOKIE_HTTPONLY=True,  # Prevent JavaScript access
+        SESSION_COOKIE_SAMESITE='Strict',  # Prevent CSRF
         PERMANENT_SESSION_LIFETIME=1800,  # 30 minutes
+        SESSION_TYPE='filesystem',  # Use filesystem session storage
+        SESSION_FILE_DIR=os.path.join(os.environ.get('LEMMA_STORAGE_DIR', '/tmp/lemma_enterprise' if is_heroku else '.lemma_enterprise'), 'sessions'),
+        SESSION_FILE_THRESHOLD=500,  # Maximum number of sessions stored
+        SESSION_FILE_MODE=0o600,  # Secure file permissions
         # CSRF Configuration
         WTF_CSRF_ENABLED=True,
         WTF_CSRF_SSL_STRICT=True,  # Enforce HTTPS for CSRF tokens
@@ -95,6 +100,10 @@ def create_app(test_config=None):
     if not is_heroku:
         os.makedirs(app.instance_path, exist_ok=True)
         os.makedirs(app.config['STORAGE_DIR'], exist_ok=True)
+        os.makedirs(app.config['SESSION_FILE_DIR'], exist_ok=True)
+
+    # Initialize Flask-Session
+    Session(app)
 
     # Set up logging
     if not app.debug:

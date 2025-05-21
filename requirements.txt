@@ -28,3 +28,4 @@ responses==0.23.1  # For mocking HTTP requests in tests
 requests-cache==1.0.1  # For caching HTTP responses in DID resolving
 # Added dependency for Stripe Identity verification
 stripe==5.0.0
+Flask-Session==0.5.0
