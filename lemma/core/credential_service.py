@@ -34,8 +34,13 @@ def get_credential_service():
 def init_credential_service(app):
     """Initialize the credential service."""
     global _credential_service
-    _credential_service = LemmaCredentialService(app.config['STORAGE_DIR'])
-    return _credential_service
+    try:
+        _credential_service = LemmaCredentialService(app.config['STORAGE_DIR'])
+        app.logger.info("Successfully initialized credential service")
+        return _credential_service
+    except Exception as e:
+        app.logger.error(f"Failed to initialize credential service: {e}")
+        return None
 
 class LemmaCredentialService:
     """Enhanced credential service with strong encryption and minimal data collection."""
@@ -43,26 +48,47 @@ class LemmaCredentialService:
     def __init__(self, storage_dir):
         """Initialize the credential service with secure storage."""
         self.storage_dir = storage_dir
-        os.makedirs(storage_dir, exist_ok=True)
+        self.is_heroku = 'DYNO' in os.environ
         
+        # Initialize storage
+        if not self.is_heroku:
+            os.makedirs(storage_dir, exist_ok=True)
+            
         # Initialize paths for storage files
-        self.keys_file = os.path.join(storage_dir, "keys.json")
-        self.registry_file = os.path.join(storage_dir, "registry.json")
-        self.users_file = os.path.join(storage_dir, "users.json")
+        self.keys_file = os.path.join(storage_dir, "keys.json") if not self.is_heroku else None
+        self.registry_file = os.path.join(storage_dir, "registry.json") if not self.is_heroku else None
+        self.users_file = os.path.join(storage_dir, "users.json") if not self.is_heroku else None
         
         # Generate encryption key for secure storage
         self.encryption_key = self._get_or_create_encryption_key()
         
         # Load or create necessary data
         self.keys = self._load_or_create_keys()
-        self.registry = self._load_registry()
-        self.users = self._load_users()
+        self.registry = {}  # Initialize empty for Heroku
+        self.users = {}     # Initialize empty for Heroku
         
         # Get access to the DID resolver
         self.did_resolver = get_did_resolver()
     
     def _get_or_create_encryption_key(self):
         """Get or create a key for encrypting sensitive data."""
+        if self.is_heroku:
+            # On Heroku, use the secret key as the encryption key base
+            secret_key = os.environ.get('LEMMA_SECRET_KEY', '')
+            if not secret_key:
+                raise ValueError("LEMMA_SECRET_KEY must be set in Heroku environment")
+            
+            # Derive a proper length key using PBKDF2
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=b'lemma_salt',  # Fixed salt is OK here as secret_key is random
+                iterations=100000,
+            )
+            key = base64.urlsafe_b64encode(kdf.derive(secret_key.encode()))
+            return key
+            
+        # For non-Heroku environments, use file-based storage
         key_file = os.path.join(self.storage_dir, "encryption.key")
         
         if os.path.exists(key_file):
@@ -263,11 +289,17 @@ class LemmaCredentialService:
             keys_to_save['private_key'] = self._encrypt_data(keys_to_save['private_key'])
         
         # Save with pretty formatting for readability
-        with open(self.keys_file, 'w', encoding='utf-8') as f:
-            json.dump(keys_to_save, f, indent=4)
+        if self.is_heroku:
+            # On Heroku, do not save keys to file
+            pass
+        else:
+            with open(self.keys_file, 'w', encoding='utf-8') as f:
+                json.dump(keys_to_save, f, indent=4)
     
     def _load_registry(self) -> Dict[str, Any]:
         """Load credential registry or create if it doesn't exist."""
+        if self.is_heroku:
+            return {}  # Heroku does not use local registry
         if os.path.exists(self.registry_file):
             with open(self.registry_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -275,6 +307,8 @@ class LemmaCredentialService:
     
     def _load_users(self) -> Dict[str, Any]:
         """Load user registry or create if it doesn't exist."""
+        if self.is_heroku:
+            return {}  # Heroku does not use local registry
         if os.path.exists(self.users_file):
             with open(self.users_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -282,23 +316,31 @@ class LemmaCredentialService:
     
     def _save_registry(self):
         """Save credential registry with secure file handling."""
-        # Create a temporary file first to prevent data corruption
-        temp_file = f"{self.registry_file}.tmp"
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            json.dump(self.registry, f, indent=2)
-        
-        # Atomic rename for data safety
-        os.replace(temp_file, self.registry_file)
+        if self.is_heroku:
+            # On Heroku, do not save registry to file
+            pass
+        else:
+            # Create a temporary file first to prevent data corruption
+            temp_file = f"{self.registry_file}.tmp"
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(self.registry, f, indent=2)
+            
+            # Atomic rename for data safety
+            os.replace(temp_file, self.registry_file)
     
     def _save_users(self):
         """Save user registry with secure file handling."""
-        # Create a temporary file first to prevent data corruption
-        temp_file = f"{self.users_file}.tmp"
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            json.dump(self.users, f, indent=2)
-        
-        # Atomic rename for data safety
-        os.replace(temp_file, self.users_file)
+        if self.is_heroku:
+            # On Heroku, do not save users to file
+            pass
+        else:
+            # Create a temporary file first to prevent data corruption
+            temp_file = f"{self.users_file}.tmp"
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(self.users, f, indent=2)
+            
+            # Atomic rename for data safety
+            os.replace(temp_file, self.users_file)
     
     def create_user(self, user_id: str) -> Dict[str, Any]:
         """Create a new user entry with minimal data."""

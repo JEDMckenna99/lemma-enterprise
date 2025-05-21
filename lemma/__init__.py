@@ -97,6 +97,7 @@ def create_app(test_config=None):
             ))
             handler.setLevel(logging.INFO)
             app.logger.addHandler(handler)
+            app.logger.setLevel(logging.INFO)
         else:
             # In other environments, use file logging
             log_dir = os.path.join(app.instance_path, 'logs')
@@ -111,21 +112,31 @@ def create_app(test_config=None):
             ))
             file_handler.setLevel(logging.INFO)
             app.logger.addHandler(file_handler)
+            app.logger.setLevel(logging.INFO)
         
-        app.logger.setLevel(logging.INFO)
         app.logger.info(f'Lemma startup in {cwd}. Template dir: {template_dir}')
 
-    # Initialize components
-    _init_components(app)
+    try:
+        # Initialize components
+        _init_components(app)
+        app.logger.info("Successfully initialized all components")
+    except Exception as e:
+        app.logger.error(f"Error initializing components: {e}")
+        # Continue anyway - some components may work
     
     # Register blueprints directly from their modules
-    from lemma.routes.main import main_bp
-    from lemma.routes.admin import admin_bp 
-    from lemma.routes.api import api_bp
-    
-    app.register_blueprint(main_bp)
-    app.register_blueprint(admin_bp, url_prefix='/admin')
-    app.register_blueprint(api_bp, url_prefix='/api')
+    try:
+        from lemma.routes.main import main_bp
+        from lemma.routes.admin import admin_bp 
+        from lemma.routes.api import api_bp
+        
+        app.register_blueprint(main_bp)
+        app.register_blueprint(admin_bp, url_prefix='/admin')
+        app.register_blueprint(api_bp, url_prefix='/api')
+        app.logger.info("Successfully registered all blueprints")
+    except Exception as e:
+        app.logger.error(f"Error registering blueprints: {e}")
+        raise  # This is critical - we need the routes
 
     # Clean up resources at the end of requests
     @app.teardown_appcontext
@@ -173,7 +184,8 @@ def _init_components(app):
     """Initialize all Lemma components."""
     # Initialize credential service
     from lemma.core.credential_service import init_credential_service
-    init_credential_service(app)
+    if not init_credential_service(app):
+        app.logger.warning("Failed to initialize credential service")
     
     # Initialize DID resolver
     try:
@@ -199,68 +211,8 @@ def _init_components(app):
     # Initialize revocation registry if enabled
     if app.config.get('ENABLE_P2P', False):
         try:
-            from lemma.core.revocation import init_revocation_registry, P2PRevocationNetwork
-            
-            # Initialize the registry
-            registry = init_revocation_registry(os.path.join(app.config['STORAGE_DIR'], 'revocation'))
+            from lemma.core.revocation_registry import init_revocation_registry
+            init_revocation_registry(app)
             app.logger.info('Initialized revocation registry')
-            
-            # Set up P2P network if peers are configured
-            if app.config.get('P2P_PEERS'):
-                network = P2PRevocationNetwork(registry, app.config['P2P_PEERS'])
-                app.config['P2P_NETWORK'] = network
-                app.logger.info(f'Initialized P2P network with {len(app.config["P2P_PEERS"])} peers')
-                
-            # Initialize peer discovery system
-            try:
-                from lemma.utils.network_utilities import init_peer_discovery
-                
-                # Get DID for node ID
-                node_id = app.config.get('DID', f"did:lemma:{socket.gethostname()}")
-                
-                # Get node URL from config or try to determine it
-                node_url = app.config.get('NODE_URL')
-                if not node_url:
-                    # Try to get hostname or IP address
-                    try:
-                        host = socket.gethostname()
-                        # Get port from config or use default
-                        port = app.config.get('PORT', 5000)
-                        # Construct URL
-                        node_url = f"http://{host}:{port}"
-                    except:
-                        node_url = "http://localhost:5000"
-                
-                # Get trusted peers from config
-                trusted_peers = []
-                for peer in app.config.get('P2P_PEERS', []):
-                    trusted_peers.append({
-                        'id': peer.get('id', f"did:lemma:peer{len(trusted_peers)}"),
-                        'url': peer
-                    })
-                
-                # Initialize peer discovery
-                discovery = init_peer_discovery(node_id, node_url, trusted_peers)
-                app.config['PEER_DISCOVERY'] = discovery
-                app.logger.info(f'Initialized peer discovery as {node_id}')
-            except ImportError:
-                app.logger.warning('Peer discovery module not available')
         except ImportError:
-            app.logger.warning('Revocation registry module not available')
-    
-    # Initialize secure storage if enabled
-    if app.config.get('HARDWARE_SECURITY', False):
-        try:
-            from lemma.utils.secure_storage import get_secure_storage
-            storage = get_secure_storage()
-            app.config['SECURE_STORAGE'] = storage
-            app.logger.info(f'Initialized secure storage on {storage.platform}')
-        except ImportError:
-            app.logger.warning('Secure storage module not available')
-    
-    # Initialize zero-knowledge components
-    try:
-        from lemma.utils.zero_knowledge import ZKProof, SelectiveDisclosure
-        app.logger.info('Initialized zero-knowledge components')
-    except ImportError:
-        app.logger.warning('Zero-knowledge modules not available')
+            app.logger.warning('Revocation registry not available')
