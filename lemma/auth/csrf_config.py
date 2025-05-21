@@ -93,7 +93,10 @@ def generate_csrf():
     
     # Use Flask-WTF's CSRF token generation
     try:
-        return flask_generate_csrf()
+        token = flask_generate_csrf()
+        # Set the token in the session
+        session['_csrf_token'] = token
+        return token
     except Exception as e:
         current_app.logger.warning(f"Error generating CSRF token: {e}")
         return None
@@ -143,6 +146,15 @@ def validate_csrf_token(token=None):
         # Finally check in JSON data (for API requests with JSON body)
         if not token and request.is_json:
             token = request.json.get('csrf_token')
+            
+        # If still no token, check the session
+        if not token:
+            token = session.get('_csrf_token')
+    
+    # If no token found anywhere, validation fails
+    if not token:
+        current_app.logger.error("No CSRF token found in request")
+        return False
     
     # Validate token using Flask-WTF
     try:

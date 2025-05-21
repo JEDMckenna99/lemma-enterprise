@@ -78,12 +78,22 @@ class LemmaWidget {
 
     async getCsrfToken() {
         try {
+            // First try to get the token from the cookie
+            const cookieToken = document.cookie.split('; ').find(row => row.startsWith('csrf_token='));
+            if (cookieToken) {
+                return cookieToken.split('=')[1];
+            }
+
+            // If no cookie, fetch a new token
             const response = await fetch('/api/generate-csrf', {
-                credentials: 'include'  // Important for CSRF token
+                method: 'GET',
+                credentials: 'include'
             });
+            
             if (!response.ok) {
                 throw new Error('Failed to get CSRF token');
             }
+            
             const data = await response.json();
             return data.csrf_token;
         } catch (error) {
@@ -119,9 +129,7 @@ class LemmaWidget {
                         'X-CSRF-Token': csrfToken
                     },
                     credentials: 'include',
-                    body: JSON.stringify({
-                        csrf_token: csrfToken
-                    })
+                    body: JSON.stringify({})
                 });
 
                 if (!response.ok) {
@@ -175,8 +183,7 @@ class LemmaWidget {
                     credentials: 'include',
                     body: JSON.stringify({
                         credential: credentials[0].credential,
-                        challenge: challenge,
-                        csrf_token: csrfToken
+                        challenge: challenge
                     })
                 });
 
@@ -198,7 +205,6 @@ class LemmaWidget {
                     body: JSON.stringify({
                         presentation: presentation,
                         challenge: challenge,
-                        csrf_token: csrfToken,
                         user_id: credentials[0].wallet_metadata.holder_id
                     })
                 });
