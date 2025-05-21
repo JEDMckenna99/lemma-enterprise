@@ -54,6 +54,11 @@ def index():
     """Render the main page."""
     from lemma.auth.csrf_config import generate_csrf
     session['csrf_token'] = generate_csrf()
+    
+    # Clear any flash messages to prevent verification warnings from appearing on main page
+    # This ensures the main page is clean as an entry point
+    session.pop('_flashes', None)
+    
     return render_template('index.html')
 
 @main_bp.route('/verify')
@@ -303,8 +308,12 @@ def protected():
         # Log the unauthorized access attempt
         current_app.logger.warning(f"Unauthorized protected page access attempt. Session data: user_id={user_id}, credential_id={credential_id}, is_verified_human={is_verified_human}")
         
-        # Redirect to API widget demo page with a clear message
-        flash("Please verify your Lemma to access this page", "warning")
+        # Only set a flash message if this appears to be a direct access attempt (not a redirect from main page)
+        referer = request.headers.get('Referer', '')
+        if not ('/' in referer or '/index' in referer):
+            flash("Please verify your Lemma to access this page", "warning")
+        
+        # Redirect to API widget demo page
         return redirect(url_for('main.api_widget_demo'))
     
     # Get the wallet credential from session if available (only available right after verification)
@@ -357,8 +366,12 @@ def math_appendix():
         # Log the unauthorized access attempt
         current_app.logger.warning(f"Unauthorized math appendix access attempt. Session data: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}")
         
-        # Redirect to API widget demo page with a clear message
-        flash("Please verify your Lemma to access this page", "warning")
+        # Only set a flash message if this appears to be a direct access attempt (not a redirect from main page)
+        referer = request.headers.get('Referer', '')
+        if not ('/' in referer or '/index' in referer):
+            flash("Please verify your Lemma to access this page", "warning")
+        
+        # Redirect to API widget demo page
         return redirect(url_for('main.api_widget_demo'))
     
     # Ensure proper serialization for template
@@ -598,8 +611,12 @@ def api_docs():
         # Log the unauthorized access attempt
         current_app.logger.warning(f"Unauthorized API docs access attempt. Session data: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}")
         
-        # Redirect to API widget demo page with a clear message
-        flash("Please verify your Lemma to access the API documentation", "warning")
+        # Only set a flash message if this appears to be a direct access attempt (not a redirect from main page)
+        referer = request.headers.get('Referer', '')
+        if not ('/' in referer or '/index' in referer):
+            flash("Please verify your Lemma to access the API documentation", "warning")
+        
+        # Redirect to API widget demo page
         return redirect(url_for('main.api_widget_demo'))
     
     # Ensure proper serialization for template
@@ -762,6 +779,7 @@ def api_widget_demo():
     # If user is already verified, redirect them to the protected page
     if is_verified:
         current_app.logger.info(f"User {user_id} is already verified, redirecting to protected page")
+        # Don't set any flash messages for this redirect
         return redirect(url_for('main.protected'))
     
     # Store user ID in session for later use
@@ -769,5 +787,9 @@ def api_widget_demo():
     
     # Log debug info
     current_app.logger.info(f"Rendering API widget demo page for user {user_id}")
+    
+    # Clear any flash messages that might have been set by other routes
+    # This keeps the widget demo page clean
+    session.pop('_flashes', None)
     
     return render_template('api_widget_demo.html', user_id=user_id)
