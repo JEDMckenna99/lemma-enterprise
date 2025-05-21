@@ -19,8 +19,8 @@ logger.info(f"Current working directory: {os.getcwd()}")
 
 app = create_app()
 
-# Configuration
-DATA_DIR = os.path.join(os.path.expanduser('~'), '.lemma_enterprise')
+# Configuration - Use instance folder for Heroku compatibility
+DATA_DIR = os.path.join(os.getcwd(), 'instance', 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 KEYS_FILE = os.path.join(DATA_DIR, 'keys.json')
