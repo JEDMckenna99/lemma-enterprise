@@ -278,26 +278,8 @@ def list_credentials():
 def get_csrf():
     """Generate a CSRF token for client-side JavaScript and set it as a cookie."""
     try:
-        # Generate a new token
-        token = secrets.token_hex(32)
-        
-        # Store in session
-        session['_csrf_token'] = token
-        
-        # Create response with token
-        response = jsonify({'csrf_token': token})
-        
-        # Set the CSRF token as a cookie with same settings as session
-        response.set_cookie(
-            '_csrf_token',  # Use same name as session
-            token,
-            httponly=False,  # JavaScript needs access
-            secure=not current_app.config.get('TESTING', False),  # Secure in production
-            samesite='Strict',  # Match the session cookie setting
-            path='/'  # Available across all paths
-        )
-        
-        return response
+        from lemma.auth.csrf_config import get_csrf_response
+        return get_csrf_response()
     except Exception as e:
         current_app.logger.error("Error generating CSRF token: %s", str(e))
         return jsonify({'error': 'Error generating CSRF token', 'details': str(e)}), 500

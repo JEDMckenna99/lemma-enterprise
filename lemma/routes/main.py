@@ -708,5 +708,9 @@ def api_docs():
 @main_bp.route('/api/generate-csrf')
 def generate_csrf_endpoint():
     """Generate a new CSRF token."""
-    token = generate_csrf()
-    return jsonify({'csrf_token': token})
+    try:
+        from lemma.auth.csrf_config import get_csrf_response
+        return get_csrf_response()
+    except Exception as e:
+        current_app.logger.error("Error generating CSRF token: %s", str(e))
+        return jsonify({'error': 'Error generating CSRF token', 'details': str(e)}), 500

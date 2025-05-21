@@ -24,6 +24,16 @@
 
 ## Development Rules
 
+### Dependencies
+- **Installation**: Run `pip install -r requirements.txt`
+- **Key Dependencies**:
+  - Flask-WTF: CSRF protection
+  - Flask-Session: Server-side session management
+  - Flask-Cors: CORS handling
+  - Stripe: Identity verification
+  - PyNaCl: Cryptographic operations
+  - Requests: HTTP client
+
 ### Code Style
 - **Python**: Follow PEP 8 guidelines
 - **Comments**: Add docstrings to all functions and classes
@@ -37,7 +47,16 @@
 1. **No PII Storage**: Ensure no personal data is stored anywhere
 2. **Secure Key Management**: Use environment variables for secrets
 3. **Input Validation**: Validate all user inputs
-4. **CSRF Protection**: Ensure all forms have CSRF protection
+4. **CSRF Protection**: 
+   - Use `lemma.auth.csrf_config.generate_csrf()` for token generation
+   - Token stored in session as `_csrf_token`
+   - Token sent in cookie as `_csrf_token` (httponly=False for JS access)
+   - Token validation via `@csrf_protect()` decorator
+   - Token sent in headers as `X-CSRF-Token` for API requests
+   - Token included in forms via hidden input field
+   - Token generation endpoints:
+     - `/api/generate-csrf` for API clients
+     - Template context processor for server-side rendering
 5. **XSS Prevention**: Escape all user-generated content
 6. **Rate Limiting**: Apply rate limits to all API endpoints
 

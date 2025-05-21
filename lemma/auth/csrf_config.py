@@ -3,7 +3,7 @@ CSRF Protection Configuration for Lemma Enterprise.
 Provides enhanced CSRF protection for enterprise-grade security.
 """
 import logging
-from flask import request, abort, current_app, session, jsonify, render_template
+from flask import request, abort, current_app, session, jsonify, render_template, make_response
 from functools import wraps, update_wrapper
 from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf as flask_generate_csrf
 import secrets
@@ -87,7 +87,7 @@ def configure_csrf(app):
     return csrf
 
 def generate_csrf():
-    """Generate a CSRF token."""
+    """Generate a CSRF token and set it in both session and cookie."""
     # In test mode with skip_auth, return a dummy token
     if current_app.config.get('TESTING', False) and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
         return 'test-csrf-token'
@@ -98,15 +98,32 @@ def generate_csrf():
     # Set the token in the session
     session['_csrf_token'] = token
     
-    # Set the token in the cookie
-    response = current_app.make_response(jsonify({'csrf_token': token}))
+    # Set the token in the cookie via response
+    response = make_response(jsonify({'csrf_token': token}))
     response.set_cookie(
         '_csrf_token',
         token,
         httponly=False,  # JavaScript needs access
         secure=not current_app.config.get('TESTING', False),  # Secure in production
-        samesite='Strict',
-        path='/'
+        samesite='Strict',  # Match the session cookie setting
+        path='/'  # Available across all paths
+    )
+    
+    return token
+
+def get_csrf_response(token=None):
+    """Create a response with CSRF token in both JSON and cookie."""
+    if token is None:
+        token = generate_csrf()
+    
+    response = make_response(jsonify({'csrf_token': token}))
+    response.set_cookie(
+        '_csrf_token',
+        token,
+        httponly=False,  # JavaScript needs access
+        secure=not current_app.config.get('TESTING', False),  # Secure in production
+        samesite='Strict',  # Match the session cookie setting
+        path='/'  # Available across all paths
     )
     
     return response
