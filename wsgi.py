@@ -14,7 +14,12 @@ logger.info("Starting Lemma Enterprise on Heroku")
 logger.info(f"Current working directory: {os.getcwd()}")
 logger.info(f"Directory contents: {os.listdir(os.getcwd())}")
 
+# Create the application instance
 app = create_app()
+
+# Push an application context
+ctx = app.app_context()
+ctx.push()
 
 # This is the WSGI entry point that Heroku will look for
 if __name__ == '__main__':
