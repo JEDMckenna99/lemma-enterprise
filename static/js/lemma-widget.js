@@ -2,11 +2,18 @@ class LemmaWidget {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
         this.wallet = new LemmaWallet();
+        this.csrfToken = null;
         this.init();
     }
 
     async init() {
         await this.wallet.init();
+        // Get initial CSRF token
+        try {
+            await this.refreshCsrfToken();
+        } catch (error) {
+            console.error('Error getting initial CSRF token:', error);
+        }
         this.render();
         this.attachEventListeners();
     }
@@ -76,7 +83,7 @@ class LemmaWidget {
         }, 5000);
     }
 
-    async getCsrfToken() {
+    async refreshCsrfToken() {
         try {
             // Always fetch a fresh token
             const response = await fetch('/api/generate-csrf', {
@@ -92,11 +99,20 @@ class LemmaWidget {
             }
             
             const data = await response.json();
-            return data.csrf_token;
+            this.csrfToken = data.csrf_token;
+            return this.csrfToken;
         } catch (error) {
             console.error('Error getting CSRF token:', error);
             throw error;
         }
+    }
+
+    async getCsrfToken() {
+        // If we don't have a token, get one
+        if (!this.csrfToken) {
+            return this.refreshCsrfToken();
+        }
+        return this.csrfToken;
     }
 
     generateUserId() {
@@ -144,6 +160,28 @@ class LemmaWidget {
                     try {
                         const errorData = await response.json();
                         errorMessage = errorData.error || errorData.message || errorMessage;
+                        
+                        // If we get a CSRF error, refresh the token and try again
+                        if (errorMessage.includes('CSRF') || response.status === 400) {
+                            await this.refreshCsrfToken();
+                            const retryResponse = await fetch('/api/start-verification', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-Token': this.csrfToken
+                                },
+                                credentials: 'include',
+                                body: JSON.stringify({ user_id: userId })
+                            });
+                            
+                            if (retryResponse.ok) {
+                                const result = await retryResponse.json();
+                                if (result.url) {
+                                    window.location.href = result.url;
+                                    return;
+                                }
+                            }
+                        }
                     } catch (e) {
                         // If response is not JSON, try to get text
                         const text = await response.text();

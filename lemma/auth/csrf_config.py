@@ -120,6 +120,9 @@ def get_csrf_response(token=None):
         max_age=3600     # 1 hour expiry
     )
     
+    # Log the token being set
+    current_app.logger.info("Setting new CSRF token in session and cookie")
+    
     return response
 
 def csrf_protect():
