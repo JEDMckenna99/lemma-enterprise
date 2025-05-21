@@ -305,6 +305,7 @@
                 <div class="cta-buttons">
                     <a href="#" id="verifyLemmaBtn" class="button primary">Verify Lemma</a>
                     <a href="#" id="accessProtectedBtn" class="button secondary">Access Protected Content</a>
+                    <a href="#" id="clearLemmaBtn" class="button secondary" style="background-color: var(--error); color: var(--white); border: none;">Clear Lemma</a>
                 </div>
             </section>
 
@@ -660,6 +661,50 @@
                 setTimeout(() => {
                     errorMessage.style.display = 'none';
                 }, 5000);
+            }
+        });
+
+        // Clear Lemma functionality
+        document.getElementById('clearLemmaBtn').addEventListener('click', function() {
+            if (confirm('Are you sure you want to clear your Lemma credential? You will need to verify again to access protected content.')) {
+                // Clear all lemma-related items from localStorage
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('lemma_credential_') || key.startsWith('lemma_presentation_') || key === 'lemma_challenge') {
+                        localStorage.removeItem(key);
+                    }
+                });
+                
+                // Clear credentials from wallet if available
+                if (window.lemmaWallet) {
+                    try {
+                        window.lemmaWallet.getAllCredentials()
+                            .then(credentials => {
+                                const deletePromises = credentials.map(cred => 
+                                    window.lemmaWallet.deleteCredential(cred.id)
+                                );
+                                
+                                return Promise.all(deletePromises);
+                            })
+                            .then(() => {
+                                console.log('All credentials deleted from wallet');
+                            })
+                            .catch(error => {
+                                console.error('Error deleting credentials from wallet:', error);
+                            });
+                    } catch (error) {
+                        console.error('Error accessing wallet to clear credentials:', error);
+                    }
+                }
+                
+                // Clear session cookie by redirecting to logout endpoint
+                fetch('/api/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                })
+                .finally(() => {
+                    alert('Lemma credential cleared successfully!');
+                    window.location.reload();
+                });
             }
         });
     </script>
