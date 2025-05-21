@@ -239,36 +239,36 @@
 
         <!-- Hidden field to store session verification status -->
         <input type="hidden" id="sessionVerified" value="{{ session.get('verified_human', False)|string|lower }}">
-        <!-- Hidden field to store credential data for wallet initialization -->
-        <input type="hidden" id="sessionCredential" value="{{ session_credential | safe if session_credential else '' }}">
-        <input type="hidden" id="sessionUserId" value="{{ user_id if user_id else '' }}">
-        <!-- Hidden field for wallet credential format -->
+        <!-- Hidden field for wallet credential formatting -->
         <input type="hidden" id="walletCredential" value="{{ wallet_credential | safe if wallet_credential else '' }}">
+        <input type="hidden" id="sessionUserId" value="{{ user_id if user_id else '' }}">
+        <!-- CSRF token for API calls -->
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <!-- Debug output -->
+        <!-- Debug output (only visible during development) -->
         <script>
-        console.log('Session credential:', document.getElementById('sessionCredential').value ? 'present (length: ' + document.getElementById('sessionCredential').value.length + ')' : 'empty');
-        console.log('Session user ID:', document.getElementById('sessionUserId').value);
         console.log('Wallet credential:', document.getElementById('walletCredential').value ? 'present (length: ' + document.getElementById('walletCredential').value.length + ')' : 'empty');
-
-        // Store the wallet credential to localStorage for immediate use
-        document.addEventListener('DOMContentLoaded', function() {
-            const walletCredentialElem = document.getElementById('walletCredential');
-            const userIdElem = document.getElementById('sessionUserId');
-            
-            if (walletCredentialElem && walletCredentialElem.value && userIdElem && userIdElem.value) {
-                try {
-                    const walletCredential = JSON.parse(walletCredentialElem.value);
-                    const userId = userIdElem.value;
-                    
-                    console.log('Storing wallet credential to localStorage:', walletCredential.credential?.id);
-                    localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(walletCredential));
-                } catch (e) {
-                    console.error('Error storing wallet credential to localStorage:', e);
-                }
-            }
-        });
+        console.log('Session user ID:', document.getElementById('sessionUserId').value);
         </script>
+
+        <!-- Security-focused credential handling script -->
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Only initialize wallet - no localStorage storage
+            console.log('Protected page loaded - waiting for wallet initialization');
+            
+            // Update credential status display
+            const userId = document.getElementById('sessionUserId').value;
+            if (userId) {
+                document.getElementById('userId').textContent = userId;
+            }
+            
+            // Display credential ID if available
+            const credentialIdElement = document.getElementById('credentialId');
+            if (credentialIdElement) {
+                credentialIdElement.textContent = '{{ credential_id if credential_id else "Stored in wallet" }}';
+            }
+        });</script>
 
         <div class="card">
             <div class="success-badge">✓ Human Verification Successful</div>

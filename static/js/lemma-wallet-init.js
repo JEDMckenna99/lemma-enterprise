@@ -96,6 +96,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (window.lemmaWalletUI) {
                   window.lemmaWalletUI.refreshCredentialList();
                 }
+                
+                // Clear from session after successful storage
+                // This is done through a hidden form submission to protect against XSS
+                const clearForm = document.createElement('form');
+                clearForm.method = 'POST';
+                clearForm.action = '/api/clear-session-credential';
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                clearForm.appendChild(csrfInput);
+                document.body.appendChild(clearForm);
+                clearForm.submit();
               })
               .catch(error => {
                 console.error('Failed to store wallet credential:', error);

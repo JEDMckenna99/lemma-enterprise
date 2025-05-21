@@ -244,9 +244,12 @@ def verification_callback():
             current_app.logger.info(f"Successfully issued credential for user {user_id} without session verification: {credential.get('id')}")
             
             # Set session variables for protected content access
+            # Only store minimal information in the session for security
             session['verified_human'] = True
             session['verified_user_id'] = user_id
-            session['verified_credential'] = credential
+            
+            # Store credential ID in session for verification
+            session['verified_credential_id'] = credential.get('id')
             
             # Set issuance and expiry times if available in the credential
             if 'issuanceDate' in credential:
@@ -266,11 +269,11 @@ def verification_callback():
                 }
             }
             
-            # Store in session for template access
+            # Store formatted credential in session for template to access (will be passed to wallet)
             session['store_credential'] = wallet_credential
             
             # Log the credential we're storing
-            current_app.logger.info(f"Storing credential in cookie: {credential.get('id')}")
+            current_app.logger.info(f"Created credential for wallet: {credential.get('id')}")
             
             # Create response with wallet cookie and redirect to protected page
             response = make_response(redirect(url_for('main.protected')))
@@ -285,21 +288,6 @@ def verification_callback():
                 httponly=False,  # JavaScript needs access
                 samesite='Lax'
             )
-            
-            # Store credential in cookie for immediate access
-            try:
-                credential_json = json.dumps(wallet_credential)
-                current_app.logger.info(f"Credential JSON length: {len(credential_json)}")
-                response.set_cookie(
-                    f'lemma_credential_{user_id}',
-                    credential_json,
-                    max_age=31536000,  # 1 year
-                    secure=secure,
-                    httponly=False,  # JavaScript needs access
-                    samesite='Lax'
-                )
-            except Exception as e:
-                current_app.logger.error(f"Error setting credential cookie: {str(e)}")
             
             # Store debug flags
             session['verification_success'] = True
@@ -348,11 +336,14 @@ def verification_callback():
                 }
                 
                 # Set session variables for protected content access
+                # Only store minimal information in the session for security
                 session['verified_human'] = True
                 session['verified_user_id'] = user_id
-                session['verified_credential'] = credential
                 
-                # Store the formatted wallet credential for template access
+                # Store credential ID in session for verification
+                session['verified_credential_id'] = credential.get('id')
+                
+                # Store the formatted wallet credential for template access (will be passed to wallet)
                 session['store_credential'] = wallet_credential
                 
                 # Set issuance and expiry times if available in the credential
@@ -377,35 +368,6 @@ def verification_callback():
                     httponly=False,  # JavaScript needs access
                     samesite='Lax'
                 )
-                
-                # Store credential in cookie for immediate access
-                try:
-                    credential_json = json.dumps(wallet_credential)
-                    current_app.logger.info(f"Storing credential in cookie: {credential.get('id')} (JSON length: {len(credential_json)})")
-                    
-                    # Ensure cookie value isn't too large
-                    if len(credential_json) < 4000:  # Most browsers limit cookies to 4KB
-                        response.set_cookie(
-                            f'lemma_credential_{user_id}',
-                            credential_json,
-                            max_age=31536000,  # 1 year
-                            secure=secure,
-                            httponly=False,  # JavaScript needs access
-                            samesite='Lax'
-                        )
-                    else:
-                        current_app.logger.warning(f"Credential JSON too large for cookie: {len(credential_json)} bytes")
-                        # Still set a smaller cookie to trigger wallet lookup
-                        response.set_cookie(
-                            f'lemma_credential_{user_id}',
-                            json.dumps({"lookup": True, "user_id": user_id}),
-                            max_age=31536000,
-                            secure=secure,
-                            httponly=False,
-                            samesite='Lax'
-                        )
-                except Exception as e:
-                    current_app.logger.error(f"Error setting credential cookie: {str(e)}")
                 
                 # Clear any old session data
                 session.pop('stripe_verification_session', None)
@@ -497,11 +459,11 @@ def protected():
     """Render the protected page that requires human verification."""
     # Check if user has valid verification in session
     user_id = session.get('verified_user_id')
-    credential_data = session.get('verified_credential')
+    credential_id = session.get('verified_credential_id')
     is_verified_human = session.get('verified_human', False)
     
     # Log detailed session state for debugging
-    current_app.logger.info(f"Protected page access - Session state: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}, verification_success={session.get('verification_success')}")
+    current_app.logger.info(f"Protected page access - Session state: user_id={user_id}, credential_id={credential_id}, is_verified_human={is_verified_human}, verification_success={session.get('verification_success')}")
     
     # Check if we were directly redirected from successful verification
     is_verification_redirect = session.get('redirect_to_protected', False)
@@ -510,77 +472,33 @@ def protected():
         # Remove the flag to prevent infinite redirects
         session.pop('redirect_to_protected', None)
     
-    # Strict verification check - require both user_id and credentials
-    if not user_id or not credential_data or not is_verified_human:
+    # Strict verification check - require user_id and verification status
+    if not user_id or not is_verified_human:
         # Log the unauthorized access attempt
-        current_app.logger.warning(f"Unauthorized protected page access attempt. Session data: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}")
+        current_app.logger.warning(f"Unauthorized protected page access attempt. Session data: user_id={user_id}, credential_id={credential_id}, is_verified_human={is_verified_human}")
         
         # Redirect to verification page with a clear message
         flash("Please verify your Lemma to access this page", "warning")
         return redirect(url_for('main.verify'))
     
-    # Verify the credential is still valid
-    credential_service = get_credential_service()
-    if credential_service:
-        verification_result = credential_service.verify_credential(credential_data)
-        if not verification_result.get('valid', False):
-            current_app.logger.warning(f"Invalid credential detected for user {user_id}")
-            flash("Your human verification has expired. Please verify again.", "warning")
-            return redirect(url_for('main.verify'))
-    
-    # Get the wallet credential from session if available
+    # Get the wallet credential from session if available (only available right after verification)
     wallet_credential = session.get('store_credential')
     
-    # Ensure credential is properly serializable
-    if credential_data and isinstance(credential_data, dict):
-        # Log credential ID for debugging
-        current_app.logger.info(f"Credential ID being passed to template: {credential_data.get('id', 'no-id')}")
-        
-        # Convert any non-serializable values to strings
-        try:
-            import json
-            # Test serialization to catch any issues before template rendering
-            # First try to serialize as-is
-            try:
-                json_string = json.dumps(credential_data)
-                current_app.logger.info("Credential JSON serialization test successful")
-            except TypeError as json_error:
-                current_app.logger.warning(f"Credential contains non-serializable data: {str(json_error)}")
-                # Make a copy to avoid modifying the session data
-                credential_data = credential_data.copy()
-                # Ensure all values are JSON serializable
-                for key, value in credential_data.items():
-                    if not isinstance(value, (str, int, float, bool, list, dict, type(None))):
-                        credential_data[key] = str(value)
-                
-                # Try JSON serialization again
-                json_string = json.dumps(credential_data)
-                current_app.logger.info("Successfully converted credential to JSON-serializable format")
-        except Exception as e:
-            current_app.logger.error(f"Failed to serialize credential: {str(e)}")
-            credential_data = {"error": "Invalid credential format", "id": credential_data.get('id', 'unknown')}
-    else:
-        current_app.logger.warning(f"Invalid credential data format: {type(credential_data)}")
-        credential_data = None  # Prevent template rendering errors
-        
-    # Ensure proper serialization for template
-    session_credential = json.dumps(credential_data) if credential_data else None
-    
-    # If we have a wallet credential format, use that for the template
-    if wallet_credential and isinstance(wallet_credential, dict):
-        try:
-            wallet_credential_json = json.dumps(wallet_credential)
-            current_app.logger.info(f"Using wallet credential format for template (length: {len(wallet_credential_json)})")
-        except Exception as e:
-            current_app.logger.error(f"Failed to serialize wallet credential: {str(e)}")
-            wallet_credential = None
+    # Get just the necessary credential data to pass to template
+    credential_data = None
+    if wallet_credential and isinstance(wallet_credential, dict) and 'credential' in wallet_credential:
+        credential_data = {
+            'id': wallet_credential['credential'].get('id'),
+            'issuanceDate': wallet_credential['credential'].get('issuanceDate'),
+            'expirationDate': wallet_credential['credential'].get('expirationDate'),
+        }
     
     # Create response with wallet cookie
     response = make_response(render_template(
         'protected.html',
         user_id=user_id,
+        credential_id=credential_id,
         credential=credential_data,
-        session_credential=session_credential,
         wallet_credential=json.dumps(wallet_credential) if wallet_credential else None,
         verification_time=session.get('verification_time'),
         verification_expiry=session.get('verification_expiry')
@@ -597,27 +515,6 @@ def protected():
             httponly=False,  # JavaScript needs access
             samesite='Lax'
         )
-    
-    # Store credential in cookie if not already there
-    if wallet_credential and not request.cookies.get(f'lemma_credential_{user_id}'):
-        try:
-            credential_json = json.dumps(wallet_credential)
-            current_app.logger.info(f"Setting credential cookie in protected route (length: {len(credential_json)})")
-            
-            # Only set if not too large for a cookie
-            if len(credential_json) < 4000:
-                response.set_cookie(
-                    f'lemma_credential_{user_id}',
-                    credential_json,
-                    max_age=31536000,  # 1 year
-                    secure=secure,
-                    httponly=False,  # JavaScript needs access
-                    samesite='Lax'
-                )
-            else:
-                current_app.logger.warning(f"Credential too large for cookie: {len(credential_json)} bytes")
-        except Exception as e:
-            current_app.logger.error(f"Failed to set credential cookie: {str(e)}")
     
     return response
 
@@ -958,3 +855,19 @@ def debug_verification(user_id):
             "verification_status": verification_status,
             "had_existing_credential": existing_credential is not None
         }), 500
+
+@main_bp.route('/api/clear-session-credential', methods=['POST'])
+@csrf_protect()
+def clear_session_credential():
+    """Clear credential from session after it's stored in wallet.
+    This is a security enhancement to minimize credential storage locations."""
+    try:
+        # Clear store_credential from session
+        if 'store_credential' in session:
+            session.pop('store_credential', None)
+            current_app.logger.info("Cleared store_credential from session after wallet storage")
+        
+        return jsonify({"success": True, "message": "Session credential cleared"})
+    except Exception as e:
+        current_app.logger.error(f"Error clearing session credential: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
