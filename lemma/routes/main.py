@@ -632,29 +632,7 @@ def logout():
     flash("You have been logged out", "info")
     return redirect(url_for('main.index'))
 
-@main_bp.route('/api/generate-csrf-token', methods=['GET'])
-def get_csrf_token():
-    """Generate a CSRF token for client-side JavaScript.
-    
-    This endpoint provides a CSRF token that can be used by client-side JavaScript
-    for API requests. It ensures proper CSRF protection for AJAX requests.
-    
-    Returns:
-        A JSON object containing the CSRF token.
-    """
-    try:
-        from flask import session
-        import secrets
-        
-        # Generate a token if it doesn't exist
-        if '_csrf_token' not in session:
-            session['_csrf_token'] = secrets.token_hex(16)
-        
-        # Return the token
-        return jsonify({'csrf_token': session.get('_csrf_token')})
-    except Exception as e:
-        current_app.logger.error("Error generating CSRF token: %s", str(e))
-        return jsonify({'error': 'Error generating CSRF token'}), 500
+
 
 @main_bp.route('/api/logout', methods=['GET', 'POST'])
 def api_logout():

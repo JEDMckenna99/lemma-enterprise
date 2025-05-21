@@ -277,10 +277,12 @@ def list_credentials():
 def get_csrf_token():
     """Generate a CSRF token for client-side JavaScript and set it as a cookie."""
     try:
-        from flask_wtf.csrf import generate_csrf
+        # Initialize session if needed
+        if not session.get('_csrf_token'):
+            session['_csrf_token'] = secrets.token_hex(32)
         
-        # Generate a CSRF token using Flask-WTF
-        csrf_token = generate_csrf()
+        # Get or generate CSRF token
+        csrf_token = session.get('_csrf_token')
         
         # Create response with token
         response = jsonify({'csrf_token': csrf_token})
@@ -290,14 +292,14 @@ def get_csrf_token():
             'csrf_token', 
             csrf_token, 
             httponly=False,  # JavaScript needs access
-            secure=True,     # Only send over HTTPS
+            secure=not current_app.config.get('TESTING', False),  # Secure in production
             samesite='Lax'   # Protect against CSRF
         )
         
         return response
     except Exception as e:
-        logger.error("Error generating CSRF token: %s", str(e))
-        return jsonify({'error': 'Error generating CSRF token'}), 500
+        current_app.logger.error("Error generating CSRF token: %s", str(e))
+        return jsonify({'error': 'Error generating CSRF token', 'details': str(e)}), 500
 
 @api_bp.route('/verify-human', methods=['POST'])
 @csrf_protect()

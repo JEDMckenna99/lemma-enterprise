@@ -3,7 +3,7 @@ CSRF Protection Configuration for Lemma Enterprise.
 Provides enhanced CSRF protection for enterprise-grade security.
 """
 import logging
-from flask import request, abort, current_app, session
+from flask import request, abort, current_app, session, jsonify, render_template
 from functools import wraps, update_wrapper
 from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf
 
@@ -65,10 +65,19 @@ def configure_csrf(app):
             
         app.logger.warning("CSRF error: %s from IP: %s", 
                           e.description, request.remote_addr)
-        return {
-            'error': 'CSRF validation failed',
-            'message': e.description
-        }, 400
+        
+        # Check if request expects JSON
+        if request.is_json or request.headers.get('Accept') == 'application/json':
+            return jsonify({
+                'error': 'CSRF validation failed',
+                'message': e.description,
+                'status': 'error'
+            }), 400
+        
+        # For non-JSON requests, return HTML error
+        return render_template('error.html', 
+                             error="CSRF validation failed", 
+                             message=e.description), 400
     
     # Configure exempt routes
     for route in CSRF_EXEMPT_ROUTES:
