@@ -19,7 +19,7 @@ except ImportError:
 # Import security and CSRF modules
 try:
     from lemma.auth.security import admin_required
-    from lemma.auth.csrf_config import csrf_protect, generate_csrf_token
+    from lemma.auth.csrf_config import csrf_protect, generate_csrf
 except ImportError:
     # Fallback to wherever these modules are actually located
     from lemma.security import admin_required

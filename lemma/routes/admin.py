@@ -14,7 +14,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, validators, HiddenField
 from lemma.auth.security import check_password_hash, generate_password_hash, authenticate_admin, login_admin, logout_admin
 from lemma.auth.decorators import admin_required
-from lemma.auth.csrf_config import csrf_protect, generate_csrf_token
+from lemma.auth.csrf_config import csrf_protect, generate_csrf
 
 from lemma.core.credential_service import get_credential_service
 import os
@@ -36,7 +36,7 @@ class IssueCredentialForm(FlaskForm):
 # Add CSRF token to all templates
 @admin_bp.context_processor
 def inject_csrf_token():
-    return {'csrf_token': generate_csrf_token()}
+    return {'csrf_token': generate_csrf()}
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
