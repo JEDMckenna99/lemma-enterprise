@@ -359,300 +359,100 @@
     </div>
 
     <script>
-        // Handle the "Verify Lemma" button click
-        document.getElementById('verifyLemmaBtn').addEventListener('click', async function(e) {
-            e.preventDefault();
+        // Handle the "Prove Lemma" button click
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, setting up event listeners');
             
-            try {
-                // First check if user already has a credential in the wallet
-                let hasExistingCredential = false;
-                
-                // Wait for wallet to initialize
-                if (typeof window.lemmaWallet !== 'undefined') {
+            const verifyBtn = document.getElementById('verifyLemmaBtn');
+            if (verifyBtn) {
+                console.log('Found verify button, attaching click handler');
+                verifyBtn.addEventListener('click', async function(e) {
+                    console.log('Verify button clicked');
+                    e.preventDefault();
+                    
                     try {
-                        const allCredentials = await window.lemmaWallet.getAllCredentials();
-                        hasExistingCredential = allCredentials && allCredentials.length > 0;
+                        // First check if user already has a credential in the wallet
+                        let hasExistingCredential = false;
                         
-                        if (hasExistingCredential) {
-                            // If user has a credential, verify it and route to protected page
-                            const credential = allCredentials[0].credential;
-                            
-                            // Get CSRF token
-                            const csrfResponse = await fetch('/api/generate-csrf-token', {
-                                credentials: 'include'
-                            });
-                            const csrfData = await csrfResponse.json();
-                            const csrfToken = csrfData.csrf_token;
-                            
-                            // Generate a challenge for verification
-                            const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-                                .map(b => b.toString(16).padStart(2, '0')).join('');
-                            
-                            // Create a presentation with the credential
-                            const presentationResponse = await fetch('/api/presentation', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-Token': csrfToken
-                                },
-                                credentials: 'include',
-                                body: JSON.stringify({
-                                    credential: credential,
-                                    challenge: challenge,
-                                    csrf_token: csrfToken
-                                })
-                            });
-
-                            if (!presentationResponse.ok) {
-                                throw new Error('Failed to create presentation');
+                        // Wait for wallet to initialize
+                        if (typeof window.lemmaWallet !== 'undefined') {
+                            try {
+                                console.log('Checking wallet for existing credentials');
+                                const allCredentials = await window.lemmaWallet.getAllCredentials();
+                                hasExistingCredential = allCredentials && allCredentials.length > 0;
+                                
+                                if (hasExistingCredential) {
+                                    console.log('Found existing credential in wallet');
+                                    // Handle existing credential case
+                                    return;
+                                }
+                            } catch (walletError) {
+                                console.error('Error checking wallet for credentials:', walletError);
                             }
-
-                            const presentation = await presentationResponse.json();
-
-                            // Verify the presentation
-                            const verifyResponse = await fetch('/api/verify-human', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-Token': csrfToken
-                                },
-                                credentials: 'include',
-                                body: JSON.stringify({
-                                    presentation: presentation,
-                                    challenge: challenge,
-                                    csrf_token: csrfToken
-                                })
-                            });
-
-                            if (!verifyResponse.ok) {
-                                const errorData = await verifyResponse.json();
-                                throw new Error(errorData.error || 'Verification failed');
-                            }
-
-                            const verifyResult = await verifyResponse.json();
-
-                            if (verifyResult.success) {
-                                // Verification successful, redirect to protected page
-                                window.location.href = '/protected';
+                        } else {
+                            console.log('Wallet not initialized, checking localStorage');
+                            // Check localStorage for backward compatibility
+                            const legacyCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+                            if (legacyCredentials.length > 0) {
+                                console.log('Found legacy credentials in localStorage');
                                 return;
                             }
-                            
-                            // Create or update info message element
-                            let infoElement = document.getElementById('verifyInfoMessage');
-                            if (!infoElement) {
-                                infoElement = document.createElement('div');
-                                infoElement.id = 'verifyInfoMessage';
-                                infoElement.style.color = '#2980b9';
-                                infoElement.style.fontWeight = 'bold';
-                                infoElement.style.padding = '10px';
-                                infoElement.style.marginTop = '15px';
-                                infoElement.style.borderRadius = '5px';
-                                infoElement.style.backgroundColor = 'rgba(41, 128, 185, 0.1)';
-                                infoElement.style.border = '1px solid #2980b9';
-                                document.querySelector('.cta-buttons').insertAdjacentElement('afterend', infoElement);
-                            }
-                            
-                            infoElement.textContent = 'You already have a Lemma credential in your wallet. Use "Access Protected Content" to proceed.';
-                            infoElement.style.display = 'block';
-                            
-                            // Auto-hide the message after 10 seconds
-                            setTimeout(() => {
-                                infoElement.style.display = 'none';
-                            }, 10000);
-                            
-                            return;
-                        }
-                    } catch (walletError) {
-                        console.error('Error checking wallet for credentials:', walletError);
-                        // Continue with verification if wallet check fails
-                    }
-                } else {
-                    // Also check localStorage for backward compatibility
-                    const legacyCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
-                    
-                    if (legacyCredentials.length > 0) {
-                        // Create or update info message element
-                        let infoElement = document.getElementById('verifyInfoMessage');
-                        if (!infoElement) {
-                            infoElement = document.createElement('div');
-                            infoElement.id = 'verifyInfoMessage';
-                            infoElement.style.color = '#2980b9';
-                            infoElement.style.fontWeight = 'bold';
-                            infoElement.style.padding = '10px';
-                            infoElement.style.marginTop = '15px';
-                            infoElement.style.borderRadius = '5px';
-                            infoElement.style.backgroundColor = 'rgba(41, 128, 185, 0.1)';
-                            infoElement.style.border = '1px solid #2980b9';
-                            document.querySelector('.cta-buttons').insertAdjacentElement('afterend', infoElement);
                         }
                         
-                        infoElement.textContent = 'You already have a Lemma credential. Use "Access Protected Content" to proceed.';
-                        infoElement.style.display = 'block';
+                        // Generate a random user ID
+                        console.log('Generating user ID');
+                        const userId = `user_${Array.from(crypto.getRandomValues(new Uint8Array(8)))
+                            .map(b => b.toString(16).padStart(2, '0')).join('')}`;
                         
-                        // Auto-hide the message after 10 seconds
-                        setTimeout(() => {
-                            infoElement.style.display = 'none';
-                        }, 10000);
+                        // Get CSRF token
+                        console.log('Getting CSRF token');
+                        const csrfResponse = await fetch('/api/generate-csrf-token', {
+                            credentials: 'include'
+                        });
                         
-                        return;
+                        if (!csrfResponse.ok) {
+                            throw new Error('Failed to get CSRF token');
+                        }
+                        
+                        const csrfData = await csrfResponse.json();
+                        console.log('Got CSRF token');
+                        
+                        // Start verification session
+                        console.log('Starting verification session');
+                        const sessionResponse = await fetch('/api/start-verification', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': csrfData.csrf_token
+                            },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                user_id: userId
+                            })
+                        });
+                        
+                        if (!sessionResponse.ok) {
+                            const errorData = await sessionResponse.json();
+                            throw new Error(errorData.error || `Server error (${sessionResponse.status})`);
+                        }
+                        
+                        const sessionData = await sessionResponse.json();
+                        console.log('Verification session started successfully');
+                        
+                        // Redirect to Stripe verification
+                        if (sessionData.redirect_url) {
+                            console.log('Redirecting to Stripe verification');
+                            window.location.href = sessionData.redirect_url;
+                        } else {
+                            throw new Error('No redirect URL received from server');
+                        }
+                    } catch (error) {
+                        console.error('Error starting verification process:', error);
+                        alert(`Error: ${error.message}. Please try again.`);
                     }
-                }
-                
-                // Generate a random user ID
-                const userId = `user_${Array.from(crypto.getRandomValues(new Uint8Array(8)))
-                    .map(b => b.toString(16).padStart(2, '0')).join('')}`;
-                
-                // Get CSRF token
-                const csrfResponse = await fetch('/api/generate-csrf-token', {
-                    credentials: 'include'
                 });
-                const csrfData = await csrfResponse.json();
-                const csrfToken = csrfData.csrf_token;
-                
-                // Create verification session via API
-                const sessionResponse = await fetch('/api/start-verification', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': csrfToken
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        user_id: userId,
-                        csrf_token: csrfToken
-                    })
-                });
-                
-                // Handle potential API errors
-                if (!sessionResponse.ok) {
-                    const errorData = await sessionResponse.json();
-                    const errorMsg = errorData.error || `Server error (${sessionResponse.status})`;
-                    
-                    // Create error message element
-                    let errorElement = document.getElementById('verifyErrorMessage');
-                    if (!errorElement) {
-                        errorElement = document.createElement('div');
-                        errorElement.id = 'verifyErrorMessage';
-                        errorElement.style.color = '#e74c3c';
-                        errorElement.style.fontWeight = 'bold';
-                        errorElement.style.padding = '10px';
-                        errorElement.style.marginTop = '15px';
-                        errorElement.style.borderRadius = '5px';
-                        errorElement.style.backgroundColor = 'rgba(231, 76, 60, 0.1)';
-                        errorElement.style.border = '1px solid #e74c3c';
-                        document.querySelector('.cta-buttons').insertAdjacentElement('afterend', errorElement);
-                    }
-                    
-                    errorElement.textContent = `Verification error: ${errorMsg}. Please try again later.`;
-                    errorElement.style.display = 'block';
-                    
-                    // Auto-hide the message after 10 seconds
-                    setTimeout(() => {
-                        errorElement.style.display = 'none';
-                    }, 10000);
-                    
-                    console.error('Verification session creation failed:', errorMsg);
-                    return;
-                }
-                
-                const sessionData = await sessionResponse.json();
-                
-                // Store the user ID in localStorage for later use
-                localStorage.setItem('lemma_pending_user_id', userId);
-                
-                // Redirect to Stripe's hosted verification flow
-                if (sessionData.url) {
-                    // Add event listener for when focus returns to this window
-                    window.addEventListener('focus', async function onFocus() {
-                        // Remove the event listener to prevent multiple executions
-                        window.removeEventListener('focus', onFocus);
-                        
-                        // Wait a moment for any credentials to be stored
-                        setTimeout(async () => {
-                            try {
-                                // Check if we have the credential in the wallet
-                                if (window.lemmaWallet) {
-                                    const credentials = await window.lemmaWallet.getAllCredentials();
-                                    if (credentials && credentials.length > 0) {
-                                        // We have a credential, verify it and redirect
-                                        const credential = credentials[0].credential;
-                                        
-                                        // Get CSRF token
-                                        const csrfResponse = await fetch('/api/generate-csrf-token', {
-                                            credentials: 'include'
-                                        });
-                                        const csrfData = await csrfResponse.json();
-                                        const csrfToken = csrfData.csrf_token;
-                                        
-                                        // Generate a challenge for verification
-                                        const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-                                            .map(b => b.toString(16).padStart(2, '0')).join('');
-                                        
-                                        // Create a presentation with the credential
-                                        const presentationResponse = await fetch('/api/presentation', {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                'X-CSRF-Token': csrfToken
-                                            },
-                                            credentials: 'include',
-                                            body: JSON.stringify({
-                                                credential: credential,
-                                                challenge: challenge,
-                                                csrf_token: csrfToken
-                                            })
-                                        });
-
-                                        if (!presentationResponse.ok) {
-                                            throw new Error('Failed to create presentation');
-                                        }
-
-                                        const presentation = await presentationResponse.json();
-
-                                        // Verify the presentation
-                                        const verifyResponse = await fetch('/api/verify-human', {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                'X-CSRF-Token': csrfToken
-                                            },
-                                            credentials: 'include',
-                                            body: JSON.stringify({
-                                                presentation: presentation,
-                                                challenge: challenge,
-                                                csrf_token: csrfToken
-                                            })
-                                        });
-
-                                        if (!verifyResponse.ok) {
-                                            const errorData = await verifyResponse.json();
-                                            throw new Error(errorData.error || 'Verification failed');
-                                        }
-
-                                        const verifyResult = await verifyResponse.json();
-
-                                        if (verifyResult.success) {
-                                            // Remove the pending user ID
-                                            localStorage.removeItem('lemma_pending_user_id');
-                                            // Verification successful, redirect to protected page
-                                            window.location.href = '/protected';
-                                        }
-                                    }
-                                }
-                            } catch (error) {
-                                console.error('Error checking for credentials after verification:', error);
-                            }
-                        }, 2000); // Wait 2 seconds for any async operations to complete
-                    });
-                    
-                    // Open Stripe verification in a new window
-                    window.open(sessionData.url, 'stripeVerification', 'width=600,height=800');
-                } else {
-                    throw new Error("Verification URL not provided by server");
-                }
-            } catch (error) {
-                console.error('Error starting verification process:', error);
-                alert(`Error: ${error.message}. Please try again.`);
+            } else {
+                console.error('Could not find verify button');
             }
         });
         
