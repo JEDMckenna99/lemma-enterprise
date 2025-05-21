@@ -102,6 +102,13 @@ class LemmaWidget {
         }
     }
 
+    generateUserId() {
+        // Generate a random user ID
+        const randomBytes = new Uint8Array(16);
+        window.crypto.getRandomValues(randomBytes);
+        return 'user_' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     attachEventListeners() {
         const proveButton = this.container.querySelector('.prove-button');
         const showButton = this.container.querySelector('.show-button');
@@ -121,6 +128,9 @@ class LemmaWidget {
                 // Get CSRF token
                 const csrfToken = await this.getCsrfToken();
 
+                // Generate a user ID
+                const userId = this.generateUserId();
+
                 // Start verification process
                 const response = await fetch('/api/start-verification', {
                     method: 'POST',
@@ -129,7 +139,7 @@ class LemmaWidget {
                         'X-CSRF-Token': csrfToken
                     },
                     credentials: 'include',
-                    body: JSON.stringify({})
+                    body: JSON.stringify({ user_id: userId })
                 });
 
                 if (!response.ok) {
