@@ -651,12 +651,37 @@ async function verifyWithLemma(userId, options = {}) {
     }
     
     try {
-        // Check if already verified
+        // First, try to directly access the protected page
+        try {
+            // Make a GET request to check if the user can access the protected page
+            const response = await fetch('/protected', {
+                method: 'GET',
+                credentials: 'include',
+                headers: {
+                    'Accept': 'text/html'
+                }
+            });
+            
+            // If the response is not a redirect, we can go directly to protected
+            if (response.ok && !response.redirected) {
+                console.log('User is already verified, can go directly to protected page');
+                return { 
+                    status: 'verified', 
+                    message: 'Already verified',
+                    redirect_url: '/protected'
+                };
+            }
+        } catch (error) {
+            console.warn('Error checking protected access:', error);
+            // Continue with normal verification flow
+        }
+        
+        // Check if already verified in wallet
         const checkResult = await window.lemmaWallet.checkVerification(userId);
         
         // If already verified, return the result
         if (checkResult.status === 'verified') {
-            console.log('User already verified');
+            console.log('User already verified in wallet');
             return checkResult;
         }
         
@@ -707,6 +732,46 @@ window.proveALemma = async function(options = {}) {
             if (element) {
                 element.textContent = 'Verifying...';
             }
+        }
+        
+        // First, try to directly access the protected page
+        try {
+            // Make a GET request to check if the user can access the protected page
+            const response = await fetch('/protected', {
+                method: 'GET',
+                credentials: 'include',
+                headers: {
+                    'Accept': 'text/html'
+                }
+            });
+            
+            // If the response is not a redirect, we can go directly to protected
+            if (response.ok && !response.redirected) {
+                console.log('User is already verified, going directly to protected page');
+                
+                // Update status element if provided
+                if (options.elementId) {
+                    const element = document.getElementById(options.elementId);
+                    if (element) {
+                        element.textContent = 'Already verified! Redirecting...';
+                    }
+                }
+                
+                // Call success callback if provided
+                if (options.onSuccess) {
+                    options.onSuccess({ status: 'verified', message: 'Already verified' });
+                }
+                
+                // Redirect to protected page
+                if (options.shouldRedirect !== false) {
+                    window.location.href = '/protected';
+                }
+                
+                return { status: 'verified', message: 'Already verified' };
+            }
+        } catch (error) {
+            console.warn('Error checking protected access:', error);
+            // Continue with normal verification flow
         }
         
         // Use the unified verification flow
