@@ -374,6 +374,69 @@
                         hasExistingCredential = allCredentials && allCredentials.length > 0;
                         
                         if (hasExistingCredential) {
+                            // If user has a credential, verify it and route to protected page
+                            const credential = allCredentials[0].credential;
+                            
+                            // Get CSRF token
+                            const csrfResponse = await fetch('/api/generate-csrf-token', {
+                                credentials: 'include'
+                            });
+                            const csrfData = await csrfResponse.json();
+                            const csrfToken = csrfData.csrf_token;
+                            
+                            // Generate a challenge for verification
+                            const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                                .map(b => b.toString(16).padStart(2, '0')).join('');
+                            
+                            // Create a presentation with the credential
+                            const presentationResponse = await fetch('/api/presentation', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-Token': csrfToken
+                                },
+                                credentials: 'include',
+                                body: JSON.stringify({
+                                    credential: credential,
+                                    challenge: challenge,
+                                    csrf_token: csrfToken
+                                })
+                            });
+
+                            if (!presentationResponse.ok) {
+                                throw new Error('Failed to create presentation');
+                            }
+
+                            const presentation = await presentationResponse.json();
+
+                            // Verify the presentation
+                            const verifyResponse = await fetch('/api/verify-human', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-Token': csrfToken
+                                },
+                                credentials: 'include',
+                                body: JSON.stringify({
+                                    presentation: presentation,
+                                    challenge: challenge,
+                                    csrf_token: csrfToken
+                                })
+                            });
+
+                            if (!verifyResponse.ok) {
+                                const errorData = await verifyResponse.json();
+                                throw new Error(errorData.error || 'Verification failed');
+                            }
+
+                            const verifyResult = await verifyResponse.json();
+
+                            if (verifyResult.success) {
+                                // Verification successful, redirect to protected page
+                                window.location.href = verifyResult.redirect || '/protected';
+                                return;
+                            }
+                            
                             // Create or update info message element
                             let infoElement = document.getElementById('verifyInfoMessage');
                             if (!infoElement) {
@@ -494,9 +557,96 @@
                 
                 const sessionData = await sessionResponse.json();
                 
+                // Store the user ID in localStorage for later use
+                localStorage.setItem('lemma_pending_user_id', userId);
+                
                 // Redirect to Stripe's hosted verification flow
                 if (sessionData.url) {
-                    window.location.href = sessionData.url;
+                    // Add event listener for when focus returns to this window
+                    window.addEventListener('focus', async function onFocus() {
+                        // Remove the event listener to prevent multiple executions
+                        window.removeEventListener('focus', onFocus);
+                        
+                        // Wait a moment for any credentials to be stored
+                        setTimeout(async () => {
+                            try {
+                                // Check if we have the credential in the wallet
+                                if (window.lemmaWallet) {
+                                    const credentials = await window.lemmaWallet.getAllCredentials();
+                                    if (credentials && credentials.length > 0) {
+                                        // We have a credential, verify it and redirect
+                                        const credential = credentials[0].credential;
+                                        
+                                        // Get CSRF token
+                                        const csrfResponse = await fetch('/api/generate-csrf-token', {
+                                            credentials: 'include'
+                                        });
+                                        const csrfData = await csrfResponse.json();
+                                        const csrfToken = csrfData.csrf_token;
+                                        
+                                        // Generate a challenge for verification
+                                        const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                                            .map(b => b.toString(16).padStart(2, '0')).join('');
+                                        
+                                        // Create a presentation with the credential
+                                        const presentationResponse = await fetch('/api/presentation', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-CSRF-Token': csrfToken
+                                            },
+                                            credentials: 'include',
+                                            body: JSON.stringify({
+                                                credential: credential,
+                                                challenge: challenge,
+                                                csrf_token: csrfToken
+                                            })
+                                        });
+
+                                        if (!presentationResponse.ok) {
+                                            throw new Error('Failed to create presentation');
+                                        }
+
+                                        const presentation = await presentationResponse.json();
+
+                                        // Verify the presentation
+                                        const verifyResponse = await fetch('/api/verify-human', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-CSRF-Token': csrfToken
+                                            },
+                                            credentials: 'include',
+                                            body: JSON.stringify({
+                                                presentation: presentation,
+                                                challenge: challenge,
+                                                csrf_token: csrfToken
+                                            })
+                                        });
+
+                                        if (!verifyResponse.ok) {
+                                            const errorData = await verifyResponse.json();
+                                            throw new Error(errorData.error || 'Verification failed');
+                                        }
+
+                                        const verifyResult = await verifyResponse.json();
+
+                                        if (verifyResult.success) {
+                                            // Remove the pending user ID
+                                            localStorage.removeItem('lemma_pending_user_id');
+                                            // Verification successful, redirect to protected page
+                                            window.location.href = verifyResult.redirect || '/protected';
+                                        }
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('Error checking for credentials after verification:', error);
+                            }
+                        }, 2000); // Wait 2 seconds for any async operations to complete
+                    });
+                    
+                    // Open Stripe verification in a new window
+                    window.open(sessionData.url, 'stripeVerification', 'width=600,height=800');
                 } else {
                     throw new Error("Verification URL not provided by server");
                 }
