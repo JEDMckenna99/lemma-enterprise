@@ -234,6 +234,17 @@ def verification_callback():
             credential = credential_service.issue_credential(user_id)
             current_app.logger.info(f"Issued credential for user {user_id} without session verification")
         
+        # Set session variables for protected content access
+        session['verified_human'] = True
+        session['verified_user_id'] = user_id
+        session['verified_credential'] = credential
+        
+        # Set issuance and expiry times if available in the credential
+        if 'issuanceDate' in credential:
+            session['verification_time'] = credential['issuanceDate']
+        if 'expirationDate' in credential:
+            session['verification_expiry'] = credential['expirationDate']
+            
         flash("Credential issued. Note: Identity verification could not be fully confirmed.", "warning")
         return redirect(url_for('main.protected'))
     
@@ -304,13 +315,21 @@ def verification_callback():
             samesite='Lax'
         )
         
+        # Clear any old session data
+        session.pop('stripe_verification_session', None)
+        session.pop(f'stripe_session_{user_id}', None)
+        
         return response
     else:
         # If verification failed, display an error message
         status = verification_status.get("status", "unknown")
         error_msg = verification_status.get("error", "")
         flash(f"Identity verification {status}. {error_msg} Please try again.", "warning")
-    
+        
+        # Clear any old session data
+        session.pop('stripe_verification_session', None)
+        session.pop(f'stripe_session_{user_id}', None)
+        
         # Redirect to the main page
         return redirect(url_for('main.index'))
 
