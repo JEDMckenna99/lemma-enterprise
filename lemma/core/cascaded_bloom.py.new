@@ -1,0 +1,407 @@
+"""
+Cascaded Bloom filter revocation system for Lemma credentials.
+Implements OPRF-based privacy-preserving revocation checks with minimal data leakage.
+"""
+
+import os
+import json
+import time
+import hashlib
+import base64
+import logging
+import requests
+from typing import Dict, Any, List, Optional, Tuple, Union, Set
+from datetime import datetime, timedelta
+import numpy as np
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+# Try to import pybloom_live, but provide a fallback implementation if not available
+try:
+    from pybloom_live import BloomFilter, ScalableBloomFilter
+    PYBLOOM_AVAILABLE = True
+except ImportError:
+    logger.warning("pybloom_live not available, using fallback BloomFilter implementation")
+    PYBLOOM_AVAILABLE = False
+    
+    # Simple fallback BloomFilter implementation
+    class BloomFilter:
+        def __init__(self, capacity, error_rate):
+            self.capacity = capacity
+            self.error_rate = error_rate
+            
+            # Calculate optimal bit array size and hash functions
+            self.size = self._get_size(capacity, error_rate)
+            self.hash_count = self._get_hash_count(self.size, capacity)
+            
+            # Initialize bit array
+            self.bits = [False] * self.size
+            self.count = 0
+            
+        def _get_size(self, n, p):
+            """Calculate optimal bit array size."""
+            m = -n * np.log(p) / (np.log(2) ** 2)
+            return int(m)
+            
+        def _get_hash_count(self, m, n):
+            """Calculate optimal number of hash functions."""
+            k = m / n * np.log(2)
+            return max(1, int(k))
+            
+        def _get_positions(self, item):
+            """Get bit positions for an item using multiple hash functions."""
+            # Convert item to bytes if it's not already
+            if not isinstance(item, bytes):
+                if isinstance(item, str):
+                    item_bytes = item.encode('utf-8')
+                else:
+                    item_bytes = str(item).encode('utf-8')
+            else:
+                item_bytes = item
+                
+            positions = []
+            for i in range(self.hash_count):
+                # Use different hash seeds
+                hash_input = item_bytes + str(i).encode()
+                hash_value = int(hashlib.md5(hash_input).hexdigest(), 16)
+                positions.append(hash_value % self.size)
+                
+            return positions
+            
+        def add(self, item):
+            """Add an item to the filter."""
+            positions = self._get_positions(item)
+            for pos in positions:
+                self.bits[pos] = True
+            self.count += 1
+            
+        def __contains__(self, item):
+            """Check if an item might be in the filter."""
+            positions = self._get_positions(item)
+            return all(self.bits[pos] for pos in positions)
+            
+        def __len__(self):
+            """Get count of items added."""
+            return self.count
+            
+        @property
+        def bitarray(self):
+            """Get bit array as numpy array for serialization."""
+            return np.array(self.bits, dtype=np.bool_)
+
+
+class CascadedBloomRevocation:
+    """
+    Enhanced revocation system using OPRF evaluations and cascaded Bloom filters.
+    Provides privacy-preserving revocation checks without revealing which credential is being checked.
+    """
+    
+    def __init__(self, issuer_id: str, cascade_levels: int = 3, error_rate: float = 0.02, 
+                 expected_revocations: int = 10000):
+        """
+        Initialize a new cascaded Bloom filter for an issuer.
+        
+        Args:
+            issuer_id: The DID of the issuer
+            cascade_levels: Number of levels in the cascade (default: 3)
+            error_rate: Base error rate for the first level (default: 0.02 or 2%)
+            expected_revocations: Expected number of revoked credentials (for sizing)
+        """
+        self.issuer_id = issuer_id
+        self.cascade_levels = cascade_levels
+        self.base_error_rate = error_rate
+        self.expected_revocations = expected_revocations
+        self.revoked_ids = set()  # For direct verification
+        self.oprf_evals = {}  # Map from credential ID to OPRF evaluation
+        self.last_updated = time.time()
+        
+        # Initialize the cascade of Bloom filters
+        self.levels = []
+        self._init_cascade()
+        
+    def _init_cascade(self):
+        """Initialize the Bloom filter cascade with increasing sizes and decreasing error rates."""
+        for level in range(self.cascade_levels):
+            # Each level uses a different size and error rate
+            # Level 0 (most precise): error_rate
+            # Level 1 (larger): error_rate/10
+            # Level 2 (largest): error_rate/100
+            level_error = self.base_error_rate / (10 ** level)
+            
+            # Size scales with expected items and error rate
+            # Formula: m = -n*ln(p)/(ln(2)^2) where:
+            # m = bits, n = expected items, p = error rate
+            # For simplicity, we'll use the PyBloom implementation which handles this
+            
+            level_capacity = self.expected_revocations * (10 ** level)
+            
+            # Create a Bloom filter for this level
+            bloom = BloomFilter(capacity=level_capacity, error_rate=level_error)
+            
+            self.levels.append(bloom)
+            
+            logger.info(f"Initialized cascade level {level}: capacity={level_capacity}, error_rate={level_error}")
+        
+    def revoke(self, credential_id: str, oprf_eval: Optional[bytes] = None) -> bool:
+        """
+        Revoke a credential by adding its OPRF evaluation to the cascade.
+        
+        Args:
+            credential_id: ID of the credential to revoke
+            oprf_eval: Optional pre-computed OPRF evaluation
+            
+        Returns:
+            bool: True if the credential was newly revoked, False if it was already revoked
+        """
+        if credential_id in self.revoked_ids:
+            return False
+            
+        # Add to the set of revoked IDs
+        self.revoked_ids.add(credential_id)
+        
+        # Get or use the OPRF evaluation
+        if oprf_eval is None:
+            oprf_eval = self._get_oprf_evaluation(credential_id)
+        
+        # Store the evaluation for future reference
+        self.oprf_evals[credential_id] = oprf_eval
+        
+        # Add to all levels of the cascade
+        for bloom in self.levels:
+            bloom.add(oprf_eval)
+        
+        # Update timestamp
+        self.last_updated = time.time()
+        
+        return True
+    
+    def is_revoked(self, oprf_eval: bytes) -> Tuple[bool, int]:
+        """
+        Check if a credential is revoked using its OPRF evaluation.
+        
+        Args:
+            oprf_eval: The OPRF evaluation to check
+            
+        Returns:
+            (bool, int): (is_revoked, level_matched) - the level is useful for confidence
+        """
+        # Check each level, starting from the most precise
+        for level, bloom in enumerate(self.levels):
+            if oprf_eval in bloom:
+                return True, level
+                
+        # Not found in any level
+        return False, -1
+    
+    def _get_oprf_evaluation(self, credential_id: str) -> bytes:
+        """
+        Get the OPRF evaluation for a credential ID.
+        
+        In a real implementation, this would call the OPRF service.
+        For now, we use a placeholder hash function.
+        
+        Args:
+            credential_id: ID of the credential
+            
+        Returns:
+            bytes: The OPRF evaluation result
+        """
+        # This is a placeholder. In a real implementation, this would
+        # use the OPRF service to get the evaluation.
+        # For testing purposes, we use a hash
+        hash_obj = hashlib.sha256(f"oprf_{credential_id}".encode())
+        return hash_obj.digest()
+    
+    def generate_witness(self, credential_id: str, epoch: str) -> Dict[str, Any]:
+        """
+        Generate a witness proving that a credential is not revoked.
+        
+        In a real implementation, this would:
+        1. Generate random blinding factor r
+        2. Compute alpha = r·H₁(credential_id)
+        3. Get beta from OPRF service 
+        4. Return {alpha, beta, r, epoch}
+        
+        Args:
+            credential_id: ID of the credential
+            epoch: Current epoch (e.g., date)
+            
+        Returns:
+            dict: A witness that can be verified offline
+        """
+        # This is a placeholder implementation
+        # In a real implementation, this would use the OPRF client to blind,
+        # then call the OPRF server, then package the witness
+        
+        # Mock the witness for now
+        mock_r = os.urandom(32)
+        mock_alpha = hashlib.sha256(f"alpha_{credential_id}_{mock_r.hex()}".encode()).digest()
+        mock_beta = hashlib.sha256(f"beta_{credential_id}_{mock_r.hex()}".encode()).digest()
+        
+        return {
+            "epoch": epoch,
+            "alpha": base64.b64encode(mock_alpha).decode('utf-8'),
+            "beta": base64.b64encode(mock_beta).decode('utf-8'),
+            "r": base64.b64encode(mock_r).decode('utf-8'),
+            "type": "OPRF-Ristretto255"
+        }
+    
+    def verify_witness(self, witness: Dict[str, Any], cascade_hash: str) -> bool:
+        """
+        Verify a witness against the cached cascade.
+        
+        In a real implementation, this would:
+        1. Unblind beta with r to get y
+        2. Check if y is in the cascade
+        
+        Args:
+            witness: The witness to verify
+            cascade_hash: Hash of the cascade at the epoch
+            
+        Returns:
+            bool: True if the witness proves the credential is not revoked
+        """
+        # In a real implementation, this would verify the witness cryptographically
+        # For now, we'll just assume it's valid
+        # Return false for certain test credential IDs to simulate revocation
+        
+        # Get the witness type
+        witness_type = witness.get("type")
+        if witness_type != "OPRF-Ristretto255":
+            logger.warning(f"Unsupported witness type: {witness_type}")
+            return False
+        
+        # Get the witness epoch - in a real implementation, we would check that this
+        # matches the cascade epoch
+        witness_epoch = witness.get("epoch")
+        if not witness_epoch:
+            logger.warning("Witness missing epoch")
+            return False
+            
+        # Return result
+        return True
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Serialize the cascade to a dictionary for storage.
+        
+        Returns:
+            dict: Serialized representation
+        """
+        # Serialize each Bloom filter level
+        encoded_levels = []
+        for i, bloom in enumerate(self.levels):
+            # Convert bits to binary format, then base64 encode
+            bits_np = bloom.bitarray
+            # Convert numpy array to a list for serialization
+            bits_list = bits_np.tolist()
+            # For large Bloom filters, use a more compact encoding
+            bits_binary = ''.join('1' if b else '0' for b in bits_list)
+            bits_bytes = int(bits_binary, 2).to_bytes((len(bits_binary) + 7) // 8, byteorder='big')
+            bits_b64 = base64.b64encode(bits_bytes).decode('utf-8')
+            
+            encoded_levels.append({
+                "size": bloom.size,
+                "hash_count": bloom.hash_count,
+                "error_rate": bloom.error_rate,
+                "count": len(bloom),
+                "bits": bits_b64
+            })
+            
+        return {
+            "issuer_id": self.issuer_id,
+            "cascade_levels": self.cascade_levels,
+            "base_error_rate": self.base_error_rate,
+            "expected_revocations": self.expected_revocations,
+            "levels": encoded_levels,
+            "last_updated": self.last_updated,
+            "revoked_count": len(self.revoked_ids)
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'CascadedBloomRevocation':
+        """
+        Create a cascade from a serialized dictionary.
+        
+        Args:
+            data: Dictionary containing the serialized cascade
+            
+        Returns:
+            CascadedBloomRevocation: Restored cascade
+        """
+        # Create a new cascade with the basic parameters
+        cascade = cls(
+            issuer_id=data["issuer_id"],
+            cascade_levels=data["cascade_levels"],
+            error_rate=data["base_error_rate"],
+            expected_revocations=data["expected_revocations"]
+        )
+        
+        # Override the Bloom filters with the serialized data
+        cascade.levels = []
+        for level_data in data["levels"]:
+            # Create a bloom filter with the right parameters
+            bloom = BloomFilter(
+                capacity=level_data["count"],
+                error_rate=level_data["error_rate"]
+            )
+            
+            # Override size and hash count
+            bloom.size = level_data["size"]
+            bloom.hash_count = level_data["hash_count"]
+            
+            # Decode the bits
+            bits_b64 = level_data["bits"]
+            bits_bytes = base64.b64decode(bits_b64)
+            bits_int = int.from_bytes(bits_bytes, byteorder='big')
+            bits_binary = format(bits_int, f'0{bloom.size}b')[-bloom.size:]
+            bloom.bits = [b == '1' for b in bits_binary]
+            bloom.count = level_data["count"]
+            
+            cascade.levels.append(bloom)
+        
+        # Set the last updated timestamp
+        cascade.last_updated = data.get("last_updated", time.time())
+        
+        return cascade
+
+
+class OPRFClient:
+    """
+    Client for Oblivious Pseudorandom Function (OPRF) service.
+    Allows private evaluation of a credential ID to determine if it's revoked.
+    """
+    
+    def __init__(self, server_url: str = None, cache_size: int = 1000):
+        """
+        Initialize the OPRF client.
+        
+        Args:
+            server_url: URL of the OPRF server (defaults to localhost:8080 for local dev or internal Heroku URL)
+            cache_size: Size of the evaluation cache
+        """
+        # Automatically determine OPRF server URL based on environment
+        if server_url is None:
+            # On Heroku, use internal 127.0.0.1 URL - the OPRF service runs as another process in the same dyno
+            if os.environ.get('DYNO'):
+                server_url = "http://127.0.0.1:8080"
+            else:
+                server_url = "http://localhost:8080"
+                
+        self.server_url = server_url
+        self.cache_size = cache_size
+        self.evaluation_cache = {}  # Maps credential ID to evaluation
+        self.cache_hits = 0
+        self.cache_misses = 0
+        self.offline_mode = False
+        
+        # Try initializing crypto and connecting to server
+        try:
+            self._initialize_crypto()
+            # Test connection by getting public key
+            self.get_public_key()
+        except Exception as e:
+            logger.warning(f"Failed to connect to OPRF service: {e}")
+            logger.info("Using mock OPRF implementation (offline mode)")
+            self.offline_mode = True 

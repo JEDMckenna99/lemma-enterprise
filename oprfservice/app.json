@@ -1,0 +1,24 @@
+{
+  "name": "lemma-oprf-service",
+  "description": "OPRF service for Lemma Human Verification System",
+  "keywords": ["go", "oprf", "lemma", "verification"],
+  "buildpacks": [
+    {
+      "url": "heroku/go"
+    }
+  ],
+  "env": {
+    "OPRF_RATE_LIMIT": {
+      "description": "Rate limit for requests per minute",
+      "value": "60"
+    },
+    "OPRF_ROTATION_DAYS": {
+      "description": "Number of days between key rotations",
+      "value": "30"
+    },
+    "OPRF_DEBUG": {
+      "description": "Enable debug mode",
+      "value": "false"
+    }
+  }
+} 

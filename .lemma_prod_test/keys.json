@@ -1,14 +1,14 @@
 {
-    "did": "did:lemma:35d9e40b50fb4fe9b50b83e7f1204d95",
+    "did": "did:lemma:368f22b35b194109bc38c4242864b02b",
     "did_method": "lemma",
-    "did_id": "35d9e40b50fb4fe9b50b83e7f1204d95",
-    "private_key": "IYOMCTzCsk2a9AfRf4epzQ0F+9idy0w0UYsdsvOCslc=",
-    "public_key": "RG4PZv6eCOuXYSOB4WYVvbkJ4Z55nDD5cR7JzRKL+6k=",
+    "did_id": "368f22b35b194109bc38c4242864b02b",
+    "private_key": "BgW1QzwVkjK5RemM5IUtqD+5m77aCX4NHphKWNuma24=",
+    "public_key": "mU1Y+/aRNKH9k/AgiUXxZIRKbRG8nZS9R9+R6dkrqxE=",
     "public_key_jwk": {
         "kty": "OKP",
         "crv": "Ed25519",
-        "x": "RG4PZv6eCOuXYSOB4WYVvbkJ4Z55nDD5cR7JzRKL-6k"
+        "x": "mU1Y-_aRNKH9k_AgiUXxZIRKbRG8nZS9R9-R6dkrqxE"
     },
-    "created_at": "2025-05-21T18:14:21.500322",
+    "created_at": "2025-05-21T19:05:13.246058",
     "key_type": "Ed25519"
 }

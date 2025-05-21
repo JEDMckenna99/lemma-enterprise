@@ -1,0 +1,1 @@
+web: ./oprf-service --port=$PORT --keydir=./keys --metrics=true 
