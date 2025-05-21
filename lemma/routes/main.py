@@ -14,6 +14,7 @@ from lemma.core.credential_service import get_credential_service
 from lemma.auth.csrf_config import generate_csrf, csrf_protect
 from lemma.routes.api import rate_limit
 from datetime import datetime
+import sys
 try:
     from lemma.utils.wallet import LemmaWallet
 except ImportError:
@@ -789,3 +790,50 @@ def clear_session_credential():
     except Exception as e:
         current_app.logger.error(f"Error clearing session credential: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+@main_bp.route('/api/debug-session', methods=['GET'])
+def debug_session():
+    """Debug endpoint to show current session state.
+    
+    This endpoint is particularly useful for Windows development environments
+    where CSRF validation might be problematic.
+    """
+    try:
+        # Only allow in debug mode
+        if not current_app.config.get('DEBUG', False) and not current_app.config.get('TESTING', False):
+            return jsonify({"error": "Debug endpoints only available in debug/test mode"}), 403
+        
+        # Get all session data
+        session_data = {key: session.get(key) for key in session}
+        
+        # Add CSRF token from cookie if available
+        csrf_cookie = request.cookies.get('_csrf_token')
+        if csrf_cookie:
+            session_data['csrf_cookie'] = csrf_cookie[:10] + '...'  # Show only part of the token
+        
+        # Get cookie settings
+        cookie_config = {
+            'SESSION_COOKIE_SECURE': current_app.config.get('SESSION_COOKIE_SECURE'),
+            'SESSION_COOKIE_HTTPONLY': current_app.config.get('SESSION_COOKIE_HTTPONLY'),
+            'SESSION_COOKIE_SAMESITE': current_app.config.get('SESSION_COOKIE_SAMESITE'),
+            'SERVER_NAME': current_app.config.get('SERVER_NAME')
+        }
+        
+        # Get environment info
+        env_info = {
+            'FLASK_ENV': current_app.config.get('ENV'),
+            'FLASK_DEBUG': current_app.config.get('DEBUG'),
+            'TESTING': current_app.config.get('TESTING'),
+            'PLATFORM': sys.platform,
+            'IS_HEROKU': "DYNO" in os.environ
+        }
+        
+        return jsonify({
+            'session': session_data,
+            'cookie_config': cookie_config,
+            'env_info': env_info,
+            'request_headers': dict(request.headers)
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error in debug-session endpoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
