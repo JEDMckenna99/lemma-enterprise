@@ -34,15 +34,15 @@ def configure_csrf(app):
         app.logger.warning("CSRF error: %s from IP: %s", 
                           e.description, request.remote_addr)
         
-        # Check if request expects JSON
-        if request.is_json or request.headers.get('Accept') == 'application/json':
+        # Always return JSON for API routes
+        if request.path.startswith('/api/'):
             return jsonify({
                 'error': 'CSRF validation failed',
                 'message': e.description,
                 'status': 'error'
             }), 400
         
-        # For non-JSON requests, return HTML error
+        # For non-API requests, return HTML error
         return render_template('error.html', 
                              error="CSRF validation failed", 
                              message=e.description), 400
@@ -92,15 +92,24 @@ def generate_csrf():
     if current_app.config.get('TESTING', False) and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
         return 'test-csrf-token'
     
-    # Use Flask-WTF's CSRF token generation
-    try:
-        token = flask_generate_csrf()
-        # Set the token in the session
-        session['_csrf_token'] = token
-        return token
-    except Exception as e:
-        current_app.logger.warning(f"Error generating CSRF token: {e}")
-        return None
+    # Generate a new token
+    token = secrets.token_hex(32)
+    
+    # Set the token in the session
+    session['_csrf_token'] = token
+    
+    # Set the token in the cookie
+    response = current_app.make_response(jsonify({'csrf_token': token}))
+    response.set_cookie(
+        '_csrf_token',
+        token,
+        httponly=False,  # JavaScript needs access
+        secure=not current_app.config.get('TESTING', False),  # Secure in production
+        samesite='Strict',
+        path='/'
+    )
+    
+    return response
 
 def csrf_protect():
     """Decorator to explicitly require CSRF protection for a view."""

@@ -154,8 +154,18 @@ class LemmaWidget {
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to start verification');
+                    let errorMessage = 'Failed to start verification';
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorData.message || errorMessage;
+                    } catch (e) {
+                        // If response is not JSON, try to get text
+                        const text = await response.text();
+                        if (text.includes('CSRF')) {
+                            errorMessage = 'Security token expired. Please refresh the page and try again.';
+                        }
+                    }
+                    throw new Error(errorMessage);
                 }
 
                 const result = await response.json();
@@ -167,7 +177,7 @@ class LemmaWidget {
                 }
             } catch (error) {
                 console.error('Error starting verification:', error);
-                this.showError('Failed to start verification. Please try again.');
+                this.showError(error.message || 'Failed to start verification. Please try again.');
             } finally {
                 proveButton.disabled = false;
                 proveButton.textContent = 'Prove Lemma';
