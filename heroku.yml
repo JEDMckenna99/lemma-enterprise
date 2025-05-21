@@ -1,8 +1,6 @@
 build:
   docker:
     web: Dockerfile
-    oprf: oprfservice/Dockerfile
 
 run:
   web: gunicorn wsgi:app
-  oprf: /app/oprf-service --port=${PORT:-8080} --keydir=/app/keys
