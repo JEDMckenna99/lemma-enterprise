@@ -7,7 +7,8 @@ import time
 import logging
 import stripe
 from functools import wraps
-from flask import Blueprint, request, jsonify, current_app, session
+from flask import Blueprint, request, jsonify, current_app, session, url_for
+from datetime import datetime
 
 # Import credential service from the correct location
 try:
@@ -24,6 +25,13 @@ except ImportError:
     # Fallback to wherever these modules are actually located
     from lemma.security import admin_required
     from lemma.auth.csrf_config import csrf_protect, generate_csrf
+
+# Import utility functions
+try:
+    from lemma.utils.stripe_service import check_verification_status, create_verification_session
+except ImportError:
+    # We'll handle this in the functions where these are used
+    pass
 
 # Create blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -1115,3 +1123,194 @@ def debug_session():
     except Exception as e:
         current_app.logger.error(f"Error in debug-session: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@api_bp.route('/complete-verification-flow', methods=['POST'])
+@csrf_protect()
+@rate_limit
+def complete_verification_flow():
+    """
+    All-in-one endpoint for the full Lemma verification flow.
+    
+    This endpoint:
+    1. Checks if the user has an existing wallet credential
+    2. If no credential, initiates Stripe Identity verification
+    3. If verification is complete, mints a new credential
+    4. Ensures the credential is stored in the user's wallet
+    5. Returns results to the calling site
+    """
+    try:
+        data = request.get_json()
+        if not data or 'user_id' not in data:
+            return jsonify({"error": "User ID is required"}), 400
+            
+        user_id = data['user_id']
+        
+        # Extract other parameters
+        check_only = data.get('check_only', False)  # Just check status without doing verification
+        callback_url = data.get('callback_url')
+        wallet_credential = data.get('wallet_credential')
+        session_id = data.get('stripe_session_id')
+        
+        # Step 1: Check if the user already has a credential
+        credential_service = get_credential_service()
+        existing_credential = credential_service.get_user_credential(user_id)
+        
+        # Step 2: If a wallet credential was provided, validate and use it
+        if wallet_credential:
+            try:
+                verification_result = credential_service.verify_credential(wallet_credential)
+                if verification_result.get('valid', False):
+                    logger.info(f"Valid wallet credential provided for user {user_id}")
+                    
+                    # Set session variables for protected content access
+                    session['verified_human'] = True
+                    session['verified_user_id'] = user_id
+                    session['verified_credential'] = wallet_credential
+                    session['verified_credential_id'] = wallet_credential.get('id')
+                    
+                    # Return success with instructions to redirect
+                    return jsonify({
+                        "status": "verified",
+                        "message": "Valid credential found in wallet",
+                        "next_step": "redirect",
+                        "redirect_url": "/protected",
+                        "user_id": user_id
+                    })
+                else:
+                    logger.warning(f"Invalid wallet credential provided for user {user_id}")
+            except Exception as e:
+                logger.error(f"Error validating wallet credential: {str(e)}")
+        
+        # Step 3: If an existing credential is found on the server, use it
+        if existing_credential:
+            logger.info(f"Found existing credential for user {user_id}")
+            
+            # Format for wallet storage
+            wallet_credential = {
+                "credential": existing_credential,
+                "wallet_metadata": {
+                    "added_at": existing_credential.get('issuanceDate', datetime.now().isoformat()),
+                    "holder_id": user_id,
+                    "status": "active",
+                    "display_name": "Lemma Human Verification",
+                    "fingerprint": existing_credential.get('id', f"credential-{user_id}")
+                }
+            }
+            
+            # Set session variables for protected content access
+            session['verified_human'] = True
+            session['verified_user_id'] = user_id
+            session['verified_credential'] = existing_credential
+            session['verified_credential_id'] = existing_credential.get('id')
+            
+            # Return success with credential for storage
+            return jsonify({
+                "status": "verified",
+                "message": "Existing credential found",
+                "next_step": "store_credential",
+                "store_credential": wallet_credential,
+                "redirect_url": "/protected",
+                "user_id": user_id
+            })
+        
+        # Step 4: If we're just checking (no verification needed), return status
+        if check_only:
+            return jsonify({
+                "status": "not_verified",
+                "message": "No credential found",
+                "next_step": "start_verification",
+                "user_id": user_id
+            })
+        
+        # Step 5: If a Stripe session ID was provided, check its status
+        if session_id:
+            verification_status = check_verification_status(session_id)
+            
+            if verification_status.get("verified", False):
+                logger.info(f"User {user_id} verified via Stripe session {session_id}")
+                
+                # Issue a new credential
+                new_credential = credential_service.issue_credential(user_id)
+                logger.info(f"Issued new credential for verified user {user_id}")
+                
+                # Format for wallet storage
+                wallet_credential = {
+                    "credential": new_credential,
+                    "wallet_metadata": {
+                        "added_at": new_credential.get('issuanceDate', datetime.now().isoformat()),
+                        "holder_id": user_id,
+                        "status": "active",
+                        "display_name": "Lemma Human Verification",
+                        "fingerprint": new_credential.get('id', f"credential-{user_id}")
+                    }
+                }
+                
+                # Set session variables for protected content access
+                session['verified_human'] = True
+                session['verified_user_id'] = user_id
+                session['verified_credential'] = new_credential
+                session['verified_credential_id'] = new_credential.get('id')
+                
+                # Return success with credential for storage
+                return jsonify({
+                    "status": "verified",
+                    "message": "Stripe verification successful",
+                    "next_step": "store_credential",
+                    "store_credential": wallet_credential,
+                    "redirect_url": "/protected",
+                    "user_id": user_id
+                })
+            elif verification_status.get("status") == "processing":
+                return jsonify({
+                    "status": "processing",
+                    "message": "Verification is still processing",
+                    "next_step": "wait",
+                    "session_id": session_id,
+                    "user_id": user_id
+                })
+            else:
+                return jsonify({
+                    "status": "failed",
+                    "message": verification_status.get("error", "Verification failed"),
+                    "next_step": "restart_verification",
+                    "user_id": user_id
+                })
+        
+        # Step 6: Start a new verification flow
+        return_url = callback_url or url_for('main.verification_callback', user_id=user_id, _external=True)
+        
+        # Create a Stripe verification session
+        verification_session = create_verification_session(user_id, return_url)
+        
+        # Check if there was an error creating the session
+        if isinstance(verification_session, dict) and "error" in verification_session:
+            error_message = verification_session["error"]
+            logger.error(f"Error creating verification session: {error_message}")
+            return jsonify({
+                "status": "error", 
+                "message": f"Error creating verification session: {error_message}",
+                "next_step": "contact_support",
+                "user_id": user_id
+            }), 500
+        
+        # Store session ID
+        session['stripe_verification_session'] = verification_session.id
+        session[f'stripe_session_{user_id}'] = verification_session.id
+        
+        # Return with verification URL
+        return jsonify({
+            "status": "initiated",
+            "message": "Verification initiated",
+            "next_step": "redirect_to_verification",
+            "verification_url": verification_session.url,
+            "session_id": verification_session.id,
+            "user_id": user_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in complete verification flow: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Error: {str(e)}",
+            "next_step": "contact_support"
+        }), 500

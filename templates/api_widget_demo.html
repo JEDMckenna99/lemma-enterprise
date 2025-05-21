@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma API Widget Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        
+        h1 {
+            color: #6B3FA0;
+            margin-bottom: 20px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        
+        .section h2 {
+            color: #4A2C71;
+            margin-top: 0;
+        }
+        
+        .code-block {
+            background-color: #f5f5f5;
+            border-left: 4px solid #6B3FA0;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: monospace;
+            margin: 15px 0;
+        }
+        
+        .demo-container {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .tab-container {
+            margin-top: 20px;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab-button {
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            color: #555;
+        }
+        
+        .tab-button.active {
+            border-bottom: 2px solid #6B3FA0;
+            color: #6B3FA0;
+        }
+        
+        .tab-content {
+            padding: 20px 0;
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f7ff;
+            border-radius: 4px;
+            border-left: 4px solid #4285f4;
+        }
+    </style>
+</head>
+<body>
+    <h1>Lemma API Widget Demo</h1>
+    
+    <div class="section">
+        <h2>What is Lemma?</h2>
+        <p>Lemma is a human verification service that uses decentralized identity to verify humans once, and allow them to prove their humanity across multiple sites without re-verification.</p>
+        <p>The Lemma API Widget makes it easy to add human verification to your website or application.</p>
+    </div>
+    
+    <div class="section">
+        <h2>Basic Integration</h2>
+        <p>Here's how to add the Lemma API Widget to your site:</p>
+        
+        <div class="code-block">
+            &lt;!-- 1. Add the Lemma script to your page --&gt;
+            &lt;script src="https://your-lemma-instance.com/static/js/lemma-api-widget.js"&gt;&lt;/script&gt;
+            
+            &lt;!-- 2. Add a container for the widget --&gt;
+            &lt;div id="lemma-widget-container"&gt;&lt;/div&gt;
+            
+            &lt;!-- 3. Initialize the widget --&gt;
+            &lt;script&gt;
+                document.addEventListener('DOMContentLoaded', function() {
+                    LemmaWidget.init({
+                        containerId: 'lemma-widget-container',
+                        callbackUrl: '/your-callback-url',
+                        onSuccess: function(result) {
+                            console.log('Verification success:', result);
+                            document.getElementById('verification-result').textContent = 
+                                'Verification successful! User ID: ' + result.user_id;
+                        }
+                    });
+                });
+            &lt;/script&gt;
+            
+            &lt;!-- 4. Display verification results --&gt;
+            &lt;div id="verification-result"&gt;&lt;/div&gt;
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>Live Demo</h2>
+        <p>Here's the widget in action:</p>
+        
+        <div class="demo-container">
+            <!-- Widget container -->
+            <div id="lemma-widget-container"></div>
+            
+            <!-- Result display -->
+            <div id="verification-result" class="result" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>Advanced Options</h2>
+        
+        <div class="tab-container">
+            <div class="tab-buttons">
+                <button class="tab-button active" data-tab="basic">Basic Options</button>
+                <button class="tab-button" data-tab="callbacks">Callbacks</button>
+                <button class="tab-button" data-tab="attributes">Data Attributes</button>
+                <button class="tab-button" data-tab="api">Direct API</button>
+            </div>
+            
+            <div id="tab-basic" class="tab-content active">
+                <h3>Basic Configuration Options</h3>
+                <div class="code-block">
+                    LemmaWidget.init({
+                        containerId: 'lemma-widget-container', // ID of the container element
+                        userId: 'user_abc123',                 // Optional: Specific user ID to use
+                        callbackUrl: '/your-callback-url',     // URL to redirect after verification
+                        buttonText: 'Verify Human',            // Custom button text
+                        description: 'Verify you are human',   // Custom description text
+                        shouldRedirect: false                  // Prevent automatic redirect
+                    });
+                </div>
+            </div>
+            
+            <div id="tab-callbacks" class="tab-content">
+                <h3>Callback Functions</h3>
+                <div class="code-block">
+                    LemmaWidget.init({
+                        containerId: 'lemma-widget-container',
+                        onSuccess: function(result) {
+                            console.log('Verification successful:', result);
+                            // Handle successful verification
+                        },
+                        onFailure: function(error) {
+                            console.error('Verification failed:', error);
+                            // Handle verification failure
+                        }
+                    });
+                </div>
+            </div>
+            
+            <div id="tab-attributes" class="tab-content">
+                <h3>HTML Data Attributes</h3>
+                <p>You can also configure the widget using HTML data attributes:</p>
+                <div class="code-block">
+                    &lt;div 
+                        id="lemma-container" 
+                        data-lemma-widget 
+                        data-lemma-user-id="user_abc123"
+                        data-lemma-callback="/your-callback"
+                        data-lemma-button-text="Verify Human"
+                        data-lemma-description="Complete verification to access this content"
+                    &gt;&lt;/div&gt;
+                </div>
+                <p>The widget will automatically initialize for elements with the <code>data-lemma-widget</code> attribute.</p>
+            </div>
+            
+            <div id="tab-api" class="tab-content">
+                <h3>Direct API Access</h3>
+                <p>You can also use the Lemma API directly without the widget UI:</p>
+                <div class="code-block">
+                    // Call the verification function directly
+                    window.proveALemma({
+                        userId: 'user_abc123',
+                        callbackUrl: '/your-callback-url',
+                        elementId: 'status-element-id', // Optional: element to update with status
+                        shouldRedirect: true,
+                        onSuccess: function(result) {
+                            console.log('Verification success:', result);
+                        },
+                        onFailure: function(error) {
+                            console.error('Verification failed:', error);
+                        }
+                    });
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Tab switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Remove active class from all buttons and contents
+                    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                    
+                    // Add active class to clicked button and corresponding content
+                    this.classList.add('active');
+                    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+                });
+            });
+        });
+        
+        // Load the Lemma widget
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if the script is already loaded
+            const script = document.createElement('script');
+            script.src = '/static/js/lemma-api-widget.js';
+            script.onload = function() {
+                // Initialize the widget
+                LemmaWidget.init({
+                    containerId: 'lemma-widget-container',
+                    onSuccess: function(result) {
+                        console.log('Verification success:', result);
+                        const resultElement = document.getElementById('verification-result');
+                        resultElement.textContent = 'Verification successful! User ID: ' + result.user_id;
+                        resultElement.style.display = 'block';
+                    },
+                    onFailure: function(error) {
+                        console.error('Verification failed:', error);
+                        const resultElement = document.getElementById('verification-result');
+                        resultElement.textContent = 'Verification failed: ' + error;
+                        resultElement.style.display = 'block';
+                    },
+                    shouldRedirect: false
+                });
+            };
+            document.head.appendChild(script);
+        });
+    </script>
+</body>
+</html> 

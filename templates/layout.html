@@ -1,19 +1,27 @@
-<!-- Include the Lemma wallet JavaScript library -->
-<script src="/static/js/lemma-wallet.js"></script>
-<script>
-  // Initialize wallet if cookie is set
-  document.addEventListener('DOMContentLoaded', function() {
-    if (document.cookie.includes('lemma_wallet_enabled=true')) {
-      console.log('Initializing Lemma wallet from layout template');
-      if (!window.lemmaWallet) {
-        const wallet = new LemmaWallet();
-        const walletUI = new LemmaWalletUI(wallet);
-        walletUI.init();
-        
-        // Store the wallet instances in the window object
-        window.lemmaWallet = wallet;
-        window.lemmaWalletUI = walletUI;
-      }
-    }
-  });
-</script> 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma Human Verification</title>
+    <link rel="icon" href="/static/img/icon.png" type="image/png">
+    <!-- Include the Lemma wallet script -->
+    <script src="/static/js/lemma-wallet-init.js"></script>
+    <style>
+        :root {
+            --primary-color: #6B3FA0;
+            --secondary-color: #4A2C71;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% block content %}{% endblock %}
+</body>
+</html> 

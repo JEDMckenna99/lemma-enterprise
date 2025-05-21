@@ -356,3 +356,440 @@ document.addEventListener('DOMContentLoaded', function() {
     ensureWalletLoaded();
   }
 }); 
+
+/**
+ * Lemma Wallet Initialization
+ * This script initializes the Lemma wallet and provides functions for verification.
+ */
+
+// Initialize the Lemma wallet when the document is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing Lemma wallet...');
+    
+    // Check if lemmaWallet already exists
+    if (window.lemmaWallet) {
+        console.log('Lemma wallet already initialized');
+        return;
+    }
+    
+    // Create the lemmaWallet object
+    window.lemmaWallet = createLemmaWallet();
+    console.log('Lemma wallet initialized');
+});
+
+/**
+ * Create the Lemma wallet instance
+ * @returns {Object} The wallet object with methods for managing credentials
+ */
+function createLemmaWallet() {
+    const wallet = {
+        // Storage for credentials
+        credentialStore: new Map(),
+        
+        // Initialize the wallet
+        init: async function() {
+            // Load credentials from localStorage
+            await this.loadFromStorage();
+            return this;
+        },
+        
+        // Load credentials from localStorage
+        loadFromStorage: async function() {
+            try {
+                // Get all credentials from localStorage
+                const credentialKeys = Object.keys(localStorage).filter(key => 
+                    key.startsWith('lemma_credential_')
+                );
+                
+                for (const key of credentialKeys) {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(key));
+                        const userId = key.replace('lemma_credential_', '');
+                        this.credentialStore.set(userId, data);
+                    } catch (e) {
+                        console.error('Error parsing credential:', e);
+                    }
+                }
+                
+                console.log(`Loaded ${this.credentialStore.size} credentials from storage`);
+            } catch (e) {
+                console.error('Error loading credentials from storage:', e);
+            }
+        },
+        
+        // Get all credentials
+        getAllCredentials: async function() {
+            const credentials = [];
+            for (const [userId, data] of this.credentialStore.entries()) {
+                credentials.push(data);
+            }
+            return credentials;
+        },
+        
+        // Get a credential by ID
+        getCredential: async function(id) {
+            for (const [userId, data] of this.credentialStore.entries()) {
+                if (data.credential && data.credential.id === id) {
+                    return data;
+                }
+            }
+            return null;
+        },
+        
+        // Store a credential
+        storeCredential: async function(credentialData) {
+            if (!credentialData || !credentialData.credential || !credentialData.wallet_metadata) {
+                throw new Error('Invalid credential format');
+            }
+            
+            const userId = credentialData.wallet_metadata.holder_id;
+            if (!userId) {
+                throw new Error('Missing holder ID in credential');
+            }
+            
+            this.credentialStore.set(userId, credentialData);
+            
+            // Store in localStorage
+            localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(credentialData));
+            console.log(`Stored credential for user ${userId}`);
+            
+            return userId;
+        },
+        
+        // Delete a credential
+        deleteCredential: async function(id) {
+            let found = false;
+            
+            // Check all credentials for a match
+            for (const [userId, data] of this.credentialStore.entries()) {
+                if ((data.credential && data.credential.id === id) || 
+                    (data.wallet_metadata && data.wallet_metadata.fingerprint === id)) {
+                    this.credentialStore.delete(userId);
+                    localStorage.removeItem(`lemma_credential_${userId}`);
+                    found = true;
+                    console.log(`Deleted credential for user ${userId}`);
+                    break;
+                }
+            }
+            
+            if (!found) {
+                throw new Error('Credential not found');
+            }
+            
+            return true;
+        },
+        
+        // Verify if a user has a valid credential
+        checkVerification: async function(userId) {
+            try {
+                // Get CSRF token
+                const csrfResponse = await fetch('/api/generate-csrf-token', {
+                    credentials: 'include'
+                });
+                const csrfData = await csrfResponse.json();
+                const csrfToken = csrfData.csrf_token;
+                
+                // Check if we have a credential for this user
+                const credential = this.credentialStore.get(userId);
+                
+                // Call the verification API
+                const response = await fetch('/api/complete-verification-flow', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        user_id: userId,
+                        check_only: true,
+                        wallet_credential: credential ? credential.credential : null
+                    })
+                });
+                
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                console.error('Error checking verification:', error);
+                throw error;
+            }
+        },
+        
+        // Start the verification flow
+        startVerification: async function(userId, options = {}) {
+            try {
+                // Get CSRF token
+                const csrfResponse = await fetch('/api/generate-csrf-token', {
+                    credentials: 'include'
+                });
+                const csrfData = await csrfResponse.json();
+                const csrfToken = csrfData.csrf_token;
+                
+                // Get credential from wallet if available
+                const credential = this.credentialStore.get(userId);
+                
+                // Call the verification API
+                const response = await fetch('/api/complete-verification-flow', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        user_id: userId,
+                        wallet_credential: credential ? credential.credential : null,
+                        callback_url: options.callback_url || null,
+                        stripe_session_id: options.session_id || null
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // Handle the response
+                if (result.status === 'verified') {
+                    console.log('User is verified');
+                    
+                    // If we need to store a credential
+                    if (result.next_step === 'store_credential' && result.store_credential) {
+                        await this.storeCredential(result.store_credential);
+                    }
+                    
+                    // Redirect if needed
+                    if (result.redirect_url) {
+                        window.location.href = result.redirect_url;
+                    }
+                } 
+                else if (result.status === 'initiated') {
+                    console.log('Verification initiated');
+                    
+                    // Redirect to verification URL
+                    if (result.verification_url) {
+                        window.location.href = result.verification_url;
+                    }
+                    
+                    // Store session ID for later checking
+                    if (result.session_id) {
+                        localStorage.setItem('lemma_verification_session', result.session_id);
+                    }
+                }
+                
+                return result;
+            } catch (error) {
+                console.error('Error in verification flow:', error);
+                throw error;
+            }
+        },
+        
+        // Check the status of an ongoing verification
+        checkVerificationStatus: async function(userId, sessionId) {
+            try {
+                // Get CSRF token
+                const csrfResponse = await fetch('/api/generate-csrf-token', {
+                    credentials: 'include'
+                });
+                const csrfData = await csrfResponse.json();
+                const csrfToken = csrfData.csrf_token;
+                
+                // Call the verification API
+                const response = await fetch('/api/complete-verification-flow', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        user_id: userId,
+                        stripe_session_id: sessionId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // Handle the response
+                if (result.status === 'verified') {
+                    console.log('Verification completed successfully');
+                    
+                    // If we need to store a credential
+                    if (result.next_step === 'store_credential' && result.store_credential) {
+                        await this.storeCredential(result.store_credential);
+                    }
+                    
+                    // Clear session ID
+                    localStorage.removeItem('lemma_verification_session');
+                    
+                    // Redirect if needed
+                    if (result.redirect_url) {
+                        window.location.href = result.redirect_url;
+                    }
+                }
+                
+                return result;
+            } catch (error) {
+                console.error('Error checking verification status:', error);
+                throw error;
+            }
+        }
+    };
+    
+    // Initialize and return
+    return wallet.init();
+}
+
+/**
+ * Helper function to handle the complete Lemma verification flow
+ * Call this from your application to verify a user
+ * @param {string} userId - The user ID to verify
+ * @param {Object} options - Additional options
+ * @returns {Promise<Object>} Verification result
+ */
+async function verifyWithLemma(userId, options = {}) {
+    if (!window.lemmaWallet) {
+        console.error('Lemma wallet not initialized');
+        throw new Error('Lemma wallet not initialized');
+    }
+    
+    try {
+        // Check if already verified
+        const checkResult = await window.lemmaWallet.checkVerification(userId);
+        
+        // If already verified, return the result
+        if (checkResult.status === 'verified') {
+            console.log('User already verified');
+            return checkResult;
+        }
+        
+        // Start verification process
+        return await window.lemmaWallet.startVerification(userId, options);
+    } catch (error) {
+        console.error('Error in verifyWithLemma:', error);
+        throw error;
+    }
+} 
+
+/**
+ * API Widget Integration Functions
+ * Use these to integrate with the Lemma API widget
+ */
+
+/**
+ * Function to be called by the "Prove a Lemma" button in API widgets
+ * This is the main entry point for external sites to verify users
+ * 
+ * @param {Object} options - Configuration options
+ * @param {string} options.userId - The user ID to verify (required)
+ * @param {string} options.callbackUrl - URL to redirect after verification
+ * @param {string} options.elementId - ID of the element to update with status messages
+ * @param {Function} options.onSuccess - Callback function when verification succeeds
+ * @param {Function} options.onFailure - Callback function when verification fails
+ * @returns {Promise<Object>} Verification result
+ */
+window.proveALemma = async function(options = {}) {
+    console.log('Prove a Lemma called with options:', options);
+    
+    // Validate required parameters
+    if (!options.userId) {
+        console.error('User ID is required for verification');
+        if (options.onFailure) {
+            options.onFailure('User ID is required for verification');
+        }
+        return { status: 'error', message: 'User ID is required' };
+    }
+    
+    // Wait for wallet initialization
+    await waitForWalletInitialization();
+    
+    try {
+        // Show status if element ID provided
+        if (options.elementId) {
+            const element = document.getElementById(options.elementId);
+            if (element) {
+                element.textContent = 'Verifying...';
+            }
+        }
+        
+        // Use the unified verification flow
+        const result = await verifyWithLemma(options.userId, {
+            callback_url: options.callbackUrl
+        });
+        
+        console.log('Verification result:', result);
+        
+        // Update status element if provided
+        if (options.elementId) {
+            const element = document.getElementById(options.elementId);
+            if (element) {
+                element.textContent = result.message || 'Verification complete';
+            }
+        }
+        
+        // Handle result based on status
+        if (result.status === 'verified') {
+            // Call success callback if provided
+            if (options.onSuccess) {
+                options.onSuccess(result);
+            }
+            
+            // Redirect if requested and redirect URL provided
+            if (result.redirect_url && options.shouldRedirect !== false) {
+                window.location.href = result.redirect_url;
+            }
+        } else if (result.status === 'initiated') {
+            // Redirect to verification URL if provided
+            if (result.verification_url) {
+                window.location.href = result.verification_url;
+            }
+        } else {
+            // Call failure callback if provided
+            if (options.onFailure) {
+                options.onFailure(result.message || 'Verification failed');
+            }
+        }
+        
+        return result;
+    } catch (error) {
+        console.error('Error in proveALemma:', error);
+        
+        // Update status element if provided
+        if (options.elementId) {
+            const element = document.getElementById(options.elementId);
+            if (element) {
+                element.textContent = 'Verification error: ' + (error.message || 'Unknown error');
+            }
+        }
+        
+        // Call failure callback if provided
+        if (options.onFailure) {
+            options.onFailure(error.message || 'Verification error');
+        }
+        
+        return { status: 'error', message: error.message || 'Verification error' };
+    }
+};
+
+/**
+ * Helper function to wait for the wallet to initialize
+ * @param {number} timeout - Maximum time to wait in milliseconds
+ * @returns {Promise<Object>} The wallet object
+ */
+function waitForWalletInitialization(timeout = 5000) {
+    return new Promise((resolve) => {
+        if (window.lemmaWallet) {
+            resolve(window.lemmaWallet);
+            return;
+        }
+        
+        const startTime = Date.now();
+        const checkInterval = setInterval(() => {
+            if (window.lemmaWallet) {
+                clearInterval(checkInterval);
+                resolve(window.lemmaWallet);
+            } else if (Date.now() - startTime > timeout) {
+                clearInterval(checkInterval);
+                console.warn('Wallet initialization timed out');
+                resolve(null);
+            }
+        }, 100);
+    });
+} 

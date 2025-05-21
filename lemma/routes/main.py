@@ -837,3 +837,8 @@ def debug_session():
     except Exception as e:
         current_app.logger.error(f"Error in debug-session endpoint: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/api-widget-demo')
+def api_widget_demo():
+    """Render the API widget demo page."""
+    return render_template('api_widget_demo.html')
