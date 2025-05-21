@@ -23,7 +23,7 @@ try:
 except ImportError:
     # Fallback to wherever these modules are actually located
     from lemma.security import admin_required
-    from lemma.csrf_config import csrf_protect, generate_csrf_token
+    from lemma.auth.csrf_config import csrf_protect, generate_csrf
 
 # Create blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
