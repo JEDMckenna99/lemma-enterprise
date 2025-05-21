@@ -403,7 +403,7 @@ If you encounter CSRF token errors when deploying to Heroku (such as "csrf_token
    # In lemma/routes/main.py
    @main_bp.context_processor
    def inject_csrf_token():
-       return {'csrf_token': generate_csrf_token()}
+       return {'csrf_token': generate_csrf()}
    ```
 
 2. Updated the templates to access the token as a variable instead of a function call:

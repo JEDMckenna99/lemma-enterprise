@@ -240,8 +240,14 @@
         <!-- Hidden field to store session verification status -->
         <input type="hidden" id="sessionVerified" value="{{ session.get('verified_human', False)|string|lower }}">
         <!-- Hidden field to store credential data for wallet initialization -->
-        <input type="hidden" id="sessionCredential" value="{{ session_credential if session_credential else '' }}">
-        <input type="hidden" id="sessionUserId" value="{{ user_id }}">
+        <input type="hidden" id="sessionCredential" value="{{ session_credential | safe if session_credential else '' }}">
+        <input type="hidden" id="sessionUserId" value="{{ user_id if user_id else '' }}">
+
+        <!-- Debug output -->
+        <script>
+        console.log('Session credential:', document.getElementById('sessionCredential').value);
+        console.log('Session user ID:', document.getElementById('sessionUserId').value);
+        </script>
 
         <div class="card">
             <div class="success-badge">✓ Human Verification Successful</div>
