@@ -9,40 +9,6 @@ from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf
 
 logger = logging.getLogger(__name__)
 
-# Initialize CSRF protection
-csrf = CSRFProtect()
-
-# List of exempt routes (paths that don't require CSRF protection)
-CSRF_EXEMPT_ROUTES = [
-    '/api/health',
-    '/api/issue-credential',
-    '/api/verify-credential',
-    '/api/verify-presentation',
-    '/api/generate-challenge',
-    '/api/credentials',
-    '/api/store-credential',
-    '/api/credential/',
-    '/admin/login',
-    '/admin/issue',
-    '/admin/revoke',
-    '/admin/logout',
-    '/api/node_info',
-    '/api/peers',
-    '/api/peers/add',
-    '/api/peers/remove/',
-    '/api/peers/discover',
-    '/api/peers/health',
-    '/api/peers/sync/',
-    '/api/revocation/status',
-    '/api/revocation/sync',
-    '/api/revocation/import',
-    '/api/revocation/issuers',
-    '/api/revocation/issuer/',
-    '/api/revocation/data/',
-    '/api/revocation/check/',
-    '/api/revocation/add_peer'
-]
-
 def configure_csrf(app):
     """Configure CSRF protection for the application."""
     # Check if we're in testing mode
@@ -53,6 +19,7 @@ def configure_csrf(app):
     app.logger.info("Configuring CSRF protection")
     
     # Initialize CSRF protection
+    csrf = CSRFProtect()
     csrf.init_app(app)
     
     # Register error handler for CSRF errors
@@ -80,7 +47,35 @@ def configure_csrf(app):
                              message=e.description), 400
     
     # Configure exempt routes
-    for route in CSRF_EXEMPT_ROUTES:
+    for route in [
+        '/api/health',
+        '/api/issue-credential',
+        '/api/verify-credential',
+        '/api/verify-presentation',
+        '/api/generate-challenge',
+        '/api/credentials',
+        '/api/store-credential',
+        '/api/credential/',
+        '/admin/login',
+        '/admin/issue',
+        '/admin/revoke',
+        '/admin/logout',
+        '/api/node_info',
+        '/api/peers',
+        '/api/peers/add',
+        '/api/peers/remove/',
+        '/api/peers/discover',
+        '/api/peers/health',
+        '/api/peers/sync/',
+        '/api/revocation/status',
+        '/api/revocation/sync',
+        '/api/revocation/import',
+        '/api/revocation/issuers',
+        '/api/revocation/issuer/',
+        '/api/revocation/data/',
+        '/api/revocation/check/',
+        '/api/revocation/add_peer'
+    ]:
         csrf.exempt(route)
         
     # In testing mode with skip_auth, exempt all routes
@@ -88,7 +83,7 @@ def configure_csrf(app):
         app.logger.info("CSRF protection disabled for testing")
         csrf.exempt("*")
     
-    return app
+    return csrf
 
 def csrf_protect():
     """Decorator to explicitly require CSRF protection for a view."""
@@ -138,9 +133,10 @@ def validate_csrf_token(token=None):
     
     # Validate token using Flask-WTF
     try:
+        csrf = current_app.extensions['csrf']
         csrf.validate_csrf(token)
         return True
-    except CSRFError:
+    except (CSRFError, KeyError):
         return False
 
 def generate_csrf_token():
