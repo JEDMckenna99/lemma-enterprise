@@ -28,6 +28,9 @@ _credential_service = None
 def get_credential_service():
     """Get the credential service instance."""
     if '_credential_service' not in g:
+        # Initialize the service if it doesn't exist
+        if not _credential_service:
+            init_credential_service(current_app)
         g._credential_service = _credential_service
     return g._credential_service
 

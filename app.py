@@ -17,8 +17,6 @@ logger = logging.getLogger(__name__)
 logger.info("Creating Lemma Enterprise application")
 logger.info(f"Current working directory: {os.getcwd()}")
 
-app = create_app()
-
 # Configuration - Use instance folder for Heroku compatibility
 DATA_DIR = os.path.join(os.getcwd(), 'instance', 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -30,6 +28,13 @@ USERS_FILE = os.path.join(DATA_DIR, 'users.json')
 # Admin credentials (should be set via environment variables in production)
 ADMIN_USERNAME = os.environ.get('LEMMA_ADMIN_USER', 'admin')
 ADMIN_PASSWORD = os.environ.get('LEMMA_ADMIN_PASS', 'password')
+
+# Create app with configuration
+app = create_app({
+    'STORAGE_DIR': DATA_DIR,
+    'ADMIN_USERNAME': ADMIN_USERNAME,
+    'ADMIN_PASSWORD': ADMIN_PASSWORD
+})
 
 if __name__ == '__main__':
     """Run the application when executed directly."""
