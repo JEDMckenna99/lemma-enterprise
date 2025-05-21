@@ -5,6 +5,7 @@ Provides endpoints for external integrations and mobile applications with enhanc
 import secrets
 import time
 import logging
+import stripe
 from functools import wraps
 from flask import Blueprint, request, jsonify, current_app, session
 
@@ -1052,3 +1053,43 @@ def sync_with_peer(peer_id):
     except Exception as e:
         logger.error(f"Error syncing with peer: {str(e)}")
         return jsonify({'error': f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/start-verification', methods=['POST'])
+@csrf_protect()
+@rate_limit
+def start_verification():
+    """Start the Stripe Identity verification flow."""
+    try:
+        data = request.get_json()
+        if not data or 'user_id' not in data:
+            return jsonify({"error": "User ID is required"}), 400
+
+        user_id = data['user_id']
+        
+        # Initialize Stripe with the API key
+        stripe.api_key = current_app.config['STRIPE_API_KEY']
+        
+        # Create a VerificationSession
+        verification_session = stripe.identity.VerificationSession.create(
+            type='document',
+            metadata={
+                'user_id': user_id
+            }
+        )
+        
+        # Store the session ID in Flask session for later use
+        session['verification_session_id'] = verification_session.id
+        session['user_id'] = user_id
+        
+        # Return the client secret and URL
+        return jsonify({
+            'url': verification_session.url,
+            'client_secret': verification_session.client_secret
+        })
+        
+    except stripe.error.StripeError as e:
+        logger.error("Stripe error starting verification: %s", str(e))
+        return jsonify({"error": f"Stripe error: {str(e)}"}), 500
+    except Exception as e:
+        logger.error("Error starting verification: %s", str(e))
+        return jsonify({"error": f"Error starting verification: {str(e)}"}), 500

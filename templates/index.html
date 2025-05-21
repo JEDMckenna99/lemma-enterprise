@@ -383,11 +383,13 @@
                                 
                                 if (hasExistingCredential) {
                                     console.log('Found existing credential in wallet');
-                                    // Handle existing credential case
+                                    alert('You already have a Lemma credential. Please use "Access Protected Content" instead.');
                                     return;
                                 }
+                                console.log('No existing credentials found in wallet, proceeding with verification');
                             } catch (walletError) {
                                 console.error('Error checking wallet for credentials:', walletError);
+                                // Continue with verification if wallet check fails
                             }
                         } else {
                             console.log('Wallet not initialized, checking localStorage');
@@ -395,8 +397,10 @@
                             const legacyCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
                             if (legacyCredentials.length > 0) {
                                 console.log('Found legacy credentials in localStorage');
+                                alert('You already have a Lemma credential. Please use "Access Protected Content" instead.');
                                 return;
                             }
+                            console.log('No legacy credentials found, proceeding with verification');
                         }
                         
                         // Generate a random user ID
@@ -415,10 +419,10 @@
                         }
                         
                         const csrfData = await csrfResponse.json();
-                        console.log('Got CSRF token');
+                        console.log('Got CSRF token:', csrfData);
                         
                         // Start verification session
-                        console.log('Starting verification session');
+                        console.log('Starting verification session with user ID:', userId);
                         const sessionResponse = await fetch('/api/start-verification', {
                             method: 'POST',
                             headers: {
@@ -437,14 +441,14 @@
                         }
                         
                         const sessionData = await sessionResponse.json();
-                        console.log('Verification session started successfully');
+                        console.log('Verification session started successfully:', sessionData);
                         
                         // Redirect to Stripe verification
-                        if (sessionData.redirect_url) {
-                            console.log('Redirecting to Stripe verification');
-                            window.location.href = sessionData.redirect_url;
+                        if (sessionData.url) {
+                            console.log('Redirecting to Stripe verification:', sessionData.url);
+                            window.location.href = sessionData.url;
                         } else {
-                            throw new Error('No redirect URL received from server');
+                            throw new Error('No verification URL received from server');
                         }
                     } catch (error) {
                         console.error('Error starting verification process:', error);
