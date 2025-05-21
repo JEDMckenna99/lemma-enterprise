@@ -276,6 +276,16 @@
             <h2>Welcome to the Exclusive Human-Only Area</h2>
             <p>This content is only accessible to verified humans. Your credential has been successfully verified.</p>
             
+            <!-- Debug panel for credential status -->
+            <div class="card" id="debugSection" style="background-color: #f9f9f9; padding: 15px; margin: 15px 0; border-left: 4px solid #4A2C71;">
+                <h3 style="margin-top: 0;">Credential Status</h3>
+                <div>
+                    <p><strong>User ID:</strong> <span id="userId">{{ user_id }}</span></p>
+                    <p><strong>Status:</strong> <span id="lemmaStatus">{{ 'Verified Human' if session.get('verified_human', False) else 'Not Verified' }}</span></p>
+                    <p><strong>Credential ID:</strong> <span id="credentialId">{{ credential.id if credential and credential.id else 'Not Available' }}</span></p>
+                </div>
+            </div>
+            
             <div class="user-info">
                 <strong>User ID:</strong> <span id="userId">{{ user_id }}</span><br>
                 <strong>Verification Status:</strong> Verified Human<br>
@@ -865,6 +875,93 @@
             } else {
                 planSection.style.display = 'none';
                 this.textContent = 'View Lemma Network';
+            }
+        });
+
+        // Debug credential loading and storage
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Protected page loaded, forcing credential load');
+            
+            // Get wallet credential from hidden field
+            const walletCredentialElem = document.getElementById('walletCredential');
+            const sessionCredentialElem = document.getElementById('sessionCredential');
+            const userIdElem = document.getElementById('sessionUserId');
+            
+            let credential = null;
+            let userId = userIdElem?.value || 'unknown';
+            
+            // Try to get credential from wallet hidden field
+            if (walletCredentialElem && walletCredentialElem.value) {
+                try {
+                    const walletCredential = JSON.parse(walletCredentialElem.value);
+                    console.log('Found wallet credential in hidden field', walletCredential);
+                    credential = walletCredential;
+                    
+                    // Store directly in localStorage for access by wallet
+                    localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(walletCredential));
+                    console.log('Stored wallet credential in localStorage');
+                    
+                    // Update UI
+                    document.getElementById('userId').textContent = userId;
+                    document.getElementById('lemmaStatus').textContent = 'Verified Human';
+                    document.getElementById('credentialId').textContent = walletCredential.credential?.id || 'Unknown';
+                } catch (e) {
+                    console.error('Error parsing wallet credential:', e);
+                }
+            }
+            // Fall back to session credential
+            else if (sessionCredentialElem && sessionCredentialElem.value) {
+                try {
+                    const rawCredential = JSON.parse(sessionCredentialElem.value);
+                    console.log('Found session credential in hidden field', rawCredential);
+                    
+                    // Format for wallet
+                    const walletCredential = {
+                        credential: rawCredential,
+                        wallet_metadata: {
+                            added_at: rawCredential.issuanceDate || new Date().toISOString(),
+                            holder_id: userId,
+                            status: "active",
+                            display_name: "Lemma Human Verification",
+                            fingerprint: rawCredential.id || `fingerprint-${Date.now()}`
+                        }
+                    };
+                    
+                    // Store directly in localStorage
+                    localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(walletCredential));
+                    console.log('Stored session credential in localStorage');
+                    
+                    // Update UI
+                    document.getElementById('userId').textContent = userId;
+                    document.getElementById('lemmaStatus').textContent = 'Verified Human';
+                    document.getElementById('credentialId').textContent = rawCredential.id || 'Unknown';
+                } catch (e) {
+                    console.error('Error parsing session credential:', e);
+                }
+            }
+            
+            // Check localStorage as a final fallback
+            if (!credential) {
+                const storageCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+                if (storageCredentials.length > 0) {
+                    try {
+                        const storageCredential = JSON.parse(localStorage.getItem(storageCredentials[0]));
+                        console.log('Found credential in localStorage', storageCredential);
+                        
+                        // Update UI
+                        const storageUserId = storageCredentials[0].replace('lemma_credential_', '');
+                        document.getElementById('userId').textContent = storageUserId;
+                        document.getElementById('lemmaStatus').textContent = 'Verified Human';
+                        document.getElementById('credentialId').textContent = 
+                            storageCredential.credential?.id || 
+                            storageCredential.id || 
+                            'Unknown';
+                    } catch (e) {
+                        console.error('Error parsing localStorage credential:', e);
+                    }
+                } else {
+                    console.error('No credentials found in any storage location');
+                }
             }
         });
     </script>
