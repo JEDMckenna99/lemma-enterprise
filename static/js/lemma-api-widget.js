@@ -261,6 +261,8 @@ window.LemmaWidget = {
       return;
     }
     
+    console.log('[WIDGET-DEBUG] Rendering widget in container:', this.config.containerId);
+    
     // Create widget elements
     const widget = document.createElement('div');
     widget.className = 'lemma-widget';
@@ -293,12 +295,20 @@ window.LemmaWidget = {
     spinner.className = 'lemma-spinner';
     spinner.id = 'lemma-spinner';
     
-    const button = document.createElement('button');
-    button.className = 'lemma-button prove-button';
-    button.id = 'lemma-verify-button';
-    button.textContent = this.config.buttonText;
+    const proveButton = document.createElement('button');
+    proveButton.className = 'lemma-button prove-button';
+    proveButton.id = 'lemma-verify-button';
+    proveButton.textContent = this.config.buttonText;
     
-    buttonContainer.appendChild(button);
+    // Directly add click handler to the button
+    const self = this; // Store reference to 'this' for use in event handler
+    proveButton.onclick = function(event) {
+      console.log('[WIDGET-DEBUG] Button clicked directly via onclick');
+      self.startVerification();
+      event.preventDefault();
+    };
+    
+    buttonContainer.appendChild(proveButton);
     
     // Add the Present Lemma button if configured
     if (this.config.showPresentButton) {
@@ -310,10 +320,14 @@ window.LemmaWidget = {
       presentButton.style.color = '#6B3FA0';
       presentButton.style.border = '2px solid #6B3FA0';
       
-      buttonContainer.appendChild(presentButton);
+      // Directly add click handler
+      presentButton.onclick = function(event) {
+        console.log('[WIDGET-DEBUG] Present button clicked directly via onclick');
+        self.presentLemma();
+        event.preventDefault();
+      };
       
-      // Add event listener for the present button
-      presentButton.addEventListener('click', () => this.presentLemma());
+      buttonContainer.appendChild(presentButton);
     }
     
     const status = document.createElement('div');
@@ -330,8 +344,7 @@ window.LemmaWidget = {
     container.innerHTML = '';
     container.appendChild(widget);
     
-    // Add event listener to button
-    button.addEventListener('click', () => this.startVerification());
+    console.log('[WIDGET-DEBUG] Widget rendered, button event handlers attached');
   },
   
   // Start the verification process
@@ -341,6 +354,8 @@ window.LemmaWidget = {
     const status = document.getElementById('lemma-status');
     
     if (!button || !spinner || !status) return;
+    
+    console.log('[WIDGET-DEBUG] Prove a Lemma button clicked');
     
     // Show spinner, disable button
     button.disabled = true;
@@ -383,6 +398,8 @@ window.LemmaWidget = {
     
     if (!button || !spinner || !status) return;
     
+    console.log('[WIDGET-DEBUG] Present Lemma button clicked');
+    
     // Show spinner, disable button
     button.disabled = true;
     spinner.style.display = 'inline-block';
@@ -391,6 +408,7 @@ window.LemmaWidget = {
     try {
       // FLOW 5: Check if wallet exists and has a credential
       if (!window.lemmaWallet) {
+        console.error('[WIDGET-DEBUG] lemmaWallet not available');
         status.textContent = 'Wallet not available. Please try again.';
         return;
       }

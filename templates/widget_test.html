@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ session.csrf_token }}">
+    <title>Lemma Widget Test</title>
+    <!-- Load the required scripts -->
+    <script src="/static/js/lemma-wallet.js"></script>
+    <script src="/static/js/lemma-wallet-init.js"></script>
+    <script src="/static/js/lemma-api-widget.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #6B3FA0;
+        }
+        
+        .container {
+            margin: 40px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .debug-panel {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        #debug-log {
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding: 10px;
+            background: #000;
+            color: #0f0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Lemma Widget Test</h1>
+    <p>This is a minimal test page for the Lemma API widget.</p>
+    
+    <div class="container">
+        <h2>Test Widget</h2>
+        <div id="lemma-widget-container"></div>
+    </div>
+    
+    <div class="debug-panel">
+        <h3>Debug Console</h3>
+        <button id="clear-log">Clear Log</button>
+        <div id="debug-log"></div>
+    </div>
+    
+    <script>
+        // Debug logging
+        const debugLog = document.getElementById('debug-log');
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        
+        // Override console methods to capture logs
+        console.log = function() {
+            originalConsoleLog.apply(console, arguments);
+            appendToDebugLog('LOG', Array.from(arguments).join(' '));
+        };
+        
+        console.error = function() {
+            originalConsoleError.apply(console, arguments);
+            appendToDebugLog('ERROR', Array.from(arguments).join(' '));
+        };
+        
+        console.warn = function() {
+            originalConsoleWarn.apply(console, arguments);
+            appendToDebugLog('WARN', Array.from(arguments).join(' '));
+        };
+        
+        function appendToDebugLog(type, message) {
+            const timestamp = new Date().toISOString().substr(11, 8);
+            debugLog.innerHTML += `[${timestamp}] [${type}] ${message}\n`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+        
+        // Clear log button
+        document.getElementById('clear-log').addEventListener('click', function() {
+            debugLog.innerHTML = '';
+        });
+        
+        // Initialize the widget
+        document.addEventListener('DOMContentLoaded', function() {
+            appendToDebugLog('INFO', 'DOM loaded, initializing widget');
+            
+            // Check if LemmaWidget is available
+            if (typeof window.LemmaWidget === 'undefined') {
+                appendToDebugLog('ERROR', 'LemmaWidget not found!');
+                document.getElementById('lemma-widget-container').innerHTML = 
+                    '<div style="color:red;padding:10px;border:1px solid red;">Error: LemmaWidget not found</div>';
+                return;
+            }
+            
+            appendToDebugLog('INFO', 'LemmaWidget found, initializing');
+            
+            // Initialize with debug callback
+            try {
+                window.LemmaWidget.init({
+                    containerId: 'lemma-widget-container',
+                    userId: 'test_user_' + Math.random().toString(36).substring(2, 10),
+                    callbackUrl: '/protected',
+                    buttonText: 'Prove a Lemma',
+                    description: 'Verify you are human to access protected content',
+                    shouldRedirect: true,
+                    showPresentButton: true,
+                    onSuccess: function(result) {
+                        appendToDebugLog('SUCCESS', JSON.stringify(result));
+                    },
+                    onFailure: function(error) {
+                        appendToDebugLog('FAILURE', JSON.stringify(error));
+                    }
+                });
+                
+                appendToDebugLog('INFO', 'Widget initialization completed');
+            } catch (error) {
+                appendToDebugLog('ERROR', 'Widget initialization failed: ' + error.message);
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html> 

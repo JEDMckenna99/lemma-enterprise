@@ -4,6 +4,11 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
+  // Debug logger
+  function debugLog(message, obj) {
+    console.log("[WALLET-DEBUG]", message, obj || '');
+  }
+  
   // Check if this page is integrated with Lemma
   const hasLemmaIntegration = 
     // Check if page contains Lemma-specific elements
@@ -15,29 +20,34 @@ document.addEventListener('DOMContentLoaded', function() {
     // Or check if localStorage contains Lemma credentials (legacy check)
     Object.keys(localStorage).some(key => key.startsWith('lemma_'));
   
+  debugLog('Lemma integration detected?', hasLemmaIntegration);
+  
   // Automatically set the cookie if page has Lemma integration
   if (hasLemmaIntegration && !document.cookie.includes('lemma_wallet_enabled=true')) {
-    console.log('Lemma integration detected, enabling wallet');
+    debugLog('Enabling wallet via cookie');
     document.cookie = "lemma_wallet_enabled=true; max-age=31536000; path=/; samesite=Lax";
   }
   
   // Check if wallet should be initialized
   const shouldInitWallet = document.cookie.includes('lemma_wallet_enabled=true');
   
+  debugLog('Should initialize wallet?', shouldInitWallet);
+  
   if (shouldInitWallet) {
-    console.log('Initializing Lemma wallet from lemma-wallet-init.js');
+    debugLog('Initializing Lemma wallet from lemma-wallet-init.js');
     
     // Ensure lemma-wallet.js is loaded
     const ensureWalletLoaded = function() {
       if (typeof LemmaWallet === 'undefined') {
         // If LemmaWallet class doesn't exist, load the script
-        console.log('Loading Lemma wallet script dynamically');
+        debugLog('Loading Lemma wallet script dynamically');
         const script = document.createElement('script');
         script.src = '/static/js/lemma-wallet.js';
         script.onload = initializeWallet;
         document.head.appendChild(script);
       } else {
         // Script already loaded, initialize wallet
+        debugLog('LemmaWallet class found, initializing');
         initializeWallet();
       }
     };
@@ -46,21 +56,48 @@ document.addEventListener('DOMContentLoaded', function() {
     const initializeWallet = function() {
       // Only initialize if not already done
       if (!window.lemmaWallet) {
-        console.log('Creating new wallet instance');
-        const wallet = new LemmaWallet();
-        const walletUI = new LemmaWalletUI(wallet);
-        walletUI.init();
-        
-        // Store the wallet instances in the window object
-        window.lemmaWallet = wallet;
-        window.lemmaWalletUI = walletUI;
-        
-        // Add credentials to wallet after initialization
-        setTimeout(function() {
-          addCredentialsToWallet(wallet);
-        }, 500);
+        debugLog('Creating new wallet instance');
+        try {
+          const wallet = new LemmaWallet();
+          
+          // Store the wallet instance in the window object
+          window.lemmaWallet = wallet;
+          
+          // Check if LemmaWalletUI exists before initializing
+          if (typeof LemmaWalletUI === 'undefined') {
+            debugLog('LemmaWalletUI not defined, creating mock implementation');
+            // Create a mock if not defined to prevent errors
+            window.LemmaWalletUI = class LemmaWalletUI {
+              constructor(wallet) {
+                this.wallet = wallet;
+                debugLog('Created mock WalletUI');
+              }
+              
+              init() {
+                debugLog('Mock WalletUI initialized');
+              }
+              
+              refreshCredentialList() {
+                debugLog('Mock refreshCredentialList called');
+              }
+            };
+          }
+          
+          const walletUI = new LemmaWalletUI(wallet);
+          walletUI.init();
+          window.lemmaWalletUI = walletUI;
+          
+          debugLog('Wallet initialized successfully');
+          
+          // Add credentials to wallet after initialization
+          setTimeout(function() {
+            addCredentialsToWallet(wallet);
+          }, 500);
+        } catch (error) {
+          console.error('[WALLET-ERROR] Failed to initialize wallet:', error);
+        }
       } else {
-        console.log('Wallet already initialized');
+        debugLog('Wallet already initialized');
       }
     };
     

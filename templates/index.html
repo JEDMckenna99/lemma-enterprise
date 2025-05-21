@@ -10,6 +10,21 @@
     <script src="/static/js/lemma-wallet-init.js"></script>
     <!-- Add API widget script -->
     <script src="/static/js/lemma-api-widget.js"></script>
+    <!-- Add debugging script -->
+    <script>
+        // Debug logger
+        function logDebug(message) {
+            console.log("[LEMMA-DEBUG]", message);
+        }
+        
+        // Intercept errors
+        window.addEventListener('error', function(event) {
+            console.error('[LEMMA-ERROR]', event.message, event.filename, event.lineno);
+        });
+        
+        // Log when scripts are loaded
+        logDebug('Page scripts loaded');
+    </script>
     <style>
         :root {
             --primary-color: #6B3FA0;
@@ -367,22 +382,44 @@
     <script>
         // Initialize the Lemma API widget when the page loads
         document.addEventListener('DOMContentLoaded', () => {
+            logDebug('DOM Content Loaded - Initializing widget');
+            
             // Get user_id from URL if available
             const urlParams = new URLSearchParams(window.location.search);
             const userId = urlParams.get('user_id') || ('user_' + Math.random().toString(36).substring(2, 10));
             
-            // Initialize the API widget
-            LemmaWidget.init({
-                containerId: 'lemma-widget-container',
-                userId: userId,
-                callbackUrl: '/protected',
-                buttonText: 'Verify Human',
-                description: 'Verify you are human to access protected content',
-                shouldRedirect: true,
-                onSuccess: function(result) {
-                    console.log('Verification successful:', result);
+            logDebug('Using userId: ' + userId);
+            
+            try {
+                // Check for widget namespace
+                if (!window.LemmaWidget) {
+                    throw new Error('LemmaWidget namespace not found');
                 }
-            });
+                
+                // Initialize the API widget
+                window.LemmaWidget.init({
+                    containerId: 'lemma-widget-container',
+                    userId: userId,
+                    callbackUrl: '/protected',
+                    buttonText: 'Prove a Lemma',
+                    description: 'Verify you are human to access protected content',
+                    shouldRedirect: true,
+                    showPresentButton: true,
+                    onSuccess: function(result) {
+                        logDebug('Verification successful: ' + JSON.stringify(result));
+                    },
+                    onFailure: function(error) {
+                        console.error('Verification failed:', error);
+                    }
+                });
+                
+                logDebug('Widget initialized');
+            } catch (error) {
+                console.error('Error initializing widget:', error);
+                document.getElementById('lemma-widget-container').innerHTML = 
+                    '<div style="color:red;padding:20px;border:1px solid red;margin:20px 0;">Error initializing verification widget: ' + 
+                    error.message + '</div>';
+            }
         });
     </script>
 </body>

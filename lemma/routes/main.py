@@ -836,3 +836,10 @@ def api_widget_demo():
     session.pop('_flashes', None)
     
     return render_template('api_widget_demo.html', user_id=user_id)
+
+@main_bp.route('/widget-test')
+def widget_test():
+    """Render a minimal test page for the Lemma widget."""
+    from lemma.auth.csrf_config import generate_csrf
+    session['csrf_token'] = generate_csrf()
+    return render_template('widget_test.html')
