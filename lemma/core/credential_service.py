@@ -90,16 +90,113 @@ class LemmaCredentialService:
     
     def _load_or_create_keys(self) -> Dict[str, Any]:
         """Load existing keys or create new ones with enterprise-grade security."""
-        if os.path.exists(self.keys_file):
-            with open(self.keys_file, 'r', encoding='utf-8') as f:
-                keys_data = json.load(f)
-                # Decrypt the private key
-                encrypted_private_key = keys_data['private_key']
-                private_key_str = self._decrypt_data(encrypted_private_key)
-                private_key_bytes = base64.b64decode(private_key_str)
-                private_key = ed25519.Ed25519PrivateKey.from_private_bytes(private_key_bytes)
-                keys_data['private_key_obj'] = private_key
+        # First check for environment variable
+        env_private_key = os.environ.get('ED25519_PRIVATE_KEY')
+        if env_private_key:
+            try:
+                # Ensure proper base64 padding
+                env_private_key = env_private_key.strip()
+                if len(env_private_key) % 4:
+                    env_private_key += '=' * (4 - len(env_private_key) % 4)
+                
+                # Decode the base64 private key
+                try:
+                    private_key_bytes = base64.b64decode(env_private_key)
+                    # Log the key length for debugging
+                    current_app.logger.info(f"Decoded private key length: {len(private_key_bytes)} bytes")
+                except Exception as e:
+                    current_app.logger.error(f"Error decoding ED25519_PRIVATE_KEY: {e}")
+                    current_app.logger.error(f"Key length: {len(env_private_key)}")
+                    current_app.logger.error(f"Key: {env_private_key[:10]}...")
+                    raise
+                
+                # Create private key object
+                try:
+                    # Ensure the private key is 32 bytes
+                    if len(private_key_bytes) != 32:
+                        # If it's longer, take the first 32 bytes
+                        private_key_bytes = private_key_bytes[:32]
+                        current_app.logger.warning("Truncating private key to 32 bytes")
+                    elif len(private_key_bytes) < 32:
+                        # If it's shorter, pad with zeros (this is not secure for production)
+                        private_key_bytes = private_key_bytes.ljust(32, b'\0')
+                        current_app.logger.warning("Padding private key to 32 bytes")
+                    
+                    private_key = ed25519.Ed25519PrivateKey.from_private_bytes(private_key_bytes)
+                except Exception as e:
+                    current_app.logger.error(f"Error creating private key object: {e}")
+                    current_app.logger.error(f"Key bytes length: {len(private_key_bytes)}")
+                    raise
+                
+                # Get public key
+                public_key = private_key.public_key()
+                
+                # Get public key bytes
+                public_bytes = public_key.public_bytes(
+                    encoding=serialization.Encoding.Raw,
+                    format=serialization.PublicFormat.Raw
+                )
+                
+                # Log public key length for debugging
+                current_app.logger.info(f"Generated public key length: {len(public_bytes)} bytes")
+                
+                # Create DID with method-specific identifier
+                did_method = os.environ.get("DID_METHOD", "lemma")
+                did_uuid = uuid.uuid4().hex
+                did = f"did:{did_method}:{did_uuid}"
+                
+                # Encode the public key for JWK format
+                public_key_jwk = {
+                    "kty": "OKP",
+                    "crv": "Ed25519",
+                    "x": base64.urlsafe_b64encode(public_bytes).decode('ascii').rstrip('=')
+                }
+                
+                # Create key data
+                keys_data = {
+                    'did': did,
+                    'did_method': did_method,
+                    'did_id': did_uuid,
+                    'private_key': base64.b64encode(private_key_bytes).decode('ascii'),  # Store normalized key
+                    'public_key': base64.b64encode(public_bytes).decode('ascii'),
+                    'public_key_jwk': public_key_jwk,
+                    'created_at': datetime.now().isoformat(),
+                    'key_type': 'Ed25519',
+                    'private_key_obj': private_key  # Not stored, just for runtime use
+                }
+                
+                # Save to local file for backup
+                self._save_keys(keys_data)
+                current_app.logger.info("Successfully loaded ED25519_PRIVATE_KEY from environment")
                 return keys_data
+            except Exception as e:
+                current_app.logger.error(f"Error loading ED25519_PRIVATE_KEY from environment: {e}")
+                # Fall through to file-based keys
+        
+        # If no environment key or error, try file
+        if os.path.exists(self.keys_file):
+            try:
+                with open(self.keys_file, 'r', encoding='utf-8') as f:
+                    keys_data = json.load(f)
+                    # Decrypt the private key
+                    encrypted_private_key = keys_data['private_key']
+                    private_key_str = self._decrypt_data(encrypted_private_key)
+                    
+                    # Ensure proper base64 padding
+                    if len(private_key_str) % 4:
+                        private_key_str += '=' * (4 - len(private_key_str) % 4)
+                    
+                    private_key_bytes = base64.b64decode(private_key_str)
+                    private_key = ed25519.Ed25519PrivateKey.from_private_bytes(private_key_bytes)
+                    keys_data['private_key_obj'] = private_key
+                    current_app.logger.info("Successfully loaded keys from file")
+                    return keys_data
+            except Exception as e:
+                current_app.logger.error(f"Error loading keys from file: {e}")
+                # Fall through to creating new keys
+        
+        # Create new keys if neither source available
+        current_app.logger.info("Creating new Ed25519 keys")
         
         # Get DID method from environment or configuration
         did_method = os.environ.get("DID_METHOD", "lemma")
@@ -149,23 +246,25 @@ class LemmaCredentialService:
         
         # Save keys with pretty formatting for readability
         self._save_keys(keys_data)
-        
+        current_app.logger.info("Successfully created and saved new keys")
         return keys_data
     
     def _save_keys(self, keys_data):
-        """Save keys securely."""
-        # Don't write the actual key object
-        save_data = keys_data.copy()
-        if 'private_key_obj' in save_data:
-            del save_data['private_key_obj']
+        """Save keys to file with secure encryption."""
+        # Create a copy of the data to avoid modifying the original
+        keys_to_save = keys_data.copy()
         
-        # Create a temporary file first to prevent data corruption
-        temp_file = f"{self.keys_file}.tmp"
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            json.dump(save_data, f, indent=2)
+        # Remove runtime-only data
+        keys_to_save.pop('private_key_obj', None)
         
-        # Atomic rename for data safety
-        os.replace(temp_file, self.keys_file)
+        # If the private key is from environment variable, encrypt it before saving
+        if os.environ.get('ED25519_PRIVATE_KEY') == keys_to_save.get('private_key'):
+            current_app.logger.info("Encrypting environment private key before saving")
+            keys_to_save['private_key'] = self._encrypt_data(keys_to_save['private_key'])
+        
+        # Save with pretty formatting for readability
+        with open(self.keys_file, 'w', encoding='utf-8') as f:
+            json.dump(keys_to_save, f, indent=4)
     
     def _load_registry(self) -> Dict[str, Any]:
         """Load credential registry or create if it doesn't exist."""
@@ -317,97 +416,122 @@ class LemmaCredentialService:
     
     def verify_credential(self, credential: Dict[str, Any]) -> Dict[str, bool]:
         """Verify a credential's signature and status with decentralized validation."""
-        # Make a copy of the credential to avoid modifying the original
-        credential_copy = credential.copy()
-        
-        # Get credential ID and issuer
-        credential_id = credential_copy.get("id")
-        issuer_did = credential_copy.get("issuer")
-        
-        if not credential_id or not issuer_did:
-            return {"valid": False, "reason": "Missing credential ID or issuer"}
-        
-        # Check revocation status using the decentralized revocation registry
         try:
-            from lemma.core.revocation import get_revocation_registry
-            revocation_registry = get_revocation_registry()
-            if revocation_registry and revocation_registry.is_revoked(issuer_did, credential_id):
-                return {"valid": False, "reason": "Credential has been revoked in the network"}
-        except ImportError:
-            # Fallback to local registry if the revocation module is not available
-            if credential_id in self.registry["credentials"] and self.registry["credentials"][credential_id]["revoked"]:
-                return {"valid": False, "reason": "Credential has been revoked locally"}
-        
-        # Check if expired
-        if "expirationDate" in credential_copy:
-            expiration_date = datetime.fromisoformat(credential_copy["expirationDate"])
-            if datetime.now() > expiration_date:
-                return {"valid": False, "reason": "Credential has expired"}
-
-        # Verify signature with enterprise-grade validation
-        proof = credential_copy.pop("proof", None)
-        if not proof:
-            return {"valid": False, "reason": "No proof found"}
-
-        # Verify proof type
-        if proof.get("type") != "Ed25519VerificationKey2020" and proof.get("type") != "Ed25519Signature2020":
-            return {"valid": False, "reason": f"Unsupported proof type: {proof.get('type')}"}
-
-        # Recreate the credential JSON that was signed
-        credential_json = json.dumps(credential_copy, sort_keys=True)
-
-        # Extract verification method from proof
-        verification_method = proof.get("verificationMethod")
-        if not verification_method:
-            verification_method = f"{issuer_did}#keys-1"  # Default verification method
-
-        # Get the public key using the DID resolver
-        try:
-            # If this is a local DID issued by this service
-            if issuer_did == self.keys["did"]:
-                # Use local key for verification
-                public_key_str = self.keys["public_key"]
-                # Ensure proper base64 padding
-                if len(public_key_str) % 4:
-                    public_key_str += '=' * (4 - len(public_key_str) % 4)
-                public_key_bytes = base64.b64decode(public_key_str)
-                
-                # Ensure the key is exactly 32 bytes
-                if len(public_key_bytes) != 32:
-                    return {"valid": False, "reason": "Invalid public key length"}
-                    
-                public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
-            elif self.did_resolver:
-                # Use DID resolver to get the public key
-                public_key = self.did_resolver.get_public_key(issuer_did, verification_method)
-                if not public_key:
-                    return {"valid": False, "reason": f"Could not resolve DID: {issuer_did}"}
-            else:
-                # Fallback to local verification if resolver not available
-                return {"valid": False, "reason": "DID resolver not available"}
-
-            # Verify signature
-            jws = proof["jws"]
-            # Ensure proper base64 padding for signature
-            if len(jws) % 4:
-                jws += '=' * (4 - len(jws) % 4)
-            signature = base64.b64decode(jws)
+            # Make a copy of the credential to avoid modifying the original
+            credential_copy = credential.copy()
             
-            # Ensure the signature is valid
+            # Get credential ID and issuer
+            credential_id = credential_copy.get("id")
+            issuer_did = credential_copy.get("issuer")
+            
+            if not credential_id or not issuer_did:
+                return {"valid": False, "reason": "Missing credential ID or issuer"}
+            
+            # Check revocation status using the decentralized revocation registry
             try:
-                public_key.verify(signature, credential_json.encode('utf-8'))
-            except Exception as e:
-                return {"valid": False, "reason": f"Signature verification failed: {str(e)}"}
+                from lemma.core.revocation import get_revocation_registry
+                revocation_registry = get_revocation_registry()
+                if revocation_registry and revocation_registry.is_revoked(issuer_did, credential_id):
+                    return {"valid": False, "reason": "Credential has been revoked in the network"}
+            except ImportError:
+                # Fallback to local registry if the revocation module is not available
+                if credential_id in self.registry["credentials"] and self.registry["credentials"][credential_id]["revoked"]:
+                    return {"valid": False, "reason": "Credential has been revoked locally"}
+            
+            # Check if expired
+            if "expirationDate" in credential_copy:
+                expiration_date = datetime.fromisoformat(credential_copy["expirationDate"])
+                if datetime.now() > expiration_date:
+                    return {"valid": False, "reason": "Credential has expired"}
 
-            return {
-                "valid": True,
-                "issuer": credential_copy["issuer"],
-                "subject": credential_copy["credentialSubject"]["id"],
-                "issuanceDate": credential_copy["issuanceDate"],
-                "expirationDate": credential_copy.get("expirationDate", "Not specified")
-            }
+            # Verify signature with enterprise-grade validation
+            proof = credential_copy.pop("proof", None)
+            if not proof:
+                return {"valid": False, "reason": "No proof found"}
+
+            # Verify proof type
+            if proof.get("type") != "Ed25519VerificationKey2020" and proof.get("type") != "Ed25519Signature2020":
+                return {"valid": False, "reason": f"Unsupported proof type: {proof.get('type')}"}
+
+            # Recreate the credential JSON that was signed
+            credential_json = json.dumps(credential_copy, sort_keys=True)
+
+            # Extract verification method from proof
+            verification_method = proof.get("verificationMethod")
+            if not verification_method:
+                verification_method = f"{issuer_did}#keys-1"  # Default verification method
+
+            # Get the public key using the DID resolver
+            try:
+                # If this is a local DID issued by this service
+                if issuer_did == self.keys["did"]:
+                    # Use local key for verification
+                    public_key_str = self.keys["public_key"]
+                    # Ensure proper base64 padding
+                    if len(public_key_str) % 4:
+                        public_key_str += '=' * (4 - len(public_key_str) % 4)
+                    
+                    try:
+                        public_key_bytes = base64.b64decode(public_key_str)
+                        current_app.logger.info(f"Decoded public key length: {len(public_key_bytes)} bytes")
+                        
+                        # Ensure the key is exactly 32 bytes
+                        if len(public_key_bytes) != 32:
+                            if len(public_key_bytes) > 32:
+                                public_key_bytes = public_key_bytes[:32]
+                                current_app.logger.warning("Truncating public key to 32 bytes")
+                            else:
+                                current_app.logger.error("Public key is too short")
+                                return {"valid": False, "reason": "Invalid public key length"}
+                        
+                        public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
+                    except Exception as e:
+                        current_app.logger.error(f"Error processing public key: {e}")
+                        return {"valid": False, "reason": f"Error processing public key: {str(e)}"}
+                        
+                elif self.did_resolver:
+                    # Use DID resolver to get the public key
+                    public_key = self.did_resolver.get_public_key(issuer_did, verification_method)
+                    if not public_key:
+                        return {"valid": False, "reason": f"Could not resolve DID: {issuer_did}"}
+                else:
+                    # Fallback to local verification if resolver not available
+                    return {"valid": False, "reason": "DID resolver not available"}
+
+                # Verify signature
+                jws = proof["jws"]
+                # Ensure proper base64 padding for signature
+                if len(jws) % 4:
+                    jws += '=' * (4 - len(jws) % 4)
+                
+                try:
+                    signature = base64.b64decode(jws)
+                    current_app.logger.info(f"Decoded signature length: {len(signature)} bytes")
+                except Exception as e:
+                    current_app.logger.error(f"Error decoding signature: {e}")
+                    return {"valid": False, "reason": f"Error decoding signature: {str(e)}"}
+                
+                # Ensure the signature is valid
+                try:
+                    public_key.verify(signature, credential_json.encode('utf-8'))
+                except Exception as e:
+                    current_app.logger.error(f"Signature verification failed: {e}")
+                    return {"valid": False, "reason": f"Signature verification failed: {str(e)}"}
+
+                return {
+                    "valid": True,
+                    "issuer": credential_copy["issuer"],
+                    "subject": credential_copy["credentialSubject"]["id"],
+                    "issuanceDate": credential_copy["issuanceDate"],
+                    "expirationDate": credential_copy.get("expirationDate", "Not specified")
+                }
+            except Exception as e:
+                current_app.logger.error(f"Error during key verification: {e}")
+                return {"valid": False, "reason": f"Error during key verification: {str(e)}"}
+                
         except Exception as e:
-            return {"valid": False, "reason": f"Invalid signature: {str(e)}"}
+            current_app.logger.error(f"Error verifying credential: {e}")
+            return {"valid": False, "reason": f"Error verifying credential: {str(e)}"}
     
     def get_user_credential(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get a user's full credential if it exists."""

@@ -273,15 +273,27 @@ def list_credentials():
         logger.error("Error listing credentials: %s", str(e))
         return jsonify({"error": f"Error listing credentials: {str(e)}"}), 500
 
-@api_bp.route('/get-csrf-token', methods=['GET'])
+@api_bp.route('/generate-csrf-token', methods=['GET'])
 def get_csrf_token():
     """Generate a CSRF token for client-side JavaScript and set it as a cookie."""
     try:
-        # Get or generate a CSRF token
-        token = generate_csrf_token()
-        response = jsonify({'csrf_token': token})
+        from flask_wtf.csrf import generate_csrf
+        
+        # Generate a CSRF token using Flask-WTF
+        csrf_token = generate_csrf()
+        
+        # Create response with token
+        response = jsonify({'csrf_token': csrf_token})
+        
         # Set the CSRF token as a cookie (modern best practice)
-        response.set_cookie('csrf_token', token, httponly=False, secure=True, samesite='Lax')
+        response.set_cookie(
+            'csrf_token', 
+            csrf_token, 
+            httponly=False,  # JavaScript needs access
+            secure=True,     # Only send over HTTPS
+            samesite='Lax'   # Protect against CSRF
+        )
+        
         return response
     except Exception as e:
         logger.error("Error generating CSRF token: %s", str(e))

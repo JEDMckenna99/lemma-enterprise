@@ -45,20 +45,8 @@ def inject_csrf_token():
 
 @main_bp.route('/')
 def index():
-    """Render the landing page."""
-    # Check if user is already verified and show appropriate message
-    is_verified = session.get('verified_user_id') is not None
-    
-    try:
-        current_app.logger.info(f"Rendering index.html template. Template path: {current_app.template_folder}")
-        return render_template('index.html', is_verified=is_verified)
-    except Exception as e:
-        current_app.logger.error(f"Error rendering index.html: {str(e)}")
-        current_app.logger.error(f"Template folder: {current_app.template_folder}")
-        current_app.logger.error(f"Template folder exists: {os.path.exists(current_app.template_folder)}")
-        if os.path.exists(current_app.template_folder):
-            current_app.logger.error(f"Template folder contents: {os.listdir(current_app.template_folder)}")
-        return f"Error loading template: {str(e)}", 500
+    """Render the main page."""
+    return render_template('index.html')
 
 @main_bp.route('/verify')
 def verify():
@@ -179,10 +167,10 @@ def start_verification(user_id):
     credential = credential_service.get_user_credential(user_id)
     
     if credential:
-        # If user already has a credential, redirect to verification page
-        current_app.logger.info(f"User {user_id} already has a credential, redirecting to verification page")
+        # If user already has a credential, redirect to main page
+        current_app.logger.info(f"User {user_id} already has a credential, redirecting to main page")
         flash("You already have a Lemma credential. Please verify with it.", "info")
-        return redirect(url_for('main.verify', user_id=user_id))
+        return redirect(url_for('main.index'))
     
     # Create a return URL for after verification
     return_url = url_for('main.verification_callback', user_id=user_id, _external=True)
@@ -195,7 +183,7 @@ def start_verification(user_id):
         # If there was an error creating the session, display an error message
         current_app.logger.error(f"Error creating verification session: {verification_session['error']}")
         flash(f"Error creating verification session: {verification_session['error']}", "error")
-        return redirect(url_for('main.verify', user_id=user_id))
+        return redirect(url_for('main.index'))
     
     # Store the verification session ID in the user's session
     session['stripe_verification_session'] = verification_session.id
@@ -241,7 +229,7 @@ def verification_callback():
             current_app.logger.info(f"Issued credential for user {user_id} without session verification")
         
         flash("Credential issued. Note: Identity verification could not be fully confirmed.", "warning")
-        return redirect(url_for('main.verify', user_id=user_id))
+        return redirect(url_for('main.protected'))
     
     # Check the verification status
     verification_status = check_verification_status(session_id)
@@ -317,8 +305,8 @@ def verification_callback():
         error_msg = verification_status.get("error", "")
         flash(f"Identity verification {status}. {error_msg} Please try again.", "warning")
     
-        # Redirect to the verification page
-        return redirect(url_for('main.verify', user_id=user_id, session_id=session_id))
+        # Redirect to the main page
+        return redirect(url_for('main.index'))
 
 @main_bp.route('/api/verification/status/<session_id>')
 def api_verification_status(session_id):

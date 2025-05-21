@@ -487,6 +487,11 @@
                             }
                             
                             console.log('Wallet credential verified successfully');
+                            // Check if we need to redirect
+                            if (verifyResult.redirect) {
+                                window.location.href = verifyResult.redirect;
+                                return;
+                            }
                             // No need to redirect, we're already on the protected page
                             // The session should now be set correctly
                             
@@ -674,7 +679,7 @@
                 try {
                     // Get CSRF token
                     const csrfResponse = await fetch('/api/generate-csrf-token', {
-                        credentials: 'include' // Ensure cookies are sent with the request
+                        credentials: 'include'
                     });
                     const csrfData = await csrfResponse.json();
                     const csrfToken = csrfData.csrf_token;
@@ -704,7 +709,7 @@
                             'Content-Type': 'application/json',
                             'X-CSRF-Token': csrfToken
                         },
-                        credentials: 'include', // Ensure cookies are sent with the request
+                        credentials: 'include',
                         body: JSON.stringify({
                             credential: credential,
                             challenge: challenge,
