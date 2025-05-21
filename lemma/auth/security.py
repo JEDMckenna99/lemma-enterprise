@@ -104,7 +104,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def generate_csrf_token():
+def generate_csrf():
     """Generate a CSRF token for forms."""
     if '_csrf_token' not in session:
         session['_csrf_token'] = secrets.token_hex(32)
