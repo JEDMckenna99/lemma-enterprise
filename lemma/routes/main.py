@@ -208,6 +208,9 @@ def verification_callback():
     session_id = request.args.get('session_id')
     user_id = request.args.get('user_id')
     
+    # Log the callback parameters
+    current_app.logger.info(f"Verification callback received. session_id: {session_id}, user_id: {user_id}")
+    
     # If session_id is not in URL params, try to get it from the Flask session
     if not session_id and user_id:
         # First try the user-specific session key
@@ -220,6 +223,7 @@ def verification_callback():
             current_app.logger.info(f"Using generic session ID: {session_id}")
     
     if not user_id:
+        current_app.logger.error("Missing user_id in verification callback")
         flash("Invalid verification callback. Missing user ID.", "error")
         return redirect(url_for('main.index'))
     
@@ -229,6 +233,11 @@ def verification_callback():
         # Even without session ID, we can still issue a credential as a fallback
         # This is less secure but allows the flow to continue
         credential_service = get_credential_service()
+        if not credential_service:
+            current_app.logger.error("Failed to get credential service")
+            flash("Error accessing credential service. Please try again.", "error")
+            return redirect(url_for('main.index'))
+            
         credential = credential_service.get_user_credential(user_id)
         if not credential:
             credential = credential_service.issue_credential(user_id)
@@ -245,8 +254,44 @@ def verification_callback():
         if 'expirationDate' in credential:
             session['verification_expiry'] = credential['expirationDate']
             
+        # Format credential for wallet storage
+        wallet_credential = {
+            'credential': credential,
+            'wallet_metadata': {
+                'added_at': credential.get('issuanceDate', ''),
+                'holder_id': user_id,
+                'status': 'active',
+                'display_name': 'Lemma Human Verification',
+                'fingerprint': credential.get('id', '')
+            }
+        }
+        
+        # Create response with wallet cookie and redirect to protected page
+        response = make_response(redirect(url_for('main.protected')))
+        
+        # Set cookie to enable the wallet
+        secure = not current_app.config.get('TESTING', False)  # Secure in production, not in testing
+        response.set_cookie(
+            'lemma_wallet_enabled', 
+            'true', 
+            max_age=31536000,  # 1 year
+            secure=secure, 
+            httponly=False,  # JavaScript needs access
+            samesite='Lax'
+        )
+        
+        # Store credential in localStorage for immediate access
+        response.set_cookie(
+            f'lemma_credential_{user_id}',
+            json.dumps(wallet_credential),
+            max_age=31536000,  # 1 year
+            secure=secure,
+            httponly=False,  # JavaScript needs access
+            samesite='Lax'
+        )
+        
         flash("Credential issued. Note: Identity verification could not be fully confirmed.", "warning")
-        return redirect(url_for('main.protected'))
+        return response
     
     # Check the verification status
     verification_status = check_verification_status(session_id)
@@ -260,6 +305,11 @@ def verification_callback():
     if verification_status.get("verified", False):
         # If verification passed, issue a lemma credential
         credential_service = get_credential_service()
+        if not credential_service:
+            current_app.logger.error("Failed to get credential service")
+            flash("Error accessing credential service. Please try again.", "error")
+            return redirect(url_for('main.index'))
+            
         credential = credential_service.get_user_credential(user_id)
         if not credential:
             credential = credential_service.issue_credential(user_id)
@@ -396,6 +446,9 @@ def protected():
     credential_data = session.get('verified_credential')
     is_verified_human = session.get('verified_human', False)
     
+    # Log the session state
+    current_app.logger.info(f"Protected page access - Session state: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}")
+    
     # Strict verification check - require both user_id and credentials
     if not user_id or not credential_data or not is_verified_human:
         # Log the unauthorized access attempt
@@ -405,11 +458,14 @@ def protected():
         flash("Please verify your Lemma to access this page", "warning")
         return redirect(url_for('main.verify'))
     
-    # For more security, you could verify the credential again here
-    # credential_service = get_credential_service()
-    # if not credential_service.verify_credential(credential_data).get('valid', False):
-    #     flash("Your human verification has expired. Please verify again.", "warning")
-    #     return redirect(url_for('main.verify'))
+    # Verify the credential is still valid
+    credential_service = get_credential_service()
+    if credential_service:
+        verification_result = credential_service.verify_credential(credential_data)
+        if not verification_result.get('valid', False):
+            current_app.logger.warning(f"Invalid credential detected for user {user_id}")
+            flash("Your human verification has expired. Please verify again.", "warning")
+            return redirect(url_for('main.verify'))
     
     # Ensure credential is properly serializable
     if credential_data and isinstance(credential_data, dict):
@@ -446,14 +502,51 @@ def protected():
     # Ensure proper serialization for template
     session_credential = json.dumps(credential_data) if credential_data else None
     
-    return render_template(
+    # Create response with wallet cookie
+    response = make_response(render_template(
         'protected.html',
         user_id=user_id,
         credential=credential_data,
         session_credential=session_credential,
         verification_time=session.get('verification_time'),
         verification_expiry=session.get('verification_expiry')
-    )
+    ))
+    
+    # Set cookie to enable the wallet if not already set
+    if not request.cookies.get('lemma_wallet_enabled'):
+        secure = not current_app.config.get('TESTING', False)  # Secure in production, not in testing
+        response.set_cookie(
+            'lemma_wallet_enabled', 
+            'true', 
+            max_age=31536000,  # 1 year
+            secure=secure, 
+            httponly=False,  # JavaScript needs access
+            samesite='Lax'
+        )
+    
+    # Store credential in localStorage if not already there
+    if credential_data and not request.cookies.get(f'lemma_credential_{user_id}'):
+        wallet_credential = {
+            'credential': credential_data,
+            'wallet_metadata': {
+                'added_at': credential_data.get('issuanceDate', ''),
+                'holder_id': user_id,
+                'status': 'active',
+                'display_name': 'Lemma Human Verification',
+                'fingerprint': credential_data.get('id', '')
+            }
+        }
+        secure = not current_app.config.get('TESTING', False)
+        response.set_cookie(
+            f'lemma_credential_{user_id}',
+            json.dumps(wallet_credential),
+            max_age=31536000,  # 1 year
+            secure=secure,
+            httponly=False,  # JavaScript needs access
+            samesite='Lax'
+        )
+    
+    return response
 
 @main_bp.route('/math-appendix')
 def math_appendix():
