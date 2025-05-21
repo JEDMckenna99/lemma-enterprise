@@ -144,11 +144,15 @@ def validate_csrf_token(token=None):
         if not token and request.form:
             token = request.form.get('csrf_token')
             
-        # Finally check in JSON data (for API requests with JSON body)
+        # Check in JSON data (for API requests with JSON body)
         if not token and request.is_json:
             token = request.json.get('csrf_token')
             
-        # If still no token, check the session
+        # Check in cookies
+        if not token:
+            token = request.cookies.get('_csrf_token')
+            
+        # Finally check in session
         if not token:
             token = session.get('_csrf_token')
     

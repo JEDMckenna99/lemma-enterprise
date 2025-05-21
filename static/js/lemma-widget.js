@@ -79,7 +79,7 @@ class LemmaWidget {
     async getCsrfToken() {
         try {
             // First try to get the token from the cookie
-            const cookieToken = document.cookie.split('; ').find(row => row.startsWith('csrf_token='));
+            const cookieToken = document.cookie.split('; ').find(row => row.startsWith('_csrf_token='));
             if (cookieToken) {
                 return cookieToken.split('=')[1];
             }
@@ -95,6 +95,17 @@ class LemmaWidget {
             }
             
             const data = await response.json();
+            
+            // Wait a bit for the cookie to be set
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Try to get the token from the cookie again
+            const newCookieToken = document.cookie.split('; ').find(row => row.startsWith('_csrf_token='));
+            if (newCookieToken) {
+                return newCookieToken.split('=')[1];
+            }
+            
+            // If still no cookie, use the token from the response
             return data.csrf_token;
         } catch (error) {
             console.error('Error getting CSRF token:', error);

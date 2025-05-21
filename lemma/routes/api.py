@@ -278,23 +278,23 @@ def list_credentials():
 def get_csrf():
     """Generate a CSRF token for client-side JavaScript and set it as a cookie."""
     try:
-        # Initialize session if needed
-        if not session.get('_csrf_token'):
-            session['_csrf_token'] = secrets.token_hex(32)
+        # Generate a new token
+        token = secrets.token_hex(32)
         
-        # Get or generate CSRF token
-        csrf_token = session.get('_csrf_token')
+        # Store in session
+        session['_csrf_token'] = token
         
         # Create response with token
-        response = jsonify({'csrf_token': csrf_token})
+        response = jsonify({'csrf_token': token})
         
-        # Set the CSRF token as a cookie (modern best practice)
+        # Set the CSRF token as a cookie with same settings as session
         response.set_cookie(
-            'csrf_token', 
-            csrf_token, 
+            '_csrf_token',  # Use same name as session
+            token,
             httponly=False,  # JavaScript needs access
             secure=not current_app.config.get('TESTING', False),  # Secure in production
-            samesite='Lax'   # Protect against CSRF
+            samesite='Strict',  # Match the session cookie setting
+            path='/'  # Available across all paths
         )
         
         return response
