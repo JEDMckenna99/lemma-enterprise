@@ -8,13 +8,14 @@ import os
 import sys
 import secrets
 import logging
-from flask import Flask, request, session, g, redirect
+from flask import Flask, request, session, g, redirect, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
 from logging.handlers import RotatingFileHandler
 import socket
 import shutil
 from flask_wtf.csrf import CSRFProtect
 from flask_cors import CORS
+import platform
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -25,6 +26,20 @@ def create_app(test_config=None):
     # Get the current working directory and determine if running on Heroku
     cwd = os.getcwd()
     is_heroku = 'DYNO' in os.environ
+    
+    # Determine if we're in development mode
+    is_development = not is_heroku and (
+        os.environ.get('FLASK_ENV') == 'development' or 
+        os.environ.get('LEMMA_ENV') == 'development' or
+        os.environ.get('FLASK_DEBUG') == '1' or
+        os.environ.get('LEMMA_DEBUG') == '1'
+    )
+    
+    # Also consider Windows a development environment for cookie security
+    is_windows = platform.system() == 'Windows'
+    if is_windows:
+        is_development = True
+        logger.info("Windows environment detected, using development settings")
     
     # Determine template and static folders based on environment
     template_dir = os.path.abspath(os.path.join(cwd, 'templates'))
@@ -70,14 +85,14 @@ def create_app(test_config=None):
         # Stripe Identity verification
         STRIPE_API_KEY=os.environ.get('STRIPE_API_KEY'),
         STRIPE_PUBLISHABLE_KEY=os.environ.get('STRIPE_PUBLISHABLE_KEY'),
-        # Enhanced security settings for OIDC4VP compliance
-        SESSION_COOKIE_SECURE=True,
-        SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE='Strict',  # Changed from 'Lax' to 'Strict' for OIDC4VP
+        # Enhanced security settings for OIDC4VP compliance - but relaxed for development
+        SESSION_COOKIE_SECURE=not is_development,  # Only use secure cookies in production
+        SESSION_COOKIE_HTTPONLY=True,  # Always use HTTP-only cookies for security
+        SESSION_COOKIE_SAMESITE='Lax',  # Use Lax instead of Strict for better usability and development
         PERMANENT_SESSION_LIFETIME=1800,  # 30 minutes
         # CSRF Configuration
         WTF_CSRF_ENABLED=True,
-        WTF_CSRF_SSL_STRICT=True,  # Enforce HTTPS for CSRF tokens
+        WTF_CSRF_SSL_STRICT=not is_development,  # Only enforce HTTPS for CSRF in production
         # Security headers
         SECURE_HEADERS={
             'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
@@ -174,19 +189,76 @@ def create_app(test_config=None):
                 url = request.url.replace('http://', 'https://', 1)
                 return redirect(url, code=301)
 
-    # Enable HSTS in production
+    # Configure security headers
     @app.after_request
     def add_security_headers(response):
-        if not app.debug and not app.testing:
-            # Enable HTTP Strict Transport Security (HSTS)
+        # Add security headers based on environment
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        
+        # Only add HSTS in production
+        if not is_development and not app.config.get('TESTING'):
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-            # Prevent MIME type sniffing
-            response.headers['X-Content-Type-Options'] = 'nosniff'
-            # Enable XSS protection
-            response.headers['X-XSS-Protection'] = '1; mode=block'
-            # Prevent clickjacking
-            response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        
+        # Ensure cookies are sent correctly
+        # For session cookies in development on Windows, we need special handling
+        if is_windows and 'Set-Cookie' in response.headers and 'session=' in response.headers['Set-Cookie']:
+            # Modify the session cookie to remove the secure flag if needed
+            cookies = response.headers.getlist('Set-Cookie')
+            new_cookies = []
+            
+            for cookie in cookies:
+                if 'session=' in cookie and 'Secure' in cookie and is_development:
+                    # Remove Secure flag for localhost development on Windows
+                    cookie = cookie.replace('Secure; ', '').replace('; Secure', '')
+                new_cookies.append(cookie)
+            
+            response.headers.pop('Set-Cookie')
+            for cookie in new_cookies:
+                response.headers.add('Set-Cookie', cookie)
+        
         return response
+
+    # Ensure secure sessions
+    @app.before_request
+    def make_session_permanent():
+        # Ensure session is permanent but respects lifetime
+        session.permanent = True
+
+    # Add support for reloading the application in development
+    if app.debug:
+        try:
+            from flask_debugtoolbar import DebugToolbarExtension
+            toolbar = DebugToolbarExtension(app)
+            app.logger.info("Debug toolbar enabled")
+        except ImportError:
+            app.logger.info("Debug toolbar not available")
+
+    # Convenience method for getting the app instance
+    @app.route('/debug-app')
+    def debug_app():
+        """Debug endpoint to check app configuration."""
+        if not app.debug and not app.config.get('TESTING'):
+            return jsonify({"error": "Debug endpoints only available in debug/test mode"}), 403
+        
+        return jsonify({
+            "environment": {
+                "is_heroku": is_heroku,
+                "is_development": is_development,
+                "is_windows": is_windows,
+                "platform": platform.system(),
+                "python_version": platform.python_version(),
+                "flask_debug": app.debug,
+                "flask_testing": app.config.get('TESTING', False),
+            },
+            "cookie_config": {
+                "session_cookie_secure": app.config.get('SESSION_COOKIE_SECURE'),
+                "session_cookie_httponly": app.config.get('SESSION_COOKIE_HTTPONLY'),
+                "session_cookie_samesite": app.config.get('SESSION_COOKIE_SAMESITE'),
+                "permanent_session_lifetime": str(app.config.get('PERMANENT_SESSION_LIFETIME')),
+            }
+        })
 
     return app
 

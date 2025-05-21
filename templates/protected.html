@@ -422,8 +422,81 @@
     </div>
 
     <script>
+        // Initialize Lemma wallet with debugging
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add a debug checker for session issues
+            async function checkSessionStatus() {
+                try {
+                    const response = await fetch('/api/debug-session');
+                    const sessionData = await response.json();
+                    console.log('DEBUG - Session status:', sessionData);
+                    
+                    // Update UI with session info
+                    const debugSection = document.getElementById('debugSection');
+                    if (debugSection) {
+                        const sessionInfo = document.createElement('div');
+                        sessionInfo.style.marginTop = '15px';
+                        sessionInfo.style.padding = '10px';
+                        sessionInfo.style.backgroundColor = '#f0f7ff';
+                        sessionInfo.style.borderRadius = '4px';
+                        sessionInfo.style.fontSize = '12px';
+                        
+                        sessionInfo.innerHTML = `
+                            <h4>Session Debug Info</h4>
+                            <p><strong>Session Cookie Present:</strong> ${sessionData.has_session_cookie}</p>
+                            <p><strong>Verified Human:</strong> ${sessionData.session.verified_human || 'false'}</p>
+                            <p><strong>User ID:</strong> ${sessionData.session.verified_user_id || 'None'}</p>
+                            <p><strong>Cookie Security:</strong> Secure=${sessionData.cookie_config.SESSION_COOKIE_SECURE}, 
+                               SameSite=${sessionData.cookie_config.SESSION_COOKIE_SAMESITE}</p>
+                        `;
+                        debugSection.appendChild(sessionInfo);
+                    }
+                    
+                    // Check if we need to force-reload due to session issues
+                    if (!sessionData.has_session_cookie && sessionData.session.verified_human) {
+                        console.warn('Session inconsistency detected - cookie missing but session verified');
+                        // Add a reload button
+                        const reloadBtn = document.createElement('button');
+                        reloadBtn.textContent = 'Force Reload Session';
+                        reloadBtn.className = 'button';
+                        reloadBtn.style.backgroundColor = '#DC3545';
+                        reloadBtn.style.marginTop = '10px';
+                        reloadBtn.addEventListener('click', () => {
+                            window.location.reload(true);
+                        });
+                        debugSection.appendChild(reloadBtn);
+                    }
+                } catch (error) {
+                    console.error('Failed to check session status:', error);
+                }
+            }
+            
+            // Run session check
+            checkSessionStatus();
+            
+            // ... rest of your existing DOMContentLoaded code ...
+        });
+
         // Check if credential exists in the wallet or session
         async function checkCredential() {
+            // Check session debug endpoint first
+            try {
+                const debugResponse = await fetch('/api/debug-session');
+                if (debugResponse.ok) {
+                    const debugData = await debugResponse.json();
+                    console.log('Session debug info:', debugData);
+                    
+                    // If we have a valid session but no session cookie, we might need to force reload
+                    if (debugData.session && debugData.session.verified_human && !debugData.has_session_cookie) {
+                        console.warn('Session inconsistency detected - reloading page');
+                        window.location.reload(true);
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking session debug:', error);
+            }
+            
             const sessionVerified = document.getElementById('sessionVerified').value === 'true';
             console.log('Session verification status:', sessionVerified);
             
@@ -524,13 +597,18 @@
                             }
                             
                             console.log('Wallet credential verified successfully');
+                            
                             // Check if we need to redirect
                             if (verifyResult.redirect) {
-                                window.location.href = verifyResult.redirect;
+                                console.log('Redirecting to:', verifyResult.redirect);
+                                // Force complete page reload to ensure session is picked up
+                                window.location.href = verifyResult.redirect + '?nocache=' + new Date().getTime();
                                 return;
                             }
+                            
                             // No need to redirect, we're already on the protected page
-                            // The session should now be set correctly
+                            // Force reload to make sure session is picked up
+                            window.location.reload(true);
                             
                         } catch (error) {
                             console.error('Error verifying wallet credential:', error);

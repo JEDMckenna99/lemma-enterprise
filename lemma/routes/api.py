@@ -1083,3 +1083,35 @@ def start_verification():
     except Exception as e:
         logger.error("Error starting verification: %s", str(e))
         return jsonify({"error": f"Error starting verification: {str(e)}"}), 500
+
+@api_bp.route('/debug-session', methods=['GET'])
+def debug_session():
+    """Debug endpoint to show current session state."""
+    from flask import session, jsonify, current_app
+    try:
+        # Only allow in debug mode
+        if not current_app.config.get('DEBUG', False) and not current_app.config.get('TESTING', False):
+            return jsonify({"error": "Debug endpoints only available in debug/test mode"}), 403
+        
+        # Get all session data
+        session_data = {key: session.get(key) for key in session}
+        
+        # Get cookie settings
+        cookie_config = {
+            'SESSION_COOKIE_SECURE': current_app.config.get('SESSION_COOKIE_SECURE'),
+            'SESSION_COOKIE_HTTPONLY': current_app.config.get('SESSION_COOKIE_HTTPONLY'),
+            'SESSION_COOKIE_SAMESITE': current_app.config.get('SESSION_COOKIE_SAMESITE'),
+            'SESSION_COOKIE_DOMAIN': current_app.config.get('SESSION_COOKIE_DOMAIN'),
+            'PERMANENT_SESSION_LIFETIME': str(current_app.config.get('PERMANENT_SESSION_LIFETIME')),
+        }
+        
+        # Return session data
+        return jsonify({
+            "session": session_data,
+            "cookie_config": cookie_config,
+            "request_cookies": {key: value for key, value in request.cookies.items()},
+            "has_session_cookie": 'session' in request.cookies,
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error in debug-session: {str(e)}")
+        return jsonify({"error": str(e)}), 500
