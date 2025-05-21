@@ -198,8 +198,8 @@ def test_expired_epoch_key(oprf_client, mock_oprf_client, epoch, expired):
         if expired:
             # Simulate an exception for expired epoch
             with pytest.raises(ValueError):
-                # This will raise ValueError due to our assertion below
-                assert False, "Expired epoch: {test_epoch}"
+                # Raise an actual ValueError for expired epochs
+                raise ValueError(f"Expired epoch: {test_epoch}")
         else:
             # Create a mock witness for valid epoch
             alpha, r = client.blind(credential_id)
