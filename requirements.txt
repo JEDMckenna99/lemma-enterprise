@@ -1,5 +1,5 @@
-Flask==2.0.1
-Werkzeug==2.0.3
+Flask==2.2.5
+Werkzeug==2.2.3
 Flask-Cors==3.0.10
 Flask-WTF==1.0.1
 WTForms==3.0.1
