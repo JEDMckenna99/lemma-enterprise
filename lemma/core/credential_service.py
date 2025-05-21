@@ -35,6 +35,19 @@ def init_credential_service(app):
     """Initialize the credential service."""
     global _credential_service
     try:
+        # On Heroku, we need to use environment variables for keys
+        if 'DYNO' in os.environ:
+            # If ED25519_PRIVATE_KEY is not set, generate a new one
+            if 'ED25519_PRIVATE_KEY' not in os.environ:
+                private_key = ed25519.Ed25519PrivateKey.generate()
+                private_bytes = private_key.private_bytes(
+                    encoding=serialization.Encoding.Raw,
+                    format=serialization.PrivateFormat.Raw,
+                    encryption_algorithm=serialization.NoEncryption()
+                )
+                os.environ['ED25519_PRIVATE_KEY'] = base64.b64encode(private_bytes).decode('ascii')
+                app.logger.info("Generated new ED25519_PRIVATE_KEY")
+
         _credential_service = LemmaCredentialService(app.config['STORAGE_DIR'])
         app.logger.info("Successfully initialized credential service")
         return _credential_service
@@ -64,8 +77,8 @@ class LemmaCredentialService:
         
         # Load or create necessary data
         self.keys = self._load_or_create_keys()
-        self.registry = {}  # Initialize empty for Heroku
-        self.users = {}     # Initialize empty for Heroku
+        self.registry = {"credentials": {}}  # Initialize empty for Heroku
+        self.users = {"users": {}}     # Initialize empty for Heroku
         
         # Get access to the DID resolver
         self.did_resolver = get_did_resolver()
@@ -116,57 +129,28 @@ class LemmaCredentialService:
     
     def _load_or_create_keys(self) -> Dict[str, Any]:
         """Load existing keys or create new ones with enterprise-grade security."""
-        # First check for environment variable
-        env_private_key = os.environ.get('ED25519_PRIVATE_KEY')
-        if env_private_key:
+        # First try to get key from environment variable
+        if self.is_heroku and 'ED25519_PRIVATE_KEY' in os.environ:
             try:
+                # Get the private key from environment
+                private_key_str = os.environ['ED25519_PRIVATE_KEY']
+                
                 # Ensure proper base64 padding
-                env_private_key = env_private_key.strip()
-                if len(env_private_key) % 4:
-                    env_private_key += '=' * (4 - len(env_private_key) % 4)
+                if len(private_key_str) % 4:
+                    private_key_str += '=' * (4 - len(private_key_str) % 4)
                 
-                # Decode the base64 private key
-                try:
-                    private_key_bytes = base64.b64decode(env_private_key)
-                    # Log the key length for debugging
-                    current_app.logger.info(f"Decoded private key length: {len(private_key_bytes)} bytes")
-                except Exception as e:
-                    current_app.logger.error(f"Error decoding ED25519_PRIVATE_KEY: {e}")
-                    current_app.logger.error(f"Key length: {len(env_private_key)}")
-                    current_app.logger.error(f"Key: {env_private_key[:10]}...")
-                    raise
+                # Decode and create key object
+                private_key_bytes = base64.b64decode(private_key_str)
+                private_key = ed25519.Ed25519PrivateKey.from_private_bytes(private_key_bytes)
                 
-                # Create private key object
-                try:
-                    # Ensure the private key is 32 bytes
-                    if len(private_key_bytes) != 32:
-                        # If it's longer, take the first 32 bytes
-                        private_key_bytes = private_key_bytes[:32]
-                        current_app.logger.warning("Truncating private key to 32 bytes")
-                    elif len(private_key_bytes) < 32:
-                        # If it's shorter, pad with zeros (this is not secure for production)
-                        private_key_bytes = private_key_bytes.ljust(32, b'\0')
-                        current_app.logger.warning("Padding private key to 32 bytes")
-                    
-                    private_key = ed25519.Ed25519PrivateKey.from_private_bytes(private_key_bytes)
-                except Exception as e:
-                    current_app.logger.error(f"Error creating private key object: {e}")
-                    current_app.logger.error(f"Key bytes length: {len(private_key_bytes)}")
-                    raise
-                
-                # Get public key
+                # Get the public key
                 public_key = private_key.public_key()
-                
-                # Get public key bytes
                 public_bytes = public_key.public_bytes(
                     encoding=serialization.Encoding.Raw,
                     format=serialization.PublicFormat.Raw
                 )
                 
-                # Log public key length for debugging
-                current_app.logger.info(f"Generated public key length: {len(public_bytes)} bytes")
-                
-                # Create DID with method-specific identifier
+                # Get DID method from environment or configuration
                 did_method = os.environ.get("DID_METHOD", "lemma")
                 did_uuid = uuid.uuid4().hex
                 did = f"did:{did_method}:{did_uuid}"
@@ -183,7 +167,7 @@ class LemmaCredentialService:
                     'did': did,
                     'did_method': did_method,
                     'did_id': did_uuid,
-                    'private_key': base64.b64encode(private_key_bytes).decode('ascii'),  # Store normalized key
+                    'private_key': private_key_str,
                     'public_key': base64.b64encode(public_bytes).decode('ascii'),
                     'public_key_jwk': public_key_jwk,
                     'created_at': datetime.now().isoformat(),
@@ -191,8 +175,6 @@ class LemmaCredentialService:
                     'private_key_obj': private_key  # Not stored, just for runtime use
                 }
                 
-                # Save to local file for backup
-                self._save_keys(keys_data)
                 current_app.logger.info("Successfully loaded ED25519_PRIVATE_KEY from environment")
                 return keys_data
             except Exception as e:
@@ -200,7 +182,7 @@ class LemmaCredentialService:
                 # Fall through to file-based keys
         
         # If no environment key or error, try file
-        if os.path.exists(self.keys_file):
+        if not self.is_heroku and os.path.exists(self.keys_file):
             try:
                 with open(self.keys_file, 'r', encoding='utf-8') as f:
                     keys_data = json.load(f)
@@ -246,33 +228,31 @@ class LemmaCredentialService:
             format=serialization.PublicFormat.Raw
         )
         
-        # Encode and encrypt the private key
-        private_key_str = base64.b64encode(private_bytes).decode('ascii')
-        encrypted_private_key = self._encrypt_data(private_key_str)
+        # Store the private key in environment if on Heroku
+        if self.is_heroku:
+            os.environ['ED25519_PRIVATE_KEY'] = base64.b64encode(private_bytes).decode('ascii')
         
-        # Encode the public key for JWK format (required for DID documents)
-        public_key_jwk = {
-            "kty": "OKP",
-            "crv": "Ed25519",
-            "x": base64.urlsafe_b64encode(public_bytes).decode('ascii').rstrip('=')
-        }
-        
-        # Create key data with additional security metadata
+        # Create key data
         keys_data = {
             'did': did,
             'did_method': did_method,
             'did_id': did_uuid,
-            'private_key': encrypted_private_key,  # Encrypted
+            'private_key': base64.b64encode(private_bytes).decode('ascii'),
             'public_key': base64.b64encode(public_bytes).decode('ascii'),
-            'public_key_jwk': public_key_jwk,
+            'public_key_jwk': {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": base64.urlsafe_b64encode(public_bytes).decode('ascii').rstrip('=')
+            },
             'created_at': datetime.now().isoformat(),
             'key_type': 'Ed25519',
             'private_key_obj': private_key  # Not stored, just for runtime use
         }
         
-        # Save keys with pretty formatting for readability
-        self._save_keys(keys_data)
-        current_app.logger.info("Successfully created and saved new keys")
+        # Save to local file for backup if not on Heroku
+        if not self.is_heroku:
+            self._save_keys(keys_data)
+        
         return keys_data
     
     def _save_keys(self, keys_data):
