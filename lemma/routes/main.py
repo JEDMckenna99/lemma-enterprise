@@ -67,6 +67,57 @@ def verify():
         user_id = f"user_{secrets.token_hex(8)}"
         return redirect(url_for('main.verify', user_id=user_id))
     
+    # Check if there's a session_id parameter from Stripe callback
+    session_id = request.args.get('session_id')
+    if session_id:
+        # Check verification status directly
+        verification_status = check_verification_status(session_id)
+        if verification_status.get("verified", False):
+            # Get credential service
+            credential_service = get_credential_service()
+            
+            # Issue a credential to the user if needed
+            credential = credential_service.get_user_credential(user_id)
+            if not credential:
+                credential = credential_service.issue_credential(user_id)
+                current_app.logger.info(f"Issued new credential for user {user_id}")
+            
+            # Format the credential for wallet storage
+            wallet_credential = {
+                "credential": credential,
+                "wallet_metadata": {
+                    "added_at": credential.get('issuanceDate', datetime.now().isoformat()),
+                    "holder_id": user_id,
+                    "status": "active",
+                    "display_name": "Lemma Human Verification",
+                    "fingerprint": credential.get('id', f"credential-{user_id}")
+                }
+            }
+            
+            # Set session variables for protected content access
+            session['verified_human'] = True
+            session['verified_user_id'] = user_id
+            session['verified_credential'] = credential
+            session['verified_credential_id'] = credential.get('id')
+            session['store_credential'] = wallet_credential
+            
+            # Create response with wallet cookie and redirect to protected page
+            response = make_response(redirect(url_for('main.protected')))
+            
+            # Set cookie to enable the wallet
+            secure = not current_app.config.get('TESTING', False) and not current_app.debug
+            response.set_cookie(
+                'lemma_wallet_enabled', 
+                'true', 
+                max_age=31536000,
+                secure=secure, 
+                httponly=False,
+                samesite='Lax'
+            )
+            
+            current_app.logger.info(f"Redirecting verified user {user_id} to protected page from verify route with session_id")
+            return response
+    
     # Store user ID in session for later use in callback
     session['verification_user_id'] = user_id
     

@@ -19,6 +19,19 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const userId = '{{ user_id }}';
+    const stripeSessionId = '{{ request.args.get("session_id") }}';
+    
+    // Check if we just came back from Stripe verification
+    if (stripeSessionId) {
+        // Update UI
+        document.getElementById('walletVerification').style.display = 'none';
+        document.getElementById('verificationStatus').style.display = 'block';
+        document.getElementById('verificationMessage').textContent = 'Verification complete! Redirecting...';
+        
+        // Redirect directly to protected page
+        window.location.href = '/protected';
+        return;
+    }
     
     // Check if we have a pending verification
     const pendingSessionId = localStorage.getItem('lemma_verification_session');
@@ -36,6 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('Verification status:', result);
                     if (result.status === 'verified') {
                         document.getElementById('verificationMessage').textContent = 'Verification successful! Redirecting...';
+                        window.location.href = '/protected';
                     } else if (result.status === 'processing') {
                         document.getElementById('verificationMessage').textContent = 'Verification is still processing. Please wait...';
                     } else {
