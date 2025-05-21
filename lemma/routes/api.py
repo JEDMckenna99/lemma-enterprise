@@ -274,8 +274,8 @@ def list_credentials():
         logger.error("Error listing credentials: %s", str(e))
         return jsonify({"error": f"Error listing credentials: {str(e)}"}), 500
 
-@api_bp.route('/generate-csrf-token', methods=['GET'])
-def get_csrf_token():
+@api_bp.route('/generate-csrf', methods=['GET'])
+def get_csrf():
     """Generate a CSRF token for client-side JavaScript and set it as a cookie."""
     try:
         # Initialize session if needed
