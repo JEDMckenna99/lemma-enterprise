@@ -18,6 +18,7 @@ class LemmaWidget {
                     <button class="lemma-button prove-button">Prove Lemma</button>
                     <button class="lemma-button show-button">Show Lemma</button>
                 </div>
+                <div class="lemma-widget-error" style="display: none; color: red; margin-top: 10px; text-align: center;"></div>
             </div>
             <style>
                 .lemma-widget {
@@ -66,10 +67,29 @@ class LemmaWidget {
         `;
     }
 
+    showError(message) {
+        const errorDiv = this.container.querySelector('.lemma-widget-error');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 5000);
+    }
+
     async getCsrfToken() {
-        const response = await fetch('/api/generate-csrf');
-        const data = await response.json();
-        return data.csrf_token;
+        try {
+            const response = await fetch('/api/generate-csrf', {
+                credentials: 'include'  // Important for CSRF token
+            });
+            if (!response.ok) {
+                throw new Error('Failed to get CSRF token');
+            }
+            const data = await response.json();
+            return data.csrf_token;
+        } catch (error) {
+            console.error('Error getting CSRF token:', error);
+            throw error;
+        }
     }
 
     attachEventListeners() {
@@ -78,10 +98,13 @@ class LemmaWidget {
 
         proveButton.addEventListener('click', async () => {
             try {
+                proveButton.disabled = true;
+                proveButton.textContent = 'Checking...';
+
                 // Check if user already has a lemma
                 const credentials = await this.wallet.getAllCredentials();
                 if (credentials && credentials.length > 0) {
-                    alert('You already have a Lemma credential. You can use "Show Lemma" to verify it.');
+                    this.showError('You already have a Lemma credential. You can use "Show Lemma" to verify it.');
                     return;
                 }
 
@@ -95,10 +118,16 @@ class LemmaWidget {
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': csrfToken
                     },
+                    credentials: 'include',
                     body: JSON.stringify({
                         csrf_token: csrfToken
                     })
                 });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to start verification');
+                }
 
                 const result = await response.json();
                 if (result.success) {
@@ -109,16 +138,22 @@ class LemmaWidget {
                 }
             } catch (error) {
                 console.error('Error starting verification:', error);
-                alert('An error occurred while starting verification. Please try again.');
+                this.showError('Failed to start verification. Please try again.');
+            } finally {
+                proveButton.disabled = false;
+                proveButton.textContent = 'Prove Lemma';
             }
         });
 
         showButton.addEventListener('click', async () => {
             try {
+                showButton.disabled = true;
+                showButton.textContent = 'Checking...';
+
                 // Check for lemma in wallet
                 const credentials = await this.wallet.getAllCredentials();
                 if (!credentials || credentials.length === 0) {
-                    alert('No Lemma found in your wallet. Please use "Prove Lemma" to get started.');
+                    this.showError('No Lemma found in your wallet. Please use "Prove Lemma" to get started.');
                     return;
                 }
 
@@ -182,7 +217,10 @@ class LemmaWidget {
                 }
             } catch (error) {
                 console.error('Error verifying credential:', error);
-                alert('An error occurred while verifying your Lemma. Please try again.');
+                this.showError('Failed to verify your Lemma. Please try again.');
+            } finally {
+                showButton.disabled = false;
+                showButton.textContent = 'Show Lemma';
             }
         });
     }
