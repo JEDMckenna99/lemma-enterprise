@@ -7,7 +7,11 @@ RUN apk add --no-cache git gcc musl-dev
 
 # Copy go.mod first to leverage Docker cache
 COPY go.mod ./
-RUN go mod download
+
+# Create a temporary main.go to download dependencies
+RUN echo 'package main; import _ "github.com/cloudflare/circl/oprf"; import _ "github.com/gin-contrib/cors"; import _ "github.com/gin-gonic/gin"; import _ "github.com/prometheus/client_golang/prometheus"; import _ "github.com/prometheus/client_golang/prometheus/promauto"; import _ "github.com/prometheus/client_golang/prometheus/promhttp"; import _ "golang.org/x/time/rate"; func main() {}' > temp.go
+RUN go mod tidy
+RUN rm temp.go
 
 # Copy the rest of the source code
 COPY . .
