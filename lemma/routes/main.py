@@ -78,7 +78,7 @@ def index():
 
 @main_bp.route('/verify')
 def verify():
-    """Redirect to the API widget demo page for verification."""
+    """Handle verification directly on main page."""
     # Check for user_id parameter - try both user_id and user for backward compatibility
     user_id = request.args.get('user_id') or request.args.get('user')
     
@@ -89,8 +89,11 @@ def verify():
     # Store user ID in session for later use
     session['verification_user_id'] = user_id
     
-    # Redirect to the API widget demo page
-    return redirect(url_for('main.api_widget_demo', user_id=user_id))
+    # Add flash message for verification
+    flash("Please complete verification to access protected content", "info")
+    
+    # Redirect to the main page with the user_id
+    return redirect(url_for('main.index', user_id=user_id))
 
 @main_bp.route('/start-verification/<user_id>', methods=['GET', 'POST'])
 def start_verification(user_id):
@@ -353,8 +356,8 @@ def protected():
         if not ('/' in referer or '/index' in referer):
             flash("Please verify your Lemma to access this page", "warning")
         
-        # Redirect to API widget demo page
-        return redirect(url_for('main.api_widget_demo'))
+        # Redirect to main page instead of API widget demo
+        return redirect(url_for('main.index'))
     
     # Get the wallet credential from session if available (only available right after verification)
     wallet_credential = session.get('store_credential')
@@ -411,8 +414,8 @@ def math_appendix():
         if not ('/' in referer or '/index' in referer):
             flash("Please verify your Lemma to access this page", "warning")
         
-        # Redirect to API widget demo page
-        return redirect(url_for('main.api_widget_demo'))
+        # Redirect to main page instead of API widget demo
+        return redirect(url_for('main.index'))
     
     # Ensure proper serialization for template
     session_credential = json.dumps(credential_data) if credential_data and isinstance(credential_data, dict) else None
@@ -656,8 +659,8 @@ def api_docs():
         if not ('/' in referer or '/index' in referer):
             flash("Please verify your Lemma to access the API documentation", "warning")
         
-        # Redirect to API widget demo page
-        return redirect(url_for('main.api_widget_demo'))
+        # Redirect to main page instead of API widget demo
+        return redirect(url_for('main.index'))
     
     # Ensure proper serialization for template
     session_credential = json.dumps(credential_data) if credential_data and isinstance(credential_data, dict) else None

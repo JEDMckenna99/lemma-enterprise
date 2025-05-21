@@ -198,7 +198,7 @@
                     LemmaWidget.init({
                         containerId: 'lemma-widget-container', // ID of the container element
                         userId: 'user_abc123',                 // Optional: Specific user ID to use
-                        callbackUrl: '/your-callback-url',     // URL to redirect after verification
+                        callbackUrl: '/protected',              // URL to redirect after verification
                         buttonText: 'Verify Human',            // Custom button text
                         description: 'Verify you are human',   // Custom description text
                         shouldRedirect: false                  // Prevent automatic redirect
@@ -306,10 +306,8 @@
                         resultElement.style.display = 'block';
                         resultElement.textContent = 'Verification successful! Redirecting to protected content...';
                         
-                        // Redirect after a short delay
-                        setTimeout(function() {
-                            window.location.href = '/protected';
-                        }, 1500);
+                        // Let the system handle redirection automatically
+                        // Don't manually redirect as it causes issues with credential session handling
                     },
                     onFailure: function(error) {
                         // Display error message

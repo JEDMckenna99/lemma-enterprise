@@ -7,8 +7,9 @@
     <title>Lemma Human Network</title>
     <!-- Load dependencies in correct order -->
     <script src="/static/js/lemma-wallet.js"></script>
-    <script src="/static/js/lemma-widget.js"></script>
     <script src="/static/js/lemma-wallet-init.js"></script>
+    <!-- Add API widget script -->
+    <script src="/static/js/lemma-api-widget.js"></script>
     <style>
         :root {
             --primary-color: #6B3FA0;
@@ -364,9 +365,24 @@
     </div>
 
     <script>
-        // Initialize the Lemma widget when the page loads
+        // Initialize the Lemma API widget when the page loads
         document.addEventListener('DOMContentLoaded', () => {
-            new LemmaWidget('lemma-widget-container');
+            // Get user_id from URL if available
+            const urlParams = new URLSearchParams(window.location.search);
+            const userId = urlParams.get('user_id') || ('user_' + Math.random().toString(36).substring(2, 10));
+            
+            // Initialize the API widget
+            LemmaWidget.init({
+                containerId: 'lemma-widget-container',
+                userId: userId,
+                callbackUrl: '/protected',
+                buttonText: 'Verify Human',
+                description: 'Verify you are human to access protected content',
+                shouldRedirect: true,
+                onSuccess: function(result) {
+                    console.log('Verification successful:', result);
+                }
+            });
         });
     </script>
 </body>
