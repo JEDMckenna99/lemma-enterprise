@@ -26,7 +26,6 @@ def create_app(test_config=None):
     is_heroku = 'DYNO' in os.environ
     
     # Determine template and static folders based on environment
-    # We'll use absolute paths for everything for consistency
     template_dir = os.path.abspath(os.path.join(cwd, 'templates'))
     static_dir = os.path.abspath(os.path.join(cwd, 'static'))
     
@@ -36,32 +35,6 @@ def create_app(test_config=None):
     logger.info(f"Using template_dir: {template_dir}")
     logger.info(f"Using static_dir: {static_dir}")
     
-    # List the contents of the app directory
-    try:
-        logger.info(f"App directory contents: {os.listdir(cwd)}")
-        if os.path.exists(template_dir):
-            logger.info(f"Template directory contents: {os.listdir(template_dir)}")
-        else:
-            logger.error(f"Template directory {template_dir} does not exist!")
-    except Exception as e:
-        logger.error(f"Error listing directories: {str(e)}")
-    
-    # Make sure the template directory exists
-    if not os.path.exists(template_dir):
-        os.makedirs(template_dir, exist_ok=True)
-        logger.warning(f"Had to create templates directory at {template_dir}")
-    
-    # Make sure the static directory exists
-    if not os.path.exists(static_dir):
-        os.makedirs(static_dir, exist_ok=True)
-        # Create an empty CSS file to make Flask happy
-        try:
-            with open(os.path.join(static_dir, 'dummy.css'), 'w') as f:
-                f.write('/* Placeholder file */')
-            logger.warning(f"Had to create static directory at {static_dir} with dummy file")
-        except Exception as e:
-            logger.error(f"Error creating dummy static file: {str(e)}")
-    
     # Create the Flask app with explicit template and static folders
     app = Flask(__name__, 
                 template_folder=template_dir,
@@ -69,38 +42,13 @@ def create_app(test_config=None):
                 instance_relative_config=True)
     
     # Initialize CSRF protection
-    csrf = CSRFProtect()
-    csrf.init_app(app)
-    
-    # Override Jinja loader to handle potential issues 
-    from flask.templating import DispatchingJinjaLoader
-    from jinja2 import FileSystemLoader, ChoiceLoader
-    
-    # Create a choice loader that will try multiple possible locations for templates
-    template_dirs = [
-        template_dir,  # First try the specified location
-        os.path.join(cwd, 'templates'),  # Then try project root/templates
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates'),  # Then package parent/templates
-    ]
-    
-    # Log the template search paths
-    logger.info(f"Template search paths: {template_dirs}")
-    
-    # Create a choice loader with multiple possible paths
-    choice_loader = ChoiceLoader([
-        FileSystemLoader(template_dirs),
-        app.jinja_loader  # Keep the default loader as fallback
-    ])
-    
-    app.jinja_loader = choice_loader
-    
-    # Enable trusted proxy support
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    from lemma.auth.csrf_config import configure_csrf
+    configure_csrf(app)
     
     # Load default configuration
     app.config.from_mapping(
         SECRET_KEY=os.environ.get('LEMMA_SECRET_KEY', secrets.token_hex(32)),
-        STORAGE_DIR=os.environ.get('LEMMA_STORAGE_DIR', '.lemma_enterprise'),
+        STORAGE_DIR=os.environ.get('LEMMA_STORAGE_DIR', '/tmp/lemma_enterprise' if is_heroku else '.lemma_enterprise'),
         ADMIN_USER=os.environ.get('LEMMA_ADMIN_USER', 'admin'),
         ADMIN_PASS=os.environ.get('LEMMA_ADMIN_PASS', 'changeme'),
         API_KEY=os.environ.get('LEMMA_API_KEY', 'dev_api_key'),
@@ -134,25 +82,35 @@ def create_app(test_config=None):
     if test_config is not None:
         app.config.from_mapping(test_config)
         
-    # Ensure the instance and storage folders exist
-    os.makedirs(app.instance_path, exist_ok=True)
-    os.makedirs(app.config['STORAGE_DIR'], exist_ok=True)
+    # Only create storage directories if not on Heroku
+    if not is_heroku:
+        os.makedirs(app.instance_path, exist_ok=True)
+        os.makedirs(app.config['STORAGE_DIR'], exist_ok=True)
 
     # Set up logging
     if not app.debug:
-        log_dir = os.path.join(app.instance_path, 'logs')
-        os.makedirs(log_dir, exist_ok=True)
-        
-        file_handler = RotatingFileHandler(
-            os.path.join(log_dir, 'lemma.log'),
-            maxBytes=10485760,  # 10MB
-            backupCount=10
-        )
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-        ))
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
+        if is_heroku:
+            # On Heroku, just log to stderr
+            handler = logging.StreamHandler(sys.stderr)
+            handler.setFormatter(logging.Formatter(
+                '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+            ))
+            handler.setLevel(logging.INFO)
+            app.logger.addHandler(handler)
+        else:
+            # In other environments, use file logging
+            log_dir = os.path.join(app.instance_path, 'logs')
+            os.makedirs(log_dir, exist_ok=True)
+            file_handler = RotatingFileHandler(
+                os.path.join(log_dir, 'lemma.log'),
+                maxBytes=10485760,  # 10MB
+                backupCount=10
+            )
+            file_handler.setFormatter(logging.Formatter(
+                '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+            ))
+            file_handler.setLevel(logging.INFO)
+            app.logger.addHandler(file_handler)
         
         app.logger.setLevel(logging.INFO)
         app.logger.info(f'Lemma startup in {cwd}. Template dir: {template_dir}')
