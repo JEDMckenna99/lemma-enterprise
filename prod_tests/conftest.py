@@ -8,6 +8,7 @@ import hashlib
 import requests
 from datetime import datetime
 from typing import Dict, Tuple, List, Any
+import base64
 
 # Production test configuration
 PROD_TEST_STORAGE_DIR = '.lemma_prod_test'
@@ -58,6 +59,55 @@ def oprf_client():
     try:
         from lemma.core.cascaded_bloom import OPRFClient
         return OPRFClient(server_url=DEFAULT_OPRF_SERVER_URL)
+    except ImportError:
+        pytest.skip("OPRF client not available")
+
+@pytest.fixture
+def mock_oprf_client():
+    """Create a mock OPRF client for tests when the real service is not available."""
+    try:
+        from lemma.core.cascaded_bloom import OPRFClient
+        client = OPRFClient(server_url=DEFAULT_OPRF_SERVER_URL)
+        
+        # Force using mock implementation for testing
+        client.using_mock = True
+        
+        # Mock public key retrieval
+        client.public_key = "mock_public_key_for_testing"
+        
+        # Mock the evaluate method
+        original_evaluate = client.evaluate
+        def mock_evaluate(alpha):
+            # Simulate OPRF evaluation with a hash
+            return hashlib.sha256(alpha).digest()
+        client.evaluate = mock_evaluate
+        
+        # Mock the get_evaluation method
+        def mock_get_evaluation(credential_id):
+            alpha, r = client.blind(credential_id)
+            beta = client.evaluate(alpha)
+            return client.unblind(beta, r)
+        client.get_evaluation = mock_get_evaluation
+        
+        # Mock the generate_witness method
+        def mock_generate_witness(credential_id, epoch):
+            alpha, r = client.blind(credential_id)
+            beta = client.evaluate(alpha)
+            return {
+                "epoch": epoch,
+                "alpha": base64.b64encode(alpha).decode('utf-8'),
+                "beta": base64.b64encode(beta).decode('utf-8'),
+                "r": base64.b64encode(r).decode('utf-8'),
+                "type": "oprf_witness"
+            }
+        client.generate_witness = mock_generate_witness
+        
+        # Mock the get_public_key method
+        def mock_get_public_key():
+            return client.public_key
+        client.get_public_key = mock_get_public_key
+        
+        return client
     except ImportError:
         pytest.skip("OPRF client not available")
 

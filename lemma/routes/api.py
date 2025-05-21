@@ -7,10 +7,12 @@ import time
 import logging
 import stripe
 from functools import wraps
-from flask import Blueprint, request, jsonify, current_app, session, url_for
+from flask import Blueprint, request, jsonify, current_app, session, url_for, render_template, abort
 from datetime import datetime
 import os
 import json
+import hashlib
+import base64
 
 # Import credential service from the correct location
 try:
@@ -1433,3 +1435,60 @@ def list_cascades():
         return jsonify({
             "error": f"Error listing cascades: {str(e)}"
         }), 500
+
+@api_bp.route('/pubkey', methods=['GET'])
+def get_oprf_pubkey():
+    """
+    Get the OPRF service's public key.
+    This is a mock endpoint for testing Flow 3 without a real OPRF service.
+    """
+    # Return a mock public key response
+    return jsonify({
+        "publicKey": "mock_public_key_for_testing_in_production",
+        "epoch": datetime.now().strftime("%Y-%m-%d"),
+        "algorithm": "ristretto255",
+        "key_id": "mock_key_1"
+    }), 200
+
+@api_bp.route('/oprfeval', methods=['POST'])
+def evaluate_oprf():
+    """
+    Evaluate blinded inputs using the OPRF service.
+    This is a mock endpoint for testing Flow 3 without a real OPRF service.
+    """
+    # Parse the request
+    data = request.get_json()
+    
+    if not data or 'alpha' not in data:
+        return jsonify({"error": "Invalid request format"}), 400
+    
+    alpha_values = data['alpha']
+    
+    if not isinstance(alpha_values, list):
+        return jsonify({"error": "Alpha must be a list"}), 400
+    
+    if len(alpha_values) > 100:
+        return jsonify({"error": "Too many elements (max 100)"}), 400
+    
+    # Process each alpha value
+    beta_values = []
+    for alpha_str in alpha_values:
+        try:
+            # Decode base64 string to bytes
+            alpha_bytes = base64.b64decode(alpha_str)
+            
+            # Mock OPRF evaluation with a hash
+            beta_bytes = hashlib.sha256(alpha_bytes).digest()
+            
+            # Encode result to base64
+            beta_values.append(base64.b64encode(beta_bytes).decode('utf-8'))
+        except Exception as e:
+            return jsonify({"error": f"Error processing element: {str(e)}"}), 400
+    
+    # Return the results
+    return jsonify({
+        "beta": beta_values,
+        "epoch": datetime.now().strftime("%Y-%m-%d"),
+        "publicKey": "mock_public_key_for_testing_in_production",
+        "keyID": "mock_key_1"
+    }), 200
