@@ -5,12 +5,14 @@ Handles public-facing pages and verification flows.
 import secrets
 import json
 import os
+import logging
 from flask import (
     Blueprint, render_template, request, redirect, 
     url_for, session, jsonify, abort, flash, current_app, make_response
 )
 from lemma.core.credential_service import get_credential_service
-from lemma.auth.csrf_config import generate_csrf_token, csrf_protect, rate_limit
+from lemma.auth.csrf_config import generate_csrf_token, csrf_protect
+from lemma.routes.api import rate_limit
 try:
     from lemma.utils.wallet import LemmaWallet
 except ImportError:
