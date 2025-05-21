@@ -9,6 +9,8 @@ import stripe
 from functools import wraps
 from flask import Blueprint, request, jsonify, current_app, session, url_for
 from datetime import datetime
+import os
+import json
 
 # Import credential service from the correct location
 try:
@@ -1313,4 +1315,121 @@ def complete_verification_flow():
             "status": "error",
             "message": f"Error: {str(e)}",
             "next_step": "contact_support"
+        }), 500
+
+@api_bp.route('/cascade/<epoch>')
+@rate_limit
+def get_cascade(epoch):
+    """
+    Get the revocation cascade for a specific epoch.
+    
+    Args:
+        epoch: The epoch identifier (e.g., "2023-06-15")
+        
+    Returns:
+        The cascade bundle for the specified epoch
+    """
+    try:
+        # Default to latest if 'latest' is requested
+        if epoch == 'latest':
+            cascade_file = os.path.join(
+                current_app.config['STORAGE_DIR'], 
+                'revocation', 
+                'cascades',
+                'cascade_latest.json'
+            )
+        else:
+            # Get the cascade from storage
+            cascade_file = os.path.join(
+                current_app.config['STORAGE_DIR'], 
+                'revocation', 
+                'cascades', 
+                f'cascade_{epoch}.json'
+            )
+        
+        if not os.path.exists(cascade_file):
+            return jsonify({
+                "error": "No cascade available for this epoch",
+                "current_epoch": datetime.now().strftime('%Y-%m-%d')
+            }), 404
+            
+        with open(cascade_file, 'r') as f:
+            cascade = json.load(f)
+            
+        # Add cache headers
+        response = jsonify(cascade)
+        # Cache for 1 hour (can be adjusted based on epoch length)
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        
+        return response
+    except Exception as e:
+        logger.error(f"Error retrieving cascade: {e}")
+        return jsonify({
+            "error": f"Error retrieving cascade: {str(e)}"
+        }), 500
+
+@api_bp.route('/cascades')
+@rate_limit
+def list_cascades():
+    """
+    Get a list of available cascades.
+    
+    Returns:
+        List of available cascades with metadata
+    """
+    try:
+        cascade_dir = os.path.join(
+            current_app.config['STORAGE_DIR'], 
+            'revocation', 
+            'cascades'
+        )
+        
+        if not os.path.exists(cascade_dir):
+            return jsonify([])
+            
+        # List all cascade files
+        cascades = []
+        for filename in os.listdir(cascade_dir):
+            if not filename.startswith('cascade_') or not filename.endswith('.json'):
+                continue
+                
+            # Skip "latest" as it's a duplicate
+            if filename == 'cascade_latest.json':
+                continue
+                
+            # Get epoch from filename
+            epoch = filename.replace('cascade_', '').replace('.json', '')
+            
+            # Get file path
+            file_path = os.path.join(cascade_dir, filename)
+            
+            # Get file stats
+            file_stat = os.stat(file_path)
+            
+            # Get bundle metadata without loading the full bundle
+            try:
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                    metadata = data.get('metadata', {})
+            except:
+                metadata = {}
+            
+            cascades.append({
+                "epoch": epoch,
+                "created": metadata.get('created', datetime.fromtimestamp(file_stat.st_ctime).isoformat()),
+                "expires": metadata.get('expires'),
+                "issuer": metadata.get('issuer'),
+                "revoked_count": metadata.get('revoked_count', 0),
+                "file_size": file_stat.st_size,
+                "url": url_for('api.get_cascade', epoch=epoch, _external=True)
+            })
+        
+        # Sort by epoch (newest first)
+        cascades.sort(key=lambda x: x["epoch"], reverse=True)
+        
+        return jsonify(cascades)
+    except Exception as e:
+        logger.error(f"Error listing cascades: {e}")
+        return jsonify({
+            "error": f"Error listing cascades: {str(e)}"
         }), 500

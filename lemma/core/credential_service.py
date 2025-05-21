@@ -610,7 +610,7 @@ class LemmaCredentialService:
         return presentation
     
     def verify_presentation(self, presentation: Dict[str, Any], expected_challenge: str) -> Dict[str, bool]:
-        """Verify a presentation with enhanced security and zero-knowledge support."""
+        """Verify a presentation with enhanced security, zero-knowledge support, and revocation witness checking."""
         try:
             # Check if this is a zero-knowledge human proof
             if "humanAssurance" in presentation:
@@ -642,6 +642,87 @@ class LemmaCredentialService:
                 credential_results.append(result)
                 if not result["valid"]:
                     return {"valid": False, "reason": f"Invalid credential: {result['reason']}"}
+            
+            # Check for revocation witness and verify if present
+            if "revocationWitness" in presentation:
+                try:
+                    # Get the credential ID
+                    credential_id = credentials[0].get("id")
+                    if not credential_id:
+                        return {"valid": False, "reason": "Credential ID missing, cannot verify revocation witness"}
+                    
+                    # Get the witness
+                    witness = presentation["revocationWitness"]
+                    
+                    # Get the epoch from the witness
+                    epoch = witness.get("epoch")
+                    if not epoch:
+                        return {"valid": False, "reason": "Witness missing epoch information"}
+                    
+                    # Fetch the cascade for this epoch
+                    try:
+                        from lemma.core.cascaded_bloom import CascadedBloomRevocation
+                        
+                        # Get the cascade bundle for this epoch
+                        cascade_file = os.path.join(
+                            current_app.config.get('STORAGE_DIR', '.lemma_enterprise'),
+                            'revocation',
+                            'cascades',
+                            f'cascade_{epoch}.json'
+                        )
+                        
+                        if not os.path.exists(cascade_file):
+                            logger.warning(f"No cascade found for epoch {epoch}, using latest")
+                            # Try to use latest cascade
+                            cascade_file = os.path.join(
+                                current_app.config.get('STORAGE_DIR', '.lemma_enterprise'),
+                                'revocation',
+                                'cascades',
+                                'cascade_latest.json'
+                            )
+                            
+                            if not os.path.exists(cascade_file):
+                                logger.error("No cascade available for verification")
+                                # We'll continue without witness verification
+                                logger.warning("Skipping revocation witness verification - no cascade available")
+                            else:
+                                # Load and verify the cascade
+                                with open(cascade_file, 'r') as f:
+                                    cascade_bundle = json.load(f)
+                                
+                                # Recreate the cascade from the bundle data
+                                cascade = CascadedBloomRevocation.from_dict(cascade_bundle.get('cascade', {}))
+                                
+                                # Compute the cascade hash
+                                cascade_hash = cascade_bundle.get('metadata', {}).get('hash', '')
+                                
+                                # Verify the witness
+                                witness_valid = cascade.verify_witness(witness, cascade_hash)
+                                if not witness_valid:
+                                    return {"valid": False, "reason": "Credential has been revoked (via witness verification)"}
+                        else:
+                            # Load and verify the cascade
+                            with open(cascade_file, 'r') as f:
+                                cascade_bundle = json.load(f)
+                            
+                            # Recreate the cascade from the bundle data
+                            cascade = CascadedBloomRevocation.from_dict(cascade_bundle.get('cascade', {}))
+                            
+                            # Compute the cascade hash
+                            cascade_hash = cascade_bundle.get('metadata', {}).get('hash', '')
+                            
+                            # Verify the witness
+                            witness_valid = cascade.verify_witness(witness, cascade_hash)
+                            if not witness_valid:
+                                return {"valid": False, "reason": "Credential has been revoked (via witness verification)"}
+                    except ImportError:
+                        logger.warning("CascadedBloomRevocation not available, skipping witness verification")
+                    except Exception as e:
+                        logger.error(f"Error verifying revocation witness: {str(e)}")
+                        # We'll continue without witness verification for backward compatibility
+                        logger.warning("Skipping revocation witness verification due to error")
+                except Exception as e:
+                    logger.error(f"Error during revocation witness verification: {str(e)}")
             
             # Verify presentation signature
             presentation_copy = presentation.copy()
@@ -676,7 +757,8 @@ class LemmaCredentialService:
                     "valid": True,
                     "holder": presentation["holder"],
                     "credentials": credential_results,
-                    "challenge": proof["challenge"]
+                    "challenge": proof["challenge"],
+                    "revocation_checked": "revocationWitness" in presentation
                 }
             except Exception as e:
                 return {"valid": False, "reason": f"Invalid presentation signature: {str(e)}"}

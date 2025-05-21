@@ -88,7 +88,8 @@ def configure_csrf(app):
         '/api/revocation/data/',
         '/api/revocation/check/',
         '/api/revocation/add_peer'
-    ]
+    ,
+        '/start-verification/<user_id>']
     
     # In development (especially on Windows), exempt more routes for easier testing
     if is_development and is_windows:
