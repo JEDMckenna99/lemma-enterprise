@@ -14,6 +14,7 @@ from logging.handlers import RotatingFileHandler
 import socket
 import shutil
 from flask_wtf.csrf import CSRFProtect
+from flask_cors import CORS
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -40,6 +41,14 @@ def create_app(test_config=None):
                 template_folder=template_dir,
                 static_folder=static_dir,
                 instance_relative_config=True)
+    
+    # Initialize CORS
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": "*",
+            "supports_credentials": True
+        }
+    })
     
     # Initialize CSRF protection
     from lemma.auth.csrf_config import configure_csrf
