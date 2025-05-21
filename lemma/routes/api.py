@@ -1060,11 +1060,12 @@ def sync_with_peer(peer_id):
 def start_verification():
     """Start the Stripe Identity verification flow."""
     try:
-        data = request.get_json()
-        if not data or 'user_id' not in data:
-            return jsonify({"error": "User ID is required"}), 400
-
-        user_id = data['user_id']
+        data = request.get_json() or {}
+        
+        # Generate a user ID if not provided
+        user_id = data.get('user_id')
+        if not user_id:
+            user_id = f"user_{secrets.token_hex(16)}"
         
         # Initialize Stripe with the API key
         stripe.api_key = current_app.config['STRIPE_API_KEY']
@@ -1077,14 +1078,17 @@ def start_verification():
             }
         )
         
-        # Store the session ID in Flask session for later use
+        # Store the session ID and user ID in Flask session for later use
         session['verification_session_id'] = verification_session.id
         session['user_id'] = user_id
         
-        # Return the client secret and URL
+        # Return success with session info
         return jsonify({
+            'success': True,
+            'session_id': verification_session.id,
             'url': verification_session.url,
-            'client_secret': verification_session.client_secret
+            'client_secret': verification_session.client_secret,
+            'user_id': user_id
         })
         
     except stripe.error.StripeError as e:

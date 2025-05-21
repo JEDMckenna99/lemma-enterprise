@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Lemma Human Network</title>
     <!-- Include the Lemma wallet initializer -->
     <script src="/static/js/lemma-wallet-init.js"></script>
@@ -363,100 +364,59 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM loaded, setting up event listeners');
             
-            const verifyBtn = document.getElementById('verifyLemmaBtn');
-            if (verifyBtn) {
+            const verifyButton = document.querySelector('.button.primary');
+            if (verifyButton) {
                 console.log('Found verify button, attaching click handler');
-                verifyBtn.addEventListener('click', async function(e) {
+                verifyButton.addEventListener('click', async function() {
                     console.log('Verify button clicked');
-                    e.preventDefault();
                     
                     try {
-                        // First check if user already has a credential in the wallet
-                        let hasExistingCredential = false;
-                        
-                        // Wait for wallet to initialize
-                        if (typeof window.lemmaWallet !== 'undefined') {
-                            try {
-                                console.log('Checking wallet for existing credentials');
-                                const allCredentials = await window.lemmaWallet.getAllCredentials();
-                                hasExistingCredential = allCredentials && allCredentials.length > 0;
-                                
-                                if (hasExistingCredential) {
-                                    console.log('Found existing credential in wallet');
-                                    alert('You already have a Lemma credential. Please use "Access Protected Content" instead.');
-                                    return;
-                                }
-                                console.log('No existing credentials found in wallet, proceeding with verification');
-                            } catch (walletError) {
-                                console.error('Error checking wallet for credentials:', walletError);
-                                // Continue with verification if wallet check fails
-                            }
-                        } else {
-                            console.log('Wallet not initialized, checking localStorage');
-                            // Check localStorage for backward compatibility
-                            const legacyCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
-                            if (legacyCredentials.length > 0) {
-                                console.log('Found legacy credentials in localStorage');
-                                alert('You already have a Lemma credential. Please use "Access Protected Content" instead.');
+                        // Check if wallet exists and has credentials
+                        const wallet = window.lemmaWallet;
+                        if (wallet) {
+                            console.log('Checking wallet for existing credentials');
+                            const credentials = await wallet.getAllCredentials();
+                            
+                            if (credentials && credentials.length > 0) {
+                                // If credentials exist, redirect to protected page
+                                window.location.href = '/protected';
                                 return;
                             }
-                            console.log('No legacy credentials found, proceeding with verification');
                         }
                         
-                        // Generate a random user ID
-                        console.log('Generating user ID');
-                        const userId = `user_${Array.from(crypto.getRandomValues(new Uint8Array(8)))
-                            .map(b => b.toString(16).padStart(2, '0')).join('')}`;
+                        // No credentials found, start verification flow
+                        console.log('No credentials found, starting verification flow');
                         
-                        // Get CSRF token
-                        console.log('Getting CSRF token');
-                        const csrfResponse = await fetch('/api/generate-csrf-token', {
-                            credentials: 'include'
-                        });
+                        // Show loading state
+                        verifyButton.disabled = true;
+                        verifyButton.textContent = 'Starting verification...';
                         
-                        if (!csrfResponse.ok) {
-                            throw new Error('Failed to get CSRF token');
-                        }
-                        
-                        const csrfData = await csrfResponse.json();
-                        console.log('Got CSRF token:', csrfData);
-                        
-                        // Start verification session
-                        console.log('Starting verification session with user ID:', userId);
-                        const sessionResponse = await fetch('/api/start-verification', {
+                        // Get a new verification session
+                        const response = await fetch('/api/start-verification', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-Token': csrfData.csrf_token
-                            },
-                            credentials: 'include',
-                            body: JSON.stringify({
-                                user_id: userId
-                            })
+                                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+                            }
                         });
                         
-                        if (!sessionResponse.ok) {
-                            const errorData = await sessionResponse.json();
-                            throw new Error(errorData.error || `Server error (${sessionResponse.status})`);
-                        }
+                        const result = await response.json();
                         
-                        const sessionData = await sessionResponse.json();
-                        console.log('Verification session started successfully:', sessionData);
-                        
-                        // Redirect to Stripe verification
-                        if (sessionData.url) {
-                            console.log('Redirecting to Stripe verification:', sessionData.url);
-                            window.location.href = sessionData.url;
+                        if (result.success) {
+                            // Redirect to Stripe verification URL
+                            window.location.href = result.url;
                         } else {
-                            throw new Error('No verification URL received from server');
+                            throw new Error(result.error || 'Failed to start verification');
                         }
                     } catch (error) {
-                        console.error('Error starting verification process:', error);
-                        alert(`Error: ${error.message}. Please try again.`);
+                        console.error('Error during verification:', error);
+                        alert('Failed to start verification. Please try again.');
+                        
+                        // Reset button state
+                        verifyButton.disabled = false;
+                        verifyButton.textContent = 'Prove Lemma';
                     }
                 });
-            } else {
-                console.error('Could not find verify button');
             }
         });
         
