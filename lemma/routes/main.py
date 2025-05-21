@@ -58,163 +58,19 @@ def index():
 
 @main_bp.route('/verify')
 def verify():
-    """Render the verification page."""
+    """Redirect to the API widget demo page for verification."""
     # Check for user_id parameter - try both user_id and user for backward compatibility
     user_id = request.args.get('user_id') or request.args.get('user')
     
     if not user_id:
         # Generate a random user ID if none provided
         user_id = f"user_{secrets.token_hex(8)}"
-        return redirect(url_for('main.verify', user_id=user_id))
     
-    # Check if there's a session_id parameter from Stripe callback
-    session_id = request.args.get('session_id')
-    if session_id:
-        # Check verification status directly
-        verification_status = check_verification_status(session_id)
-        if verification_status.get("verified", False):
-            # Get credential service
-            credential_service = get_credential_service()
-            
-            # Issue a credential to the user if needed
-            credential = credential_service.get_user_credential(user_id)
-            if not credential:
-                credential = credential_service.issue_credential(user_id)
-                current_app.logger.info(f"Issued new credential for user {user_id}")
-            
-            # Format the credential for wallet storage
-            wallet_credential = {
-                "credential": credential,
-                "wallet_metadata": {
-                    "added_at": credential.get('issuanceDate', datetime.now().isoformat()),
-                    "holder_id": user_id,
-                    "status": "active",
-                    "display_name": "Lemma Human Verification",
-                    "fingerprint": credential.get('id', f"credential-{user_id}")
-                }
-            }
-            
-            # Set session variables for protected content access
-            session['verified_human'] = True
-            session['verified_user_id'] = user_id
-            session['verified_credential'] = credential
-            session['verified_credential_id'] = credential.get('id')
-            session['store_credential'] = wallet_credential
-            
-            # Create response with wallet cookie and redirect to protected page
-            response = make_response(redirect(url_for('main.protected')))
-            
-            # Set cookie to enable the wallet
-            secure = not current_app.config.get('TESTING', False) and not current_app.debug
-            response.set_cookie(
-                'lemma_wallet_enabled', 
-                'true', 
-                max_age=31536000,
-                secure=secure, 
-                httponly=False,
-                samesite='Lax'
-            )
-            
-            current_app.logger.info(f"Redirecting verified user {user_id} to protected page from verify route with session_id")
-            return response
-    
-    # Store user ID in session for later use in callback
+    # Store user ID in session for later use
     session['verification_user_id'] = user_id
     
-    # Log detailed session state for debugging
-    current_app.logger.info(f"Verify page access - User ID: {user_id}, Session data: verified_user_id={session.get('verified_user_id')}, verified_human={session.get('verified_human', False)}")
-    
-    # Check if the user is already verified in the session
-    is_verified = session.get('verified_user_id') == user_id and session.get('verified_human', False)
-    
-    # If user is already verified, redirect them to the protected page
-    if is_verified:
-        current_app.logger.info(f"User {user_id} is already verified, redirecting to protected page")
-        return redirect(url_for('main.protected'))
-    
-    # Store any old verification data in debug field
-    if session.get('verified_user_id') and session.get('verified_user_id') != user_id:
-        current_app.logger.warning(f"Replacing verified user {session.get('verified_user_id')} with new user {user_id}")
-        session['previous_verified_user_id'] = session.get('verified_user_id')
-    
-    # Check if user has a credential
-    credential_service = get_credential_service()
-    credential = credential_service.get_user_credential(user_id)
-    
-    # Generate a challenge for presentation verification
-    challenge = secrets.token_hex(16)
-    session['verification_challenge'] = challenge
-    
-    # Check if this is a Stripe Identity verification callback
-    stripe_session = request.args.get('session_id')
-    verification_status = None
-    
-    if stripe_session:
-        # Check the verification status
-        verification_status = check_verification_status(stripe_session)
-        if verification_status.get("verified", False):
-            # If verification passed, issue a lemma credential
-            if not credential:
-                credential = credential_service.issue_credential(user_id)
-                current_app.logger.info(f"Issued credential for verified user {user_id}")
-            
-            # Set session variables for protected content access
-            session['verified_human'] = True
-            session['verified_user_id'] = user_id
-            session['verified_credential'] = credential
-            
-            # Set issuance and expiry times if available in the credential
-            if 'issuanceDate' in credential:
-                session['verification_time'] = credential['issuanceDate']
-            if 'expirationDate' in credential:
-                session['verification_expiry'] = credential['expirationDate']
-            
-            # Create response with wallet cookie and redirect to protected page
-            response = make_response(redirect(url_for('main.protected')))
-            
-            # Set cookie to enable the wallet
-            secure = not current_app.config.get('TESTING', False) and not current_app.debug  # Secure in production, not in testing/debug
-            response.set_cookie(
-                'lemma_wallet_enabled', 
-                'true', 
-                max_age=31536000,  # 1 year
-                secure=secure, 
-                httponly=False,  # JavaScript needs access
-                samesite='Lax'
-            )
-            
-            current_app.logger.info(f"Redirecting verified user {user_id} to protected page from verify route")
-            
-            return response
-    
-    # Render the verification page
-    verification_options = {}
-    
-    # Get the Stripe publishable key from config
-    stripe_key = current_app.config.get('STRIPE_PUBLISHABLE_KEY')
-    
-    # A flag to indicate if we have the ability to do Stripe verification
-    can_use_stripe = bool(stripe_key and current_app.config.get('STRIPE_API_KEY'))
-    
-    # Create the verification start URL for this user
-    verification_start_url = url_for('main.start_verification', user_id=user_id, _external=True)
-    
-    # Log debug info
-    current_app.logger.info(f"Rendering verification page for user {user_id}, Stripe available: {can_use_stripe}")
-    
-    return render_template(
-        'verify.html',
-        user_id=user_id,
-        credential=credential,
-        challenge=challenge,
-        verification_status=verification_status,
-        verification_options=verification_options,
-        stripe_key=stripe_key if can_use_stripe else None,
-        verification_url=verification_start_url if can_use_stripe else None,
-        wallet_credential=None,  # No credential to auto-store yet
-        is_verified=is_verified,
-        can_use_stripe=can_use_stripe
-    )
+    # Redirect to the API widget demo page
+    return redirect(url_for('main.api_widget_demo', user_id=user_id))
 
 @main_bp.route('/start-verification/<user_id>')
 def start_verification(user_id):
@@ -447,9 +303,9 @@ def protected():
         # Log the unauthorized access attempt
         current_app.logger.warning(f"Unauthorized protected page access attempt. Session data: user_id={user_id}, credential_id={credential_id}, is_verified_human={is_verified_human}")
         
-        # Redirect to verification page with a clear message
+        # Redirect to API widget demo page with a clear message
         flash("Please verify your Lemma to access this page", "warning")
-        return redirect(url_for('main.verify'))
+        return redirect(url_for('main.api_widget_demo'))
     
     # Get the wallet credential from session if available (only available right after verification)
     wallet_credential = session.get('store_credential')
@@ -501,9 +357,9 @@ def math_appendix():
         # Log the unauthorized access attempt
         current_app.logger.warning(f"Unauthorized math appendix access attempt. Session data: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}")
         
-        # Redirect to verification page with a clear message
+        # Redirect to API widget demo page with a clear message
         flash("Please verify your Lemma to access this page", "warning")
-        return redirect(url_for('main.verify'))
+        return redirect(url_for('main.api_widget_demo'))
     
     # Ensure proper serialization for template
     session_credential = json.dumps(credential_data) if credential_data and isinstance(credential_data, dict) else None
@@ -742,9 +598,9 @@ def api_docs():
         # Log the unauthorized access attempt
         current_app.logger.warning(f"Unauthorized API docs access attempt. Session data: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}")
         
-        # Redirect to verification page with a clear message
+        # Redirect to API widget demo page with a clear message
         flash("Please verify your Lemma to access the API documentation", "warning")
-        return redirect(url_for('main.verify'))
+        return redirect(url_for('main.api_widget_demo'))
     
     # Ensure proper serialization for template
     session_credential = json.dumps(credential_data) if credential_data and isinstance(credential_data, dict) else None
@@ -891,5 +747,27 @@ def debug_session():
 
 @main_bp.route('/api-widget-demo')
 def api_widget_demo():
-    """Render the API widget demo page."""
-    return render_template('api_widget_demo.html')
+    """Render the API widget demo page with verification functionality."""
+    # Check for user_id parameter
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        # Generate a random user ID if none provided
+        user_id = f"user_{secrets.token_hex(8)}"
+        return redirect(url_for('main.api_widget_demo', user_id=user_id))
+    
+    # Check if the user is already verified in the session
+    is_verified = session.get('verified_user_id') == user_id and session.get('verified_human', False)
+    
+    # If user is already verified, redirect them to the protected page
+    if is_verified:
+        current_app.logger.info(f"User {user_id} is already verified, redirecting to protected page")
+        return redirect(url_for('main.protected'))
+    
+    # Store user ID in session for later use
+    session['verification_user_id'] = user_id
+    
+    # Log debug info
+    current_app.logger.info(f"Rendering API widget demo page for user {user_id}")
+    
+    return render_template('api_widget_demo.html', user_id=user_id)

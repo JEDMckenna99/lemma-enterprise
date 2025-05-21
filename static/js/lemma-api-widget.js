@@ -106,20 +106,127 @@ lemmaStyle.textContent = `
 `;
 document.head.appendChild(lemmaStyle);
 
-// Load the Lemma wallet script
-function loadLemmaWallet() {
-  if (document.querySelector('script[src*="lemma-wallet-init.js"]')) {
-    return Promise.resolve();
-  }
-  
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://your-lemma-instance.com/static/js/lemma-wallet-init.js';
-    script.onload = resolve;
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
+// Get the current base URL
+function getBaseUrl() {
+  return window.location.protocol + '//' + window.location.host;
 }
+
+// Get a CSRF token
+async function getCsrfToken() {
+  try {
+    const response = await fetch('/api/generate-csrf');
+    const data = await response.json();
+    return data.csrf_token;
+  } catch (error) {
+    console.error('Error getting CSRF token:', error);
+    return null;
+  }
+}
+
+// Main verification function
+window.proveALemma = async function(options = {}) {
+  const userId = options.userId || ('user_' + Math.random().toString(36).substring(2, 10));
+  const callbackUrl = options.callbackUrl || '/protected';
+  const elementId = options.elementId;
+  const shouldRedirect = options.shouldRedirect !== false;
+  const onSuccess = options.onSuccess;
+  const onFailure = options.onFailure;
+  
+  // Update status if element provided
+  const updateStatus = (message) => {
+    if (elementId) {
+      const element = document.getElementById(elementId);
+      if (element) element.textContent = message;
+    }
+  };
+  
+  try {
+    updateStatus('Starting verification...');
+    
+    // Get CSRF token
+    const csrfToken = await getCsrfToken();
+    if (!csrfToken) {
+      throw new Error('Could not get CSRF token');
+    }
+    
+    // Start verification
+    const response = await fetch('/api/start-verification', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        return_url: getBaseUrl() + callbackUrl
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.error) {
+      updateStatus('Verification failed: ' + result.error);
+      if (onFailure) onFailure({ message: result.error });
+      return { status: 'error', message: result.error };
+    }
+    
+    if (result.credential) {
+      // Direct verification successful
+      updateStatus('Verification successful!');
+      
+      // Store credential in wallet if available
+      if (window.lemmaWallet && result.credential) {
+        try {
+          await window.lemmaWallet.storeCredential(result.credential);
+          // Clear from session after storing in wallet
+          fetch('/api/clear-session-credential', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': csrfToken
+            }
+          });
+        } catch (walletError) {
+          console.warn('Could not store credential in wallet:', walletError);
+        }
+      }
+      
+      if (onSuccess) onSuccess(result);
+      
+      // Redirect if needed
+      if (shouldRedirect) {
+        updateStatus('Redirecting to protected content...');
+        setTimeout(() => {
+          window.location.href = callbackUrl;
+        }, 1000);
+      }
+      
+      return { status: 'verified', credential: result.credential };
+    } else if (result.url) {
+      // Need to redirect to external verification
+      updateStatus('Redirecting to verification service...');
+      localStorage.setItem('lemma_verification_session', result.id);
+      
+      // Redirect to verification URL
+      if (shouldRedirect) {
+        window.location.href = result.url;
+      }
+      
+      return { status: 'initiated', verification_url: result.url, session_id: result.id };
+    }
+    
+    // Unexpected response
+    updateStatus('Unexpected verification response');
+    if (onFailure) onFailure({ message: 'Unexpected verification response' });
+    return { status: 'error', message: 'Unexpected verification response' };
+    
+  } catch (error) {
+    console.error('Verification error:', error);
+    updateStatus('Verification error: ' + (error.message || 'Unknown error'));
+    if (onFailure) onFailure(error);
+    return { status: 'error', message: error.message || 'Unknown error' };
+  }
+};
 
 // Create the Lemma Widget namespace
 window.LemmaWidget = {
@@ -130,7 +237,8 @@ window.LemmaWidget = {
     onSuccess: null,
     onFailure: null,
     buttonText: 'Prove a Lemma',
-    description: 'Verify you are human with Lemma'
+    description: 'Verify you are human with Lemma',
+    shouldRedirect: true
   },
   
   // Initialize the widget
@@ -138,15 +246,8 @@ window.LemmaWidget = {
     // Merge options with defaults
     this.config = { ...this.config, ...options };
     
-    // Generate a random user ID if not provided
-    if (!this.config.userId) {
-      this.config.userId = 'user_' + Math.random().toString(36).substring(2, 10);
-    }
-    
-    // Load the Lemma wallet script
-    loadLemmaWallet()
-      .then(() => this.render())
-      .catch(err => console.error('Error loading Lemma wallet:', err));
+    // Render the widget
+    this.render();
     
     return this;
   },
@@ -226,20 +327,12 @@ window.LemmaWidget = {
     spinner.style.display = 'inline-block';
     status.textContent = 'Starting verification...';
     
-    // Ensure window.proveALemma is available
-    if (typeof window.proveALemma !== 'function') {
-      status.textContent = 'Lemma verification not available. Please try again later.';
-      button.disabled = false;
-      spinner.style.display = 'none';
-      return;
-    }
-    
     // Call the Lemma verification function
     window.proveALemma({
       userId: this.config.userId,
       callbackUrl: this.config.callbackUrl,
       elementId: 'lemma-status',
-      shouldRedirect: this.config.shouldRedirect !== false,
+      shouldRedirect: this.config.shouldRedirect,
       onSuccess: (result) => {
         // Hide spinner
         spinner.style.display = 'none';
@@ -248,55 +341,37 @@ window.LemmaWidget = {
         if (typeof this.config.onSuccess === 'function') {
           this.config.onSuccess(result);
         }
-        
-        // Enable button unless redirecting
-        if (this.config.shouldRedirect === false) {
-          button.disabled = false;
-        }
       },
-      onFailure: (message) => {
+      onFailure: (error) => {
         // Hide spinner, enable button
         spinner.style.display = 'none';
         button.disabled = false;
         
         // Call the failure callback if provided
         if (typeof this.config.onFailure === 'function') {
-          this.config.onFailure(message);
+          this.config.onFailure(error);
         }
-      }
-    }).catch(error => {
-      // Handle any errors
-      status.textContent = 'Error: ' + (error.message || 'Unknown error');
-      spinner.style.display = 'none';
-      button.disabled = false;
-      
-      if (typeof this.config.onFailure === 'function') {
-        this.config.onFailure(error.message || 'Unknown error');
       }
     });
   }
 };
 
-// Auto-initialize if data attributes are present
+// Initialize widgets with data attributes on page load
 document.addEventListener('DOMContentLoaded', function() {
-  const containers = document.querySelectorAll('[data-lemma-widget]');
-  containers.forEach(container => {
-    const options = {
-      containerId: container.id,
-      userId: container.getAttribute('data-lemma-user-id'),
-      callbackUrl: container.getAttribute('data-lemma-callback'),
-      buttonText: container.getAttribute('data-lemma-button-text'),
-      description: container.getAttribute('data-lemma-description')
+  // Find all elements with data-lemma-widget attribute
+  const widgetElements = document.querySelectorAll('[data-lemma-widget]');
+  
+  widgetElements.forEach(element => {
+    const config = {
+      containerId: element.id,
+      userId: element.dataset.lemmaUserId,
+      callbackUrl: element.dataset.lemmaCallback,
+      buttonText: element.dataset.lemmaButtonText,
+      description: element.dataset.lemmaDescription,
+      shouldRedirect: element.dataset.lemmaShouldRedirect !== 'false'
     };
     
-    // Filter out undefined values
-    Object.keys(options).forEach(key => {
-      if (options[key] === null || options[key] === undefined) {
-        delete options[key];
-      }
-    });
-    
-    // Initialize widget with data attributes
-    LemmaWidget.init(options);
+    // Initialize the widget with the element's data attributes
+    LemmaWidget.init(config);
   });
 }); 
