@@ -5,8 +5,8 @@ WORKDIR /app
 # Install dependencies
 RUN apk add --no-cache git gcc musl-dev
 
-# Copy go.mod and go.sum first to leverage Docker cache
-COPY go.mod go.sum ./
+# Copy go.mod first to leverage Docker cache
+COPY go.mod ./
 RUN go mod download
 
 # Copy the rest of the source code
