@@ -71,9 +71,9 @@ def app():
 @pytest.fixture
 def csrf_token(app):
     """Set up CSRF token for tests."""
-    from lemma.auth.csrf_config import generate_csrf_token
+    from lemma.auth.csrf_config import generate_csrf
     with app.test_client(use_cookies=True).session_transaction() as session:
-        session['_csrf_token'] = generate_csrf_token()
+        session['_csrf_token'] = generate_csrf()
 
 # Flask's assumptions about an incoming request don't quite match up with
 # what the test client provides in terms of manipulating cookies, and the
