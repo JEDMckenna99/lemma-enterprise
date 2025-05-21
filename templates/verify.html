@@ -1,0 +1,164 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="verify-container">
+    <h2>Human Verification</h2>
+    
+    {% if has_wallet %}
+        <div id="walletVerification" class="verification-section">
+            <h3>Verify with Lemma Wallet</h3>
+            <p>You have a Lemma wallet. Click below to verify using your existing credential.</p>
+            <button id="verifyWithWallet" class="button primary">Verify with Wallet</button>
+        </div>
+    {% endif %}
+    
+    {% if not has_credential %}
+        <div id="stripeVerification" class="verification-section">
+            <h3>Get Verified</h3>
+            <p>Complete a quick verification process to receive your Lemma credential.</p>
+            <button id="startVerification" class="button primary">Start Verification</button>
+        </div>
+    {% endif %}
+    
+    <div id="verificationStatus" style="display: none;">
+        <div class="spinner"></div>
+        <p>Verifying...</p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const userId = '{{ user_id }}';
+    const challenge = '{{ challenge }}';
+    
+    // Handle wallet verification
+    const walletVerifyButton = document.getElementById('verifyWithWallet');
+    if (walletVerifyButton) {
+        walletVerifyButton.addEventListener('click', async function() {
+            try {
+                // Show verification status
+                document.getElementById('verificationStatus').style.display = 'block';
+                
+                // Get credentials from wallet
+                const wallet = window.lemmaWallet;
+                if (!wallet) {
+                    throw new Error('Wallet not initialized');
+                }
+                
+                const credentials = await wallet.getAllCredentials();
+                if (!credentials || credentials.length === 0) {
+                    throw new Error('No credentials found in wallet');
+                }
+                
+                // Use the first valid credential
+                const credential = credentials[0].credential;
+                
+                // Create presentation
+                const presentation = {
+                    "@context": [
+                        "https://www.w3.org/2018/credentials/v1",
+                        "https://lemmanetwork.org/contexts/lemma/v1"
+                    ],
+                    "type": ["VerifiablePresentation"],
+                    "verifiableCredential": [credential],
+                    "challenge": challenge
+                };
+                
+                // Submit presentation for verification
+                const response = await fetch('/api/main-verify-presentation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        presentation: presentation,
+                        challenge: challenge
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.verified) {
+                    // Redirect to protected page
+                    window.location.href = result.redirect || '/protected';
+                } else {
+                    throw new Error(result.error || 'Verification failed');
+                }
+            } catch (error) {
+                console.error('Verification error:', error);
+                alert('Verification failed: ' + error.message);
+                document.getElementById('verificationStatus').style.display = 'none';
+            }
+        });
+    }
+    
+    // Handle new verification
+    const startVerificationButton = document.getElementById('startVerification');
+    if (startVerificationButton) {
+        startVerificationButton.addEventListener('click', function() {
+            window.location.href = '/start-verification/' + userId;
+        });
+    }
+});
+</script>
+
+<style>
+.verify-container {
+    max-width: 600px;
+    margin: 40px auto;
+    padding: 20px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.verification-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+}
+
+.verification-section h3 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+}
+
+.button {
+    display: inline-block;
+    padding: 12px 24px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.3s;
+}
+
+.button:hover {
+    background-color: var(--secondary-color);
+}
+
+#verificationStatus {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 10px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %} 

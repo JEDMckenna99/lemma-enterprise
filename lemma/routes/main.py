@@ -527,11 +527,8 @@ def main_verify_presentation():
                 current_app.logger.warning("CSRF token missing from IP: %s", request.remote_addr)
                 return jsonify({"error": "CSRF validation failed", "message": "CSRF token missing"}), 400
                 
-            # For now, be lenient with token validation in this endpoint
-            # A production system would be more strict
         except Exception as e:
             current_app.logger.error("CSRF validation error: %s", str(e))
-            # In production, we would abort here, but in tests we allow it to continue
             if not testing_mode:
                 return jsonify({"error": "CSRF validation error"}), 400
     else:
@@ -549,7 +546,6 @@ def main_verify_presentation():
     
     # In test mode, we might want to bypass the challenge check
     if testing_mode and skip_auth:
-        # For tests, we'll accept any challenge
         session_challenge = challenge
         current_app.logger.info("Challenge check bypassed for testing")
     else:
@@ -568,7 +564,6 @@ def main_verify_presentation():
     
     # In test mode, we might want to simplify verification
     if testing_mode and skip_auth:
-        # For tests, we'll create a simple verification result
         verification_result = {
             'valid': True,
             'holder': f"did:example:{data.get('user_id', 'test_user')}",
@@ -576,7 +571,6 @@ def main_verify_presentation():
         }
         current_app.logger.info("Using simplified verification for testing")
     else:
-        # Normal verification
         verification_result = credential_service.verify_presentation(presentation, challenge)
     
     current_app.logger.info(f"Verification result: {verification_result}")
@@ -592,13 +586,15 @@ def main_verify_presentation():
     user_id = holder.split(':')[-1] if ':' in holder else holder
     
     # Store in session
+    session['verified_human'] = True  # Add this line to set verified_human flag
     session['verified_user_id'] = user_id
     session['verified_presentation'] = presentation
     session['verification_time'] = verification_result.get('issuanceDate')
     
-    # For the protected route, we also need verified_credential and expiry
-    if 'verified_credential' not in session:
-        # Create a simple credential for testing
+    # For the protected route, we also need verified_credential
+    if 'verifiableCredential' in presentation:
+        session['verified_credential'] = presentation['verifiableCredential'][0]
+    elif 'verified_credential' not in session:
         session['verified_credential'] = {'id': f"credential-{user_id}", 'type': 'VerifiableCredential'}
     
     # Add expiry if not present
@@ -614,7 +610,7 @@ def main_verify_presentation():
     current_app.logger.info(f"Session after verification: {list(session.keys())}")
     
     return jsonify({
-        "success": True,
+        "verified": True,
         "message": "Presentation verified successfully",
         "redirect": url_for('main.protected')
     })
@@ -631,8 +627,6 @@ def logout():
     
     flash("You have been logged out", "info")
     return redirect(url_for('main.index'))
-
-
 
 @main_bp.route('/api/logout', methods=['GET', 'POST'])
 def api_logout():

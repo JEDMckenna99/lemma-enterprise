@@ -303,8 +303,8 @@
                 <h2>Verify Once, Prove Anywhere</h2>
                 <p>Lemma is a privacy-focused, one-time proof-of-humanness system built on W3C Verifiable Credentials.</p>
                 <div class="cta-buttons">
-                    <a href="#" id="verifyLemmaBtn" class="button primary">Verify Lemma</a>
-                    <a href="#" id="accessProtectedBtn" class="button secondary">Access Protected Content</a>
+                    <a href="{{ url_for('main.verify') }}" id="verifyLemmaBtn" class="button primary">Verify Lemma</a>
+                    <a href="{{ url_for('main.protected') }}" id="accessProtectedBtn" class="button secondary">Access Protected Content</a>
                     <a href="#" id="clearLemmaBtn" class="button secondary" style="background-color: var(--error); color: var(--white); border: none;">Clear Lemma</a>
                 </div>
             </section>
