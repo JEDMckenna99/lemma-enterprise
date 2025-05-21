@@ -68,42 +68,29 @@ document.addEventListener('DOMContentLoaded', function() {
     const addCredentialsToWallet = function(wallet) {
       console.log("Checking for credentials to add to wallet");
       
-      // First check for session credential as it's the most reliable source
-      const sessionCredential = document.getElementById('sessionCredential');
-      const sessionUserId = document.getElementById('sessionUserId');
+      // First check for wallet credential directly from template (highest priority)
+      const walletCredentialElem = document.getElementById('walletCredential');
+      const sessionUserIdElement = document.getElementById('sessionUserId');
       
       let credentialAdded = false;
       
-      if (sessionCredential && sessionCredential.value && sessionUserId && sessionUserId.value) {
+      if (walletCredentialElem && walletCredentialElem.value && sessionUserIdElement && sessionUserIdElement.value) {
         try {
-          console.log("Found credential in session field");
-          const credentialValue = sessionCredential.value.trim();
-          const userId = sessionUserId.value;
+          console.log("Found wallet credential in template field");
+          const walletCredentialValue = walletCredentialElem.value.trim();
           
           // Parse the credential
-          let credential = JSON.parse(credentialValue);
+          const walletCredential = JSON.parse(walletCredentialValue);
           
-          if (!credential || !credential.id) {
-            console.warn("Invalid credential format in session field");
+          if (!walletCredential || !walletCredential.credential || !walletCredential.credential.id) {
+            console.warn("Invalid wallet credential format in template field");
           } else {
-            // Create wallet credential
-            const walletCredential = {
-              credential: credential,
-              wallet_metadata: {
-                added_at: credential.issuanceDate || new Date().toISOString(),
-                holder_id: userId,
-                status: "active",
-                display_name: "Lemma Human Verification",
-                fingerprint: credential.id,
-                key_type: credential.proof?.type || "Ed25519Signature2020",
-                key_format: "raw"
-              }
-            };
+            console.log("Storing wallet credential from template:", walletCredential.credential.id);
             
             // Store in wallet
             wallet.storeCredential(walletCredential)
               .then(() => {
-                console.log('Successfully stored session credential in wallet:', credential.id);
+                console.log('Successfully stored wallet credential in wallet:', walletCredential.credential.id);
                 credentialAdded = true;
                 // Refresh UI if available
                 if (window.lemmaWalletUI) {
@@ -111,15 +98,65 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
               })
               .catch(error => {
-                console.error('Failed to store session credential:', error);
+                console.error('Failed to store wallet credential:', error);
               });
           }
         } catch (error) {
-          console.error('Error processing session credential:', error);
+          console.error('Error processing wallet credential from template:', error);
         }
       }
       
-      // Only check other sources if session credential wasn't added
+      // Check session credential if wallet credential not found
+      if (!credentialAdded) {
+        const sessionCredential = document.getElementById('sessionCredential');
+        
+        if (sessionCredential && sessionCredential.value && sessionUserIdElement && sessionUserIdElement.value) {
+          try {
+            console.log("Found credential in session field");
+            const credentialValue = sessionCredential.value.trim();
+            const userId = sessionUserIdElement.value;
+            
+            // Parse the credential
+            let credential = JSON.parse(credentialValue);
+            
+            if (!credential || !credential.id) {
+              console.warn("Invalid credential format in session field");
+            } else {
+              // Create wallet credential
+              const walletCredential = {
+                credential: credential,
+                wallet_metadata: {
+                  added_at: credential.issuanceDate || new Date().toISOString(),
+                  holder_id: userId,
+                  status: "active",
+                  display_name: "Lemma Human Verification",
+                  fingerprint: credential.id,
+                  key_type: credential.proof?.type || "Ed25519Signature2020",
+                  key_format: "raw"
+                }
+              };
+              
+              // Store in wallet
+              wallet.storeCredential(walletCredential)
+                .then(() => {
+                  console.log('Successfully stored session credential in wallet:', credential.id);
+                  credentialAdded = true;
+                  // Refresh UI if available
+                  if (window.lemmaWalletUI) {
+                    window.lemmaWalletUI.refreshCredentialList();
+                  }
+                })
+                .catch(error => {
+                  console.error('Failed to store session credential:', error);
+                });
+            }
+          } catch (error) {
+            console.error('Error processing session credential:', error);
+          }
+        }
+      }
+      
+      // Only check other sources if no credential added yet
       if (!credentialAdded) {
         // Check cookies next
         const cookies = document.cookie.split(';');
@@ -131,10 +168,70 @@ document.addEventListener('DOMContentLoaded', function() {
           credentialCookies.forEach(function(cookie) {
             try {
               const [key, value] = cookie.trim().split('=');
-              const walletCredential = JSON.parse(decodeURIComponent(value));
+              let walletCredential;
               
-              if (!walletCredential || !walletCredential.credential || !walletCredential.credential.id) {
-                console.warn(`Invalid credential format in cookie ${key}`);
+              try {
+                walletCredential = JSON.parse(decodeURIComponent(value));
+              } catch (e) {
+                console.error(`Failed to parse cookie value: ${e}`);
+                return;
+              }
+              
+              if (!walletCredential) {
+                console.warn(`Invalid credential format in cookie ${key} - null or undefined`);
+                return;
+              }
+              
+              // Handle lookup type cookie
+              if (walletCredential.lookup === true) {
+                console.log("Found lookup cookie, will fetch credential from API");
+                const userId = walletCredential.user_id;
+                if (!userId) {
+                  console.warn("Lookup cookie missing user_id");
+                  return;
+                }
+                
+                // Fetch credential from API
+                fetch(`/api/credential-lookup/${userId}`)
+                  .then(response => response.json())
+                  .then(credential => {
+                    if (!credential || !credential.id) {
+                      console.warn("API returned invalid credential");
+                      return;
+                    }
+                    
+                    // Create wallet credential
+                    const fullWalletCredential = {
+                      credential: credential,
+                      wallet_metadata: {
+                        added_at: credential.issuanceDate || new Date().toISOString(),
+                        holder_id: userId,
+                        status: "active",
+                        display_name: "Lemma Human Verification",
+                        fingerprint: credential.id
+                      }
+                    };
+                    
+                    // Store in wallet
+                    return wallet.storeCredential(fullWalletCredential);
+                  })
+                  .then(() => {
+                    console.log('Stored credential from API lookup');
+                    credentialAdded = true;
+                    // Refresh UI if available
+                    if (window.lemmaWalletUI) {
+                      window.lemmaWalletUI.refreshCredentialList();
+                    }
+                  })
+                  .catch(error => {
+                    console.error(`Failed to fetch and store credential:`, error);
+                  });
+                return;
+              }
+              
+              // Handle normal credential cookie
+              if (!walletCredential.credential || !walletCredential.credential.id) {
+                console.warn(`Invalid credential format in cookie ${key} - missing expected properties`);
                 return;
               }
               
@@ -170,8 +267,37 @@ document.addEventListener('DOMContentLoaded', function() {
           storageCredentials.forEach(function(key) {
             try {
               const credentialJson = localStorage.getItem(key);
-              const credential = JSON.parse(credentialJson);
+              let credential;
               
+              try {
+                credential = JSON.parse(credentialJson);
+              } catch (e) {
+                console.error(`Failed to parse localStorage credential: ${e}`);
+                return;
+              }
+              
+              // Check if this is already a wallet credential format
+              if (credential && credential.credential && credential.wallet_metadata) {
+                console.log('Found wallet-formatted credential in localStorage');
+                
+                // Store directly
+                wallet.storeCredential(credential)
+                  .then(() => {
+                    console.log('Stored wallet credential from localStorage:', credential.credential.id);
+                    // Don't remove from localStorage, might need it again
+                    credentialAdded = true;
+                    // Refresh UI if available
+                    if (window.lemmaWalletUI) {
+                      window.lemmaWalletUI.refreshCredentialList();
+                    }
+                  })
+                  .catch(error => {
+                    console.error(`Failed to store wallet credential from localStorage:`, error);
+                  });
+                return;
+              }
+              
+              // Handle raw credential format
               if (!credential || !credential.id) {
                 console.warn(`Invalid credential format in localStorage for key ${key}`);
                 return;
@@ -194,7 +320,7 @@ document.addEventListener('DOMContentLoaded', function() {
               wallet.storeCredential(walletCredential)
                 .then(() => {
                   console.log('Migrated credential to wallet:', credential.id);
-                  // Remove from localStorage after successful migration
+                  // Remove from localStorage after successful migration to avoid duplication
                   localStorage.removeItem(key);
                   credentialAdded = true;
                   // Refresh UI if available

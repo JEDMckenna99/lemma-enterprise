@@ -242,11 +242,32 @@
         <!-- Hidden field to store credential data for wallet initialization -->
         <input type="hidden" id="sessionCredential" value="{{ session_credential | safe if session_credential else '' }}">
         <input type="hidden" id="sessionUserId" value="{{ user_id if user_id else '' }}">
+        <!-- Hidden field for wallet credential format -->
+        <input type="hidden" id="walletCredential" value="{{ wallet_credential | safe if wallet_credential else '' }}">
 
         <!-- Debug output -->
         <script>
-        console.log('Session credential:', document.getElementById('sessionCredential').value);
+        console.log('Session credential:', document.getElementById('sessionCredential').value ? 'present (length: ' + document.getElementById('sessionCredential').value.length + ')' : 'empty');
         console.log('Session user ID:', document.getElementById('sessionUserId').value);
+        console.log('Wallet credential:', document.getElementById('walletCredential').value ? 'present (length: ' + document.getElementById('walletCredential').value.length + ')' : 'empty');
+
+        // Store the wallet credential to localStorage for immediate use
+        document.addEventListener('DOMContentLoaded', function() {
+            const walletCredentialElem = document.getElementById('walletCredential');
+            const userIdElem = document.getElementById('sessionUserId');
+            
+            if (walletCredentialElem && walletCredentialElem.value && userIdElem && userIdElem.value) {
+                try {
+                    const walletCredential = JSON.parse(walletCredentialElem.value);
+                    const userId = userIdElem.value;
+                    
+                    console.log('Storing wallet credential to localStorage:', walletCredential.credential?.id);
+                    localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(walletCredential));
+                } catch (e) {
+                    console.error('Error storing wallet credential to localStorage:', e);
+                }
+            }
+        });
         </script>
 
         <div class="card">
