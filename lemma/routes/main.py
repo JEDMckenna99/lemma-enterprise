@@ -50,7 +50,7 @@ def inject_csrf_token():
 @main_bp.route('/')
 def index():
     """Render the main page."""
-    from flask_wtf.csrf import generate_csrf
+    from lemma.auth.csrf_config import generate_csrf
     session['csrf_token'] = generate_csrf()
     return render_template('index.html')
 
