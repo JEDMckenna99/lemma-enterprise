@@ -6,6 +6,7 @@ import logging
 from flask import request, abort, current_app, session, jsonify, render_template
 from functools import wraps, update_wrapper
 from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf as flask_generate_csrf
+import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -156,10 +157,12 @@ def validate_csrf_token(token=None):
         current_app.logger.error("No CSRF token found in request")
         return False
     
-    # Validate token using Flask-WTF
-    try:
-        csrf = current_app.extensions['csrf']
-        return csrf.validate(token)
-    except (CSRFError, KeyError) as e:
-        current_app.logger.error(f"CSRF validation error: {str(e)}")
+    # Get the session token
+    session_token = session.get('_csrf_token')
+    
+    # Compare the provided token with the session token
+    if not session_token or not token or not secrets.compare_digest(str(session_token), str(token)):
+        current_app.logger.error("CSRF token validation failed")
         return False
+        
+    return True

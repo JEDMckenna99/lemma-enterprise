@@ -138,11 +138,11 @@ class LemmaWidget {
                 }
 
                 const result = await response.json();
-                if (result.success) {
+                if (result.url) {
                     // Redirect to Stripe verification URL
                     window.location.href = result.url;
                 } else {
-                    throw new Error(result.error || 'Failed to start verification');
+                    throw new Error('No verification URL provided');
                 }
             } catch (error) {
                 console.error('Error starting verification:', error);
