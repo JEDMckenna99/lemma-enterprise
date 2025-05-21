@@ -1042,12 +1042,11 @@ def sync_with_peer(peer_id):
 def start_verification():
     """Start the Stripe Identity verification flow."""
     try:
-        data = request.get_json() or {}
-        
-        # Generate a user ID if not provided
-        user_id = data.get('user_id')
-        if not user_id:
-            user_id = f"user_{secrets.token_hex(16)}"
+        data = request.get_json()
+        if not data or 'user_id' not in data:
+            return jsonify({"error": "User ID is required"}), 400
+            
+        user_id = data['user_id']
         
         # Initialize Stripe with the API key
         stripe.api_key = current_app.config['STRIPE_API_KEY']

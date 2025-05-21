@@ -92,22 +92,11 @@ def generate_csrf():
     if current_app.config.get('TESTING', False) and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
         return 'test-csrf-token'
     
-    # Generate a new token
-    token = secrets.token_hex(32)
+    # Generate a new token using Flask-WTF's function
+    token = flask_generate_csrf()
     
     # Set the token in the session
     session['_csrf_token'] = token
-    
-    # Set the token in the cookie via response
-    response = make_response(jsonify({'csrf_token': token}))
-    response.set_cookie(
-        '_csrf_token',
-        token,
-        httponly=False,  # JavaScript needs access
-        secure=not current_app.config.get('TESTING', False),  # Secure in production
-        samesite='Strict',  # Match the session cookie setting
-        path='/'  # Available across all paths
-    )
     
     return token
 
@@ -157,10 +146,10 @@ def validate_csrf_token(token=None):
     """Validate a CSRF token."""
     # Skip CSRF validation in test environments if configured
     if current_app.config.get('TESTING', False):
-        if current_app.config.get('SKIP_AUTH_IN_TESTS', False) or current_app.config.get('WTF_CSRF_ENABLED', False) is False:
+        if current_app.config.get('SKIP_AUTH_IN_TESTS', False):
             current_app.logger.info("Skipping CSRF validation in test environment")
             return True
-        
+    
     # Get token from request if not provided
     if token is None:
         # Check in headers first (for API requests)
