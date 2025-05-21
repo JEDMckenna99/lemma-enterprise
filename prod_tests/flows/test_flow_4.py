@@ -10,7 +10,12 @@ import time
 import os
 import base64
 import hashlib
+import logging
 from unittest.mock import patch, MagicMock
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Test ID
 FLOW_ID = 4
@@ -63,11 +68,31 @@ def mock_cascade_bundle(epoch):
 
 def test_cascade_endpoint_available(client, epoch):
     """Test that the cascade endpoint is available."""
+    logger.debug(f"Testing cascade endpoint for epoch: {epoch}")
+    
+    # Check if we can access the data directory
+    from flask import current_app
+    with client.application.app_context():
+        data_dir = current_app.config.get('STORAGE_DIR', 'instance/data')
+        cascade_dir = os.path.join(data_dir, 'revocation', 'cascades')
+        logger.debug(f"Cascade directory: {cascade_dir}")
+        
+        if os.path.exists(cascade_dir):
+            files = os.listdir(cascade_dir)
+            logger.debug(f"Files in cascade directory: {files}")
+    
     # Try to access the cascade endpoint
-    response = client.get(f'/cascade/{epoch}')
+    endpoint = f'/cascade/{epoch}'
+    logger.debug(f"Accessing endpoint: {endpoint}")
+    response = client.get(endpoint)
+    logger.debug(f"Response status: {response.status_code}")
+    
+    if hasattr(response, 'data'):
+        logger.debug(f"Response data: {response.data[:100]}...")
     
     # If the endpoint doesn't exist, skip the tests
     if response.status_code == 404:
+        logger.debug("Cascade endpoint not available, skipping tests")
         pytest.skip("Cascade endpoint not available")
     
     # Should either return a cascade or a 403/401 if auth required
@@ -76,6 +101,8 @@ def test_cascade_endpoint_available(client, epoch):
 
 def test_cascade_download(client, epoch, api_key):
     """Test downloading a cascade bundle."""
+    logger.debug(f"Testing cascade download for epoch: {epoch}")
+    
     # Try to download the cascade with API key
     response = client.get(
         f'/cascade/{epoch}',
@@ -84,6 +111,7 @@ def test_cascade_download(client, epoch, api_key):
     
     # If no cascade found, skip
     if response.status_code == 404:
+        logger.debug(f"No cascade found for epoch {epoch}, skipping tests")
         pytest.skip("No cascade found for the current epoch")
     
     # Should return 200 with a JSON cascade

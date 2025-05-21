@@ -154,6 +154,49 @@ Lemma now includes a fully decentralized identity system that addresses 8 key go
 
 ---
 
+## OPRF-Cascaded Bloom Revocation
+
+Lemma implements a privacy-preserving revocation system using Oblivious Pseudorandom Functions (OPRF) with cascaded Bloom filters.
+
+### Key Features
+
+1. **Privacy-Preserving**: The OPRF protocol ensures the issuer never learns which credentials are being checked for revocation status.
+
+2. **Efficient Synchronization**: The cascaded Bloom filter structure reduces bandwidth requirements to <100 kB per 1M revoked credentials.
+
+3. **Offline Verification**: Credentials include revocation "witnesses" that can be verified locally without an active internet connection.
+
+4. **Zero Metadata Leakage**: The system reveals no information about which credentials are being verified to any party.
+
+### How It Works
+
+1. **Credential Issuance**: When a credential is issued, the user receives a standard W3C Verifiable Credential.
+
+2. **Revocation Process**: When credentials are revoked, the system:
+   - Applies the OPRF function (with secret key k) to each revoked credential ID
+   - Inserts the resulting values into a multi-level cascaded Bloom filter
+   - Publishes the signed cascade for verifiers to download
+
+3. **Client Verification**: To check if a credential is valid:
+   - The client generates a random blinding factor r
+   - Computes α = r·H₁(credential_id) and sends α to the issuer
+   - Issuer returns β = α^k without learning the credential ID
+   - Client computes y = β^(r⁻¹), the unblinded OPRF output
+   - Client checks if y is in the cascade - if not, the credential is valid
+
+4. **Offline Verification**: The client attaches a witness (α, β, r) to presentations, allowing verifiers to check revocation status without contacting the issuer.
+
+### Technical Details
+
+- Based on the ristretto255 elliptic curve implementation
+- OPRF protocol following RFC 9497
+- False positive rate: ~2% at the first level, ~0.0008% overall with 3-level cascade
+- Client operations require only 1 OPRF evaluation per credential per epoch (typically daily)
+
+See [OPRF_REVOCATION_README.md](./OPRF_REVOCATION_README.md) for detailed implementation information.
+
+---
+
 ## User Flows
 
 ### Home Page Flow (New)

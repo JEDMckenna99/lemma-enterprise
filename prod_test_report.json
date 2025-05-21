@@ -1,0 +1,6 @@
+{
+  "status": "PASS",
+  "timestamp": "2025-05-21T17:45:00.573008",
+  "total_time_seconds": 1.660154104232788,
+  "command": "-v --cov=lemma --cov-report=term-missing -xvs prod_tests/flows/test_flow_3.py"
+}

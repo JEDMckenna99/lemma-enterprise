@@ -1,220 +1,283 @@
 #!/usr/bin/env python3
 """
-Deployment Preparation Script for Lemma Enterprise
+Prepare Deployment Script for Lemma Enterprise
 
-This script prepares the application for deployment by checking
-dependencies, environment variables, and other configuration settings.
+This script prepares the Lemma Enterprise system for production deployment
+by setting up necessary files, configurations, and testing that everything
+works correctly.
 """
+
 import os
 import sys
 import json
+import subprocess
+import logging
+import argparse
 import shutil
-from pathlib import Path
-import secrets
-import string
+import base64
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, PublicFormat, NoEncryption
+from datetime import datetime
 
-# Required environment variables
-REQUIRED_ENV_VARS = {
-    "LEMMA_ADMIN_USER": os.environ.get("LEMMA_ADMIN_USER", "admin"),
-    "LEMMA_ADMIN_PASS": os.environ.get("LEMMA_ADMIN_PASS", ""),
-    "LEMMA_SECRET_KEY": os.environ.get("LEMMA_SECRET_KEY", ""),
-    "LEMMA_API_KEY": os.environ.get("LEMMA_API_KEY", "")
-}
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('deployment_prep.log')
+    ]
+)
+logger = logging.getLogger('prepare_deployment')
 
-# Optional environment variables with defaults
-OPTIONAL_ENV_VARS = {
-    "LEMMA_SESSION_TIMEOUT": os.environ.get("LEMMA_SESSION_TIMEOUT", "3600"),
-    "LEMMA_RATE_LIMIT": os.environ.get("LEMMA_RATE_LIMIT", "100/hour")
-}
-
-def check_environment_variables():
-    """Check if required environment variables are set."""
-    print("Checking environment variables...")
+def setup_env(env_file='.env', production=False):
+    """Set up environment variables file."""
+    logger.info(f"Setting up environment file: {env_file}")
     
-    missing_vars = []
-    for var_name, var_value in REQUIRED_ENV_VARS.items():
-        if not var_value:
-            missing_vars.append(var_name)
+    # Template file to copy from
+    template_file = '.env.production.template' if production else '.env'
     
-    if missing_vars:
-        print("\n❌ Missing required environment variables:")
-        for var_name in missing_vars:
-            print(f"  - {var_name}")
-        
-        # Generate secure defaults
-        secure_defaults = {}
-        if "LEMMA_SECRET_KEY" in missing_vars:
-            secure_defaults["LEMMA_SECRET_KEY"] = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
-        
-        if "LEMMA_API_KEY" in missing_vars:
-            secure_defaults["LEMMA_API_KEY"] = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
-        
-        # Write to .env.production.template
-        with open(".env.production.template", "w") as f:
-            for var_name, var_value in REQUIRED_ENV_VARS.items():
-                if var_name in secure_defaults:
-                    f.write(f"{var_name}={secure_defaults[var_name]}\n")
-                elif var_value:
-                    f.write(f"{var_name}={var_value}\n")
-                else:
-                    f.write(f"{var_name}=CHANGE_ME\n")
+    # If template doesn't exist but default env does, use that
+    if not os.path.exists(template_file) and os.path.exists('.env'):
+        template_file = '.env'
+    
+    # If template exists and it's not the same as the target file, copy it
+    if os.path.exists(template_file) and os.path.abspath(template_file) != os.path.abspath(env_file):
+        shutil.copy(template_file, env_file)
+        logger.info(f"Copied {template_file} to {env_file}")
+    elif not os.path.exists(env_file):
+        # Create a minimal env file
+        with open(env_file, 'w') as f:
+            f.write("# Lemma Enterprise Environment Variables\n")
+            f.write("FLASK_APP=app.py\n")
+            f.write("FLASK_RUN_PORT=5000\n")
+            f.write("LEMMA_ADMIN_USER=admin\n")
+            f.write("LEMMA_ADMIN_PASS=password\n")
+            f.write("LEMMA_STORAGE_DIR=instance/data\n")
+            f.write("LEMMA_API_KEY=test_api_key\n")
+            f.write("LEMMA_ADMIN_API_KEY=admin_api_key\n")
             
-            for var_name, var_value in OPTIONAL_ENV_VARS.items():
-                f.write(f"{var_name}={var_value}\n")
+            # Production settings
+            if production:
+                f.write("LEMMA_DISABLE_MOCK_SERVICES=true\n")
+                f.write("LEMMA_REQUIRE_HTTPS=true\n")
+                f.write("LEMMA_STRICT_CSRF=true\n")
+                f.write("LEMMA_STRICT_API_KEYS=true\n")
         
-        print("\n⚠️ Created .env.production.template with secure defaults.")
-        print("Please update this file with your values before deployment.")
-        return False
+        logger.info(f"Created new environment file: {env_file}")
+    else:
+        logger.info(f"Using existing environment file: {env_file}")
     
-    print("✅ All required environment variables are set.")
+    return env_file
+
+def setup_keys(storage_dir='instance/data'):
+    """Set up cryptographic keys for the application."""
+    logger.info("Setting up cryptographic keys")
     
-    # Write deployment config
-    deployment_config = {
-        "required_vars": REQUIRED_ENV_VARS,
-        "optional_vars": OPTIONAL_ENV_VARS
+    # Create the keys directory
+    keys_dir = os.path.join(storage_dir, 'keys')
+    os.makedirs(keys_dir, exist_ok=True)
+    
+    # Generate Ed25519 keys for signing
+    logger.info("Generating Ed25519 key pair")
+    private_key = ed25519.Ed25519PrivateKey.generate()
+    public_key = private_key.public_key()
+    
+    # Encode the keys
+    private_bytes = private_key.private_bytes(
+        encoding=Encoding.Raw,
+        format=PrivateFormat.Raw,
+        encryption_algorithm=NoEncryption()
+    )
+    public_bytes = public_key.public_bytes(
+        encoding=Encoding.Raw,
+        format=PublicFormat.Raw
+    )
+    
+    # Create key dictionary
+    keys = {
+        "ed25519_private": base64.b64encode(private_bytes).decode('utf-8'),
+        "ed25519_public": base64.b64encode(public_bytes).decode('utf-8'),
+        "created": datetime.now().isoformat(),
+        "key_id": "key-1"
     }
     
-    with open("deployment_config.json", "w") as f:
-        json.dump(deployment_config, f, indent=2)
+    # Save the keys
+    keys_file = os.path.join(keys_dir, 'keys.json')
+    with open(keys_file, 'w') as f:
+        json.dump(keys, f, indent=2)
     
-    print("✅ Deployment configuration written to deployment_config.json")
-    return True
+    logger.info(f"Saved keys to {keys_file}")
+    return keys_file
 
-def check_dependencies():
-    """Check if required dependencies are installed."""
-    print("\nChecking dependencies...")
+def setup_storage(storage_dir='instance/data'):
+    """Set up storage directories."""
+    logger.info(f"Setting up storage in {storage_dir}")
+    
+    # Main data directory
+    os.makedirs(storage_dir, exist_ok=True)
+    
+    # Keys directory
+    keys_dir = os.path.join(storage_dir, 'keys')
+    os.makedirs(keys_dir, exist_ok=True)
+    
+    # Revocation directories
+    revocation_dir = os.path.join(storage_dir, 'revocation')
+    os.makedirs(revocation_dir, exist_ok=True)
+    
+    cascades_dir = os.path.join(revocation_dir, 'cascades')
+    os.makedirs(cascades_dir, exist_ok=True)
+    
+    registry_dir = os.path.join(revocation_dir, 'registry')
+    os.makedirs(registry_dir, exist_ok=True)
+    
+    # Logs directory
+    logs_dir = os.path.join(storage_dir, '..', 'logs')
+    os.makedirs(logs_dir, exist_ok=True)
+    
+    logger.info("Storage directories created successfully")
+    return storage_dir
+
+def build_initial_cascade(storage_dir='instance/data'):
+    """Build initial cascade for testing."""
+    logger.info("Building initial cascade")
+    
+    # Run the revoke_and_build.py script to create a test cascade
+    try:
+        result = subprocess.run(
+            [sys.executable, 'revoke_and_build.py', '--test', '--storage', storage_dir],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        logger.info("Successfully built initial cascade")
+        logger.debug(f"Output: {result.stdout}")
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error building cascade: {e}")
+        logger.error(f"Stdout: {e.stdout}")
+        logger.error(f"Stderr: {e.stderr}")
+        return False
+
+def run_flow_tests():
+    """Run the flow tests to verify the system works."""
+    logger.info("Running flow tests")
     
     try:
-        with open("requirements.txt", "r") as f:
-            requirements = f.read().splitlines()
+        # Create a pytest command to run flow test 4
+        from datetime import datetime
+        epoch = datetime.now().strftime('%Y-%m-%d')
         
-        import pkg_resources
-        
-        missing_deps = []
-        for req in requirements:
-            if req and not req.startswith('#'):
-                try:
-                    pkg_resources.require(req)
-                except (pkg_resources.DistributionNotFound, pkg_resources.VersionConflict):
-                    missing_deps.append(req)
-        
-        if missing_deps:
-            print(f"❌ Missing {len(missing_deps)} dependencies:")
-            for dep in missing_deps[:5]:
-                print(f"  - {dep}")
-            
-            if len(missing_deps) > 5:
-                print(f"  - and {len(missing_deps) - 5} more...")
-            
-            print("\nRun: pip install -r requirements.txt")
+        result = subprocess.run(
+            [sys.executable, '-m', 'pytest', 'prod_tests/flows/test_flow_4.py', '-v'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        logger.info("Flow test 4 passed successfully")
+        logger.debug(f"Output: {result.stdout}")
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Flow test 4 failed: {e}")
+        logger.error(f"Stdout: {e.stdout}")
+        logger.error(f"Stderr: {e.stderr}")
+        return False
+
+def setup_heroku_config():
+    """Set up Heroku configuration."""
+    logger.info("Setting up Heroku configuration")
+    
+    # Check if Heroku CLI is installed
+    try:
+        result = subprocess.run(['heroku', '--version'], capture_output=True, text=True, check=True)
+        logger.info(f"Heroku CLI detected: {result.stdout.strip()}")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        logger.warning("Heroku CLI not found. Please install it to deploy to Heroku.")
+        return False
+    
+    # Check if we're already logged in
+    try:
+        result = subprocess.run(['heroku', 'auth:whoami'], capture_output=True, text=True, check=True)
+        logger.info(f"Logged in as: {result.stdout.strip()}")
+    except subprocess.CalledProcessError:
+        logger.warning("Not logged in to Heroku. Please run 'heroku login' to authenticate.")
+        return False
+    
+    # Prompt for app name
+    app_name = input("Enter Heroku app name (leave blank to create new): ").strip()
+    
+    if not app_name:
+        # Create a new app
+        try:
+            result = subprocess.run(['heroku', 'create'], capture_output=True, text=True, check=True)
+            app_name = result.stdout.strip().split('|')[0].strip().split(' ')[-1]
+            logger.info(f"Created new Heroku app: {app_name}")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error creating Heroku app: {e}")
             return False
-        
-        print("✅ All dependencies are installed.")
-        return True
-    except Exception as e:
-        print(f"❌ Error checking dependencies: {e}")
-        return False
-
-def prepare_deployment_package():
-    """Prepare the deployment package."""
-    print("\nPreparing deployment package...")
     
-    # List of files to exclude
-    exclude_patterns = [
-        "__pycache__",
-        "*.pyc",
-        ".git",
-        ".env",
-        ".vscode",
-        ".DS_Store",
-        "*.zip",
-        "venv",
-        "env",
-        ".pytest_cache",
-        "*.sqlite",
-        "*.db",
-        ".coverage",
-        "htmlcov",
-        "temp",
-        "tmp"
-    ]
-    
-    # List of test files to exclude
-    test_files = [
-        "test_*.py",
-        "*_test.py"
-    ]
-    
-    try:
-        # Create output directory
-        os.makedirs("deployment", exist_ok=True)
-        
-        # Create a list of all files
-        all_files = []
-        for root, dirs, files in os.walk("."):
-            # Check if directory should be excluded
-            if any(exclude in root for exclude in exclude_patterns):
-                continue
-            
-            # Add non-excluded files
-            for file in files:
-                # Skip excluded patterns
-                if any(file.endswith(exc.replace("*", "")) for exc in exclude_patterns if "*" in exc):
+    # Set environment variables from .env.production
+    if os.path.exists('.env.production'):
+        logger.info("Setting Heroku config variables from .env.production")
+        with open('.env.production', 'r') as f:
+            for line in f:
+                line = line.strip()
+                # Skip comments and empty lines
+                if not line or line.startswith('#'):
                     continue
                 
-                # Skip test files
-                if any(file.startswith(test.replace("*", "")) or file.endswith(test.replace("*", "")) for test in test_files if "*" in test):
-                    continue
-                
-                file_path = os.path.join(root, file)
-                if file_path.startswith("./") or file_path.startswith(".\\"):
-                    file_path = file_path[2:]
-                
-                all_files.append(file_path)
-        
-        print(f"✅ Found {len(all_files)} files to include in the package.")
-        
-        # Copy files to deployment directory
-        for file_path in all_files:
-            dest_path = os.path.join("deployment", file_path)
-            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-            shutil.copy2(file_path, dest_path)
-        
-        print("✅ Files copied to deployment directory.")
-        
-        # Create deployment zip
-        shutil.make_archive("lemma-enterprise", "zip", "deployment")
-        
-        print("✅ Deployment package created: lemma-enterprise.zip")
-        return True
-    except Exception as e:
-        print(f"❌ Error preparing deployment package: {e}")
-        return False
+                # Parse the variable
+                parts = line.split('=', 1)
+                if len(parts) == 2:
+                    key, value = parts
+                    try:
+                        subprocess.run(
+                            ['heroku', 'config:set', f"{key}={value}", '--app', app_name],
+                            capture_output=True,
+                            text=True,
+                            check=True
+                        )
+                        logger.info(f"Set {key} for {app_name}")
+                    except subprocess.CalledProcessError as e:
+                        logger.error(f"Error setting {key}: {e}")
+    
+    logger.info(f"Heroku configuration complete for app: {app_name}")
+    logger.info(f"To deploy, run: git push heroku main")
+    return True
 
 def main():
-    """Main function to prepare deployment."""
-    print("=== LEMMA ENTERPRISE DEPLOYMENT PREPARATION ===\n")
+    parser = argparse.ArgumentParser(description="Prepare Lemma Enterprise for deployment")
+    parser.add_argument("--prod", action="store_true", help="Prepare for production deployment")
+    parser.add_argument("--storage", default="instance/data", help="Storage directory")
+    parser.add_argument("--heroku", action="store_true", help="Configure for Heroku deployment")
+    parser.add_argument("--test-flow-4", action="store_true", help="Run flow test 4")
+    args = parser.parse_args()
     
-    env_check = check_environment_variables()
-    dep_check = check_dependencies()
+    # Set up storage
+    setup_storage(args.storage)
     
-    if not env_check or not dep_check:
-        print("\n⚠️ Please fix the issues above before proceeding with deployment.")
-        return False
+    # Set up environment
+    env_file = '.env.production' if args.prod else '.env'
+    setup_env(env_file, args.prod)
     
-    package_result = prepare_deployment_package()
+    # Set up cryptographic keys
+    setup_keys(args.storage)
     
-    if not package_result:
-        print("\n⚠️ Failed to create deployment package.")
-        return False
+    # Build initial cascade
+    build_initial_cascade(args.storage)
     
-    print("\n🎉 Deployment preparation complete!")
-    print("\nNext steps:")
-    print("1. Deploy the application using the generated lemma-enterprise.zip package")
-    print("2. Set the environment variables on your hosting platform")
-    print("3. Verify that the application is running correctly")
+    # Run flow test 4 if requested
+    if args.test_flow_4:
+        if run_flow_tests():
+            logger.info("Flow test 4 passed - system is ready for production")
+        else:
+            logger.error("Flow test 4 failed - please fix issues before deploying")
     
-    return True
+    # Set up Heroku if requested
+    if args.heroku:
+        setup_heroku_config()
+    
+    logger.info("Deployment preparation complete")
 
 if __name__ == "__main__":
-    sys.exit(0 if main() else 1)
+    main()
