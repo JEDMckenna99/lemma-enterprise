@@ -236,9 +236,10 @@ window.LemmaWidget = {
     callbackUrl: null,
     onSuccess: null,
     onFailure: null,
-    buttonText: 'Prove a Lemma',
+    buttonText: 'Verify Human',
     description: 'Verify you are human with Lemma',
-    shouldRedirect: true
+    shouldRedirect: true,
+    showPresentButton: true // Whether to show the Present Lemma button
   },
   
   // Initialize the widget
@@ -284,17 +285,36 @@ window.LemmaWidget = {
     
     const buttonContainer = document.createElement('div');
     buttonContainer.className = 'lemma-button-container';
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.gap = '10px';
+    buttonContainer.style.justifyContent = 'center';
     
     const spinner = document.createElement('div');
     spinner.className = 'lemma-spinner';
     spinner.id = 'lemma-spinner';
     
     const button = document.createElement('button');
-    button.className = 'lemma-button';
+    button.className = 'lemma-button prove-button';
     button.id = 'lemma-verify-button';
     button.textContent = this.config.buttonText;
     
     buttonContainer.appendChild(button);
+    
+    // Add the Present Lemma button if configured
+    if (this.config.showPresentButton) {
+      const presentButton = document.createElement('button');
+      presentButton.className = 'lemma-button present-button';
+      presentButton.id = 'lemma-present-button';
+      presentButton.textContent = 'Present Lemma';
+      presentButton.style.backgroundColor = 'white';
+      presentButton.style.color = '#6B3FA0';
+      presentButton.style.border = '2px solid #6B3FA0';
+      
+      buttonContainer.appendChild(presentButton);
+      
+      // Add event listener for the present button
+      presentButton.addEventListener('click', () => this.presentLemma());
+    }
     
     const status = document.createElement('div');
     status.className = 'lemma-status';
@@ -353,7 +373,208 @@ window.LemmaWidget = {
         }
       }
     });
-  }
+  },
+  
+  // Present the lemma credential (Flow 5 and 6)
+  presentLemma: async function() {
+    const button = document.getElementById('lemma-present-button');
+    const spinner = document.getElementById('lemma-spinner');
+    const status = document.getElementById('lemma-status');
+    
+    if (!button || !spinner || !status) return;
+    
+    // Show spinner, disable button
+    button.disabled = true;
+    spinner.style.display = 'inline-block';
+    status.textContent = 'Checking credential...';
+    
+    try {
+      // FLOW 5: Check if wallet exists and has a credential
+      if (!window.lemmaWallet) {
+        status.textContent = 'Wallet not available. Please try again.';
+        return;
+      }
+      
+      // Get credentials from wallet
+      const credentials = await window.lemmaWallet.getAllCredentials();
+      if (!credentials || credentials.length === 0) {
+        status.textContent = 'No Lemma found in your wallet. Please use "Verify Human" first.';
+        return;
+      }
+      
+      // Get the credential
+      const credential = credentials[0].credential;
+      
+      // FLOW 5: First check revocation locally
+      try {
+        // Check if the credential has been revoked locally
+        const isRevoked = await this.checkRevocationStatus(credential);
+        if (isRevoked) {
+          status.textContent = 'This credential has been revoked. Please obtain a new one.';
+          return;
+        }
+        
+        // Get CSRF token
+        const csrfToken = await getCsrfToken();
+        
+        // FLOW 6: Create a presentation
+        status.textContent = 'Creating presentation...';
+        
+        // Get a challenge
+        const challengeResponse = await fetch('/api/generate-challenge');
+        const challengeData = await challengeResponse.json();
+        const challenge = challengeData.challenge;
+        
+        // Create a presentation
+        const presentationResponse = await fetch('/api/presentation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            credential: credential,
+            challenge: challenge
+          })
+        });
+        
+        if (!presentationResponse.ok) {
+          const errorData = await presentationResponse.json();
+          throw new Error(errorData.error || 'Failed to create presentation');
+        }
+        
+        const presentation = await presentationResponse.json();
+        
+        // Verify the presentation
+        status.textContent = 'Verifying...';
+        const verifyResponse = await fetch('/api/verify-human', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            presentation: presentation,
+            challenge: challenge,
+            user_id: credentials[0].wallet_metadata.holder_id
+          })
+        });
+        
+        if (!verifyResponse.ok) {
+          const errorData = await verifyResponse.json();
+          throw new Error(errorData.error || 'Verification failed');
+        }
+        
+        const verifyResult = await verifyResponse.json();
+        
+        // Handle success
+        if (verifyResult.success) {
+          status.textContent = 'Verification successful! Redirecting...';
+          
+          // Call success callback if provided
+          if (typeof this.config.onSuccess === 'function') {
+            this.config.onSuccess(verifyResult);
+          }
+          
+          // Redirect if needed
+          if (this.config.shouldRedirect && verifyResult.redirect) {
+            setTimeout(() => {
+              window.location.href = verifyResult.redirect;
+            }, 1000);
+          }
+        } else {
+          throw new Error(verifyResult.error || 'Verification failed');
+        }
+      } catch (error) {
+        console.error('Error verifying credential:', error);
+        status.textContent = 'Failed to verify your Lemma: ' + (error.message || 'Unknown error');
+        
+        // Call failure callback if provided
+        if (typeof this.config.onFailure === 'function') {
+          this.config.onFailure(error);
+        }
+      }
+    } catch (error) {
+      console.error('Error in presentLemma:', error);
+      status.textContent = 'Error: ' + (error.message || 'Unknown error');
+      
+      // Call failure callback if provided
+      if (typeof this.config.onFailure === 'function') {
+        this.config.onFailure(error);
+      }
+    } finally {
+      // Hide spinner, enable button
+      spinner.style.display = 'none';
+      button.disabled = false;
+    }
+  },
+  
+  // Check if a credential is revoked (part of Flow 5)
+  checkRevocationStatus: function(credential) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        console.log('Checking revocation status locally for credential:', credential.id);
+        
+        // Extract the credential ID
+        const credentialId = credential.id;
+        if (!credentialId) {
+          console.error('No credential ID found');
+          resolve(true); // Treat as revoked if no ID
+          return;
+        }
+        
+        // Step 1: Check locally cached revocation list first
+        const cachedRevocations = localStorage.getItem('lemma_revocation_list');
+        if (cachedRevocations) {
+          const revocationList = JSON.parse(cachedRevocations);
+          if (revocationList.includes(credentialId)) {
+            console.log(`Credential ${credentialId} is revoked according to local cache`);
+            resolve(true);
+            return;
+          }
+        }
+        
+        // Step 2: Fetch the latest revocation list from server
+        try {
+          const response = await fetch('/api/check-revocation', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              credential_id: credentialId
+            })
+          });
+          
+          if (!response.ok) {
+            // If can't reach server, use the local check result
+            console.warn('Could not reach revocation server, using local status only');
+            resolve(false); // Assume not revoked if we can't check and not in local cache
+            return;
+          }
+          
+          const result = await response.json();
+          
+          // Update local cache if we got a new revocation list
+          if (result.revocation_list) {
+            localStorage.setItem('lemma_revocation_list', JSON.stringify(result.revocation_list));
+          }
+          
+          resolve(result.revoked || false);
+        } catch (fetchError) {
+          console.error('Error fetching revocation status:', fetchError);
+          resolve(false);
+        }
+      } catch (error) {
+        console.error('Error checking revocation status:', error);
+        // If there's an error in the checking process, prefer to let the user proceed
+        // The server-side verification will do a more thorough check
+        resolve(false);
+      }
+    });
+  },
 };
 
 // Initialize widgets with data attributes on page load
