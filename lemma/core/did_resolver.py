@@ -197,34 +197,58 @@ class DIDResolver:
         Resolve a did:lemma identifier.
         did:lemma is our custom method for Lemma Network identifiers.
         """
-        # For local did:lemma, we'll assume it's issued by this instance
-        # In a production system, this would query a registry or database
-        
-        did = f"did:lemma:{method_specific_id}"
-        
-        # Placeholder - in real implementation, this would check a registry
-        # or other storage to get the actual key for this DID
-        
-        # For now, just create a minimal DID Document
-        return {
-            "@context": "https://www.w3.org/ns/did/v1",
-            "id": did,
-            "verificationMethod": [
-                {
-                    "id": f"{did}#keys-1",
-                    "type": "Ed25519VerificationKey2020",
-                    "controller": did,
-                    # This would contain the actual public key in a real implementation
-                    "publicKeyJwk": {
-                        "kty": "OKP",
-                        "crv": "Ed25519",
-                        "x": ""  # Would be filled with actual key
-                    }
+        try:
+            # For local did:lemma, we'll use the credential service to get the keys
+            from lemma.core.credential_service import get_credential_service
+            credential_service = get_credential_service()
+            
+            # Get the keys from the credential service
+            keys = credential_service.keys
+            
+            # Check if this is our DID
+            if method_specific_id == keys.get('did_id'):
+                # Create a DID document with our public key
+                did = f"did:lemma:{method_specific_id}"
+                public_key_jwk = keys.get('public_key_jwk', {})
+                
+                return {
+                    "@context": [
+                        "https://www.w3.org/ns/did/v1",
+                        "https://w3id.org/security/suites/ed25519-2020/v1"
+                    ],
+                    "id": did,
+                    "verificationMethod": [
+                        {
+                            "id": f"{did}#keys-1",
+                            "type": "Ed25519VerificationKey2020",
+                            "controller": did,
+                            "publicKeyJwk": public_key_jwk
+                        }
+                    ],
+                    "authentication": [f"{did}#keys-1"],
+                    "assertionMethod": [f"{did}#keys-1"]
                 }
-            ],
-            "authentication": [f"{did}#keys-1"],
-            "assertionMethod": [f"{did}#keys-1"]
-        }
+            
+            # If not our DID, try to resolve from network
+            from flask import current_app
+            peers = current_app.config.get('LEMMA_PEERS', [])
+            
+            # Try each peer until we find one that can resolve the DID
+            for peer in peers:
+                try:
+                    url = f"{peer}/api/did/lemma/{method_specific_id}"
+                    response = requests.get(url, timeout=5)
+                    if response.ok:
+                        return response.json()
+                except:
+                    continue
+            
+            return None
+            
+        except Exception as e:
+            from flask import current_app
+            current_app.logger.error(f"Error resolving did:lemma: {str(e)}")
+            return None
 
 # Global resolver instance
 _did_resolver = None

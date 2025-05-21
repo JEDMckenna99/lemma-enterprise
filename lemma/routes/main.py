@@ -10,7 +10,7 @@ from flask import (
     url_for, session, jsonify, abort, flash, current_app, make_response
 )
 from lemma.core.credential_service import get_credential_service
-from lemma.auth.csrf_config import generate_csrf_token
+from lemma.auth.csrf_config import generate_csrf_token, csrf_protect, rate_limit
 try:
     from lemma.utils.wallet import LemmaWallet
 except ImportError:
@@ -315,41 +315,53 @@ def api_verification_status(session_id):
     return jsonify(verification_status)
 
 @main_bp.route('/api/start-verification', methods=['POST'])
+@csrf_protect()
+@rate_limit
 def api_start_verification():
     """API endpoint to start a verification session."""
-    data = request.get_json()
-    if not data or 'user_id' not in data:
-        return jsonify({"error": "User ID is required"}), 400
-    
-    user_id = data['user_id']
-    
-    # Create a return URL for after verification
-    return_url = url_for('main.verification_callback', user_id=user_id, _external=True)
-    
-    # Create a Stripe verification session
-    verification_session = create_verification_session(user_id, return_url)
-    
-    # Check if there was an error creating the session
-    if isinstance(verification_session, dict) and "error" in verification_session:
-        error_message = verification_session["error"]
-        current_app.logger.error(f"Error creating verification session: {error_message}")
+    try:
+        data = request.get_json()
+        if not data or 'user_id' not in data:
+            return jsonify({"error": "User ID is required"}), 400
         
-        # Check for specific Stripe errors and provide helpful responses
-        if "API key" in error_message:
-            return jsonify({"error": "Stripe configuration error. Please contact the administrator."}), 500
-        else:
-            return jsonify({"error": error_message}), 500
-    
-    # Store the session ID in the Flask session
-    session['stripe_verification_session'] = verification_session.id
-    # Also store with user_id as key for more reliable retrieval
-    session[f'stripe_session_{user_id}'] = verification_session.id
-    
-    # Return just the session ID and URL for redirection
-    return jsonify({
-        "id": verification_session.id,
-        "url": verification_session.url
-    })
+        user_id = data['user_id']
+        
+        # Create a return URL for after verification
+        return_url = url_for('main.verification_callback', user_id=user_id, _external=True)
+        
+        # Create a Stripe verification session
+        verification_session = create_verification_session(user_id, return_url)
+        
+        # Check if there was an error creating the session
+        if isinstance(verification_session, dict) and "error" in verification_session:
+            error_message = verification_session["error"]
+            current_app.logger.error(f"Error creating verification session: {error_message}")
+            
+            # Check for specific Stripe errors and provide helpful responses
+            if "API key" in error_message:
+                return jsonify({"error": "Stripe configuration error. Please contact the administrator."}), 500
+            else:
+                return jsonify({"error": error_message}), 500
+        
+        try:
+            # Store the session ID in the Flask session
+            session['stripe_verification_session'] = verification_session.id
+            # Also store with user_id as key for more reliable retrieval
+            session[f'stripe_session_{user_id}'] = verification_session.id
+            session['pending_verification_user_id'] = user_id
+            
+            # Return just the session ID and URL for redirection
+            return jsonify({
+                "id": verification_session.id,
+                "url": verification_session.url
+            })
+        except Exception as session_error:
+            current_app.logger.error(f"Error storing session data: {str(session_error)}")
+            return jsonify({"error": "Failed to store session data"}), 500
+            
+    except Exception as e:
+        current_app.logger.error(f"Error in start-verification: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @main_bp.route('/protected')
 def protected():

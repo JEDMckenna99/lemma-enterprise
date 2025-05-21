@@ -763,7 +763,8 @@
                     });
 
                     if (!presentationResponse.ok) {
-                        throw new Error('Failed to create presentation');
+                        const errorData = await presentationResponse.json();
+                        throw new Error(errorData.error || 'Failed to create presentation');
                     }
 
                     const presentation = await presentationResponse.json();
@@ -779,7 +780,8 @@
                         body: JSON.stringify({
                             presentation: presentation,
                             challenge: challenge,
-                            csrf_token: csrfToken
+                            csrf_token: csrfToken,
+                            user_id: userId  // Add user_id to help with verification
                         })
                     });
 
@@ -792,7 +794,7 @@
 
                     if (verifyResult.success) {
                         // Verification successful, redirect to protected page
-                        window.location.href = '/protected';
+                        window.location.href = verifyResult.redirect || '/protected';
                     } else {
                         throw new Error(verifyResult.error || 'Invalid credential');
                     }
