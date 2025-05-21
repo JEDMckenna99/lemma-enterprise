@@ -677,34 +677,65 @@
                 // Clear credentials from wallet if available
                 if (window.lemmaWallet) {
                     try {
+                        // First get all credentials
                         window.lemmaWallet.getAllCredentials()
                             .then(credentials => {
-                                const deletePromises = credentials.map(cred => 
-                                    window.lemmaWallet.deleteCredential(cred.id)
-                                );
-                                
-                                return Promise.all(deletePromises);
+                                if (credentials.length > 0) {
+                                    // Delete each credential
+                                    const deletePromises = credentials.map(cred => 
+                                        window.lemmaWallet.deleteCredential(cred.id)
+                                    );
+                                    
+                                    return Promise.all(deletePromises);
+                                }
                             })
                             .then(() => {
                                 console.log('All credentials deleted from wallet');
+                                // Also delete the IndexedDB database completely
+                                return new Promise((resolve, reject) => {
+                                    const deleteRequest = window.indexedDB.deleteDatabase('lemma_wallet');
+                                    deleteRequest.onsuccess = () => {
+                                        console.log('IndexedDB database deleted successfully');
+                                        resolve();
+                                    };
+                                    deleteRequest.onerror = () => {
+                                        console.error('Error deleting IndexedDB database');
+                                        reject();
+                                    };
+                                });
                             })
-                            .catch(error => {
-                                console.error('Error deleting credentials from wallet:', error);
+                            .then(() => {
+                                // Clear cookies
+                                document.cookie.split(";").forEach(function(c) { 
+                                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                                });
+                                
+                                // Clear session cookie by redirecting to logout endpoint
+                                return fetch('/api/logout', {
+                                    method: 'POST',
+                                    credentials: 'include'
+                                });
+                            })
+                            .finally(() => {
+                                alert('Lemma credential cleared successfully! The page will now reload.');
+                                window.location.reload();
                             });
                     } catch (error) {
                         console.error('Error accessing wallet to clear credentials:', error);
+                        // Still try to reload the page
+                        window.location.reload();
                     }
+                } else {
+                    // If no wallet, just clear session and reload
+                    fetch('/api/logout', {
+                        method: 'POST',
+                        credentials: 'include'
+                    })
+                    .finally(() => {
+                        alert('Lemma credential cleared successfully!');
+                        window.location.reload();
+                    });
                 }
-                
-                // Clear session cookie by redirecting to logout endpoint
-                fetch('/api/logout', {
-                    method: 'POST',
-                    credentials: 'include'
-                })
-                .finally(() => {
-                    alert('Lemma credential cleared successfully!');
-                    window.location.reload();
-                });
             }
         });
     </script>
