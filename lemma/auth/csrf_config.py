@@ -159,7 +159,7 @@ def validate_csrf_token(token=None):
     # Validate token using Flask-WTF
     try:
         csrf = current_app.extensions['csrf']
-        return csrf.validate_token(token)
+        return csrf.validate(token)
     except (CSRFError, KeyError) as e:
         current_app.logger.error(f"CSRF validation error: {str(e)}")
         return False
