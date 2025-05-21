@@ -43,11 +43,15 @@ main_bp = Blueprint('main', __name__)
 # Add CSRF token to all templates
 @main_bp.context_processor
 def inject_csrf_token():
-    return {'csrf_token': generate_csrf_token()}
+    """Add CSRF token to template context."""
+    from lemma.auth.csrf_config import generate_csrf
+    return {'csrf_token': generate_csrf}
 
 @main_bp.route('/')
 def index():
     """Render the main page."""
+    from flask_wtf.csrf import generate_csrf
+    session['csrf_token'] = generate_csrf()
     return render_template('index.html')
 
 @main_bp.route('/verify')

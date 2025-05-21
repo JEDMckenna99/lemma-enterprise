@@ -5,7 +5,7 @@ Provides enhanced CSRF protection for enterprise-grade security.
 import logging
 from flask import request, abort, current_app, session, jsonify, render_template
 from functools import wraps, update_wrapper
-from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf
+from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf as flask_generate_csrf
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +85,19 @@ def configure_csrf(app):
     
     return csrf
 
+def generate_csrf():
+    """Generate a CSRF token."""
+    # In test mode with skip_auth, return a dummy token
+    if current_app.config.get('TESTING', False) and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
+        return 'test-csrf-token'
+    
+    # Use Flask-WTF's CSRF token generation
+    try:
+        return flask_generate_csrf()
+    except Exception as e:
+        current_app.logger.warning(f"Error generating CSRF token: {e}")
+        return None
+
 def csrf_protect():
     """Decorator to explicitly require CSRF protection for a view."""
     def decorator(view_function):
@@ -138,16 +151,3 @@ def validate_csrf_token(token=None):
         return True
     except (CSRFError, KeyError):
         return False
-
-def generate_csrf_token():
-    """Generate a CSRF token."""
-    # In test mode with skip_auth, return a dummy token
-    if current_app.config.get('TESTING', False) and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
-        return 'test-csrf-token'
-    
-    # Use Flask-WTF's CSRF token generation
-    try:
-        return generate_csrf()
-    except Exception as e:
-        current_app.logger.warning(f"Error generating CSRF token: {e}")
-        return None
