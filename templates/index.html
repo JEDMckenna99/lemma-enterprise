@@ -391,13 +391,24 @@
                         verifyButton.disabled = true;
                         verifyButton.textContent = 'Starting verification...';
                         
+                        // Get CSRF token first
+                        const csrfResponse = await fetch('/api/generate-csrf', {
+                            credentials: 'include'
+                        });
+                        const csrfData = await csrfResponse.json();
+                        const csrfToken = csrfData.csrf_token;
+                        
                         // Get a new verification session
                         const response = await fetch('/api/start-verification', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
-                            }
+                                'X-CSRF-Token': csrfToken
+                            },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                csrf_token: csrfToken
+                            })
                         });
                         
                         const result = await response.json();
@@ -469,7 +480,7 @@
             
             try {
                 // Get CSRF token first
-                const csrfResponse = await fetch('/api/generate-csrf-token', {
+                const csrfResponse = await fetch('/api/generate-csrf', {
                     credentials: 'include'
                 });
                 const csrfData = await csrfResponse.json();
