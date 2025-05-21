@@ -433,7 +433,7 @@
 
                             if (verifyResult.success) {
                                 // Verification successful, redirect to protected page
-                                window.location.href = verifyResult.redirect || '/protected';
+                                window.location.href = '/protected';
                                 return;
                             }
                             
@@ -635,7 +635,7 @@
                                             // Remove the pending user ID
                                             localStorage.removeItem('lemma_pending_user_id');
                                             // Verification successful, redirect to protected page
-                                            window.location.href = verifyResult.redirect || '/protected';
+                                            window.location.href = '/protected';
                                         }
                                     }
                                 }
@@ -792,7 +792,7 @@
 
                     if (verifyResult.success) {
                         // Verification successful, redirect to protected page
-                        window.location.href = verifyResult.redirect || '/protected';
+                        window.location.href = '/protected';
                     } else {
                         throw new Error(verifyResult.error || 'Invalid credential');
                     }
