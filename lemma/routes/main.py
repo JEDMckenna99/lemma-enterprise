@@ -700,3 +700,9 @@ def api_docs():
         verification_time=session.get('verification_time'),
         verification_expiry=session.get('verification_expiry')
     )
+
+@main_bp.route('/api/generate-csrf-token')
+def generate_csrf_token_endpoint():
+    """Generate a new CSRF token."""
+    token = generate_csrf_token()
+    return jsonify({'csrf_token': token})
