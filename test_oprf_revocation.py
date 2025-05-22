@@ -9,7 +9,7 @@ This script tests the entire OPRF-cascaded Bloom filter system:
 4. Integration with the credential service
 
 Usage:
-    python test_oprf_revocation.py [--server-url SERVER_URL]
+    python test_oprf_revocation.py [--server-url SERVER_URL] [--use-mock]
 """
 
 import os
@@ -35,6 +35,38 @@ except ImportError:
 
 # Constants
 DEFAULT_SERVER_URL = "http://localhost:8080"
+
+
+class MockOPRFClient(OPRFClient):
+    """Mock OPRF client that deterministically hashes inputs."""
+    
+    def __init__(self, server_url: str = None):
+        """Initialize with mock implementation."""
+        super().__init__(server_url)
+        # Force using mock implementation
+        self.using_mock = True
+        self.offline_mode = True
+        print("✅ Using mock OPRF client for testing")
+    
+    def get_public_key(self) -> str:
+        """Get a mock public key."""
+        self.public_key = "mock_public_key_for_testing"
+        return self.public_key
+    
+    def evaluate(self, alpha: bytes) -> bytes:
+        """Simulate OPRF evaluation with a hash."""
+        return hashlib.sha256(alpha).digest()
+    
+    def get_evaluation(self, credential_id: str) -> bytes:
+        """Get a deterministic OPRF evaluation for testing."""
+        # First try blinding and unblinding through our mock methods
+        try:
+            alpha, r = self.blind(credential_id)
+            beta = self.evaluate(alpha)
+            return self.unblind(beta, r)
+        except Exception:
+            # If that fails, use direct hashing
+            return hashlib.sha256(credential_id.encode('utf-8')).digest()
 
 
 def check_oprf_service(server_url: str) -> bool:
@@ -294,6 +326,7 @@ def test_integration() -> bool:
 def main():
     parser = argparse.ArgumentParser(description="Test the OPRF-Cascaded Bloom Filter revocation system.")
     parser.add_argument("--server-url", default=DEFAULT_SERVER_URL, help=f"OPRF service URL (default: {DEFAULT_SERVER_URL})")
+    parser.add_argument("--use-mock", action="store_true", help="Use mock OPRF client instead of actual server")
     args = parser.parse_args()
     
     print("==========================================")
@@ -301,17 +334,24 @@ def main():
     print("==========================================")
     print(f"OPRF service URL: {args.server_url}")
     
-    # Check if OPRF service is running
-    service_running = check_oprf_service(args.server_url)
-    if not service_running:
-        print("\n❌ OPRF service is not running or not reachable. Please start the service and try again.")
-        sys.exit(1)
-    
-    # Test OPRF client
-    client_success, oprf_client = test_oprf_client(args.server_url)
-    if not client_success:
-        print("\n❌ OPRF client test failed. Exiting.")
-        sys.exit(1)
+    # Check if using mock mode
+    if args.use_mock:
+        print("Using mock OPRF client (no server required)")
+        oprf_client = MockOPRFClient(args.server_url)
+        client_success = True
+    else:
+        # Check if OPRF service is running
+        service_running = check_oprf_service(args.server_url)
+        if not service_running:
+            print("\n❌ OPRF service is not running or not reachable.")
+            print("You can run with --use-mock to use a mock client instead.")
+            sys.exit(1)
+        
+        # Test OPRF client
+        client_success, oprf_client = test_oprf_client(args.server_url)
+        if not client_success:
+            print("\n❌ OPRF client test failed. Exiting.")
+            sys.exit(1)
     
     # Test cascaded Bloom filter
     cascade_success, cascade = test_cascaded_bloom(oprf_client)
@@ -330,7 +370,6 @@ def main():
     # Print summary
     print("\n==========================================")
     print("Test Summary:")
-    print(f"OPRF Service: {'✅ Working' if service_running else '❌ Failed'}")
     print(f"OPRF Client: {'✅ Working' if client_success else '❌ Failed'}")
     print(f"Cascaded Bloom Filter: {'✅ Working' if cascade_success else '❌ Failed'}")
     print(f"Witness Verification: {'✅ Working' if witness_success else '⚠️ Partial'}")

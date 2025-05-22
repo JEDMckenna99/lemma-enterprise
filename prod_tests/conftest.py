@@ -13,7 +13,7 @@ import base64
 # Production test configuration
 PROD_TEST_STORAGE_DIR = '.lemma_prod_test'
 DEFAULT_SERVER_URL = "http://localhost:5000"
-DEFAULT_OPRF_SERVER_URL = "http://localhost:8080"
+DEFAULT_OPRF_SERVER_URL = "https://lemma-enterprise-oprf-6e217f216b93.herokuapp.com"
 
 @pytest.fixture
 def app():

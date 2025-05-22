@@ -1,0 +1,14 @@
+{
+  "name": "Lemma Enterprise with OPRF Service",
+  "description": "A secure, modular, enterprise-grade implementation for verifying humans with minimal data collection and strong cryptographic standards.",
+  "buildpacks": [
+    { "url": "heroku/go" },
+    { "url": "heroku/python" }
+  ],
+  "env": {
+    "OPRF_SERVICE_INTERNAL": {
+      "description": "Internal OPRF service configuration",
+      "value": "true"
+    }
+  }
+} 

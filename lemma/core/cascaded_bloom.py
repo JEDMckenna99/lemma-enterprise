@@ -366,15 +366,29 @@ class OPRFClient:
     Allows private evaluation of a credential ID to determine if it's revoked.
     """
     
-    def __init__(self, server_url: str = "http://localhost:8080", cache_size: int = 1000):
+    def __init__(self, server_url: str = None, cache_size: int = 1000):
         """
         Initialize the OPRF client.
         
         Args:
-            server_url: URL of the OPRF server
+            server_url: URL of the OPRF service (can be None to auto-detect)
             cache_size: Size of the evaluation cache
         """
-        self.server_url = server_url
+        # Auto-detect OPRF service URL if not provided
+        if server_url is None:
+            # Check if internal OPRF service is enabled (multi-buildpack deployment)
+            if os.environ.get("OPRF_SERVICE_INTERNAL") == "true":
+                # Internal service deployed alongside the main app
+                port = os.environ.get("PORT", "8080")
+                self.server_url = f"http://localhost:{port}"
+                logger.info(f"Using internal OPRF service at {self.server_url}")
+            else:
+                # Use external service URL from environment or default
+                self.server_url = os.environ.get("OPRF_SERVICE_URL", "http://localhost:8080")
+                logger.info(f"Using external OPRF service at {self.server_url}")
+        else:
+            self.server_url = server_url
+            
         self.cache_size = cache_size
         self.evaluation_cache = {}  # Maps credential ID to evaluation
         self.cache_hits = 0

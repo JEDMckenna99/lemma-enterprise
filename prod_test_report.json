@@ -1,6 +1,6 @@
 {
   "status": "FAIL",
-  "timestamp": "2025-05-21T19:05:22.404237",
-  "total_time_seconds": 18.364009618759155,
+  "timestamp": "2025-05-21T19:19:01.721025",
+  "total_time_seconds": 18.35862398147583,
   "command": "-v --cov=lemma --cov-report=term-missing -xvs prod_tests/flows/test_flow_5.py"
 }

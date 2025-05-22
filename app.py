@@ -31,6 +31,14 @@ USERS_FILE = os.path.join(DATA_DIR, 'users.json')
 ADMIN_USERNAME = os.environ.get('LEMMA_ADMIN_USER', 'admin')
 ADMIN_PASSWORD = os.environ.get('LEMMA_ADMIN_PASS', 'password')
 
+# Set OPRF service configuration
+# Check if running in a multi-buildpack configuration on Heroku
+# This is determined by the presence of the go buildpack and heroku.yml
+if os.path.exists('heroku.yml') and os.path.exists('.godir'):
+    logger.info("Detected multi-buildpack configuration with Go and Python")
+    os.environ['OPRF_SERVICE_INTERNAL'] = 'true'
+    logger.info("Set OPRF_SERVICE_INTERNAL=true for integrated OPRF service")
+
 # Create app with configuration
 def create_app(test_config=None):
     """Create the Flask application."""

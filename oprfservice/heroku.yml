@@ -1,3 +1,12 @@
 build:
   docker:
-    web: Dockerfile 
+    web: Dockerfile
+setup:
+  addons:
+    - plan: heroku-redis:hobby-dev
+      as: REDIS
+  config:
+    OPRF_RATE_LIMIT: 60
+    OPRF_ROTATION_DAYS: 30
+    OPRF_DEBUG: false
+    OPRF_METRICS_ENABLED: true 

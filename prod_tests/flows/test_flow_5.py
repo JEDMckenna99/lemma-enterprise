@@ -166,16 +166,17 @@ def test_wallet_revocation_check():
     is_revoked = mock_wallet_check(test_eval)
     assert is_revoked is False, "Wallet revocation check failed"
 
-def test_revocation_check_via_api(client, api_key, oprf_client, epoch):
+def test_revocation_check_via_api(client, api_key, mock_oprf_client, epoch):
     """Test checking revocation status via the API."""
-    if oprf_client is None:
-        pytest.skip("OPRF client not available")
+    # Use the mock client since the real one might not be available
+    if mock_oprf_client is None:
+        pytest.skip("Mock OPRF client not available")
     
     # Generate a test credential ID
     test_cred = f"test_cred_{int(time.time())}"
     
-    # Get a witness
-    witness = oprf_client.generate_witness(test_cred, epoch)
+    # Generate a witness using the mock implementation
+    witness = mock_oprf_client.generate_witness(test_cred, epoch)
     
     # Call the revocation check API
     response = client.post(

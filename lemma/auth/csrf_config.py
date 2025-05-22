@@ -161,30 +161,36 @@ def get_csrf_response(token=None):
     
     return response
 
-def csrf_protect():
-    """Decorator to explicitly require CSRF protection for a view."""
-    def decorator(view_function):
-        @wraps(view_function)
-        def wrapped_view(*args, **kwargs):
-            # Skip CSRF check in testing environment if configured
-            if current_app.config.get('TESTING', False) and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
-                return view_function(*args, **kwargs)
-            
-            # Validate CSRF token
-            if not validate_csrf_token():
-                current_app.logger.warning("CSRF validation failed from IP: %s", request.remote_addr)
-                abort(400, "CSRF validation failed")
-            
-            return view_function(*args, **kwargs)
+# Fixed CSRF protect decorator that can handle both @csrf_protect and @csrf_protect() usage patterns
+def csrf_protect(f=None):
+    """
+    Decorator to explicitly require CSRF protection for a view.
+    Can be used as @csrf_protect or @csrf_protect()
+    """
+    # This allows the decorator to be used with or without parentheses
+    if f is None:
+        return csrf_protect
         
-        # Update the name of the wrapped function to include the original function's name
-        wrapped_view.__name__ = f"csrf_protected_{view_function.__name__}"
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Skip CSRF check in testing environment if configured
+        if current_app.config.get('TESTING', False) and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
+            return f(*args, **kwargs)
         
-        # Make sure the blueprint endpoint routing works correctly
-        update_wrapper(wrapped_view, view_function)
+        # Validate CSRF token
+        if not validate_csrf_token():
+            current_app.logger.warning("CSRF validation failed from IP: %s", request.remote_addr)
+            abort(400, "CSRF validation failed")
         
-        return wrapped_view
-    return decorator
+        return f(*args, **kwargs)
+    
+    # Update the name of the wrapped function to include the original function's name
+    decorated_function.__name__ = f"csrf_protected_{f.__name__}"
+    
+    # Make sure the blueprint endpoint routing works correctly
+    update_wrapper(decorated_function, f)
+    
+    return decorated_function
 
 def validate_csrf_token(token=None):
     """Validate a CSRF token."""

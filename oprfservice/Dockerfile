@@ -8,19 +8,15 @@ RUN apk add --no-cache git gcc musl-dev
 # Copy go.mod first to leverage Docker cache
 COPY go.mod ./
 
-# Create a temporary main.go to download dependencies
-RUN echo 'package main; import _ "github.com/cloudflare/circl/oprf"; import _ "github.com/gin-contrib/cors"; import _ "github.com/gin-gonic/gin"; import _ "github.com/prometheus/client_golang/prometheus"; import _ "github.com/prometheus/client_golang/prometheus/promauto"; import _ "github.com/prometheus/client_golang/prometheus/promhttp"; import _ "golang.org/x/time/rate"; func main() {}' > temp.go
+# Download dependencies and create go.sum
+RUN go mod download
 RUN go mod tidy
-RUN rm temp.go
 
-# Copy the rest of the source code
+# Copy the rest of the application
 COPY . .
 
-# Run go mod tidy again after copying all files
-RUN go mod tidy
-
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o oprf-service
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o oprf-service .
 
 # Use a smaller image for the runtime
 FROM alpine:3.16
@@ -30,26 +26,22 @@ WORKDIR /app
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
 
+# Create directory for keys
+RUN mkdir -p /app/keys
+
 # Copy the binary from the builder stage
 COPY --from=builder /app/oprf-service /app/
-COPY --from=builder /app/run.sh /app/
 
-# Make run.sh executable
-RUN chmod +x /app/run.sh
-
-# Create volume for keys
-VOLUME ["/app/keys"]
-
-# Set environment variables for configuration
-ENV OPRF_PORT=8080
+# Set default environment variables
+ENV PORT=8080
 ENV OPRF_KEY_DIR=/app/keys
 ENV OPRF_RATE_LIMIT=60
 ENV OPRF_ROTATION_DAYS=30
 ENV OPRF_METRICS_ENABLED=true
 ENV OPRF_DEBUG=false
 
-# Expose the service port
+# Expose the service port - Heroku will override this with its own PORT env var
 EXPOSE 8080
 
-# Run the service
-ENTRYPOINT ["/app/run.sh"] 
+# Run the service directly (no shell script)
+CMD /app/oprf-service --port=$PORT --keydir=/app/keys 
