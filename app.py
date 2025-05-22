@@ -13,7 +13,6 @@ import json
 from flask import Flask, redirect, request, jsonify
 from lemma import create_app as lemma_create_app
 import requests
-from flask_wtf.csrf import CSRFProtect, csrf_exempt
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:%(name)s:%(message)s")
@@ -145,10 +144,8 @@ def create_app():
                 "status": "error",
                 "error": str(e)
             }), 500
-    
-    # Exempt the credential verification endpoint from CSRF protection        
+            
     @app.route('/api/credentials/verify', methods=['POST'])
-    @csrf_exempt
     def verify_credential():
         """API endpoint to verify credentials with OPRF revocation check."""
         try:
