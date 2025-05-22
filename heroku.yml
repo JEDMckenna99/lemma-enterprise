@@ -5,6 +5,8 @@ build:
   config:
     python_version: 3.9
     go_version: 1.18
+  packages:
+    - ./oprfservice
   
 run:
   web: gunicorn wsgi:app
