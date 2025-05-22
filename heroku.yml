@@ -3,11 +3,8 @@ build:
     - python
   config:
     python_version: 3.9
-  pre:
-    - bin/compile-oprf.sh
   
 run:
   web: gunicorn wsgi:app
-  oprf: ./bin/oprfservice --port=${PORT} --keydir=./instance/data/keys
 
 stack: heroku-22
