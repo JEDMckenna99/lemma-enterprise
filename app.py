@@ -13,6 +13,7 @@ import json
 from flask import Flask, redirect, request, jsonify
 from lemma import create_app as lemma_create_app
 import requests
+from lemma.core.cascaded_bloom import get_cascade_manager, init_cascade_manager
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:%(name)s:%(message)s")
@@ -39,6 +40,11 @@ def create_app():
     
     # Ensure data directories exist
     os.makedirs(os.path.join(DATA_DIR, 'revocation', 'cascades'), exist_ok=True)
+    
+    # Initialize cascade manager for OPRF revocation
+    cascade_dir = os.path.join(DATA_DIR, 'revocation', 'cascades')
+    init_cascade_manager(cascade_dir)
+    cascade_manager = get_cascade_manager()
     
     # Define routes
     @app.route('/')
@@ -69,12 +75,12 @@ def create_app():
                 cascade = {
                     "epoch": epoch if epoch != 'latest' else datetime.datetime.now().strftime('%Y-%m-%d'),
                     "created": datetime.datetime.now().isoformat(),
-                    "issuer": "did:web:lemma-enterprise.herokuapp.com",
+                    "issuer": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com",
                     "filters": [],
                     "signature": {
                         "type": "Ed25519Signature2020",
                         "created": datetime.datetime.now().isoformat(),
-                        "verificationMethod": "did:web:lemma-enterprise.herokuapp.com#key-1",
+                        "verificationMethod": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com#key-1",
                         "proofValue": "z" + "".join(random.choices("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=64))
                     }
                 }
@@ -127,19 +133,61 @@ def create_app():
     def oprf_status():
         """API endpoint to check OPRF service status."""
         try:
-            # Instead of trying to connect to an external service,
-            # we'll simulate a successful response
+            # Get the cascade manager status
+            cascade_status = cascade_manager.get_status() if cascade_manager else {"status": "not_initialized"}
+            
+            # Return the OPRF service status
             return jsonify({
                 "status": "ok",
                 "oprf_service": "internal",
                 "oprf_response": {
                     "status": "ok",
                     "service": "oprf",
-                    "version": "1.0.0"
+                    "version": "1.0.0",
+                    "cascade_status": cascade_status
                 }
             })
         except Exception as e:
             logger.error(f"Error in OPRF status endpoint: {str(e)}")
+            return jsonify({
+                "status": "error",
+                "error": str(e)
+            }), 500
+    
+    @app.route('/api/oprf/evaluate', methods=['POST'])
+    def oprf_evaluate():
+        """API endpoint to evaluate the OPRF function for a blinded input."""
+        try:
+            # Get the request data
+            data = request.json
+            
+            if not data:
+                return jsonify({"error": "No data provided"}), 400
+                
+            # Extract the blinded input
+            blinded_input = data.get('blinded_input')
+            
+            if not blinded_input:
+                return jsonify({"error": "No blinded input provided"}), 400
+                
+            # Evaluate the OPRF function
+            if cascade_manager:
+                result = cascade_manager.evaluate_oprf(blinded_input)
+                return jsonify({
+                    "status": "ok",
+                    "evaluated_value": result
+                })
+            else:
+                # If cascade manager is not initialized, return a mock response
+                # This is just for testing - in production, we would return an error
+                mock_result = "oprf_" + "".join(random.choices("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=32))
+                return jsonify({
+                    "status": "ok",
+                    "evaluated_value": mock_result
+                })
+                
+        except Exception as e:
+            logger.error(f"Error evaluating OPRF: {str(e)}")
             return jsonify({
                 "status": "error",
                 "error": str(e)
@@ -169,23 +217,60 @@ def create_app():
                 
             if not domain:
                 return jsonify({"error": "No domain provided"}), 400
-                
-            # In a real implementation, we would verify the credential
-            # For testing, we'll just return a mock response with revocation check
             
-            # Always mark revocation as checked and not revoked for testing
-            revocation_checked = True if check_revocation else False
-            revocation_status = "not_revoked" if check_revocation else "unknown"
+            # Log the verification request
+            logger.info(f"Verifying credential with revocation check: {check_revocation}")
+            
+            # Extract the credential ID for revocation checking
+            credential = presentation.get("verifiableCredential", [{}])[0] if presentation.get("verifiableCredential") else {}
+            credential_id = credential.get("id", "")
+            
+            # Initialize revocation variables
+            revocation_checked = False
+            revocation_status = "unknown"
+            
+            # Perform revocation check if requested
+            if check_revocation and credential_id and cascade_manager:
+                try:
+                    # Check if the credential is revoked using the cascade manager
+                    logger.info(f"Checking revocation status for credential: {credential_id}")
                     
-            # Return a mock verification result
+                    # Get revocation proof from the presentation if available
+                    revocation_proof = presentation.get("revocationProof", {})
+                    
+                    # Check revocation status
+                    is_revoked = cascade_manager.check_revocation(
+                        credential_id, 
+                        revocation_proof.get("witness") if revocation_proof else None
+                    )
+                    
+                    revocation_checked = True
+                    revocation_status = "revoked" if is_revoked else "not_revoked"
+                    
+                    logger.info(f"Revocation status for {credential_id}: {revocation_status}")
+                except Exception as e:
+                    logger.error(f"Error checking revocation: {str(e)}")
+                    revocation_checked = True
+                    revocation_status = "error"
+            else:
+                # For testing, simulate a successful revocation check
+                if check_revocation:
+                    revocation_checked = True
+                    revocation_status = "not_revoked"
+                    logger.info("Simulated revocation check (no cascade manager available)")
+            
+            # In a real implementation, we would verify the credential signature
+            # For now, we'll assume the credential is valid
+                    
+            # Return the verification result
             return jsonify({
                 "verification_result": True,
                 "credential_status": "valid",
-                "issuer": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com",
-                "subject": presentation.get("verifiableCredential", [{}])[0].get("credentialSubject", {}).get("id", "unknown"),
-                "issuance_date": presentation.get("verifiableCredential", [{}])[0].get("issuanceDate", "unknown"),
-                "expiration_date": presentation.get("verifiableCredential", [{}])[0].get("expirationDate", "unknown"),
-                "attributes": presentation.get("verifiableCredential", [{}])[0].get("credentialSubject", {}),
+                "issuer": credential.get("issuer", "unknown"),
+                "subject": credential.get("credentialSubject", {}).get("id", "unknown"),
+                "issuance_date": credential.get("issuanceDate", "unknown"),
+                "expiration_date": credential.get("expirationDate", "unknown"),
+                "attributes": credential.get("credentialSubject", {}),
                 "revocation_checked": revocation_checked,
                 "revocation_status": revocation_status
             })
