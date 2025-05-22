@@ -2,7 +2,12 @@ build:
   languages:
     - python
     - go
+  config:
+    python_version: 3.9
+    go_version: 1.18
   
 run:
   web: gunicorn wsgi:app
   oprf: bin/oprfservice --port=${PORT} --keydir=./instance/data/keys
+
+stack: heroku-22
