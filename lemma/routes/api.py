@@ -412,7 +412,7 @@ def verify_human():
         return jsonify({"success": False, "error": f"Error verifying human: {str(e)}"}), 500
 
 @api_bp.route('/presentation', methods=['POST'])
-@csrf_protect()
+@rate_limit
 def create_presentation():
     """Create a presentation from a credential."""
     try:
