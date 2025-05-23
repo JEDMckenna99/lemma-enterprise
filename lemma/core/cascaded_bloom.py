@@ -877,4 +877,230 @@ def verify_cascade_signature(cascade: Dict[str, Any]) -> bool:
             
     except Exception as e:
         logger.error(f"Error verifying cascade signature: {e}")
-        return False 
+        return False
+
+
+# Singleton instance for the cascade manager
+_cascade_manager = None
+
+class CascadeManager:
+    """
+    Manager class for working with OPRF cascades.
+    Acts as a singleton service for the application.
+    """
+    
+    def __init__(self, cascade_dir: str):
+        """
+        Initialize a cascade manager.
+        
+        Args:
+            cascade_dir: Directory where cascade files are stored
+        """
+        self.cascade_dir = cascade_dir
+        self.oprf_client = OPRFClient()
+        self.current_cascade = None
+        self.current_epoch = None
+        
+        # Create directory if it doesn't exist
+        os.makedirs(cascade_dir, exist_ok=True)
+        
+        # Try to load the latest cascade
+        self._load_latest_cascade()
+        
+        logger.info(f"Initialized CascadeManager with directory: {cascade_dir}")
+    
+    def _load_latest_cascade(self):
+        """Load the latest cascade if available."""
+        # Look for cascade_latest.json first
+        latest_file = os.path.join(self.cascade_dir, 'cascade_latest.json')
+        
+        if os.path.exists(latest_file):
+            try:
+                with open(latest_file, 'r') as f:
+                    cascade_data = json.load(f)
+                    
+                # Create cascade from the data
+                self.current_cascade = CascadedBloomRevocation.from_dict(cascade_data.get('cascade', {}))
+                self.current_epoch = cascade_data.get('epoch')
+                
+                logger.info(f"Loaded latest cascade for epoch: {self.current_epoch}")
+                return
+            except Exception as e:
+                logger.error(f"Error loading latest cascade: {e}")
+        
+        # If no latest file, look for most recent epoch file
+        try:
+            cascade_files = [f for f in os.listdir(self.cascade_dir) 
+                             if f.startswith('cascade_') and f.endswith('.json') and f != 'cascade_latest.json']
+            
+            if cascade_files:
+                # Sort by epoch date (assumes format cascade_YYYY-MM-DD.json)
+                cascade_files.sort(reverse=True)
+                latest_file = os.path.join(self.cascade_dir, cascade_files[0])
+                
+                with open(latest_file, 'r') as f:
+                    cascade_data = json.load(f)
+                    
+                # Create cascade from the data
+                self.current_cascade = CascadedBloomRevocation.from_dict(cascade_data.get('cascade', {}))
+                self.current_epoch = cascade_data.get('epoch')
+                
+                logger.info(f"Loaded most recent cascade for epoch: {self.current_epoch}")
+                return
+        except Exception as e:
+            logger.error(f"Error finding most recent cascade: {e}")
+        
+        # If no cascades found, create a new one
+        self.current_epoch = datetime.now().strftime('%Y-%m-%d')
+        self.current_cascade = CascadedBloomRevocation(issuer_id=f"did:lemma:temp_{int(time.time())}")
+        logger.info(f"Created new empty cascade for epoch: {self.current_epoch}")
+    
+    def get_status(self):
+        """Get the status of the cascade manager."""
+        return {
+            "cascade_dir": self.cascade_dir,
+            "current_epoch": self.current_epoch,
+            "oprf_status": "available" if self.oprf_client else "unavailable",
+            "cascade_size": len(self.current_cascade.revoked_ids) if self.current_cascade else 0,
+            "cascade_levels": self.current_cascade.cascade_levels if self.current_cascade else 0,
+            "last_updated": datetime.fromtimestamp(self.current_cascade.last_updated).isoformat() 
+                            if self.current_cascade else None
+        }
+    
+    def evaluate_oprf(self, blinded_input: str) -> str:
+        """
+        Evaluate the OPRF function for a blinded input.
+        
+        Args:
+            blinded_input: Base64-encoded blinded input
+            
+        Returns:
+            str: Base64-encoded evaluation result
+        """
+        if not self.oprf_client:
+            raise ValueError("OPRF client not available")
+            
+        try:
+            # Decode the blinded input
+            alpha = base64.b64decode(blinded_input)
+            
+            # Evaluate using the OPRF client
+            beta = self.oprf_client.evaluate(alpha)
+            
+            # Encode the result
+            return base64.b64encode(beta).decode('utf-8')
+        except Exception as e:
+            logger.error(f"Error evaluating OPRF: {e}")
+            raise
+    
+    def check_revocation(self, credential_id: str) -> Tuple[bool, dict]:
+        """
+        Check if a credential is revoked.
+        
+        Args:
+            credential_id: ID of the credential to check
+            
+        Returns:
+            (bool, dict): (is_revoked, details)
+        """
+        if not self.current_cascade:
+            logger.warning("No cascade available for revocation check")
+            return False, {"error": "No cascade available"}
+            
+        # Get the OPRF evaluation
+        try:
+            evaluation = self.oprf_client.get_evaluation(credential_id)
+            
+            # Check if revoked
+            is_revoked, level = self.current_cascade.is_revoked(evaluation)
+            
+            return is_revoked, {
+                "epoch": self.current_epoch,
+                "level": level,
+                "confidence": "high" if level == 0 else "medium" if level == 1 else "low"
+            }
+        except Exception as e:
+            logger.error(f"Error checking revocation: {e}")
+            return False, {"error": str(e)}
+    
+    def build_new_cascade(self, revoked_list: List[str], epoch: str = None) -> Dict[str, Any]:
+        """
+        Build a new cascade from a list of revoked credentials.
+        
+        Args:
+            revoked_list: List of credential IDs to revoke
+            epoch: Optional epoch identifier (default: current date)
+            
+        Returns:
+            dict: The cascade bundle
+        """
+        # Use current date if no epoch provided
+        if not epoch:
+            epoch = datetime.now().strftime('%Y-%m-%d')
+        
+        # Build the cascade
+        cascade = build_revocation_cascade(
+            revoked_list=revoked_list,
+            oprf_client=self.oprf_client,
+            issuer_id=f"did:lemma:cascade_{epoch}"
+        )
+        
+        # Create the bundle
+        bundle = create_cascade_bundle(cascade, epoch)
+        
+        # Save to file
+        cascade_file = os.path.join(self.cascade_dir, f'cascade_{epoch}.json')
+        latest_file = os.path.join(self.cascade_dir, 'cascade_latest.json')
+        
+        with open(cascade_file, 'w') as f:
+            json.dump(bundle, f, indent=2)
+            
+        # Also save as latest
+        with open(latest_file, 'w') as f:
+            json.dump(bundle, f, indent=2)
+        
+        # Update current cascade
+        self.current_cascade = cascade
+        self.current_epoch = epoch
+        
+        logger.info(f"Built new cascade for epoch {epoch} with {len(revoked_list)} revoked credentials")
+        
+        return bundle
+
+
+def init_cascade_manager(cascade_dir: str) -> CascadeManager:
+    """
+    Initialize the cascade manager singleton.
+    
+    Args:
+        cascade_dir: Directory where cascade files are stored
+        
+    Returns:
+        CascadeManager: The initialized manager
+    """
+    global _cascade_manager
+    
+    if _cascade_manager is None:
+        logger.info(f"Initializing cascade manager in {cascade_dir}")
+        _cascade_manager = CascadeManager(cascade_dir)
+    else:
+        logger.info("Cascade manager already initialized")
+        
+    return _cascade_manager
+
+
+def get_cascade_manager() -> CascadeManager:
+    """
+    Get the cascade manager singleton instance.
+    
+    Returns:
+        CascadeManager: The cascade manager instance
+    """
+    global _cascade_manager
+    
+    if _cascade_manager is None:
+        logger.warning("Cascade manager not initialized, defaulting to temporary directory")
+        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp_cascades')
+        _cascade_manager = CascadeManager(temp_dir)
+        
+    return _cascade_manager 

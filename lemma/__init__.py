@@ -302,3 +302,39 @@ def _init_components(app):
             app.logger.info('Initialized revocation registry')
         except ImportError:
             app.logger.warning('Revocation registry not available')
+    
+    # Initialize OPRF cascade manager - ensure it works in Heroku
+    try:
+        from lemma.core.cascaded_bloom import CascadedBloomRevocation, OPRFClient
+        # Check if we're running on Heroku
+        is_heroku = 'DYNO' in os.environ
+        
+        # Configure OPRF client
+        if is_heroku:
+            # In Heroku, set the OPRF service to internal (same dyno)
+            os.environ['OPRF_SERVICE_INTERNAL'] = 'true'
+            app.logger.info("Configured OPRF for internal service on Heroku")
+            
+            # Ensure the keys directory exists
+            keys_dir = os.path.join(app.instance_path, 'data', 'keys')
+            os.makedirs(keys_dir, exist_ok=True)
+            
+            # Ensure the cascade directory exists
+            cascade_dir = os.path.join(app.instance_path, 'data', 'revocation', 'cascades')
+            os.makedirs(cascade_dir, exist_ok=True)
+            
+        # Initialize OPRF client
+        oprf_client = OPRFClient()
+        app.logger.info(f"Initialized OPRF client: {oprf_client.server_url}")
+        
+        # Store client in app context for reuse
+        g._oprf_client = oprf_client
+        
+        # Try to connect to the OPRF service
+        try:
+            pubkey = oprf_client.get_public_key()
+            app.logger.info(f"Successfully connected to OPRF service, public key available")
+        except Exception as e:
+            app.logger.warning(f"OPRF service not available yet: {e}")
+    except ImportError:
+        app.logger.warning('OPRF cascade integration not available')

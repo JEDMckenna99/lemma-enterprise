@@ -73,38 +73,38 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 ## Architecture & Components
 
 ### Core Backend
-- **`app.py`:** Main Flask application and entry point.
-- **`lemma/__init__.py`:** Application factory and configuration.
-- **`lemma/core/credential_service.py`:** Credential issuance and verification logic.
-- **`lemma/core/did_resolver.py`:** Multi-method DID resolver for decentralized identity.
-- **`lemma/core/revocation.py`:** P2P revocation system with compact bitstrings.
-- **`lemma/auth/security.py`:** Authentication and security features.
-- **`lemma/routes/`:** Modular route handlers.
-- **`lemma/utils/zero_knowledge.py`:** Zero-knowledge proof utilities for selective disclosure.
-- **`lemma/utils/secure_storage.py`:** Hardware-backed key storage utilities.
-- **`lemma/models/`:** Data models.
-- **`tests/`:** Comprehensive test suite.
+- **app.py:** Main Flask application and entry point.
+- **lemma/__init__.py:** Application factory and configuration.
+- **lemma/core/credential_service.py:** Credential issuance and verification logic.
+- **lemma/core/did_resolver.py:** Multi-method DID resolver for decentralized identity.
+- **lemma/core/revocation.py:** P2P revocation system with compact bitstrings.
+- **lemma/auth/security.py:** Authentication and security features.
+- **lemma/routes/:** Modular route handlers.
+- **lemma/utils/zero_knowledge.py:** Zero-knowledge proof utilities for selective disclosure.
+- **lemma/utils/secure_storage.py:** Hardware-backed key storage utilities.
+- **lemma/models/:** Data models.
+- **tests/:** Comprehensive test suite.
 
 ### Frontend Components
-- **`static/js/lemma-wallet.js`:** Client-side wallet for storing and managing Lemma credentials.
-- **`static/js/lemma-wallet-init.js`:** Automatic wallet initialization for Lemma-integrated pages.
-- **`static/js/lemma-plan.js`:** Interactive, paginated display of the Lemma Network for verified users.
-- **`static/js/lemma-plan.css`:** Styling for the Lemma Network display.
+- **static/js/lemma-wallet.js:** Client-side wallet for storing and managing Lemma credentials.
+- **static/js/lemma-wallet-init.js:** Automatic wallet initialization for Lemma-integrated pages.
+- **static/js/lemma-plan.js:** Interactive, paginated display of the Lemma Network for verified users.
+- **static/js/lemma-plan.css:** Styling for the Lemma Network display.
 
 ### Templates
-- **`templates/index.html`:** Landing page with "Verify Lemma" and "Access Protected Content" buttons.
-- **`templates/verify.html`:** Credential verification and storage page.
-- **`templates/protected.html`:** Content requiring human verification with credential management.
-- **`templates/admin_login.html`:** Secure admin login.
-- **`templates/admin.html`:** Admin dashboard for issuing credentials.
-- **`templates/layout.html`:** Common layout template with wallet integration.
+- **templates/index.html:** Landing page with "Verify Lemma" and "Access Protected Content" buttons.
+- **templates/verify.html:** Credential verification and storage page.
+- **templates/protected.html:** Content requiring human verification with credential management.
+- **templates/admin_login.html:** Secure admin login.
+- **templates/admin.html:** Admin dashboard for issuing credentials.
+- **templates/layout.html:** Common layout template with wallet integration.
 
 ### Storage System
-- **`.lemma_enterprise/`:** (Created automatically) Contains cryptographic keys and credential registry:
-  - `keys.json`: Ed25519 keys
-  - `registry.json`: Issued credentials
-  - `users.json`: User IDs (no personal data)
-  - `revocation/`: Revocation data for decentralized verification
+- **.lemma_enterprise/:** (Created automatically) Contains cryptographic keys and credential registry:
+  - keys.json: Ed25519 keys
+  - registry.json: Issued credentials
+  - users.json: User IDs (no personal data)
+  - revocation/: Revocation data for decentralized verification
 
 ---
 
@@ -113,7 +113,7 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 Lemma now includes a fully decentralized identity system that addresses 8 key goals:
 
 ### 1. Decentralized Identifier Management
-- Support for multiple DID methods (`did:key`, `did:web`, `did:ethr`, `did:lemma`)
+- Support for multiple DID methods (did:key, did:web, did:ethr, did:lemma)
 - Credentials remain valid even if the issuing authority goes offline
 - Cross-platform interoperability with other identity systems
 
@@ -124,7 +124,7 @@ Lemma now includes a fully decentralized identity system that addresses 8 key go
 
 ### 3. End-to-End Encryption of Credentials
 - Zero-knowledge proof utilities for minimal data disclosure
-- Selective disclosure of only the `isHuman: true` claim
+- Selective disclosure of only the isHuman: true claim
 - JWT-based proof formats for standardized verification
 
 ### 4. Peer-to-Peer Revocation Broadcast
@@ -214,12 +214,12 @@ See [OPRF_REVOCATION_README.md](./OPRF_REVOCATION_README.md) for detailed implem
    - Redirects to protected content upon successful verification
 
 ### Admin Onboarding Flow
-1. **Admin Authentication:** Secure login at `/admin/login` (password hashing, CSRF protection).
-2. **Credential Issuance:** Admin enters a user ID at `/admin/issue` to issue a credential.
+1. **Admin Authentication:** Secure login at /admin/login (password hashing, CSRF protection).
+2. **Credential Issuance:** Admin enters a user ID at /admin/issue to issue a credential.
 3. **Verification Link:** System generates a shareable verification link.
-4. **User Verification:** User opens the verification link to `/verify?user_id={user_id}` to store their credential.
+4. **User Verification:** User opens the verification link to /verify?user_id={user_id} to store their credential.
 5. **Local Storage:** Credential is stored in the user's browser.
-6. **Cross-Page Access:** User can access protected content at `/protected` using their credential.
+6. **Cross-Page Access:** User can access protected content at /protected using their credential.
 
 ### Protected Content Management (New)
 1. **View Credential:** Users can view their Lemma credential details directly on the protected page.
@@ -240,13 +240,13 @@ See [OPRF_REVOCATION_README.md](./OPRF_REVOCATION_README.md) for detailed implem
 #### Stripe Identity Verification to Credential Issuance
 The Lemma system uses Stripe Identity for robust human verification before issuing credentials:
 
-1. **Initiation:** User clicks "Verify Lemma" on the home page or visits `/start-verification/{user_id}`.
+1. **Initiation:** User clicks "Verify Lemma" on the home page or visits /start-verification/{user_id}.
 2. **Identity Verification:**
    - Lemma creates a Stripe Identity verification session
    - User is redirected to Stripe's hosted verification UI
    - User completes the identity verification process (ID document + selfie)
 3. **Callback Processing:**
-   - Stripe redirects back to `/verification-callback?user_id={user_id}`
+   - Stripe redirects back to /verification-callback?user_id={user_id}
    - Lemma checks verification status via Stripe API
    - If verification passes, a Verifiable Credential (VC) is issued
 4. **Credential Storage:**
@@ -272,7 +272,7 @@ For third-party sites integrating with Lemma, this workflow enables credential v
    - Wallet creates a Verifiable Presentation (VP) containing:
      - The user's human verification credential
      - Proof of possession (signature over the challenge)
-     - Minimum necessary claims (typically just `isHuman: true`)
+     - Minimum necessary claims (typically just isHuman: true)
 4. **Verification Process:**
    - Customer site sends the VP to their backend
    - Backend verifies the VP against Lemma's verification API
@@ -289,7 +289,7 @@ This workflow enables a "verify once, use anywhere" model where users don't need
 Lemma is designed to be easily integrated into customer sites, allowing them to verify users as humans without collecting personal data.
 
 ### Basic Integration
-```html
+html
 <!-- Add these scripts to your website -->
 <script src="https://your-lemma-instance.com/static/js/lemma-wallet.js"></script>
 <script src="https://your-lemma-instance.com/static/js/lemma-wallet-init.js"></script>
@@ -298,10 +298,10 @@ Lemma is designed to be easily integrated into customer sites, allowing them to 
 <div data-lemma="true">
   <!-- Your protected content goes here -->
 </div>
-```
+
 
 ### JavaScript API Integration
-```javascript
+javascript
 // Verify a user with Lemma
 async function verifyWithLemma() {
   // Check if wallet is available
@@ -334,12 +334,12 @@ async function verifyWithLemma() {
     }
   }
 }
-```
+
 
 ### Backend Verification
 On your server, you'll need to verify the Lemma credential presentation:
 
-```python
+python
 # Example using the Python requests library
 import requests
 
@@ -361,7 +361,7 @@ def verify_lemma_credential(credential, challenge):
     
     # Verification failed
     return False
-```
+
 
 The Lemma wallet is designed to be portable and work across websites, which is core to providing "verify once, use anywhere" functionality.
 
@@ -375,7 +375,7 @@ The Lemma wallet is designed to be portable and work across websites, which is c
 - Git
 
 ### Local Development
-```bash
+bash
 # Clone the repository
 git clone <repository-url>
 cd lemma-enterprise
@@ -400,19 +400,19 @@ export LEMMA_HARDWARE_SECURITY=true
 
 # Run the application
 python app.py
-```
+
 
 ### Docker Deployment
-```bash
+bash
 # Build and run with Docker Compose
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
-```
+
 
 ### Heroku Deployment
-```bash
+bash
 # Login to Heroku
 heroku login
 
@@ -435,41 +435,46 @@ git push heroku main
 
 # Open the application
 heroku open
-```
+
 
 #### Troubleshooting Heroku Deployment
 
 If you encounter CSRF token errors when deploying to Heroku (such as "csrf_token is undefined" in the verify.html template), we've implemented the following fixes:
 
 1. Added a context processor to inject the CSRF token into all templates rendered by the main blueprint:
-   ```python
+   
+python
    # In lemma/routes/main.py
    @main_bp.context_processor
    def inject_csrf_token():
        return {'csrf_token': generate_csrf()}
-   ```
+
 
 2. Updated the templates to access the token as a variable instead of a function call:
-   ```html
+   
+html
    <!-- In templates like verify.html -->
    <meta name="csrf-token" content="{{ csrf_token }}">
-   ```
+
 
 This solution ensures that CSRF tokens are properly available in templates when deployed to Heroku's environment, preventing 500 errors during the verification process.
 
 ### Azure Deployment
 1. **Create an Azure Web App:**
-   ```bash
+   
+bash
    az webapp create --resource-group YourResourceGroup --plan YourAppServicePlan --name LemmaHumanVerification --runtime "PYTHON:3.9"
-   ```
+
 2. **Set Environment Variables:**
-   ```bash
+   
+bash
    az webapp config appsettings set --resource-group YourResourceGroup --name LemmaHumanVerification --settings LEMMA_ADMIN_USER="your_admin_username" LEMMA_ADMIN_PASS="your_secure_password" LEMMA_SECRET_KEY="your_random_secret" DID="did:lemma:azure" DID_METHOD="key" LEMMA_ENABLE_P2P="true"
-   ```
+
 3. **Deploy the Code:**
-   ```bash
+   
+bash
    az webapp deployment source config-zip --resource-group YourResourceGroup --name LemmaHumanVerification --src lemma-enterprise.zip
-   ```
+
 
 ---
 
@@ -477,9 +482,8 @@ This solution ensures that CSRF tokens are properly available in templates when 
 
 ### Authentication
 All API endpoints that modify data require an API key:
-```
 X-API-Key: your_api_key_here
-```
+
 
 ### Endpoints
 - **GET /api/health:** Health check endpoint
@@ -507,9 +511,9 @@ X-API-Key: your_api_key_here
 ## Security Considerations
 
 - **Admin Credentials:** Set strong admin credentials via environment variables.
-- **Session Secret:** Use a strong random value for `LEMMA_SECRET_KEY`.
+- **Session Secret:** Use a strong random value for LEMMA_SECRET_KEY.
 - **API Key:** Set a strong API key for external integrations.
-- **Key Protection:** The `.lemma_enterprise` directory contains cryptographic keys—keep it secure.
+- **Key Protection:** The .lemma_enterprise directory contains cryptographic keys—keep it secure.
 - **HTTPS:** Always use HTTPS in production for secure credential transmission.
 - **Rate Limiting:** API endpoints are protected against abuse.
 - **Password Hashing:** Admin passwords are securely hashed.
@@ -546,9 +550,9 @@ X-API-Key: your_api_key_here
 ## Customization
 
 - Modify the HTML templates to match your branding.
-- Adjust the credential expiration in the credential service or `app.py` (default: 1 year).
-- Add additional protected pages by following the pattern in `protected.html`.
-- Customize security settings in `lemma/__init__.py`.
+- Adjust the credential expiration in the credential service or app.py (default: 1 year).
+- Add additional protected pages by following the pattern in protected.html.
+- Customize security settings in lemma/__init__.py.
 - Configure preferred DID methods using environment variables.
 - Set up P2P peers for decentralized revocation.
 - Style error messages and notifications to match your design system.
@@ -566,7 +570,7 @@ The system currently supports:
 - **Browser LocalStorage**: Credentials are automatically stored in the browser's localStorage for seamless use on a single device.
 - **Downloadable JSON Backup**: Users can download their credential as a JSON file which can be backed up or transferred to other devices.
 - **Import Functionality**: Users can import previously downloaded JSON credentials on any device, enabling cross-device credential use.
-- **Encrypted Backups**: Password-protected credential backups with the `EncryptedBackup` utility.
+- **Encrypted Backups**: Password-protected credential backups with the EncryptedBackup utility.
 - **Hardware-Backed Storage**: Support for storing keys in TPM, Secure Enclave, or Android Keystore.
 
 This implementation ensures users can:
@@ -595,13 +599,13 @@ These integrations will enable:
 ## Testing
 
 The system includes comprehensive tests for all critical paths:
-```bash
+bash
 # Run all tests with coverage report
 python run_tests.py
 
 # Or use pytest directly
 pytest -v --cov=lemma
-```
+
 
 ---
 

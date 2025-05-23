@@ -495,3 +495,85 @@ The implementation will follow these phases:
 3. Enhance revocation system with cascaded bloom filter implementation
 4. Create the client-side OPRF libraries
 5. Integrate all components and run end-to-end tests 
+
+## Heroku Deployment
+
+The OPRF service is designed to integrate seamlessly with the main Lemma application when deployed to Heroku. This integration uses Heroku's container stack to run both services within the same app.
+
+### Deployment Configuration
+
+For Heroku deployments, we use:
+
+1. **Multi-Process Dyno Configuration:**
+   - The `Procfile` includes two processes: `web` for the main Flask app and `oprf` for the OPRF service
+   - Both run within the same Heroku app, simplifying deployment and management
+
+2. **Environment Variables:**
+   - `OPRF_SERVICE_INTERNAL=true` - Tells the app that the OPRF service is running internally
+   - `OPRF_RATE_LIMIT=60` - Rate limiting for OPRF evaluations
+   - `OPRF_ROTATION_DAYS=30` - How often to rotate OPRF keys
+
+3. **Container Stack:**
+   - Uses Heroku's container stack to support both Python and Go
+   - Configured through `heroku.yml`
+
+### Deployment Steps
+
+The easiest way to deploy is to use the provided `deploy_oprf_heroku.ps1` script:
+
+```bash
+# On Windows with PowerShell
+./deploy_oprf_heroku.ps1
+
+# Follow the prompts to deploy to your Heroku app
+```
+
+### Manual Deployment
+
+If you prefer to deploy manually:
+
+1. Update your `heroku.yml` to include both buildpacks:
+   ```yaml
+   build:
+     languages:
+       - python
+       - go
+   ```
+
+2. Set the dyno configuration:
+   ```bash
+   heroku ps:scale web=1 oprf=1
+   ```
+
+3. Set the required environment variables:
+   ```bash
+   heroku config:set OPRF_SERVICE_INTERNAL=true
+   heroku config:set OPRF_RATE_LIMIT=60
+   heroku config:set OPRF_ROTATION_DAYS=30
+   ```
+
+4. Push to Heroku:
+   ```bash
+   git push heroku main
+   ```
+
+### Verification
+
+After deployment, you can verify that both services are running:
+
+1. Check process status:
+   ```bash
+   heroku ps
+   ```
+
+2. Test the OPRF service:
+   ```bash
+   curl https://your-app-name.herokuapp.com/api/oprf/status
+   ```
+
+3. Check the logs:
+   ```bash
+   heroku logs --tail
+   ```
+
+The successful integration allows seamless privacy-preserving revocation checks without requiring a separate service deployment. 

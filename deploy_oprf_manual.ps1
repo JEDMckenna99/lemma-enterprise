@@ -1,44 +1,22 @@
-# This script deploys the OPRF service as a separate Heroku app
+# This script manually deploys a simple OPRF service to Heroku
 
 # Configuration
 $OPRF_APP_NAME = "lemma-oprf-service"
 $MAIN_APP_NAME = "lemma-enterprise"
 
-# Create the OPRF app if it doesn't exist
-try {
-    $appInfo = heroku apps:info $OPRF_APP_NAME
-    Write-Host "OPRF app $OPRF_APP_NAME already exists"
-} catch {
-    Write-Host "Creating OPRF app $OPRF_APP_NAME..."
-    heroku apps:create $OPRF_APP_NAME
-}
-
-# Set the stack to heroku-22
-heroku stack:set heroku-22 --app $OPRF_APP_NAME
-
-# Add the Go buildpack
-heroku buildpacks:set heroku/go --app $OPRF_APP_NAME
-
 # Create a temporary directory for the OPRF service
 Write-Host "Creating temporary directory for OPRF service..."
-$tempDir = "oprf-deploy-temp"
+$tempDir = "simple-oprf-manual"
 if (Test-Path $tempDir) {
     Remove-Item -Recurse -Force $tempDir
 }
 New-Item -ItemType Directory -Path $tempDir | Out-Null
 Set-Location $tempDir
 
-# Initialize git repository
-git init
+# Create a simple Go application for the OPRF service
+Write-Host "Creating simple OPRF service..."
 
-# Copy OPRF service files
-Write-Host "Copying OPRF service files..."
-Copy-Item -Recurse -Path ..\oprfservice\* -Destination .
-
-# Create a Procfile
-"web: ./oprfservice" | Out-File -FilePath "Procfile" -Encoding ascii
-
-# Create a simple main.go file for testing
+# Create main.go
 @"
 package main
 
@@ -47,6 +25,7 @@ import (
     "log"
     "net/http"
     "os"
+    "encoding/json"
 )
 
 func main() {
@@ -80,26 +59,27 @@ func main() {
 }
 "@ | Out-File -FilePath "main.go" -Encoding utf8
 
-# Create a go.mod file that works with Heroku
+# Create go.mod
 @"
 module github.com/lemma/oprf-service
 
 go 1.18
-
-// +heroku goVersion go1.18
 "@ | Out-File -FilePath "go.mod" -Encoding utf8
 
-# Add all files to git
+# Create Procfile
+@"
+web: ./bin/app
+"@ | Out-File -FilePath "Procfile" -Encoding ascii
+
+# Initialize git repository
+git init
 git add .
-git commit -m "Deploy OPRF service"
+git commit -m "Simple OPRF service"
 
 # Push to Heroku
 Write-Host "Pushing to Heroku..."
-git push https://git.heroku.com/$OPRF_APP_NAME.git HEAD:main -f
-
-# Scale the app
-Write-Host "Scaling the app..."
-heroku ps:scale web=1 --app $OPRF_APP_NAME
+heroku git:remote -a $OPRF_APP_NAME
+git push heroku master -f
 
 # Configure the main app to use the OPRF service
 Write-Host "Configuring main app to use OPRF service..."

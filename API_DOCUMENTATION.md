@@ -1,792 +1,428 @@
-# Lemma API Documentation
+# Lemma Enterprise API Documentation
 
-*Version 2.1.0 - May 2025*
-
-This document provides comprehensive documentation for integrating with the Lemma Human Verification System API. Lemma provides a secure, privacy-preserving way to verify that users are human without collecting personal information.
+This document provides comprehensive documentation for integrating with the Lemma Enterprise API, which enables verification of human identity using decentralized identifiers (DIDs) and verifiable credentials.
 
 ## Table of Contents
 
 1. [Overview](#overview)
 2. [Authentication](#authentication)
 3. [API Endpoints](#api-endpoints)
-   - [Health Check](#health-check)
-   - [Credential Issuance](#credential-issuance)
-   - [Credential Verification](#credential-verification)
-   - [Presentation Creation and Verification](#presentation-creation-and-verification)
-   - [Human Verification](#human-verification)
-   - [Session Management](#session-management)
-   - [CSRF Protection](#csrf-protection)
-4. [Client-Side Integration](#client-side-integration)
-   - [Lemma Wallet Integration](#lemma-wallet-integration)
-   - [Verification Widget](#verification-widget)
-   - [Cross-Origin Support](#cross-origin-support)
-5. [Error Handling](#error-handling)
-6. [Rate Limiting](#rate-limiting)
-7. [Security Considerations](#security-considerations)
+4. [Credential Issuance](#credential-issuance)
+5. [Credential Verification](#credential-verification)
+6. [Error Handling](#error-handling)
+7. [Rate Limiting](#rate-limiting)
 8. [Example Implementations](#example-implementations)
 9. [Webhooks](#webhooks)
 10. [OPRF Revocation](#oprf-revocation)
+11. [Deployment Architecture](#deployment-architecture)
 
 ## Overview
 
-The Lemma API enables third-party applications to:
+The Lemma Enterprise API allows third-party applications to verify that users are human without collecting personally identifiable information (PII). It uses W3C Verifiable Credentials and Decentralized Identifiers (DIDs) to provide privacy-preserving identity verification.
 
-1. Verify that users are human without collecting personal information
-2. Issue and verify W3C standard Verifiable Credentials
-3. Create and verify Verifiable Presentations
-4. Check credential revocation status using privacy-preserving OPRF technology
-5. Integrate with the Lemma wallet for credential management
-
-All API endpoints return JSON responses and use standard HTTP status codes. The API is designed to be RESTful and follows best practices for web API design.
+Key features:
+- Privacy-first human verification
+- Cryptographically secure credentials
+- Revocation checking via OPRF (Oblivious Pseudorandom Function)
+- Cross-site credential presentation
 
 ## Authentication
 
-Most API endpoints that modify data require an API key for authentication. Include the API key in the `X-API-Key` header:
+All API requests must include authentication using one of the following methods:
+
+### API Key Authentication
+
+Include your API key in the request header:
 
 ```
-X-API-Key: your_api_key_here
+Authorization: Bearer YOUR_API_KEY
 ```
 
-You can obtain an API key by contacting the Lemma administrator or through the admin dashboard.
+API keys can be obtained by contacting the Lemma Enterprise administrator.
 
-### CSRF Protection
+### JWT Authentication
 
-For endpoints that modify data and are called from a browser context, you must include a CSRF token. You can obtain a CSRF token using the `/api/generate-csrf-token` endpoint.
+For client-side applications, use JWT authentication:
 
-Include the CSRF token in one of the following ways:
-- In the `X-CSRF-Token` header
-- In a `csrf_token` field in the request body (for JSON requests)
-- In a `csrf_token` field in the form data (for form submissions)
+1. Obtain a JWT token by calling the `/api/auth/token` endpoint with your API key
+2. Include the JWT token in subsequent requests:
+
+```
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+JWT tokens expire after 1 hour and must be refreshed.
 
 ## API Endpoints
 
-### Health Check
+### Base URL
 
-#### GET /api/health
+All API endpoints are relative to the base URL:
 
-Check if the API is operational.
-
-**Request:**
-```http
-GET /api/health
+```
+https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api
 ```
 
-**Response:**
-```json
-{
-  "status": "ok",
-  "version": "2.1.0",
-  "timestamp": 1716403200
-}
-```
+### Available Endpoints
 
-### Credential Issuance
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/auth/token` | POST | Obtain a JWT token |
+| `/credentials/issue` | POST | Issue a new credential |
+| `/credentials/verify` | POST | Verify a credential presentation |
+| `/credentials/status` | GET | Check credential status |
+| `/oprf/evaluate` | POST | Evaluate an OPRF for revocation checking |
+| `/oprf/status` | GET | Check OPRF service status |
 
-#### POST /api/issue-credential
+## Credential Issuance
 
-Issue a new credential for a user.
+Credentials are issued to users after they complete the verification process. The process involves:
 
-**Authentication Required:** Yes (API Key)
+1. User initiates verification
+2. User completes identity verification
+3. Credential is issued to user's wallet
+4. User can present credential to verifiers
 
-**Request:**
+### Issue Credential Request
+
 ```http
-POST /api/issue-credential
+POST /api/credentials/issue
 Content-Type: application/json
-X-API-Key: your_api_key_here
-X-CSRF-Token: csrf_token_here
+Authorization: Bearer YOUR_API_KEY
 
 {
-  "user_id": "user_123",
-  "expiration_days": 365,
+  "subject_id": "did:web:example.com:users:123",
+  "credential_type": "HumanCredential",
+  "expiration": "2026-01-01T00:00:00Z",
   "attributes": {
-    "isHuman": true
+    "isHuman": true,
+    "verificationLevel": "basic"
   }
 }
 ```
 
-**Response:**
-```json
+### Issue Credential Response
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
 {
-  "status": "success",
+  "credential_id": "urn:uuid:123e4567-e89b-12d3-a456-426614174000",
+  "issuer": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com",
+  "issuance_date": "2025-05-22T15:30:45Z",
   "credential": {
-    "id": "urn:uuid:3e4fc296-88c5-4081-a9ec-c131e9c9b120",
     "@context": [
-      "https://www.w3.org/2018/credentials/v1"
+      "https://www.w3.org/2018/credentials/v1",
+      "https://lemma.example/contexts/human/v1"
     ],
-    "type": ["VerifiableCredential", "HumanVerificationCredential"],
-    "issuer": "did:lemma:issuer",
-    "issuanceDate": "2025-05-22T12:00:00Z",
-    "expirationDate": "2026-05-22T12:00:00Z",
+    "type": ["VerifiableCredential", "HumanCredential"],
+    "issuer": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com",
+    "issuanceDate": "2025-05-22T15:30:45Z",
+    "expirationDate": "2026-01-01T00:00:00Z",
     "credentialSubject": {
-      "id": "did:user:user_123",
-      "isHuman": true
+      "id": "did:web:example.com:users:123",
+      "isHuman": true,
+      "verificationLevel": "basic"
     },
     "proof": {
       "type": "Ed25519Signature2020",
-      "created": "2025-05-22T12:00:00Z",
-      "verificationMethod": "did:lemma:issuer#keys-1",
+      "created": "2025-05-22T15:30:45Z",
+      "verificationMethod": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com#key-1",
       "proofPurpose": "assertionMethod",
-      "jws": "eyJhbGciOiJFZERTQSIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..signature"
+      "proofValue": "z58DAdFfa9SkqZMVPxAQpic7ndSayn5NBc2QcbPTsRPtH..."
     }
   }
 }
 ```
 
-### Credential Verification
+## Credential Verification
 
-#### POST /api/verify-credential
+Verifiers can request and verify credential presentations from users.
 
-Verify a credential.
+### Verify Credential Request
 
-**Request:**
 ```http
-POST /api/verify-credential
+POST /api/credentials/verify
 Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
 
 {
-  "credential": {
-    // Credential object from issue-credential response
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "status": "success",
-  "valid": true,
-  "verification_result": {
-    "credential_valid": true,
-    "signature_valid": true,
-    "issuer_valid": true,
-    "not_expired": true,
-    "not_revoked": true
-  }
-}
-```
-
-### Presentation Creation and Verification
-
-#### POST /api/presentation
-
-Create a presentation from a credential.
-
-**Request:**
-```http
-POST /api/presentation
-Content-Type: application/json
-X-CSRF-Token: csrf_token_here
-
-{
-  "credential": {
-    // Credential object from issue-credential response
-  },
-  "challenge": "random_challenge_string"
-}
-```
-
-**Response:**
-```json
-{
-  "status": "success",
   "presentation": {
     "@context": [
-      "https://www.w3.org/2018/credentials/v1"
+      "https://www.w3.org/2018/credentials/v1",
+      "https://lemma.example/contexts/human/v1"
     ],
     "type": ["VerifiablePresentation"],
-    "verifiableCredential": [
-      // Credential object
-    ],
-    "holder": "did:user:user_123",
+    "verifiableCredential": [{
+      "@context": [
+        "https://www.w3.org/2018/credentials/v1",
+        "https://lemma.example/contexts/human/v1"
+      ],
+      "type": ["VerifiableCredential", "HumanCredential"],
+      "issuer": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com",
+      "issuanceDate": "2025-05-22T15:30:45Z",
+      "expirationDate": "2026-01-01T00:00:00Z",
+      "credentialSubject": {
+        "id": "did:web:example.com:users:123",
+        "isHuman": true,
+        "verificationLevel": "basic"
+      },
+      "proof": {
+        "type": "Ed25519Signature2020",
+        "created": "2025-05-22T15:30:45Z",
+        "verificationMethod": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com#key-1",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z58DAdFfa9SkqZMVPxAQpic7ndSayn5NBc2QcbPTsRPtH..."
+      }
+    }],
     "proof": {
       "type": "Ed25519Signature2020",
-      "created": "2025-05-22T12:05:00Z",
-      "challenge": "random_challenge_string",
+      "created": "2025-05-22T15:35:22Z",
+      "verificationMethod": "did:web:example.com:users:123#key-1",
       "proofPurpose": "authentication",
-      "verificationMethod": "did:lemma:issuer#keys-1",
-      "jws": "eyJhbGciOiJFZERTQSIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..signature"
+      "challenge": "1234567890",
+      "domain": "verifier.example.com",
+      "proofValue": "z6Hgi7RB1JKj2CyPzSmBUUUyRWQYTc7VKZCgXGiRdz..."
     }
-  }
+  },
+  "challenge": "1234567890",
+  "domain": "verifier.example.com",
+  "check_revocation": true
 }
 ```
 
-#### POST /api/verify-presentation
+### Verify Credential Response
 
-Verify a presentation.
-
-**Request:**
 ```http
-POST /api/verify-presentation
+HTTP/1.1 200 OK
 Content-Type: application/json
 
 {
-  "presentation": {
-    // Presentation object from presentation response
+  "verification_result": true,
+  "credential_status": "valid",
+  "issuer": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com",
+  "subject": "did:web:example.com:users:123",
+  "issuance_date": "2025-05-22T15:30:45Z",
+  "expiration_date": "2026-01-01T00:00:00Z",
+  "attributes": {
+    "isHuman": true,
+    "verificationLevel": "basic"
   },
-  "challenge": "random_challenge_string"
+  "revocation_checked": true,
+  "revocation_status": "not_revoked"
 }
-```
-
-**Response:**
-```json
-{
-  "status": "success",
-  "valid": true,
-  "verification_result": {
-    "presentation_valid": true,
-    "credentials_valid": true,
-    "challenge_valid": true,
-    "holder_valid": true
-  }
-}
-```
-
-### Human Verification
-
-#### POST /api/verify-human
-
-Verify a human presentation and set session.
-
-**Request:**
-```http
-POST /api/verify-human
-Content-Type: application/json
-X-CSRF-Token: csrf_token_here
-
-{
-  "presentation": {
-    // Presentation object from presentation response
-  },
-  "challenge": "random_challenge_string"
-}
-```
-
-**Response:**
-```json
-{
-  "status": "success",
-  "verified": true,
-  "user_id": "user_123",
-  "session_expires": "2025-05-22T13:05:00Z"
-}
-```
-
-#### GET /api/credential-lookup/{user_id}
-
-Get a user's credential (auto-issues if not found).
-
-**Request:**
-```http
-GET /api/credential-lookup/user_123
-```
-
-**Response:**
-```json
-{
-  "status": "success",
-  "credential": {
-    // Credential object
-  },
-  "is_new": false
-}
-```
-
-### Session Management
-
-#### POST /api/logout
-
-Clear the verification session.
-
-**Request:**
-```http
-POST /api/logout
-Content-Type: application/json
-X-CSRF-Token: csrf_token_here
-
-{}
-```
-
-**Response:**
-```json
-{
-  "status": "success",
-  "message": "Session cleared"
-}
-```
-
-### CSRF Protection
-
-#### GET /api/generate-csrf-token
-
-Generate a CSRF token for secure form submission.
-
-**Request:**
-```http
-GET /api/generate-csrf-token
-```
-
-**Response:**
-```json
-{
-  "csrf_token": "random_csrf_token_string"
-}
-```
-
-## Client-Side Integration
-
-### Lemma Wallet Integration
-
-The Lemma wallet provides client-side storage and management of credentials. To integrate with the Lemma wallet, include the following scripts on your page:
-
-```html
-<script src="https://your-lemma-instance.com/static/js/lemma-wallet.js"></script>
-<script src="https://your-lemma-instance.com/static/js/lemma-wallet-init.js"></script>
-```
-
-Then, you can interact with the wallet using the global `lemmaWallet` object:
-
-```javascript
-// Check if wallet is available
-if (window.lemmaWallet) {
-  // Get credentials
-  const credentials = await window.lemmaWallet.getAllCredentials();
-  
-  // Create a presentation
-  const challenge = "random_challenge";
-  const presentation = await window.lemmaWallet.createPresentation(credentials[0], challenge);
-  
-  // Verify the presentation
-  const result = await fetch('/api/verify-human', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': csrfToken
-    },
-    body: JSON.stringify({
-      presentation: presentation,
-      challenge: challenge
-    })
-  }).then(res => res.json());
-  
-  if (result.verified) {
-    // User is verified
-  }
-}
-```
-
-### Verification Widget
-
-For a simpler integration, you can use the Lemma verification widget:
-
-```html
-<div id="lemma-widget-container"></div>
-
-<script src="https://your-lemma-instance.com/static/js/lemma-wallet.js"></script>
-<script src="https://your-lemma-instance.com/static/js/lemma-wallet-init.js"></script>
-<script src="https://your-lemma-instance.com/static/js/lemma-api-widget.js"></script>
-
-<script>
-  // Initialize the widget
-  window.LemmaWidget.init({
-    containerId: 'lemma-widget-container',
-    userId: 'user_123',
-    callbackUrl: '/protected',
-    buttonText: 'Verify Human',
-    description: 'Verify you are human to access protected content',
-    onSuccess: function(result) {
-      console.log('Verification successful:', result);
-    },
-    onFailure: function(error) {
-      console.error('Verification failed:', error);
-    }
-  });
-</script>
-```
-
-### Cross-Origin Support
-
-The Lemma wallet supports cross-origin requests, allowing you to verify users across different domains. To enable cross-origin support:
-
-1. Configure your Lemma instance to allow cross-origin requests from your domain:
-
-```python
-# In your Lemma instance configuration
-CORS_ALLOWED_ORIGINS = ['https://your-site.com']
-```
-
-2. Use the `apiBase` option when initializing the widget or calling `proveALemma`:
-
-```javascript
-window.proveALemma({
-  userId: 'user_123',
-  apiBase: 'https://your-lemma-instance.com',
-  onSuccess: function(result) {
-    console.log('Verification successful:', result);
-  }
-});
 ```
 
 ## Error Handling
 
-All API endpoints return standard HTTP status codes:
+The API uses standard HTTP status codes to indicate success or failure:
 
-- `200 OK`: The request was successful
-- `400 Bad Request`: The request was invalid
-- `401 Unauthorized`: Authentication is required
-- `403 Forbidden`: The request is not allowed
-- `404 Not Found`: The requested resource was not found
-- `500 Internal Server Error`: An error occurred on the server
+- 200 OK: Request succeeded
+- 400 Bad Request: Invalid request parameters
+- 401 Unauthorized: Authentication failed
+- 403 Forbidden: Insufficient permissions
+- 404 Not Found: Resource not found
+- 429 Too Many Requests: Rate limit exceeded
+- 500 Internal Server Error: Server error
 
-Error responses include a JSON object with an `error` field describing the error:
+Error responses include a JSON body with details:
 
 ```json
 {
-  "status": "error",
-  "error": "Invalid credential format",
-  "details": "Missing required field: credentialSubject"
+  "error": "invalid_request",
+  "error_description": "Missing required parameter: challenge",
+  "status_code": 400
 }
 ```
 
 ## Rate Limiting
 
-API endpoints are rate-limited to prevent abuse. The rate limits are as follows:
+API requests are rate-limited to prevent abuse. Limits are applied per API key:
 
-- Public endpoints: 60 requests per minute per IP address
-- Authenticated endpoints: 300 requests per minute per API key
+- Authentication endpoints: 10 requests per minute
+- Credential issuance: 30 requests per minute
+- Credential verification: 60 requests per minute
+- OPRF evaluation: 100 requests per minute
 
-When a rate limit is exceeded, the API returns a `429 Too Many Requests` status code with a `Retry-After` header indicating when the client can retry the request.
+Rate limit headers are included in all responses:
 
-## Security Considerations
-
-When integrating with the Lemma API, consider the following security best practices:
-
-1. **Always use HTTPS** for all API requests
-2. **Protect your API key** and never expose it in client-side code
-3. **Validate all user input** before sending it to the API
-4. **Use CSRF tokens** for all requests that modify data
-5. **Set secure and HttpOnly flags** on cookies
-6. **Implement proper error handling** to avoid exposing sensitive information
-7. **Use Content Security Policy (CSP)** to prevent XSS attacks
-8. **Regularly rotate API keys** to minimize the impact of key compromise
+```
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 58
+X-RateLimit-Reset: 1621872000
+```
 
 ## Example Implementations
 
-### Python
+### JavaScript Client
+
+```javascript
+// Example JavaScript client for credential verification
+async function verifyCredential(presentation, challenge, domain) {
+  const apiKey = 'YOUR_API_KEY';
+  const response = await fetch('https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/credentials/verify', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      presentation,
+      challenge,
+      domain,
+      check_revocation: true
+    })
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`Verification failed: ${error.error_description}`);
+  }
+  
+  return response.json();
+}
+```
+
+### Python Client
 
 ```python
 import requests
-import json
 
-# Configuration
-LEMMA_API_URL = "https://your-lemma-instance.com/api"
-API_KEY = "your_api_key_here"
-
-# Issue a credential
-def issue_credential(user_id):
-    response = requests.post(
-        f"{LEMMA_API_URL}/issue-credential",
-        headers={
-            "Content-Type": "application/json",
-            "X-API-Key": API_KEY
-        },
-        json={
-            "user_id": user_id,
-            "expiration_days": 365,
-            "attributes": {
-                "isHuman": True
-            }
-        }
-    )
+def verify_credential(presentation, challenge, domain, api_key):
+    """
+    Verify a credential presentation using the Lemma Enterprise API.
+    
+    Args:
+        presentation (dict): The verifiable presentation
+        challenge (str): The challenge string
+        domain (str): The domain string
+        api_key (str): Your API key
+        
+    Returns:
+        dict: The verification result
+    """
+    url = "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/credentials/verify"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    payload = {
+        "presentation": presentation,
+        "challenge": challenge,
+        "domain": domain,
+        "check_revocation": True
+    }
+    
+    response = requests.post(url, json=payload, headers=headers)
+    response.raise_for_status()
     
     return response.json()
-
-# Verify a credential
-def verify_credential(credential):
-    response = requests.post(
-        f"{LEMMA_API_URL}/verify-credential",
-        headers={
-            "Content-Type": "application/json"
-        },
-        json={
-            "credential": credential
-        }
-    )
-    
-    return response.json()
-
-# Example usage
-user_id = "user_123"
-result = issue_credential(user_id)
-
-if result["status"] == "success":
-    credential = result["credential"]
-    verification = verify_credential(credential)
-    
-    if verification["status"] == "success" and verification["valid"]:
-        print(f"User {user_id} is verified human")
-    else:
-        print("Verification failed")
-else:
-    print(f"Error: {result.get('error')}")
-```
-
-### JavaScript
-
-```javascript
-// Configuration
-const LEMMA_API_URL = "https://your-lemma-instance.com/api";
-const API_KEY = "your_api_key_here";
-
-// Get CSRF token
-async function getCsrfToken() {
-  const response = await fetch(`${LEMMA_API_URL}/generate-csrf-token`, {
-    credentials: 'include'
-  });
-  const data = await response.json();
-  return data.csrf_token;
-}
-
-// Verify a human
-async function verifyHuman(userId) {
-  try {
-    // Get CSRF token
-    const csrfToken = await getCsrfToken();
-    
-    // Check if user has a credential
-    const lookupResponse = await fetch(`${LEMMA_API_URL}/credential-lookup/${userId}`, {
-      credentials: 'include'
-    });
-    
-    const lookupResult = await lookupResponse.json();
-    
-    if (lookupResult.status !== "success") {
-      throw new Error(lookupResult.error || "Failed to lookup credential");
-    }
-    
-    // Generate a random challenge
-    const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-    
-    // Create a presentation
-    const presentationResponse = await fetch(`${LEMMA_API_URL}/presentation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        credential: lookupResult.credential,
-        challenge: challenge
-      })
-    });
-    
-    const presentationResult = await presentationResponse.json();
-    
-    if (presentationResult.status !== "success") {
-      throw new Error(presentationResult.error || "Failed to create presentation");
-    }
-    
-    // Verify the presentation
-    const verifyResponse = await fetch(`${LEMMA_API_URL}/verify-human`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        presentation: presentationResult.presentation,
-        challenge: challenge
-      })
-    });
-    
-    const verifyResult = await verifyResponse.json();
-    
-    if (verifyResult.status === "success" && verifyResult.verified) {
-      return {
-        verified: true,
-        userId: verifyResult.user_id
-      };
-    } else {
-      throw new Error(verifyResult.error || "Verification failed");
-    }
-  } catch (error) {
-    console.error("Error verifying human:", error);
-    return {
-      verified: false,
-      error: error.message
-    };
-  }
-}
-
-// Example usage
-verifyHuman("user_123").then(result => {
-  if (result.verified) {
-    console.log(`User ${result.userId} is verified human`);
-  } else {
-    console.log(`Verification failed: ${result.error}`);
-  }
-});
 ```
 
 ## Webhooks
 
-Lemma supports webhooks to notify your application of important events. To configure webhooks, contact the Lemma administrator or use the admin dashboard.
+Lemma Enterprise supports webhooks for asynchronous notifications about credential events:
+
+1. Register a webhook URL in your account settings
+2. Configure the events you want to receive
+3. Implement an endpoint to receive webhook events
 
 ### Webhook Events
 
 - `credential.issued`: A new credential has been issued
-- `credential.verified`: A credential has been verified
+- `credential.verified`: A credential has been successfully verified
 - `credential.revoked`: A credential has been revoked
-- `human.verified`: A human has been verified
 
 ### Webhook Payload
 
 ```json
 {
-  "event": "human.verified",
-  "timestamp": "2025-05-22T12:05:00Z",
+  "event": "credential.verified",
+  "timestamp": "2025-05-22T15:40:12Z",
   "data": {
-    "user_id": "user_123",
-    "credential_id": "urn:uuid:3e4fc296-88c5-4081-a9ec-c131e9c9b120",
-    "verification_method": "presentation"
+    "credential_id": "urn:uuid:123e4567-e89b-12d3-a456-426614174000",
+    "issuer": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com",
+    "subject": "did:web:example.com:users:123",
+    "verification_result": true
   }
 }
 ```
 
 ### Webhook Security
 
-Webhook requests include a signature in the `X-Lemma-Signature` header. To verify the signature:
+Webhook requests include a signature header for verification:
 
-1. Concatenate the webhook timestamp and the request body
-2. Compute an HMAC-SHA256 using your webhook secret
-3. Compare the computed signature with the `X-Lemma-Signature` header
-
-```python
-import hmac
-import hashlib
-
-def verify_webhook_signature(payload, timestamp, signature, secret):
-    message = f"{timestamp}.{payload}"
-    expected_signature = hmac.new(
-        secret.encode('utf-8'),
-        message.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
-    
-    return hmac.compare_digest(expected_signature, signature)
 ```
+X-Lemma-Signature: t=1621872012,v1=5257a869e7ecebeda32affa62cdca3fa51cad7e77a0e56ff536d0ce8e108d8bd
+```
+
+To verify the signature:
+1. Split the header value to get the timestamp and signature
+2. Compute the HMAC-SHA256 of the request body using your webhook secret
+3. Compare the computed signature with the received signature
 
 ## OPRF Revocation
 
-Lemma uses Oblivious Pseudorandom Functions (OPRF) for privacy-preserving credential revocation. The OPRF service allows checking if a credential has been revoked without revealing the credential ID.
+Lemma Enterprise uses Oblivious Pseudorandom Functions (OPRFs) for privacy-preserving credential revocation checks. This allows verifying that a credential has not been revoked without revealing the credential identifier.
 
-### OPRF Endpoints
+### OPRF Evaluation Request
 
-#### GET /oprf/health
-
-Check if the OPRF service is operational.
-
-**Request:**
 ```http
-GET /oprf/health
-```
+POST /api/oprf/evaluate
+Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
 
-**Response:**
-```json
 {
-  "status": "ok",
-  "service": "lemma-oprf-service",
-  "version": "1.0.0",
-  "timestamp": 1716403200,
-  "epoch": "2025-05-22"
+  "blinded_element": "X8cc6e802c5a1c8b3e9b92cf2c8c1c792a91d65137a913f4b3e8c3f197ca1d603",
+  "key_id": "2025-05-22-key1"
 }
 ```
 
-#### POST /oprf/evaluate
+### OPRF Evaluation Response
 
-Evaluate a blinded input using the OPRF function.
-
-**Request:**
 ```http
-POST /oprf/evaluate
+HTTP/1.1 200 OK
 Content-Type: application/json
 
 {
-  "blinded": "base64_encoded_blinded_data"
+  "evaluated_element": "X1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7a8b9c0d1e2f3g4h5i6j7k8l9m0",
+  "key_id": "2025-05-22-key1",
+  "proof": "X9s8r7q6p5o4n3m2l1k0j9i8h7g6f5e4d3c2b1a0z9y8x7w6v5u4t3s2r1q0p9o8n7m6l5k4j3i2h1g0f9e8d7c6b5a4"
 }
-```
-
-**Response:**
-```json
-{
-  "evaluated": "base64_encoded_evaluated_data",
-  "key_id": "current_key_id",
-  "epoch": "2025-05-22"
-}
-```
-
-#### GET /oprf/cascade
-
-Get the current revocation cascade.
-
-**Request:**
-```http
-GET /oprf/cascade
-```
-
-**Response:**
-```json
-{
-  "epoch": "2025-05-22",
-  "cascade": {
-    "levels": [
-      {
-        "size": 1000,
-        "bits": "base64_encoded_bits"
-      },
-      {
-        "size": 10000,
-        "bits": "base64_encoded_bits"
-      }
-    ],
-    "metadata": {
-      "total_revoked": 100,
-      "false_positive_rate": 0.001
-    }
-  }
-}
-```
-
-### Client-Side OPRF Integration
-
-The Lemma wallet includes built-in support for OPRF revocation checking. To use it:
-
-```javascript
-// Check if a credential is revoked
-async function checkRevocation(credentialId) {
-  if (!window.lemmaWallet) {
-    throw new Error("Lemma wallet not available");
-  }
-  
-  // Get the OPRF client from the wallet
-  const oprfClient = window.lemmaWallet.getOPRFClient();
-  
-  // Check if the credential is revoked
-  const isRevoked = await oprfClient.checkRevocation(credentialId);
-  
-  return isRevoked;
-}
-
-// Example usage
-checkRevocation("urn:uuid:3e4fc296-88c5-4081-a9ec-c131e9c9b120").then(isRevoked => {
-  if (isRevoked) {
-    console.log("Credential is revoked");
-  } else {
-    console.log("Credential is valid");
-  }
-});
 ```
 
 For more information on the OPRF revocation system, see the [OPRF_REVOCATION_README.md](./OPRF_REVOCATION_README.md) file.
+
+## Deployment Architecture
+
+The Lemma Enterprise system consists of two separate Heroku applications:
+
+1. **Main Web Application** - A Python/Flask application that handles the user interface, credential issuance, and verification.
+2. **OPRF Service** - A Go microservice that provides Oblivious Pseudorandom Function (OPRF) evaluation for privacy-preserving revocation checks.
+
+This separation allows for better scalability and maintenance of each component. The web application communicates with the OPRF service via HTTP requests, using the URL specified in the `OPRF_SERVICE_INTERNAL` environment variable.
+
+### Deployment Process
+
+To deploy the complete system:
+
+1. Deploy the main web application using:
+   ```
+   git push heroku main
+   ```
+
+2. Deploy the OPRF service using the provided script:
+   ```
+   # On Windows
+   .\deploy_oprf_service.ps1
+   
+   # On Unix/Linux
+   ./deploy_oprf_service.sh
+   ```
+
+3. Scale both applications as needed:
+   ```
+   heroku ps:scale web=1 --app lemma-enterprise
+   heroku ps:scale web=1 --app lemma-oprf-service
+   ```
