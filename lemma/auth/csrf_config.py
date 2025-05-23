@@ -36,6 +36,7 @@ def configure_csrf(app):
         # List of API endpoints that should be exempt from CSRF because they use API key auth
         api_key_endpoints = [
             '/api/issue-credential',
+            '/api/verify-credential',
             '/api/user-credential',
             '/api/credentials', 
             '/api/revocation/status',
