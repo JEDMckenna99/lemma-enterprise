@@ -201,7 +201,6 @@ def generate_challenge():
     return jsonify({"challenge": challenge})
 
 @api_bp.route('/verify-presentation', methods=['POST'])
-@csrf_protect()
 @rate_limit
 def verify_presentation():
     """Verify a presentation via API."""
