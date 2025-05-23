@@ -387,8 +387,19 @@ class LemmaCredentialService:
                 
                 # Get DID method from environment or configuration
                 did_method = os.environ.get("DID_METHOD", "lemma")
-                did_uuid = uuid.uuid4().hex
-                did = f"did:{did_method}:{did_uuid}"
+                
+                # Create proper DID based on method
+                if did_method == "key":
+                    # For did:key, encode the public key directly in the identifier
+                    # Use hex encoding for now (multibase 'f' prefix for base16)
+                    public_key_hex = public_bytes.hex()
+                    did_id = f"f{public_key_hex}"  # 'f' prefix indicates hex encoding
+                    did = f"did:key:{did_id}"
+                else:
+                    # For other methods (lemma, web, etc.), use UUID
+                    did_uuid = uuid.uuid4().hex
+                    did_id = did_uuid
+                    did = f"did:{did_method}:{did_uuid}"
                 
                 # Encode the public key for JWK format
                 public_key_jwk = {
@@ -401,7 +412,7 @@ class LemmaCredentialService:
                 keys_data = {
                     'did': did,
                     'did_method': did_method,
-                    'did_id': did_uuid,
+                    'did_id': did_id,
                     'private_key': private_key_str,
                     'public_key': base64.b64encode(public_bytes).decode('ascii'),
                     'public_key_jwk': public_key_jwk,
@@ -448,10 +459,6 @@ class LemmaCredentialService:
         private_key = ed25519.Ed25519PrivateKey.generate()
         public_key = private_key.public_key()
         
-        # Create DID with method-specific identifier
-        did_uuid = uuid.uuid4().hex
-        did = f"did:{did_method}:{did_uuid}"
-        
         # Serialize keys for storage with secure encoding
         private_bytes = private_key.private_bytes(
             encoding=serialization.Encoding.Raw,
@@ -463,6 +470,19 @@ class LemmaCredentialService:
             format=serialization.PublicFormat.Raw
         )
         
+        # Create proper DID based on method
+        if did_method == "key":
+            # For did:key, encode the public key directly in the identifier
+            # Use hex encoding for now (multibase 'f' prefix for base16)
+            public_key_hex = public_bytes.hex()
+            did_id = f"f{public_key_hex}"  # 'f' prefix indicates hex encoding
+            did = f"did:key:{did_id}"
+        else:
+            # For other methods (lemma, web, etc.), use UUID
+            did_uuid = uuid.uuid4().hex
+            did_id = did_uuid
+            did = f"did:{did_method}:{did_uuid}"
+        
         # Store the private key in environment if on Heroku
         if self.is_heroku:
             os.environ['ED25519_PRIVATE_KEY'] = base64.b64encode(private_bytes).decode('ascii')
@@ -471,7 +491,7 @@ class LemmaCredentialService:
         keys_data = {
             'did': did,
             'did_method': did_method,
-            'did_id': did_uuid,
+            'did_id': did_id,
             'private_key': base64.b64encode(private_bytes).decode('ascii'),
             'public_key': base64.b64encode(public_bytes).decode('ascii'),
             'public_key_jwk': {
@@ -904,7 +924,7 @@ class LemmaCredentialService:
                         )
                         
                         if not os.path.exists(cascade_file):
-                            logger.warning(f"No cascade found for epoch {epoch}, using latest")
+                            current_app.logger.warning(f"No cascade found for epoch {epoch}, using latest")
                             # Try to use latest cascade
                             cascade_file = os.path.join(
                                 current_app.config.get('STORAGE_DIR', '.lemma_enterprise'),
@@ -914,9 +934,9 @@ class LemmaCredentialService:
                             )
                             
                             if not os.path.exists(cascade_file):
-                                logger.error("No cascade available for verification")
+                                current_app.logger.error("No cascade available for verification")
                                 # We'll continue without witness verification
-                                logger.warning("Skipping revocation witness verification - no cascade available")
+                                current_app.logger.warning("Skipping revocation witness verification - no cascade available")
                             else:
                                 # Load and verify the cascade
                                 with open(cascade_file, 'r') as f:
@@ -948,13 +968,13 @@ class LemmaCredentialService:
                             if not witness_valid:
                                 return {"valid": False, "reason": "Credential has been revoked (via witness verification)"}
                     except ImportError:
-                        logger.warning("CascadedBloomRevocation not available, skipping witness verification")
+                        current_app.logger.warning("CascadedBloomRevocation not available, skipping witness verification")
                     except Exception as e:
-                        logger.error(f"Error verifying revocation witness: {str(e)}")
+                        current_app.logger.error(f"Error verifying revocation witness: {str(e)}")
                         # We'll continue without witness verification for backward compatibility
-                        logger.warning("Skipping revocation witness verification due to error")
+                        current_app.logger.warning("Skipping revocation witness verification due to error")
                 except Exception as e:
-                    logger.error(f"Error during revocation witness verification: {str(e)}")
+                    current_app.logger.error(f"Error during revocation witness verification: {str(e)}")
             
             # Verify presentation signature
             presentation_copy = presentation.copy()
