@@ -309,36 +309,40 @@ def _init_components(app):
     
     # Initialize OPRF cascade manager - ensure it works in Heroku
     try:
-        from lemma.core.cascaded_bloom import CascadedBloomRevocation, OPRFClient
-        # Check if we're running on Heroku
-        is_heroku = 'DYNO' in os.environ
+        # Check if OPRF is enabled
+        oprf_enabled = os.environ.get('OPRF_SERVICE_INTERNAL', 'false').lower() == 'true'
         
-        # Configure OPRF client
-        if is_heroku:
-            # In Heroku, set the OPRF service to internal (same dyno)
-            os.environ['OPRF_SERVICE_INTERNAL'] = 'true'
-            app.logger.info("Configured OPRF for internal service on Heroku")
+        if oprf_enabled:
+            from lemma.core.cascaded_bloom import CascadedBloomRevocation, OPRFClient
+            # Check if we're running on Heroku
+            is_heroku = 'DYNO' in os.environ
             
-            # Ensure the keys directory exists
-            keys_dir = os.path.join(app.instance_path, 'data', 'keys')
-            os.makedirs(keys_dir, exist_ok=True)
+            # Configure OPRF client
+            if is_heroku:
+                app.logger.info("Configured OPRF for internal service on Heroku")
+                
+                # Ensure the keys directory exists
+                keys_dir = os.path.join(app.instance_path, 'data', 'keys')
+                os.makedirs(keys_dir, exist_ok=True)
+                
+                # Ensure the cascade directory exists
+                cascade_dir = os.path.join(app.instance_path, 'data', 'revocation', 'cascades')
+                os.makedirs(cascade_dir, exist_ok=True)
+                
+            # Initialize OPRF client
+            oprf_client = OPRFClient()
+            app.logger.info(f"Initialized OPRF client: {oprf_client.server_url}")
             
-            # Ensure the cascade directory exists
-            cascade_dir = os.path.join(app.instance_path, 'data', 'revocation', 'cascades')
-            os.makedirs(cascade_dir, exist_ok=True)
+            # Store client in app context for reuse
+            g._oprf_client = oprf_client
             
-        # Initialize OPRF client
-        oprf_client = OPRFClient()
-        app.logger.info(f"Initialized OPRF client: {oprf_client.server_url}")
-        
-        # Store client in app context for reuse
-        g._oprf_client = oprf_client
-        
-        # Try to connect to the OPRF service
-        try:
-            pubkey = oprf_client.get_public_key()
-            app.logger.info(f"Successfully connected to OPRF service, public key available")
-        except Exception as e:
-            app.logger.warning(f"OPRF service not available yet: {e}")
+            # Try to connect to the OPRF service
+            try:
+                pubkey = oprf_client.get_public_key()
+                app.logger.info(f"Successfully connected to OPRF service, public key available")
+            except Exception as e:
+                app.logger.warning(f"OPRF service not available yet: {e}")
+        else:
+            app.logger.info("OPRF service disabled via configuration")
     except ImportError:
         app.logger.warning('OPRF cascade integration not available')
