@@ -13,7 +13,16 @@ import json
 from flask import Flask, redirect, request, jsonify
 from lemma import create_app as lemma_create_app
 import requests
-from lemma.core.cascaded_bloom import get_cascade_manager, init_cascade_manager
+
+# Try to import cascaded_bloom, but make it optional
+try:
+    from lemma.core.cascaded_bloom import get_cascade_manager, init_cascade_manager
+    OPRF_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"OPRF cascaded bloom not available: {e}")
+    OPRF_AVAILABLE = False
+    get_cascade_manager = lambda: None
+    init_cascade_manager = lambda x: None
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:%(name)s:%(message)s")
@@ -41,10 +50,15 @@ def create_app():
     # Ensure data directories exist
     os.makedirs(os.path.join(DATA_DIR, 'revocation', 'cascades'), exist_ok=True)
     
-    # Initialize cascade manager for OPRF revocation
-    cascade_dir = os.path.join(DATA_DIR, 'revocation', 'cascades')
-    init_cascade_manager(cascade_dir)
-    cascade_manager = get_cascade_manager()
+    # Initialize cascade manager for OPRF revocation only if available and enabled
+    cascade_manager = None
+    if OPRF_AVAILABLE and os.environ.get('OPRF_SERVICE_INTERNAL', 'false').lower() != 'false':
+        cascade_dir = os.path.join(DATA_DIR, 'revocation', 'cascades')
+        init_cascade_manager(cascade_dir)
+        cascade_manager = get_cascade_manager()
+        logger.info("OPRF cascade manager initialized")
+    else:
+        logger.info("OPRF cascade manager disabled or not available")
     
     # Define routes
     @app.route('/')
