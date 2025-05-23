@@ -40,6 +40,7 @@ def configure_csrf(app):
             '/api/user-credential',
             '/api/credentials', 
             '/api/presentation',
+            '/api/verify-presentation',
             '/api/revocation/status',
             '/api/revocation/sync',
             '/api/revocation/import',
