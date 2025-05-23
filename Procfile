@@ -1,2 +1,2 @@
 web: gunicorn wsgi:app
-oprf: ./bin/oprfservice --port=$PORT --keydir=./instance/data/keys
+oprf: ./bin/oprf-service --port=$PORT --keydir=./instance/data/keys --metrics=true --debug=false
