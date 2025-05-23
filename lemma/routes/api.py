@@ -214,15 +214,17 @@ def verify_presentation():
         if not verification_result.get('valid', False):
             logger.info("Invalid presentation verification attempt: %s", verification_result.get('reason'))
             return jsonify({
+                "success": False,
                 "valid": False,
                 "reason": verification_result.get('reason', 'Unknown error')
-            })
+            }), 400  # Return 400 for invalid presentations
         
         # Log successful verification
         holder = verification_result.get('holder', '')
         logger.info("Presentation verified for holder: %s", holder)
         
         return jsonify({
+            "success": True,
             "valid": True,
             "holder": verification_result.get('holder'),
             "credentials": verification_result.get('credentials'),
