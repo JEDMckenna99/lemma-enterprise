@@ -54,47 +54,38 @@ def create_app():
     
     @app.route('/cascade/<epoch>')
     def cascade_direct(epoch):
-        logger.debug(f"Direct cascade request for epoch: {epoch}")
+        logger.info(f"Cascade request for epoch: {epoch}")
         try:
             # First try to find the cascade in the default location
             cascade_dir = os.path.join(DATA_DIR, 'revocation', 'cascades')
             cascade_file = os.path.join(cascade_dir, f'cascade_{epoch}.json')
             
-            logger.debug(f"Looking for cascade file at: {cascade_file}")
-            
             # If not found, try latest
             if not os.path.exists(cascade_file) and epoch != 'latest':
                 latest_file = os.path.join(cascade_dir, 'cascade_latest.json')
                 if os.path.exists(latest_file):
-                    logger.debug(f"Cascade {epoch} not found, using latest")
+                    logger.info(f"Cascade {epoch} not found, using latest")
                     cascade_file = latest_file
             
-            # If still not found, create a dummy cascade
+            # If still not found, return an error instead of creating dummy data
             if not os.path.exists(cascade_file):
-                logger.debug(f"Cascade {epoch} not found, creating dummy")
-                cascade = {
-                    "epoch": epoch if epoch != 'latest' else datetime.datetime.now().strftime('%Y-%m-%d'),
-                    "created": datetime.datetime.now().isoformat(),
-                    "issuer": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com",
-                    "filters": [],
-                    "signature": {
-                        "type": "Ed25519Signature2020",
-                        "created": datetime.datetime.now().isoformat(),
-                        "verificationMethod": "did:web:lemma-enterprise-0f6ba17076c1.herokuapp.com#key-1",
-                        "proofValue": "z" + "".join(random.choices("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=64))
-                    }
-                }
-            else:
-                # Load the cascade from file
-                with open(cascade_file, 'r') as f:
-                    cascade = json.load(f)
+                logger.warning(f"Cascade {epoch} not found and no cascades available")
+                return jsonify({
+                    "error": "Cascade not found",
+                    "message": f"No cascade available for epoch {epoch}",
+                    "available_epochs": []  # Could list available epochs here
+                }), 404
+            
+            # Load the cascade from file
+            with open(cascade_file, 'r') as f:
+                cascade = json.load(f)
             
             # Add CORS headers for testing
             response = jsonify(cascade)
             response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
             
-            logger.debug(f"Successfully loaded cascade for epoch {epoch}")
+            logger.info(f"Successfully loaded cascade for epoch {epoch}")
             return response
         except Exception as e:
             logger.error(f"Error serving cascade: {str(e)}")
@@ -178,13 +169,13 @@ def create_app():
                     "evaluated_value": result
                 })
             else:
-                # If cascade manager is not initialized, return a mock response
-                # This is just for testing - in production, we would return an error
-                mock_result = "oprf_" + "".join(random.choices("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=32))
+                # If cascade manager is not initialized, return an error
+                logger.error("OPRF service not available - cascade manager not initialized")
                 return jsonify({
-                    "status": "ok",
-                    "evaluated_value": mock_result
-                })
+                    "status": "error",
+                    "error": "OPRF service not available",
+                    "message": "Cascade manager not initialized"
+                }), 503
                 
         except Exception as e:
             logger.error(f"Error evaluating OPRF: {str(e)}")
@@ -239,10 +230,7 @@ def create_app():
                     revocation_proof = presentation.get("revocationProof", {})
                     
                     # Check revocation status
-                    is_revoked = cascade_manager.check_revocation(
-                        credential_id, 
-                        revocation_proof.get("witness") if revocation_proof else None
-                    )
+                    is_revoked, revocation_details = cascade_manager.check_revocation(credential_id)
                     
                     revocation_checked = True
                     revocation_status = "revoked" if is_revoked else "not_revoked"

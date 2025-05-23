@@ -1,169 +1,141 @@
 """
-Pytest configuration for Lemma Enterprise tests.
+Pytest configuration and fixtures for Lemma Human Verification System tests.
 """
-import pytest
 import os
-import shutil
-import flask
-from flask import session, current_app
-from flask.testing import FlaskClient as BaseFlaskClient
+import pytest
+import tempfile
+import json
+from typing import Dict, Any, Generator
+from flask import Flask
+from flask.testing import FlaskClient
 
-# Test configuration
-TEST_STORAGE_DIR = '.lemma_test'
+# Add the project root to the path
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from lemma import create_app
+from lemma.core.credential_service import get_credential_service
+
 
 @pytest.fixture
-def app():
+def app() -> Generator[Flask, None, None]:
     """Create a test Flask application."""
-    # Import here to avoid circular imports
-    from lemma import create_app
-    import flask_wtf
+    # Create a temporary directory for test storage
+    temp_dir = tempfile.mkdtemp()
     
-    # Store original CSRF protection state
-    original_csrf_enabled = flask_wtf.csrf.CSRFProtect._exempt_views
-    
-    # Create test app with test configuration
-    test_app = create_app({
+    # Test configuration
+    test_config = {
         'TESTING': True,
-        'SKIP_AUTH_IN_TESTS': True,
-        'STORAGE_DIR': TEST_STORAGE_DIR,
-        'SECRET_KEY': 'test_secret_key',
-        'ADMIN_USERNAME': 'test_admin',
-        'ADMIN_PASSWORD': 'test_password',
-        'API_KEY': 'test_api_key',  # This must match the API key used in tests
-        'WTF_CSRF_ENABLED': False,  # Disable CSRF for testing
-        'SESSION_COOKIE_SECURE': False,  # Allow insecure cookies in tests
-        'SESSION_COOKIE_HTTPONLY': False,  # Allow JavaScript access in tests
-        'SESSION_COOKIE_SAMESITE': None,  # Disable SameSite in tests
-        'CSRF_ENABLED': False  # Explicitly disable CSRF for testing
-    })
+        'SECRET_KEY': 'test-secret-key-for-testing-only',
+        'WTF_CSRF_ENABLED': True,
+        'WTF_CSRF_TIME_LIMIT': None,  # Disable CSRF time limit for tests
+        'STORAGE_DIR': temp_dir,
+        'API_KEY': 'test-api-key',
+        'ADMIN_USER': 'test_admin',
+        'ADMIN_PASS': 'test_password',
+        'DID': 'did:lemma:test',
+        'SKIP_AUTH_IN_TESTS': False,  # We want to test auth
+        'SKIP_API_KEY_CHECK': False,  # We want to test API keys
+    }
     
-    # Completely disable CSRF protection for tests
-    try:
-        # Try to completely disable CSRF protection
-        flask_wtf.csrf.CSRFProtect._exempt_views = set()
-        flask_wtf.csrf.CSRFProtect._exempt_blueprints = set()
-        
-        # Add a before_request handler to skip CSRF validation
-        @test_app.before_request
-        def disable_csrf():
-            flask.g.csrf_valid = True
-    except Exception as e:
-        print(f"Failed to disable CSRF protection: {e}")
-        pass
+    app = create_app(test_config)
     
-    # Log configuration for debugging
-    test_app.logger.info(f"Test app configuration: TESTING={test_app.config.get('TESTING')}, SKIP_AUTH_IN_TESTS={test_app.config.get('SKIP_AUTH_IN_TESTS')}")
-    test_app.logger.info(f"API_KEY={test_app.config.get('API_KEY')}")
-    test_app.logger.info(f"WTF_CSRF_ENABLED={test_app.config.get('WTF_CSRF_ENABLED')}")
-    test_app.logger.info(f"CSRF_ENABLED={test_app.config.get('CSRF_ENABLED')}")
+    with app.app_context():
+        yield app
     
-    # Ensure API key authentication works in tests
-    test_app.config['SKIP_API_KEY_CHECK'] = True
-    
-    # Set up test context
-    with test_app.app_context():
-        yield test_app
-    
-    # Clean up test data
-    if os.path.exists(TEST_STORAGE_DIR):
-        shutil.rmtree(TEST_STORAGE_DIR)
+    # Cleanup
+    import shutil
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
 
 @pytest.fixture
-def csrf_token(app):
-    """Set up CSRF token for tests."""
-    from lemma.auth.csrf_config import generate_csrf
-    with app.test_client(use_cookies=True).session_transaction() as session:
-        session['_csrf_token'] = generate_csrf()
+def client(app: Flask) -> FlaskClient:
+    """Create a test client for the Flask application."""
+    return app.test_client()
 
-# Flask's assumptions about an incoming request don't quite match up with
-# what the test client provides in terms of manipulating cookies, and the
-# CSRF system depends on cookies working correctly. This class is a
-# fake request that forwards requests to the test client for setting cookies.
-class RequestShim(object):
-    """A fake request that proxies cookie-related methods to a Flask test client."""
-    def __init__(self, client):
-        self.client = client
-
-    def set_cookie(self, key, value='', *args, **kwargs):
-        """Set the cookie on the Flask test client."""
-        server_name = current_app.config.get("SERVER_NAME") or "localhost"
-        return self.client.set_cookie(
-            server_name, key=key, value=value, *args, **kwargs
-        )
-
-    def delete_cookie(self, key, *args, **kwargs):
-        """Delete the cookie on the Flask test client."""
-        server_name = current_app.config.get("SERVER_NAME") or "localhost"
-        return self.client.delete_cookie(
-            server_name, key=key, *args, **kwargs
-        )
-
-# Extended Flask test client class that knows how to handle CSRF tokens
-class FlaskClient(BaseFlaskClient):
-    @property
-    def csrf_token(self):
-        # First, wrap our request shim around the test client
-        request = RequestShim(self) 
-        
-        # Look up any cookies that might already exist on this test client
-        environ_overrides = {}
-        self.cookie_jar.inject_wsgi(environ_overrides)
-        
-        with current_app.test_request_context(
-                "/", environ_overrides=environ_overrides):
-            # Generate a CSRF token
-            try:
-                from flask_wtf.csrf import generate_csrf
-                csrf_token = generate_csrf()
-            except ImportError:
-                # Fallback if Flask-WTF is not available
-                csrf_token = 'test-csrf-token'
-                session['_csrf_token'] = csrf_token
-            
-            # Save the session to the cookie jar
-            current_app.session_interface.save_session(current_app, session, request)
-            
-            # Return the CSRF token
-            return csrf_token
-    
-    def open(self, *args, **kwargs):
-        # For POST, PUT, DELETE requests, automatically add CSRF token
-        method = kwargs.get('method', args[0] if args else 'GET')
-        if method in ['POST', 'PUT', 'DELETE']:
-            # Add CSRF token to form data
-            if 'data' in kwargs and kwargs['data'] is not None:
-                if isinstance(kwargs['data'], dict):
-                    kwargs['data']['csrf_token'] = self.csrf_token
-            
-            # Add CSRF token to headers
-            if 'headers' not in kwargs:
-                kwargs['headers'] = {}
-            kwargs['headers']['X-CSRF-Token'] = self.csrf_token
-        
-        # Call the original open method
-        return super().open(*args, **kwargs)
 
 @pytest.fixture
-def client(app):
-    """Create a test client with CSRF token handling."""
-    # Set the custom test client class
-    app.test_client_class = FlaskClient
-    
-    # Create a test client
-    client = app.test_client(use_cookies=True)
-    
-    return client
+def runner(app: Flask):
+    """Create a test runner for the Flask application."""
+    return app.test_cli_runner()
+
 
 @pytest.fixture
-def credential_service(app):
-    """Create a test credential service."""
-    # Import here to avoid circular imports
-    try:
-        from lemma.core.credential_service import CredentialService
-        return CredentialService(app.config['STORAGE_DIR'])
-    except ImportError:
-        # Mock credential service for testing if import fails
-        class MockCredentialService:
-            def __init__(self, storage_dir):
-                self.storage_dir = storage_dir
-        return MockCredentialService(app.config['STORAGE_DIR'])
+def auth_headers() -> Dict[str, str]:
+    """Provide valid API key headers for testing."""
+    return {'X-API-Key': 'test-api-key'}
+
+
+@pytest.fixture
+def sample_credential() -> Dict[str, Any]:
+    """Provide a sample credential for testing."""
+    return {
+        "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://lemmanetwork.org/contexts/lemma/v1"
+        ],
+        "id": "vc_test_credential_123",
+        "type": ["VerifiableCredential", "LemmaCredential", "HumanCredential"],
+        "issuer": "did:lemma:test",
+        "issuanceDate": "2024-01-01T00:00:00Z",
+        "expirationDate": "2025-01-01T00:00:00Z",
+        "credentialSubject": {
+            "id": "did:user:test_user_123",
+            "type": "Person",
+            "isHuman": True,
+            "verifiedBy": "admin"
+        },
+        "proof": {
+            "type": "Ed25519Signature2020",
+            "created": "2024-01-01T00:00:00Z",
+            "verificationMethod": "did:lemma:test#keys-1",
+            "proofPurpose": "assertionMethod",
+            "jws": "test_signature_base64"
+        }
+    }
+
+
+@pytest.fixture
+def sample_presentation(sample_credential: Dict[str, Any]) -> Dict[str, Any]:
+    """Provide a sample presentation for testing."""
+    return {
+        "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://lemmanetwork.org/contexts/lemma/v1"
+        ],
+        "id": "vp_test_presentation_123",
+        "type": ["VerifiablePresentation"],
+        "holder": "did:user:test_user_123",
+        "verifiableCredential": [sample_credential],
+        "created": "2024-01-01T00:00:00Z",
+        "challenge": "test_challenge_12345",
+        "proof": {
+            "type": "Ed25519Signature2020",
+            "created": "2024-01-01T00:00:00Z",
+            "verificationMethod": "did:lemma:test#keys-1",
+            "proofPurpose": "authentication",
+            "challenge": "test_challenge_12345",
+            "jws": "test_presentation_signature_base64"
+        }
+    }
+
+
+@pytest.fixture
+def admin_session(client: FlaskClient) -> Dict[str, Any]:
+    """Create an authenticated admin session."""
+    # Login as admin
+    response = client.post('/admin/login', data={
+        'username': 'test_admin',
+        'password': 'test_password'
+    }, follow_redirects=True)
+    
+    assert response.status_code == 200
+    return {'session': client.session}
+
+
+@pytest.fixture
+def csrf_token(client: FlaskClient) -> str:
+    """Get a valid CSRF token for testing."""
+    response = client.get('/api/generate-csrf')
+    assert response.status_code == 200
+    return response.json['csrf_token'] 

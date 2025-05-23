@@ -163,7 +163,6 @@ def verification_callback():
         current_app.logger.warning(f"Possible replay attack detected: user {user_id} already has a credential")
         flash("This verification has already been processed", "error")
         return make_response("Verification already processed - This user is already verified", 400)
-        return make_response("Verification already processed - This appears to be a replay attack", 400)
     
     # Log verification callback details
     current_app.logger.info(f"Verification callback received for session {stripe_session_id} and user {user_id}")

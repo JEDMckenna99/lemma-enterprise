@@ -13,6 +13,9 @@ from typing import Dict, Any, List, Tuple, Optional
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.exceptions import InvalidSignature
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ZKProof:
     """
@@ -166,7 +169,7 @@ class ZKProof:
                 signature_b64 = base64.urlsafe_b64encode(signature).decode().rstrip("=")
             except Exception as e:
                 # Fallback to hash-based signature if there's an error
-                print(f"Warning: Failed to create EdDSA signature: {e}")
+                logger.error(f"Failed to create EdDSA signature: {e}")
                 signature = hashlib.sha256(f"{message}.{challenge}".encode()).digest()
                 signature_b64 = base64.urlsafe_b64encode(signature).decode().rstrip("=")
         else:

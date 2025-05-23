@@ -30,7 +30,7 @@ def get_admin_password_hash():
             return f.read().strip()
     
     # Create a new hash from the configured password
-    password = current_app.config['ADMIN_PASSWORD']
+    password = current_app.config['ADMIN_PASS']
     password_hash = hash_password(password)
     
     # Store the hash securely
@@ -50,26 +50,15 @@ def authenticate_admin(username, password):
     # Verify the password
     return verify_password(stored_hash, password)
 
-def login_admin(username):
-    """Log in an admin user with secure session handling."""
-    # Generate a secure session token
-    session_token = secrets.token_hex(32)
-    
-    # Set secure session data
-    session.clear()
-    session['admin_logged_in'] = True
-    session['admin_username'] = username
-    session['admin_token'] = session_token
-    session['admin_login_time'] = datetime.now().isoformat()
-    session['admin_ip'] = request.remote_addr
-    session['admin_user_agent'] = request.user_agent.string
-    session.permanent = True
-    
-    # Log the login for audit purposes
-    # In a production system, you would use a proper logging system
-    print(f"Admin login: {username} from {request.remote_addr} at {datetime.now().isoformat()}")
-    
-    return session_token
+def login_admin(username, password):
+    """Authenticate and log in an admin user."""
+    if authenticate_admin(username, password):
+        session['admin_logged_in'] = True
+        session['admin_username'] = username
+        # Log the admin login for security audit trail
+        current_app.logger.info(f"Admin login: {username} from {request.remote_addr} at {datetime.now().isoformat()}")
+        return True
+    return False
 
 def logout_admin():
     """Log out an admin user."""

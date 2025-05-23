@@ -32,7 +32,8 @@ def create_app(test_config=None):
         os.environ.get('FLASK_ENV') == 'development' or 
         os.environ.get('LEMMA_ENV') == 'development' or
         os.environ.get('FLASK_DEBUG') == '1' or
-        os.environ.get('LEMMA_DEBUG') == '1'
+        os.environ.get('LEMMA_DEBUG') == '1' or
+        os.environ.get('DEBUG') == '1'
     )
     
     # Also consider Windows a development environment for cookie security
@@ -259,6 +260,9 @@ def create_app(test_config=None):
                 "permanent_session_lifetime": str(app.config.get('PERMANENT_SESSION_LIFETIME')),
             }
         })
+
+    # Set debug mode explicitly for security
+    app.debug = is_development and not is_heroku
 
     return app
 

@@ -1,8 +1,0 @@
-{
-  "storage_dir": "instance/data",
-  "oprf_server_url": "http://localhost:8080",
-  "cascade_levels": 3,
-  "error_rate": 0.02,
-  "issuer_id": "did:lemma:enterprise",
-  "keep_days": 7
-} 

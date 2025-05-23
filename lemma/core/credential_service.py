@@ -10,22 +10,19 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
+from urllib.parse import urlparse
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import Fernet
 from flask import current_app, g
 
-try:
-    from lemma.core.did_resolver import get_did_resolver
-except ImportError:
-    # Fallback for tests or when the module is not yet available
-    get_did_resolver = lambda: None
+from lemma.core.did_resolver import get_did_resolver
 
 # Global credential service instance
 _credential_service = None
 
-def get_credential_service():
+def get_credential_service() -> Optional['LemmaCredentialService']:
     """Get the credential service instance."""
     if '_credential_service' not in g:
         # Initialize the service if it doesn't exist
@@ -34,29 +31,257 @@ def get_credential_service():
         g._credential_service = _credential_service
     return g._credential_service
 
-def init_credential_service(app):
+def init_credential_service(app) -> Optional['LemmaCredentialService']:
     """Initialize the credential service."""
     global _credential_service
-    try:
-        # On Heroku, we need to use environment variables for keys
-        if 'DYNO' in os.environ:
-            # If ED25519_PRIVATE_KEY is not set, generate a new one
-            if 'ED25519_PRIVATE_KEY' not in os.environ:
-                private_key = ed25519.Ed25519PrivateKey.generate()
-                private_bytes = private_key.private_bytes(
-                    encoding=serialization.Encoding.Raw,
-                    format=serialization.PrivateFormat.Raw,
-                    encryption_algorithm=serialization.NoEncryption()
-                )
-                os.environ['ED25519_PRIVATE_KEY'] = base64.b64encode(private_bytes).decode('ascii')
-                app.logger.info("Generated new ED25519_PRIVATE_KEY")
+    
+    if _credential_service is None:
+        try:
+            # Try to initialize with Heroku-specific logic first if on Heroku
+            if 'DYNO' in os.environ:
+                _init_heroku_key_management(app)
+            
+            _credential_service = LemmaCredentialService(app.config.get('STORAGE_DIR', app.instance_path))
+            app.logger.info("Credential service initialized successfully")
+        except Exception as e:
+            app.logger.error(f"Failed to initialize credential service: {e}")
+            return None
+    
+    return _credential_service
 
-        _credential_service = LemmaCredentialService(app.config['STORAGE_DIR'])
-        app.logger.info("Successfully initialized credential service")
-        return _credential_service
+def _init_heroku_key_management(app):
+    """Initialize key management strategy for Heroku deployments."""
+    # Check if we have persistent keys from external storage
+    external_storage_url = os.environ.get('LEMMA_EXTERNAL_STORAGE_URL')
+    
+    if external_storage_url:
+        # Try to load keys from external storage (e.g., AWS S3, Azure Blob, etc.)
+        app.logger.info("Attempting to load keys from external storage")
+        try:
+            _load_keys_from_external_storage(external_storage_url, app)
+        except Exception as e:
+            app.logger.warning(f"Failed to load keys from external storage: {e}")
+    
+    # Ensure ED25519_PRIVATE_KEY is set, generate if needed
+    if 'ED25519_PRIVATE_KEY' not in os.environ:
+        app.logger.info("Generating new ED25519 private key for Heroku deployment")
+        private_key = ed25519.Ed25519PrivateKey.generate()
+        private_bytes = private_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        encoded_key = base64.b64encode(private_bytes).decode('ascii')
+        os.environ['ED25519_PRIVATE_KEY'] = encoded_key
+        
+        # Try to save the key to external storage for persistence
+        if external_storage_url:
+            try:
+                _save_keys_to_external_storage(external_storage_url, {'ED25519_PRIVATE_KEY': encoded_key}, app)
+                app.logger.info("Saved new key to external storage")
+            except Exception as e:
+                app.logger.warning(f"Failed to save key to external storage: {e}")
+        
+        app.logger.warning("Generated ephemeral key - will not persist across dyno restarts")
+    else:
+        app.logger.info("Using existing ED25519_PRIVATE_KEY from environment")
+
+def _load_keys_from_external_storage(storage_url, app):
+    """Load keys from external storage service."""
+    import requests
+    from urllib.parse import urlparse
+    
+    parsed_url = urlparse(storage_url)
+    
+    if parsed_url.scheme in ['s3', 'aws']:
+        # AWS S3 implementation
+        _load_keys_from_s3(parsed_url, app)
+    elif parsed_url.scheme in ['azure', 'blob']:
+        # Azure Blob Storage implementation
+        _load_keys_from_azure_blob(parsed_url, app)
+    elif parsed_url.scheme in ['http', 'https']:
+        # HTTP-based key service
+        _load_keys_from_http(storage_url, app)
+    else:
+        raise ValueError(f"Unsupported external storage scheme: {parsed_url.scheme}")
+
+def _save_keys_to_external_storage(storage_url, keys, app):
+    """Save keys to external storage service."""
+    from urllib.parse import urlparse
+    
+    parsed_url = urlparse(storage_url)
+    
+    if parsed_url.scheme in ['s3', 'aws']:
+        # AWS S3 implementation
+        _save_keys_to_s3(parsed_url, keys, app)
+    elif parsed_url.scheme in ['azure', 'blob']:
+        # Azure Blob Storage implementation
+        _save_keys_to_azure_blob(parsed_url, keys, app)
+    elif parsed_url.scheme in ['http', 'https']:
+        # HTTP-based key service
+        _save_keys_to_http(storage_url, keys, app)
+    else:
+        raise ValueError(f"Unsupported external storage scheme: {parsed_url.scheme}")
+
+def _load_keys_from_s3(parsed_url, app):
+    """Load keys from AWS S3."""
+    try:
+        import boto3
+        
+        # Parse S3 details from URL
+        bucket_name = parsed_url.netloc
+        key_path = parsed_url.path.lstrip('/')
+        
+        s3_client = boto3.client('s3')
+        
+        # Try to download the key file
+        response = s3_client.get_object(Bucket=bucket_name, Key=key_path)
+        key_data = json.loads(response['Body'].read().decode('utf-8'))
+        
+        # Set environment variables from stored keys
+        for key, value in key_data.items():
+            os.environ[key] = value
+            
+        app.logger.info(f"Successfully loaded keys from S3: {bucket_name}/{key_path}")
+        
+    except ImportError:
+        raise ValueError("boto3 package required for S3 integration")
     except Exception as e:
-        app.logger.error(f"Failed to initialize credential service: {e}")
-        return None
+        raise ValueError(f"Failed to load keys from S3: {e}")
+
+def _save_keys_to_s3(parsed_url, keys, app):
+    """Save keys to AWS S3."""
+    try:
+        import boto3
+        
+        # Parse S3 details from URL
+        bucket_name = parsed_url.netloc
+        key_path = parsed_url.path.lstrip('/')
+        
+        s3_client = boto3.client('s3')
+        
+        # Upload the key data
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=key_path,
+            Body=json.dumps(keys),
+            ServerSideEncryption='AES256'
+        )
+        
+        app.logger.info(f"Successfully saved keys to S3: {bucket_name}/{key_path}")
+        
+    except ImportError:
+        raise ValueError("boto3 package required for S3 integration")
+    except Exception as e:
+        raise ValueError(f"Failed to save keys to S3: {e}")
+
+def _load_keys_from_azure_blob(parsed_url, app):
+    """Load keys from Azure Blob Storage."""
+    try:
+        from azure.storage.blob import BlobServiceClient
+        
+        # Parse Azure Blob details from URL
+        account_name = parsed_url.netloc.split('.')[0]
+        container_name = parsed_url.path.split('/')[1]
+        blob_name = '/'.join(parsed_url.path.split('/')[2:])
+        
+        # Create blob service client
+        blob_service_client = BlobServiceClient(
+            account_url=f"https://{account_name}.blob.core.windows.net",
+            credential=os.environ.get('AZURE_STORAGE_KEY')
+        )
+        
+        # Download the blob
+        blob_client = blob_service_client.get_blob_client(
+            container=container_name, 
+            blob=blob_name
+        )
+        
+        blob_data = blob_client.download_blob().readall()
+        key_data = json.loads(blob_data.decode('utf-8'))
+        
+        # Set environment variables from stored keys
+        for key, value in key_data.items():
+            os.environ[key] = value
+            
+        app.logger.info(f"Successfully loaded keys from Azure Blob: {container_name}/{blob_name}")
+        
+    except ImportError:
+        raise ValueError("azure-storage-blob package required for Azure integration")
+    except Exception as e:
+        raise ValueError(f"Failed to load keys from Azure Blob: {e}")
+
+def _save_keys_to_azure_blob(parsed_url, keys, app):
+    """Save keys to Azure Blob Storage."""
+    try:
+        from azure.storage.blob import BlobServiceClient
+        
+        # Parse Azure Blob details from URL
+        account_name = parsed_url.netloc.split('.')[0]
+        container_name = parsed_url.path.split('/')[1]
+        blob_name = '/'.join(parsed_url.path.split('/')[2:])
+        
+        # Create blob service client
+        blob_service_client = BlobServiceClient(
+            account_url=f"https://{account_name}.blob.core.windows.net",
+            credential=os.environ.get('AZURE_STORAGE_KEY')
+        )
+        
+        # Upload the blob
+        blob_client = blob_service_client.get_blob_client(
+            container=container_name, 
+            blob=blob_name
+        )
+        
+        blob_client.upload_blob(
+            json.dumps(keys), 
+            overwrite=True
+        )
+        
+        app.logger.info(f"Successfully saved keys to Azure Blob: {container_name}/{blob_name}")
+        
+    except ImportError:
+        raise ValueError("azure-storage-blob package required for Azure integration")
+    except Exception as e:
+        raise ValueError(f"Failed to save keys to Azure Blob: {e}")
+
+def _load_keys_from_http(storage_url, app):
+    """Load keys from HTTP-based key service."""
+    import requests
+    
+    headers = {}
+    
+    # Add authentication if provided
+    auth_token = os.environ.get('LEMMA_STORAGE_AUTH_TOKEN')
+    if auth_token:
+        headers['Authorization'] = f"Bearer {auth_token}"
+    
+    response = requests.get(storage_url, headers=headers, timeout=30)
+    response.raise_for_status()
+    
+    key_data = response.json()
+    
+    # Set environment variables from stored keys
+    for key, value in key_data.items():
+        os.environ[key] = value
+        
+    app.logger.info(f"Successfully loaded keys from HTTP service: {storage_url}")
+
+def _save_keys_to_http(storage_url, keys, app):
+    """Save keys to HTTP-based key service."""
+    import requests
+    
+    headers = {'Content-Type': 'application/json'}
+    
+    # Add authentication if provided
+    auth_token = os.environ.get('LEMMA_STORAGE_AUTH_TOKEN')
+    if auth_token:
+        headers['Authorization'] = f"Bearer {auth_token}"
+    
+    response = requests.post(storage_url, json=keys, headers=headers, timeout=30)
+    response.raise_for_status()
+    
+    app.logger.info(f"Successfully saved keys to HTTP service: {storage_url}")
 
 class LemmaCredentialService:
     """Enhanced credential service with strong encryption and minimal data collection."""

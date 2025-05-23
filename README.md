@@ -4,7 +4,7 @@
 
 A secure, modular, enterprise-grade implementation for verifying humans with minimal data collection and strong cryptographic standards.
 
-**Latest Version: 2.1.0** (Updated May 2025)
+**Latest Version: 2.2.0** (Updated December 2024)
 
 ---
 
@@ -37,28 +37,45 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 - **Bot Prevention:** Fundamentally cuts bots at their core by making it impossible to generate valid credentials without human verification.
 - **Decentralized Identity:** Supports multiple DID methods and true self-sovereign identity.
 - **Zero-Knowledge Proofs:** Enables selective disclosure for maximum privacy.
+- **Enterprise Security:** Production-ready security with comprehensive input validation and CSRF protection.
 
 ---
 
-## What's New in Version 2.1.0
+## What's New in Version 2.2.0
 
-- **Lemma Wallet Integration**: Added a built-in wallet that automatically appears on any Lemma-integrated page, allowing users to manage multiple credentials.
-- **Enhanced Home Page Flow**: The "Verify Lemma" button now automatically issues, stores, and verifies credentials locally without redirects.
-- **Improved User Feedback**: The "Access Protected Content" button now displays a clear error message on the same page when no lemma is found instead of redirecting.
-- **Protected Content Enhancements**: Users can now view their Lemma credential details directly on the protected page.
-- **Lemma Network Access**: Added an interactive, paginated view of the Lemma Network for verified humans on the protected page.
-- **Credential Management**: Added ability to clear Lemma credentials directly from the protected page.
-- **Better Error Handling**: Improved error messages and feedback throughout the verification flow.
-- **Fixed CSRF Issues**: Resolved CSRF token handling for more reliable deployment, especially on Heroku.
-- **Local Storage Integration**: Improved integration with browser's local storage for seamless credential persistence.
-- **Auto-Hiding Messages**: Error notifications now automatically hide after a few seconds for better UX.
+### 🔒 Enhanced Security Features
+- **Simplified CSRF Protection:** Removed development-specific exemptions and Windows-specific workarounds for consistent security across all environments
+- **Comprehensive Input Validation:** Added robust validation for all API endpoints with proper error handling and security limits
+- **Production-Ready Builds:** Eliminated debug code and print statements from production deployments
+- **Improved Key Management:** Enhanced key persistence strategy for Heroku and cloud deployments with external storage support
+
+### 🛡️ Security Improvements
+- **Uniform CSRF Protection:** `SameSite=Strict` cookies and consistent token validation
+- **Input Sanitization:** Comprehensive validation for credentials, presentations, challenges, and API keys
+- **Secure Logging:** Removed information leakage through debug statements
+- **External Key Storage:** Support for AWS S3, Azure Blob, and HTTP-based key persistence
+
+### 🔧 Production Enhancements
+- **Environment Detection:** Automatic production/development mode detection
+- **Secure Cookie Handling:** Proper cookie security based on deployment environment
+- **Rate Limiting:** Enhanced protection against abuse with configurable limits
+- **Error Handling:** Improved error responses without information disclosure
+
+### 🚀 Previous Features (v2.1.0)
+- **Lemma Wallet Integration**: Built-in wallet that automatically appears on any Lemma-integrated page
+- **Enhanced Home Page Flow**: Automatic credential issuance, storage, and verification
+- **Improved User Feedback**: Clear error messages and auto-hiding notifications
+- **Protected Content Enhancements**: Direct credential management from protected pages
+- **Lemma Network Access**: Interactive, paginated view of the Lemma Network
+- **Credential Management**: Import/export functionality for cross-device use
+- **Fixed CSRF Issues**: Resolved token handling for reliable deployment
 
 ---
 
 ## Key Features
 
 - **Modular Architecture:** Clean separation of concerns for maintainability.
-- **Enhanced Security:** Password hashing, CSRF protection, secure cookies, encrypted storage, and rate limiting.
+- **Enterprise Security:** Production-grade CSRF protection, input validation, secure cookies, encrypted storage, and rate limiting.
 - **Comprehensive Testing:** Full test coverage for all critical paths.
 - **Improved UX:** Auto-redirects and detailed error feedback.
 - **Multiple Deployment Options:** Easy deployment with Docker, Heroku, or Azure Web Apps.
@@ -67,6 +84,7 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 - **Hardware-Backed Security:** Support for TPM, Secure Enclave, and Android Keystore.
 - **P2P Revocation:** Decentralized credential revocation broadcast system.
 - **Portable Wallet:** Client-side credential wallet that can be integrated into any website.
+- **Security-First Design:** All endpoints protected with validation, rate limiting, and proper authentication.
 
 ---
 
@@ -74,12 +92,14 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 
 ### Core Backend
 - **app.py:** Main Flask application and entry point.
-- **lemma/__init__.py:** Application factory and configuration.
-- **lemma/core/credential_service.py:** Credential issuance and verification logic.
+- **lemma/__init__.py:** Application factory and configuration with production security settings.
+- **lemma/core/credential_service.py:** Credential issuance and verification logic with enhanced key management.
 - **lemma/core/did_resolver.py:** Multi-method DID resolver for decentralized identity.
 - **lemma/core/revocation.py:** P2P revocation system with compact bitstrings.
 - **lemma/auth/security.py:** Authentication and security features.
-- **lemma/routes/:** Modular route handlers.
+- **lemma/auth/csrf_config.py:** Enhanced CSRF protection configuration.
+- **lemma/utils/input_validation.py:** Comprehensive input validation for all API endpoints.
+- **lemma/routes/:** Modular route handlers with security middleware.
 - **lemma/utils/zero_knowledge.py:** Zero-knowledge proof utilities for selective disclosure.
 - **lemma/utils/secure_storage.py:** Hardware-backed key storage utilities.
 - **lemma/models/:** Data models.
@@ -101,16 +121,45 @@ Lemma Enterprise provides a complete solution for trusted admin onboarding of ve
 
 ### Storage System
 - **.lemma_enterprise/:** (Created automatically) Contains cryptographic keys and credential registry:
-  - keys.json: Ed25519 keys
+  - keys.json: Ed25519 keys with encryption
   - registry.json: Issued credentials
   - users.json: User IDs (no personal data)
   - revocation/: Revocation data for decentralized verification
 
 ---
 
+## Security Architecture
+
+### Production Security Features
+- **CSRF Protection:** Simplified, consistent protection across all environments with secure cookie handling
+- **Input Validation:** Comprehensive validation for all API inputs with security limits and proper error handling
+- **Rate Limiting:** Protection against abuse with configurable request limits per IP
+- **Secure Logging:** Production builds automatically remove debug information and print statements
+- **Key Management:** Enhanced persistence strategy with support for external storage services
+
+### Security Headers & Policies
+- **HTTPS Enforcement:** All OIDC4VP implementations enforce HTTPS in production environments
+- **Security Headers:**
+  - X-Content-Type-Options: nosniff
+  - X-Frame-Options: SAMEORIGIN  
+  - X-XSS-Protection: 1; mode=block
+  - Strict-Transport-Security with includeSubDomains (production only)
+- **Session Security:**
+  - 30-minute session lifetime
+  - Secure and HttpOnly cookie flags
+  - SameSite=Strict policy for CSRF protection
+
+### Input Validation & Sanitization
+- **Credential Validation:** Structure, signature, and content validation
+- **API Security:** All endpoints protected with comprehensive input validation
+- **Rate Limiting:** Configurable limits with IP-based tracking
+- **Error Handling:** Secure error responses without information disclosure
+
+---
+
 ## Decentralized Identity Features
 
-Lemma now includes a fully decentralized identity system that addresses 8 key goals:
+Lemma includes a fully decentralized identity system that addresses 8 key goals:
 
 ### 1. Decentralized Identifier Management
 - Support for multiple DID methods (did:key, did:web, did:ethr, did:lemma)
@@ -199,7 +248,7 @@ See [OPRF_REVOCATION_README.md](./OPRF_REVOCATION_README.md) for detailed implem
 
 ## User Flows
 
-### Home Page Flow (New)
+### Home Page Flow
 1. **Initial Entry:** User visits the home page with two main actions: "Verify Lemma" and "Access Protected Content".
 2. **Lemma Verification:** Clicking "Verify Lemma" automatically:
    - Generates a unique user ID
@@ -221,7 +270,7 @@ See [OPRF_REVOCATION_README.md](./OPRF_REVOCATION_README.md) for detailed implem
 5. **Local Storage:** Credential is stored in the user's browser.
 6. **Cross-Page Access:** User can access protected content at /protected using their credential.
 
-### Protected Content Management (New)
+### Protected Content Management
 1. **View Credential:** Users can view their Lemma credential details directly on the protected page.
 2. **Credential Management:** Users can clear their stored credential using the "Clear Lemma" button.
 3. **Import Functionality:** Users can import a previously downloaded credential.
@@ -289,7 +338,7 @@ This workflow enables a "verify once, use anywhere" model where users don't need
 Lemma is designed to be easily integrated into customer sites, allowing them to verify users as humans without collecting personal data.
 
 ### Basic Integration
-html
+```html
 <!-- Add these scripts to your website -->
 <script src="https://your-lemma-instance.com/static/js/lemma-wallet.js"></script>
 <script src="https://your-lemma-instance.com/static/js/lemma-wallet-init.js"></script>
@@ -298,10 +347,10 @@ html
 <div data-lemma="true">
   <!-- Your protected content goes here -->
 </div>
-
+```
 
 ### JavaScript API Integration
-javascript
+```javascript
 // Verify a user with Lemma
 async function verifyWithLemma() {
   // Check if wallet is available
@@ -334,12 +383,12 @@ async function verifyWithLemma() {
     }
   }
 }
-
+```
 
 ### Backend Verification
 On your server, you'll need to verify the Lemma credential presentation:
 
-python
+```python
 # Example using the Python requests library
 import requests
 
@@ -361,7 +410,7 @@ def verify_lemma_credential(credential, challenge):
     
     # Verification failed
     return False
-
+```
 
 The Lemma wallet is designed to be portable and work across websites, which is core to providing "verify once, use anywhere" functionality.
 
@@ -375,7 +424,7 @@ The Lemma wallet is designed to be portable and work across websites, which is c
 - Git
 
 ### Local Development
-bash
+```bash
 # Clone the repository
 git clone <repository-url>
 cd lemma-enterprise
@@ -400,19 +449,19 @@ export LEMMA_HARDWARE_SECURITY=true
 
 # Run the application
 python app.py
-
+```
 
 ### Docker Deployment
-bash
+```bash
 # Build and run with Docker Compose
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
-
+```
 
 ### Heroku Deployment
-bash
+```bash
 # Login to Heroku
 heroku login
 
@@ -429,52 +478,56 @@ heroku config:set DID=did:lemma:heroku
 heroku config:set DID_METHOD=key
 heroku config:set LEMMA_ENABLE_P2P=true
 heroku config:set LEMMA_HARDWARE_SECURITY=true
+# For external key storage (optional)
+heroku config:set LEMMA_EXTERNAL_STORAGE_URL=s3://your-bucket/keys.json
+heroku config:set AWS_ACCESS_KEY_ID=your_access_key
+heroku config:set AWS_SECRET_ACCESS_KEY=your_secret_key
 
 # Deploy the application
 git push heroku main
 
 # Open the application
 heroku open
+```
 
+#### Enhanced Heroku Key Management
 
-#### Troubleshooting Heroku Deployment
+Version 2.2.0 includes improved key persistence for Heroku deployments:
 
-If you encounter CSRF token errors when deploying to Heroku (such as "csrf_token is undefined" in the verify.html template), we've implemented the following fixes:
+1. **Environment-Based Keys**: Keys are stored in environment variables for immediate availability
+2. **External Storage Support**: Optional integration with AWS S3, Azure Blob, or HTTP-based storage
+3. **Automatic Key Generation**: System generates secure keys if none are provided
+4. **Graceful Fallbacks**: Multiple fallback strategies ensure system availability
 
-1. Added a context processor to inject the CSRF token into all templates rendered by the main blueprint:
-   
-python
-   # In lemma/routes/main.py
-   @main_bp.context_processor
-   def inject_csrf_token():
-       return {'csrf_token': generate_csrf()}
+Configure external storage with:
+```bash
+# For AWS S3
+heroku config:set LEMMA_EXTERNAL_STORAGE_URL=s3://your-bucket/lemma-keys.json
 
+# For Azure Blob
+heroku config:set LEMMA_EXTERNAL_STORAGE_URL=azure://account.blob.core.windows.net/container/keys.json
+heroku config:set AZURE_STORAGE_KEY=your_storage_key
 
-2. Updated the templates to access the token as a variable instead of a function call:
-   
-html
-   <!-- In templates like verify.html -->
-   <meta name="csrf-token" content="{{ csrf_token }}">
-
-
-This solution ensures that CSRF tokens are properly available in templates when deployed to Heroku's environment, preventing 500 errors during the verification process.
+# For HTTP service
+heroku config:set LEMMA_EXTERNAL_STORAGE_URL=https://your-key-service.com/api/keys
+heroku config:set LEMMA_STORAGE_AUTH_TOKEN=your_auth_token
+```
 
 ### Azure Deployment
 1. **Create an Azure Web App:**
-   
-bash
+   ```bash
    az webapp create --resource-group YourResourceGroup --plan YourAppServicePlan --name LemmaHumanVerification --runtime "PYTHON:3.9"
+   ```
 
 2. **Set Environment Variables:**
-   
-bash
+   ```bash
    az webapp config appsettings set --resource-group YourResourceGroup --name LemmaHumanVerification --settings LEMMA_ADMIN_USER="your_admin_username" LEMMA_ADMIN_PASS="your_secure_password" LEMMA_SECRET_KEY="your_random_secret" DID="did:lemma:azure" DID_METHOD="key" LEMMA_ENABLE_P2P="true"
+   ```
 
 3. **Deploy the Code:**
-   
-bash
+   ```bash
    az webapp deployment source config-zip --resource-group YourResourceGroup --name LemmaHumanVerification --src lemma-enterprise.zip
-
+   ```
 
 ---
 
@@ -482,15 +535,16 @@ bash
 
 ### Authentication
 All API endpoints that modify data require an API key:
+```
 X-API-Key: your_api_key_here
+```
 
-
-### Endpoints
+### Core Endpoints
 - **GET /api/health:** Health check endpoint
 - **POST /api/issue-credential:** Issue a credential (requires API key)
-- **POST /api/verify-credential:** Verify a credential
+- **POST /api/verify-credential:** Verify a credential with comprehensive validation
 - **GET /api/generate-challenge:** Generate a challenge for presentation verification
-- **POST /api/verify-presentation:** Verify a presentation
+- **POST /api/verify-presentation:** Verify a presentation with enhanced security
 - **GET /api/credential-lookup/{user_id}:** Get a user's credential (auto-issues if not found)
 - **GET /api/user-credential/{user_id}:** Get a user's credential (requires API key)
 - **GET /api/credentials:** List all credentials (requires API key and admin authentication)
@@ -499,6 +553,10 @@ X-API-Key: your_api_key_here
 - **POST /api/logout:** Clear the verification session
 - **GET /api/generate-csrf-token:** Generate a CSRF token for secure form submission
 
+### Security Endpoints
+- **GET /api/generate-csrf:** Generate CSRF token with secure cookie setting
+- **POST /api/complete-verification-flow:** All-in-one verification endpoint with comprehensive validation
+
 ### Decentralized Identity Endpoints
 - **POST /api/create-minimal-proof:** Create a minimal zero-knowledge proof
 - **POST /api/verify-minimal-proof:** Verify a minimal zero-knowledge proof
@@ -506,22 +564,52 @@ X-API-Key: your_api_key_here
 - **POST /api/verify-selective-disclosure:** Verify a selective disclosure
 - **POST /api/verify-with-hardware:** Verify using hardware-backed security
 
+### Revocation & P2P Endpoints
+- **GET /api/revocation/status:** Get revocation status for the local node
+- **POST /api/revocation/sync:** Manually trigger synchronization with peer nodes
+- **POST /api/revocation/import:** Import revocation data from a peer node
+- **GET /api/revocation/issuers:** List all issuers in the revocation registry
+- **GET /api/revocation/issuer/{issuer_id}:** Get metadata for an issuer's revocation data
+- **GET /api/revocation/data/{issuer_id}:** Get the full revocation data for an issuer
+
 ---
 
 ## Security Considerations
 
+### Production Security
+- **Enhanced CSRF Protection:** Uniform protection across all environments with secure cookie handling
+- **Comprehensive Input Validation:** All endpoints protected with robust validation and security limits
+- **Rate Limiting:** Configurable protection against abuse with IP-based tracking
+- **Secure Key Management:** Multiple persistence strategies including external storage for cloud deployments
+- **Debug Code Removal:** Automatic removal of debug statements and print calls in production builds
+
+### Core Security Features
 - **Admin Credentials:** Set strong admin credentials via environment variables.
 - **Session Secret:** Use a strong random value for LEMMA_SECRET_KEY.
 - **API Key:** Set a strong API key for external integrations.
-- **Key Protection:** The .lemma_enterprise directory contains cryptographic keys—keep it secure.
+- **Key Protection:** Enhanced key management with encryption and external storage options.
 - **HTTPS:** Always use HTTPS in production for secure credential transmission.
-- **Rate Limiting:** API endpoints are protected against abuse.
 - **Password Hashing:** Admin passwords are securely hashed.
-- **CSRF Protection:** All forms are protected against CSRF attacks.
 - **Encrypted Storage:** Sensitive data is encrypted at rest.
 - **Minimal Data Collection:** Only stores that a user is human—no personal information.
 - **Hardware Security:** Use hardware-backed key storage when available.
 - **Decentralized Verification:** No single point of failure for credential verification.
+
+### Security Headers & Policies
+- **HTTPS Enforcement:** All OIDC4VP implementations enforce HTTPS in production environments:
+  - Strict HTTPS redirection for all requests
+  - HTTP Strict Transport Security (HSTS) headers
+  - Secure cookie settings with SameSite=Strict
+  - SSL/TLS required for all credential operations
+- **Enhanced Security Headers:**
+  - X-Content-Type-Options: nosniff
+  - X-Frame-Options: SAMEORIGIN
+  - X-XSS-Protection: 1; mode=block
+  - Strict-Transport-Security with includeSubDomains
+- **Session Security:**
+  - 30-minute session lifetime
+  - Secure and HttpOnly cookie flags
+  - CSRF protection with SSL enforcement
 
 ---
 
@@ -556,6 +644,8 @@ X-API-Key: your_api_key_here
 - Configure preferred DID methods using environment variables.
 - Set up P2P peers for decentralized revocation.
 - Style error messages and notifications to match your design system.
+- Configure input validation limits in lemma/utils/input_validation.py.
+- Set up external key storage for cloud deployments.
 
 ---
 
@@ -599,33 +689,32 @@ These integrations will enable:
 ## Testing
 
 The system includes comprehensive tests for all critical paths:
-bash
+```bash
 # Run all tests with coverage report
 python run_tests.py
 
 # Or use pytest directly
 pytest -v --cov=lemma
+```
 
+### Security Testing
+Version 2.2.0 includes enhanced security testing:
+- CSRF protection validation
+- Input validation boundary testing
+- Rate limiting verification
+- Authentication and authorization tests
+- Key management security tests
+
+---
+
+## Documentation
+
+- **[SECURITY_IMPROVEMENTS.md](./SECURITY_IMPROVEMENTS.md):** Detailed documentation of the security enhancements in version 2.2.0
+- **[OPRF_REVOCATION_README.md](./OPRF_REVOCATION_README.md):** Technical details on the OPRF revocation system
+- **API Documentation:** Available at `/api/docs` when running the application
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details. 
-
-### Security Features
-
-- **HTTPS Enforcement:** All OIDC4VP implementations enforce HTTPS in production environments:
-  - Strict HTTPS redirection for all requests
-  - HTTP Strict Transport Security (HSTS) headers
-  - Secure cookie settings with SameSite=Strict
-  - SSL/TLS required for all credential operations
-- **Enhanced Security Headers:**
-  - X-Content-Type-Options: nosniff
-  - X-Frame-Options: SAMEORIGIN
-  - X-XSS-Protection: 1; mode=block
-  - Strict-Transport-Security with includeSubDomains
-- **Session Security:**
-  - 30-minute session lifetime
-  - Secure and HttpOnly cookie flags
-  - CSRF protection with SSL enforcement
+This project is licensed under the MIT License. See the LICENSE file for details.

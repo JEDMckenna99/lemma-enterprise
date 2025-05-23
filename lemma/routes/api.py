@@ -5,8 +5,8 @@ Provides endpoints for external integrations and mobile applications with enhanc
 import secrets
 import time
 import logging
-import stripe
 from functools import wraps
+from typing import Dict, Any, Optional, Tuple, Callable
 from flask import Blueprint, request, jsonify, current_app, session, url_for, render_template, abort
 from datetime import datetime
 import os
@@ -14,28 +14,18 @@ import json
 import hashlib
 import base64
 
-# Import credential service from the correct location
+# Optional imports
 try:
-    from lemma.core.credential_service import get_credential_service
+    import stripe
 except ImportError:
-    # Fallback to wherever the credential service is actually located
-    from lemma.services.credential_service import get_credential_service
+    stripe = None
 
-# Import security and CSRF modules
-try:
-    from lemma.auth.security import admin_required
-    from lemma.auth.csrf_config import csrf_protect, generate_csrf
-except ImportError:
-    # Fallback to wherever these modules are actually located
-    from lemma.security import admin_required
-    from lemma.auth.csrf_config import csrf_protect, generate_csrf
-
-# Import utility functions
-try:
-    from lemma.utils.stripe_service import check_verification_status, create_verification_session
-except ImportError:
-    # We'll handle this in the functions where these are used
-    pass
+# Standard imports without fallbacks
+from lemma.core.credential_service import get_credential_service
+from lemma.auth.security import admin_required
+from lemma.auth.csrf_config import csrf_protect, generate_csrf
+from lemma.utils.input_validation import InputValidator, ValidationError, validate_request_data
+from lemma.utils.stripe_service import check_verification_status, create_verification_session
 
 # Create blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -44,12 +34,12 @@ api_bp = Blueprint('api', __name__, url_prefix='/api')
 logger = logging.getLogger(__name__)
 
 # Rate limiting implementation
-request_history = {}
+request_history: Dict[str, list] = {}
 
-def rate_limit(f):
+def rate_limit(f: Callable) -> Callable:
     """Decorator to apply rate limiting to API endpoints."""
     @wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorated_function(*args: Any, **kwargs: Any) -> Any:
         # Skip rate limiting in test environment
         if current_app.config.get('TESTING', False):
             return f(*args, **kwargs)
@@ -79,10 +69,10 @@ def rate_limit(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def require_api_key(f):
+def require_api_key(f: Callable) -> Callable:
     """Decorator to require API key for endpoints."""
     @wraps(f)
-    def decorated(*args, **kwargs):
+    def decorated(*args: Any, **kwargs: Any) -> Any:
         # Skip API key check in testing environment if configured
         testing_mode = current_app.config.get('TESTING', False)
         skip_auth = current_app.config.get('SKIP_AUTH_IN_TESTS', False)
@@ -104,14 +94,14 @@ def require_api_key(f):
 
 @api_bp.route('/health')
 @rate_limit
-def health_check():
+def health_check() -> Tuple[Dict[str, Any], int]:
     """Health check endpoint."""
     return jsonify({
         "status": "ok", 
         "service": "lemma-human-verification",
         "version": "1.0.0",
         "timestamp": time.time()
-    })
+    }), 200
 
 @api_bp.route('/issue-credential', methods=['POST'])
 @require_api_key
@@ -154,10 +144,16 @@ def verify_credential():
     """Verify a credential via API."""
     try:
         data = request.get_json()
-        if not data or 'credential' not in data:
-            return jsonify({"error": "Credential is required"}), 400
         
-        credential = data['credential']
+        # Comprehensive input validation
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Validate required fields
+        try:
+            credential = InputValidator.validate_credential(data.get('credential'))
+        except ValidationError as e:
+            return jsonify({"error": e.message, "field": e.field}), 400
         
         # Verify the credential
         credential_service = get_credential_service()
@@ -181,15 +177,9 @@ def verify_credential():
             "issuanceDate": verification_result.get('issuanceDate'),
             "expirationDate": verification_result.get('expirationDate')
         })
-    except ValueError as e:
-        logger.error("Invalid credential format: %s", str(e))
-        return jsonify({"error": f"Invalid credential format: {str(e)}"}), 400
-    except KeyError as e:
-        logger.error("Missing required field in credential: %s", str(e))
-        return jsonify({"error": f"Missing required field: {str(e)}"}), 400
     except Exception as e:
         logger.error("Error verifying credential: %s", str(e))
-        return jsonify({"error": f"Error verifying credential: {str(e)}"}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 @api_bp.route('/generate-challenge')
 @rate_limit
@@ -205,11 +195,17 @@ def verify_presentation():
     """Verify a presentation via API."""
     try:
         data = request.get_json()
-        if not data or 'presentation' not in data or 'challenge' not in data:
-            return jsonify({"error": "Presentation and challenge are required"}), 400
         
-        presentation = data['presentation']
-        challenge = data['challenge']
+        # Comprehensive input validation
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Validate required fields
+        try:
+            presentation = InputValidator.validate_presentation(data.get('presentation'))
+            challenge = InputValidator.validate_challenge(data.get('challenge'))
+        except ValidationError as e:
+            return jsonify({"error": e.message, "field": e.field}), 400
         
         # Verify the presentation
         credential_service = get_credential_service()
@@ -232,15 +228,9 @@ def verify_presentation():
             "credentials": verification_result.get('credentials'),
             "challenge": verification_result.get('challenge')
         })
-    except ValueError as e:
-        logger.error("Invalid presentation format: %s", str(e))
-        return jsonify({"error": f"Invalid presentation format: {str(e)}"}), 400
-    except KeyError as e:
-        logger.error("Missing required field in presentation: %s", str(e))
-        return jsonify({"error": f"Missing required field: {str(e)}"}), 400
     except Exception as e:
         logger.error("Error verifying presentation: %s", str(e))
-        return jsonify({"error": f"Error verifying presentation: {str(e)}"}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 @api_bp.route('/user-credential/<user_id>')
 @require_api_key

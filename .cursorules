@@ -1,6 +1,6 @@
 {
   "name": "Lemma Enterprise Rules",
-  "description": "Rules for the Lemma enterprise identity verification system",
+  "description": "Rules for the Lemma enterprise identity verification system with OPRF revocation",
   "lintRules": {
     "python": {
       "maxLineLength": 100,
@@ -19,7 +19,12 @@
     "def _load_or_create_keys",
     "ED25519_PRIVATE_KEY",
     "@app.route",
-    "session['verified_human']"
+    "session['verified_human']",
+    "cascade_manager",
+    "evaluate_oprf",
+    "check_revocation",
+    "CascadedBloomRevocation",
+    "OPRFClient"
   ],
   "disallowedPatterns": [
     "print\\(.*\\)",
@@ -37,23 +42,70 @@
     "os.environ\\['LEMMA_API_KEY'\\] = ",
     "os.environ.set\\(",
     "$env:",
-    "export[\\s]+ED25519|export[\\s]+DID|export[\\s]+LEMMA_"
+    "export[\\s]+ED25519|export[\\s]+DID|export[\\s]+LEMMA_",
+    "\\.env",
+    "config\\.set\\(",
+    "heroku config:set",
+    "os\\.environ\\[.*\\] = ",
+    "setenv\\(",
+    "putenv\\("
   ],
   "architecture": {
     "components": {
-      "routes": "HTTP endpoints in /lemma/routes/",
-      "core": "Business logic in /lemma/core/",
-      "auth": "Authentication logic in /lemma/auth/",
-      "utils": "Utility functions in /lemma/utils/",
-      "models": "Data models in /lemma/models/"
+      "app.py": "Main Flask application with OPRF endpoints",
+      "lemma/routes/": {
+        "main.py": "Core user verification routes",
+        "api.py": "API endpoints for credential operations",
+        "admin.py": "Admin interface routes"
+      },
+      "lemma/core/": {
+        "cascaded_bloom.py": "OPRF-based revocation system with cascaded Bloom filters",
+        "credential_service.py": "W3C Verifiable Credential issuance and verification",
+        "did_resolver.py": "DID resolution and management",
+        "revocation.py": "Credential revocation logic"
+      },
+      "lemma/auth/": {
+        "csrf_config.py": "CSRF protection configuration",
+        "security.py": "Security utilities and key management",
+        "decorators.py": "Authentication decorators"
+      },
+      "lemma/utils/": {
+        "wallet.py": "Browser wallet integration",
+        "stripe_service.py": "Stripe Identity verification",
+        "zero_knowledge.py": "Zero-knowledge proof utilities",
+        "network_utilities.py": "Network and HTTP utilities",
+        "secure_storage.py": "Secure storage mechanisms"
+      },
+      "lemma/models/": {
+        "__init__.py": "Data models and schemas"
+      }
     }
   },
+  "coreFlows": {
+    "verification": "User -> Stripe Identity -> Credential Issuance -> Browser Wallet Storage",
+    "presentation": "User -> Wallet Presentation -> Partner Site Verification",
+    "revocation": "OPRF Evaluation -> Cascaded Bloom Filter -> Privacy-Preserving Check"
+  },
+  "oprfIntegration": {
+    "endpoints": [
+      "/api/oprf/status",
+      "/api/oprf/evaluate", 
+      "/api/credentials/verify"
+    ],
+    "components": [
+      "CascadeManager",
+      "CascadedBloomRevocation",
+      "OPRFClient"
+    ],
+    "dataFlow": "credential_id -> OPRF evaluation -> Bloom filter check -> revocation status"
+  },
   "priorities": [
+    "OPRF revocation system stability",
+    "Cascaded Bloom filter performance",
     "Core verification flow",
     "W3C VC issuance",
     "Browser wallet storage",
-    "Presentation/verification",
-    "Session management"
+    "API endpoint reliability"
   ],
   "securityRules": [
     "No PII storage",
@@ -62,7 +114,18 @@
     "CSRF protection for all forms",
     "Escape user-generated content",
     "Rate limiting for API endpoints",
-    "No automatic setting of environment variables"
+    "NEVER create or modify environment variables - ALL ARE ALREADY SET IN HEROKU",
+    "Use existing Heroku config vars only",
+    "OPRF evaluations must be blinded",
+    "Revocation checks must preserve privacy"
+  ],
+  "debuggingPriorities": [
+    "OPRF service integration",
+    "Cascade manager initialization", 
+    "Bloom filter operations",
+    "Credential verification flow",
+    "Session management",
+    "API endpoint responses"
   ],
   "didFormat": "did:lemma:<uuid>",
   "vcStructure": {
@@ -75,12 +138,38 @@
     "ED25519_PRIVATE_KEY": "Base64-encoded private key (already set in Heroku)",
     "DID": "Custom DID (already set in Heroku)",
     "LEMMA_ADMIN_USER": "Admin username (already set in Heroku)",
-    "LEMMA_ADMIN_PASS": "Admin password (already set in Heroku)"
+    "LEMMA_ADMIN_PASS": "Admin password (already set in Heroku)",
+    "OPRF_SERVICE_INTERNAL": "Enable internal OPRF service (true for production)",
+    "NOTE": "ALL ENVIRONMENT VARIABLES ARE ALREADY CONFIGURED IN HEROKU - DO NOT CREATE NEW ONES"
+  },
+  "environmentPolicy": {
+    "rule": "NEVER create new environment variables",
+    "reason": "All required environment variables are already securely stored in Heroku",
+    "action": "Use existing Heroku config vars only",
+    "forbidden": [
+      "Creating new .env files",
+      "Setting new environment variables",
+      "Modifying existing environment variable values",
+      "Adding new config vars to Heroku"
+    ],
+    "procedure": "If you need environment variables, use the existing ones already configured in Heroku production environment"
   },
   "testing": {
     "unitTestsRequired": true,
     "integrationTestsRequired": true,
     "coverageThreshold": 80,
-    "command": "python run_tests.py"
+    "command": "python run_tests.py",
+    "focusAreas": [
+      "OPRF evaluation correctness",
+      "Cascade manager functionality",
+      "Credential verification",
+      "API endpoint responses"
+    ]
+  },
+  "commonIssues": {
+    "oprfErrors": "Check cascade_manager initialization and OPRF_SERVICE_INTERNAL env var",
+    "revocationErrors": "Verify cascade files exist in instance/data/revocation/cascades/",
+    "credentialErrors": "Check DID resolution and signing key availability",
+    "sessionErrors": "Verify CSRF token generation and validation"
   }
 } 
