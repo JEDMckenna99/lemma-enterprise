@@ -20,8 +20,47 @@ def configure_csrf(app):
     # Log CSRF protection configuration
     app.logger.info(f"Configuring CSRF protection (testing={testing_mode})")
     
-    # Initialize CSRF protection
+    # Initialize CSRF protection with custom configuration
     csrf = CSRFProtect()
+    
+    # Store reference to CSRF instance for exemptions
+    app.csrf = csrf
+    
+    # Override the protect method to exempt API key-protected endpoints
+    original_protect = csrf.protect
+    
+    def custom_csrf_protect():
+        """
+        Custom CSRF protection that exempts API key-protected endpoints.
+        """
+        # List of API endpoints that should be exempt from CSRF because they use API key auth
+        api_key_endpoints = [
+            '/api/issue-credential',
+            '/api/user-credential',
+            '/api/credentials', 
+            '/api/revocation/status',
+            '/api/revocation/sync',
+            '/api/revocation/import',
+            '/api/revocation/issuers',
+            '/api/revocation/add_peer',
+            '/api/peers',
+            '/api/peers/add',
+            '/api/peers/discover',
+            '/api/peers/health'
+        ]
+        
+        # Check if this is an API key-protected endpoint
+        if request.path.startswith('/api/') and request.method in ['POST', 'PUT', 'DELETE']:
+            for endpoint in api_key_endpoints:
+                if request.path == endpoint or request.path.startswith(endpoint + '/'):
+                    # Skip CSRF protection for API key endpoints
+                    return
+        
+        # Use original CSRF protection for all other endpoints
+        return original_protect()
+    
+    # Replace the protect method
+    csrf.protect = custom_csrf_protect
     csrf.init_app(app)
     
     # Register error handler for CSRF errors
