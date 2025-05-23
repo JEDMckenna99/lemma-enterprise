@@ -378,9 +378,8 @@ class OPRFClient:
         if server_url is None:
             # Check if internal OPRF service is enabled (multi-buildpack deployment)
             if os.environ.get("OPRF_SERVICE_INTERNAL") == "true":
-                # Internal service deployed alongside the main app
-                port = os.environ.get("PORT", "8080")
-                self.server_url = f"http://localhost:{port}"
+                # Internal service deployed alongside the main app on fixed port 8080
+                self.server_url = "http://localhost:8080"
                 logger.info(f"Using internal OPRF service at {self.server_url}")
             else:
                 # Use external service URL from environment or default

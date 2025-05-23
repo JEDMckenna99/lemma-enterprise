@@ -461,6 +461,23 @@ docker-compose logs -f
 ```
 
 ### Heroku Deployment
+
+#### Quick Deployment with OPRF Cascade Revocation Layer
+
+For the fastest deployment with the complete OPRF cascade revocation system:
+
+**Windows (PowerShell):**
+```powershell
+.\deploy_with_oprf.ps1
+```
+
+**Linux/Mac (Bash):**
+```bash
+./deploy_with_oprf.sh
+```
+
+#### Manual Heroku Deployment
+
 ```bash
 # Login to Heroku
 heroku login
@@ -474,6 +491,13 @@ heroku config:set LEMMA_ADMIN_PASS=secure_password_change_me
 heroku config:set LEMMA_SECRET_KEY=your_secret_key_here
 heroku config:set LEMMA_API_KEY=your_api_key_here
 heroku config:set DID=did:lemma:heroku
+
+# Enable OPRF cascade revocation layer
+heroku config:set OPRF_SERVICE_INTERNAL=true
+heroku config:set OPRF_RATE_LIMIT=60
+heroku config:set OPRF_ROTATION_DAYS=30
+heroku config:set OPRF_DEBUG=false
+
 # For decentralized features
 heroku config:set DID_METHOD=key
 heroku config:set LEMMA_ENABLE_P2P=true
@@ -486,31 +510,39 @@ heroku config:set AWS_SECRET_ACCESS_KEY=your_secret_key
 # Deploy the application
 git push heroku main
 
+# Scale both web and OPRF processes
+heroku ps:scale web=1 oprf=1
+
 # Open the application
 heroku open
 ```
 
-#### Enhanced Heroku Key Management
+#### OPRF Service Verification
 
-Version 2.2.0 includes improved key persistence for Heroku deployments:
+After deployment, verify the OPRF cascade revocation layer is operational:
 
-1. **Environment-Based Keys**: Keys are stored in environment variables for immediate availability
-2. **External Storage Support**: Optional integration with AWS S3, Azure Blob, or HTTP-based storage
-3. **Automatic Key Generation**: System generates secure keys if none are provided
-4. **Graceful Fallbacks**: Multiple fallback strategies ensure system availability
-
-Configure external storage with:
 ```bash
-# For AWS S3
-heroku config:set LEMMA_EXTERNAL_STORAGE_URL=s3://your-bucket/lemma-keys.json
+# Check process status
+heroku ps
 
-# For Azure Blob
-heroku config:set LEMMA_EXTERNAL_STORAGE_URL=azure://account.blob.core.windows.net/container/keys.json
-heroku config:set AZURE_STORAGE_KEY=your_storage_key
+# View OPRF service logs
+heroku logs --tail --dyno=oprf
 
-# For HTTP service
-heroku config:set LEMMA_EXTERNAL_STORAGE_URL=https://your-key-service.com/api/keys
-heroku config:set LEMMA_STORAGE_AUTH_TOKEN=your_auth_token
+# Test OPRF integration
+curl https://your-app.herokuapp.com/api/oprf/status
+```
+
+Expected response:
+```json
+{
+  "status": "ok",
+  "oprf_service": "internal",
+  "oprf_response": {
+    "status": "ok",
+    "service": "oprf",
+    "version": "1.0.0"
+  }
+}
 ```
 
 ### Azure Deployment

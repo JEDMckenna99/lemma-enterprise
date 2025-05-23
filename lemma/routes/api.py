@@ -85,9 +85,13 @@ def require_api_key(f: Callable) -> Callable:
         api_key = request.headers.get('X-API-Key')
         expected_api_key = current_app.config.get('API_KEY')
         
-        if not api_key or api_key != expected_api_key:
+        if not api_key:
+            logger.warning("Missing API key from IP: %s", request.remote_addr)
+            return jsonify({"error": "Missing API key", "message": "X-API-Key header is required"}), 401
+            
+        if api_key != expected_api_key:
             logger.warning("Invalid API key attempt from IP: %s", request.remote_addr)
-            return jsonify({"error": "Invalid or missing API key"}), 401
+            return jsonify({"error": "Invalid API key", "message": "The provided API key is not valid"}), 403
             
         return f(*args, **kwargs)
     return decorated
@@ -115,9 +119,17 @@ def issue_credential():
         
         user_id = data['user_id']
         
+        # Validate user_id format
+        if not isinstance(user_id, str) or len(user_id.strip()) == 0:
+            return jsonify({"error": "Invalid user ID format"}), 400
+        
         # Issue the credential
         credential_service = get_credential_service()
-        credential = credential_service.issue_credential(user_id)
+        if not credential_service:
+            logger.error("Credential service not available")
+            return jsonify({"error": "Credential service not available"}), 503
+            
+        credential = credential_service.issue_credential(user_id.strip())
         
         # Log successful issuance
         logger.info("Credential issued for user: %s", user_id)
@@ -285,6 +297,21 @@ def get_csrf():
         from lemma.auth.csrf_config import get_csrf_response
         response = get_csrf_response()
         current_app.logger.info("Generated new CSRF token")
+        return response
+    except Exception as e:
+        current_app.logger.error("Error generating CSRF token: %s", str(e))
+        return jsonify({
+            'error': 'Error generating CSRF token',
+            'details': str(e)
+        }), 500
+
+@api_bp.route('/generate-csrf-token', methods=['GET'])
+def get_csrf_token():
+    """Generate a CSRF token for client-side JavaScript - alternative endpoint."""
+    try:
+        from lemma.auth.csrf_config import get_csrf_response
+        response = get_csrf_response()
+        current_app.logger.info("Generated new CSRF token via /generate-csrf-token")
         return response
     except Exception as e:
         current_app.logger.error("Error generating CSRF token: %s", str(e))

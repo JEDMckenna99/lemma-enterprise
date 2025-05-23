@@ -31,23 +31,7 @@ def get_credential_service() -> Optional['LemmaCredentialService']:
         g._credential_service = _credential_service
     return g._credential_service
 
-def init_credential_service(app) -> Optional['LemmaCredentialService']:
-    """Initialize the credential service."""
-    global _credential_service
-    
-    if _credential_service is None:
-        try:
-            # Try to initialize with Heroku-specific logic first if on Heroku
-            if 'DYNO' in os.environ:
-                _init_heroku_key_management(app)
-            
-            _credential_service = LemmaCredentialService(app.config.get('STORAGE_DIR', app.instance_path))
-            app.logger.info("Credential service initialized successfully")
-        except Exception as e:
-            app.logger.error(f"Failed to initialize credential service: {e}")
-            return None
-    
-    return _credential_service
+def init_credential_service(app) -> Optional['LemmaCredentialService']:    """Initialize the credential service."""    global _credential_service        if _credential_service is None:        try:            # Try to initialize with Heroku-specific logic first if on Heroku            if 'DYNO' in os.environ:                app.logger.info("Initializing Heroku key management")                _init_heroku_key_management(app)                app.logger.info("Heroku key management initialized")                        storage_dir = app.config.get('STORAGE_DIR', app.instance_path)            app.logger.info(f"Initializing credential service with storage_dir: {storage_dir}")                        _credential_service = LemmaCredentialService(storage_dir)            app.logger.info("Credential service initialized successfully")        except Exception as e:            import traceback            app.logger.error(f"Failed to initialize credential service: {e}")            app.logger.error(f"Traceback: {traceback.format_exc()}")            return None        return _credential_service
 
 def _init_heroku_key_management(app):
     """Initialize key management strategy for Heroku deployments."""

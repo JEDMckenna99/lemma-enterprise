@@ -89,7 +89,7 @@ def create_app(test_config=None):
         # Enhanced security settings for OIDC4VP compliance - but relaxed for development
         SESSION_COOKIE_SECURE=not is_development,  # Only use secure cookies in production
         SESSION_COOKIE_HTTPONLY=True,  # Always use HTTP-only cookies for security
-        SESSION_COOKIE_SAMESITE='Lax',  # Use Lax instead of Strict for better usability and development
+        SESSION_COOKIE_SAMESITE='Strict' if not is_development else 'Lax',  # Strict in production, Lax in dev
         PERMANENT_SESSION_LIFETIME=1800,  # 30 minutes
         # CSRF Configuration
         WTF_CSRF_ENABLED=True,
@@ -202,19 +202,22 @@ def create_app(test_config=None):
         if not is_development and not app.config.get('TESTING'):
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         
-        # Ensure cookies are sent correctly
-        # For session cookies in development on Windows, we need special handling
-        if is_windows and 'Set-Cookie' in response.headers and 'session=' in response.headers['Set-Cookie']:
-            # Modify the session cookie to remove the secure flag if needed
+        # Ensure session cookies have HttpOnly flag - this is critical for security
+        if 'Set-Cookie' in response.headers:
             cookies = response.headers.getlist('Set-Cookie')
             new_cookies = []
             
             for cookie in cookies:
-                if 'session=' in cookie and 'Secure' in cookie and is_development:
-                    # Remove Secure flag for localhost development on Windows
-                    cookie = cookie.replace('Secure; ', '').replace('; Secure', '')
+                if 'session=' in cookie:
+                    # Ensure HttpOnly is present
+                    if 'HttpOnly' not in cookie:
+                        cookie += '; HttpOnly'
+                    # In production, ensure secure flag is present for HTTPS
+                    if not is_development and 'Secure' not in cookie:
+                        cookie += '; Secure'
                 new_cookies.append(cookie)
             
+            # Replace all cookies
             response.headers.pop('Set-Cookie')
             for cookie in new_cookies:
                 response.headers.add('Set-Cookie', cookie)

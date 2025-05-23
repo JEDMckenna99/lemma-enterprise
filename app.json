@@ -53,8 +53,8 @@
       "value": "web"
     },
     "OPRF_SERVICE_INTERNAL": {
-      "description": "Internal URL for OPRF service",
-      "value": "http://localhost:8080"
+      "description": "Enable internal OPRF service (true for production)",
+      "value": "true"
     },
     "OPRF_RATE_LIMIT": {
       "description": "Rate limit for OPRF service (requests per minute)",

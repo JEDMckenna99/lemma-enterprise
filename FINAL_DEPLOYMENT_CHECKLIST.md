@@ -13,19 +13,21 @@ git commit -m "Fix production dependencies and tests for deployment"
 git push heroku main
 ```
 
-### 2. Set Missing Environment Variables in Heroku
+### 2. Set Environment Variables in Heroku
 
 Since you mentioned all variables are stored in Heroku, please verify these are set:
 
 **Required for Core Functionality:**
 ```bash
 # Verify these are set in your Heroku config
-heroku config:get STRIPE_SECRET_KEY        # Should be sk_live_... for production
-heroku config:get STRIPE_PUBLISHABLE_KEY   # Should be pk_live_... for production
 heroku config:get LEMMA_ADMIN_USER
 heroku config:get LEMMA_ADMIN_PASS
 heroku config:get LEMMA_SECRET_KEY
 heroku config:get LEMMA_API_KEY
+
+# Set Stripe TEST keys (to avoid costs during development/testing)
+heroku config:set STRIPE_SECRET_KEY=sk_test_51RJNLBDIouMeOMablPrCc6aZzxvHYK2RDQcTAPFdBeeInO3Oo763Md4naHlIuD4f2fsw6TRgrN9AbAZbPym3KZrA00h5jdtmDA
+heroku config:set STRIPE_PUBLISHABLE_KEY=pk_test_51RJNLBDIouMeOMab56ZoLLf7qyXOfw2dWq8dDnhihzcc9hOHhw2xqyvzEUXbfZDsYyAnZNa5ADkycRpqUvDzMr3G00CgiM8efu
 ```
 
 **Required for Production Security:**
@@ -37,25 +39,17 @@ heroku config:set LEMMA_FORCE_HTTPS=true
 ```
 
 **OPRF Service Configuration:**
-Choose ONE of these options:
-
-**Option A - Disable OPRF (Simpler, recommended for immediate deployment):**
+**Recommended - Disable OPRF for immediate deployment:**
 ```bash
 heroku config:set LEMMA_ENABLE_OPRF=false
-```
-
-**Option B - Deploy OPRF Service (More complete, but requires additional setup):**
-```bash
-heroku config:set OPRF_SERVICE_URL=https://your-oprf-service.herokuapp.com
-# Note: You'll need to deploy the oprfservice separately
 ```
 
 ## 🟡 POST-DEPLOYMENT VERIFICATION
 
 ### 1. Check Application Health
 ```bash
-# Replace YOUR_APP_NAME with your actual Heroku app name
-curl https://YOUR_APP_NAME.herokuapp.com/api/health
+
+curl https://lemma-enterprise.herokuapp.com/api/health
 ```
 **Expected Response:**
 ```json
@@ -69,7 +63,7 @@ curl https://YOUR_APP_NAME.herokuapp.com/api/health
 
 ### 2. Test CSRF Token Generation
 ```bash
-curl https://YOUR_APP_NAME.herokuapp.com/api/generate-csrf
+curl https://lemma-enterprise.herokuapp.com/api/generate-csrf
 ```
 **Expected Response:**
 ```json
@@ -80,36 +74,27 @@ curl https://YOUR_APP_NAME.herokuapp.com/api/generate-csrf
 
 ### 3. Test Home Page
 ```bash
-# Visit in browser
-open https://YOUR_APP_NAME.herokuapp.com
+
+open https://lemma-enterprise.herokuapp.com
 ```
 **Expected:** Home page loads without errors, shows "Verify Lemma" and "Access Protected Content" buttons.
 
-### 4. Test Human Verification Flow
+### 4. Test Human Verification Flow (with Test Keys)
 1. Click "Verify Lemma" button
-2. **If Stripe is configured:** Should redirect to Stripe Identity verification
-3. **If Stripe not configured:** Should show error about Stripe configuration
+2. **With Stripe test keys:** Should redirect to Stripe Identity verification (test mode)
+3. **Test verification works but won't charge real money**
 
 ### 5. Check Heroku Logs
 ```bash
 heroku logs --tail
 ```
-**Expected:** No ERROR messages, only INFO and WARNING messages about missing optional services.
+**Expected:** No ERROR messages, INFO messages about Stripe test mode, no OPRF service errors.
 
 ## 🚨 TROUBLESHOOTING GUIDE
 
-### Issue: "Stripe API key not configured"
-**Solution:**
-```bash
-heroku config:set STRIPE_SECRET_KEY=sk_live_YOUR_LIVE_KEY
-heroku config:set STRIPE_PUBLISHABLE_KEY=pk_live_YOUR_LIVE_KEY
-```
-
-### Issue: "pyristretto255 not available"
-**Solution:** This is fixed in the updated code. Deploy the latest version.
 
 ### Issue: "OPRF service connection failed"
-**Solution:** Set `LEMMA_ENABLE_OPRF=false` unless you need revocation features.
+**Solution:** Set `LEMMA_ENABLE_OPRF=false` (recommended for now).
 
 ### Issue: Application won't start
 **Check:** 
@@ -161,7 +146,7 @@ Your software is production-ready when:
 - ✅ Health endpoint returns 200 OK
 - ✅ No critical errors in logs
 - ✅ Home page loads correctly
-- ✅ Stripe verification works (if configured)
+- ✅ Stripe verification works (test mode)
 - ✅ Customer integration APIs respond correctly
 - ✅ All tests pass
 
@@ -192,17 +177,36 @@ Execute these commands to deploy:
 # 1. Deploy the code
 git push heroku main
 
-# 2. Set production security (if not already set)
+# 2. Set Stripe TEST keys (no cost)
+heroku config:set STRIPE_SECRET_KEY=sk_test_YOUR_TEST_KEY
+heroku config:set STRIPE_PUBLISHABLE_KEY=pk_test_YOUR_TEST_KEY
+
+# 3. Set production security
 heroku config:set FLASK_ENV=production DEBUG=false LEMMA_FORCE_HTTPS=true
 
-# 3. Disable OPRF for immediate deployment (recommended)
+# 4. Disable OPRF for immediate deployment
 heroku config:set LEMMA_ENABLE_OPRF=false
 
-# 4. Verify deployment
+# 5. Verify deployment
 curl https://YOUR_APP_NAME.herokuapp.com/api/health
 
-# 5. Check logs
+# 6. Check logs
 heroku logs --tail
 ```
 
-Your Lemma Enterprise software is now ready for customer site integration! 🎉 
+## 💰 COST-EFFECTIVE TESTING APPROACH
+
+**Current Setup (Test Keys):**
+- ✅ Full human verification flow works
+- ✅ No charges for Stripe Identity verification
+- ✅ Perfect for customer integration testing
+- ✅ All APIs functional
+
+**When Ready for Live Production:**
+```bash
+# Later, when you want to process real verifications:
+heroku config:set STRIPE_SECRET_KEY=sk_live_YOUR_LIVE_KEY
+heroku config:set STRIPE_PUBLISHABLE_KEY=pk_live_YOUR_LIVE_KEY
+```
+
+Your Lemma Enterprise software is now ready for customer site integration testing with no additional costs! 🎉 

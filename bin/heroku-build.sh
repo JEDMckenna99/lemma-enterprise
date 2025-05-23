@@ -1,24 +1,21 @@
 #!/bin/bash
 set -e
 
-echo "=== Starting Heroku build process ==="
+echo "Building OPRF service for Heroku deployment..."
 
-# Make scripts executable
-chmod +x bin/*.sh
+# Change to the OPRF service directory
+cd oprfservice
 
-# Install Go for OPRF service
-echo "=== Installing Go ==="
-curl -L https://go.dev/dl/go1.18.linux-amd64.tar.gz -o go.tar.gz
-tar -C /tmp -xzf go.tar.gz
-export PATH=$PATH:/tmp/go/bin
-go version
+# Build the OPRF service binary
+echo "Compiling OPRF service..."
+go build -o ../bin/oprfservice main.go
 
-# Compile OPRF service
-echo "=== Compiling OPRF service ==="
-./bin/compile-oprf.sh
+# Make the binary executable
+chmod +x ../bin/oprfservice
 
-# Ensure directories exist
-mkdir -p instance/data/keys
-mkdir -p instance/data/revocation/cascades
+echo "OPRF service compiled successfully"
 
-echo "=== Build completed successfully ===" 
+# Return to the root directory
+cd ..
+
+echo "Heroku build completed" 
