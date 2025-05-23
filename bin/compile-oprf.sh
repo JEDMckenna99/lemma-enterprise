@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "Compiling OPRF service..."
+echo "Compiling Mock OPRF service..."
 cd oprfservice
 
 # Initialize Go modules if needed
@@ -12,13 +12,13 @@ fi
 
 # Download dependencies
 echo "Downloading Go dependencies..."
-go mod tidy
-go get -v ./...
+go get -v github.com/gin-contrib/cors
+go get -v github.com/gin-gonic/gin
 
-# Build the service
-echo "Building OPRF service..."
-go build -o ../bin/oprfservice
+# Build the simple mock service
+echo "Building Mock OPRF service..."
+go build -o ../bin/oprfservice simple_mock.go
 
 # Make executable
 chmod +x ../bin/oprfservice
-echo "OPRF service compiled successfully"
+echo "Mock OPRF service compiled successfully"
