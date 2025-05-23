@@ -150,7 +150,7 @@ def issue_credential():
         return jsonify({"error": f"Error issuing credential: {str(e)}"}), 500
 
 @api_bp.route('/verify-credential', methods=['POST'])
-@csrf_protect()
+@require_api_key
 @rate_limit
 def verify_credential():
     """Verify a credential via API."""
