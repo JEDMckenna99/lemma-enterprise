@@ -91,6 +91,8 @@ def create_app(test_config=None):
         SESSION_COOKIE_HTTPONLY=True,  # Always use HTTP-only cookies for security
         SESSION_COOKIE_SAMESITE='Strict' if not is_development else 'Lax',  # Strict in production, Lax in dev
         PERMANENT_SESSION_LIFETIME=1800,  # 30 minutes
+        # Force session cookie attributes in production
+        SESSION_COOKIE_NAME='session',
         # CSRF Configuration
         WTF_CSRF_ENABLED=True,
         WTF_CSRF_SSL_STRICT=not is_development,  # Only enforce HTTPS for CSRF in production
@@ -190,7 +192,44 @@ def create_app(test_config=None):
                 url = request.url.replace('http://', 'https://', 1)
                 return redirect(url, code=301)
 
-    # Configure security headers    @app.after_request    def add_security_headers(response):        # Add security headers based on environment        response.headers['X-Content-Type-Options'] = 'nosniff'        response.headers['X-Frame-Options'] = 'SAMEORIGIN'        response.headers['X-XSS-Protection'] = '1; mode=block'                # Only add HSTS in production        if not is_development and not app.config.get('TESTING'):            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'                # Ensure session cookies have proper security flags        if 'Set-Cookie' in response.headers:            cookies = response.headers.getlist('Set-Cookie')            new_cookies = []                        for cookie in cookies:                # Apply security flags to session and CSRF cookies                if 'session=' in cookie or '_csrf_token=' in cookie:                    # Ensure HttpOnly is present for session cookies (not CSRF tokens which need JS access)                    if 'session=' in cookie and 'HttpOnly' not in cookie:                        cookie += '; HttpOnly'                    # In production, ensure secure flag is present for HTTPS                    if not is_development and 'Secure' not in cookie:                        cookie += '; Secure'                    # Ensure SameSite is set correctly                    if 'SameSite' not in cookie:                        samesite_value = 'Strict' if not is_development else 'Lax'                        cookie += f'; SameSite={samesite_value}'                new_cookies.append(cookie)                        # Replace all cookies            response.headers.pop('Set-Cookie')            for cookie in new_cookies:                response.headers.add('Set-Cookie', cookie)                return response
+    # Configure security headers
+    @app.after_request
+    def add_security_headers(response):
+        # Add security headers based on environment
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        
+        # Only add HSTS in production
+        if not is_development and not app.config.get('TESTING'):
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        
+        # Ensure session cookies have proper security flags
+        if 'Set-Cookie' in response.headers:
+            cookies = response.headers.getlist('Set-Cookie')
+            new_cookies = []
+            
+            for cookie in cookies:
+                # Apply security flags to session cookies
+                if 'session=' in cookie:
+                    # Ensure HttpOnly is present for session cookies
+                    if 'HttpOnly' not in cookie:
+                        cookie += '; HttpOnly'
+                    # In production, ensure secure flag is present for HTTPS
+                    if not is_development and 'Secure' not in cookie:
+                        cookie += '; Secure'
+                    # Ensure SameSite is set correctly
+                    if 'SameSite' not in cookie:
+                        samesite_value = 'Strict' if not is_development else 'Lax'
+                        cookie += f'; SameSite={samesite_value}'
+                new_cookies.append(cookie)
+            
+            # Replace all cookies
+            response.headers.pop('Set-Cookie')
+            for cookie in new_cookies:
+                response.headers.add('Set-Cookie', cookie)
+        
+        return response
 
     # Ensure secure sessions
     @app.before_request
@@ -316,4 +355,4 @@ def _init_components(app):
         else:
             app.logger.info("OPRF service disabled via configuration")
     except ImportError:
-        app.logger.warning('OPRF cascade integration not available')
+        app.logger.warning('OPRF cascade integration not available') 
