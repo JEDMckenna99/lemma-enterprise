@@ -1,0 +1,337 @@
+{% extends "layout.html" %}
+
+{% block title %}Invoices - Lemma Network{% endblock %}
+
+{% block head %}
+<style>
+    .billing-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .billing-card {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .billing-header {
+        border-bottom: 1px solid #e0e0e0;
+        padding-bottom: 16px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .btn-primary {
+        background: #1976d2;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-secondary {
+        background: #f5f5f5;
+        color: #666;
+        border: 1px solid #ddd;
+        padding: 12px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .invoice-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    
+    .invoice-table th,
+    .invoice-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .invoice-table th {
+        background: #f8f9fa;
+        font-weight: 600;
+        color: #333;
+    }
+    
+    .invoice-table tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-paid {
+        background: #e8f5e8;
+        color: #2e7d32;
+    }
+    
+    .status-pending {
+        background: #fff3e0;
+        color: #f57c00;
+    }
+    
+    .status-failed {
+        background: #ffebee;
+        color: #c62828;
+    }
+    
+    .notification {
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+    }
+    
+    .notification.info {
+        background: #e3f2fd;
+        color: #1565c0;
+        border-left: 4px solid #1976d2;
+    }
+    
+    .notification.warning {
+        background: #fff3e0;
+        color: #ef6c00;
+        border-left: 4px solid #ff9800;
+    }
+    
+    .notification.error {
+        background: #ffebee;
+        color: #c62828;
+        border-left: 4px solid #f44336;
+    }
+    
+    .billing-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    
+    .summary-item {
+        text-align: center;
+        padding: 16px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .summary-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1976d2;
+        margin-bottom: 4px;
+    }
+    
+    .summary-label {
+        font-size: 12px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+    
+    .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="billing-container">
+    <div class="billing-header">
+        <div>
+            <h1>Invoices & Billing History</h1>
+            <p>View your complete billing history and download invoices</p>
+        </div>
+        <div>
+            <a href="{{ url_for('billing.payment_methods') }}" class="btn-secondary">Payment Methods</a>
+        </div>
+    </div>
+    
+    {% if not stripe_enabled %}
+    <div class="notification warning">
+        <strong>Billing Not Configured</strong><br>
+        Stripe integration is not enabled. Contact your administrator to set up billing.
+    </div>
+    {% elif not customer.stripe_customer_id %}
+    <div class="notification info">
+        <strong>Billing Setup Required</strong><br>
+        <a href="{{ url_for('billing.payment_methods') }}">Set up billing</a> to view your invoices and billing history.
+    </div>
+    {% elif not billing_data or not billing_data.enabled %}
+    <div class="notification error">
+        <strong>Unable to Load Billing Data</strong><br>
+        {% if billing_data and billing_data.error %}
+        Error: {{ billing_data.error }}
+        {% else %}
+        Unable to retrieve billing information. Please try again later.
+        {% endif %}
+    </div>
+    {% else %}
+    <!-- Show billing summary -->
+    <div class="billing-summary">
+        <div class="summary-item">
+            <div class="summary-value">${{ "%.2f"|format(billing_data.billing_totals.total_charges) }}</div>
+            <div class="summary-label">Total Charges</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">${{ "%.2f"|format(billing_data.billing_totals.verification_charges) }}</div>
+            <div class="summary-label">Verification Fees</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">${{ "%.2f"|format(billing_data.billing_totals.subscription_charges) }}</div>
+            <div class="summary-label">Monthly Subscriptions</div>
+        </div>
+        {% if billing_data.upcoming_invoice and billing_data.upcoming_invoice.amount_due > 0 %}
+        <div class="summary-item">
+            <div class="summary-value">${{ "%.2f"|format(billing_data.upcoming_invoice.amount_due) }}</div>
+            <div class="summary-label">Next Invoice</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if billing_data.upcoming_invoice %}
+    <div class="billing-card">
+        <h3>Upcoming Invoice</h3>
+        <div style="background: #f8f9fa; padding: 16px; border-radius: 8px;">
+            <p><strong>Amount Due:</strong> ${{ "%.2f"|format(billing_data.upcoming_invoice.amount_due) }}</p>
+            <p><strong>Period:</strong> {{ billing_data.upcoming_invoice.period_start }} to {{ billing_data.upcoming_invoice.period_end }}</p>
+            <p><em>This invoice will be automatically charged to your default payment method.</em></p>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="billing-card">
+        <h3>Invoice History</h3>
+        <p>Your complete billing history for the Lemma Network</p>
+        
+        <!-- For demo purposes, show a sample table structure -->
+        <!-- In production, this would be populated with actual Stripe invoice data -->
+        <table class="invoice-table">
+            <thead>
+                <tr>
+                    <th>Invoice #</th>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Sample data - replace with actual invoice data from Stripe -->
+                <tr>
+                    <td>INV-001</td>
+                    <td>{{ moment().format('YYYY-MM-DD') }}</td>
+                    <td>Monthly Subscription</td>
+                    <td>${{ "%.2f"|format(billing_data.billing_totals.subscription_charges) }}</td>
+                    <td><span class="status-badge status-paid">Paid</span></td>
+                    <td>
+                        <button class="btn-secondary" onclick="downloadInvoice('INV-001')">Download PDF</button>
+                    </td>
+                </tr>
+                {% if billing_data.billing_totals.verification_charges > 0 %}
+                <tr>
+                    <td>INV-002</td>
+                    <td>{{ moment().subtract(5, 'days').format('YYYY-MM-DD') }}</td>
+                    <td>Verification Fees</td>
+                    <td>${{ "%.2f"|format(billing_data.billing_totals.verification_charges) }}</td>
+                    <td><span class="status-badge status-paid">Paid</span></td>
+                    <td>
+                        <button class="btn-secondary" onclick="downloadInvoice('INV-002')">Download PDF</button>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        
+        <!-- Show empty state if no invoices -->
+        {% if billing_data.billing_totals.total_charges == 0 %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📄</div>
+            <h4>No Invoices Yet</h4>
+            <p>Your invoices will appear here once you start using Lemma Network services.</p>
+            <a href="{{ url_for('onboarding.dashboard') }}" class="btn-primary">Go to Dashboard</a>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="billing-card">
+        <h3>Billing Support</h3>
+        <p>Need help with your billing? We're here to assist:</p>
+        <ul>
+            <li><strong>Questions about charges:</strong> Review your usage analytics</li>
+            <li><strong>Payment issues:</strong> Update your payment methods</li>
+            <li><strong>Invoice disputes:</strong> Contact our support team</li>
+            <li><strong>Network pricing:</strong> Learn about our pricing model</li>
+        </ul>
+        <div style="margin-top: 16px;">
+            <a href="{{ url_for('onboarding.usage') }}" class="btn-secondary">Usage Analytics</a>
+            <a href="mailto:billing@lemma.network" class="btn-secondary">Contact Support</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function downloadInvoice(invoiceId) {
+    // In production, this would download the actual invoice from Stripe
+    alert(`Invoice ${invoiceId} download functionality coming soon!`);
+}
+
+// Add moment.js style date formatting if needed
+window.moment = function() {
+    return {
+        format: function(format) {
+            const now = new Date();
+            if (format === 'YYYY-MM-DD') {
+                return now.toISOString().split('T')[0];
+            }
+            return now.toISOString();
+        },
+        subtract: function(amount, unit) {
+            return {
+                format: function(format) {
+                    const date = new Date();
+                    if (unit === 'days') {
+                        date.setDate(date.getDate() - amount);
+                    }
+                    if (format === 'YYYY-MM-DD') {
+                        return date.toISOString().split('T')[0];
+                    }
+                    return date.toISOString();
+                }
+            };
+        }
+    };
+};
+</script>
+{% endblock %} 

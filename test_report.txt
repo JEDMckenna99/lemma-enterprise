@@ -7,7 +7,7 @@ Security Tests: FAILED
 Input Validation Tests: FAILED
 Dependency Tests: PASSED
 All Tests with Coverage: FAILED
-  - Code Coverage: 23.0%
+  - Code Coverage: 19.0%
 Flake8 Linting: FAILED
 MyPy Type Checking: FAILED
 

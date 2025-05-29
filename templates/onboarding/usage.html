@@ -1,0 +1,381 @@
+{% extends "layout.html" %}
+
+{% block title %}Usage Analytics - {{ customer.domain }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-6xl">
+    <!-- Header -->
+    <div class="flex justify-between items-start mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                📊 Usage Analytics
+            </h1>
+            <p class="text-gray-600">
+                Detailed verification statistics for <strong>{{ customer.domain }}</strong>
+            </p>
+        </div>
+        <div class="text-right">
+            <a href="{{ url_for('onboarding.dashboard') }}" 
+               class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                ← Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid md:grid-cols-4 gap-6 mb-8">
+        <!-- Today -->
+        <div class="bg-white rounded-lg shadow border p-6">
+            <div class="flex items-center">
+                <div class="bg-green-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                    <span class="text-green-600 text-xl">📅</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Today</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ "{:,}".format(usage_1d.total_verifications) }}</p>
+                    <p class="text-xs text-gray-500">verifications</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- This Week -->
+        <div class="bg-white rounded-lg shadow border p-6">
+            <div class="flex items-center">
+                <div class="bg-blue-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                    <span class="text-blue-600 text-xl">📈</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Last 7 Days</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ "{:,}".format(usage_7d.total_verifications) }}</p>
+                    <p class="text-xs text-gray-500">verifications</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- This Month -->
+        <div class="bg-white rounded-lg shadow border p-6">
+            <div class="flex items-center">
+                <div class="bg-purple-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                    <span class="text-purple-600 text-xl">🗓️</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">This Month</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ "{:,}".format(usage_30d.total_verifications) }}</p>
+                    <p class="text-xs text-gray-500">verifications</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Cost -->
+        <div class="bg-white rounded-lg shadow border p-6">
+            <div class="flex items-center">
+                <div class="bg-yellow-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                    <span class="text-yellow-600 text-xl">💰</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Month Cost</p>
+                    <p class="text-2xl font-bold text-gray-900">${{ "%.2f"|format(usage_30d.monthly_cost) }}</p>
+                    <p class="text-xs text-gray-500">{{ usage_30d.pricing_tier }} tier</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid lg:grid-cols-2 gap-8">
+        <!-- Usage Chart -->
+        <div class="bg-white rounded-lg shadow border">
+            <div class="border-b border-gray-200 px-6 py-4">
+                <h2 class="text-xl font-semibold text-gray-800">📈 Daily Usage Trend</h2>
+            </div>
+            <div class="p-6">
+                <!-- Simple bar chart visualization -->
+                <div class="space-y-3">
+                    {% set max_usage = usage_30d.daily_usage.values() | list | max %}
+                    {% for date, count in usage_30d.daily_usage.items() %}
+                        {% if loop.index <= 14 %}  {# Show last 14 days #}
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-gray-600 w-20">{{ date[-5:] }}</span>  {# Show MM-DD #}
+                                <div class="flex items-center flex-1 mx-4">
+                                    <div class="w-full bg-gray-200 rounded-full h-3">
+                                        {% if max_usage > 0 %}
+                                            {% set width = (count / max_usage * 100) | int %}
+                                        {% else %}
+                                            {% set width = 0 %}
+                                        {% endif %}
+                                        <div class="bg-gradient-to-r from-blue-400 to-blue-600 h-3 rounded-full transition-all duration-300" 
+                                             style="width: {{ width }}%"></div>
+                                    </div>
+                                </div>
+                                <span class="text-gray-800 font-medium w-12 text-right">{{ count }}</span>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                <!-- Usage Insights -->
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-800 mb-3">📝 Usage Insights</h3>
+                    <div class="space-y-2 text-sm text-gray-600">
+                        {% set avg_daily = (usage_30d.total_verifications / 30) | round %}
+                        <p>• Average daily usage: <strong>{{ avg_daily }} verifications</strong></p>
+                        
+                        {% set peak_day = usage_30d.daily_usage.values() | list | max %}
+                        <p>• Peak day usage: <strong>{{ peak_day }} verifications</strong></p>
+                        
+                        {% set remaining_free = pricing.free_tier - usage_30d.total_verifications %}
+                        {% if remaining_free > 0 %}
+                            <p>• Free tier remaining: <strong>{{ "{:,}".format(remaining_free) }} verifications</strong></p>
+                        {% else %}
+                            <p>• Using paid tier: <strong>{{ "{:,}".format(-remaining_free) }} verifications over free limit</strong></p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pricing Breakdown -->
+        <div class="bg-white rounded-lg shadow border">
+            <div class="border-b border-gray-200 px-6 py-4">
+                <h2 class="text-xl font-semibold text-gray-800">💳 Pricing Breakdown</h2>
+            </div>
+            <div class="p-6">
+                <div class="space-y-6">
+                    <!-- Current Month Calculation -->
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-800 mb-3">This Month's Bill</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Total verifications:</span>
+                                <span class="font-medium">{{ "{:,}".format(usage_30d.total_verifications) }}</span>
+                            </div>
+                            
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Free tier (first {{ "{:,}".format(pricing.free_tier) }}):</span>
+                                <span class="font-medium text-green-600">$0.00</span>
+                            </div>
+                            
+                            {% if usage_30d.total_verifications > pricing.free_tier %}
+                                {% set billable = usage_30d.total_verifications - pricing.free_tier %}
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-600">Billable verifications ({{ "{:,}".format(billable) }}):</span>
+                                    {% if usage_30d.pricing_tier == 'enterprise' %}
+                                        <span class="font-medium">${{ "%.2f"|format(billable * pricing.enterprise_discount) }}</span>
+                                    {% else %}
+                                        <span class="font-medium">${{ "%.2f"|format(billable * pricing.price_per_verification) }}</span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            
+                            <div class="border-t border-gray-300 pt-3">
+                                <div class="flex justify-between text-base font-semibold">
+                                    <span>Total:</span>
+                                    <span class="text-blue-600">${{ "%.2f"|format(usage_30d.monthly_cost) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing Tiers -->
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-800 mb-3">💡 Pricing Tiers</h3>
+                        <div class="space-y-3">
+                            <!-- Free Tier -->
+                            <div class="border rounded-lg p-4 {% if usage_30d.pricing_tier == 'free' %}border-green-500 bg-green-50{% else %}border-gray-200{% endif %}">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Free Tier</h4>
+                                        <p class="text-sm text-gray-600">First {{ "{:,}".format(pricing.free_tier) }} verifications</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-lg font-bold text-green-600">$0.00</p>
+                                        {% if usage_30d.pricing_tier == 'free' %}
+                                            <span class="text-xs text-green-600 font-medium">CURRENT</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Standard Tier -->
+                            <div class="border rounded-lg p-4 {% if usage_30d.pricing_tier == 'standard' %}border-blue-500 bg-blue-50{% else %}border-gray-200{% endif %}">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Standard</h4>
+                                        <p class="text-sm text-gray-600">After free tier</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-lg font-bold text-blue-600">${{ "%.2f"|format(pricing.price_per_verification) }}</p>
+                                        <p class="text-xs text-gray-500">per verification</p>
+                                        {% if usage_30d.pricing_tier == 'standard' %}
+                                            <span class="text-xs text-blue-600 font-medium">CURRENT</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Enterprise Tier -->
+                            <div class="border rounded-lg p-4 {% if usage_30d.pricing_tier == 'enterprise' %}border-purple-500 bg-purple-50{% else %}border-gray-200{% endif %}">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Enterprise</h4>
+                                        <p class="text-sm text-gray-600">{{ "{:,}".format(pricing.enterprise_minimum) }}+ verifications/month</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-lg font-bold text-purple-600">${{ "%.2f"|format(pricing.enterprise_discount) }}</p>
+                                        <p class="text-xs text-gray-500">per verification</p>
+                                        {% if usage_30d.pricing_tier == 'enterprise' %}
+                                            <span class="text-xs text-purple-600 font-medium">CURRENT</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Projected Costs -->
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-800 mb-3">🔮 Projected Costs</h3>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            {% set daily_avg = (usage_7d.total_verifications / 7) | round %}
+                            {% set monthly_projection = daily_avg * 30 %}
+                            {% set projected_cost = 0 %}
+                            {% if monthly_projection > pricing.free_tier %}
+                                {% set billable_projection = monthly_projection - pricing.free_tier %}
+                                {% if monthly_projection >= pricing.enterprise_minimum %}
+                                    {% set projected_cost = billable_projection * pricing.enterprise_discount %}
+                                {% else %}
+                                    {% set projected_cost = billable_projection * pricing.price_per_verification %}
+                                {% endif %}
+                            {% endif %}
+                            
+                            <p class="text-sm text-blue-700 mb-2">
+                                Based on your last 7 days average (<strong>{{ daily_avg }}/day</strong>):
+                            </p>
+                            <div class="text-lg font-semibold text-blue-800">
+                                Projected monthly usage: <strong>{{ "{:,}".format(monthly_projection) }} verifications</strong>
+                            </div>
+                            <div class="text-lg font-semibold text-blue-800">
+                                Projected monthly cost: <strong>${{ "%.2f"|format(projected_cost) }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Tools -->
+    <div class="mt-8 grid md:grid-cols-2 gap-6">
+        <!-- Export Data -->
+        <div class="bg-white rounded-lg shadow border p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-3">📥 Export Data</h3>
+            <p class="text-gray-600 text-sm mb-4">Download your usage data for external analysis or reporting.</p>
+            <div class="space-y-3">
+                <button onclick="exportCSV()" 
+                        class="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm">
+                    📊 Export as CSV
+                </button>
+                <button onclick="exportJSON()" 
+                        class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm">
+                    📋 Export as JSON
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-lg shadow border p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-3">⚡ Quick Actions</h3>
+            <div class="space-y-3">
+                <a href="{{ url_for('onboarding.integration') }}" 
+                   class="block w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm text-center">
+                    📖 View Integration Guide
+                </a>
+                <a href="{{ url_for('onboarding.api_keys') }}" 
+                   class="block w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm text-center">
+                    🔑 Manage API Keys
+                </a>
+                <a href="{{ url_for('onboarding.dashboard') }}" 
+                   class="block w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-sm text-center">
+                    🏠 Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function exportCSV() {
+    const data = {{ usage_30d.daily_usage | tojson }};
+    const csvContent = "Date,Verifications\n" + 
+        Object.entries(data).map(([date, count]) => `${date},${count}`).join('\n');
+    
+    downloadFile(csvContent, 'lemma-usage-data.csv', 'text/csv');
+    showMessage('✅ CSV exported successfully!', 'success');
+}
+
+function exportJSON() {
+    const exportData = {
+        domain: '{{ customer.domain }}',
+        export_date: new Date().toISOString(),
+        usage_30d: {{ usage_30d | tojson }},
+        usage_7d: {{ usage_7d | tojson }},
+        usage_1d: {{ usage_1d | tojson }},
+        pricing: {{ pricing | tojson }}
+    };
+    
+    const jsonContent = JSON.stringify(exportData, null, 2);
+    downloadFile(jsonContent, 'lemma-usage-data.json', 'application/json');
+    showMessage('✅ JSON exported successfully!', 'success');
+}
+
+function downloadFile(content, fileName, contentType) {
+    const blob = new Blob([content], { type: contentType });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+function showMessage(message, type) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `fixed bottom-4 right-4 ${type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'} border rounded-lg p-4 shadow-lg z-50`;
+    messageDiv.innerHTML = `<p class="text-sm font-medium">${message}</p>`;
+    
+    document.body.appendChild(messageDiv);
+    
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            document.body.removeChild(messageDiv);
+        }
+    }, 3000);
+}
+
+// Auto-refresh every 5 minutes
+setInterval(() => {
+    window.location.reload();
+}, 300000);
+</script>
+
+<style>
+.container {
+    animation: fadeIn 0.6s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.grid > div {
+    transition: transform 0.2s ease-in-out;
+}
+
+.grid > div:hover {
+    transform: translateY(-2px);
+}
+</style>
+{% endblock %} 

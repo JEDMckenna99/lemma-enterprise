@@ -1,0 +1,66 @@
+{
+  "name": "@lemma-network/verifier",
+  "version": "1.0.0",
+  "description": "Official Lemma Verifier SDK - Add human verification to any website in 10 minutes",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "prepublishOnly": "npm run build",
+    "example:react": "cd examples/react && npm start",
+    "example:express": "cd examples/express && npm start"
+  },
+  "keywords": [
+    "human-verification",
+    "bot-detection",
+    "identity",
+    "verifiable-credentials",
+    "w3c",
+    "did",
+    "authentication",
+    "security",
+    "lemma"
+  ],
+  "author": "Lemma Network",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lemma-network/verifier-sdk.git"
+  },
+  "homepage": "https://lemma.network",
+  "bugs": {
+    "url": "https://github.com/lemma-network/verifier-sdk/issues"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/express": "^4.17.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "ts-jest": "^29.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "express": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "express": {
+      "optional": true
+    }
+  }
+} 

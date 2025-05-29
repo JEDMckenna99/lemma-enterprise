@@ -13,6 +13,7 @@ import os
 import json
 import hashlib
 import base64
+import sys
 
 # Optional imports
 try:
@@ -1510,3 +1511,432 @@ def evaluate_oprf():
         "publicKey": "mock_public_key_for_testing_in_production",
         "keyID": "mock_key_1"
     }), 200
+
+# ============================================================================
+# AUTOMATION MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@api_bp.route('/automation/status', methods=['GET'])
+@require_api_key
+@rate_limit
+def get_automation_status():
+    """Get current status of the revocation automation system."""
+    try:
+        from lemma.core.revocation_automation import get_automation_manager
+        
+        manager = get_automation_manager()
+        status = manager.get_status()
+        
+        return jsonify({
+            'success': True,
+            'automation': status,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting automation status: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error getting automation status: {str(e)}"
+        }), 500
+
+@api_bp.route('/automation/start', methods=['POST'])
+@require_api_key
+@rate_limit
+def start_automation():
+    """Start the revocation automation system."""
+    try:
+        from lemma.core.revocation_automation import get_automation_manager
+        
+        manager = get_automation_manager()
+        manager.start_automation()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Revocation automation started successfully',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error starting automation: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error starting automation: {str(e)}"
+        }), 500
+
+@api_bp.route('/automation/stop', methods=['POST'])
+@require_api_key
+@rate_limit
+def stop_automation():
+    """Stop the revocation automation system."""
+    try:
+        from lemma.core.revocation_automation import get_automation_manager
+        
+        manager = get_automation_manager()
+        manager.stop_automation()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Revocation automation stopped successfully',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error stopping automation: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error stopping automation: {str(e)}"
+        }), 500
+
+@api_bp.route('/automation/rotate-keys', methods=['POST'])
+@require_api_key
+@rate_limit
+def manual_key_rotation():
+    """Manually trigger OPRF key rotation."""
+    try:
+        from lemma.core.revocation_automation import get_automation_manager
+        
+        manager = get_automation_manager()
+        success, message = manager.manual_key_rotation()
+        
+        return jsonify({
+            'success': success,
+            'message': message,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in manual key rotation: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error in manual key rotation: {str(e)}"
+        }), 500
+
+@api_bp.route('/automation/rebuild-cascade', methods=['POST'])
+@require_api_key
+@rate_limit
+def manual_cascade_rebuild():
+    """Manually trigger cascade rebuild."""
+    try:
+        from lemma.core.revocation_automation import get_automation_manager
+        
+        manager = get_automation_manager()
+        success, message = manager.manual_cascade_rebuild()
+        
+        return jsonify({
+            'success': success,
+            'message': message,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in manual cascade rebuild: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error in manual cascade rebuild: {str(e)}"
+        }), 500
+
+@api_bp.route('/automation/metrics', methods=['GET'])
+@require_api_key
+@rate_limit
+def get_automation_metrics():
+    """Get detailed automation metrics and performance data."""
+    try:
+        from lemma.core.revocation_automation import get_automation_manager
+        
+        manager = get_automation_manager()
+        
+        # Get automation metrics
+        automation_status = manager.get_status()
+        
+        # Read stored metrics file if available
+        metrics_file = os.path.join(
+            current_app.config.get('STORAGE_DIR', 'instance/data'),
+            'automation_metrics.json'
+        )
+        
+        stored_metrics = {}
+        if os.path.exists(metrics_file):
+            try:
+                with open(metrics_file, 'r') as f:
+                    stored_metrics = json.load(f)
+            except Exception as e:
+                logger.warning(f"Could not read automation metrics file: {e}")
+        
+        # Combine metrics
+        combined_metrics = {
+            'current_status': automation_status,
+            'historical_data': stored_metrics,
+            'system_info': {
+                'python_version': f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+                'platform': sys.platform,
+                'storage_dir': current_app.config.get('STORAGE_DIR', 'instance/data')
+            },
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        return jsonify({
+            'success': True,
+            'metrics': combined_metrics
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting automation metrics: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error getting automation metrics: {str(e)}"
+        }), 500
+
+# ============================================================================
+# ENHANCED ANALYTICS ENDPOINTS
+# ============================================================================
+
+@api_bp.route('/analytics/customer/<customer_id>', methods=['GET'])
+@require_api_key
+@rate_limit
+def get_customer_analytics(customer_id):
+    """Get comprehensive analytics for a specific customer."""
+    try:
+        from lemma.core.analytics_service import get_analytics_service
+        
+        analytics_service = get_analytics_service()
+        days = request.args.get('days', 30, type=int)
+        
+        # Validate days parameter
+        if days < 1 or days > 365:
+            return jsonify({
+                'success': False,
+                'error': 'Days parameter must be between 1 and 365'
+            }), 400
+        
+        analytics_data = analytics_service.get_customer_analytics(customer_id, days)
+        
+        return jsonify({
+            'success': True,
+            'analytics': analytics_data,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting customer analytics: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error getting customer analytics: {str(e)}"
+        }), 500
+
+@api_bp.route('/analytics/platform', methods=['GET'])
+@require_api_key
+@rate_limit
+def get_platform_analytics():
+    """Get platform-wide analytics for business intelligence."""
+    try:
+        from lemma.core.analytics_service import get_analytics_service
+        
+        analytics_service = get_analytics_service()
+        days = request.args.get('days', 30, type=int)
+        
+        # Validate days parameter
+        if days < 1 or days > 365:
+            return jsonify({
+                'success': False,
+                'error': 'Days parameter must be between 1 and 365'
+            }), 400
+        
+        platform_data = analytics_service.get_platform_analytics(days)
+        
+        return jsonify({
+            'success': True,
+            'platform_analytics': platform_data,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting platform analytics: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error getting platform analytics: {str(e)}"
+        }), 500
+
+@api_bp.route('/analytics/reports', methods=['POST'])
+@require_api_key
+@rate_limit
+def generate_analytics_report():
+    """Generate comprehensive analytics reports."""
+    try:
+        from lemma.core.analytics_service import get_analytics_service
+        
+        analytics_service = get_analytics_service()
+        
+        data = request.get_json() or {}
+        report_type = data.get('type', 'daily')
+        format = data.get('format', 'json')
+        
+        # Validate parameters
+        valid_types = ['daily', 'weekly', 'monthly', 'customer_summary']
+        valid_formats = ['json', 'csv']
+        
+        if report_type not in valid_types:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid report type. Must be one of: {valid_types}'
+            }), 400
+        
+        if format not in valid_formats:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid format. Must be one of: {valid_formats}'
+            }), 400
+        
+        success, result, report_data = analytics_service.generate_analytics_report(report_type, format)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'report_path': result,
+                'report_type': report_type,
+                'format': format,
+                'data': report_data if format == 'json' else None,
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error generating analytics report: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error generating analytics report: {str(e)}"
+        }), 500
+
+@api_bp.route('/analytics/health', methods=['GET'])
+@require_api_key
+@rate_limit
+def get_analytics_health():
+    """Get analytics system health and status."""
+    try:
+        from lemma.core.analytics_service import get_analytics_service
+        
+        analytics_service = get_analytics_service()
+        health_data = analytics_service.get_system_health()
+        
+        return jsonify({
+            'success': True,
+            'health': health_data,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting analytics health: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error getting analytics health: {str(e)}"
+        }), 500
+
+@api_bp.route('/analytics/log-event', methods=['POST'])
+@require_api_key
+@rate_limit
+def log_analytics_event():
+    """Log a custom analytics event."""
+    try:
+        from lemma.core.analytics_service import get_analytics_service
+        
+        analytics_service = get_analytics_service()
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Request body is required'
+            }), 400
+        
+        customer_id = data.get('customer_id')
+        event_type = data.get('event_type', 'verification')
+        metadata = data.get('metadata', {})
+        
+        if not customer_id:
+            return jsonify({
+                'success': False,
+                'error': 'customer_id is required'
+            }), 400
+        
+        success = analytics_service.log_verification_event(customer_id, event_type, metadata)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Event logged successfully',
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to log event'
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error logging analytics event: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error logging analytics event: {str(e)}"
+        }), 500
+
+@api_bp.route('/analytics/dashboard', methods=['GET'])
+@require_api_key
+@rate_limit
+def get_analytics_dashboard():
+    """Get comprehensive dashboard data for administration interface."""
+    try:
+        from lemma.core.analytics_service import get_analytics_service
+        from lemma.core.revocation_automation import get_automation_manager
+        
+        analytics_service = get_analytics_service()
+        automation_manager = get_automation_manager()
+        
+        # Get analytics data
+        platform_analytics = analytics_service.get_platform_analytics(30)
+        analytics_health = analytics_service.get_system_health()
+        automation_status = automation_manager.get_status()
+        
+        # Get recent customer activity
+        recent_customers = []
+        if platform_analytics.get('top_customers'):
+            for customer_id, usage in platform_analytics['top_customers'][:5]:
+                customer_analytics = analytics_service.get_customer_analytics(customer_id, 7)
+                recent_customers.append({
+                    'customer_id': customer_id,
+                    'usage_7d': usage,
+                    'trend': customer_analytics.get('performance', {}).get('usage_trend', 'stable'),
+                    'tier': customer_analytics.get('financial', {}).get('pricing_tier', 'free')
+                })
+        
+        # Compile dashboard data
+        dashboard = {
+            'summary': {
+                'total_customers': platform_analytics.get('customers', {}).get('total_customers', 0),
+                'active_customers': platform_analytics.get('customers', {}).get('active_customers', 0),
+                'total_verifications': platform_analytics.get('usage', {}).get('total_verifications', 0),
+                'monthly_revenue': platform_analytics.get('financial', {}).get('total_revenue', 0),
+                'system_health': analytics_health.get('status', 'unknown'),
+                'automation_status': automation_status.get('automation_running', False)
+            },
+            'platform_analytics': platform_analytics,
+            'recent_customers': recent_customers,
+            'system_health': analytics_health,
+            'automation_status': automation_status,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        return jsonify({
+            'success': True,
+            'dashboard': dashboard
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting analytics dashboard: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error getting analytics dashboard: {str(e)}"
+        }), 500

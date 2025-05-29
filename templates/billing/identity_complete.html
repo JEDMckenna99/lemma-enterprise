@@ -1,0 +1,275 @@
+{% extends "layout.html" %}
+
+{% block title %}Identity Verification Complete - Lemma Network{% endblock %}
+
+{% block head %}
+<style>
+    .completion-container {
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 40px;
+        text-align: center;
+    }
+    
+    .completion-card {
+        background: white;
+        border-radius: 12px;
+        padding: 40px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border: 1px solid #e0e0e0;
+    }
+    
+    .completion-icon {
+        font-size: 64px;
+        margin-bottom: 24px;
+        animation: bounce 2s infinite;
+    }
+    
+    .completion-title {
+        font-size: 28px;
+        font-weight: 600;
+        color: #1976d2;
+        margin-bottom: 16px;
+    }
+    
+    .completion-message {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 32px;
+        line-height: 1.5;
+    }
+    
+    .verification-details {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 32px;
+        text-align: left;
+    }
+    
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+    
+    .detail-label {
+        font-weight: 500;
+        color: #333;
+    }
+    
+    .detail-value {
+        color: #666;
+        font-family: monospace;
+    }
+    
+    .btn-primary {
+        background: #1976d2;
+        color: white;
+        border: none;
+        padding: 12px 32px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+        margin: 8px;
+    }
+    
+    .btn-secondary {
+        background: #f5f5f5;
+        color: #666;
+        border: 1px solid #ddd;
+        padding: 12px 32px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+        margin: 8px;
+    }
+    
+    .btn:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+    }
+    
+    .error-state {
+        color: #c62828;
+    }
+    
+    .error-icon {
+        color: #f44336;
+    }
+    
+    .next-steps {
+        background: #e3f2fd;
+        border-left: 4px solid #1976d2;
+        padding: 16px;
+        border-radius: 4px;
+        margin-bottom: 24px;
+        text-align: left;
+    }
+    
+    .next-steps h4 {
+        margin: 0 0 12px 0;
+        color: #1976d2;
+    }
+    
+    .next-steps ul {
+        margin: 0;
+        padding-left: 20px;
+    }
+    
+    .next-steps li {
+        margin-bottom: 8px;
+        color: #1565c0;
+    }
+    
+    @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% {
+            transform: translateY(0);
+        }
+        40% {
+            transform: translateY(-10px);
+        }
+        60% {
+            transform: translateY(-5px);
+        }
+    }
+    
+    .processing-indicator {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #1976d2;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 8px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="completion-container">
+    <div class="completion-card">
+        {% if error %}
+        <!-- Error State -->
+        <div class="completion-icon error-icon">⚠️</div>
+        <h1 class="completion-title error-state">Verification Error</h1>
+        <p class="completion-message">
+            There was an issue with your identity verification. Please try again or contact support if the problem persists.
+        </p>
+        
+        <div class="verification-details">
+            <div class="detail-item">
+                <span class="detail-label">Error:</span>
+                <span class="detail-value">{{ error }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Time:</span>
+                <span class="detail-value">{{ moment().format('YYYY-MM-DD HH:mm:ss') }}</span>
+            </div>
+        </div>
+        
+        <div class="next-steps">
+            <h4>What to do next:</h4>
+            <ul>
+                <li>Check that your document photos are clear and well-lit</li>
+                <li>Ensure your document is valid and not expired</li>
+                <li>Try using a different browser or device</li>
+                <li>Contact support if issues persist</li>
+            </ul>
+        </div>
+        
+        <a href="{{ url_for('onboarding.dashboard') }}" class="btn-primary">Return to Dashboard</a>
+        <a href="mailto:support@lemma.network" class="btn-secondary">Contact Support</a>
+        
+        {% else %}
+        <!-- Success State -->
+        <div class="completion-icon">🎉</div>
+        <h1 class="completion-title">Identity Verification Complete!</h1>
+        <p class="completion-message">
+            Thank you for completing your identity verification. Your submission is being processed and you'll receive a Lemma verification credential once approved.
+        </p>
+        
+        {% if session_id %}
+        <div class="verification-details">
+            <div class="detail-item">
+                <span class="detail-label">Verification Session:</span>
+                <span class="detail-value">{{ session_id[:20] }}...</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Status:</span>
+                <span class="detail-value processing-indicator"></span>
+                <span>Processing</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Submitted:</span>
+                <span class="detail-value">{{ moment().format('YYYY-MM-DD HH:mm:ss') }}</span>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="next-steps">
+            <h4>What happens next:</h4>
+            <ul>
+                <li>Your identity verification is being processed (typically takes a few minutes)</li>
+                <li>Once verified, a $2.00 verification fee will be charged</li>
+                <li>You'll receive your Lemma verification credential</li>
+                <li>Your credential will be valid across the entire Lemma Network</li>
+            </ul>
+        </div>
+        
+        <a href="{{ url_for('onboarding.dashboard') }}" class="btn-primary">Return to Dashboard</a>
+        <a href="{{ url_for('billing.payment_methods') }}" class="btn-secondary">View Billing</a>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Auto-refresh page every 30 seconds to check for verification updates
+{% if session_id and not error %}
+setTimeout(() => {
+    // In a real implementation, you might poll the verification status
+    // and update the page dynamically
+    console.log('Checking verification status...');
+    
+    // Example: poll verification status
+    var sessionId = '{{ session_id }}';
+    // fetch('/billing/identity-verification/' + sessionId + '/status')
+    //   .then(response => response.json())
+    //   .then(data => {
+    //     if (data.verification_session.status === 'verified') {
+    //       window.location.reload();
+    //     }
+    //   });
+}, 30000);
+{% endif %}
+
+// Simple date formatting for the template
+window.moment = function() {
+    return {
+        format: function(format) {
+            const now = new Date();
+            if (format === 'YYYY-MM-DD HH:mm:ss') {
+                return now.toISOString().replace('T', ' ').substring(0, 19);
+            }
+            return now.toISOString();
+        }
+    };
+};
+</script>
+{% endblock %} 

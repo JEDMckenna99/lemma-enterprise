@@ -1,0 +1,465 @@
+{% extends "layout.html" %}
+
+{% block title %}Integration Guide - {{ customer.domain }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">
+            📖 Integration Guide
+        </h1>
+        <p class="text-gray-600 mb-4">
+            Complete guide to integrating Lemma verification into <strong>{{ customer.domain }}</strong>
+        </p>
+        <div class="inline-flex items-center bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+            <span class="text-blue-800 text-sm">🚀 Your API Key: <code class="font-mono">{{ customer.api_key[:12] }}...</code></span>
+        </div>
+    </div>
+
+    <!-- Quick Start -->
+    <div class="bg-white rounded-lg shadow border mb-8">
+        <div class="border-b border-gray-200 px-6 py-4">
+            <h2 class="text-xl font-semibold text-gray-800">⚡ Quick Start (2 minutes)</h2>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-600 mb-4">The fastest way to add human verification to your site:</p>
+            
+            <div class="bg-gray-900 rounded-lg p-4 mb-4">
+                <code class="text-green-400 text-sm block whitespace-pre-wrap"><!-- Add to your HTML head -->
+&lt;script src="https://cdn.jsdelivr.net/npm/@lemma-network/verifier@latest"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+// Initialize Lemma
+const lemma = new LemmaVerifier({
+  apiKey: '{{ customer.api_key }}',
+  instanceUrl: '{{ base_url }}'
+});
+
+// Verify a user is human
+lemma.verify().then(result => {
+  if (result.verified) {
+    // User is verified human - grant access
+    showProtectedContent();
+  } else {
+    // User couldn't be verified
+    showVerificationNeeded();
+  }
+});
+&lt;/script&gt;</code>
+            </div>
+            
+            <button onclick="copyCode('quickStart')" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
+                📋 Copy Quick Start Code
+            </button>
+        </div>
+    </div>
+
+    <!-- React Integration -->
+    <div class="bg-white rounded-lg shadow border mb-8">
+        <div class="border-b border-gray-200 px-6 py-4">
+            <h2 class="text-xl font-semibold text-gray-800">⚛️ React Integration</h2>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-600 mb-4">Using our React hooks for seamless integration:</p>
+            
+            <div class="space-y-4">
+                <!-- Installation -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">1. Install the Package</h3>
+                    <div class="bg-gray-900 rounded-lg p-4">
+                        <code class="text-green-400 text-sm">npm install @lemma-network/verifier</code>
+                    </div>
+                </div>
+
+                <!-- React Hook Usage -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">2. Use the Hook</h3>
+                    <div class="bg-gray-900 rounded-lg p-4">
+                        <code class="text-green-400 text-sm block whitespace-pre-wrap">import { useLemmaVerification, LemmaGate } from '@lemma-network/verifier';
+
+function MyComponent() {
+  const { isVerified, verify, loading } = useLemmaVerification({
+    apiKey: '{{ customer.api_key }}',
+    instanceUrl: '{{ base_url }}'
+  });
+
+  if (loading) return &lt;div&gt;Checking verification...&lt;/div&gt;;
+  
+  if (!isVerified) {
+    return (
+      &lt;button onClick={verify}&gt;
+        🤖 Verify You're Human
+      &lt;/button&gt;
+    );
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;Welcome, verified human! 🎉&lt;/h2&gt;
+      {/* Your protected content here */}
+    &lt;/div&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;LemmaGate 
+      apiKey="{{ customer.api_key }}"
+      instanceUrl="{{ base_url }}"
+      fallback={&lt;div&gt;Please verify you're human&lt;/div&gt;}
+    &gt;
+      {/* This content only shows to verified humans */}
+      &lt;SecretContent /&gt;
+    &lt;/LemmaGate&gt;
+  );
+}</code>
+                    </div>
+                </div>
+
+                <!-- Gate Component -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">3. Using the Gate Component</h3>
+                    <div class="bg-gray-900 rounded-lg p-4">
+                        <code class="text-green-400 text-sm block whitespace-pre-wrap">import { LemmaGate } from '@lemma-network/verifier';
+
+function App() {
+  return (
+    &lt;LemmaGate 
+      apiKey="{{ customer.api_key }}"
+      instanceUrl="{{ base_url }}"
+      fallback={&lt;div&gt;Please verify you're human&lt;/div&gt;}
+    &gt;
+      {/* This content only shows to verified humans */}
+      &lt;SecretContent /&gt;
+    &lt;/LemmaGate&gt;
+  );
+}</code>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="copyCode('react')" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
+                📋 Copy React Examples
+            </button>
+        </div>
+    </div>
+
+    <!-- Express.js Backend -->
+    <div class="bg-white rounded-lg shadow border mb-8">
+        <div class="border-b border-gray-200 px-6 py-4">
+            <h2 class="text-xl font-semibold text-gray-800">🚀 Express.js Backend</h2>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-600 mb-4">Protect your API endpoints with Lemma middleware:</p>
+            
+            <div class="space-y-4">
+                <!-- Installation -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">1. Install & Setup</h3>
+                    <div class="bg-gray-900 rounded-lg p-4">
+                        <code class="text-green-400 text-sm block whitespace-pre-wrap">npm install @lemma-network/verifier
+
+const { lemmaMiddleware, requireLemmaVerification, verifyLemmaCredential } = require('@lemma-network/verifier');
+
+// Configure middleware
+const app = express();
+app.use('/protected', lemmaMiddleware({
+  apiKey: '{{ customer.api_key }}',
+  instanceUrl: '{{ base_url }}'
+}));</code>
+                    </div>
+                </div>
+
+                <!-- Route Protection -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">2. Protect Routes</h3>
+                    <div class="bg-gray-900 rounded-lg p-4">
+                        <code class="text-green-400 text-sm block whitespace-pre-wrap">const { requireLemmaVerification } = require('@lemma-network/verifier');
+
+// Protect specific routes
+app.get('/api/sensitive-data', 
+  requireLemmaVerification({
+    apiKey: '{{ customer.api_key }}',
+    instanceUrl: '{{ base_url }}'
+  }),
+  (req, res) => {
+    // Only verified humans reach this code
+    res.json({ secret: 'Only humans can see this!' });
+  }
+);</code>
+                    </div>
+                </div>
+
+                <!-- Custom Verification -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">3. Custom Verification Logic</h3>
+                    <div class="bg-gray-900 rounded-lg p-4">
+                        <code class="text-green-400 text-sm block whitespace-pre-wrap">const { verifyLemmaCredential } = require('@lemma-network/verifier');
+
+app.post('/api/verify-user', async (req, res) => {
+  const { credential } = req.body;
+  
+  const result = await verifyLemmaCredential(credential, {
+    apiKey: '{{ customer.api_key }}',
+    instanceUrl: '{{ base_url }}'
+  });
+  
+  if (result.verified) {
+    // Grant access or create user session
+    req.session.isHuman = true;
+    res.json({ success: true, message: 'Human verified!' });
+  } else {
+    res.status(403).json({ success: false, message: 'Verification failed' });
+  }
+});</code>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="copyCode('express')" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
+                📋 Copy Express Examples
+            </button>
+        </div>
+    </div>
+
+    <!-- API Reference -->
+    <div class="bg-white rounded-lg shadow border mb-8">
+        <div class="border-b border-gray-200 px-6 py-4">
+            <h2 class="text-xl font-semibold text-gray-800">📋 API Reference</h2>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-600 mb-4">Direct API endpoints for custom integrations:</p>
+            
+            <div class="space-y-6">
+                <!-- Verify Human Endpoint -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">Verify Human</h3>
+                    <div class="bg-gray-50 rounded-lg p-4 border">
+                        <div class="mb-2">
+                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">POST</span>
+                            <code class="ml-2 text-sm">{{ base_url }}/api/verify-human</code>
+                        </div>
+                        <div class="text-sm text-gray-600 space-y-2">
+                            <p><strong>Headers:</strong> <code>X-API-Key: {{ customer.api_key }}</code></p>
+                            <p><strong>Body:</strong> <code>{ "presentation": "..." }</code></p>
+                            <p><strong>Response:</strong> <code>{ "success": true, "verified": true }</code></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Get Credential Endpoint -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">Get User Credential</h3>
+                    <div class="bg-gray-50 rounded-lg p-4 border">
+                        <div class="mb-2">
+                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">GET</span>
+                            <code class="ml-2 text-sm">{{ base_url }}/api/credential-lookup/{user_id}</code>
+                        </div>
+                        <div class="text-sm text-gray-600 space-y-2">
+                            <p><strong>Headers:</strong> <code>X-API-Key: {{ customer.api_key }}</code></p>
+                            <p><strong>Response:</strong> W3C Verifiable Credential JSON</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Health Check -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">Health Check</h3>
+                    <div class="bg-gray-50 rounded-lg p-4 border">
+                        <div class="mb-2">
+                            <span class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-medium">GET</span>
+                            <code class="ml-2 text-sm">{{ base_url }}/api/health</code>
+                        </div>
+                        <div class="text-sm text-gray-600">
+                            <p><strong>Response:</strong> <code>{ "status": "ok", "version": "2.3.0" }</code></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Testing & Debugging -->
+    <div class="bg-white rounded-lg shadow border mb-8">
+        <div class="border-b border-gray-200 px-6 py-4">
+            <h2 class="text-xl font-semibold text-gray-800">🧪 Testing Your Integration</h2>
+        </div>
+        <div class="p-6">
+            <div class="space-y-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 class="text-lg font-medium text-blue-800 mb-2">✅ Test Checklist</h3>
+                    <ul class="space-y-2 text-sm text-blue-700">
+                        <li>☐ SDK loads without console errors</li>
+                        <li>☐ Verification request returns success/failure correctly</li>
+                        <li>☐ Protected content only shows to verified users</li>
+                        <li>☐ API key authentication works</li>
+                        <li>☐ Error handling gracefully manages network failures</li>
+                    </ul>
+                </div>
+
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h3 class="text-lg font-medium text-yellow-800 mb-2">🐛 Common Issues</h3>
+                    <ul class="space-y-2 text-sm text-yellow-700">
+                        <li><strong>CORS errors:</strong> Make sure your domain {{ customer.domain }} is correctly configured</li>
+                        <li><strong>API key issues:</strong> Verify the key is included in requests as X-API-Key header</li>
+                        <li><strong>Network errors:</strong> Check that {{ base_url }} is accessible from your domain</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Support & Next Steps -->
+    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200 p-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">🚀 Next Steps</h2>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="text-lg font-medium text-gray-800 mb-2">Get Support</h3>
+                <ul class="space-y-2 text-sm text-gray-600">
+                    <li>📧 Email support: <a href="mailto:support@lemma.network" class="text-blue-600 hover:underline">support@lemma.network</a></li>
+                    <li>📖 Documentation: <a href="https://docs.lemma.network" class="text-blue-600 hover:underline">docs.lemma.network</a></li>
+                    <li>💬 Discord community: <a href="https://discord.gg/lemma" class="text-blue-600 hover:underline">discord.gg/lemma</a></li>
+                </ul>
+            </div>
+            <div>
+                <h3 class="text-lg font-medium text-gray-800 mb-2">Monitor Usage</h3>
+                <ul class="space-y-2 text-sm text-gray-600">
+                    <li><a href="{{ url_for('onboarding.dashboard') }}" class="text-blue-600 hover:underline">📊 View your dashboard</a></li>
+                    <li><a href="{{ url_for('onboarding.usage') }}" class="text-blue-600 hover:underline">📈 Detailed analytics</a></li>
+                    <li><a href="{{ url_for('onboarding.api_keys') }}" class="text-blue-600 hover:underline">🔑 Manage API keys</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden code storage for copying -->
+<textarea id="quickStart" style="position: absolute; left: -9999px;"><!-- Add to your HTML head -->
+&lt;script src="https://cdn.jsdelivr.net/npm/@lemma-network/verifier@latest"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+// Initialize Lemma
+const lemma = new LemmaVerifier({
+  apiKey: '{{ customer.api_key }}',
+  instanceUrl: '{{ base_url }}'
+});
+
+// Verify a user is human
+lemma.verify().then(result => {
+  if (result.verified) {
+    // User is verified human - grant access
+    showProtectedContent();
+  } else {
+    // User couldn't be verified
+    showVerificationNeeded();
+  }
+});
+&lt;/script&gt;</textarea>
+
+<textarea id="react" style="position: absolute; left: -9999px;">import { useLemmaVerification, LemmaGate } from '@lemma-network/verifier';
+
+// Hook usage
+function MyComponent() {
+  const { isVerified, verify, loading } = useLemmaVerification({
+    apiKey: '{{ customer.api_key }}',
+    instanceUrl: '{{ base_url }}'
+  });
+
+  if (loading) return &lt;div&gt;Checking verification...&lt;/div&gt;;
+  
+  if (!isVerified) {
+    return &lt;button onClick={verify}&gt;🤖 Verify You're Human&lt;/button&gt;;
+  }
+
+  return &lt;div&gt;&lt;h2&gt;Welcome, verified human! 🎉&lt;/h2&gt;&lt;/div&gt;;
+}
+
+// Gate component usage
+function App() {
+  return (
+    &lt;LemmaGate 
+      apiKey="{{ customer.api_key }}"
+      instanceUrl="{{ base_url }}"
+      fallback={&lt;div&gt;Please verify you're human&lt;/div&gt;}
+    &gt;
+      &lt;SecretContent /&gt;
+    &lt;/LemmaGate&gt;
+  );
+}</textarea>
+
+<textarea id="express" style="position: absolute; left: -9999px;">const { lemmaMiddleware, requireLemmaVerification, verifyLemmaCredential } = require('@lemma-network/verifier');
+
+// Middleware setup
+app.use('/protected', lemmaMiddleware({
+  apiKey: '{{ customer.api_key }}',
+  instanceUrl: '{{ base_url }}'
+}));
+
+// Route protection
+app.get('/api/sensitive-data', 
+  requireLemmaVerification({
+    apiKey: '{{ customer.api_key }}',
+    instanceUrl: '{{ base_url }}'
+  }),
+  (req, res) => {
+    res.json({ secret: 'Only humans can see this!' });
+  }
+);
+
+// Custom verification
+app.post('/api/verify-user', async (req, res) => {
+  const { credential } = req.body;
+  
+  const result = await verifyLemmaCredential(credential, {
+    apiKey: '{{ customer.api_key }}',
+    instanceUrl: '{{ base_url }}'
+  });
+  
+  if (result.verified) {
+    req.session.isHuman = true;
+    res.json({ success: true, message: 'Human verified!' });
+  } else {
+    res.status(403).json({ success: false, message: 'Verification failed' });
+  }
+});</textarea>
+
+<script>
+function copyCode(sectionId) {
+    const textarea = document.getElementById(sectionId);
+    textarea.select();
+    document.execCommand('copy');
+    
+    // Show feedback
+    showMessage('✅ Code copied to clipboard!', 'success');
+}
+
+function showMessage(message, type) {
+    // Create temporary message element
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `fixed bottom-4 right-4 ${type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'} border rounded-lg p-4 shadow-lg z-50`;
+    messageDiv.innerHTML = `<p class="text-sm font-medium">${message}</p>`;
+    
+    document.body.appendChild(messageDiv);
+    
+    setTimeout(() => {
+        document.body.removeChild(messageDiv);
+    }, 3000);
+}
+</script>
+
+<style>
+.container {
+    animation: fadeIn 0.6s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+code {
+    word-break: break-word;
+}
+</style>
+{% endblock %} 

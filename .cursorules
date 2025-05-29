@@ -99,13 +99,94 @@
     ],
     "dataFlow": "credential_id -> OPRF evaluation -> Bloom filter check -> revocation status"
   },
+  "pilotReadiness": {
+    "description": "Guidelines for building pilot-ready features without touching crypto layer",
+    "currentStatus": "70% PILOT READY - Self-serve onboarding console COMPLETE",
+    "completedFeatures": [
+      "✅ P1: Verifier SDK v1.0 - COMPLETE (ready for npm publish)",
+      "✅ P2: Self-serve onboarding console - COMPLETE (full customer journey implemented)",
+      "🟡 P3: Revocation service automation - PARTIAL (needs daily rotation endpoint)",
+      "🟡 P4: Usage analytics dashboard - PARTIAL (basic logging implemented, needs metrics API)",
+      "❌ P5: SOC 2 Type I readiness - TODO (documentation and controls needed)"
+    ],
+    "focusAreas": [
+      "Revocation service automation (30 mins)",
+      "Enhanced analytics API (30 mins)", 
+      "SOC 2 compliance infrastructure (60 mins)"
+    ],
+    "onboardingConsole": {
+      "status": "✅ COMPLETE",
+      "routes": "lemma/routes/onboarding.py - Full customer management system",
+      "templates": [
+        "templates/onboarding/start.html - Marketing landing page",
+        "templates/onboarding/register.html - Customer registration",
+        "templates/onboarding/verify.html - Domain verification",
+        "templates/onboarding/dashboard.html - Customer dashboard",
+        "templates/onboarding/integration.html - Integration guide", 
+        "templates/onboarding/usage.html - Analytics dashboard",
+        "templates/onboarding/api_keys.html - API key management"
+      ],
+      "features": [
+        "✅ Domain ownership verification (DNS TXT + HTML meta tag)",
+        "✅ API key generation and management", 
+        "✅ Usage monitoring with pricing calculations",
+        "✅ Real-time analytics and cost tracking",
+        "✅ Complete integration examples (React, Express, raw API)",
+        "✅ Tiered pricing (Free: 1K/month, Standard: $0.10, Enterprise: $0.08)"
+      ],
+      "businessValue": "Customers can now self-serve onboard and integrate in under 10 minutes"
+    },
+    "cryptoProtection": {
+      "rule": "NEVER modify files in lemma/core/ that handle cryptography",
+      "protectedFiles": [
+        "lemma/core/credential_service.py",
+        "lemma/core/did_resolver.py", 
+        "lemma/core/revocation.py",
+        "lemma/core/cascaded_bloom.py"
+      ],
+      "allowedChanges": [
+        "Add logging/metrics to existing functions",
+        "Add new utility functions that don't change crypto logic",
+        "Add new API endpoints that call existing crypto functions"
+      ]
+    },
+    "sdkDevelopment": {
+      "structure": "sdk/ directory for npm package development",
+      "components": [
+        "TypeScript definitions",
+        "React hooks", 
+        "Express middleware",
+        "Documentation and examples"
+      ],
+      "buildFrom": "Existing static/js/ components (lemma-wallet.js, lemma-widget.js)"
+    },
+    "analytics": {
+      "storage": "instance/data/analytics/ for logs and metrics",
+      "dashboard": "templates/analytics/ for usage visualization",
+      "metrics": [
+        "Verification requests per site",
+        "Token reuse rates",
+        "CAPTCHA seconds saved",
+        "Network effect measurements"
+      ]
+    },
+    "compliance": {
+      "documentation": "docs/compliance/ for SOC 2 materials",
+      "controls": "Automated control evidence collection",
+      "auditing": "Enhanced logging for compliance requirements"
+    }
+  },
   "priorities": [
     "OPRF revocation system stability",
-    "Cascaded Bloom filter performance",
+    "Cascaded Bloom filter performance", 
     "Core verification flow",
     "W3C VC issuance",
     "Browser wallet storage",
-    "API endpoint reliability"
+    "API endpoint reliability",
+    "Revocation service automation (daily rotation)",
+    "Enhanced analytics API endpoints",
+    "SOC 2 compliance preparation",
+    "Customer onboarding experience optimization"
   ],
   "securityRules": [
     "No PII storage",
@@ -113,7 +194,7 @@
     "Input validation required",
     "CSRF protection for all forms",
     "Escape user-generated content",
-    "Rate limiting for API endpoints",
+    "Rate limiting for API endpoints", 
     "NEVER create or modify environment variables - ALL ARE ALREADY SET IN HEROKU",
     "Use existing Heroku config vars only",
     "OPRF evaluations must be blinded",
@@ -161,9 +242,14 @@
     "command": "python run_tests.py",
     "focusAreas": [
       "OPRF evaluation correctness",
-      "Cascade manager functionality",
+      "Cascade manager functionality", 
       "Credential verification",
-      "API endpoint responses"
+      "API endpoint responses",
+      "SDK integration testing",
+      "Onboarding flow validation",
+      "Domain verification testing",
+      "Customer analytics accuracy",
+      "API key security and management"
     ]
   },
   "commonIssues": {

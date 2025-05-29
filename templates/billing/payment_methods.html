@@ -1,0 +1,282 @@
+{% extends "layout.html" %}
+
+{% block title %}Payment Methods - Lemma Network{% endblock %}
+
+{% block head %}
+<style>
+    .billing-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .billing-card {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .billing-header {
+        border-bottom: 1px solid #e0e0e0;
+        padding-bottom: 16px;
+        margin-bottom: 20px;
+    }
+    
+    .billing-status {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-active {
+        background: #e8f5e8;
+        color: #2e7d32;
+    }
+    
+    .status-setup-required {
+        background: #fff3e0;
+        color: #f57c00;
+    }
+    
+    .status-error {
+        background: #ffebee;
+        color: #c62828;
+    }
+    
+    .btn-primary {
+        background: #1976d2;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-secondary {
+        background: #f5f5f5;
+        color: #666;
+        border: 1px solid #ddd;
+        padding: 12px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn:hover {
+        opacity: 0.9;
+    }
+    
+    .billing-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    
+    .summary-item {
+        text-align: center;
+        padding: 16px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .summary-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1976d2;
+        margin-bottom: 4px;
+    }
+    
+    .summary-label {
+        font-size: 12px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .notification {
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+    }
+    
+    .notification.info {
+        background: #e3f2fd;
+        color: #1565c0;
+        border-left: 4px solid #1976d2;
+    }
+    
+    .notification.warning {
+        background: #fff3e0;
+        color: #ef6c00;
+        border-left: 4px solid #ff9800;
+    }
+    
+    .notification.error {
+        background: #ffebee;
+        color: #c62828;
+        border-left: 4px solid #f44336;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="billing-container">
+    <div class="billing-header">
+        <h1>Payment Methods</h1>
+        <p>Manage your billing information and payment methods for the Lemma Network</p>
+    </div>
+    
+    {% if not stripe_enabled %}
+    <div class="notification warning">
+        <strong>Billing Not Configured</strong><br>
+        Stripe integration is not enabled. Contact your administrator to set up billing.
+    </div>
+    {% elif not customer.stripe_customer_id %}
+    <div class="notification info">
+        <strong>Billing Setup Required</strong><br>
+        Complete billing setup to start using paid features of the Lemma Network.
+    </div>
+    
+    <div class="billing-card">
+        <h3>Set Up Billing</h3>
+        <p>Configure your billing information to access premium Lemma Network features:</p>
+        <ul>
+            <li>Network-effect pricing (starts at $0.10/user/month, decreases as network grows)</li>
+            <li>One-time verification fees ($2.00 per new user)</li>
+            <li>Real-time usage analytics and reporting</li>
+            <li>Priority support and advanced features</li>
+        </ul>
+        
+        <button id="setupBilling" class="btn-primary">Set Up Billing</button>
+    </div>
+    {% else %}
+    <!-- Billing is set up -->
+    <div class="notification info">
+        <strong>Billing Active</strong><br>
+        Your billing is set up and active. Manage your payment methods and view invoices below.
+    </div>
+    
+    {% if billing_summary and billing_summary.enabled %}
+    <div class="billing-summary">
+        <div class="summary-item">
+            <div class="summary-value">${{ "%.2f"|format(billing_summary.billing_totals.total_charges) }}</div>
+            <div class="summary-label">Total Charges</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">${{ "%.2f"|format(billing_summary.billing_totals.verification_charges) }}</div>
+            <div class="summary-label">Verification Fees</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">${{ "%.2f"|format(billing_summary.billing_totals.subscription_charges) }}</div>
+            <div class="summary-label">Subscription Charges</div>
+        </div>
+        {% if billing_summary.upcoming_invoice %}
+        <div class="summary-item">
+            <div class="summary-value">${{ "%.2f"|format(billing_summary.upcoming_invoice.amount_due) }}</div>
+            <div class="summary-label">Next Invoice</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="billing-card">
+        <h3>Billing Information</h3>
+        <p><strong>Customer ID:</strong> {{ billing_summary.customer.id }}</p>
+        <p><strong>Email:</strong> {{ billing_summary.customer.email }}</p>
+        <p><strong>Customer Since:</strong> {{ billing_summary.customer.created }}</p>
+        
+        {% if billing_summary.subscriptions %}
+        <h4>Active Subscriptions</h4>
+        {% for subscription in billing_summary.subscriptions %}
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin: 8px 0;">
+            <span class="billing-status status-active">{{ subscription.status }}</span>
+            <p><strong>Subscription ID:</strong> {{ subscription.id }}</p>
+            <p><strong>Current Period:</strong> {{ subscription.current_period_start }} to {{ subscription.current_period_end }}</p>
+            {% if subscription.metadata.network_rate %}
+            <p><strong>Current Rate:</strong> ${{ subscription.metadata.network_rate }}/user/month</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="notification error">
+        <strong>Billing Error</strong><br>
+        Unable to load billing information. Please try again or contact support.
+    </div>
+    {% endif %}
+    
+    <div class="billing-card">
+        <h3>Quick Actions</h3>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <a href="{{ url_for('billing.invoices') }}" class="btn-primary">View Invoices</a>
+            <a href="{{ url_for('onboarding.usage') }}" class="btn-secondary">Usage Analytics</a>
+            <a href="{{ url_for('onboarding.dashboard') }}" class="btn-secondary">Dashboard</a>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="billing-card">
+        <h3>Network Pricing Information</h3>
+        <p>The Lemma Network uses a revolutionary network-effect pricing model where costs decrease as more sites join the network:</p>
+        <ul>
+            <li><strong>Verification Fee:</strong> $2.00 per new user (one-time)</li>
+            <li><strong>Monthly Rate:</strong> Starting at $0.10/user/month</li>
+            <li><strong>Network Discount:</strong> Rate decreases as network grows</li>
+            <li><strong>Minimum Rate:</strong> $0.045/user/month (55% maximum discount)</li>
+        </ul>
+        <p><a href="{{ url_for('onboarding.dashboard') }}" class="btn-secondary">View Current Network Pricing</a></p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const setupBillingBtn = document.getElementById('setupBilling');
+    
+    if (setupBillingBtn) {
+        setupBillingBtn.addEventListener('click', function() {
+            // Disable button and show loading
+            this.disabled = true;
+            this.textContent = 'Setting up...';
+            
+            fetch('/billing/setup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message and reload page
+                    alert('Billing setup completed successfully!');
+                    window.location.reload();
+                } else {
+                    // Show error message
+                    alert('Error setting up billing: ' + (data.error || 'Unknown error'));
+                    this.disabled = false;
+                    this.textContent = 'Set Up Billing';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error setting up billing. Please try again.');
+                this.disabled = false;
+                this.textContent = 'Set Up Billing';
+            });
+        });
+    }
+});
+</script>
+{% endblock %} 
