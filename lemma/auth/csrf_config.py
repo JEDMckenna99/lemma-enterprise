@@ -3,11 +3,11 @@ CSRF Protection Configuration for Lemma Enterprise.
 Provides enhanced CSRF protection for enterprise-grade security.
 """
 import logging
+import secrets
+import os
 from flask import request, abort, current_app, session, jsonify, render_template, make_response
 from functools import wraps, update_wrapper
 from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf as flask_generate_csrf
-import secrets
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,11 @@ def configure_csrf(app):
     
     # Log CSRF protection configuration
     app.logger.info(f"Configuring CSRF protection (testing={testing_mode})")
+    
+    # Configure Flask-WTF CSRF settings
+    app.config['WTF_CSRF_CHECK_DEFAULT'] = False  # We'll handle CSRF manually
+    app.config['WTF_CSRF_SSL_STRICT'] = False     # Allow non-HTTPS in development
+    app.config['WTF_CSRF_TIME_LIMIT'] = 3600      # 1 hour token lifetime
     
     # Initialize CSRF protection with custom configuration
     csrf = CSRFProtect()
@@ -51,6 +56,26 @@ def configure_csrf(app):
             '/api/peers/discover',
             '/api/peers/health'
         ]
+        
+        # List of endpoints that should use relaxed CSRF (no referrer check)
+        relaxed_csrf_endpoints = [
+            '/api/v2/security-log',
+            '/api/security-log'
+        ]
+        
+        # Check if this is a relaxed CSRF endpoint
+        if request.path in relaxed_csrf_endpoints:
+            # For security logging, just check token without referrer
+            token = request.headers.get('X-CSRF-Token')
+            if not token and request.is_json:
+                token = request.json.get('csrf_token')
+            
+            if token and session.get('_csrf_token'):
+                if secrets.compare_digest(str(session.get('_csrf_token')), str(token)):
+                    return  # Valid token, allow request
+            
+            # Invalid or missing token for relaxed endpoint
+            abort(400, "CSRF token required")
         
         # Check if this is an API key-protected endpoint
         if request.path.startswith('/api/') and request.method in ['POST', 'PUT', 'DELETE']:
