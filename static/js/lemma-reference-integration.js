@@ -74,16 +74,21 @@ class LemmaReferenceIntegration {
      */
     async waitForLemmaWallet(maxAttempts = 20, delayMs = 100) {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            if (window.LemmaWallet) {
-                console.log('[LEMMA REFERENCE] LemmaWallet found on attempt', attempt);
+            // Check if LemmaWallet class is available
+            if (window.LemmaWallet && typeof window.LemmaWallet === 'function') {
+                console.log('[LEMMA REFERENCE] LemmaWallet class found on attempt', attempt);
                 return;
             }
             
-            console.log(`[LEMMA REFERENCE] Waiting for LemmaWallet (attempt ${attempt}/${maxAttempts})...`);
+            console.log(`[LEMMA REFERENCE] Waiting for LemmaWallet class (attempt ${attempt}/${maxAttempts})... Current: ${typeof window.LemmaWallet}`);
             await new Promise(resolve => setTimeout(resolve, delayMs));
         }
         
-        throw new Error('LemmaWallet not available after waiting - ensure lemma-wallet.js is loaded before lemma-reference-integration.js');
+        // More detailed error message for debugging
+        const availableGlobals = Object.keys(window).filter(key => key.toLowerCase().includes('lemma'));
+        console.error('[LEMMA REFERENCE] Available Lemma-related globals:', availableGlobals);
+        
+        throw new Error(`LemmaWallet class not available after waiting ${maxAttempts * delayMs}ms - ensure lemma-wallet.js is loaded before lemma-reference-integration.js`);
     }
     
     /**

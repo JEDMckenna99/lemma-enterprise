@@ -1035,6 +1035,10 @@ class LemmaWalletUI {
     }
 }
 
+// Export classes to global scope for external use
+window.LemmaWallet = LemmaWallet;
+window.LemmaWalletUI = LemmaWalletUI;
+
 // Initialize the wallet when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Check if the wallet should be initialized
