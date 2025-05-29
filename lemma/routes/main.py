@@ -242,12 +242,34 @@ def api_start_verification():
             return jsonify({"error": "User ID is required"}), 400
         
         user_id = data['user_id']
+        current_app.logger.info(f"Starting verification for user: {user_id}")
         
-        # Create a return URL for after verification
-        return_url = url_for('main.verification_callback', user_id=user_id, _external=True)
-        
-        # Create a Stripe verification session
-        verification_session = create_verification_session(user_id, return_url)
+        # Check if Stripe is properly configured
+        try:
+            # Create a return URL for after verification
+            return_url = url_for('main.verification_callback', user_id=user_id, _external=True)
+            current_app.logger.info(f"Return URL: {return_url}")
+            
+            # Create a Stripe verification session
+            verification_session = create_verification_session(user_id, return_url)
+            current_app.logger.info(f"Verification session result: {type(verification_session)}")
+            
+        except Exception as stripe_error:
+            current_app.logger.error(f"Stripe integration error: {str(stripe_error)}")
+            
+            # For development/testing, provide a mock verification flow
+            if current_app.config.get('TESTING', False) or current_app.config.get('DEBUG', False):
+                current_app.logger.info("Stripe not available, using mock verification flow")
+                return jsonify({
+                    "success": True,
+                    "url": "/verification-start/" + user_id + "?auto_start=true",
+                    "message": "Mock verification - Stripe not configured"
+                })
+            else:
+                return jsonify({
+                    "error": "Verification service temporarily unavailable",
+                    "details": "Stripe Identity service is not properly configured"
+                }), 503
         
         # Check if there was an error creating the session
         if isinstance(verification_session, dict) and "error" in verification_session:
@@ -255,8 +277,11 @@ def api_start_verification():
             current_app.logger.error(f"Error creating verification session: {error_message}")
             
             # Check for specific Stripe errors and provide helpful responses
-            if "API key" in error_message:
-                return jsonify({"error": "Stripe configuration error. Please contact the administrator."}), 500
+            if "API key" in error_message or "Stripe" in error_message:
+                return jsonify({
+                    "error": "Verification service configuration error", 
+                    "details": "Please contact the administrator"
+                }), 500
             else:
                 return jsonify({"error": error_message}), 500
         
@@ -267,8 +292,9 @@ def api_start_verification():
             session[f'stripe_session_{user_id}'] = verification_session.id
             session['pending_verification_user_id'] = user_id
             
-            # Return just the session ID and URL for redirection
+            # Return success response with URL
             return jsonify({
+                "success": True,
                 "id": verification_session.id,
                 "url": verification_session.url
             })
@@ -278,7 +304,10 @@ def api_start_verification():
             
     except Exception as e:
         current_app.logger.error(f"Error in start-verification: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({
+            "error": "Internal server error",
+            "details": str(e) if current_app.config.get('DEBUG', False) else None
+        }), 500
 
 @main_bp.route('/protected')
 def protected():

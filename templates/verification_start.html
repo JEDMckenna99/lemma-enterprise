@@ -335,7 +335,7 @@
             Start Identity Verification
         </button>
         <div class="help-text">
-            Verification fee: $2.00 • Valid across the entire Lemma Network
+            Valid across the entire Lemma Network
         </div>
     </div>
 </div>
@@ -363,6 +363,8 @@ async function startVerification() {
         // Generate user ID if not provided
         const userId = '{{ user_id }}' || 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         
+        console.log('[VERIFICATION] Starting verification for user:', userId);
+        
         // Start verification process
         const response = await fetch('/api/start-verification', {
             method: 'POST',
@@ -375,27 +377,61 @@ async function startVerification() {
             })
         });
         
+        console.log('[VERIFICATION] API Response status:', response.status);
+        
         if (!response.ok) {
-            throw new Error(`Failed to start verification: ${response.status}`);
+            const errorData = await response.json();
+            console.error('[VERIFICATION] API Error:', errorData);
+            throw new Error(errorData.error || `HTTP ${response.status}`);
         }
         
         const data = await response.json();
+        console.log('[VERIFICATION] API Response data:', data);
         
         if (data.success && data.url) {
-            // Redirect to Stripe verification
+            console.log('[VERIFICATION] Redirecting to verification URL:', data.url);
+            // Redirect to verification URL (either Stripe or mock)
+            window.location.href = data.url;
+        } else if (data.url) {
+            // Legacy format - just redirect
+            console.log('[VERIFICATION] Redirecting to legacy verification URL:', data.url);
             window.location.href = data.url;
         } else {
             throw new Error(data.error || 'Failed to create verification session');
         }
         
     } catch (error) {
+        console.error('[VERIFICATION] Error:', error);
+        
         // Hide loading and show error
         overlay.style.display = 'none';
         button.disabled = false;
         button.textContent = 'Start Identity Verification';
         
-        alert('Error starting verification: ' + error.message + '\nPlease try again or contact support.');
-        console.error('Verification error:', error);
+        // Show user-friendly error message
+        let errorMessage = 'Unable to start verification. ';
+        
+        if (error.message.includes('503')) {
+            errorMessage += 'The verification service is temporarily unavailable. Please try again later.';
+        } else if (error.message.includes('configuration')) {
+            errorMessage += 'Service configuration issue. Please contact support.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+            errorMessage += 'Network error. Please check your connection and try again.';
+        } else {
+            errorMessage += error.message;
+        }
+        
+        alert(errorMessage);
+        
+        // For debugging in development
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.error('[VERIFICATION DEBUG] Full error details:', {
+                error: error,
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                url: window.location.href
+            });
+        }
     }
 }
 
