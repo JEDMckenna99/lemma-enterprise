@@ -5,54 +5,88 @@
 {% block head %}
 <style>
     .completion-container {
-        max-width: 600px;
+        max-width: 700px;
         margin: 50px auto;
-        padding: 40px;
-        text-align: center;
+        padding: 40px 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     
     .completion-card {
         background: white;
-        border-radius: 12px;
-        padding: 40px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-radius: 20px;
+        padding: 48px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
         border: 1px solid #e0e0e0;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .completion-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
     
     .completion-icon {
-        font-size: 64px;
+        font-size: 80px;
         margin-bottom: 24px;
-        animation: bounce 2s infinite;
+        animation: bounce 2s ease-in-out infinite;
+        display: block;
     }
     
     .completion-title {
-        font-size: 28px;
-        font-weight: 600;
-        color: #1976d2;
+        font-size: 32px;
+        font-weight: 700;
+        color: #1a1b23;
         margin-bottom: 16px;
+        line-height: 1.2;
     }
     
     .completion-message {
-        font-size: 16px;
-        color: #666;
-        margin-bottom: 32px;
-        line-height: 1.5;
+        font-size: 18px;
+        color: #6b7280;
+        margin-bottom: 40px;
+        line-height: 1.6;
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
     }
     
     .verification-details {
-        background: #f8f9fa;
-        border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 32px;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 40px;
         text-align: left;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .details-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1a1b23;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .details-title::before {
+        content: "📋";
+        margin-right: 8px;
     }
     
     .detail-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 0;
-        border-bottom: 1px solid #e0e0e0;
+        padding: 12px 0;
+        border-bottom: 1px solid #e2e8f0;
     }
     
     .detail-item:last-child {
@@ -60,76 +94,133 @@
     }
     
     .detail-label {
-        font-weight: 500;
-        color: #333;
+        font-weight: 600;
+        color: #374151;
+        font-size: 14px;
     }
     
     .detail-value {
-        color: #666;
-        font-family: monospace;
+        color: #6b7280;
+        font-family: 'SF Mono', Consolas, monospace;
+        font-size: 13px;
+        background: #f3f4f6;
+        padding: 4px 8px;
+        border-radius: 6px;
+    }
+    
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .status-processing {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .status-verified {
+        background: #d1fae5;
+        color: #047857;
     }
     
     .btn-primary {
-        background: #1976d2;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         border: none;
-        padding: 12px 32px;
-        border-radius: 6px;
+        padding: 14px 32px;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
         cursor: pointer;
-        font-weight: 500;
         text-decoration: none;
         display: inline-block;
-        margin: 8px;
+        margin: 8px 12px;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        text-decoration: none;
+        color: white;
     }
     
     .btn-secondary {
-        background: #f5f5f5;
-        color: #666;
-        border: 1px solid #ddd;
+        background: #f8fafc;
+        color: #374151;
+        border: 2px solid #e5e7eb;
         padding: 12px 32px;
-        border-radius: 6px;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
         cursor: pointer;
-        font-weight: 500;
         text-decoration: none;
         display: inline-block;
-        margin: 8px;
+        margin: 8px 12px;
+        transition: all 0.3s ease;
     }
     
-    .btn:hover {
-        opacity: 0.9;
+    .btn-secondary:hover {
+        background: #f1f5f9;
+        border-color: #d1d5db;
         transform: translateY(-1px);
+        text-decoration: none;
+        color: #374151;
     }
     
     .error-state {
-        color: #c62828;
+        color: #dc2626;
     }
     
     .error-icon {
-        color: #f44336;
+        color: #f87171;
     }
     
     .next-steps {
-        background: #e3f2fd;
-        border-left: 4px solid #1976d2;
-        padding: 16px;
-        border-radius: 4px;
-        margin-bottom: 24px;
+        background: linear-gradient(135deg, #e0f2fe 0%, #e0f7fa 100%);
+        border-left: 5px solid #0891b2;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 32px;
         text-align: left;
     }
     
     .next-steps h4 {
-        margin: 0 0 12px 0;
-        color: #1976d2;
+        margin: 0 0 16px 0;
+        color: #0f172a;
+        font-size: 18px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+    }
+    
+    .next-steps h4::before {
+        content: "🎯";
+        margin-right: 8px;
     }
     
     .next-steps ul {
         margin: 0;
-        padding-left: 20px;
+        padding-left: 24px;
+        color: #0f172a;
     }
     
     .next-steps li {
-        margin-bottom: 8px;
-        color: #1565c0;
+        margin-bottom: 12px;
+        font-size: 15px;
+        line-height: 1.5;
+        color: #374151;
+    }
+    
+    .next-steps li::marker {
+        color: #0891b2;
     }
     
     @keyframes bounce {
@@ -137,19 +228,19 @@
             transform: translateY(0);
         }
         40% {
-            transform: translateY(-10px);
+            transform: translateY(-15px);
         }
         60% {
-            transform: translateY(-5px);
+            transform: translateY(-7px);
         }
     }
     
     .processing-indicator {
         display: inline-block;
-        width: 20px;
-        height: 20px;
-        border: 3px solid #f3f3f3;
-        border-top: 3px solid #1976d2;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #fbbf24;
+        border-top: 2px solid #f59e0b;
         border-radius: 50%;
         animation: spin 1s linear infinite;
         margin-right: 8px;
@@ -158,6 +249,70 @@
     @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
+    }
+    
+    .success-checkmark {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        background: #10b981;
+        border-radius: 50%;
+        position: relative;
+        margin-right: 8px;
+    }
+    
+    .success-checkmark::after {
+        content: '✓';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 10px;
+        font-weight: bold;
+    }
+    
+    .network-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 25px;
+        font-weight: 600;
+        font-size: 14px;
+        display: inline-block;
+        margin-top: 20px;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    .network-badge::before {
+        content: "🌐";
+        margin-right: 8px;
+    }
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .completion-container {
+            padding: 20px 16px;
+            margin: 20px auto;
+        }
+        
+        .completion-card {
+            padding: 32px 24px;
+        }
+        
+        .completion-title {
+            font-size: 24px;
+        }
+        
+        .completion-message {
+            font-size: 16px;
+        }
+        
+        .btn-primary, .btn-secondary {
+            display: block;
+            margin: 12px 0;
+            text-align: center;
+        }
     }
 </style>
 {% endblock %}
@@ -170,55 +325,67 @@
         <div class="completion-icon error-icon">⚠️</div>
         <h1 class="completion-title error-state">Verification Error</h1>
         <p class="completion-message">
-            There was an issue with your identity verification. Please try again or contact support if the problem persists.
+            We encountered an issue while processing your identity verification. Don't worry - this happens occasionally and can usually be resolved quickly.
         </p>
         
         <div class="verification-details">
+            <div class="details-title">Error Details</div>
             <div class="detail-item">
-                <span class="detail-label">Error:</span>
+                <span class="detail-label">Error Type:</span>
                 <span class="detail-value">{{ error }}</span>
             </div>
             <div class="detail-item">
                 <span class="detail-label">Time:</span>
                 <span class="detail-value">{{ moment().format('YYYY-MM-DD HH:mm:ss') }}</span>
             </div>
+            <div class="detail-item">
+                <span class="detail-label">Session ID:</span>
+                <span class="detail-value">{{ session_id[:20] if session_id else 'N/A' }}...</span>
+            </div>
         </div>
         
         <div class="next-steps">
             <h4>What to do next:</h4>
             <ul>
-                <li>Check that your document photos are clear and well-lit</li>
-                <li>Ensure your document is valid and not expired</li>
-                <li>Try using a different browser or device</li>
-                <li>Contact support if issues persist</li>
+                <li><strong>Check your photos:</strong> Ensure document photos are clear, well-lit, and show all corners</li>
+                <li><strong>Verify document validity:</strong> Make sure your ID is current and not expired</li>
+                <li><strong>Try a different device:</strong> Sometimes camera quality or browser compatibility can affect verification</li>
+                <li><strong>Contact support:</strong> Our team is ready to help if issues persist</li>
             </ul>
         </div>
         
-        <a href="{{ url_for('onboarding.dashboard') }}" class="btn-primary">Return to Dashboard</a>
+        <a href="{{ url_for('onboarding.dashboard') if url_for else '#' }}" class="btn-primary">Return to Dashboard</a>
         <a href="mailto:support@lemma.network" class="btn-secondary">Contact Support</a>
         
         {% else %}
         <!-- Success State -->
         <div class="completion-icon">🎉</div>
-        <h1 class="completion-title">Identity Verification Complete!</h1>
+        <h1 class="completion-title">Verification Complete!</h1>
         <p class="completion-message">
-            Thank you for completing your identity verification. Your submission is being processed and you'll receive a Lemma verification credential once approved.
+            Congratulations! Your identity has been successfully verified. You're now part of the Lemma Verified Network.
         </p>
         
         {% if session_id %}
         <div class="verification-details">
+            <div class="details-title">Verification Summary</div>
             <div class="detail-item">
-                <span class="detail-label">Verification Session:</span>
+                <span class="detail-label">Session ID:</span>
                 <span class="detail-value">{{ session_id[:20] }}...</span>
             </div>
             <div class="detail-item">
                 <span class="detail-label">Status:</span>
-                <span class="detail-value processing-indicator"></span>
-                <span>Processing</span>
+                <span class="status-badge status-processing">
+                    <span class="processing-indicator"></span>
+                    Processing Credential
+                </span>
             </div>
             <div class="detail-item">
-                <span class="detail-label">Submitted:</span>
+                <span class="detail-label">Completed:</span>
                 <span class="detail-value">{{ moment().format('YYYY-MM-DD HH:mm:ss') }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Verification Fee:</span>
+                <span class="detail-value">$2.00 USD</span>
             </div>
         </div>
         {% endif %}
@@ -226,40 +393,82 @@
         <div class="next-steps">
             <h4>What happens next:</h4>
             <ul>
-                <li>Your identity verification is being processed (typically takes a few minutes)</li>
-                <li>Once verified, a $2.00 verification fee will be charged</li>
-                <li>You'll receive your Lemma verification credential</li>
-                <li>Your credential will be valid across the entire Lemma Network</li>
+                <li><strong>Credential Generation:</strong> Your Lemma verification credential is being created (usually takes 1-2 minutes)</li>
+                <li><strong>Payment Processing:</strong> The $2.00 verification fee will be charged to your payment method</li>
+                <li><strong>Network Access:</strong> Once complete, you'll have access to the entire Lemma Verified Network</li>
+                <li><strong>Cross-Platform Use:</strong> Your credential works across all Lemma-integrated websites and services</li>
             </ul>
         </div>
         
-        <a href="{{ url_for('onboarding.dashboard') }}" class="btn-primary">Return to Dashboard</a>
-        <a href="{{ url_for('billing.payment_methods') }}" class="btn-secondary">View Billing</a>
+        <div class="network-badge">
+            Welcome to the Lemma Verified Network
+        </div>
+        
+        <div style="margin-top: 32px;">
+            <a href="{{ url_for('onboarding.dashboard') if url_for else '#' }}" class="btn-primary">Go to Dashboard</a>
+            <a href="{{ url_for('billing.payment_methods') if url_for else '#' }}" class="btn-secondary">View Billing</a>
+        </div>
         {% endif %}
     </div>
 </div>
 
 <script>
-// Auto-refresh page every 30 seconds to check for verification updates
+// Auto-refresh functionality for processing status
 {% if session_id and not error %}
-setTimeout(() => {
-    // In a real implementation, you might poll the verification status
-    // and update the page dynamically
-    console.log('Checking verification status...');
+let refreshCount = 0;
+const maxRefreshes = 20; // Maximum 10 minutes of checking
+
+function checkVerificationStatus() {
+    refreshCount++;
     
-    // Example: poll verification status
-    var sessionId = '{{ session_id }}';
-    // fetch('/billing/identity-verification/' + sessionId + '/status')
-    //   .then(response => response.json())
-    //   .then(data => {
-    //     if (data.verification_session.status === 'verified') {
-    //       window.location.reload();
-    //     }
-    //   });
-}, 30000);
+    if (refreshCount > maxRefreshes) {
+        console.log('Maximum refresh attempts reached');
+        return;
+    }
+    
+    const sessionId = '{{ session_id }}';
+    
+    // In a real implementation, you would poll the verification status
+    fetch(`/billing/identity-verification/${sessionId}/status`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.verification_session) {
+                const status = data.verification_session.status;
+                const statusElement = document.querySelector('.status-badge');
+                
+                if (status === 'verified') {
+                    statusElement.className = 'status-badge status-verified';
+                    statusElement.innerHTML = '<span class="success-checkmark"></span>Verified & Complete';
+                    
+                    // Stop refreshing and show success
+                    console.log('Verification complete!');
+                    
+                    // Update the page title
+                    document.title = 'Verification Complete - Lemma Network';
+                    
+                    return; // Stop checking
+                } else if (status === 'requires_input') {
+                    statusElement.innerHTML = '<span class="processing-indicator"></span>Requires Additional Input';
+                } else {
+                    statusElement.innerHTML = '<span class="processing-indicator"></span>Processing...';
+                }
+            }
+            
+            // Continue checking every 30 seconds
+            setTimeout(checkVerificationStatus, 30000);
+        })
+        .catch(error => {
+            console.error('Error checking verification status:', error);
+            // Continue checking despite errors
+            setTimeout(checkVerificationStatus, 30000);
+        });
+}
+
+// Start checking after 30 seconds
+setTimeout(checkVerificationStatus, 30000);
 {% endif %}
 
-// Simple date formatting for the template
+// Simple date formatting utility
 window.moment = function() {
     return {
         format: function(format) {
@@ -271,5 +480,20 @@ window.moment = function() {
         }
     };
 };
+
+// Add subtle animations
+document.addEventListener('DOMContentLoaded', function() {
+    const card = document.querySelector('.completion-card');
+    if (card) {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.6s ease-out';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, 100);
+    }
+});
 </script>
 {% endblock %} 

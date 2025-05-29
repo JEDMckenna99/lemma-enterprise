@@ -7,6 +7,7 @@ import json
 import os
 import logging
 import time
+import random
 from flask import (
     Blueprint, render_template, request, redirect, 
     url_for, session, jsonify, abort, flash, current_app, make_response
@@ -794,3 +795,13 @@ def widget_test():
     from lemma.auth.csrf_config import generate_csrf
     session['csrf_token'] = generate_csrf()
     return render_template('widget_test.html')
+
+@main_bp.route('/verification-start')
+@main_bp.route('/verification-start/<user_id>')
+def verification_start(user_id=None):
+    """Show the enhanced verification start page."""
+    # Generate a user ID if not provided
+    if not user_id:
+        user_id = f"user_{int(time.time())}_{random.randint(1000, 9999)}"
+    
+    return render_template('verification_start.html', user_id=user_id)

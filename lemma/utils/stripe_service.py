@@ -54,24 +54,32 @@ def create_verification_session(user_id: str, return_url: Optional[str] = None) 
                 # Not in a request context, use a placeholder
                 return_url = f"/verification-callback?user_id={user_id}"
         
-        # Create the verification session with Stripe
+        # Create the verification session with enhanced Stripe options
         verification_session = stripe.identity.VerificationSession.create(
             type="document",
             metadata={
                 "user_id": user_id,
-                "service": "lemma"
+                "service": "lemma",
+                "platform": "lemma_network",
+                "verification_type": "human_verification"
             },
             options={
                 "document": {
+                    # Enhanced document options for better verification
                     "allowed_types": ["driving_license", "id_card", "passport"],
                     "require_id_number": True,
-                    "require_matching_selfie": True
+                    "require_matching_selfie": True,
+                    "require_live_capture": True,  # Prevents static photos
+                    # Additional security options
+                    "allowed_countries": ["US", "CA", "GB", "AU", "NZ", "DE", "FR", "IT", "ES", "NL", "SE", "NO", "DK", "FI"],
                 }
             },
-            return_url=return_url
+            return_url=return_url,
+            # Enhanced for better user experience and branding
+            refresh_url=return_url,  # Allow users to refresh the session
         )
         
-        logger.info(f"Created Stripe verification session for user {user_id}: {verification_session.id}")
+        logger.info(f"Created enhanced Stripe verification session for user {user_id}: {verification_session.id}")
         return verification_session
     
     except stripe.error.StripeError as e:

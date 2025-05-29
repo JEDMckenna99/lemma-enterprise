@@ -613,17 +613,7 @@
             if (getVerifiedBtn) {
                 getVerifiedBtn.addEventListener('click', async function() {
                     try {
-                        // Disable button to prevent double-clicks
-                        getVerifiedBtn.disabled = true;
-                        getVerifiedBtn.innerHTML = '🔄 Starting Verification...';
-                        
-                        // Generate a unique user ID
-                        const userId = 'user_' + Array.from(crypto.getRandomValues(new Uint8Array(16)))
-                            .map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
-                        
-                        console.log('[LEMMA NETWORK] Starting verification for user:', userId);
-                        
-                        // Check if user already has a credential in wallet
+                        // Check if user already has a credential in wallet first
                         if (window.lemmaWallet) {
                             const existingCredentials = await window.lemmaWallet.getAllCredentials();
                             if (existingCredentials && existingCredentials.length > 0) {
@@ -633,59 +623,20 @@
                             }
                         }
                         
-                        // Start the verification process by calling the API
-                        const response = await fetch('/api/start-verification', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
-                            },
-                            body: JSON.stringify({
-                                user_id: userId
-                            })
-                        });
+                        // Generate a unique user ID for the verification flow
+                        const userId = 'user_' + Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                            .map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
                         
-                        if (!response.ok) {
-                            throw new Error(`Failed to start verification: ${response.status}`);
-                        }
+                        console.log('[LEMMA NETWORK] Redirecting to enhanced verification page for user:', userId);
                         
-                        const verificationData = await response.json();
-                        console.log('[LEMMA NETWORK] Verification session created:', verificationData);
-                        
-                        // Redirect to Stripe verification (no need to store in sessionStorage)
-                        if (verificationData.url) {
-                            console.log('[LEMMA NETWORK] Redirecting to Stripe verification...');
-                            window.location.href = verificationData.url;
-                        } else {
-                            throw new Error('No verification URL received');
-                        }
+                        // Redirect to the enhanced verification start page
+                        window.location.href = `/verification-start/${userId}`;
                         
                     } catch (error) {
-                        console.error('[LEMMA NETWORK] Error starting verification:', error);
+                        console.error('[LEMMA NETWORK] Error checking credentials:', error);
                         
-                        // Re-enable button and show error
-                        getVerifiedBtn.disabled = false;
-                        getVerifiedBtn.innerHTML = `
-                            🚀 Get Verified
-                            <span class="status-badge network">Network Access</span>
-                        `;
-                        
-                        // Show error message
-                        const errorDiv = document.createElement('div');
-                        errorDiv.className = 'flash-message error';
-                        errorDiv.innerHTML = `Failed to start verification: ${error.message}. Please try again.`;
-                        
-                        const flashContainer = document.querySelector('.flash-messages') || document.querySelector('.hero');
-                        if (flashContainer) {
-                            flashContainer.appendChild(errorDiv);
-                            
-                            // Auto-remove error after 10 seconds
-                            setTimeout(() => {
-                                if (errorDiv.parentNode) {
-                                    errorDiv.parentNode.removeChild(errorDiv);
-                                }
-                            }, 10000);
-                        }
+                        // If there's an error, still redirect to verification page
+                        window.location.href = '/verification-start';
                     }
                 });
             }

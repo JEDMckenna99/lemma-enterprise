@@ -1,0 +1,412 @@
+{% extends "layout.html" %}
+
+{% block title %}Identity Verification - Lemma Network{% endblock %}
+
+{% block head %}
+<style>
+    .verification-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 40px 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .verification-header {
+        text-align: center;
+        margin-bottom: 48px;
+    }
+    
+    .lemma-logo {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 24px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 48px;
+        font-weight: 700;
+        letter-spacing: -2px;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+    }
+    
+    .verification-title {
+        font-size: 32px;
+        font-weight: 700;
+        color: #1a1b23;
+        margin-bottom: 16px;
+        line-height: 1.2;
+    }
+    
+    .verification-subtitle {
+        font-size: 18px;
+        color: #6b7280;
+        margin-bottom: 40px;
+        line-height: 1.5;
+    }
+    
+    .verification-steps {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+        margin-bottom: 32px;
+    }
+    
+    .steps-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1a1b23;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .steps-title::before {
+        content: "🔐";
+        margin-right: 12px;
+        font-size: 24px;
+    }
+    
+    .step {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 20px;
+        padding: 16px;
+        background: #f9fafb;
+        border-radius: 12px;
+        border-left: 4px solid #667eea;
+    }
+    
+    .step:last-child {
+        margin-bottom: 0;
+    }
+    
+    .step-number {
+        width: 32px;
+        height: 32px;
+        background: #667eea;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        margin-right: 16px;
+        flex-shrink: 0;
+    }
+    
+    .step-content {
+        flex: 1;
+    }
+    
+    .step-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1a1b23;
+        margin-bottom: 4px;
+    }
+    
+    .step-description {
+        font-size: 14px;
+        color: #6b7280;
+        line-height: 1.4;
+    }
+    
+    .security-notice {
+        background: linear-gradient(135deg, #e0f2fe 0%, #e8f5e8 100%);
+        border: 1px solid #4fc3f7;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 32px;
+    }
+    
+    .notice-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #0277bd;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .notice-title::before {
+        content: "🛡️";
+        margin-right: 8px;
+    }
+    
+    .notice-text {
+        font-size: 14px;
+        color: #01579b;
+        line-height: 1.5;
+    }
+    
+    .verification-actions {
+        text-align: center;
+        margin-top: 40px;
+    }
+    
+    .btn-verify {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 16px 48px;
+        border-radius: 12px;
+        font-size: 18px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        transition: all 0.3s ease;
+        margin-bottom: 16px;
+    }
+    
+    .btn-verify:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+    
+    .btn-verify:active {
+        transform: translateY(0);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .help-text {
+        color: #6b7280;
+        font-size: 14px;
+        margin-top: 16px;
+    }
+    
+    .requirements-list {
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 32px;
+    }
+    
+    .requirements-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #92400e;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .requirements-title::before {
+        content: "📋";
+        margin-right: 8px;
+    }
+    
+    .requirements-list ul {
+        margin: 0;
+        padding-left: 20px;
+        color: #92400e;
+    }
+    
+    .requirements-list li {
+        margin-bottom: 8px;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+    
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(26, 27, 35, 0.8);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    
+    .loading-content {
+        background: white;
+        padding: 40px;
+        border-radius: 16px;
+        text-align: center;
+        max-width: 400px;
+        margin: 20px;
+    }
+    
+    .loading-spinner {
+        width: 48px;
+        height: 48px;
+        border: 4px solid #e5e7eb;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 24px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1a1b23;
+        margin-bottom: 8px;
+    }
+    
+    .loading-subtext {
+        font-size: 14px;
+        color: #6b7280;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="verification-container">
+    <div class="verification-header">
+        <div class="lemma-logo">L</div>
+        <h1 class="verification-title">Verify Your Identity</h1>
+        <p class="verification-subtitle">
+            Join the Lemma Verified Network with a quick and secure identity verification
+        </p>
+    </div>
+    
+    <div class="requirements-list">
+        <div class="requirements-title">What You'll Need</div>
+        <ul>
+            <li>A valid government-issued photo ID (driver's license, passport, or state ID)</li>
+            <li>Access to your device's camera for document photos and selfie</li>
+            <li>Well-lit environment for clear photos</li>
+            <li>About 2-3 minutes to complete the process</li>
+        </ul>
+    </div>
+    
+    <div class="verification-steps">
+        <h2 class="steps-title">How It Works</h2>
+        
+        <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+                <div class="step-title">Document Upload</div>
+                <div class="step-description">Take photos of your government-issued ID using your device's camera</div>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+                <div class="step-title">Selfie Verification</div>
+                <div class="step-description">Take a selfie to confirm the ID belongs to you</div>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+                <div class="step-title">Instant Verification</div>
+                <div class="step-description">Our secure system verifies your identity in seconds</div>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+                <div class="step-title">Network Access</div>
+                <div class="step-description">Get your Lemma credential and access to the verified network</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="security-notice">
+        <div class="notice-title">Your Privacy is Protected</div>
+        <div class="notice-text">
+            Your verification is processed by Stripe Identity, a SOC 2 Type II certified service. 
+            We only verify that you're human - no personal information is stored in our system.
+        </div>
+    </div>
+    
+    <div class="verification-actions">
+        <button id="startVerification" class="btn-verify" onclick="startVerification()">
+            Start Identity Verification
+        </button>
+        <div class="help-text">
+            Verification fee: $2.00 • Valid across the entire Lemma Network
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Starting Verification</div>
+        <div class="loading-subtext">You'll be redirected to our secure verification partner...</div>
+    </div>
+</div>
+
+<script>
+async function startVerification() {
+    const button = document.getElementById('startVerification');
+    const overlay = document.getElementById('loadingOverlay');
+    
+    try {
+        // Show loading
+        button.disabled = true;
+        button.textContent = 'Starting...';
+        overlay.style.display = 'flex';
+        
+        // Generate user ID if not provided
+        const userId = '{{ user_id }}' || 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
+        // Start verification process
+        const response = await fetch('/api/start-verification', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+            },
+            body: JSON.stringify({
+                user_id: userId
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Failed to start verification: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.url) {
+            // Redirect to Stripe verification
+            window.location.href = data.url;
+        } else {
+            throw new Error(data.error || 'Failed to create verification session');
+        }
+        
+    } catch (error) {
+        // Hide loading and show error
+        overlay.style.display = 'none';
+        button.disabled = false;
+        button.textContent = 'Start Identity Verification';
+        
+        alert('Error starting verification: ' + error.message + '\nPlease try again or contact support.');
+        console.error('Verification error:', error);
+    }
+}
+
+// Handle URL parameters if coming from elsewhere
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const autoStart = urlParams.get('auto_start');
+    
+    if (autoStart === 'true') {
+        setTimeout(startVerification, 1000);
+    }
+});
+</script>
+{% endblock %} 
