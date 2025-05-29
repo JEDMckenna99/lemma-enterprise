@@ -1,8 +1,8 @@
-# Lemma: A Network of Verified Humans
+# Lemma: A Network of Verified Users
 
-*The essential proof of humanness for digital trust*
+*The essential User Trust Protocol for digital trust*
 
-A secure, modular, enterprise-grade implementation for verifying humans with minimal data collection and strong cryptographic standards.
+A secure, modular, enterprise-grade implementation for verifying users with minimal data collection and strong cryptographic standards.
 
 **Latest Version: 2.3.0** (Updated May 2025) 🎉 **PRODUCTION READY**
 
@@ -10,16 +10,16 @@ A secure, modular, enterprise-grade implementation for verifying humans with min
 
 ## Our Ethos
 
-Lemma exists to solve one fundamental problem in the digital world: **proving that a user is a unique human being, nothing more and nothing less**.
+Lemma exists to solve one fundamental problem in the digital world: **proving that a user is a unique entity (human or authorized agent), nothing more and nothing less**.
 
 We believe:
 
-- **Privacy is paramount**: We collect only what's necessary to verify humanness, protecting user data while enabling trust.
+- **Privacy is paramount**: We collect only what's necessary to verify user authenticity, protecting user data while enabling trust.
 - **Simplicity is powerful**: A focused solution that does one thing exceptionally well creates more value than complex systems that do many things adequately.
 - **Offline verification matters**: By enabling credential verification without requiring an active internet connection, we create a more resilient digital ecosystem.
-- **Bots undermine digital trust**: When nearly 40% of internet traffic is non-human, businesses need a reliable way to ensure they're interacting with real people.
+- **Bots undermine digital trust**: When nearly 40% of internet traffic is non-human, businesses need a reliable way to ensure they're interacting with legitimate users.
 - **Self-sovereignty is essential**: Users should control their own identity and determine what information they share with whom.
-- **Network effects create value**: Like Google organized the world's information, Lemma organizes the world's verified humans.
+- **Network effects create value**: Like Google organized the world's information, Lemma organizes the world's verified users.
 
 Lemma provides the simple proof that allows larger business functions to operate smoothly in a world increasingly challenged by sophisticated bots and automated systems.
 
@@ -27,12 +27,12 @@ Lemma provides the simple proof that allows larger business functions to operate
 
 **Becoming the foundational verification layer for the entire internet.**
 
-Just as Google became essential by organizing the world's information, **Lemma is becoming essential by organizing the world's verified humans**. Our vision extends far beyond single-site verification to create a **global network of trust** where verified agents can seamlessly work across thousands of integrated platforms.
+Just as Google became essential by organizing the world's information, **Lemma is becoming essential by organizing the world's verified users**. Our vision extends far beyond single-site verification to create a **global network of trust** where verified agents can seamlessly work across thousands of integrated platforms.
 
 ### **🚀 The "Next Google" Strategy**
 
 - **Google's Mission:** Organize the world's information and make it universally accessible
-- **Lemma's Mission:** Organize the world's verified humans and make trust universally accessible
+- **Lemma's Mission:** Organize the world's verified users and make trust universally accessible
 - **Network Effect:** Every new site that integrates Lemma makes the entire network exponentially more valuable
 
 ### **💰 Network-Effect Pricing Model**
@@ -105,7 +105,7 @@ The Lemma Verified Network serves as the **perfect roadmap for agents working on
 
 ## Overview
 
-**Lemma Enterprise is building the foundational verification layer for the entire internet** - a global network where verified humans and agents can seamlessly operate across thousands of integrated platforms.
+**Lemma Enterprise is building the foundational verification layer for the entire internet** - a global network where verified users and agents can seamlessly operate across thousands of integrated platforms.
 
 ### **🎯 Core Platform Capabilities:**
 
@@ -508,7 +508,7 @@ The Lemma Verified Network is specifically designed to serve as the **foundation
 
 | Google's Journey | **Lemma's Journey** |
 |------------------|---------------------|
-| Organized world's information | **Organizing world's verified humans** |
+| Organized world's information | **Organizing world's verified users** |
 | Made search ubiquitous | **Making verification ubiquitous** |
 | Platform for digital advertising | **Platform for digital trust** |
 | Created web standards | **Creating verification standards** |
@@ -609,7 +609,7 @@ Join thousands of integrated sites in the Lemma Verified Network and gain instan
 
 ### **🚀 Network Benefits for Integrating Sites**
 
-- **✅ Instant User Base:** Access millions of pre-verified humans and professional agents
+- **✅ Instant User Base:** Access millions of pre-verified users and professional agents
 - **✅ Zero Onboarding Friction:** Users already verified across the network need no additional verification
 - **✅ Agent Ecosystem:** Tap into a network of verified professional agents for your platform
 - **✅ Trust Inheritance:** Benefit from reputation and verification data across the entire network

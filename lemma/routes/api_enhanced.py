@@ -42,8 +42,8 @@ def require_crypto_v2(f):
 @api_enhanced.route('/verify-human', methods=['POST'])
 @rate_limit
 @require_crypto_v2
-def verify_human_enhanced():
-    """Enhanced human verification endpoint with crypto hardening"""
+def verify_user_enhanced():
+    """Enhanced user verification endpoint with crypto hardening"""
     start_time = time.time()
     
     try:
@@ -88,7 +88,7 @@ def verify_human_enhanced():
                 'success': False,
                 'verified': False,
                 'cryptoValid': False,
-                'error': 'Verification failed',
+                'error': 'User Trust Protocol verification failed',
                 'errors': verification_result['errors'],
                 'securityLevel': verification_result['security_level']
             }), 401
@@ -96,7 +96,7 @@ def verify_human_enhanced():
         # If we get here, verification passed
         # Set enhanced session with crypto validation
         session.regenerate() if hasattr(session, 'regenerate') else None
-        session['verified_human'] = True
+        session['verified_user'] = True
         session['crypto_verified'] = True
         session['crypto_version'] = crypto_version
         session['security_level'] = verification_result['security_level']
@@ -123,13 +123,14 @@ def verify_human_enhanced():
             'cryptoValid': True,
             'securityLevel': verification_result['security_level'],
             'cryptoVersion': crypto_version,
-            'verificationTime': round(verification_time * 1000, 2)
+            'verificationTime': round(verification_time * 1000, 2),
+            'message': 'User Trust Protocol verification successful'
         })
 
     except Exception as e:
         SecurityLogger.log_security_event('verification_exception', {
             'error': str(e),
-            'endpoint': 'verify_human_enhanced'
+            'endpoint': 'verify_user_enhanced'
         }, 'ERROR')
         
         return jsonify({
@@ -248,12 +249,12 @@ def get_protected_content_enhanced():
     
     try:
         # Check session-based verification
-        if not session.get('verified_human'):
+        if not session.get('verified_user'):
             SecurityLogger.log_security_event('protected_content_access_denied', {
                 'reason': 'not_verified'
             }, 'WARNING')
             return jsonify({
-                'error': 'Human verification required'
+                'error': 'User verification required'
             }), 401
 
         # Check crypto verification for enhanced security
@@ -302,8 +303,8 @@ def get_protected_content_enhanced():
         if crypto_verified and crypto_version == '2.0':
             content = """
             <div class="enhanced-content">
-                <h2>🔒 Enhanced Security Content</h2>
-                <p>You have accessed this content with <strong>Enhanced Security (Crypto v2.0)</strong></p>
+                <h2>🔒 Enhanced User Trust Protocol Content</h2>
+                <p>You have accessed this content with <strong>Enhanced Security (User Trust Protocol v2.0)</strong></p>
                 <div class="security-details">
                     <h3>Security Features Active:</h3>
                     <ul>
@@ -316,7 +317,7 @@ def get_protected_content_enhanced():
                     </ul>
                 </div>
                 <p class="crypto-info">
-                    <strong>Crypto Version:</strong> {crypto_version}<br>
+                    <strong>User Trust Protocol Version:</strong> {crypto_version}<br>
                     <strong>Security Level:</strong> {security_level}
                 </p>
             </div>
@@ -329,7 +330,7 @@ def get_protected_content_enhanced():
             <div class="basic-content">
                 <h2>🔓 Basic Security Content</h2>
                 <p>You have accessed this content with basic security validation.</p>
-                <p><em>Upgrade to Crypto v2.0 for enhanced security features.</em></p>
+                <p><em>Upgrade to User Trust Protocol v2.0 for enhanced security features.</em></p>
             </div>
             """
 
@@ -411,7 +412,7 @@ def get_crypto_status():
     
     try:
         status = {
-            'cryptoVersion': '2.0',
+            'protocolVersion': '2.0',
             'supportedVersions': LemmaCryptoHardened.SUPPORTED_CRYPTO_VERSIONS,
             'securityFeatures': {
                 'enhancedChallenges': True,
@@ -422,8 +423,8 @@ def get_crypto_status():
                 'constantTimeOperations': True
             },
             'securityLevels': {
-                'basic': 'Crypto v1.0 - Standard security',
-                'enhanced': 'Crypto v2.0 - Enhanced security with hardening'
+                'basic': 'User Trust Protocol v1.0 - Standard security',
+                'enhanced': 'User Trust Protocol v2.0 - Enhanced security with hardening'
             },
             'entropyRequirements': {
                 'challengeBits': LemmaCryptoHardened.MIN_CHALLENGE_ENTROPY_BITS,
@@ -432,7 +433,9 @@ def get_crypto_status():
             'timeouts': {
                 'presentationMaxAgeMinutes': LemmaCryptoHardened.MAX_PRESENTATION_AGE_MINUTES,
                 'sessionMaxAgeMinutes': 60
-            }
+            },
+            'protocolName': 'User Trust Protocol',
+            'description': 'Enterprise-grade user verification with cryptographic security'
         }
 
         return jsonify({

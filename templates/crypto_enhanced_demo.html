@@ -276,9 +276,9 @@
     <div class="container">
         <!-- Header -->
         <div class="demo-header">
-            <h1>🔐 Lemma Crypto Enhanced Demo</h1>
+            <h1>🔐 Lemma User Trust Protocol Demo</h1>
             <div class="version-badge">Crypto Version 2.0 - Enterprise Security</div>
-            <p>Demonstration of enhanced cryptographic security features with real-time verification</p>
+            <p>Demonstration of enhanced cryptographic security features with real-time user verification</p>
         </div>
 
         <!-- Security Dashboard -->
@@ -307,7 +307,7 @@
                 <div class="status-card">
                     <h3>Verification Status</h3>
                     <div class="value" id="verificationStatus">Not Verified</div>
-                    <div class="label">Human Verification</div>
+                    <div class="label">User Verification</div>
                 </div>
             </div>
 
@@ -356,7 +356,7 @@
             <div class="control-section">
                 <h3>2. Verification Testing</h3>
                 <button class="btn" onclick="testCredentialDetection()">Auto-Detect Credentials</button>
-                <button class="btn" onclick="testEnhancedVerification()">Test Enhanced Verification</button>
+                <button class="btn" onclick="testEnhancedVerification()">Test Enhanced User Verification</button>
                 <button class="btn secondary" onclick="simulateReplayAttack()">Simulate Replay Attack</button>
             </div>
 
@@ -376,11 +376,11 @@
         <!-- Enhanced Content Area -->
         <div class="enhanced-content" data-lemma-enhanced="true">
             <h2>🔒 Protected Content Area</h2>
-            <p>This content area is protected by the enhanced Lemma Gate with Crypto v2.0 security features.</p>
+            <p>This content area is protected by the enhanced Lemma Gate with User Trust Protocol v2.0 security features.</p>
             
             <div class="protected-area" id="protectedContent">
-                <h3>🚀 Enhanced Security Verification Required</h3>
-                <p>Content will be revealed automatically once enhanced verification is complete.</p>
+                <h3>🚀 Enhanced User Trust Protocol Verification Required</h3>
+                <p>Content will be revealed automatically once enhanced user verification is complete.</p>
                 <div class="crypto-info">
                     Enhanced security features will be validated before content access.
                 </div>
@@ -664,7 +664,7 @@
             
             // Update protected content
             document.getElementById('protectedContent').innerHTML = `
-                <h3>✅ Enhanced Verification Successful!</h3>
+                <h3>✅ Enhanced User Trust Protocol Verification Successful!</h3>
                 <p>You have been verified with <strong>Enhanced Security (Crypto v${result.crypto_version})</strong></p>
                 <div class="crypto-info">
                     Credential ID: ${result.credential_id}<br>

@@ -1,6 +1,7 @@
 /**
  * Lemma Gate Enhanced with Crypto Hardening
  * Integrates with crypto-hardened backend for maximum security
+ * Implements User Trust Protocol for comprehensive user verification
  */
 
 class LemmaGateEnhanced {
@@ -352,8 +353,8 @@ class LemmaGateEnhanced {
       <div class="lemma-gate-overlay"></div>
       <div class="lemma-gate-content">
         <div class="lemma-gate-header">
-          <h2>🔒 Enhanced Human Verification Required</h2>
-          <p>This content requires verified human access with enhanced security.</p>
+          <h2>🔒 Enhanced User Trust Protocol Verification Required</h2>
+          <p>This content requires verified user access with enhanced security.</p>
         </div>
         
         ${this.options.showSecurityDetails ? `
@@ -371,16 +372,16 @@ class LemmaGateEnhanced {
         
         <div class="lemma-gate-actions">
           <button class="lemma-verify-btn enhanced" onclick="window.location.href='/verify'">
-            🚀 Get Enhanced Verification
+            🚀 Get Enhanced User Verification
           </button>
           <p class="lemma-crypto-info">
-            Crypto Version: ${this.options.cryptoVersion} | 
+            User Trust Protocol Version: ${this.options.cryptoVersion} | 
             Security Level: Enhanced
           </p>
         </div>
         
         <div class="lemma-gate-footer">
-          <p>Powered by <strong>Lemma Enhanced Security</strong></p>
+          <p>Powered by <strong>Lemma User Trust Protocol</strong></p>
         </div>
       </div>
     `;
@@ -405,10 +406,10 @@ class LemmaGateEnhanced {
       successBanner.className = 'lemma-verification-success enhanced';
       successBanner.innerHTML = `
         <div class="success-content">
-          <h3>✅ Enhanced Verification Successful</h3>
-          <p>You have been verified with <strong>Enhanced Security (Crypto v${this.options.cryptoVersion})</strong></p>
+          <h3>✅ Enhanced User Trust Protocol Verification Successful</h3>
+          <p>You have been verified with <strong>Enhanced Security (User Trust Protocol v${this.options.cryptoVersion})</strong></p>
           <div class="verification-details">
-            <span class="crypto-badge">🔐 Crypto v${this.options.cryptoVersion}</span>
+            <span class="crypto-badge">🔐 User Trust Protocol v${this.options.cryptoVersion}</span>
             <span class="security-badge">🛡️ Enhanced Security</span>
           </div>
         </div>

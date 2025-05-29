@@ -208,7 +208,7 @@ def verify_credential():
 @api_bp.route('/generate-challenge', methods=['GET'])
 @rate_limit
 def generate_challenge():
-    """Generate a challenge for presentation verification. Enhanced crypto support."""
+    """Generate a challenge for presentation verification. Enhanced User Trust Protocol support."""
     try:
         # Check if client supports enhanced crypto
         request_crypto_version = request.headers.get('X-Crypto-Version', '1.0')
@@ -221,7 +221,8 @@ def generate_challenge():
             # Log with enhanced security
             SecurityLogger.log_security_event('secure_challenge_generated', {
                 'crypto_version': '2.0',
-                'entropy_bits': entropy_bits
+                'entropy_bits': entropy_bits,
+                'protocol': 'User Trust Protocol'
             })
         else:
             # Generate basic 128-bit challenge for compatibility
@@ -236,7 +237,8 @@ def generate_challenge():
             'success': True,
             'challenge': challenge,
             'entropyBits': entropy_bits,
-            'cryptoVersion': request_crypto_version
+            'protocolVersion': request_crypto_version,
+            'protocol': 'User Trust Protocol'
         })
     except Exception as e:
         current_app.logger.error(f"Challenge generation error: {e}")
@@ -364,8 +366,8 @@ def get_csrf_token():
 @api_bp.route('/verify-human', methods=['POST'])
 @csrf_protect()
 @rate_limit
-def verify_human():
-    """Verify a human presentation and set session. Enhanced crypto support."""
+def verify_user():
+    """Verify a user presentation and set session. Enhanced crypto support."""
     try:
         data = request.get_json()
         if not data:
@@ -390,7 +392,7 @@ def verify_human():
             )
             
             # Set enhanced session data
-            session['verified_human'] = verification_result['valid']
+            session['verified_user'] = verification_result['valid']
             session['crypto_verified'] = verification_result['crypto_valid']
             session['crypto_version'] = verification_result['crypto_version']
             session['security_level'] = verification_result['security_level']
@@ -400,7 +402,8 @@ def verify_human():
                 'verified': verification_result['valid'],
                 'cryptoValid': verification_result['crypto_valid'],
                 'cryptoVersion': verification_result['crypto_version'],
-                'securityLevel': verification_result['security_level']
+                'securityLevel': verification_result['security_level'],
+                'message': 'User Trust Protocol verification' + (' successful' if verification_result['valid'] else ' failed')
             })
         
         # Fallback to basic verification
@@ -417,7 +420,7 @@ def verify_human():
         credential_service = get_credential_service()
         is_valid = credential_service.verify_presentation(presentation, challenge)
         
-        session['verified_human'] = is_valid
+        session['verified_user'] = is_valid
         session['crypto_verified'] = False
         session['crypto_version'] = '1.0'
         session['security_level'] = 'basic'
@@ -427,11 +430,12 @@ def verify_human():
             'verified': is_valid,
             'cryptoValid': False,
             'cryptoVersion': '1.0',
-            'securityLevel': 'basic'
+            'securityLevel': 'basic',
+            'message': 'User Trust Protocol verification' + (' successful' if is_valid else ' failed')
         })
 
     except Exception as e:
-        current_app.logger.error(f"Human verification error: {e}")
+        current_app.logger.error(f"User verification error: {e}")
         return jsonify({'success': False, 'error': 'Verification failed'}), 500
 
 @api_bp.route('/presentation', methods=['POST'])
@@ -1209,7 +1213,7 @@ def complete_verification_flow():
                     logger.info(f"Valid wallet credential provided for user {user_id}")
                     
                     # Set session variables for protected content access
-                    session['verified_human'] = True
+                    session['verified_user'] = True
                     session['verified_user_id'] = user_id
                     session['verified_credential'] = wallet_credential
                     session['verified_credential_id'] = wallet_credential.get('id')
@@ -1244,7 +1248,7 @@ def complete_verification_flow():
             }
             
             # Set session variables for protected content access
-            session['verified_human'] = True
+            session['verified_user'] = True
             session['verified_user_id'] = user_id
             session['verified_credential'] = existing_credential
             session['verified_credential_id'] = existing_credential.get('id')
@@ -1292,7 +1296,7 @@ def complete_verification_flow():
                 }
                 
                 # Set session variables for protected content access
-                session['verified_human'] = True
+                session['verified_user'] = True
                 session['verified_user_id'] = user_id
                 session['verified_credential'] = new_credential
                 session['verified_credential_id'] = new_credential.get('id')
