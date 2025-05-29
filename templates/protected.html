@@ -378,6 +378,9 @@
                     autoHideMessages: true
                 });
                 
+                // Explicitly initialize (now that constructor doesn't auto-init)
+                await lemmaIntegration.init();
+                
                 // Get protected content element
                 protectedContentElement = document.getElementById('protectedContent');
                 

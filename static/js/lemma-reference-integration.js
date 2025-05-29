@@ -28,19 +28,31 @@ class LemmaReferenceIntegration {
         this.autoHideMessages = options.autoHideMessages !== false;
         
         console.log('[LEMMA REFERENCE] Initializing reference integration...');
-        this.init();
+        
+        // Don't auto-initialize in constructor to allow for proper async handling
+        this.initPromise = null;
     }
     
     async init() {
+        // Return existing promise if already initializing
+        if (this.initPromise) {
+            return this.initPromise;
+        }
+        
+        // Create initialization promise
+        this.initPromise = this._performInit();
+        return this.initPromise;
+    }
+    
+    async _performInit() {
         try {
+            // Wait for LemmaWallet to be available with retry logic
+            await this.waitForLemmaWallet();
+            
             // Initialize wallet (same as any external site would)
-            if (window.LemmaWallet) {
-                this.wallet = new LemmaWallet();
-                await this.wallet.init();
-                console.log('[LEMMA REFERENCE] Wallet initialized successfully');
-            } else {
-                throw new Error('LemmaWallet not available - ensure lemma-wallet.js is loaded');
-            }
+            this.wallet = new LemmaWallet();
+            await this.wallet.init();
+            console.log('[LEMMA REFERENCE] Wallet initialized successfully');
             
             // Check HTTPS requirement
             if (this.requireHTTPS && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
@@ -52,8 +64,26 @@ class LemmaReferenceIntegration {
             
         } catch (error) {
             console.error('[LEMMA REFERENCE] Initialization failed:', error);
+            this.initialized = false;
             throw error;
         }
+    }
+    
+    /**
+     * Wait for LemmaWallet to be available with retry logic
+     */
+    async waitForLemmaWallet(maxAttempts = 20, delayMs = 100) {
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            if (window.LemmaWallet) {
+                console.log('[LEMMA REFERENCE] LemmaWallet found on attempt', attempt);
+                return;
+            }
+            
+            console.log(`[LEMMA REFERENCE] Waiting for LemmaWallet (attempt ${attempt}/${maxAttempts})...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        
+        throw new Error('LemmaWallet not available after waiting - ensure lemma-wallet.js is loaded before lemma-reference-integration.js');
     }
     
     /**
@@ -61,7 +91,14 @@ class LemmaReferenceIntegration {
      * Uses the same method any external site would use
      */
     async hasValidCredentials() {
-        if (!this.initialized) await this.init();
+        if (!this.initialized) {
+            try {
+                await this.init();
+            } catch (error) {
+                console.error('[LEMMA REFERENCE] Failed to initialize during hasValidCredentials:', error);
+                return false;
+            }
+        }
         
         try {
             const credentials = await this.wallet.getAllCredentials();
@@ -135,7 +172,17 @@ class LemmaReferenceIntegration {
      * This is the exact flow any external site would implement
      */
     async performVerification(options = {}) {
-        if (!this.initialized) await this.init();
+        if (!this.initialized) {
+            try {
+                await this.init();
+            } catch (error) {
+                console.error('[LEMMA REFERENCE] Failed to initialize during performVerification:', error);
+                if (options.onError) {
+                    options.onError(error);
+                }
+                return { success: false, error: error.message };
+            }
+        }
         
         try {
             console.log('[LEMMA REFERENCE] Starting verification flow...');
@@ -334,9 +381,68 @@ class LemmaReferenceIntegration {
      * Protect a page or element (same as external sites would use)
      */
     async protectElement(element, options = {}) {
-        if (!this.initialized) await this.init();
-        
         try {
+            // Show loading state while initializing
+            if (!this.initialized) {
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'lemma-loading-prompt';
+                loadingDiv.innerHTML = `
+                    <div style="
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 20px;
+                        border-radius: 10px;
+                        text-align: center;
+                        margin: 20px 0;
+                    ">
+                        <h3>🔄 Initializing Lemma...</h3>
+                        <p style="margin: 10px 0;">Setting up human verification system...</p>
+                    </div>
+                `;
+                
+                // Insert loading state
+                element.parentNode.insertBefore(loadingDiv, element);
+                element.style.display = 'none';
+                
+                try {
+                    await this.init();
+                    // Remove loading state after successful initialization
+                    loadingDiv.remove();
+                } catch (error) {
+                    console.error('[LEMMA REFERENCE] Failed to initialize during protectElement:', error);
+                    
+                    // Show error state
+                    loadingDiv.innerHTML = `
+                        <div style="
+                            background: #f8d7da;
+                            color: #721c24;
+                            border: 1px solid #f5c6cb;
+                            padding: 20px;
+                            border-radius: 10px;
+                            text-align: center;
+                            margin: 20px 0;
+                        ">
+                            <h3>⚠️ Initialization Failed</h3>
+                            <p style="margin: 10px 0;">Unable to initialize Lemma integration</p>
+                            <button onclick="window.location.reload()" style="
+                                background: #dc3545;
+                                color: white;
+                                border: none;
+                                padding: 8px 16px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                margin-top: 10px;
+                            ">🔄 Refresh Page</button>
+                        </div>
+                    `;
+                    
+                    if (options.onError) {
+                        options.onError(error);
+                    }
+                    return;
+                }
+            }
+            
             const hasValid = await this.hasValidCredentials();
             
             if (hasValid) {
