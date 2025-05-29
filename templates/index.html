@@ -4,37 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ session.csrf_token }}">
-    <title>Lemma Human Network</title>
-    <!-- Load dependencies in correct order -->
+    <title>Lemma: A Network of Verified Users</title>
+    
+    <!-- Load Lemma Verified Network components -->
     <script src="/static/js/lemma-wallet.js"></script>
-    <script src="/static/js/lemma-wallet-init.js"></script>
-    <!-- Add API widget script -->
-    <script src="/static/js/lemma-api-widget.js"></script>
-    <!-- Add debugging script -->
-    <script>
-        // Debug logger
-        function logDebug(message) {
-            console.log("[LEMMA-DEBUG]", message);
-        }
-        
-        // Intercept errors
-        window.addEventListener('error', function(event) {
-            console.error('[LEMMA-ERROR]', event.message, event.filename, event.lineno);
-        });
-        
-        // Log when scripts are loaded
-        logDebug('Page scripts loaded');
-    </script>
+    <script src="/static/js/lemma-crypto-hardened.js"></script>
+    <script src="/static/js/lemma-gate-enhanced.js"></script>
+    
     <style>
         :root {
-            --primary-color: #6B3FA0;
-            --secondary-color: #4A2C71;
-            --accent-color: #8F6BC1;
+            --primary-color: #28a745;
+            --secondary-color: #20c997;
+            --accent-color: #6f42c1;
             --text-color: #333333;
-            --light-bg: #F8F9FA;
-            --white: #FFFFFF;
-            --success: #28A745;
-            --error: #DC3545;
+            --light-bg: #f8f9fa;
+            --white: #ffffff;
+            --success: #28a745;
+            --error: #dc3545;
+            --border-radius: 8px;
         }
         
         * {
@@ -44,73 +31,104 @@
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6;
             color: var(--text-color);
-            background-color: var(--light-bg);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
         
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 20px;
         }
         
         header {
             display: flex;
             align-items: center;
             padding: 20px 0;
+            margin-bottom: 30px;
         }
         
         .logo {
-            width: 50px;
-            height: 50px;
-            background-color: var(--primary-color);
-            border-radius: 10px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-right: 15px;
+            margin-right: 20px;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
         }
         
         .logo span {
             color: var(--white);
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
         }
         
-        h1 {
-            color: var(--primary-color);
-            font-size: 28px;
+        .site-title {
+            color: var(--white);
+            font-size: 32px;
+            font-weight: 700;
+        }
+        
+        .site-subtitle {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 16px;
+            margin-left: 20px;
         }
         
         main {
-            padding: 40px 0;
+            padding: 0;
         }
         
         .hero {
             text-align: center;
-            padding: 60px 20px;
-            background-color: var(--white);
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 60px 40px;
+            background: var(--white);
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             margin-bottom: 40px;
         }
         
         .hero h2 {
-            font-size: 36px;
+            font-size: 42px;
             margin-bottom: 20px;
             color: var(--primary-color);
+            font-weight: 700;
+        }
+        
+        .hero .subtitle {
+            font-size: 20px;
+            color: var(--text-color);
+            margin-bottom: 15px;
+            font-weight: 600;
         }
         
         .hero p {
             font-size: 18px;
-            max-width: 600px;
-            margin: 0 auto 30px;
+            max-width: 700px;
+            margin: 0 auto 40px;
+            color: #666;
+            line-height: 1.7;
         }
 
-        #lemma-widget-container {
-            margin: 20px auto;
+        .verification-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 40px;
+            border-radius: var(--border-radius);
+            margin: 30px 0;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .verification-section h3 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 24px;
+            text-align: center;
         }
         
         .cta-buttons {
@@ -118,133 +136,160 @@
             justify-content: center;
             gap: 20px;
             flex-wrap: wrap;
+            margin-top: 30px;
         }
         
         .button {
             display: inline-block;
-            padding: 12px 24px;
-            border-radius: 6px;
+            padding: 15px 30px;
+            border-radius: var(--border-radius);
             font-weight: 600;
             text-decoration: none;
             transition: all 0.3s ease;
+            font-size: 16px;
+            border: none;
+            cursor: pointer;
+            text-align: center;
+            min-width: 200px;
         }
         
         .button.primary {
-            background-color: var(--primary-color);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
             color: var(--white);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
         }
         
         .button.primary:hover {
-            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
         }
         
         .button.secondary {
-            background-color: var(--white);
+            background: var(--white);
             color: var(--primary-color);
             border: 2px solid var(--primary-color);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
         
         .button.secondary:hover {
-            background-color: var(--light-bg);
+            background: var(--light-bg);
+            transform: translateY(-1px);
         }
         
         .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 30px;
             margin-bottom: 60px;
         }
         
         .feature-card {
-            background-color: var(--white);
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background: var(--white);
+            padding: 40px 30px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
         }
         
         .feature-icon {
-            font-size: 40px;
+            font-size: 48px;
             margin-bottom: 20px;
         }
         
         .feature-card h3 {
-            font-size: 22px;
+            font-size: 24px;
             margin-bottom: 15px;
             color: var(--primary-color);
         }
         
-        .how-it-works {
-            background-color: var(--white);
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        .feature-card p {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
         }
         
-        .how-it-works h2 {
-            text-align: center;
-            font-size: 28px;
+        .protocol-info {
+            background: var(--white);
+            padding: 40px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             margin-bottom: 40px;
+        }
+        
+        .protocol-info h2 {
+            text-align: center;
+            font-size: 32px;
+            margin-bottom: 30px;
             color: var(--primary-color);
         }
         
-        .steps {
+        .protocol-features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
         }
         
-        .step {
-            text-align: center;
-        }
-        
-        .step-number {
-            width: 40px;
-            height: 40px;
-            background-color: var(--primary-color);
-            color: var(--white);
-            border-radius: 50%;
+        .protocol-feature {
             display: flex;
             align-items: center;
-            justify-content: center;
-            margin: 0 auto 15px;
-            font-weight: bold;
+            gap: 15px;
+            padding: 15px;
+            background: var(--light-bg);
+            border-radius: var(--border-radius);
         }
         
-        .step h3 {
-            font-size: 20px;
-            margin-bottom: 10px;
-            color: var(--primary-color);
+        .protocol-feature .icon {
+            font-size: 24px;
+            min-width: 30px;
+        }
+        
+        .protocol-feature .text {
+            font-size: 16px;
+            color: #555;
         }
         
         footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 20px 0;
-            border-top: 1px solid #eee;
+            padding: 30px 0;
             margin-top: 60px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        footer p {
+            color: rgba(255, 255, 255, 0.8);
         }
         
         .footer-links a {
-            color: var(--primary-color);
+            color: var(--white);
             text-decoration: none;
             margin-left: 20px;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
         }
         
         .footer-links a:hover {
-            text-decoration: underline;
+            background-color: rgba(255, 255, 255, 0.1);
         }
         
         /* Flash messages */
         .flash-messages {
-            margin: 10px 0;
+            margin: 20px 0;
         }
         
         .flash-message {
-            padding: 10px 15px;
-            border-radius: 4px;
-            margin-bottom: 10px;
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 15px;
+            font-weight: 500;
         }
         
         .flash-message.info {
@@ -270,8 +315,34 @@
             color: #b71c1c;
             border-left: 4px solid #f44336;
         }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status-badge.network {
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--primary-color);
+        }
         
         @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .hero {
+                padding: 40px 25px;
+            }
+            
+            .hero h2 {
+                font-size: 32px;
+            }
+            
             .cta-buttons {
                 flex-direction: column;
                 align-items: center;
@@ -280,17 +351,28 @@
             .button {
                 width: 100%;
                 max-width: 300px;
+            }
+            
+            header {
+                flex-direction: column;
                 text-align: center;
+                gap: 10px;
+            }
+            
+            .site-subtitle {
+                margin-left: 0;
             }
             
             footer {
                 flex-direction: column;
-                gap: 15px;
+                gap: 20px;
+                text-align: center;
             }
             
             .footer-links {
                 display: flex;
                 gap: 20px;
+                justify-content: center;
             }
             
             .footer-links a {
@@ -300,12 +382,15 @@
     </style>
 </head>
 <body>
-    <div class="container" data-lemma="true">
+    <div class="container">
         <header>
             <div class="logo">
                 <span>L</span>
             </div>
-            <h1>Lemma Human Network</h1>
+            <div>
+                <h1 class="site-title">Lemma: A Network of Verified Users</h1>
+                <p class="site-subtitle">The essential verification protocol for digital trust</p>
+            </div>
         </header>
         
         <!-- Flash messages -->
@@ -323,102 +408,157 @@
 
         <main>
             <section class="hero">
-                <h2>Verify Once, Prove Anywhere</h2>
-                <p>Lemma is a privacy-focused, one-time proof-of-humanness system built on W3C Verifiable Credentials. Prove you're human once through secure identity verification, and use your Lemma credential anywhere.</p>
+                <h2>Verify Once, Trusted Everywhere</h2>
+                <p class="subtitle">Join the Lemma Verified Network</p>
+                <p>Lemma creates a global network where verified users and agents can seamlessly operate across thousands of integrated platforms. Verify once, unlock access everywhere.</p>
                 
-                <!-- Lemma Widget Container -->
-                <div id="lemma-widget-container"></div>
+                <div class="verification-section">
+                    <h3>🌐 Join the Lemma Verified Network</h3>
+                    <p>One verification unlocks access to thousands of integrated platforms. Perfect for humans and authorized agents working across the modern digital economy.</p>
+                    
+                    <div class="cta-buttons">
+                        <a href="/verify" class="button primary">
+                            🚀 Get Verified
+                            <span class="status-badge network">Network Access</span>
+                        </a>
+                        <a href="/protected" class="button secondary">
+                            🔒 Try Protected Content
+                        </a>
+                    </div>
+                </div>
             </section>
 
             <section class="features">
                 <div class="feature-card">
-                    <div class="feature-icon">🔒</div>
-                    <h3>Privacy-First</h3>
-                    <p>Your credentials are stored locally and encrypted. No personal data is collected.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔄</div>
-                    <h3>One-Time Proof</h3>
-                    <p>Prove your humanness once through secure identity verification and use your credential across multiple sites.</p>
-                </div>
-                <div class="feature-card">
                     <div class="feature-icon">🌐</div>
-                    <h3>W3C Standards</h3>
-                    <p>Built on open standards for maximum interoperability and security.</p>
+                    <h3>Global Verification Network</h3>
+                    <p>Join thousands of integrated sites in the Lemma Verified Network. Your verification credentials work seamlessly across all network partners.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>Agent-Centric Architecture</h3>
+                    <p>Perfect infrastructure for both humans and authorized agents. Enable seamless workflows across multiple platforms for the AI economy.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔐</div>
+                    <h3>Enterprise Security</h3>
+                    <p>W3C-compliant verification with enterprise-grade cryptographic security. Bot prevention at scale across the entire network.</p>
                 </div>
             </section>
 
-            <section class="how-it-works">
-                <h2>How It Works</h2>
-                <div class="steps">
-                    <div class="step">
-                        <div class="step-number">1</div>
-                        <h3>Prove Humanness</h3>
-                        <p>Complete a one-time identity verification through our secure Stripe Identity flow.</p>
+            <section class="protocol-info">
+                <h2>🚀 Network Advantage</h2>
+                <p style="text-align: center; font-size: 18px; color: #666; margin-bottom: 30px;">
+                    Unlike single-site verification, Lemma creates exponential value through network effects
+                </p>
+                
+                <div class="protocol-features">
+                    <div class="protocol-feature">
+                        <span class="icon">✅</span>
+                        <span class="text">Cross-platform portability with unified credentials</span>
                     </div>
-                    <div class="step">
-                        <div class="step-number">2</div>
-                        <h3>Get Your Lemma</h3>
-                        <p>Receive a secure DID-based credential stored in your Lemma wallet.</p>
+                    <div class="protocol-feature">
+                        <span class="icon">🌍</span>
+                        <span class="text">Access to pre-verified user base and agent network</span>
                     </div>
-                    <div class="step">
-                        <div class="step-number">3</div>
-                        <h3>Use Anywhere</h3>
-                        <p>Use your Lemma credential on any integrated site to prove you're human.</p>
+                    <div class="protocol-feature">
+                        <span class="icon">🛡️</span>
+                        <span class="text">Network-wide bot detection and prevention</span>
                     </div>
+                    <div class="protocol-feature">
+                        <span class="icon">📋</span>
+                        <span class="text">W3C standards for universal compatibility</span>
+                    </div>
+                    <div class="protocol-feature">
+                        <span class="icon">📶</span>
+                        <span class="text">Offline verification capabilities</span>
+                    </div>
+                    <div class="protocol-feature">
+                        <span class="icon">🔒</span>
+                        <span class="text">Privacy by design - credentials stored in your browser</span>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 30px;">
+                    <a href="/onboarding" class="button secondary">
+                        🚀 Start Integration
+                    </a>
                 </div>
             </section>
         </main>
 
         <footer>
-            <p>Lemma Human Network &copy; 2025</p>
+            <p>Lemma Verified Network &copy; 2025 - Production Ready v2.3.0</p>
             <div class="footer-links">
-                <a href="/admin">Admin</a>
-                <a href="https://github.com/JEDMckenna99/lemma">GitHub</a>
+                <a href="/onboarding">🌐 Join Network</a>
+                <a href="/admin">⚙️ Admin</a>
+                <a href="https://github.com/JEDMckenna99/lemma">📚 GitHub</a>
             </div>
         </footer>
     </div>
 
     <script>
-        // Initialize the Lemma API widget when the page loads
+        // Initialize Lemma Verified Network integration
         document.addEventListener('DOMContentLoaded', () => {
-            logDebug('DOM Content Loaded - Initializing widget');
+            console.log('[LEMMA NETWORK] Initializing verification system...');
             
-            // Get user_id from URL if available
-            const urlParams = new URLSearchParams(window.location.search);
-            const userId = urlParams.get('user_id') || ('user_' + Math.random().toString(36).substring(2, 10));
-            
-            logDebug('Using userId: ' + userId);
-            
-            try {
-                // Check for widget namespace
-                if (!window.LemmaWidget) {
-                    throw new Error('LemmaWidget namespace not found');
-                }
-                
-                // Initialize the API widget
-                window.LemmaWidget.init({
-                    containerId: 'lemma-widget-container',
-                    userId: userId,
-                    callbackUrl: '/protected',
-                    buttonText: 'Prove a Lemma',
-                    description: 'Verify you are human to access protected content',
-                    shouldRedirect: true,
-                    showPresentButton: true,
-                    onSuccess: function(result) {
-                        logDebug('Verification successful: ' + JSON.stringify(result));
+            // Check if enhanced gate is available
+            if (window.LemmaGateEnhanced) {
+                // Initialize enhanced gate for any protected elements
+                window.lemmaGateEnhanced = new LemmaGateEnhanced({
+                    containerSelector: '[data-lemma="true"]',
+                    autoDetectCredentials: true,
+                    showSecurityDetails: true,
+                    cryptoVersion: '2.0',
+                    requireEnhancedSecurity: true,
+                    onVerificationSuccess: function(result) {
+                        console.log('[LEMMA NETWORK] Verification successful:', result);
                     },
-                    onFailure: function(error) {
-                        console.error('Verification failed:', error);
+                    onVerificationFailure: function(error) {
+                        console.log('[LEMMA NETWORK] Verification failed:', error);
+                    },
+                    onSecurityEvent: function(eventType, data, level) {
+                        console.log(`[LEMMA NETWORK] Security event: ${eventType}`, data);
                     }
                 });
                 
-                logDebug('Widget initialized');
-            } catch (error) {
-                console.error('Error initializing widget:', error);
-                document.getElementById('lemma-widget-container').innerHTML = 
-                    '<div style="color:red;padding:20px;border:1px solid red;margin:20px 0;">Error initializing verification widget: ' + 
-                    error.message + '</div>';
+                console.log('[LEMMA NETWORK] Enhanced gate initialized successfully');
+            } else {
+                console.warn('[LEMMA NETWORK] Enhanced gate not available, falling back to basic mode');
+            }
+
+            // Auto-check for existing network credentials
+            if (window.lemmaWallet) {
+                window.lemmaWallet.getAllCredentials().then(credentials => {
+                    if (credentials && credentials.length > 0) {
+                        console.log('[LEMMA NETWORK] Found network credentials:', credentials.length);
+                        
+                        // Add network status indicator
+                        const heroSection = document.querySelector('.hero');
+                        if (heroSection) {
+                            const statusDiv = document.createElement('div');
+                            statusDiv.style.cssText = `
+                                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                                color: white;
+                                padding: 15px 25px;
+                                border-radius: 8px;
+                                margin-bottom: 30px;
+                                font-weight: 600;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                gap: 10px;
+                            `;
+                            statusDiv.innerHTML = `
+                                <span>🌐</span>
+                                <span>Connected to Lemma Verified Network - ${credentials.length} credential(s) active</span>
+                            `;
+                            heroSection.appendChild(statusDiv);
+                        }
+                    }
+                }).catch(error => {
+                    console.log('[LEMMA NETWORK] No network credentials found');
+                });
             }
         });
     </script>
