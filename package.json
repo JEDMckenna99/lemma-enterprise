@@ -1,0 +1,28 @@
+{
+  "name": "lemma-enterprise",
+  "version": "2.3.0",
+  "description": "Lemma Enterprise - Human Verification Network with OPRF Cascade Revocation",
+  "scripts": {
+    "heroku-prebuild": "chmod +x bin/heroku-prebuild.sh && ./bin/heroku-prebuild.sh",
+    "build-oprf": "chmod +x bin/compile-oprf.sh && ./bin/compile-oprf.sh",
+    "build-oprf-windows": "powershell -ExecutionPolicy Bypass -File bin/compile-oprf.ps1",
+    "test-oprf": "curl http://localhost:8080/health || echo 'OPRF service not running'"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "keywords": [
+    "human-verification",
+    "oprf",
+    "revocation",
+    "privacy",
+    "cryptography",
+    "lemma"
+  ],
+  "author": "Lemma Enterprise",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lemma/lemma-enterprise.git"
+  }
+} 
