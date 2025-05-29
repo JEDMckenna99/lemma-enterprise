@@ -320,7 +320,7 @@ class LemmaReferenceIntegration {
      * Handle post-verification callback
      * Processes the credential after successful verification
      */
-    async handleVerificationCallback(urlParams) {
+    async handleVerificationCallback(urlParams, options = {}) {
         try {
             const userId = urlParams.get('user_id');
             const verificationSuccess = urlParams.get('verification_success');
@@ -351,27 +351,37 @@ class LemmaReferenceIntegration {
             });
             
             const result = await response.json();
+            console.log('[LEMMA REFERENCE] Complete verification flow result:', result);
             
             if (response.ok && result.status === 'verified' && result.store_credential) {
                 console.log('[LEMMA REFERENCE] Storing credential in wallet...');
                 
                 // Store credential in wallet (same as any external site)
                 await this.wallet.storeCredential(result.store_credential);
+                console.log('[LEMMA REFERENCE] Credential stored successfully');
                 
                 // Show success message
                 this.showMessage('✅ Verification complete! Your Lemma credential has been stored.', 'success');
                 
-                // Redirect to return URL or protected content
-                const returnUrl = sessionStorage.getItem('lemma_return_url') || '/protected';
-                sessionStorage.removeItem('lemma_return_url');
-                
-                setTimeout(() => {
-                    window.location.href = returnUrl;
-                }, 2000);
-                
-                return { success: true, status: 'credential_stored' };
+                // Check if we should stay on current page or redirect
+                if (options.stayOnCurrentPage) {
+                    console.log('[LEMMA REFERENCE] Staying on current page after verification');
+                    return { success: true, status: 'credential_stored', shouldStay: true };
+                } else {
+                    // Redirect to return URL or protected content
+                    const returnUrl = sessionStorage.getItem('lemma_return_url') || '/protected';
+                    sessionStorage.removeItem('lemma_return_url');
+                    
+                    console.log('[LEMMA REFERENCE] Redirecting to:', returnUrl);
+                    setTimeout(() => {
+                        window.location.href = returnUrl;
+                    }, 2000);
+                    
+                    return { success: true, status: 'credential_stored', redirect: returnUrl };
+                }
                 
             } else {
+                console.error('[LEMMA REFERENCE] Verification failed:', result);
                 throw new Error(result.error || 'Verification failed');
             }
             

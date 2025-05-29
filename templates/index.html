@@ -862,7 +862,9 @@ if (await lemma.hasValidCredentials()) {
                 console.log('[LEMMA GATE] Processing verification callback...');
                 
                 if (lemmaIntegration && protectedContent && protectionOptions) {
-                    const result = await lemmaIntegration.handleVerificationCallback(urlParams);
+                    const result = await lemmaIntegration.handleVerificationCallback(urlParams, {
+                        stayOnCurrentPage: true // Stay on home page instead of redirecting
+                    });
                     
                     if (result.success) {
                         console.log('[LEMMA GATE] Verification callback processed successfully');
