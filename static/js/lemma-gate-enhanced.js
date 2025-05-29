@@ -549,13 +549,38 @@ class LemmaGateEnhanced {
         console.log(`[LEMMA SECURITY] ${eventType}:`, eventData.data);
       }
 
+      // Get CSRF token from meta tag or cookie
+      let csrfToken = '';
+      const metaTag = document.querySelector('meta[name="csrf-token"]');
+      if (metaTag) {
+        csrfToken = metaTag.getAttribute('content');
+      } else {
+        // Try to get from cookie
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+          const [name, value] = cookie.trim().split('=');
+          if (name === '_csrf_token') {
+            csrfToken = value;
+            break;
+          }
+        }
+      }
+
+      // Prepare headers
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-Crypto-Version': this.options.cryptoVersion
+      };
+
+      // Add CSRF token if available
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
+
       // Send to server (non-blocking)
       fetch(this.options.securityLogEndpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Crypto-Version': this.options.cryptoVersion
-        },
+        headers: headers,
         credentials: 'include',
         body: JSON.stringify(eventData)
       }).catch(error => {

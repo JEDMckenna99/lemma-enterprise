@@ -186,78 +186,30 @@ def verification_callback():
         if verification_status.get("verified", False):
             current_app.logger.info(f"User {user_id} verified successfully through Stripe Identity")
             
-            # Get credential service
-            credential_service = get_credential_service()
-            
-            # Issue a credential to the user
-            credential = credential_service.get_user_credential(user_id)
-            if not credential:
-                credential = credential_service.issue_credential(user_id)
-                current_app.logger.info(f"Issued new credential for user {user_id}")
-            else:
-                current_app.logger.info(f"Using existing credential for user {user_id}")
-            
-            # Format the credential for wallet storage
-            wallet_credential = {
-                "credential": credential,
-                "wallet_metadata": {
-                    "added_at": credential.get('issuanceDate', datetime.now().isoformat()),
-                    "holder_id": user_id,
-                    "status": "active",
-                    "display_name": "Lemma Human Verification",
-                    "fingerprint": credential.get('id', f"credential-{user_id}")
-                }
-            }
-            
-            # Make sure the session is properly set up for verification success
-            session.clear()  # Clear the session to avoid any conflicts
-            session.permanent = True  # Make the session permanent
-            
-            # Set all required session variables
-            session['verified_human'] = True
+            # Store minimal session data for API to use
+            session['stripe_verification_success'] = True
+            session['stripe_session_id'] = stripe_session_id
             session['verified_user_id'] = user_id
-            session['verified_credential'] = credential
-            session['verified_credential_id'] = credential.get('id')
-            session['store_credential'] = wallet_credential
+            session['verification_timestamp'] = datetime.now().isoformat()
             
-            # Set issuance and expiry times if available in the credential
-            if 'issuanceDate' in credential:
-                session['verification_time'] = credential['issuanceDate']
-            if 'expirationDate' in credential:
-                session['verification_expiry'] = credential['expirationDate']
-                
-            # Set success message
-            flash("Identity verified successfully! Your Lemma credential has been issued.", "success")
-            
-            # Create response with wallet cookie and redirect to protected page
-            response = make_response(redirect(url_for('main.protected')))
-            
-            # Set cookie to enable the wallet
-            secure = not current_app.config.get('TESTING', False) and not current_app.debug  # Secure in production, not in testing/debug
-            response.set_cookie(
-                'lemma_wallet_enabled', 
-                'true', 
-                max_age=31536000,  # 1 year
-                secure=secure, 
-                httponly=False,  # JavaScript needs access
-                samesite='Lax'
-            )
-            
-            # Clear any old session data
+            # Clear old session data
             session.pop('stripe_verification_session', None)
             session.pop(f'stripe_session_{user_id}', None)
             
-            # Store a debug flag and force redirect to protected page
-            session['verification_success'] = True
-            session['redirect_to_protected'] = True
+            # Set success message
+            flash("Identity verified successfully! Your Lemma credential is being prepared.", "success")
             
-            # Store additional debug info for troubleshooting
-            session['callback_timestamp'] = datetime.now().isoformat()
-            session['session_id'] = stripe_session_id
+            # Redirect to home page with verification success parameters
+            # The frontend will handle credential retrieval and wallet storage via API
+            return_url = url_for('main.index', 
+                               user_id=user_id, 
+                               verification_success='true',
+                               session_id=stripe_session_id,
+                               _external=True)
             
-            current_app.logger.info(f"Redirecting verified user {user_id} to protected page")
+            current_app.logger.info(f"Redirecting verified user {user_id} to home page for API-driven credential retrieval: {return_url}")
             
-            return response
+            return redirect(return_url)
         else:
             # Handle verification failure
             error_message = verification_status.get("error_message", "Unknown error")

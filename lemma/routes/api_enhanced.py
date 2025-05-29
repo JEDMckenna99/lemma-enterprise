@@ -357,6 +357,28 @@ def log_client_security_event():
     """Endpoint for clients to report security events"""
     
     try:
+        # Check for CSRF token for security logging
+        csrf_token = None
+        
+        # Try to get CSRF token from multiple locations
+        csrf_token = request.headers.get('X-CSRF-Token')
+        if not csrf_token and request.is_json:
+            csrf_token = request.json.get('csrf_token')
+        if not csrf_token:
+            csrf_token = request.cookies.get('_csrf_token')
+        
+        # For security logging, we'll be more permissive but still log attempts
+        if not csrf_token:
+            # Log the attempt but allow it for security monitoring
+            logger.warning(f"Security log attempt without CSRF token from IP: {request.remote_addr}")
+            
+            # Still validate session to prevent abuse
+            if not session.get('_csrf_token'):
+                return jsonify({
+                    'success': False,
+                    'error': 'CSRF token missing'
+                }), 400
+        
         data = request.get_json()
         if not data:
             return jsonify({
@@ -379,7 +401,10 @@ def log_client_security_event():
             'crypto_verification_error',
             'presentation_validation_failed',
             'content_displayed',
-            'gate_status_check'
+            'gate_status_check',
+            'crypto_status_verified',
+            'gate_modal_displayed',
+            'gate_initialized'
         ]
 
         if event_type not in allowed_events:

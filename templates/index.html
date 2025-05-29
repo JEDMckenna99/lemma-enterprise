@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ session.csrf_token }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Lemma: A Network of Verified Users</title>
     
     <!-- Load Lemma Verified Network components -->
     <script src="/static/js/lemma-wallet.js"></script>
+    <script src="/static/js/lemma-gate-secure.js"></script>
     <script src="/static/js/lemma-crypto-hardened.js"></script>
     <script src="/static/js/lemma-gate-enhanced.js"></script>
     
@@ -417,10 +418,10 @@
                     <p>One verification unlocks access to thousands of integrated platforms. Perfect for humans and authorized agents working across the modern digital economy.</p>
                     
                     <div class="cta-buttons">
-                        <a href="/verify" class="button primary">
+                        <button id="getVerifiedBtn" class="button primary">
                             🚀 Get Verified
                             <span class="status-badge network">Network Access</span>
-                        </a>
+                        </button>
                         <a href="/protected" class="button secondary">
                             🔒 Try Protected Content
                         </a>
@@ -557,8 +558,12 @@
                 console.warn('[LEMMA NETWORK] Enhanced gate not available, falling back to basic mode');
             }
 
-            // Auto-check for existing network credentials
-            if (window.lemmaWallet) {
+            // Initialize Lemma wallet if available
+            if (window.LemmaWallet) {
+                console.log('[LEMMA NETWORK] Initializing wallet...');
+                window.lemmaWallet = new LemmaWallet();
+                
+                // Auto-check for existing network credentials
                 window.lemmaWallet.getAllCredentials().then(credentials => {
                     if (credentials && credentials.length > 0) {
                         console.log('[LEMMA NETWORK] Found network credentials:', credentials.length);
@@ -585,10 +590,199 @@
                             `;
                             heroSection.appendChild(statusDiv);
                         }
+                        
+                        // Update the Get Verified button to show "Access Network" instead
+                        const getVerifiedBtn = document.getElementById('getVerifiedBtn');
+                        if (getVerifiedBtn) {
+                            getVerifiedBtn.innerHTML = `
+                                ✅ Network Connected
+                                <span class="status-badge network">Active</span>
+                            `;
+                            getVerifiedBtn.onclick = () => {
+                                window.location.href = '/protected';
+                            };
+                        }
                     }
                 }).catch(error => {
-                    console.log('[LEMMA NETWORK] No network credentials found');
+                    console.log('[LEMMA NETWORK] No network credentials found or wallet unavailable');
                 });
+            }
+
+            // Add click handler for Get Verified button
+            const getVerifiedBtn = document.getElementById('getVerifiedBtn');
+            if (getVerifiedBtn) {
+                getVerifiedBtn.addEventListener('click', async function() {
+                    try {
+                        // Disable button to prevent double-clicks
+                        getVerifiedBtn.disabled = true;
+                        getVerifiedBtn.innerHTML = '🔄 Starting Verification...';
+                        
+                        // Generate a unique user ID
+                        const userId = 'user_' + Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                            .map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
+                        
+                        console.log('[LEMMA NETWORK] Starting verification for user:', userId);
+                        
+                        // Check if user already has a credential in wallet
+                        if (window.lemmaWallet) {
+                            const existingCredentials = await window.lemmaWallet.getAllCredentials();
+                            if (existingCredentials && existingCredentials.length > 0) {
+                                console.log('[LEMMA NETWORK] User already has credentials, redirecting to protected page');
+                                window.location.href = '/protected';
+                                return;
+                            }
+                        }
+                        
+                        // Start the verification process by calling the API
+                        const response = await fetch('/api/start-verification', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                            },
+                            body: JSON.stringify({
+                                user_id: userId
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`Failed to start verification: ${response.status}`);
+                        }
+                        
+                        const verificationData = await response.json();
+                        console.log('[LEMMA NETWORK] Verification session created:', verificationData);
+                        
+                        // Redirect to Stripe verification (no need to store in sessionStorage)
+                        if (verificationData.url) {
+                            console.log('[LEMMA NETWORK] Redirecting to Stripe verification...');
+                            window.location.href = verificationData.url;
+                        } else {
+                            throw new Error('No verification URL received');
+                        }
+                        
+                    } catch (error) {
+                        console.error('[LEMMA NETWORK] Error starting verification:', error);
+                        
+                        // Re-enable button and show error
+                        getVerifiedBtn.disabled = false;
+                        getVerifiedBtn.innerHTML = `
+                            🚀 Get Verified
+                            <span class="status-badge network">Network Access</span>
+                        `;
+                        
+                        // Show error message
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'flash-message error';
+                        errorDiv.innerHTML = `Failed to start verification: ${error.message}. Please try again.`;
+                        
+                        const flashContainer = document.querySelector('.flash-messages') || document.querySelector('.hero');
+                        if (flashContainer) {
+                            flashContainer.appendChild(errorDiv);
+                            
+                            // Auto-remove error after 10 seconds
+                            setTimeout(() => {
+                                if (errorDiv.parentNode) {
+                                    errorDiv.parentNode.removeChild(errorDiv);
+                                }
+                            }, 10000);
+                        }
+                    }
+                });
+            }
+        });
+
+        // Handle post-verification credential storage
+        window.addEventListener('load', async function() {
+            // Check if we're returning from verification via URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const userId = urlParams.get('user_id');
+            const verificationSuccess = urlParams.get('verification_success');
+            const sessionId = urlParams.get('session_id');
+            
+            if (userId && verificationSuccess === 'true' && sessionId && window.lemmaWallet) {
+                console.log('[LEMMA NETWORK] Processing successful verification callback...');
+                
+                try {
+                    // Call the complete verification flow API to get the credential
+                    const response = await fetch(`/api/complete-verification-flow`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            user_id: userId,
+                            stripe_session_id: sessionId
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        console.log('[LEMMA NETWORK] Verification API response:', result);
+                        
+                        if (result.status === 'verified' && result.store_credential) {
+                            console.log('[LEMMA NETWORK] Storing credential in wallet...');
+                            
+                            // Store the credential in the wallet
+                            await window.lemmaWallet.storeCredential(result.store_credential);
+                            console.log('[LEMMA NETWORK] Credential stored successfully in wallet');
+                            
+                            // Show success message
+                            const successDiv = document.createElement('div');
+                            successDiv.className = 'flash-message success';
+                            successDiv.innerHTML = '✅ Verification complete! Your Lemma credential has been stored in your wallet.';
+                            
+                            const heroSection = document.querySelector('.hero');
+                            if (heroSection) {
+                                heroSection.insertBefore(successDiv, heroSection.firstChild);
+                                
+                                // Auto-remove after 5 seconds
+                                setTimeout(() => {
+                                    if (successDiv.parentNode) {
+                                        successDiv.parentNode.removeChild(successDiv);
+                                    }
+                                }, 5000);
+                            }
+                            
+                            // Clean up URL parameters and redirect to protected page after a brief delay
+                            setTimeout(() => {
+                                window.location.href = '/protected';
+                            }, 2000);
+                            
+                        } else if (result.status === 'verified') {
+                            // Already verified, just redirect
+                            console.log('[LEMMA NETWORK] User already verified, redirecting to protected page');
+                            window.location.href = '/protected';
+                        } else {
+                            console.error('[LEMMA NETWORK] Unexpected verification result:', result);
+                        }
+                    } else {
+                        const errorData = await response.json();
+                        console.error('[LEMMA NETWORK] Verification API error:', errorData);
+                        
+                        // Show error message
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'flash-message error';
+                        errorDiv.innerHTML = `❌ Failed to complete verification: ${errorData.error || 'Unknown error'}`;
+                        
+                        const heroSection = document.querySelector('.hero');
+                        if (heroSection) {
+                            heroSection.insertBefore(errorDiv, heroSection.firstChild);
+                        }
+                    }
+                } catch (error) {
+                    console.error('[LEMMA NETWORK] Error processing verification callback:', error);
+                    
+                    // Show error message
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'flash-message error';
+                    errorDiv.innerHTML = `❌ Error processing verification: ${error.message}`;
+                    
+                    const heroSection = document.querySelector('.hero');
+                    if (heroSection) {
+                        heroSection.insertBefore(errorDiv, heroSection.firstChild);
+                    }
+                }
             }
         });
     </script>
