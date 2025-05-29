@@ -70,8 +70,6 @@ def create_verification_session(user_id: str, return_url: Optional[str] = None) 
                     "require_id_number": True,
                     "require_matching_selfie": True,
                     "require_live_capture": True,  # Prevents static photos
-                    # Additional security options
-                    "allowed_countries": ["US", "CA", "GB", "AU", "NZ", "DE", "FR", "IT", "ES", "NL", "SE", "NO", "DK", "FI"],
                 }
             },
             return_url=return_url,
