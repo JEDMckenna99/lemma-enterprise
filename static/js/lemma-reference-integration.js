@@ -387,18 +387,22 @@ class LemmaReferenceIntegration {
      */
     async protectElement(element, options = {}) {
         try {
-            // Show loading state while initializing
+            console.log('[LEMMA REFERENCE] Protecting element with Lemma verification...');
+            
+            // Initialize if not already done
             if (!this.initialized) {
+                console.log('[LEMMA REFERENCE] Initializing during protectElement...');
+                
                 const loadingDiv = document.createElement('div');
-                loadingDiv.className = 'lemma-loading-prompt';
+                loadingDiv.className = 'lemma-loading';
                 loadingDiv.innerHTML = `
                     <div style="
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        padding: 20px;
+                        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                        padding: 30px;
                         border-radius: 10px;
                         text-align: center;
                         margin: 20px 0;
+                        border: 2px solid #dee2e6;
                     ">
                         <h3>🔄 Initializing Lemma...</h3>
                         <p style="margin: 10px 0;">Setting up human verification system...</p>
@@ -458,54 +462,69 @@ class LemmaReferenceIntegration {
                 }
                 console.log('[LEMMA REFERENCE] Access granted to protected element');
             } else {
-                // Hide content and show verification prompt
+                // Hide content
                 element.style.display = 'none';
                 
-                const promptDiv = document.createElement('div');
-                promptDiv.className = 'lemma-verification-prompt';
-                promptDiv.innerHTML = `
-                    <div style="
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        padding: 30px;
-                        border-radius: 10px;
-                        text-align: center;
-                        margin: 20px 0;
-                    ">
-                        <h3>🔒 Human Verification Required</h3>
-                        <p style="margin: 15px 0;">This content requires Lemma human verification.</p>
-                        <button id="verifyButton" style="
-                            background: #28a745;
-                            color: white;
-                            border: none;
-                            padding: 12px 24px;
-                            border-radius: 6px;
-                            font-size: 16px;
-                            font-weight: 600;
-                            cursor: pointer;
-                            margin-top: 10px;
-                        ">🚀 Verify with Lemma</button>
-                    </div>
-                `;
-                
-                element.parentNode.insertBefore(promptDiv, element);
-                
-                // Add click handler
-                promptDiv.querySelector('#verifyButton').addEventListener('click', () => {
-                    this.performVerification({
-                        returnUrl: window.location.href,
-                        onSuccess: () => {
-                            promptDiv.remove();
-                            element.style.display = '';
-                            if (options.onSuccess) options.onSuccess();
-                        },
-                        onError: (error) => {
-                            if (options.onError) options.onError(error);
+                // Check if custom verification UI is disabled
+                if (options.showDefaultVerificationUI === false) {
+                    // Use custom verification required callback
+                    if (options.onVerificationRequired) {
+                        console.log('[LEMMA REFERENCE] Using custom verification UI');
+                        options.onVerificationRequired();
+                    } else {
+                        console.log('[LEMMA REFERENCE] Custom verification UI disabled but no onVerificationRequired callback provided');
+                        if (options.onError) {
+                            options.onError(new Error('Custom verification UI disabled but no onVerificationRequired callback provided'));
                         }
+                    }
+                } else {
+                    // Show default verification prompt
+                    const promptDiv = document.createElement('div');
+                    promptDiv.className = 'lemma-verification-prompt';
+                    promptDiv.innerHTML = `
+                        <div style="
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
+                            padding: 30px;
+                            border-radius: 10px;
+                            text-align: center;
+                            margin: 20px 0;
+                        ">
+                            <h3>🔒 Human Verification Required</h3>
+                            <p style="margin: 15px 0;">This content requires Lemma human verification.</p>
+                            <button id="verifyButton" style="
+                                background: #28a745;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 6px;
+                                font-size: 16px;
+                                font-weight: 600;
+                                cursor: pointer;
+                                margin-top: 10px;
+                            ">🚀 Verify with Lemma</button>
+                        </div>
+                    `;
+                    
+                    element.parentNode.insertBefore(promptDiv, element);
+                    
+                    // Add click handler
+                    promptDiv.querySelector('#verifyButton').addEventListener('click', () => {
+                        this.performVerification({
+                            returnUrl: window.location.href,
+                            onSuccess: () => {
+                                promptDiv.remove();
+                                element.style.display = '';
+                                if (options.onSuccess) options.onSuccess();
+                            },
+                            onError: (error) => {
+                                if (options.onError) options.onError(error);
+                            }
+                        });
                     });
-                });
-                
-                console.log('[LEMMA REFERENCE] Access denied - verification prompt shown');
+                    
+                    console.log('[LEMMA REFERENCE] Access denied - default verification prompt shown');
+                }
             }
             
         } catch (error) {
@@ -513,6 +532,35 @@ class LemmaReferenceIntegration {
             if (options.onError) {
                 options.onError(error);
             }
+        }
+    }
+    
+    /**
+     * Refresh protection status for an element (typically called after verification)
+     */
+    async refreshProtection(element, options = {}) {
+        console.log('[LEMMA REFERENCE] Refreshing protection status...');
+        
+        const hasValid = await this.hasValidCredentials();
+        
+        if (hasValid) {
+            // Remove any existing verification prompts
+            const existingPrompts = element.parentNode.querySelectorAll('.lemma-verification-prompt');
+            existingPrompts.forEach(prompt => prompt.remove());
+            
+            // Show protected content
+            element.style.display = '';
+            if (options.onSuccess) {
+                options.onSuccess();
+            }
+            console.log('[LEMMA REFERENCE] Protection refreshed - access granted');
+        } else {
+            // Still no valid credentials
+            element.style.display = 'none';
+            if (options.onVerificationRequired) {
+                options.onVerificationRequired();
+            }
+            console.log('[LEMMA REFERENCE] Protection refreshed - still requires verification');
         }
     }
     

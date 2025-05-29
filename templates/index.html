@@ -660,8 +660,7 @@ lemma.protectElement(document.getElementById('protected-content'));
 
 // Or check verification status
 if (await lemma.hasValidCredentials()) {
-    showProtectedContent();
-}</pre>
+    showProtectedContent();}</pre>
                     </div>
                     
                     <div style="text-align: center; margin-top: 30px;">
@@ -746,6 +745,9 @@ if (await lemma.hasValidCredentials()) {
     <script>
         // Initialize Lemma Reference Integration (same as any external site would)
         let lemmaIntegration;
+        let protectedContent;
+        let verificationRequired;
+        let protectionOptions;
         
         document.addEventListener('DOMContentLoaded', async () => {
             console.log('[LEMMA GATE] Initializing as integrated site...');
@@ -763,28 +765,13 @@ if (await lemma.hasValidCredentials()) {
                 // Explicitly initialize
                 await lemmaIntegration.init();
                 
-                // Protect the entire main content using the Lemma gate
-                const protectedContent = document.getElementById('protected-content');
-                const verificationRequired = document.getElementById('verification-required');
+                // Get DOM elements
+                protectedContent = document.getElementById('protected-content');
+                verificationRequired = document.getElementById('verification-required');
                 const verifyButton = document.getElementById('verify-button');
                 
-                // Set up verification button
-                verifyButton.onclick = async () => {
-                    await lemmaIntegration.performVerification({
-                        returnUrl: window.location.href,
-                        onSuccess: (result) => {
-                            console.log('[LEMMA GATE] Verification successful:', result);
-                            // The protectElement callback will handle showing content
-                        },
-                        onError: (error) => {
-                            console.error('[LEMMA GATE] Verification failed:', error);
-                            lemmaIntegration.showMessage(`❌ Verification failed: ${error.message}`, 'error');
-                        }
-                    });
-                };
-                
-                // Protect the content with the Lemma gate
-                await lemmaIntegration.protectElement(protectedContent, {
+                // Define protection options
+                protectionOptions = {
                     // Custom verification required UI
                     showDefaultVerificationUI: false,
                     
@@ -809,7 +796,26 @@ if (await lemma.hasValidCredentials()) {
                         protectedContent.style.display = 'none';
                         lemmaIntegration.showMessage(`❌ Error: ${error.message}`, 'error');
                     }
-                });
+                };
+                
+                // Set up verification button
+                verifyButton.onclick = async () => {
+                    await lemmaIntegration.performVerification({
+                        returnUrl: window.location.href,
+                        onSuccess: async (result) => {
+                            console.log('[LEMMA GATE] Verification successful:', result);
+                            // Refresh protection status after successful verification
+                            await lemmaIntegration.refreshProtection(protectedContent, protectionOptions);
+                        },
+                        onError: (error) => {
+                            console.error('[LEMMA GATE] Verification failed:', error);
+                            lemmaIntegration.showMessage(`❌ Verification failed: ${error.message}`, 'error');
+                        }
+                    });
+                };
+                
+                // Protect the content with the Lemma gate
+                await lemmaIntegration.protectElement(protectedContent, protectionOptions);
                 
                 console.log('[LEMMA GATE] Lemma gate protection active');
                 
@@ -855,7 +861,7 @@ if (await lemma.hasValidCredentials()) {
             if (urlParams.get('verification_success') === 'true') {
                 console.log('[LEMMA GATE] Processing verification callback...');
                 
-                if (lemmaIntegration) {
+                if (lemmaIntegration && protectedContent && protectionOptions) {
                     const result = await lemmaIntegration.handleVerificationCallback(urlParams);
                     
                     if (result.success) {
@@ -864,8 +870,8 @@ if (await lemma.hasValidCredentials()) {
                         const cleanUrl = window.location.origin + window.location.pathname;
                         window.history.replaceState({}, document.title, cleanUrl);
                         
-                        // The protectElement should automatically show the protected content
-                        // when it detects valid credentials
+                        // Refresh protection status to show protected content
+                        await lemmaIntegration.refreshProtection(protectedContent, protectionOptions);
                     } else {
                         console.error('[LEMMA GATE] Verification callback failed:', result.error);
                     }
