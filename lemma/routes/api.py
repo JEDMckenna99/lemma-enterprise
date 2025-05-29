@@ -28,6 +28,17 @@ from lemma.auth.csrf_config import csrf_protect, generate_csrf
 from lemma.utils.input_validation import InputValidator, ValidationError, validate_request_data
 from lemma.utils.stripe_service import check_verification_status, create_verification_session
 
+# Try to import enhanced crypto features
+try:
+    from lemma.core.crypto_hardened import (
+        LemmaCryptoHardened, 
+        SecurityLogger, 
+        enhanced_verify_presentation
+    )
+    CRYPTO_ENHANCED_AVAILABLE = True
+except ImportError:
+    CRYPTO_ENHANCED_AVAILABLE = False
+
 # Create blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -194,12 +205,42 @@ def verify_credential():
         logger.error("Error verifying credential: %s", str(e))
         return jsonify({"error": "Internal server error"}), 500
 
-@api_bp.route('/generate-challenge')
+@api_bp.route('/generate-challenge', methods=['GET'])
 @rate_limit
 def generate_challenge():
-    """Generate a challenge for presentation verification."""
-    challenge = secrets.token_hex(16)
-    return jsonify({"challenge": challenge})
+    """Generate a challenge for presentation verification. Enhanced crypto support."""
+    try:
+        # Check if client supports enhanced crypto
+        request_crypto_version = request.headers.get('X-Crypto-Version', '1.0')
+        
+        if CRYPTO_ENHANCED_AVAILABLE and request_crypto_version == '2.0':
+            # Generate enhanced 256-bit challenge
+            challenge = LemmaCryptoHardened.generate_secure_challenge()
+            entropy_bits = 256
+            
+            # Log with enhanced security
+            SecurityLogger.log_security_event('secure_challenge_generated', {
+                'crypto_version': '2.0',
+                'entropy_bits': entropy_bits
+            })
+        else:
+            # Generate basic 128-bit challenge for compatibility
+            challenge_bytes = os.urandom(16)
+            challenge = challenge_bytes.hex()
+            entropy_bits = 128
+
+        session['current_challenge'] = challenge
+        session['challenge_created'] = time.time()
+        
+        return jsonify({
+            'success': True,
+            'challenge': challenge,
+            'entropyBits': entropy_bits,
+            'cryptoVersion': request_crypto_version
+        })
+    except Exception as e:
+        current_app.logger.error(f"Challenge generation error: {e}")
+        return jsonify({'success': False, 'error': 'Challenge generation failed'}), 500
 
 @api_bp.route('/verify-presentation', methods=['POST'])
 @rate_limit
@@ -324,92 +365,74 @@ def get_csrf_token():
 @csrf_protect()
 @rate_limit
 def verify_human():
-    """Verify a human presentation and set session for protected content access."""
+    """Verify a human presentation and set session. Enhanced crypto support."""
     try:
-        current_app.logger.info("Processing human verification request from IP: %s", request.remote_addr)
-        
         data = request.get_json()
-        if not data or 'presentation' not in data or 'challenge' not in data:
-            return jsonify({"success": False, "error": "Presentation and challenge are required"}), 400
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+        presentation = data.get('presentation')
+        challenge = data.get('challenge')
+        crypto_version = data.get('cryptoVersion', '1.0')
+
+        if not presentation:
+            return jsonify({'success': False, 'error': 'Presentation required'}), 400
+
+        # Detect if client supports crypto v2.0
+        request_crypto_version = request.headers.get('X-Crypto-Version', '1.0')
         
-        presentation = data['presentation']
-        challenge = data['challenge']
-        
-        # Basic input validation
-        if not isinstance(presentation, dict):
-            logger.error("Invalid presentation format: not a dictionary")
-            return jsonify({"success": False, "error": "Invalid presentation format"}), 400
+        # Use enhanced verification if available and client supports it
+        if CRYPTO_ENHANCED_AVAILABLE and request_crypto_version == '2.0':
+            verification_result = enhanced_verify_presentation(
+                presentation=presentation,
+                challenge=challenge,
+                require_crypto_v2=False  # Allow fallback for compatibility
+            )
             
-        if not isinstance(challenge, str) or len(challenge) < 8:
-            logger.error("Invalid challenge format")
-            return jsonify({"success": False, "error": "Invalid challenge format"}), 400
-        
-        # Verify the presentation
-        try:
-            credential_service = get_credential_service()
-            verification_result = credential_service.verify_presentation(presentation, challenge)
-        except Exception as ve:
-            logger.error("Exception during presentation verification: %s", str(ve))
-            return jsonify({"success": False, "error": f"Verification error: {str(ve)}"}), 500
-        
-        if not verification_result.get('valid', False):
-            reason = verification_result.get('reason', 'Verification failed')
-            logger.info("Invalid human verification attempt: %s", reason)
-            
-            # Include more details for debugging in development
-            if current_app.config.get('DEBUG', False):
-                error_details = {
-                    "success": False,
-                    "error": reason,
-                    "challenge": challenge[:5] + "...", # Show part of the challenge for debugging
-                    "debug_info": "Verification failed in verify_presentation function"
-                }
-                return jsonify(error_details)
+            # Set enhanced session data
+            session['verified_human'] = verification_result['valid']
+            session['crypto_verified'] = verification_result['crypto_valid']
+            session['crypto_version'] = verification_result['crypto_version']
+            session['security_level'] = verification_result['security_level']
             
             return jsonify({
-                "success": False,
-                "error": reason
+                'success': verification_result['valid'],
+                'verified': verification_result['valid'],
+                'cryptoValid': verification_result['crypto_valid'],
+                'cryptoVersion': verification_result['crypto_version'],
+                'securityLevel': verification_result['security_level']
             })
         
-        # Extract DID from the holder
-        holder = verification_result.get('holder', '')
-        user_id = holder.split(':')[-1] if ':' in holder else holder
+        # Fallback to basic verification
+        try:
+            # Basic presentation validation
+            if not isinstance(presentation, dict):
+                raise ValidationError("Presentation must be a dictionary", "presentation")
+            if 'verifiableCredential' not in presentation:
+                raise ValidationError("Missing verifiableCredential", "presentation")
+        except ValidationError as e:
+            return jsonify({'success': False, 'error': f'Invalid presentation: {str(e)}'}), 400
+
+        # Basic verification logic (existing)
+        credential_service = get_credential_service()
+        is_valid = credential_service.verify_presentation(presentation, challenge)
         
-        # Set session variables for protected content access
-        session['verified_human'] = True
-        session['verified_user_id'] = user_id
-        session['verified_presentation'] = presentation
-        
-        # Get credential info from the presentation
-        if 'verifiableCredential' in presentation and presentation['verifiableCredential']:
-            credential = presentation['verifiableCredential'][0] if isinstance(presentation['verifiableCredential'], list) else presentation['verifiableCredential']
-            session['verified_credential'] = credential
-            
-            # Set issuance and expiry times if available
-            if 'issuanceDate' in credential:
-                session['verification_time'] = credential['issuanceDate']
-            if 'expirationDate' in credential:
-                session['verification_expiry'] = credential['expirationDate']
-        
-        # Log successful verification
-        logger.info("Human verification successful for holder: %s", holder)
+        session['verified_human'] = is_valid
+        session['crypto_verified'] = False
+        session['crypto_version'] = '1.0'
+        session['security_level'] = 'basic'
         
         return jsonify({
-            "success": True,
-            "message": "Human verification successful",
-            "redirect": "/protected",
-            "user_id": user_id
+            'success': is_valid,
+            'verified': is_valid,
+            'cryptoValid': False,
+            'cryptoVersion': '1.0',
+            'securityLevel': 'basic'
         })
-        
-    except ValueError as e:
-        logger.error("Invalid presentation format in human verification: %s", str(e))
-        return jsonify({"success": False, "error": f"Invalid presentation format: {str(e)}"}), 400
-    except KeyError as e:
-        logger.error("Missing required field in human verification: %s", str(e))
-        return jsonify({"success": False, "error": f"Missing required field: {str(e)}"}), 400
+
     except Exception as e:
-        logger.error("Error verifying human: %s", str(e))
-        return jsonify({"success": False, "error": f"Error verifying human: {str(e)}"}), 500
+        current_app.logger.error(f"Human verification error: {e}")
+        return jsonify({'success': False, 'error': 'Verification failed'}), 500
 
 @api_bp.route('/presentation', methods=['POST'])
 @rate_limit

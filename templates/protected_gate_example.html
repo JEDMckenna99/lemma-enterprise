@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protected Content - Lemma Gate Demo</title>
+    
+    <!-- Load Lemma components -->
+    <script src="/static/js/lemma-wallet.js"></script>
+    <script src="/static/js/lemma-wallet-init.js"></script>
+    <script src="/static/js/lemma-gate.js"></script>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .protected-content {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        .success-badge {
+            display: inline-block;
+            background: #d4edda;
+            color: #155724;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .content-section {
+            margin: 1.5rem 0;
+        }
+        
+        .content-section h2 {
+            color: #6B3FA0;
+            margin-bottom: 1rem;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        
+        .feature-card {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #6B3FA0;
+        }
+        
+        .feature-card h3 {
+            margin-top: 0;
+            color: #6B3FA0;
+        }
+        
+        .debug-panel {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 2rem;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-verified { background-color: #28a745; }
+        .status-checking { background-color: #ffc107; animation: pulse 1s infinite; }
+        .status-failed { background-color: #dc3545; }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Lemma Gate Container (shown when verification is needed) -->
+    <div id="lemma-gate" style="display: none;">
+        <!-- Gate content will be injected here by LemmaGate -->
+    </div>
+
+    <!-- Protected Content Container (shown when verified) -->
+    <div id="protected-content" style="display: none;">
+        <div class="container">
+            <div class="header">
+                <h1>🛡️ Protected Content Area</h1>
+                <p>Welcome to the Lemma-protected zone!</p>
+            </div>
+
+            <div class="protected-content">
+                <div class="success-badge">
+                    ✅ Human Verification Confirmed
+                </div>
+                
+                <div class="content-section">
+                    <h2>Exclusive Human-Only Content</h2>
+                    <p>
+                        Congratulations! You've successfully accessed this protected area. 
+                        This content is only available to verified humans in the Lemma Network.
+                    </p>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>🔐 Secure Access</h3>
+                        <p>Your verification was checked automatically in the background using cryptographic proofs.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🌐 Network Benefits</h3>
+                        <p>This credential works across thousands of Lemma-integrated sites.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🚀 Seamless Experience</h3>
+                        <p>No manual verification needed - the gate recognized you automatically.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🤖 Bot Protection</h3>
+                        <p>Advanced AI and automated systems cannot access this content.</p>
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <h2>How the Lemma Gate Worked</h2>
+                    <p>When you visited this page, the Lemma Gate automatically:</p>
+                    <ol>
+                        <li><strong>Detected your credential</strong> - Found your Lemma verification in your wallet</li>
+                        <li><strong>Verified DID resolution</strong> - Checked that your credential issuer is valid</li>
+                        <li><strong>Checked revocation status</strong> - Used OPRF to ensure credential isn't revoked</li>
+                        <li><strong>Performed server verification</strong> - Cryptographically verified your presentation</li>
+                        <li><strong>Granted seamless access</strong> - You passed through without any manual steps!</li>
+                    </ol>
+                </div>
+
+                <div class="content-section">
+                    <h2>Agent-Friendly Architecture</h2>
+                    <p>
+                        This same seamless verification works perfectly for professional agents working 
+                        across multiple platforms. Agents can move between hundreds of Lemma-integrated 
+                        sites without interruption to their workflows.
+                    </p>
+                </div>
+
+                <!-- Debug Panel (for development) -->
+                <div class="debug-panel">
+                    <h3>🔧 Verification Status</h3>
+                    <div id="verification-status">
+                        <span class="status-indicator status-checking"></span>
+                        <span>Checking verification status...</span>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <button onclick="window.lemmaGate.forceRecheck()" style="background: #6B3FA0; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                            🔄 Force Recheck
+                        </button>
+                        <button onclick="showGateStatus()" style="background: #17a2b8; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-left: 10px;">
+                            📊 Show Status
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Enhanced status monitoring
+        function updateVerificationStatus() {
+            if (window.lemmaGate) {
+                const status = window.lemmaGate.getVerificationStatus();
+                const statusElement = document.getElementById('verification-status');
+                
+                if (status.isVerified) {
+                    statusElement.innerHTML = `
+                        <span class="status-indicator status-verified"></span>
+                        <span>✅ Verified and authenticated</span>
+                    `;
+                } else if (status.isChecking) {
+                    statusElement.innerHTML = `
+                        <span class="status-indicator status-checking"></span>
+                        <span>⏳ Checking credentials...</span>
+                    `;
+                } else {
+                    statusElement.innerHTML = `
+                        <span class="status-indicator status-failed"></span>
+                        <span>❌ Verification required</span>
+                    `;
+                }
+            }
+        }
+
+        function showGateStatus() {
+            if (window.lemmaGate) {
+                const status = window.lemmaGate.getVerificationStatus();
+                alert(`Gate Status:
+                
+Verified: ${status.isVerified}
+Checking: ${status.isChecking}
+Has Credentials: ${status.hasCredentials}
+                `);
+            } else {
+                alert('Gate not initialized yet');
+            }
+        }
+
+        // Initialize enhanced gate with callbacks
+        document.addEventListener('DOMContentLoaded', function() {
+            // Wait for gate to initialize
+            setTimeout(() => {
+                if (window.lemmaGate) {
+                    // Override the gate with enhanced callbacks
+                    window.lemmaGate.options.onVerificationStart = () => {
+                        console.log('🚀 Verification started');
+                        updateVerificationStatus();
+                    };
+                    
+                    window.lemmaGate.options.onVerificationSuccess = (credential) => {
+                        console.log('✅ Verification successful', credential);
+                        updateVerificationStatus();
+                    };
+                    
+                    window.lemmaGate.options.onVerificationFailed = (error) => {
+                        console.log('❌ Verification failed', error);
+                        updateVerificationStatus();
+                    };
+                    
+                    // Initial status update
+                    updateVerificationStatus();
+                    
+                    // Periodic status updates
+                    setInterval(updateVerificationStatus, 2000);
+                }
+            }, 1500);
+        });
+
+        // Simulate different scenarios for demo purposes
+        function simulateNetworkError() {
+            console.log('🔧 Simulating network error...');
+            window.lemmaGate.showError('Network connection failed. Please check your internet connection.');
+        }
+
+        function simulateRevocationFailure() {
+            console.log('🔧 Simulating revocation failure...');
+            window.lemmaGate.showError('Your credential has been revoked. Please obtain a new verification.');
+        }
+
+        // Add keyboard shortcuts for demo
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'r':
+                        e.preventDefault();
+                        window.lemmaGate?.forceRecheck();
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        showGateStatus();
+                        break;
+                }
+            }
+        });
+    </script>
+</body>
+</html> 

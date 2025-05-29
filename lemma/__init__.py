@@ -13,7 +13,14 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from logging.handlers import RotatingFileHandler
 import socket
 import shutil
-from flask_wtf.csrf import CSRFProtect
+
+# Optional CSRF protection import
+try:
+    from flask_wtf.csrf import CSRFProtect
+    CSRF_AVAILABLE = True
+except ImportError:
+    CSRF_AVAILABLE = False
+
 from flask_cors import CORS
 import platform
 
@@ -169,6 +176,14 @@ def create_app(test_config=None):
     except Exception as e:
         app.logger.error(f"Error registering blueprints: {e}")
         raise  # This is critical - we need the routes
+
+    # Register enhanced API blueprint
+    try:
+        from lemma.routes.api_enhanced import api_enhanced
+        app.register_blueprint(api_enhanced)
+        app.logger.info("Enhanced API v2 endpoints registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Enhanced API not available: {e}")
 
     # Clean up resources at the end of requests
     @app.teardown_appcontext
