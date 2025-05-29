@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Wallet Storage Test - Lemma Network</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h3 {
+            color: #333;
+            margin-top: 0;
+        }
+        .btn {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .success {
+            border-left-color: #28a745;
+            background: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Lemma Wallet Storage Test</h1>
+    <p>This page tests wallet storage functionality and helps debug credential storage issues.</p>
+
+    <!-- Wallet Detection -->
+    <div class="test-section">
+        <h3>📱 Wallet Detection</h3>
+        <button class="btn btn-primary" onclick="testWalletDetection()">Check Wallet Status</button>
+        <div id="walletDetectionResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- IndexedDB Storage Test -->
+    <div class="test-section">
+        <h3>💾 IndexedDB Storage Test</h3>
+        <button class="btn btn-primary" onclick="testIndexedDBStorage()">Test IndexedDB Storage</button>
+        <button class="btn btn-secondary" onclick="listIndexedDBCredentials()">List IndexedDB Credentials</button>
+        <button class="btn btn-danger" onclick="clearIndexedDBStorage()">Clear IndexedDB</button>
+        <div id="indexedDBResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- LocalStorage Test -->
+    <div class="test-section">
+        <h3>🗄️ LocalStorage Test</h3>
+        <button class="btn btn-primary" onclick="testLocalStorage()">Test LocalStorage</button>
+        <button class="btn btn-secondary" onclick="listLocalStorageCredentials()">List LocalStorage Credentials</button>
+        <button class="btn btn-danger" onclick="clearLocalStorage()">Clear LocalStorage</button>
+        <div id="localStorageResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Store Test Credential -->
+    <div class="test-section">
+        <h3>🔐 Store Test Credential</h3>
+        <button class="btn btn-success" onclick="storeTestCredential()">Store Test Credential</button>
+        <button class="btn btn-secondary" onclick="retrieveTestCredential()">Retrieve Test Credential</button>
+        <div id="credentialTestResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Browser Support -->
+    <div class="test-section">
+        <h3>🌐 Browser Support</h3>
+        <button class="btn btn-primary" onclick="checkBrowserSupport()">Check Browser Support</button>
+        <div id="browserSupportResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Load wallet scripts -->
+    <script src="/static/js/lemma-wallet.js"></script>
+    <script src="/static/js/lemma-wallet-init.js"></script>
+
+    <script>
+        // Global variables for testing
+        let testWallet = null;
+
+        // Initialize test environment
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('[WALLET-TEST] Page loaded, initializing test environment');
+            
+            // Auto-run basic checks
+            setTimeout(() => {
+                testWalletDetection();
+                checkBrowserSupport();
+            }, 1000);
+        });
+
+        // Test wallet detection
+        async function testWalletDetection() {
+            const resultDiv = document.getElementById('walletDetectionResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                let result = 'WALLET DETECTION RESULTS:\n\n';
+                
+                // Check if LemmaWallet class exists
+                result += `LemmaWallet class available: ${typeof LemmaWallet !== 'undefined'}\n`;
+                result += `LemmaWalletUI class available: ${typeof LemmaWalletUI !== 'undefined'}\n`;
+                
+                // Check if global wallet instance exists
+                result += `Global wallet instance (window.lemmaWallet): ${window.lemmaWallet ? 'EXISTS' : 'NOT FOUND'}\n`;
+                result += `Global wallet UI instance (window.lemmaWalletUI): ${window.lemmaWalletUI ? 'EXISTS' : 'NOT FOUND'}\n`;
+                
+                // Try to create a new wallet instance
+                if (typeof LemmaWallet !== 'undefined') {
+                    try {
+                        testWallet = new LemmaWallet();
+                        await testWallet.init();
+                        result += `New wallet instance created: SUCCESS\n`;
+                        result += `Wallet initialized: ${testWallet.initialized}\n`;
+                    } catch (error) {
+                        result += `New wallet instance creation: FAILED - ${error.message}\n`;
+                    }
+                } else {
+                    result += `Cannot create wallet instance: LemmaWallet class not available\n`;
+                }
+                
+                resultDiv.textContent = result;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = `Error during wallet detection: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // Test IndexedDB storage
+        async function testIndexedDBStorage() {
+            const resultDiv = document.getElementById('indexedDBResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                if (!testWallet) {
+                    testWallet = new LemmaWallet();
+                    await testWallet.init();
+                }
+                
+                // Create a test credential
+                const testCredential = {
+                    credential: {
+                        id: `test-credential-${Date.now()}`,
+                        type: ['VerifiableCredential'],
+                        issuer: 'did:lemma:test',
+                        issuanceDate: new Date().toISOString(),
+                        credentialSubject: {
+                            id: 'did:user:test_user',
+                            isHuman: true
+                        }
+                    },
+                    wallet_metadata: {
+                        added_at: new Date().toISOString(),
+                        holder_id: 'test_user',
+                        status: 'active',
+                        display_name: 'Test Credential',
+                        fingerprint: `test-fingerprint-${Date.now()}`
+                    }
+                };
+                
+                // Store the credential
+                await testWallet.storeCredential(testCredential);
+                
+                // Retrieve and count credentials
+                const allCredentials = await testWallet.getAllCredentials();
+                
+                resultDiv.textContent = `IndexedDB Test Results:
+✅ Test credential stored successfully
+📊 Total credentials in IndexedDB: ${allCredentials.length}
+🔍 Test credential ID: ${testCredential.credential.id}`;
+                resultDiv.className = 'result success';
+                
+            } catch (error) {
+                resultDiv.textContent = `IndexedDB test failed: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // List IndexedDB credentials
+        async function listIndexedDBCredentials() {
+            const resultDiv = document.getElementById('indexedDBResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                if (!testWallet) {
+                    testWallet = new LemmaWallet();
+                    await testWallet.init();
+                }
+                
+                const allCredentials = await testWallet.getAllCredentials();
+                
+                let result = `IndexedDB Credentials (${allCredentials.length} total):\n\n`;
+                
+                if (allCredentials.length === 0) {
+                    result += 'No credentials found in IndexedDB\n';
+                } else {
+                    allCredentials.forEach((cred, index) => {
+                        result += `${index + 1}. ID: ${cred.credential.id}\n`;
+                        result += `   Holder: ${cred.wallet_metadata.holder_id}\n`;
+                        result += `   Added: ${cred.wallet_metadata.added_at}\n`;
+                        result += `   Status: ${cred.wallet_metadata.status}\n\n`;
+                    });
+                }
+                
+                resultDiv.textContent = result;
+                resultDiv.className = 'result';
+                
+            } catch (error) {
+                resultDiv.textContent = `Failed to list IndexedDB credentials: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // Test LocalStorage
+        function testLocalStorage() {
+            const resultDiv = document.getElementById('localStorageResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                // Create a test credential for LocalStorage
+                const testCredential = {
+                    credential: {
+                        id: `test-ls-credential-${Date.now()}`,
+                        type: ['VerifiableCredential'],
+                        issuer: 'did:lemma:test',
+                        issuanceDate: new Date().toISOString(),
+                        credentialSubject: {
+                            id: 'did:user:test_ls_user',
+                            isHuman: true
+                        }
+                    },
+                    wallet_metadata: {
+                        added_at: new Date().toISOString(),
+                        holder_id: 'test_ls_user',
+                        status: 'active',
+                        display_name: 'Test LocalStorage Credential',
+                        fingerprint: `test-ls-fingerprint-${Date.now()}`
+                    }
+                };
+                
+                // Store in LocalStorage
+                localStorage.setItem(`lemma_credential_test_ls_user`, JSON.stringify(testCredential));
+                
+                // Verify storage
+                const stored = localStorage.getItem(`lemma_credential_test_ls_user`);
+                const parsed = JSON.parse(stored);
+                
+                resultDiv.textContent = `LocalStorage Test Results:
+✅ Test credential stored successfully
+🔍 Credential ID: ${parsed.credential.id}
+💾 Storage key: lemma_credential_test_ls_user`;
+                resultDiv.className = 'result success';
+                
+            } catch (error) {
+                resultDiv.textContent = `LocalStorage test failed: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // List LocalStorage credentials
+        function listLocalStorageCredentials() {
+            const resultDiv = document.getElementById('localStorageResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                const lemmaKeys = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+                
+                let result = `LocalStorage Credentials (${lemmaKeys.length} total):\n\n`;
+                
+                if (lemmaKeys.length === 0) {
+                    result += 'No Lemma credentials found in LocalStorage\n';
+                } else {
+                    lemmaKeys.forEach((key, index) => {
+                        try {
+                            const credentialData = JSON.parse(localStorage.getItem(key));
+                            result += `${index + 1}. Key: ${key}\n`;
+                            if (credentialData.credential) {
+                                result += `   ID: ${credentialData.credential.id}\n`;
+                                result += `   Holder: ${credentialData.wallet_metadata?.holder_id || 'Unknown'}\n`;
+                            } else {
+                                result += `   Format: Legacy/Raw credential\n`;
+                            }
+                            result += `\n`;
+                        } catch (e) {
+                            result += `${index + 1}. Key: ${key} (Invalid JSON)\n\n`;
+                        }
+                    });
+                }
+                
+                resultDiv.textContent = result;
+                resultDiv.className = 'result';
+                
+            } catch (error) {
+                resultDiv.textContent = `Failed to list LocalStorage credentials: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // Store test credential using the current wallet system
+        async function storeTestCredential() {
+            const resultDiv = document.getElementById('credentialTestResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                const testCredential = {
+                    credential: {
+                        id: `integrated-test-${Date.now()}`,
+                        type: ['VerifiableCredential'],
+                        issuer: 'did:lemma:test',
+                        issuanceDate: new Date().toISOString(),
+                        credentialSubject: {
+                            id: 'did:user:integrated_test',
+                            isHuman: true
+                        }
+                    },
+                    wallet_metadata: {
+                        added_at: new Date().toISOString(),
+                        holder_id: 'integrated_test',
+                        status: 'active',
+                        display_name: 'Integrated Test Credential',
+                        fingerprint: `integrated-test-${Date.now()}`
+                    }
+                };
+                
+                // Try to use the global wallet first
+                let wallet = window.lemmaWallet;
+                if (!wallet) {
+                    // Create a new wallet instance
+                    wallet = new LemmaWallet();
+                    await wallet.init();
+                }
+                
+                await wallet.storeCredential(testCredential);
+                
+                resultDiv.textContent = `✅ Test credential stored successfully using integrated wallet system
+🆔 Credential ID: ${testCredential.credential.id}
+👤 Holder ID: ${testCredential.wallet_metadata.holder_id}`;
+                resultDiv.className = 'result success';
+                
+            } catch (error) {
+                resultDiv.textContent = `❌ Failed to store test credential: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // Retrieve test credential
+        async function retrieveTestCredential() {
+            const resultDiv = document.getElementById('credentialTestResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                let wallet = window.lemmaWallet;
+                if (!wallet) {
+                    wallet = new LemmaWallet();
+                    await wallet.init();
+                }
+                
+                const allCredentials = await wallet.getAllCredentials();
+                const testCredentials = allCredentials.filter(cred => 
+                    cred.wallet_metadata.holder_id.includes('test') || 
+                    cred.credential.id.includes('test')
+                );
+                
+                let result = `🔍 Test Credential Retrieval Results:\n\n`;
+                result += `Total credentials in wallet: ${allCredentials.length}\n`;
+                result += `Test credentials found: ${testCredentials.length}\n\n`;
+                
+                if (testCredentials.length > 0) {
+                    testCredentials.forEach((cred, index) => {
+                        result += `${index + 1}. ${cred.credential.id}\n`;
+                        result += `   Holder: ${cred.wallet_metadata.holder_id}\n`;
+                        result += `   Display: ${cred.wallet_metadata.display_name}\n\n`;
+                    });
+                } else {
+                    result += 'No test credentials found. Try storing one first.\n';
+                }
+                
+                resultDiv.textContent = result;
+                resultDiv.className = 'result';
+                
+            } catch (error) {
+                resultDiv.textContent = `❌ Failed to retrieve credentials: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // Check browser support
+        function checkBrowserSupport() {
+            const resultDiv = document.getElementById('browserSupportResult');
+            resultDiv.style.display = 'block';
+            
+            let result = 'BROWSER SUPPORT CHECK:\n\n';
+            
+            // IndexedDB support
+            result += `IndexedDB: ${window.indexedDB ? '✅ Supported' : '❌ Not Supported'}\n`;
+            
+            // LocalStorage support
+            try {
+                localStorage.setItem('test', 'test');
+                localStorage.removeItem('test');
+                result += `LocalStorage: ✅ Supported\n`;
+            } catch (e) {
+                result += `LocalStorage: ❌ Not Supported\n`;
+            }
+            
+            // Crypto API support
+            result += `Crypto API: ${window.crypto ? '✅ Supported' : '❌ Not Supported'}\n`;
+            
+            // Fetch API support
+            result += `Fetch API: ${window.fetch ? '✅ Supported' : '❌ Not Supported'}\n`;
+            
+            // Browser info
+            result += `\nBrowser Info:\n`;
+            result += `User Agent: ${navigator.userAgent}\n`;
+            result += `Platform: ${navigator.platform}\n`;
+            result += `Language: ${navigator.language}\n`;
+            
+            resultDiv.textContent = result;
+            resultDiv.className = 'result';
+        }
+
+        // Clear storage functions
+        async function clearIndexedDBStorage() {
+            const resultDiv = document.getElementById('indexedDBResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                if (!testWallet) {
+                    testWallet = new LemmaWallet();
+                    await testWallet.init();
+                }
+                
+                const allCredentials = await testWallet.getAllCredentials();
+                let deletedCount = 0;
+                
+                for (const cred of allCredentials) {
+                    await testWallet.deleteCredential(cred.credential.id);
+                    deletedCount++;
+                }
+                
+                resultDiv.textContent = `✅ IndexedDB cleared successfully. Deleted ${deletedCount} credentials.`;
+                resultDiv.className = 'result success';
+                
+            } catch (error) {
+                resultDiv.textContent = `❌ Failed to clear IndexedDB: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        function clearLocalStorage() {
+            const resultDiv = document.getElementById('localStorageResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                const lemmaKeys = Object.keys(localStorage).filter(key => key.startsWith('lemma_'));
+                const deletedCount = lemmaKeys.length;
+                
+                lemmaKeys.forEach(key => localStorage.removeItem(key));
+                
+                resultDiv.textContent = `✅ LocalStorage cleared successfully. Deleted ${deletedCount} Lemma items.`;
+                resultDiv.className = 'result success';
+                
+            } catch (error) {
+                resultDiv.textContent = `❌ Failed to clear LocalStorage: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+    </script>
+</body>
+</html> 

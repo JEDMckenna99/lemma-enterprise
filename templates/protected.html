@@ -4,18 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Protected Content - Lemma</title>
-    <!-- Include the Lemma wallet initializer -->
-    <script src="/static/js/lemma-wallet-init.js"></script>
-    <!-- Debug script -->
+    
+    <!-- Load Lemma Reference Integration (same as any external site) -->
+    <script src="/static/js/lemma-wallet.js"></script>
+    <script src="/static/js/lemma-reference-integration.js"></script>
+    
+    <!-- Debug script for development -->
     <script src="/static/js/debug-wallet.js"></script>
-    <!-- Lemma Plan Script -->
-    <script src="/static/js/lemma-plan.js"></script>
-    <!-- Lemma Pricing Script -->
-    <script src="/static/js/lemma-pricing.js"></script>
-    <!-- Lemma Plan CSS -->
-    <link rel="stylesheet" href="/static/js/lemma-plan.css">
-    <!-- Lemma Pricing CSS -->
-    <link rel="stylesheet" href="/static/js/lemma-pricing.css">
+    
     <style>
         :root {
             --primary-color: #6B3FA0;
@@ -120,10 +116,15 @@
             cursor: pointer;
             text-decoration: none;
             margin-top: 20px;
+            margin-right: 10px;
         }
         
         .button:hover {
             background-color: var(--secondary-color);
+        }
+        
+        .button.secondary {
+            background-color: #6c757d;
         }
         
         .user-info {
@@ -132,6 +133,44 @@
             border-radius: 6px;
             margin-top: 20px;
             border-left: 4px solid #4285f4;
+        }
+        
+        .verification-prompt {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .verification-prompt h3 {
+            margin-bottom: 15px;
+        }
+        
+        .verification-prompt p {
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+        
+        .integration-info {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .integration-info h3 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+        
+        .integration-info code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 14px;
         }
         
         footer {
@@ -149,796 +188,477 @@
             text-decoration: underline;
         }
         
-        /* Pricing section styles */
-        .pricing-container {
-            margin: 20px 0;
-            padding: 20px;
-            background-color: var(--light-bg);
-            border-radius: 8px;
-            border: 1px solid #ddd;
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
         }
         
-        .pricing-graph {
-            margin: 20px 0;
-            background-color: white;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #eee;
-        }
-        
-        .pricing-calculator {
-            margin: 20px 0;
-            padding: 20px;
-            background-color: white;
-            border-radius: 8px;
-            border: 1px solid #eee;
-        }
-        
-        .calculator-row {
-            display: flex;
-            margin-bottom: 10px;
-            align-items: center;
-        }
-        
-        .calculator-label {
-            flex: 1;
-            font-weight: 500;
-        }
-        
-        .calculator-input {
-            width: 100px;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        
-        .calculator-result {
-            margin-top: 20px;
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
             padding: 15px;
-            background-color: #f9f9f9;
             border-radius: 6px;
-            border-left: 4px solid var(--primary-color);
+            margin: 20px 0;
         }
         
-        .math-formula {
-            font-family: "Times New Roman", Times, serif;
-            font-style: italic;
-            padding: 10px;
-            background-color: #f9f9f9;
-            border-radius: 4px;
-            margin: 10px 0;
-            display: inline-block;
-        }
-        
-        .toggle-plan-button, .toggle-pricing-button {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: var(--primary-color);
-            color: var(--white);
-            border: none;
+        .credential-details {
+            background: #e3f9e5;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
             border-radius: 6px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-right: 10px;
+            margin: 20px 0;
         }
         
-        .toggle-plan-button:hover, .toggle-pricing-button:hover {
-            background-color: var(--secondary-color);
+        .credential-details h4 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+        
+        .credential-details p {
+            color: #155724;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            .button {
+                display: block;
+                width: 100%;
+                text-align: center;
+                margin: 10px 0;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container" data-lemma="true">
+    <div class="container">
         <header>
             <div class="logo">
                 <span>L</span>
             </div>
-            <h1>Protected Content</h1>
+            <h1>Protected Content - Reference Implementation</h1>
         </header>
 
-        <!-- Hidden field to store session verification status -->
-        <input type="hidden" id="sessionVerified" value="{{ session.get('verified_human', False)|string|lower }}">
-        <!-- Hidden field for wallet credential formatting -->
-        <input type="hidden" id="walletCredential" value="{{ wallet_credential | safe if wallet_credential else '' }}">
-        <input type="hidden" id="sessionUserId" value="{{ user_id if user_id else '' }}">
-        <!-- CSRF token for API calls -->
-        <meta name="csrf-token" content="{{ csrf_token() }}">
+        <main>
+            <!-- Loading state -->
+            <div id="loadingSection" class="card loading">
+                <p>🔄 Checking verification status...</p>
+                <p style="font-size: 14px; color: #666; margin-top: 10px;">
+                    Using Lemma Reference Integration (same as any external site)
+                </p>
+            </div>
 
-        <!-- Debug output (only visible during development) -->
-        <script>
-        console.log('Wallet credential:', document.getElementById('walletCredential').value ? 'present (length: ' + document.getElementById('walletCredential').value.length + ')' : 'empty');
-        console.log('Session user ID:', document.getElementById('sessionUserId').value);
-        </script>
-
-        <!-- Security-focused credential handling script -->
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Only initialize wallet - no localStorage storage
-            console.log('Protected page loaded - waiting for wallet initialization');
-            
-            // Update credential status display
-            const userId = document.getElementById('sessionUserId').value;
-            if (userId) {
-                document.getElementById('userId').textContent = userId;
-            }
-            
-            // Display credential ID if available
-            const credentialIdElement = document.getElementById('credentialId');
-            if (credentialIdElement) {
-                credentialIdElement.textContent = '{{ credential_id if credential_id else "Stored in wallet" }}';
-            }
-        });</script>
-
-        <div class="card">
-            <div class="success-badge">✓ Human Verification Successful</div>
-            
-            <h2>Welcome to the Exclusive Human-Only Area</h2>
-            <p>This content is only accessible to verified humans. Your credential has been successfully verified.</p>
-            
-            <!-- Debug panel for credential status -->
-            <div class="card" id="debugSection" style="background-color: #f9f9f9; padding: 15px; margin: 15px 0; border-left: 4px solid #4A2C71;">
-                <h3 style="margin-top: 0;">Credential Status</h3>
-                <div>
-                    <p><strong>User ID:</strong> <span id="userId">{{ user_id }}</span></p>
-                    <p><strong>Status:</strong> <span id="lemmaStatus">{{ 'Verified Human' if session.get('verified_human', False) else 'Not Verified' }}</span></p>
-                    <p><strong>Credential ID:</strong> <span id="credentialId">{{ credential.id if credential and credential.id else 'Not Available' }}</span></p>
-                </div>
-            </div>
-            
-            <div class="user-info">
-                <strong>User ID:</strong> <span id="userId">{{ user_id }}</span><br>
-                <strong>Verification Status:</strong> Verified Human<br>
-                <strong>Access Level:</strong> Full Access
-                <div style="margin-top: 15px;">
-                    <button id="importBtn" class="button" style="margin-top: 5px; font-size: 14px; padding: 8px 12px;">Import Credential</button>
-                    <input type="file" id="importFile" accept="application/json" style="display:none;">
-                    <button id="viewLemmaBtn" class="button" style="margin-top: 5px; font-size: 14px; padding: 8px 12px; margin-left: 10px; background-color: #4A2C71;">View Lemma</button>
-                    <button id="clearLemmaBtn" class="button" style="margin-top: 5px; font-size: 14px; padding: 8px 12px; margin-left: 10px; background-color: #DC3545;">Clear Lemma</button>
-                </div>
-            </div>
-            
-            <!-- Lemma Credential Viewer (Hidden by default) -->
-            <div id="lemmaViewer" class="content-section" style="display: none; margin-top: 20px; background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
-                <h3 style="margin-bottom: 10px; color: var(--primary-color);">Your Lemma Credential</h3>
-                <div style="background-color: white; padding: 10px; border-radius: 6px; border: 1px solid #eee; max-height: 300px; overflow-y: auto;">
-                    <pre id="lemmaContent" style="white-space: pre-wrap; word-break: break-all; font-size: 12px;"></pre>
-                </div>
-                <button id="closeLemmaBtn" class="button" style="margin-top: 10px; font-size: 14px; padding: 8px 12px; background-color: #6c757d;">Close</button>
-            </div>
-            
-            <!-- Toggle buttons for different sections -->
-            <div class="content-section">
-                <button id="togglePlanBtn" class="toggle-plan-button">View Lemma Network</button>
-                <button id="togglePricingBtn" class="toggle-pricing-button" onclick="togglePricingSection()">View Pricing Model</button>
-                <a href="/math-appendix" class="toggle-plan-button" style="text-decoration: none;">View Mathematical Appendix</a>
-            </div>
-            
-            <!-- Lemma Network (Hidden by default) -->
-            <div id="lemma-plan-section" style="display: none;">
-                <div id="lemma-plan-container" class="plan-container"></div>
-                <div id="lemma-plan-pagination" class="plan-pagination"></div>
-            </div>
-            
-            <!-- Pricing Model Section (Hidden by default) -->
-            <div id="pricing-section" class="content-section" style="display: none;">
-                <h2>Lemma Network Pricing Model</h2>
-                
-                <p>Lemma's innovative pricing approach is designed to create a network effect - the more organizations that join the Lemma network, the more affordable it becomes for everyone.</p>
-                
-                <h3 style="margin-top: 20px; color: var(--secondary-color);">One-Time Onboarding Fee</h3>
-                <p>A modest one-time verification fee ($1-$2 per user) covers the cost of identity verification through Stripe Identity. This fee is charged only once per unique human in the network, regardless of how many sites they access with their Lemma credential.</p>
-                
-                <h3 style="margin-top: 20px; color: var(--secondary-color);">Network-Driven Monthly Pricing</h3>
-                <p>Our revolutionary monthly per-user fee <strong>decreases automatically</strong> as more organizations join the network. This is represented by the mathematical formula:</p>
-                
-                <div class="math-formula">
-                    p(N) = p₀e⁻ᵅᴺ
+            <!-- Verification required state -->
+            <div id="verificationRequired" class="card" style="display: none;">
+                <div class="verification-prompt">
+                    <h3>🔒 Human Verification Required</h3>
+                    <p>This content requires Lemma human verification to access.</p>
+                    <button id="verifyBtn" class="button">
+                        🚀 Verify with Lemma
+                    </button>
                 </div>
                 
-                <p>Where:</p>
-                <ul style="margin-left: 20px; margin-bottom: 15px;">
-                    <li><strong>p₀</strong> is the base monthly per-user fee (e.g., $0.50)</li>
-                    <li><strong>α</strong> is the decay constant that controls how quickly the price drops</li>
-                    <li><strong>N</strong> is the total number of organizations using Lemma</li>
-                </ul>
-                
-                <p>As more organizations join, the price per user decreases exponentially for everyone in the network:</p>
-                
-                <div class="pricing-graph">
-                    <canvas id="pricing-curve" width="700" height="400"></canvas>
-                </div>
-                
-                <p>For example, with a base price of $0.50 per user per month:</p>
-                <ul style="margin-left: 20px; margin-bottom: 15px;">
-                    <li>With 5 organizations: ~$0.35 per user/month</li>
-                    <li>With 10 organizations: ~$0.25 per user/month</li>
-                    <li>With 20 organizations: ~$0.125 per user/month</li>
-                </ul>
-                
-                <div class="pricing-calculator">
-                    <h3 style="margin-top: 0; color: var(--secondary-color);">Pricing Calculator</h3>
-                    <p>Estimate your Lemma costs based on network size and user count:</p>
-                    
-                    <div class="calculator-row">
-                        <div class="calculator-label">Number of organizations in the network:</div>
-                        <input type="number" id="num-sites" class="calculator-input" value="5" min="1" max="100">
-                    </div>
-                    
-                    <div class="calculator-row">
-                        <div class="calculator-label">Number of monthly active users:</div>
-                        <input type="number" id="num-users" class="calculator-input" value="1000" min="1">
-                    </div>
-                    
-                    <div class="calculator-result">
-                        <div><strong>Estimated price per user:</strong> <span id="per-user-price">$0.35</span>/month</div>
-                        <div><strong>Total monthly cost:</strong> <span id="monthly-total">$350.00</span></div>
+                <div class="integration-info">
+                    <h3>🔧 Reference Implementation</h3>
+                    <p>This protection is implemented using the same <code>LemmaReferenceIntegration</code> class that any external site would use:</p>
+                    <div style="background: #fff; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin-top: 10px;">
+<pre>await lemmaIntegration.protectElement(element, {
+    onSuccess: () => showProtectedContent(),
+    onError: (error) => handleError(error)
+});</pre>
                     </div>
                 </div>
+            </div>
+
+            <!-- Protected content (shown when verified) -->
+            <div id="protectedContent" class="card" style="display: none;">
+                <div class="success-badge">✅ Verification Successful</div>
                 
-                <h3 style="margin-top: 20px; color: var(--secondary-color);">Advantages Over Traditional Pricing</h3>
-                <p>Unlike traditional identity and security services that charge a fixed per-user rate regardless of network size, Lemma's network-effect pricing creates shared value:</p>
-                <ul style="margin-left: 20px; margin-bottom: 15px;">
-                    <li>Early adopters benefit as the network grows</li>
-                    <li>The cost of maintaining unique human verification is distributed across all participants</li>
-                    <li>As adoption increases, costs decrease while the value of the network increases</li>
-                    <li>Pricing aligns with the value received - you only pay for active users who benefit from Lemma verification</li>
-                </ul>
+                <div class="content-section">
+                    <h2>🎉 Welcome to Protected Content!</h2>
+                    <p>Congratulations! You have successfully verified with Lemma and can now access this protected content.</p>
+                    
+                    <p>This demonstration shows exactly how any external website would implement content protection using the Lemma Verified Network.</p>
+                </div>
+
+                <div class="content-section">
+                    <h2>🔧 How This Works</h2>
+                    <p>This page demonstrates the <strong>reference implementation</strong> approach where:</p>
+                    <ul style="margin: 15px 0 15px 30px;">
+                        <li>✅ Uses <strong>only public APIs</strong> (no internal shortcuts)</li>
+                        <li>✅ Same wallet storage as any integrated site would use</li>
+                        <li>✅ Same authentication flows as external integrations</li>
+                        <li>✅ Same error handling and user experience patterns</li>
+                    </ul>
+                    
+                    <div class="integration-info">
+                        <h3>🌐 Network Benefits</h3>
+                        <p>Your Lemma credential works across:</p>
+                        <ul style="margin: 10px 0 10px 20px; font-size: 14px;">
+                            <li>This reference implementation site</li>
+                            <li>All other Lemma-integrated platforms</li>
+                            <li>Any site that implements the same integration pattern</li>
+                            <li>Professional agent workflows across multiple platforms</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <h2>📱 Your Lemma Credentials</h2>
+                    <div id="credentialInfo">
+                        <p>Loading credential information...</p>
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <h2>🚀 What's Next?</h2>
+                    <p>Now that you're verified with Lemma:</p>
+                    <ul style="margin: 15px 0 15px 30px;">
+                        <li>Your verification works across all Lemma-integrated sites</li>
+                        <li>No need to re-verify on other network partners</li>
+                        <li>Your reputation and trust score follows you everywhere</li>
+                        <li>You can work as an agent across multiple platforms</li>
+                    </ul>
+                    
+                    <button id="viewCredentialsBtn" class="button">
+                        👀 View Credentials in Wallet
+                    </button>
+                    
+                    <button id="testIntegrationBtn" class="button secondary">
+                        🧪 Test Integration Flow
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error state -->
+            <div id="errorSection" class="card" style="display: none;">
+                <div class="error-message">
+                    <h3>⚠️ Integration Error</h3>
+                    <p id="errorMessage">An error occurred while checking verification status.</p>
+                </div>
                 
-                <p>This pricing approach reflects Lemma's fundamental belief that maintaining a network of verified humans should become more affordable as it becomes more universal.</p>
+                <button id="retryBtn" class="button">
+                    🔄 Retry Verification Check
+                </button>
             </div>
-            
-            <div class="content-section">
-                <h2>Why Human Verification Matters</h2>
-                <p>In an age of increasing automation and AI, verifying that users are human helps maintain the integrity of online communities and services. Lemma's approach focuses on privacy and minimal data collection.</p>
-                <p>Unlike traditional verification systems that collect extensive personal information, Lemma only verifies your humanity - nothing more.</p>
-            </div>
-            
-            <div class="content-section">
-                <h2>How Lemma's Verification Works Across Sites</h2>
-                <p>Your Lemma credential is stored securely in your digital wallet and can be presented to any site that accepts Lemma verification. This means:</p>
-                <ul style="margin-left: 20px; margin-bottom: 15px;">
-                    <li>You only need to be verified once</li>
-                    <li>Your credentials travel with you across devices via your wallet</li>
-                    <li>No central database stores your personal information</li>
-                    <li>Each site can verify your humanity without knowing anything else about you</li>
-                    <li>The verification uses cryptographic proofs that can't be forged</li>
-                </ul>
-                <p>The wallet implementation enables seamless credential management, backup, and cross-device usage, providing a more robust solution than traditional browser storage.</p>
-                <p>This demonstration shows how your credential can be used to access protected content across different pages or even different websites.</p>
-            </div>
-            
-            <div class="nav-links">
-                <a href="{{ url_for('main.math_appendix') }}">Mathematical Appendix</a>
-                <a href="{{ url_for('main.api_docs') }}">API Documentation</a>
-            </div>
-            
-            <a href="/" class="button">Return to Home</a>
-        </div>
-        
+        </main>
+
         <footer>
-            <p>Lemma Human Network &copy; 2025 | <a href="/verify">Verification Page</a></p>
+            <p>Protected by <a href="/">Lemma Verified Network</a> | 
+            <a href="/onboarding">🌐 Integrate Your Site</a> | 
+            <a href="/">🏠 Home</a></p>
         </footer>
     </div>
 
     <script>
-        // Initialize Lemma wallet with debugging
-        document.addEventListener('DOMContentLoaded', function() {
-            // Add a debug checker for session issues
-            async function checkSessionStatus() {
-                try {
-                    const response = await fetch('/api/debug-session');
-                    const sessionData = await response.json();
-                    console.log('DEBUG - Session status:', sessionData);
-                    
-                    // Update UI with session info
-                    const debugSection = document.getElementById('debugSection');
-                    if (debugSection) {
-                        const sessionInfo = document.createElement('div');
-                        sessionInfo.style.marginTop = '15px';
-                        sessionInfo.style.padding = '10px';
-                        sessionInfo.style.backgroundColor = '#f0f7ff';
-                        sessionInfo.style.borderRadius = '4px';
-                        sessionInfo.style.fontSize = '12px';
-                        
-                        sessionInfo.innerHTML = `
-                            <h4>Session Debug Info</h4>
-                            <p><strong>Session Cookie Present:</strong> ${sessionData.has_session_cookie}</p>
-                            <p><strong>Verified Human:</strong> ${sessionData.session.verified_human || 'false'}</p>
-                            <p><strong>User ID:</strong> ${sessionData.session.verified_user_id || 'None'}</p>
-                            <p><strong>Cookie Security:</strong> Secure=${sessionData.cookie_config.SESSION_COOKIE_SECURE}, 
-                               SameSite=${sessionData.cookie_config.SESSION_COOKIE_SAMESITE}</p>
-                        `;
-                        debugSection.appendChild(sessionInfo);
-                    }
-                    
-                    // Check if we need to force-reload due to session issues
-                    if (!sessionData.has_session_cookie && sessionData.session.verified_human) {
-                        console.warn('Session inconsistency detected - cookie missing but session verified');
-                        // Add a reload button
-                        const reloadBtn = document.createElement('button');
-                        reloadBtn.textContent = 'Force Reload Session';
-                        reloadBtn.className = 'button';
-                        reloadBtn.style.backgroundColor = '#DC3545';
-                        reloadBtn.style.marginTop = '10px';
-                        reloadBtn.addEventListener('click', () => {
-                            window.location.reload(true);
-                        });
-                        debugSection.appendChild(reloadBtn);
-                    }
-                } catch (error) {
-                    console.error('Failed to check session status:', error);
-                }
-            }
-            
-            // Run session check
-            checkSessionStatus();
-            
-            // ... rest of your existing DOMContentLoaded code ...
-        });
-
-        // Check if credential exists in the wallet or session
-        async function checkCredential() {
-            const userId = document.getElementById('sessionUserId').value;
-            const sessionVerified = document.getElementById('sessionVerified').value === 'true';
-            
-            console.log('Session verification status:', sessionVerified);
-            
-            // If already verified in session, we're done
-            if (sessionVerified) {
-                console.log('User already verified in session');
-                return;
-            }
+        // Initialize Lemma Reference Integration (exactly like external sites)
+        let lemmaIntegration;
+        let protectedContentElement;
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('[PROTECTED] Initializing reference implementation...');
             
             try {
-                // Wait for wallet to initialize
-                await waitForWallet();
+                // Initialize the reference integration (same as any external site)
+                lemmaIntegration = new LemmaReferenceIntegration({
+                    apiBaseUrl: '', // Same domain
+                    enableCSRF: true,
+                    requireHTTPS: false, // Allow local development
+                    showDebugInfo: true,
+                    autoHideMessages: true
+                });
                 
-                if (!window.lemmaWallet) {
-                    console.error('Lemma wallet not initialized');
-                    alert('Error initializing Lemma wallet. Redirecting to verification page...');
-                    window.location.href = '/verify?user_id=' + userId;
-                    return;
-                }
+                // Get protected content element
+                protectedContentElement = document.getElementById('protectedContent');
                 
-                // Use the verification flow from our wallet
-                const result = await verifyWithLemma(userId);
-                console.log('Verification result:', result);
+                // Use the reference integration to protect the content
+                await protectContentUsingReferenceAPI();
                 
-                if (result.status === 'verified') {
-                    console.log('User verified, redirecting or reloading');
-                    
-                    // Either redirect or reload page
-                    if (result.redirect_url) {
-                        window.location.href = result.redirect_url + '?nocache=' + new Date().getTime();
-                    } else {
-                        window.location.reload(true);
-                    }
-                } else if (result.status === 'initiated') {
-                    console.log('Verification initiated, redirecting to verification URL');
-                    if (result.verification_url) {
-                        window.location.href = result.verification_url;
-                    } else {
-                        window.location.href = '/verify?user_id=' + userId;
-                    }
-                } else {
-                    console.error('Verification failed:', result.message);
-                    alert('Verification failed. Redirecting to verification page...');
-                    window.location.href = '/verify?user_id=' + userId;
-                }
             } catch (error) {
-                console.error('Error during credential verification:', error);
-                alert('Error during verification. Redirecting to verification page...');
-                window.location.href = '/verify?user_id=' + userId;
+                console.error('[PROTECTED] Reference integration failed:', error);
+                showError('Failed to initialize Lemma integration: ' + error.message);
+            }
+        });
+        
+        // Protect content using the reference API (same as external sites)
+        async function protectContentUsingReferenceAPI() {
+            console.log('[PROTECTED] Protecting content using reference API...');
+            
+            try {
+                // Check verification status using public API
+                const hasValidCredentials = await lemmaIntegration.hasValidCredentials();
+                
+                if (hasValidCredentials) {
+                    // User is verified - show protected content
+                    console.log('[PROTECTED] User has valid credentials - showing protected content');
+                    await showProtectedContent();
+                } else {
+                    // User needs verification - show verification prompt
+                    console.log('[PROTECTED] User needs verification - showing verification prompt');
+                    showVerificationRequired();
+                }
+                
+                // Hide loading state
+                document.getElementById('loadingSection').style.display = 'none';
+                
+            } catch (error) {
+                console.error('[PROTECTED] Error checking verification status:', error);
+                showError('Error checking verification status: ' + error.message);
             }
         }
         
-        // Helper function to wait for wallet to initialize
-        function waitForWallet(timeout = 2000) {
-            return new Promise((resolve) => {
-                if (window.lemmaWallet) {
-                    resolve();
-                    return;
-                }
+        // Show verification required screen
+        function showVerificationRequired() {
+            document.getElementById('verificationRequired').style.display = 'block';
+            document.getElementById('loadingSection').style.display = 'none';
+            
+            // Add click handler for verification button
+            document.getElementById('verifyBtn').addEventListener('click', async () => {
+                console.log('[PROTECTED] Starting verification flow...');
                 
-                const startTime = Date.now();
-                const checkInterval = setInterval(() => {
-                    if (window.lemmaWallet) {
-                        clearInterval(checkInterval);
-                        resolve();
-                    } else if (Date.now() - startTime > timeout) {
-                        // Timeout
-                        clearInterval(checkInterval);
-                        resolve();
+                await lemmaIntegration.performVerification({
+                    returnUrl: window.location.href,
+                    onSuccess: async (result) => {
+                        console.log('[PROTECTED] Verification successful:', result);
+                        lemmaIntegration.showMessage('✅ Verification successful! Refreshing content...', 'success');
+                        
+                        // Show protected content
+                        document.getElementById('verificationRequired').style.display = 'none';
+                        await showProtectedContent();
+                    },
+                    onError: (error) => {
+                        console.error('[PROTECTED] Verification failed:', error);
+                        lemmaIntegration.showMessage(`❌ Verification failed: ${error.message}`, 'error');
                     }
-                }, 100);
+                });
             });
         }
         
-        // Display user information from wallet or session
-        async function displayUserInfo() {
-            // Wait for wallet to initialize
-            await waitForWallet();
+        // Show protected content (user is verified)
+        async function showProtectedContent() {
+            console.log('[PROTECTED] Displaying protected content...');
             
-            const userIdElement = document.getElementById('userId');
+            document.getElementById('protectedContent').style.display = 'block';
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('verificationRequired').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'none';
             
-            // Only update if element doesn't have server-provided content
-            if (userIdElement && (userIdElement.textContent === "" || userIdElement.textContent === "Unknown")) {
-                if (window.lemmaWallet) {
-                    try {
-                        const credentials = await window.lemmaWallet.getAllCredentials();
-                        if (credentials.length > 0) {
-                            const firstCredential = credentials[0];
-                            const userId = firstCredential.wallet_metadata.holder_id;
-                            userIdElement.textContent = userId;
-                        }
-                    } catch (error) {
-                        console.error('Error getting credentials from wallet:', error);
-                    }
+            // Load and display credential information
+            await loadCredentialInfo();
+            
+            // Add event handlers for protected content buttons
+            setupProtectedContentHandlers();
+        }
+        
+        // Load credential information using the wallet
+        async function loadCredentialInfo() {
+            try {
+                const credentials = await lemmaIntegration.wallet.getAllCredentials();
+                const credentialInfoDiv = document.getElementById('credentialInfo');
+                
+                if (credentials && credentials.length > 0) {
+                    const cred = credentials[0];
+                    const credential = cred.credential;
+                    
+                    credentialInfoDiv.innerHTML = `
+                        <div class="credential-details">
+                            <h4>📄 Active Credential</h4>
+                            <p><strong>ID:</strong> ${credential.id ? credential.id.substring(0, 40) + '...' : 'Unknown'}</p>
+                            <p><strong>Issued:</strong> ${credential.issuanceDate ? new Date(credential.issuanceDate).toLocaleDateString() : 'Unknown'}</p>
+                            <p><strong>Expires:</strong> ${credential.expirationDate ? new Date(credential.expirationDate).toLocaleDateString() : 'Never'}</p>
+                            <p><strong>Subject:</strong> ${credential.credentialSubject?.id || 'Unknown'}</p>
+                            <p><strong>Storage:</strong> Browser wallet (same as any external site)</p>
+                        </div>
+                    `;
                 } else {
-                    // Fallback to localStorage check for backward compatibility
-                    const legacyCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
-                    if (legacyCredentials.length > 0) {
-                        const userId = legacyCredentials[0].replace('lemma_credential_', '');
-                        userIdElement.textContent = userId;
-                    }
-                }
-            }
-        }
-        
-        // Wait for the wallet to initialize
-        async function waitForWallet() {
-            let attempts = 0;
-            const maxAttempts = 20;
-            
-            while (attempts < maxAttempts) {
-                if (window.lemmaWallet) {
-                    return window.lemmaWallet;
+                    credentialInfoDiv.innerHTML = `
+                        <div class="error-message">
+                            <p>⚠️ No credentials found in wallet</p>
+                        </div>
+                    `;
                 }
                 
-                await new Promise(resolve => setTimeout(resolve, 500));
-                attempts++;
-            }
-            
-            console.error('Wallet failed to initialize after multiple attempts');
-            return null;
-        }
-        
-        // Auto-store session credential in wallet when page loads
-        async function storeSessionCredential() {
-            const sessionCredentialElement = document.getElementById('sessionCredential');
-            const sessionUserIdElement = document.getElementById('sessionUserId');
-            
-            if (!sessionCredentialElement || !sessionCredentialElement.value) {
-                console.log('No session credential to store');
-                return;
-            }
-            
-            try {
-                const credential = JSON.parse(sessionCredentialElement.value);
-                console.log('Found credential in session, will store in wallet:', credential);
-                
-                if (!credential || !credential.id) {
-                    console.warn('Invalid credential format');
-                    return;
-                }
-                
-                // Get user ID
-                const userId = sessionUserIdElement?.value || 'unknown';
-                
-                // Wait for wallet to initialize
-                const wallet = await waitForWallet();
-                if (!wallet) {
-                    console.error('Could not access wallet for credential storage');
-                    return;
-                }
-                
-                // Check if this credential is already in the wallet
-                const existingCredentials = await wallet.getAllCredentials();
-                const exists = existingCredentials.some(c => 
-                    c.credential.id === credential.id || 
-                    (c.wallet_metadata && c.wallet_metadata.holder_id === userId)
-                );
-                
-                if (exists) {
-                    console.log('Credential already exists in wallet');
-                    return;
-                }
-                
-                // Format for wallet storage
-                const walletCredential = {
-                    credential: credential,
-                    wallet_metadata: {
-                        added_at: new Date().toISOString(),
-                        holder_id: userId,
-                        status: "active",
-                        display_name: "Lemma Human Verification",
-                        fingerprint: credential.id || `fingerprint-${Date.now()}`
-                    }
-                };
-                
-                // Store in wallet
-                await wallet.storeCredential(walletCredential);
-                console.log('Successfully stored credential in wallet:', credential.id);
             } catch (error) {
-                console.error('Error storing session credential in wallet:', error);
+                console.error('[PROTECTED] Error loading credential info:', error);
+                document.getElementById('credentialInfo').innerHTML = `
+                    <div class="error-message">
+                        <p>⚠️ Error loading credential information: ${error.message}</p>
+                    </div>
+                `;
             }
         }
         
-        // Check for credentials immediately when page loads
-        window.addEventListener('load', async function() {
-            console.log('Protected page loaded, checking credentials');
-            try {
-                await checkCredential();
-                // Store session credential in wallet if available
-                await storeSessionCredential();
-            } catch (error) {
-                console.error('Error during credential check:', error);
-            }
-        });
-        
-        // Import credential from JSON file
-        document.getElementById('importBtn').addEventListener('click', function() {
-            document.getElementById('importFile').click();
-        });
-        
-        document.getElementById('importFile').addEventListener('change', async function(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = async function(e) {
+        // Setup button handlers for protected content
+        function setupProtectedContentHandlers() {
+            // View Credentials button
+            document.getElementById('viewCredentialsBtn').addEventListener('click', async () => {
                 try {
-                    // Get CSRF token
-                    const csrfResponse = await fetch('/api/generate-csrf-token', {
-                        credentials: 'include'
-                    });
-                    const csrfData = await csrfResponse.json();
-                    const csrfToken = csrfData.csrf_token;
+                    const credentials = await lemmaIntegration.wallet.getAllCredentials();
                     
-                    const credential = JSON.parse(e.target.result);
-                    
-                    // Basic validation to ensure this is a Lemma credential
-                    if (!credential.id || !credential.type || !credential.credentialSubject || !credential.proof) {
-                        throw new Error("Invalid credential format");
-                    }
-                    
-                    // Extract user ID from credential
-                    const userId = credential.credentialSubject.id.replace('did:user:', '');
-                    
-                    // Store in localStorage
-                    localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(credential));
-                    
-                    // Generate a random challenge for presentation
-                    const challenge = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-                        .map(b => b.toString(16).padStart(2, '0')).join('');
-                    localStorage.setItem('lemma_challenge', challenge);
-                    
-                    // Create a presentation with the imported credential
-                    const presResponse = await fetch('/api/presentation', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-Token': csrfToken
-                        },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            credential: credential,
-                            challenge: challenge,
-                            csrf_token: csrfToken
-                        })
-                    });
-                    
-                    if (!presResponse.ok) {
-                        throw new Error(`Failed to create presentation: ${presResponse.status}`);
-                    }
-                    
-                    const presentation = await presResponse.json();
-                    localStorage.setItem(`lemma_presentation_${userId}`, JSON.stringify(presentation));
-                    
-                    // Verify the presentation to authenticate the user
-                    const verifyResponse = await fetch('/api/verify-human', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-Token': csrfToken
-                        },
-                        body: JSON.stringify({
-                            presentation: presentation,
-                            challenge: challenge,
-                            csrf_token: csrfToken
-                        })
-                    });
-                    
-                    if (!verifyResponse.ok) {
-                        const errorData = await verifyResponse.json();
-                        throw new Error(`Verification failed: ${verifyResponse.status} - ${JSON.stringify(errorData)}`);
-                    }
-                    
-                    // Update displayed user ID
-                    document.getElementById('userId').textContent = userId;
-                    
-                    alert('Credential imported successfully!');
-                    
-                    // Refresh the page to reflect the new credential
-                    window.location.reload();
-                } catch (e) {
-                    console.error('Error importing credential:', e);
-                    alert('Error importing credential: ' + e.message);
-                }
-            };
-            reader.readAsText(file);
-        });
-        
-        // View Lemma Credential
-        document.getElementById('viewLemmaBtn').addEventListener('click', function() {
-            const credentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
-            if (credentials.length > 0) {
-                const credentialKey = credentials[0];
-                const credentialJson = localStorage.getItem(credentialKey);
-                try {
-                    // Format the JSON for better readability
-                    const credential = JSON.parse(credentialJson);
-                    document.getElementById('lemmaContent').textContent = JSON.stringify(credential, null, 2);
-                    document.getElementById('lemmaViewer').style.display = 'block';
-                } catch (e) {
-                    alert('Error parsing credential: ' + e.message);
-                }
-            } else {
-                alert('No Lemma credential found in browser storage.');
-            }
-        });
-        
-        // Close Lemma Viewer
-        document.getElementById('closeLemmaBtn').addEventListener('click', function() {
-            document.getElementById('lemmaViewer').style.display = 'none';
-        });
-        
-        // Clear Lemma Credential
-        document.getElementById('clearLemmaBtn').addEventListener('click', function() {
-            if (confirm('Are you sure you want to clear your Lemma credential? You will need to verify again to access protected content.')) {
-                // Clear all lemma-related items from localStorage
-                Object.keys(localStorage).forEach(key => {
-                    if (key.startsWith('lemma_credential_') || key.startsWith('lemma_presentation_') || key === 'lemma_challenge') {
-                        localStorage.removeItem(key);
-                    }
-                });
-                
-                // Clear credentials from wallet if available
-                if (window.lemmaWallet) {
-                    try {
-                        window.lemmaWallet.getAllCredentials()
-                            .then(credentials => {
-                                const deletePromises = credentials.map(cred => 
-                                    window.lemmaWallet.deleteCredential(cred.id)
-                                );
-                                
-                                return Promise.all(deletePromises);
-                            })
-                            .then(() => {
-                                console.log('All credentials deleted from wallet');
-                            })
-                            .catch(error => {
-                                console.error('Error deleting credentials from wallet:', error);
-                            });
-                    } catch (error) {
-                        console.error('Error accessing wallet to clear credentials:', error);
-                    }
-                }
-                
-                // Clear session cookie by redirecting to logout endpoint
-                fetch('/api/logout', {
-                    method: 'POST',
-                    credentials: 'include'
-                })
-                .finally(() => {
-                    alert('Lemma credential cleared. Redirecting to home page...');
-                    window.location.href = '/';
-                });
-            }
-        });
-        
-        // Plan toggle functionality
-        document.getElementById('togglePlanBtn').addEventListener('click', function() {
-            const planSection = document.getElementById('lemma-plan-section');
-            if (planSection.style.display === 'none') {
-                planSection.style.display = 'block';
-                this.textContent = 'Hide Lemma Network';
-                // Hide pricing section if it's open
-                document.getElementById('pricing-section').style.display = 'none';
-                document.getElementById('togglePricingBtn').textContent = 'View Pricing Model';
-            } else {
-                planSection.style.display = 'none';
-                this.textContent = 'View Lemma Network';
-            }
-        });
-
-        // Debug credential loading and storage
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Protected page loaded, forcing credential load');
-            
-            // Get wallet credential from hidden field
-            const walletCredentialElem = document.getElementById('walletCredential');
-            const sessionCredentialElem = document.getElementById('sessionCredential');
-            const userIdElem = document.getElementById('sessionUserId');
-            
-            let credential = null;
-            let userId = userIdElem?.value || 'unknown';
-            
-            // Try to get credential from wallet hidden field
-            if (walletCredentialElem && walletCredentialElem.value) {
-                try {
-                    const walletCredential = JSON.parse(walletCredentialElem.value);
-                    console.log('Found wallet credential in hidden field', walletCredential);
-                    credential = walletCredential;
-                    
-                    // Store directly in localStorage for access by wallet
-                    localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(walletCredential));
-                    console.log('Stored wallet credential in localStorage');
-                    
-                    // Update UI
-                    document.getElementById('userId').textContent = userId;
-                    document.getElementById('lemmaStatus').textContent = 'Verified Human';
-                    document.getElementById('credentialId').textContent = walletCredential.credential?.id || 'Unknown';
-                } catch (e) {
-                    console.error('Error parsing wallet credential:', e);
-                }
-            }
-            // Fall back to session credential
-            else if (sessionCredentialElem && sessionCredentialElem.value) {
-                try {
-                    const rawCredential = JSON.parse(sessionCredentialElem.value);
-                    console.log('Found session credential in hidden field', rawCredential);
-                    
-                    // Format for wallet
-                    const walletCredential = {
-                        credential: rawCredential,
-                        wallet_metadata: {
-                            added_at: rawCredential.issuanceDate || new Date().toISOString(),
-                            holder_id: userId,
-                            status: "active",
-                            display_name: "Lemma Human Verification",
-                            fingerprint: rawCredential.id || `fingerprint-${Date.now()}`
-                        }
-                    };
-                    
-                    // Store directly in localStorage
-                    localStorage.setItem(`lemma_credential_${userId}`, JSON.stringify(walletCredential));
-                    console.log('Stored session credential in localStorage');
-                    
-                    // Update UI
-                    document.getElementById('userId').textContent = userId;
-                    document.getElementById('lemmaStatus').textContent = 'Verified Human';
-                    document.getElementById('credentialId').textContent = rawCredential.id || 'Unknown';
-                } catch (e) {
-                    console.error('Error parsing session credential:', e);
-                }
-            }
-            
-            // Check localStorage as a final fallback
-            if (!credential) {
-                const storageCredentials = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
-                if (storageCredentials.length > 0) {
-                    try {
-                        const storageCredential = JSON.parse(localStorage.getItem(storageCredentials[0]));
-                        console.log('Found credential in localStorage', storageCredential);
+                    if (credentials && credentials.length > 0) {
+                        const credentialData = JSON.stringify(credentials[0], null, 2);
                         
-                        // Update UI
-                        const storageUserId = storageCredentials[0].replace('lemma_credential_', '');
-                        document.getElementById('userId').textContent = storageUserId;
-                        document.getElementById('lemmaStatus').textContent = 'Verified Human';
-                        document.getElementById('credentialId').textContent = 
-                            storageCredential.credential?.id || 
-                            storageCredential.id || 
-                            'Unknown';
-                    } catch (e) {
-                        console.error('Error parsing localStorage credential:', e);
+                        // Create modal or new window to show credential details
+                        const modal = document.createElement('div');
+                        modal.style.cssText = `
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                            background: rgba(0,0,0,0.8);
+                            z-index: 10000;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            padding: 20px;
+                        `;
+                        
+                        modal.innerHTML = `
+                            <div style="
+                                background: white;
+                                border-radius: 10px;
+                                padding: 20px;
+                                max-width: 600px;
+                                max-height: 80vh;
+                                overflow-y: auto;
+                                position: relative;
+                            ">
+                                <h3 style="margin-bottom: 15px;">📄 Credential Details</h3>
+                                <pre style="
+                                    background: #f8f9fa;
+                                    padding: 15px;
+                                    border-radius: 6px;
+                                    font-size: 12px;
+                                    overflow-x: auto;
+                                    white-space: pre-wrap;
+                                ">${credentialData}</pre>
+                                <button onclick="this.closest('[style*=\"position: fixed\"]').remove()" style="
+                                    position: absolute;
+                                    top: 10px;
+                                    right: 15px;
+                                    background: #dc3545;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 4px;
+                                    padding: 5px 10px;
+                                    cursor: pointer;
+                                ">✕</button>
+                            </div>
+                        `;
+                        
+                        document.body.appendChild(modal);
+                        
+                        // Close modal when clicking outside
+                        modal.addEventListener('click', (e) => {
+                            if (e.target === modal) {
+                                modal.remove();
+                            }
+                        });
+                        
+                    } else {
+                        lemmaIntegration.showMessage('⚠️ No credentials found in wallet', 'error');
                     }
-                } else {
-                    console.error('No credentials found in any storage location');
+                    
+                } catch (error) {
+                    console.error('[PROTECTED] Error viewing credentials:', error);
+                    lemmaIntegration.showMessage('❌ Error accessing wallet: ' + error.message, 'error');
+                }
+            });
+            
+            // Test Integration button
+            document.getElementById('testIntegrationBtn').addEventListener('click', async () => {
+                lemmaIntegration.showMessage('🧪 Running integration test...', 'info');
+                
+                try {
+                    // Test the verification flow
+                    const debugInfo = lemmaIntegration.getDebugInfo();
+                    console.log('[PROTECTED] Debug info:', debugInfo);
+                    
+                    // Test API connectivity
+                    const challengeResponse = await lemmaIntegration.makeAPICall('/api/generate-challenge');
+                    const challengeData = await challengeResponse.json();
+                    
+                    if (challengeResponse.ok && challengeData.success) {
+                        lemmaIntegration.showMessage('✅ Integration test passed! All APIs working correctly.', 'success');
+                    } else {
+                        lemmaIntegration.showMessage('⚠️ Integration test warning: API response unexpected', 'error');
+                    }
+                    
+                } catch (error) {
+                    console.error('[PROTECTED] Integration test failed:', error);
+                    lemmaIntegration.showMessage('❌ Integration test failed: ' + error.message, 'error');
+                }
+            });
+        }
+        
+        // Show error state
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorSection').style.display = 'block';
+            document.getElementById('loadingSection').style.display = 'none';
+            
+            // Add retry handler
+            document.getElementById('retryBtn').addEventListener('click', () => {
+                document.getElementById('errorSection').style.display = 'none';
+                document.getElementById('loadingSection').style.display = 'block';
+                
+                // Retry protection check
+                setTimeout(protectContentUsingReferenceAPI, 1000);
+            });
+        }
+        
+        // Handle verification callback (same as external sites)
+        window.addEventListener('load', async function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            if (urlParams.get('verification_success') === 'true') {
+                console.log('[PROTECTED] Processing verification callback...');
+                
+                if (lemmaIntegration) {
+                    const result = await lemmaIntegration.handleVerificationCallback(urlParams);
+                    
+                    if (result.success) {
+                        console.log('[PROTECTED] Verification callback processed successfully');
+                        // Clean up URL parameters
+                        const cleanUrl = window.location.origin + window.location.pathname;
+                        window.history.replaceState({}, document.title, cleanUrl);
+                        // Refresh content protection
+                        await protectContentUsingReferenceAPI();
+                    } else {
+                        console.error('[PROTECTED] Verification callback failed:', result.error);
+                        showError('Verification callback failed: ' + result.error);
+                    }
                 }
             }
         });
+        
+        // Debug functions for developers
+        window.getProtectedPageDebugInfo = () => {
+            return {
+                lemmaIntegration: lemmaIntegration ? lemmaIntegration.getDebugInfo() : null,
+                currentState: {
+                    loadingVisible: document.getElementById('loadingSection').style.display !== 'none',
+                    verificationRequiredVisible: document.getElementById('verificationRequired').style.display !== 'none',
+                    protectedContentVisible: document.getElementById('protectedContent').style.display !== 'none',
+                    errorVisible: document.getElementById('errorSection').style.display !== 'none'
+                },
+                url: window.location.href,
+                timestamp: new Date().toISOString()
+            };
+        };
+        
+        console.log('[PROTECTED] Page loaded - type getProtectedPageDebugInfo() for debug information');
     </script>
 </body>
 </html>

@@ -8,9 +8,7 @@
     
     <!-- Load Lemma Verified Network components -->
     <script src="/static/js/lemma-wallet.js"></script>
-    <script src="/static/js/lemma-gate-secure.js"></script>
-    <script src="/static/js/lemma-crypto-hardened.js"></script>
-    <script src="/static/js/lemma-gate-enhanced.js"></script>
+    <script src="/static/js/lemma-reference-integration.js"></script>
     
     <style>
         :root {
@@ -200,21 +198,141 @@
         .feature-icon {
             font-size: 48px;
             margin-bottom: 20px;
+            display: block;
         }
         
         .feature-card h3 {
-            font-size: 24px;
-            margin-bottom: 15px;
             color: var(--primary-color);
+            margin-bottom: 15px;
+            font-size: 24px;
         }
         
         .feature-card p {
-            font-size: 16px;
             color: #666;
             line-height: 1.6;
         }
         
-        .protocol-info {
+        .pricing-section {
+            background: var(--white);
+            padding: 50px 40px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+        
+        .pricing-section h2 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 30px;
+            font-size: 36px;
+        }
+        
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .pricing-card {
+            border: 2px solid #e9ecef;
+            border-radius: var(--border-radius);
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .pricing-card.featured {
+            border-color: var(--primary-color);
+            transform: scale(1.05);
+        }
+        
+        .pricing-card.featured::before {
+            content: "Most Popular";
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary-color);
+            color: var(--white);
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .price {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+        
+        .price-period {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .pricing-features {
+            list-style: none;
+            margin-bottom: 30px;
+        }
+        
+        .pricing-features li {
+            padding: 8px 0;
+            color: #666;
+        }
+        
+        .pricing-features li::before {
+            content: "✓";
+            color: var(--primary-color);
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .network-effects {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 40px;
+            border-radius: var(--border-radius);
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .network-effects h3 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+        
+        .network-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .stat-card {
+            background: var(--white);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: block;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .network-comparison {
             background: var(--white);
             padding: 40px;
             border-radius: var(--border-radius);
@@ -222,122 +340,161 @@
             margin-bottom: 40px;
         }
         
-        .protocol-info h2 {
-            text-align: center;
-            font-size: 32px;
-            margin-bottom: 30px;
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .comparison-table th,
+        .comparison-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .comparison-table th {
+            background: var(--light-bg);
             color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .integration-demo {
+            background: var(--white);
+            padding: 40px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+        
+        .integration-demo h3 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 24px;
+            text-align: center;
+        }
+        
+        .demo-section {
+            border: 2px dashed #e9ecef;
+            border-radius: var(--border-radius);
+            padding: 30px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .protocol-benefits {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--white);
+            padding: 50px 40px;
+            border-radius: var(--border-radius);
+            margin-bottom: 40px;
+        }
+        
+        .protocol-benefits h3 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+        
+        .benefit-item {
+            text-align: center;
+        }
+        
+        .benefit-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        .benefit-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .benefit-description {
+            opacity: 0.9;
+        }
+        
+        .integration-section {
+            background: var(--white);
+            padding: 50px 40px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+        
+        .integration-section h3 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
         }
         
         .protocol-features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: var(--border-radius);
+            padding: 30px;
             margin-top: 30px;
+        }
+        
+        .protocol-features h4 {
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
         }
         
         .protocol-feature {
             display: flex;
             align-items: center;
-            gap: 15px;
-            padding: 15px;
-            background: var(--light-bg);
-            border-radius: var(--border-radius);
+            gap: 10px;
         }
         
         .protocol-feature .icon {
-            font-size: 24px;
-            min-width: 30px;
-        }
-        
-        .protocol-feature .text {
-            font-size: 16px;
-            color: #555;
+            font-size: 20px;
         }
         
         footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 30px 0;
-            margin-top: 60px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        footer p {
+            text-align: center;
+            padding: 40px 20px;
             color: rgba(255, 255, 255, 0.8);
         }
         
+        footer p {
+            margin-bottom: 15px;
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        
         .footer-links a {
-            color: var(--white);
+            color: rgba(255, 255, 255, 0.8);
             text-decoration: none;
-            margin-left: 20px;
-            padding: 8px 16px;
-            border-radius: 4px;
-            transition: background-color 0.3s ease;
+            transition: color 0.3s ease;
         }
         
         .footer-links a:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-        
-        /* Flash messages */
-        .flash-messages {
-            margin: 20px 0;
-        }
-        
-        .flash-message {
-            padding: 15px 20px;
-            border-radius: var(--border-radius);
-            margin-bottom: 15px;
-            font-weight: 500;
-        }
-        
-        .flash-message.info {
-            background-color: #e3f2fd;
-            color: #0d47a1;
-            border-left: 4px solid #2196f3;
-        }
-        
-        .flash-message.success {
-            background-color: #e8f5e9;
-            color: #1b5e20;
-            border-left: 4px solid #4caf50;
-        }
-        
-        .flash-message.warning {
-            background-color: #fff8e1;
-            color: #ff6f00;
-            border-left: 4px solid #ffc107;
-        }
-        
-        .flash-message.error {
-            background-color: #ffebee;
-            color: #b71c1c;
-            border-left: 4px solid #f44336;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-left: 10px;
-        }
-
-        .status-badge.network {
-            background: rgba(40, 167, 69, 0.1);
-            color: var(--primary-color);
+            color: var(--white);
         }
         
         @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-            
             .hero {
-                padding: 40px 25px;
+                padding: 40px 20px;
             }
             
             .hero h2 {
@@ -350,34 +507,19 @@
             }
             
             .button {
-                width: 100%;
-                max-width: 300px;
+                min-width: 250px;
             }
             
-            header {
-                flex-direction: column;
-                text-align: center;
-                gap: 10px;
+            .features {
+                grid-template-columns: 1fr;
             }
             
-            .site-subtitle {
-                margin-left: 0;
+            .pricing-grid {
+                grid-template-columns: 1fr;
             }
             
-            footer {
-                flex-direction: column;
-                gap: 20px;
-                text-align: center;
-            }
-            
-            .footer-links {
-                display: flex;
-                gap: 20px;
-                justify-content: center;
-            }
-            
-            .footer-links a {
-                margin-left: 0;
+            .pricing-card.featured {
+                transform: none;
             }
         }
     </style>
@@ -389,123 +531,212 @@
                 <span>L</span>
             </div>
             <div>
-                <h1 class="site-title">Lemma: A Network of Verified Users</h1>
-                <p class="site-subtitle">The essential verification protocol for digital trust</p>
+                <h1 class="site-title">Lemma</h1>
+                <p class="site-subtitle">The essential User Trust Protocol for digital trust</p>
             </div>
         </header>
-        
-        <!-- Flash messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            <div class="flash-messages">
-              {% for category, message in messages %}
-                <div class="flash-message {{ category }}">
-                  {{ message }}
-                </div>
-              {% endfor %}
-            </div>
-          {% endif %}
-        {% endwith %}
 
         <main>
             <section class="hero">
-                <h2>Verify Once, Trusted Everywhere</h2>
-                <p class="subtitle">Join the Lemma Verified Network</p>
-                <p>Lemma creates a global network where verified users and agents can seamlessly operate across thousands of integrated platforms. Verify once, unlock access everywhere.</p>
+                <h2>A Network of Verified Users</h2>
+                <p class="subtitle">The foundational verification layer for the entire internet</p>
+                <p>Prove that you're a unique human entity—nothing more, nothing less. Join the global network where verified users and agents can seamlessly work across thousands of integrated platforms.</p>
                 
-                <div class="verification-section">
-                    <h3>🌐 Join the Lemma Verified Network</h3>
-                    <p>One verification unlocks access to thousands of integrated platforms. Perfect for humans and authorized agents working across the modern digital economy.</p>
-                    
-                    <div class="cta-buttons">
-                        <button id="getVerifiedBtn" class="button primary">
-                            🚀 Get Verified
-                            <span class="status-badge network">Network Access</span>
-                        </button>
-                        <a href="/protected" class="button secondary">
-                            🔒 Try Protected Content
-                        </a>
-                    </div>
+                <div class="cta-buttons">
+                    <button id="getVerifiedBtn" class="button primary">
+                        🚀 Get Verified
+                    </button>
+                    <button id="accessProtectedBtn" class="button secondary">
+                        🔒 Access Protected Content
+                    </button>
                 </div>
             </section>
 
-            <section class="features">
-                <div class="feature-card">
-                    <div class="feature-icon">🌐</div>
-                    <h3>Global Verification Network</h3>
-                    <p>Join thousands of integrated sites in the Lemma Verified Network. Your verification credentials work seamlessly across all network partners.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🤖</div>
-                    <h3>Agent-Centric Architecture</h3>
-                    <p>Perfect infrastructure for both humans and authorized agents. Enable seamless workflows across multiple platforms for the AI economy.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔐</div>
-                    <h3>Enterprise Security</h3>
-                    <p>W3C-compliant verification with enterprise-grade cryptographic security. Bot prevention at scale across the entire network.</p>
-                </div>
-            </section>
-
-            <section class="protocol-info">
-                <h2>🚀 Network Advantage</h2>
-                <p style="text-align: center; font-size: 18px; color: #666; margin-bottom: 30px;">
-                    Unlike single-site verification, Lemma creates exponential value through network effects
+            <!-- Integration Demo Section -->
+            <section class="integration-demo">
+                <h3>🔧 Reference Implementation Demo</h3>
+                <p style="text-align: center; margin-bottom: 30px; color: #666;">
+                    This page demonstrates exactly how any external site should integrate with Lemma using only public APIs.
                 </p>
                 
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 40px; margin: 40px 0;">
-                    
-                    <!-- Benefits for Users -->
-                    <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 30px; border-radius: 8px; border-left: 4px solid #28a745;">
-                        <h3 style="color: #28a745; font-size: 20px; margin-bottom: 20px; text-align: center;">✅ For Users & Agents</h3>
-                        <div class="protocol-features">
-                            <div class="protocol-feature">
-                                <span class="icon">🌍</span>
-                                <span class="text">One verification unlocks thousands of platforms instantly</span>
-                            </div>
-                            <div class="protocol-feature">
-                                <span class="icon">🚀</span>
-                                <span class="text">Zero re-verification needed across network partners</span>
-                            </div>
-                            <div class="protocol-feature">
-                                <span class="icon">🤖</span>
-                                <span class="text">Seamless agent workflows across multiple platforms</span>
-                            </div>
-                            <div class="protocol-feature">
-                                <span class="icon">🔒</span>
-                                <span class="text">Privacy by design - credentials stored in your browser</span>
-                            </div>
-                            <div class="protocol-feature">
-                                <span class="icon">📶</span>
-                                <span class="text">Offline verification capabilities anywhere</span>
-                            </div>
-                        </div>
-                    </div>
+                <div class="demo-section" data-lemma-protected="true" style="display: none;">
+                    <h4>🎉 Welcome to Protected Content!</h4>
+                    <p style="margin: 15px 0;">You've successfully verified with Lemma and can now access this protected content.</p>
+                    <p style="font-size: 14px; color: #666;">
+                        This content was protected using the same Lemma Reference Integration that any external site would use.
+                    </p>
+                </div>
+            </section>
 
-                    <!-- Benefits for Sites -->
-                    <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); padding: 30px; border-radius: 8px; border-left: 4px solid #ffc107;">
-                        <h3 style="color: #856404; font-size: 20px; margin-bottom: 20px; text-align: center;">🏢 For Integrated Sites</h3>
-                        <div class="protocol-features">
-                            <div class="protocol-feature">
-                                <span class="icon">👥</span>
-                                <span class="text">Instant access to pre-verified user base and agents</span>
-                            </div>
-                            <div class="protocol-feature">
-                                <span class="icon">⚡</span>
-                                <span class="text">Zero onboarding friction for network users</span>
-                            </div>
-                            <div class="protocol-feature">
-                                <span class="icon">🛡️</span>
-                                <span class="text">Bot-free environment with network-wide protection</span>
-                            </div>
-                            <div class="protocol-feature">
-                                <span class="icon">📋</span>
-                                <span class="text">W3C standards for universal compatibility</span>
-                            </div>
-                            <div class="protocol-feature">
-                                <span class="icon">🔗</span>
-                                <span class="text">Trust inheritance from the entire network</span>
-                            </div>
+            <!-- Rest of the existing content -->
+            <section class="features">
+                <div class="feature-card">
+                    <span class="feature-icon">🌐</span>
+                    <h3>Network Effects</h3>
+                    <p>One verification unlocks access to thousands of integrated platforms. The more sites join, the more valuable the network becomes for everyone.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">🤖</span>
+                    <h3>Agent-Centric</h3>
+                    <p>Perfect infrastructure for professional agents working across multiple platforms. Carry your reputation and verification status everywhere.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">🔒</span>
+                    <h3>Privacy by Design</h3>
+                    <p>We only verify that you're human—no additional personal information collected. Credentials are stored in your browser, not in our database.</p>
+                </div>
+            </section>
+
+            <!-- Network Effects Section -->
+            <section class="network-effects">
+                <h3>🚀 Network Effects in Action</h3>
+                <p>As more sites integrate with Lemma, the value for everyone increases exponentially</p>
+                
+                <div class="network-stats">
+                    <div class="stat-card">
+                        <span class="stat-number">10+</span>
+                        <div class="stat-label">Integrated Sites</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">1K+</span>
+                        <div class="stat-label">Verified Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">99.9%</span>
+                        <div class="stat-label">Uptime</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">$0.08</span>
+                        <div class="stat-label">Per User/Month</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Pricing Section -->
+            <section class="pricing-section">
+                <h2>💰 Network-Effect Pricing</h2>
+                <p style="text-align: center; margin-bottom: 40px; color: #666; font-size: 18px;">
+                    Revolutionary pricing that gets better as the network grows
+                </p>
+                
+                <div class="pricing-grid">
+                    <div class="pricing-card">
+                        <div class="price">Free</div>
+                        <div class="price-period">1,000 verifications/month</div>
+                        <ul class="pricing-features">
+                            <li>Perfect for testing</li>
+                            <li>Full API access</li>
+                            <li>Community support</li>
+                            <li>W3C standard credentials</li>
+                        </ul>
+                        <a href="/onboarding" class="button secondary">Get Started</a>
+                    </div>
+                    
+                    <div class="pricing-card featured">
+                        <div class="price">$0.10</div>
+                        <div class="price-period">per user per month</div>
+                        <ul class="pricing-features">
+                            <li>Decreases as network grows</li>
+                            <li>55% maximum discount</li>
+                            <li>Priority support</li>
+                            <li>Advanced analytics</li>
+                            <li>Custom integrations</li>
+                        </ul>
+                        <a href="/onboarding" class="button primary">Join Network</a>
+                    </div>
+                    
+                    <div class="pricing-card">
+                        <div class="price">$0.045</div>
+                        <div class="price-period">minimum rate (at 1000+ sites)</div>
+                        <ul class="pricing-features">
+                            <li>Maximum network discount</li>
+                            <li>Enterprise SLA</li>
+                            <li>Dedicated support</li>
+                            <li>Custom features</li>
+                            <li>Network partnership</li>
+                        </ul>
+                        <a href="/onboarding" class="button secondary">Contact Sales</a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Integration Section -->
+            <section class="integration-section">
+                <h3>🔧 Easy Integration</h3>
+                <p style="text-align: center; margin-bottom: 30px; color: #666;">
+                    Add human verification to your platform in just a few lines of code
+                </p>
+                
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 14px; overflow-x: auto;">
+<pre style="margin: 0;">// Initialize Lemma verification
+const lemma = new LemmaReferenceIntegration();
+
+// Protect any element
+lemma.protectElement(document.getElementById('protected-content'));
+
+// Or check verification status
+if (await lemma.hasValidCredentials()) {
+    showProtectedContent();}</pre>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <a href="/onboarding" class="button secondary">
+                        📖 View Full Documentation
+                    </a>
+                </div>
+            </section>
+
+            <!-- Protocol Benefits -->
+            <section class="protocol-benefits">
+                <h3>🌐 The Lemma Verified Network</h3>
+                
+                <div class="benefits-grid">
+                    <div class="benefit-item">
+                        <span class="benefit-icon">⚡</span>
+                        <div class="benefit-title">Cross-Site Verification</div>
+                        <div class="benefit-description">Verify once, use everywhere across the network</div>
+                    </div>
+                    <div class="benefit-item">
+                        <span class="benefit-icon">🔗</span>
+                        <div class="benefit-title">Agent Portability</div>
+                        <div class="benefit-description">Professional agents work seamlessly across platforms</div>
+                    </div>
+                    <div class="benefit-item">
+                        <span class="benefit-icon">📈</span>
+                        <div class="benefit-title">Network Value</div>
+                        <div class="benefit-description">Value increases exponentially with each new integration</div>
+                    </div>
+                    <div class="benefit-item">
+                        <span class="benefit-icon">🛡️</span>
+                        <div class="benefit-title">Bot Prevention</div>
+                        <div class="benefit-description">Cuts bots at their core across the entire network</div>
+                    </div>
+                </div>
+                
+                <div class="protocol-features">
+                    <h4>🔧 Technical Standards</h4>
+                    <div class="feature-list">
+                        <div class="protocol-feature">
+                            <span class="icon">🔐</span>
+                            <span class="text">Ed25519 cryptographic security</span>
+                        </div>
+                        <div class="protocol-feature">
+                            <span class="icon">📱</span>
+                            <span class="text">Offline credential verification</span>
+                        </div>
+                        <div class="protocol-feature">
+                            <span class="icon">🌍</span>
+                            <span class="text">Decentralized identity support</span>
+                        </div>
+                        <div class="protocol-feature">
+                            <span class="icon">📋</span>
+                            <span class="text">W3C standards for universal compatibility</span>
+                        </div>
+                        <div class="protocol-feature">
+                            <span class="icon">🔗</span>
+                            <span class="text">Trust inheritance from the entire network</span>
                         </div>
                     </div>
                 </div>
@@ -529,213 +760,151 @@
     </div>
 
     <script>
-        // Initialize Lemma Verified Network integration
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('[LEMMA NETWORK] Initializing verification system...');
+        // Initialize Lemma Reference Integration (same as any external site would)
+        let lemmaIntegration;
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('[LEMMA MAIN] Initializing as reference implementation...');
             
-            // Check if enhanced gate is available
-            if (window.LemmaGateEnhanced) {
-                // Initialize enhanced gate for any protected elements
-                window.lemmaGateEnhanced = new LemmaGateEnhanced({
-                    containerSelector: '[data-lemma="true"]',
-                    autoDetectCredentials: true,
-                    showSecurityDetails: true,
-                    cryptoVersion: '2.0',
-                    requireEnhancedSecurity: true,
-                    onVerificationSuccess: function(result) {
-                        console.log('[LEMMA NETWORK] Verification successful:', result);
-                    },
-                    onVerificationFailure: function(error) {
-                        console.log('[LEMMA NETWORK] Verification failed:', error);
-                    },
-                    onSecurityEvent: function(eventType, data, level) {
-                        console.log(`[LEMMA NETWORK] Security event: ${eventType}`, data);
-                    }
+            try {
+                // Initialize the reference integration (exactly like external sites)
+                lemmaIntegration = new LemmaReferenceIntegration({
+                    apiBaseUrl: '', // Same domain
+                    enableCSRF: true,
+                    requireHTTPS: false, // Allow local development
+                    showDebugInfo: true,
+                    autoHideMessages: true
                 });
                 
-                console.log('[LEMMA NETWORK] Enhanced gate initialized successfully');
-            } else {
-                console.warn('[LEMMA NETWORK] Enhanced gate not available, falling back to basic mode');
-            }
-
-            // Initialize Lemma wallet if available
-            if (window.LemmaWallet) {
-                console.log('[LEMMA NETWORK] Initializing wallet...');
-                window.lemmaWallet = new LemmaWallet();
+                // Check verification status and update UI
+                await updateVerificationUI();
                 
-                // Auto-check for existing network credentials
-                window.lemmaWallet.getAllCredentials().then(credentials => {
-                    if (credentials && credentials.length > 0) {
-                        console.log('[LEMMA NETWORK] Found network credentials:', credentials.length);
-                        
-                        // Add network status indicator
-                        const heroSection = document.querySelector('.hero');
-                        if (heroSection) {
-                            const statusDiv = document.createElement('div');
-                            statusDiv.style.cssText = `
-                                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-                                color: white;
-                                padding: 15px 25px;
-                                border-radius: 8px;
-                                margin-bottom: 30px;
-                                font-weight: 600;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                gap: 10px;
-                            `;
-                            statusDiv.innerHTML = `
-                                <span>🌐</span>
-                                <span>Connected to Lemma Verified Network - ${credentials.length} credential(s) active</span>
-                            `;
-                            heroSection.appendChild(statusDiv);
+                // Protect the demo section using the reference integration
+                const protectedDemo = document.querySelector('[data-lemma-protected="true"]');
+                if (protectedDemo) {
+                    await lemmaIntegration.protectElement(protectedDemo, {
+                        onSuccess: () => {
+                            console.log('[LEMMA MAIN] Demo content access granted');
+                        },
+                        onError: (error) => {
+                            console.error('[LEMMA MAIN] Demo content access error:', error);
                         }
-                        
-                        // Update the Get Verified button to show "Access Network" instead
-                        const getVerifiedBtn = document.getElementById('getVerifiedBtn');
-                        if (getVerifiedBtn) {
-                            getVerifiedBtn.innerHTML = `
-                                ✅ Network Connected
-                                <span class="status-badge network">Active</span>
-                            `;
-                            getVerifiedBtn.onclick = () => {
-                                window.location.href = '/protected';
-                            };
-                        }
-                    }
-                }).catch(error => {
-                    console.log('[LEMMA NETWORK] No network credentials found or wallet unavailable');
-                });
-            }
-
-            // Add click handler for Get Verified button
-            const getVerifiedBtn = document.getElementById('getVerifiedBtn');
-            if (getVerifiedBtn) {
-                getVerifiedBtn.addEventListener('click', async function() {
-                    try {
-                        // Check if user already has a credential in wallet first
-                        if (window.lemmaWallet) {
-                            const existingCredentials = await window.lemmaWallet.getAllCredentials();
-                            if (existingCredentials && existingCredentials.length > 0) {
-                                console.log('[LEMMA NETWORK] User already has credentials, redirecting to protected page');
-                                window.location.href = '/protected';
-                                return;
-                            }
-                        }
-                        
-                        // Generate a unique user ID for the verification flow
-                        const userId = 'user_' + Array.from(crypto.getRandomValues(new Uint8Array(16)))
-                            .map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
-                        
-                        console.log('[LEMMA NETWORK] Redirecting to enhanced verification page for user:', userId);
-                        
-                        // Redirect to the enhanced verification start page
-                        window.location.href = `/verification-start/${userId}`;
-                        
-                    } catch (error) {
-                        console.error('[LEMMA NETWORK] Error checking credentials:', error);
-                        
-                        // If there's an error, still redirect to verification page
-                        window.location.href = '/verification-start';
-                    }
-                });
+                    });
+                }
+                
+                console.log('[LEMMA MAIN] Reference implementation ready');
+                
+            } catch (error) {
+                console.error('[LEMMA MAIN] Reference integration failed:', error);
+                lemmaIntegration.showMessage('⚠️ Failed to initialize Lemma integration', 'error');
             }
         });
-
-        // Handle post-verification credential storage
-        window.addEventListener('load', async function() {
-            // Check if we're returning from verification via URL parameters
-            const urlParams = new URLSearchParams(window.location.search);
-            const userId = urlParams.get('user_id');
-            const verificationSuccess = urlParams.get('verification_success');
-            const sessionId = urlParams.get('session_id');
-            
-            if (userId && verificationSuccess === 'true' && sessionId && window.lemmaWallet) {
-                console.log('[LEMMA NETWORK] Processing successful verification callback...');
+        
+        // Update UI based on verification status
+        async function updateVerificationUI() {
+            try {
+                const hasCredentials = await lemmaIntegration.hasValidCredentials();
+                const getVerifiedBtn = document.getElementById('getVerifiedBtn');
+                const accessProtectedBtn = document.getElementById('accessProtectedBtn');
                 
-                try {
-                    // Call the complete verification flow API to get the credential
-                    const response = await fetch(`/api/complete-verification-flow`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
-                        },
-                        body: JSON.stringify({
-                            user_id: userId,
-                            stripe_session_id: sessionId
-                        })
-                    });
+                if (hasCredentials) {
+                    // User is already verified
+                    getVerifiedBtn.innerHTML = '✅ Verified';
+                    getVerifiedBtn.style.background = '#28a745';
+                    getVerifiedBtn.onclick = () => {
+                        lemmaIntegration.showMessage('✅ You are already verified with Lemma!', 'success');
+                    };
                     
-                    if (response.ok) {
-                        const result = await response.json();
-                        console.log('[LEMMA NETWORK] Verification API response:', result);
-                        
-                        if (result.status === 'verified' && result.store_credential) {
-                            console.log('[LEMMA NETWORK] Storing credential in wallet...');
-                            
-                            // Store the credential in the wallet
-                            await window.lemmaWallet.storeCredential(result.store_credential);
-                            console.log('[LEMMA NETWORK] Credential stored successfully in wallet');
-                            
-                            // Show success message
-                            const successDiv = document.createElement('div');
-                            successDiv.className = 'flash-message success';
-                            successDiv.innerHTML = '✅ Verification complete! Your Lemma credential has been stored in your wallet.';
-                            
-                            const heroSection = document.querySelector('.hero');
-                            if (heroSection) {
-                                heroSection.insertBefore(successDiv, heroSection.firstChild);
-                                
-                                // Auto-remove after 5 seconds
-                                setTimeout(() => {
-                                    if (successDiv.parentNode) {
-                                        successDiv.parentNode.removeChild(successDiv);
-                                    }
-                                }, 5000);
+                    accessProtectedBtn.innerHTML = '🚀 Access Network';
+                    accessProtectedBtn.onclick = () => {
+                        window.location.href = '/protected';
+                    };
+                    
+                    // Show network status
+                    const hero = document.querySelector('.hero');
+                    const statusDiv = document.createElement('div');
+                    statusDiv.style.cssText = `
+                        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                        color: white;
+                        padding: 15px 25px;
+                        border-radius: 8px;
+                        margin-bottom: 20px;
+                        font-weight: 600;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 10px;
+                    `;
+                    statusDiv.innerHTML = `
+                        <span>🌐</span>
+                        <span>Connected to Lemma Verified Network</span>
+                    `;
+                    hero.appendChild(statusDiv);
+                    
+                } else {
+                    // User needs verification
+                    getVerifiedBtn.onclick = async () => {
+                        await lemmaIntegration.performVerification({
+                            returnUrl: window.location.href,
+                            onSuccess: (result) => {
+                                console.log('[LEMMA MAIN] Verification successful:', result);
+                                updateVerificationUI();
+                            },
+                            onError: (error) => {
+                                console.error('[LEMMA MAIN] Verification failed:', error);
+                                lemmaIntegration.showMessage(`❌ Verification failed: ${error.message}`, 'error');
                             }
-                            
-                            // Clean up URL parameters and redirect to protected page after a brief delay
-                            setTimeout(() => {
-                                window.location.href = '/protected';
-                            }, 2000);
-                            
-                        } else if (result.status === 'verified') {
-                            // Already verified, just redirect
-                            console.log('[LEMMA NETWORK] User already verified, redirecting to protected page');
+                        });
+                    };
+                    
+                    accessProtectedBtn.onclick = async () => {
+                        const hasValid = await lemmaIntegration.hasValidCredentials();
+                        if (hasValid) {
                             window.location.href = '/protected';
                         } else {
-                            console.error('[LEMMA NETWORK] Unexpected verification result:', result);
+                            lemmaIntegration.showMessage('🔒 Please verify with Lemma first to access protected content', 'info');
                         }
+                    };
+                }
+                
+            } catch (error) {
+                console.error('[LEMMA MAIN] Error updating verification UI:', error);
+            }
+        }
+        
+        // Handle verification callback (same as external sites)
+        window.addEventListener('load', async function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            if (urlParams.get('verification_success') === 'true') {
+                console.log('[LEMMA MAIN] Processing verification callback...');
+                
+                if (lemmaIntegration) {
+                    const result = await lemmaIntegration.handleVerificationCallback(urlParams);
+                    
+                    if (result.success) {
+                        console.log('[LEMMA MAIN] Verification callback processed successfully');
+                        // Clean up URL parameters
+                        const cleanUrl = window.location.origin + window.location.pathname;
+                        window.history.replaceState({}, document.title, cleanUrl);
+                        // Update UI
+                        await updateVerificationUI();
                     } else {
-                        const errorData = await response.json();
-                        console.error('[LEMMA NETWORK] Verification API error:', errorData);
-                        
-                        // Show error message
-                        const errorDiv = document.createElement('div');
-                        errorDiv.className = 'flash-message error';
-                        errorDiv.innerHTML = `❌ Failed to complete verification: ${errorData.error || 'Unknown error'}`;
-                        
-                        const heroSection = document.querySelector('.hero');
-                        if (heroSection) {
-                            heroSection.insertBefore(errorDiv, heroSection.firstChild);
-                        }
-                    }
-                } catch (error) {
-                    console.error('[LEMMA NETWORK] Error processing verification callback:', error);
-                    
-                    // Show error message
-                    const errorDiv = document.createElement('div');
-                    errorDiv.className = 'flash-message error';
-                    errorDiv.innerHTML = `❌ Error processing verification: ${error.message}`;
-                    
-                    const heroSection = document.querySelector('.hero');
-                    if (heroSection) {
-                        heroSection.insertBefore(errorDiv, heroSection.firstChild);
+                        console.error('[LEMMA MAIN] Verification callback failed:', result.error);
                     }
                 }
             }
         });
+        
+        // Debug info for developers
+        window.getLemmaDebugInfo = () => {
+            if (lemmaIntegration) {
+                return lemmaIntegration.getDebugInfo();
+            }
+            return { error: 'Lemma integration not initialized' };
+        };
+        
+        console.log('[LEMMA MAIN] Page loaded - type getLemmaDebugInfo() for debug information');
     </script>
 </body>
 </html>

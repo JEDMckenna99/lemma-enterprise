@@ -311,57 +311,15 @@ def api_start_verification():
 
 @main_bp.route('/protected')
 def protected():
-    """Render the protected page that requires human verification."""
-    # Check if user has valid verification in session
-    user_id = session.get('verified_user_id')
-    credential_id = session.get('verified_credential_id')
-    is_verified_human = session.get('verified_human', False)
+    """Render the protected page that uses reference implementation approach."""
+    # This page now uses the LemmaReferenceIntegration class (same as external sites)
+    # No more session-based shortcuts - everything goes through public APIs
     
-    # Log detailed session state for debugging
-    current_app.logger.info(f"Protected page access - Session state: user_id={user_id}, credential_id={credential_id}, is_verified_human={is_verified_human}, verification_success={session.get('verification_success')}")
+    current_app.logger.info("Protected page accessed - using reference implementation approach")
     
-    # Check if we were directly redirected from successful verification
-    is_verification_redirect = session.get('redirect_to_protected', False)
-    if is_verification_redirect:
-        current_app.logger.info("Accessed via direct redirect from verification_callback")
-        # Remove the flag to prevent infinite redirects
-        session.pop('redirect_to_protected', None)
-    
-    # Strict verification check - require user_id and verification status
-    if not user_id or not is_verified_human:
-        # Log the unauthorized access attempt
-        current_app.logger.warning(f"Unauthorized protected page access attempt. Session data: user_id={user_id}, credential_id={credential_id}, is_verified_human={is_verified_human}")
-        
-        # Only set a flash message if this appears to be a direct access attempt (not a redirect from main page)
-        referer = request.headers.get('Referer', '')
-        if not ('/' in referer or '/index' in referer):
-            flash("Please verify your Lemma to access this page", "warning")
-        
-        # Redirect to main page instead of API widget demo
-        return redirect(url_for('main.index'))
-    
-    # Get the wallet credential from session if available (only available right after verification)
-    wallet_credential = session.get('store_credential')
-    
-    # Get just the necessary credential data to pass to template
-    credential_data = None
-    if wallet_credential and isinstance(wallet_credential, dict) and 'credential' in wallet_credential:
-        credential_data = {
-            'id': wallet_credential['credential'].get('id'),
-            'issuanceDate': wallet_credential['credential'].get('issuanceDate'),
-            'expirationDate': wallet_credential['credential'].get('expirationDate'),
-        }
-    
-    # Create response with wallet cookie
-    response = make_response(render_template(
-        'protected.html',
-        user_id=user_id,
-        credential_id=credential_id,
-        credential=credential_data,
-        wallet_credential=json.dumps(wallet_credential) if wallet_credential else None,
-        verification_time=session.get('verification_time'),
-        verification_expiry=session.get('verification_expiry')
-    ))
+    # Simply render the template - all verification is handled client-side
+    # using the same LemmaReferenceIntegration that external sites would use
+    response = make_response(render_template('protected.html'))
     
     # Set cookie to enable the wallet if not already set
     if not request.cookies.get('lemma_wallet_enabled'):
