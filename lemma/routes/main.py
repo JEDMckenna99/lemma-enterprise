@@ -792,3 +792,8 @@ def verification_start(user_id=None):
         user_id = f"user_{int(time.time())}_{random.randint(1000, 9999)}"
     
     return render_template('verification_start.html', user_id=user_id)
+
+@main_bp.route('/gate-demo')
+def gate_demo():
+    """Demo page showing the new Lemma Gate in action"""
+    return render_template('gate_demo.html')
