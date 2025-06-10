@@ -13,6 +13,13 @@ def gate_demo_page():
     """
     Demo page showing the new Lemma Gate in action
     """
+    return render_template('gate_demo.html')
+
+@gate_demo.route('/gate-demo-legacy')
+def gate_demo_legacy():
+    """
+    Legacy demo page for backwards compatibility
+    """
     return render_template('protected_gate_example.html')
 
 @gate_demo.route('/gate-integration-guide')
