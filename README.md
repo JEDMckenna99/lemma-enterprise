@@ -1,4 +1,4 @@
-# Lemma: A Network of Verified Users
+# Lemma: Human Verification Protocol
 
 *The essential User Trust Protocol for digital trust*
 
@@ -19,115 +19,76 @@ We believe:
 - **Offline verification matters**: By enabling credential verification without requiring an active internet connection, we create a more resilient digital ecosystem.
 - **Bots undermine digital trust**: When nearly 40% of internet traffic is non-human, businesses need a reliable way to ensure they're interacting with legitimate users.
 - **Self-sovereignty is essential**: Users should control their own identity and determine what information they share with whom.
-- **Network effects create value**: Like Google organized the world's information, Lemma organizes the world's verified users.
 
 Lemma provides the simple proof that allows larger business functions to operate smoothly in a world increasingly challenged by sophisticated bots and automated systems.
 
-## 🌐 **The Lemma Verified Network Vision**
+## 🎯 **The Lemma Vision**
 
-**Becoming the foundational verification layer for the entire internet.**
+**Building the foundational verification layer for digital platforms.**
 
-Just as Google became essential by organizing the world's information, **Lemma is becoming essential by organizing the world's verified users**. Our vision extends far beyond single-site verification to create a **global network of trust** where verified agents can seamlessly work across thousands of integrated platforms.
+Lemma aims to become an essential verification standard, starting with individual site protection and growing toward broader network effects as adoption scales.
 
-### **🚀 The "Next Google" Strategy**
+### **🚀 Our Roadmap**
 
-- **Google's Mission:** Organize the world's information and make it universally accessible
-- **Lemma's Mission:** Organize the world's verified users and make trust universally accessible
-- **Network Effect:** Every new site that integrates Lemma makes the entire network exponentially more valuable
+- **Phase 1 (Current):** Core verification platform for individual sites
+- **Phase 2:** Cross-site credential portability
+- **Phase 3:** Professional agent workflows  
+- **Phase 4:** Network-wide verification standard
 
 ### **💰 Network-Effect Pricing Model**
 
 **Revolutionary pricing that gets better as the network grows.**
 
-Unlike traditional SaaS pricing, Lemma implements a **network-effect pricing model** where costs decrease for everyone as more sites join:
+Unlike traditional SaaS pricing, Lemma implements a **network-effect pricing model** where costs decrease for everyone as more businesses join:
 
 #### **Core Pricing Structure**
-- **$2.00 verification fee** for new users joining the network
-- **$0.10 starting rate** per user per month for integrated sites
-- **Rate decreases exponentially** as network grows (using configurable decay rate)
-- **$0.045 floor rate** (55% maximum discount) maintains sustainability
+- **$2.00 onboarding fee** for each new user your business brings to the Lemma network
+- **$0.10 starting rate** per user per month for businesses with users in the network
+- **Rate decreases automatically** as more businesses join the network
+- **Network benefits** increase as the ecosystem grows
 
-#### **Mathematical Model**
+#### **How Network Pricing Works**
 ```
-current_rate = max(base_rate × e^(-decay_rate × network_sites), floor_rate)
-
-Example Network Growth:
-• 10 sites: $0.098/user (2% discount)
-• 50 sites: $0.090/user (10% discount)  
-• 100 sites: $0.082/user (18% discount)
-• 500 sites: $0.055/user (45% discount)
-• 1000+ sites: $0.045/user (55% discount - maximum)
+Monthly Rate Decreases as Network Grows:
+• 10 businesses: $0.098/user/month (2% discount)
+• 50 businesses: $0.090/user/month (10% discount)  
+• 100 businesses: $0.082/user/month (18% discount)
+• 500 businesses: $0.055/user/month (45% discount)
+• 1000+ businesses: $0.045/user/month (55% maximum discount)
 ```
 
 #### **Strategic Advantages**
-- **Network Effects:** Exponential value increase with growth
-- **Customer Retention:** Leaving network means losing accumulated discounts
-- **Competitive Moat:** Increasingly impossible for competitors to match value
-- **Viral Growth:** Customers incentivized to recruit new integrations
-
-#### **Network Tiers**
-| Network Size | Tier | Monthly Rate | Description |
-|--------------|------|--------------|-------------|
-| 1-9 sites | 🌱 Starter | $0.095-$0.100 | Starter Network |
-| 10-49 sites | 🚀 Early | $0.085-$0.095 | Early Network |
-| 50-99 sites | 📈 Growing | $0.075-$0.085 | Growing Network |
-| 100-499 sites | 🏢 Enterprise | $0.055-$0.075 | Enterprise Network |
-| 500+ sites | 🌐 Maximum | $0.045-$0.055 | Maximum Discount |
-
-*See [NETWORK_PRICING_DOCUMENTATION.md](./NETWORK_PRICING_DOCUMENTATION.md) for complete implementation details.*
+- **Network Effects:** Your costs decrease as more businesses join
+- **User Value:** One verification works across all network businesses
+- **Competitive Moat:** Early adopters get better pricing as network grows
+- **Viral Growth:** Businesses incentivized to recruit others to reduce their costs
 
 ### **🤖 Perfect Timing - The AI Crisis**
 
-With AI making bot detection increasingly impossible, Lemma's **human verification network** becomes the critical infrastructure layer that every legitimate platform desperately needs. We're not just solving today's bot problem - we're building tomorrow's trust infrastructure.
-
-### **🔑 Agent-Centric Architecture**
-
-The Lemma Verified Network serves as the **perfect roadmap for agents working on someone's behalf across multiple Lemma-integrated sites**:
-
-- **✅ Cross-Site Agent Authentication:** Verified agents carry their credentials across the entire network
-- **✅ Unified Trust Score:** Reputation and verification status follows agents everywhere
-- **✅ Seamless Site-to-Site Verification:** No re-verification needed across network partners
-- **✅ Agent Portability:** Work for clients across thousands of platforms with one verification
-
-### **🎯 Network Effects at Scale**
-
-```
-🌐 Lemma Verified Network Growth Model:
-   
-   1 site = Individual solution
-   10 sites = Useful network
-   100 sites = Valuable ecosystem  
-   1,000 sites = Industry standard
-   10,000+ sites = Internet infrastructure
-```
+With AI making bot detection increasingly impossible, Lemma's **human verification** becomes critical infrastructure that every legitimate platform needs. We're not just solving today's bot problem - we're building tomorrow's trust infrastructure.
 
 ---
 
 ## Overview
 
-**Lemma Enterprise is building the foundational verification layer for the entire internet** - a global network where verified users and agents can seamlessly operate across thousands of integrated platforms.
+**Lemma Enterprise provides production-ready human verification** - a robust platform for distinguishing real users from bots with strong privacy protections.
 
 ### **🎯 Core Platform Capabilities:**
 
-- **🌐 Network-Scale Verification:** Powers the Lemma Verified Network across unlimited integrated sites
-- **🤖 Agent-Centric Design:** Perfect infrastructure for agents working across multiple platforms on behalf of clients
 - **🔐 Minimal Data Collection:** Only verifies that a user is human—no additional personal information is collected
-- **⚡ Cross-Network Portability:** Verification credentials work seamlessly across all network partners
-- **🛡️ Bot Prevention at Scale:** Fundamentally cuts bots at their core across the entire network
 - **📋 W3C Standards:** Issues standard Verifiable Credentials and Presentations for universal compatibility
 - **🔒 Privacy by Design:** Credentials are stored in the user's browser, not in a central database
 - **📶 Offline Verification:** Credentials can be verified without requiring an active internet connection
 - **🚀 Enterprise Security:** Production-ready security with comprehensive input validation and CSRF protection
 - **🌍 Decentralized Identity:** Supports multiple DID methods and true self-sovereign identity
+- **⚡ Easy Integration:** Simple APIs and JavaScript components for rapid deployment
 
-### **💡 The Network Advantage:**
+### **💡 Key Advantages:**
 
-Unlike traditional single-site verification solutions, Lemma creates **exponential value through network effects**:
-
-- **For Sites:** Instant access to a pre-verified user base and agent network
-- **For Users:** One verification unlocks access to thousands of integrated platforms  
-- **For Agents:** Seamless workflow across the entire network with unified credentials
-- **For Developers:** Standard APIs that work consistently across all network partners
+- **For Sites:** Reliable bot prevention with minimal user friction
+- **For Users:** Privacy-first verification that works across compatible platforms
+- **For Developers:** Standard APIs and comprehensive documentation
+- **For Businesses:** Reduced fraud and improved trust in user interactions
 
 ---
 
@@ -217,10 +178,10 @@ Version 2.3.0 represents a **major breakthrough** that resolves the critical DID
 ### **✅ Complete Customer Journey**
 
 **1. Landing & Registration (`/onboarding`)**
-- Professional landing page with pricing tiers and value propositions
+- Professional landing page with pricing information and value propositions
 - Simple registration form: email, company (optional), domain
-- Clear pricing: Free (1K/month), Standard ($0.10), Enterprise ($0.08)
-- No credit card required for free tier
+- Clear pricing: Standard ($0.10), Enterprise ($0.08)
+- Simple setup process for immediate integration
 
 **2. Domain Verification (`/onboarding/verify`)**
 - **DNS TXT Record Method** (Recommended): `_lemma-verification.domain.com`
@@ -243,9 +204,9 @@ Version 2.3.0 represents a **major breakthrough** that resolves the critical DID
 
 **5. Analytics Dashboard (`/onboarding/usage`)**
 - **Detailed Usage Tracking:** Daily, weekly, and monthly breakdowns
-- **Pricing Breakdowns:** Free tier usage, billable verifications, cost projections
+- **Pricing Breakdowns:** Usage tracking, verification costs, cost projections
 - **Data Export:** CSV and JSON export for external analysis
-- **Usage Insights:** Average daily usage, peak usage, tier recommendations
+- **Usage Insights:** Average daily usage, peak usage, optimization recommendations
 
 **6. API Key Management (`/onboarding/api-keys`)**
 - **Secure Key Display:** Password-protected view with toggle visibility
@@ -256,11 +217,11 @@ Version 2.3.0 represents a **major breakthrough** that resolves the critical DID
 ### **🎯 Business Value for Customers**
 
 - **⚡ 10-Minute Integration:** From registration to working verification in under 10 minutes
-- **🆓 Free Tier:** 1,000 verifications per month at no cost
+- **💰 Network Effect Pricing:** Your costs decrease as more businesses join the network
 - **📊 Real-Time Analytics:** Complete visibility into usage and costs
 - **🔐 Enterprise Security:** Production-ready security with comprehensive validation
 - **📖 Developer-Friendly:** Complete documentation with copy-paste examples
-- **🌐 Network Effects:** Access to pre-verified users across the Lemma Network
+- **🌐 Network Benefits:** Users verified once work across all network businesses
 
 ### **🛠️ Technical Implementation**
 
@@ -601,20 +562,20 @@ This workflow enables a "verify once, use anywhere" model where users don't need
 
 ---
 
-## 🌐 **Lemma Verified Network Integration**
+## 🌐 **Lemma Integration Guide**
 
-**Transform your platform into part of the world's largest human verification network.**
+**Add human verification to your platform with minimal friction.**
 
-Join thousands of integrated sites in the Lemma Verified Network and gain instant access to a pre-verified user base while contributing to the global infrastructure for internet trust.
+Integrate Lemma's human verification into your site to prevent bots while maintaining user privacy and following W3C standards.
 
-### **🚀 Network Benefits for Integrating Sites**
+### **🚀 Integration Benefits**
 
-- **✅ Instant User Base:** Access millions of pre-verified users and professional agents
-- **✅ Zero Onboarding Friction:** Users already verified across the network need no additional verification
-- **✅ Agent Ecosystem:** Tap into a network of verified professional agents for your platform
-- **✅ Trust Inheritance:** Benefit from reputation and verification data across the entire network
-- **✅ Bot-Free Environment:** Leverage network-wide bot detection and prevention
-- **✅ Standards Compliance:** W3C-compliant verification that works everywhere
+- **✅ Bot Prevention:** Reliable protection against automated accounts and spam
+- **✅ Privacy-First:** Minimal data collection - only verifies humanity
+- **✅ Quick Integration:** Production-ready in under 10 minutes
+- **✅ Standards-Based:** W3C Verifiable Credentials for future compatibility
+- **✅ Offline Capable:** Verification works without constant internet connection
+- **✅ Cross-Device Support:** Credentials work across user devices
 
 ### Basic Integration
 ```html
