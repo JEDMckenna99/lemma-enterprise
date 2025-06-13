@@ -274,41 +274,95 @@ def validate_request_data(validator_func):
     """Decorator to validate request data using a validator function."""
     def decorator(f):
         def wrapper(*args, **kwargs):
-            from flask import request, jsonify
-            
             try:
                 # Get request data
-                if request.is_json:
-                    data = request.get_json()
-                    if data is None:
-                        return jsonify({"error": "Invalid JSON"}), 400
-                elif request.form:
-                    data = request.form.to_dict()
+                if hasattr(request, 'json') and request.json:
+                    data = request.json
                 else:
-                    data = {}
+                    data = request.form.to_dict()
                 
-                # Validate data
+                # Validate using the provided function
                 validated_data = validator_func(data)
                 
                 # Add validated data to kwargs
                 kwargs['validated_data'] = validated_data
                 
                 return f(*args, **kwargs)
-                
             except ValidationError as e:
                 logger.warning(f"Validation error in {f.__name__}: {e.message}")
-                return jsonify({
-                    "error": "Validation failed",
-                    "message": e.message,
-                    "field": e.field
-                }), 400
+                return {"error": e.message, "field": e.field}, 400
             except Exception as e:
                 logger.error(f"Unexpected error in validation: {str(e)}")
-                return jsonify({"error": "Internal validation error"}), 500
-        
-        # Preserve function metadata
-        wrapper.__name__ = f.__name__
-        wrapper.__doc__ = f.__doc__
+                return {"error": "Validation failed"}, 500
         
         return wrapper
-    return decorator 
+    return decorator
+
+def validate_input(value: Any, field_type: str, required: bool = False, **kwargs) -> Any:
+    """
+    General purpose input validation function.
+    
+    Args:
+        value: The value to validate
+        field_type: Type of validation to perform
+        required: Whether the field is required
+        **kwargs: Additional validation parameters
+    
+    Returns:
+        Validated value
+    
+    Raises:
+        ValidationError: If validation fails
+    """
+    # Handle None/empty values
+    if value is None or (isinstance(value, str) and value.strip() == ""):
+        if required:
+            raise ValidationError(f"{field_type} is required", field_type)
+        return None
+    
+    # Route to appropriate validator based on field_type
+    if field_type == 'user_id':
+        return InputValidator.validate_user_id(value)
+    elif field_type == 'did':
+        return InputValidator.validate_did(value)
+    elif field_type == 'challenge':
+        return InputValidator.validate_challenge(value)
+    elif field_type == 'credential':
+        return InputValidator.validate_credential(value)
+    elif field_type == 'presentation':
+        return InputValidator.validate_presentation(value)
+    elif field_type == 'api_key':
+        return InputValidator.validate_api_key(value)
+    elif field_type == 'base64':
+        return InputValidator.validate_base64(value, field_type)
+    elif field_type == 'uuid':
+        return InputValidator.validate_uuid(value, field_type)
+    elif field_type == 'string':
+        min_length = kwargs.get('min_length', 1)
+        max_length = kwargs.get('max_length', InputValidator.MAX_STRING_LENGTH)
+        return InputValidator.validate_string(value, field_type, min_length, max_length)
+    elif field_type == 'list':
+        max_length = kwargs.get('max_length', InputValidator.MAX_LIST_LENGTH)
+        return InputValidator.validate_list(value, field_type, max_length)
+    elif field_type == 'dict':
+        required_keys = kwargs.get('required_keys', None)
+        return InputValidator.validate_dict(value, field_type, required_keys)
+    elif field_type in ['site_id', 'month', 'date']:
+        # Common billing API field types
+        if field_type == 'site_id':
+            return InputValidator.validate_string(value, field_type, min_length=1, max_length=100)
+        elif field_type == 'month':
+            # Validate YYYY-MM format
+            if not isinstance(value, str) or not re.match(r'^\d{4}-\d{2}$', value):
+                raise ValidationError("Month must be in YYYY-MM format", field_type)
+            return value
+        elif field_type == 'date':
+            # Validate YYYY-MM-DD format
+            if not isinstance(value, str) or not re.match(r'^\d{4}-\d{2}-\d{2}$', value):
+                raise ValidationError("Date must be in YYYY-MM-DD format", field_type)
+            return value
+    else:
+        # Default string validation
+        return InputValidator.validate_string(value, field_type, 
+                                            kwargs.get('min_length', 1),
+                                            kwargs.get('max_length', InputValidator.MAX_STRING_LENGTH)) 
