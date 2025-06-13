@@ -8,7 +8,7 @@ import hashlib
 import base64
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import current_app, session, redirect, url_for, request, abort
+from flask import current_app, session, redirect, url_for, request, abort, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
 def hash_password(password):
@@ -89,6 +89,35 @@ def admin_required(f):
         if not is_testing and session.get('admin_ip') != request.remote_addr:
             session.clear()
             return redirect(url_for('admin.login', next=request.url, reason='ip_changed'))
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+def api_key_required(f):
+    """Decorator to require API key authentication for a route."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Skip authentication checks in test environment if configured
+        is_testing = current_app.config.get('TESTING', False)
+        
+        if is_testing and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
+            return f(*args, **kwargs)
+        
+        # Check for API key in headers
+        api_key = request.headers.get('X-API-Key')
+        
+        if not api_key:
+            return jsonify({"error": "API key required"}), 401
+        
+        # Validate API key
+        expected_api_key = current_app.config.get('API_KEY')
+        if not expected_api_key:
+            current_app.logger.error("API_KEY not configured")
+            return jsonify({"error": "API authentication not configured"}), 500
+        
+        if api_key != expected_api_key:
+            current_app.logger.warning(f"Invalid API key attempt from {request.remote_addr}")
+            return jsonify({"error": "Invalid API key"}), 401
         
         return f(*args, **kwargs)
     return decorated_function
