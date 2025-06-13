@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # Main Lemma Enterprise Application
+  lemma-app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - LEMMA_ADMIN_USER=${LEMMA_ADMIN_USER:-admin}
+      - LEMMA_ADMIN_PASS=${LEMMA_ADMIN_PASS:-change_me_in_production}
+      - LEMMA_SECRET_KEY=${LEMMA_SECRET_KEY:-change_me_in_production}
+      - LEMMA_API_KEY=${LEMMA_API_KEY:-change_me_in_production}
+      - DID=${DID:-did:lemma:docker}
+      - DID_METHOD=${DID_METHOD:-key}
+      - LEMMA_ENABLE_P2P=${LEMMA_ENABLE_P2P:-true}
+      - LEMMA_HARDWARE_SECURITY=${LEMMA_HARDWARE_SECURITY:-false}
+      - OPRF_SERVICE_URL=http://oprf-service:8080
+      - FLASK_ENV=production
+    volumes:
+      - lemma_data:/app/instance/data
+      - lemma_keys:/app/instance/keys
+    depends_on:
+      - oprf-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # OPRF Service for Revocation
+  oprf-service:
+    build: ./oprfservice
+    ports:
+      - "8080:8080"
+    environment:
+      - OPRF_RATE_LIMIT=${OPRF_RATE_LIMIT:-60}
+      - OPRF_ROTATION_DAYS=${OPRF_ROTATION_DAYS:-30}
+      - OPRF_DEBUG=${OPRF_DEBUG:-false}
+    volumes:
+      - oprf_keys:/keys
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Offline Verifier (Optional - for air-gapped environments)
+  lemma-offline:
+    build: .
+    ports:
+      - "5001:5000"
+    environment:
+      - LEMMA_OFFLINE_MODE=true
+      - LEMMA_AUTO_UPDATE=false
+      - LEMMA_STORAGE_DIR=/app/instance/data
+      - FLASK_ENV=production
+      - DID=${DID:-did:lemma:offline}
+    volumes:
+      - lemma_offline_data:/app/instance/data
+    restart: unless-stopped
+    profiles:
+      - offline
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  lemma_data:
+    driver: local
+  lemma_keys:
+    driver: local
+  lemma_offline_data:
+    driver: local
+  oprf_keys:
+    driver: local
+
+networks:
+  default:
+    name: lemma-network 

@@ -8,7 +8,7 @@ requests==2.32.3
 click==8.1.8
 Jinja2==3.1.5
 MarkupSafe==3.0.2
-gunicorn==23.0.0
+gunicorn==21.2.0
 stripe==11.2.0
 PyJWT==2.10.1
 bleach==6.2.0
@@ -30,3 +30,6 @@ pytest-cov==4.0.0
 black==23.1.0
 isort==5.12.0
 flake8==6.0.0
+gevent==23.9.1
+greenlet==3.0.1
+psutil==5.9.6

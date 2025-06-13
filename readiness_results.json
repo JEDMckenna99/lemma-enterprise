@@ -1,0 +1,29 @@
+{
+  "performance": {},
+  "automation": {
+    "tests_passed": 0,
+    "total_tests": 4,
+    "score": 0.0,
+    "fully_automated": false
+  },
+  "security": {
+    "tests_passed": 2,
+    "total_tests": 3,
+    "score": 66.66666666666666
+  },
+  "api": {
+    "working_endpoints": 3,
+    "total_endpoints": 5,
+    "score": 60.0,
+    "full_coverage": false
+  },
+  "overall": {
+    "score": 31.666666666666664,
+    "performance": 0.0,
+    "automation": 0.0,
+    "api": 60.0,
+    "security": 66.66666666666666,
+    "ready_for_billing": false,
+    "ready_for_production": false
+  }
+}
