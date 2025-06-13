@@ -40,6 +40,15 @@ try:
 except ImportError:
     CRYPTO_ENHANCED_AVAILABLE = False
 
+# Import billing components
+try:
+    from lemma.billing import log_verification_success
+    BILLING_ENABLED = True
+except ImportError:
+    BILLING_ENABLED = False
+    def log_verification_success(*args, **kwargs):
+        pass  # No-op if billing not available
+
 # Create blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -336,6 +345,27 @@ def verify_presentation():
 
         # Ultra-fast success response
         processing_time = (time.time() - start_time) * 1000
+        
+        # Log successful verification for billing
+        if BILLING_ENABLED and verification_result.get('valid', False):
+            try:
+                # Extract site_id from request headers or default
+                site_id = request.headers.get('X-Site-ID', 'default_site')
+                subject_did = verification_result.get('holder', 'unknown')
+                
+                # Log verification success event
+                log_verification_success(
+                    site_id=site_id,
+                    subject_did=subject_did,
+                    timestamp=start_time,
+                    metadata={
+                        'processing_time_ms': round(processing_time, 1),
+                        'challenge': challenge,
+                        'verification_type': 'presentation'
+                    }
+                )
+            except Exception as e:
+                logger.warning(f"Failed to log billing event: {e}")
         
         result = {
             "success": True,

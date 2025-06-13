@@ -179,6 +179,16 @@ def create_app(test_config=None):
         app.logger.error(f"Error registering blueprints: {e}")
         raise  # This is critical - we need the routes
 
+    # Register billing API blueprint
+    try:
+        from lemma.routes.billing_api import billing_api
+        app.register_blueprint(billing_api)
+        app.logger.info("Billing API endpoints registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Billing API not available: {e}")
+    except Exception as e:
+        app.logger.error(f"Error registering billing API: {e}")
+
     # Register enhanced API blueprint
     try:
         from lemma.routes.api_enhanced import api_enhanced
