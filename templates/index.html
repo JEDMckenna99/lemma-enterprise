@@ -4,10 +4,11 @@
 {% block description %}The essential verification protocol for digital trust. Prevent bots, protect users, build the verified internet.{% endblock %}
 
 {% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
 <style>
-    /* Homepage-specific styles */
+    /* Homepage-specific styles - Stripe Design System */
     .hero-gradient {
-        background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+        background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
     }
     
     .hero-bg-pattern {
@@ -31,16 +32,17 @@
     .feature-card {
         padding: var(--space-8);
         border-radius: var(--radius-lg);
-        background: white;
-        box-shadow: var(--shadow-sm);
-        border: 1px solid var(--color-gray-200);
-        transition: all var(--transition-base);
+        background: var(--white);
+        box-shadow: var(--shadow-card);
+        border: 1px solid var(--gray-200);
+        transition: all var(--duration-base) var(--ease-swift-out);
         height: 100%;
     }
     
     .feature-card:hover {
         transform: translateY(-2px);
         box-shadow: var(--shadow-lg);
+        border-color: var(--gray-300);
     }
     
     .stats-grid {
@@ -57,13 +59,13 @@
     .stat-number {
         font-size: 2.5rem;
         font-weight: 700;
-        color: var(--color-primary);
+        color: var(--primary-500);
         display: block;
     }
     
     .stat-label {
-        font-size: 0.875rem;
-        color: var(--color-gray-600);
+        font-size: var(--font-size-sm);
+        color: var(--gray-500);
         text-transform: uppercase;
         letter-spacing: 0.05em;
     }
@@ -76,51 +78,80 @@
     }
     
     .cta-section {
-        background: linear-gradient(135deg, var(--color-gray-50) 0%, white 100%);
+        background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);
         border-radius: var(--radius-xl);
         padding: var(--space-16);
         text-align: center;
         margin: var(--space-20) 0;
-        border: 1px solid var(--color-gray-200);
+        border: 1px solid var(--gray-200);
     }
     
     .btn-lg {
-        padding: var(--space-4) var(--space-8);
-        font-size: 1rem;
+        height: 48px;
+        padding: 0 var(--space-8);
+        font-size: var(--font-size-base);
         font-weight: 600;
     }
     
     .btn-ghost {
         background: transparent;
-        color: var(--color-gray-700);
-        border: 1px solid var(--color-gray-300);
+        color: var(--gray-700);
+        border: 1px solid var(--gray-300);
     }
     
     .btn-ghost:hover {
-        background: var(--color-gray-50);
-        color: var(--color-gray-900);
+        background: var(--gray-50);
+        color: var(--gray-800);
     }
     
     .code-preview {
-        background: var(--color-gray-900);
-        color: var(--color-gray-100);
+        background: var(--gray-900);
+        color: var(--gray-100);
         padding: var(--space-6);
         border-radius: var(--radius-lg);
-        font-family: var(--font-family-mono);
-        font-size: 0.875rem;
+        font-family: var(--font-mono);
+        font-size: var(--font-size-sm);
         line-height: 1.6;
         overflow-x: auto;
         margin: var(--space-6) 0;
+        position: relative;
     }
     
     .highlight {
         background: linear-gradient(120deg, rgba(99, 91, 255, 0.1) 0%, rgba(99, 91, 255, 0.05) 100%);
-        padding: 2px 6px;
+        padding: var(--space-1) var(--space-2);
         border-radius: var(--radius-sm);
         font-weight: 600;
     }
+
+    /* Hero button styling with Stripe colors */
+    .btn-hero-primary {
+        background: var(--white);
+        color: var(--primary-500);
+        border: 1px solid var(--white);
+        font-weight: 600;
+    }
+
+    .btn-hero-primary:hover {
+        background: var(--gray-50);
+        color: var(--primary-600);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-active);
+    }
+
+    .btn-hero-ghost {
+        background: transparent;
+        color: var(--white);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-hero-ghost:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.5);
+        color: var(--white);
+    }
     
-    @media (max-width: 768px) {
+    @media (max-width: 767px) {
         .features-grid {
             grid-template-columns: 1fr;
         }
@@ -133,6 +164,14 @@
         .cta-section {
             padding: var(--space-8);
         }
+
+        .hero-title {
+            font-size: 2.25rem !important;
+        }
+
+        .hero-subtitle {
+            font-size: var(--font-size-lg) !important;
+        }
     }
 </style>
 {% endblock %}
@@ -143,12 +182,15 @@
     <div class="container">
         <div class="nav-content">
             <div class="nav-brand">
-                🛡️ Lemma
+                <svg class="icon icon-lg" style="margin-right: var(--space-2);">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                Lemma
             </div>
-            <div class="nav-links">
-                <a href="#features">Features</a>
-                <a href="#developers">Developers</a>
-                <a href="#pricing">Pricing</a>
+            <div class="nav-links d-md-none">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#developers" class="nav-link">Developers</a>
+                <a href="#pricing" class="nav-link">Pricing</a>
                 <a href="{{ url_for('onboarding.start') }}" class="btn btn-primary">Get Started</a>
             </div>
         </div>
@@ -158,20 +200,28 @@
 <!-- Hero Section -->
 <section class="hero-gradient hero-bg-pattern">
     <div class="container" style="padding-top: var(--space-20); padding-bottom: var(--space-20);">
-        <div style="max-width: 800px; margin: 0 auto; text-align: center; color: white;">
-            <h1 style="font-size: 3.5rem; font-weight: 800; margin-bottom: var(--space-6); color: white;">
-                The verification layer for the <span style="background: linear-gradient(45deg, #FFD700, #FFA500); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">trusted internet</span>
+        <div style="max-width: 800px; margin: 0 auto; text-align: center; color: var(--white);">
+            <h1 class="hero-title" style="font-size: 3.5rem; font-weight: 800; margin-bottom: var(--space-6); color: var(--white);">
+                The verification layer for the 
+                <span style="background: linear-gradient(45deg, #FFD700, #FFA500); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">trusted internet</span>
             </h1>
-            <p style="font-size: 1.25rem; margin-bottom: var(--space-8); color: rgba(255, 255, 255, 0.9); line-height: 1.6;">
+            <p class="hero-subtitle" style="font-size: 1.25rem; margin-bottom: var(--space-8); color: rgba(255, 255, 255, 0.9); line-height: 1.6;">
                 Prevent bots, protect users, and build trust with the only human verification that works across platforms. 
                 One verification unlocks access to the entire network.
             </p>
             <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
-                <a href="{{ url_for('onboarding.start') }}" class="btn btn-secondary btn-lg">
-                    🚀 Start Building
+                <a href="{{ url_for('onboarding.start') }}" class="btn btn-hero-primary btn-lg">
+                    <svg class="icon" style="margin-right: var(--space-2);">
+                        <path d="M5 12l5 5L20 7"/>
+                    </svg>
+                    Start Building
                 </a>
-                <a href="#developers" class="btn btn-ghost btn-lg" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
-                    📖 View Docs
+                <a href="#developers" class="btn btn-hero-ghost btn-lg">
+                    <svg class="icon" style="margin-right: var(--space-2);">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                    </svg>
+                    View Docs
                 </a>
             </div>
         </div>
@@ -179,7 +229,7 @@
 </section>
 
 <!-- Stats Section -->
-<section style="padding: var(--space-16) 0; background: white;">
+<section style="padding: var(--space-16) 0; background: var(--white);">
     <div class="container">
         <div class="stats-grid">
             <div class="stat-item">
@@ -187,8 +237,8 @@
                 <span class="stat-label">Bot Detection</span>
             </div>
             <div class="stat-item">
-                <span class="stat-number">&lt;100ms</span>
-                <span class="stat-label">Verification Time</span>
+                <span class="stat-number">&lt;150ms</span>
+                <span class="stat-label">Response Time</span>
             </div>
             <div class="stat-item">
                 <span class="stat-number">W3C</span>
@@ -203,255 +253,251 @@
 </section>
 
 <!-- Features Section -->
-<section id="features" style="padding: var(--space-20) 0; background: var(--color-gray-50);">
+<section id="features" style="padding: var(--space-20) 0;">
     <div class="container">
-        <div style="text-align: center; margin-bottom: var(--space-16);">
-            <h2 style="margin-bottom: var(--space-4);">Built for the AI era</h2>
-            <p style="font-size: 1.125rem; max-width: 600px; margin: 0 auto;">
-                As AI makes traditional bot detection obsolete, Lemma provides the only reliable way to verify human users while preserving privacy.
+        <div class="text-center mb-8">
+            <h2 style="font-size: var(--font-size-h2); font-weight: 700; color: var(--gray-800); margin-bottom: var(--space-4);">
+                Built for the next generation of the internet
+            </h2>
+            <p style="font-size: var(--font-size-lg); color: var(--gray-500); max-width: 600px; margin: 0 auto;">
+                Lemma provides the foundational verification layer that platforms need to distinguish real users from bots.
             </p>
         </div>
         
         <div class="features-grid">
             <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(99, 91, 255, 0.1); color: var(--color-primary);">
-                    🔐
+                <div class="feature-icon" style="background: rgba(99, 91, 255, 0.1); color: var(--primary-500);">
+                    <svg class="icon icon-lg">
+                        <path d="M9 12l2 2 4-4"/>
+                        <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
+                        <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
+                    </svg>
                 </div>
-                <h3 style="margin-bottom: var(--space-3);">Privacy-First Verification</h3>
-                <p>Only verifies humanity—no personal data collected. W3C standard credentials work across platforms without tracking.</p>
+                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
+                    Network Effects
+                </h3>
+                <p style="color: var(--gray-500); line-height: 1.6;">
+                    One verification works across all integrated platforms. As more businesses join, verification becomes more valuable for everyone.
+                </p>
             </div>
             
             <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--color-success);">
-                    ⚡
+                <div class="feature-icon" style="background: rgba(0, 210, 155, 0.1); color: var(--success);">
+                    <svg class="icon icon-lg">
+                        <path d="M12 1v22"/>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
                 </div>
-                <h3 style="margin-bottom: var(--space-3);">Instant Integration</h3>
-                <p>From signup to production in under 10 minutes. Simple APIs, React hooks, and middleware for every platform.</p>
+                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
+                    Network Pricing
+                </h3>
+                <p style="color: var(--gray-500); line-height: 1.6;">
+                    Revolutionary pricing that decreases as the network grows. Early adopters get better rates as more businesses join.
+                </p>
             </div>
             
             <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--color-warning);">
-                    🌐
+                <div class="feature-icon" style="background: rgba(255, 165, 0, 0.1); color: var(--warning);">
+                    <svg class="icon icon-lg">
+                        <path d="M6 9l6 6 6-6"/>
+                    </svg>
                 </div>
-                <h3 style="margin-bottom: var(--space-3);">Network Effects</h3>
-                <p>Verify once, access everywhere. Your costs decrease as more businesses join the network. Users love the seamless experience.</p>
+                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
+                    Privacy First
+                </h3>
+                <p style="color: var(--gray-500); line-height: 1.6;">
+                    Zero personal data collection. We only verify that a user is human—nothing more, nothing less.
+                </p>
             </div>
             
             <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--color-info);">
-                    📊
+                <div class="feature-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--info);">
+                    <svg class="icon icon-lg">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                    </svg>
                 </div>
-                <h3 style="margin-bottom: var(--space-3);">Enterprise Analytics</h3>
-                <p>Real-time dashboards, usage analytics, and cost optimization insights. SOC 2 compliance and enterprise security.</p>
+                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
+                    Enterprise Ready
+                </h3>
+                <p style="color: var(--gray-500); line-height: 1.6;">
+                    Production-grade infrastructure with &lt;150ms response times, 99.9% uptime, and comprehensive billing.
+                </p>
             </div>
             
             <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(139, 69, 19, 0.1); color: #8B4513;">
-                    🛡️
+                <div class="feature-icon" style="background: rgba(139, 69, 19, 0.1); color: #8b4513;">
+                    <svg class="icon icon-lg">
+                        <path d="M14 9V5a3 3 0 0 0-6 0v4"/>
+                        <rect x="2" y="9" width="20" height="11" rx="2" ry="2"/>
+                    </svg>
                 </div>
-                <h3 style="margin-bottom: var(--space-3);">Offline Verification</h3>
-                <p>Credentials work without internet connection. Perfect for mobile apps, IoT devices, and distributed systems.</p>
+                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
+                    W3C Standards
+                </h3>
+                <p style="color: var(--gray-500); line-height: 1.6;">
+                    Built on open standards with full support for Verifiable Credentials and Decentralized Identifiers.
+                </p>
             </div>
             
             <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(168, 85, 247, 0.1); color: #A855F7;">
-                    🤖
+                <div class="feature-icon" style="background: rgba(255, 20, 147, 0.1); color: #ff1493;">
+                    <svg class="icon icon-lg">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22,4 12,14.01 9,11.01"/>
+                    </svg>
                 </div>
-                <h3 style="margin-bottom: var(--space-3);">AI-Proof Architecture</h3>
-                <p>While others fight an arms race, we solved it differently. Human verification that scales to millions without compromise.</p>
+                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
+                    Easy Integration
+                </h3>
+                <p style="color: var(--gray-500); line-height: 1.6;">
+                    Simple APIs and drop-in components. Add human verification to your platform in under 10 minutes.
+                </p>
             </div>
         </div>
     </div>
 </section>
 
 <!-- Developer Section -->
-<section id="developers" style="padding: var(--space-20) 0; background: white;">
+<section id="developers" style="padding: var(--space-20) 0; background: var(--gray-50);">
     <div class="container">
-        <div style="text-align: center; margin-bottom: var(--space-16);">
-            <h2 style="margin-bottom: var(--space-4);">Developer Experience</h2>
-            <p style="font-size: 1.125rem; max-width: 600px; margin: 0 auto;">
-                Production-ready APIs designed for developers. Simple integration, powerful features, comprehensive documentation.
+        <div class="text-center mb-8">
+            <h2 style="font-size: var(--font-size-h2); font-weight: 700; color: var(--gray-800); margin-bottom: var(--space-4);">
+                Developer Experience
+            </h2>
+            <p style="font-size: var(--font-size-lg); color: var(--gray-500); max-width: 600px; margin: 0 auto;">
+                Clean APIs, comprehensive documentation, and copy-paste examples to get you started in minutes.
             </p>
         </div>
         
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-12); align-items: center;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: center;">
             <div>
-                <h3 style="margin-bottom: var(--space-4);">React Integration</h3>
-                <p style="margin-bottom: var(--space-6);">
-                    Drop-in components and hooks for instant human verification. Works with Next.js, Create React App, and any React setup.
+                <h3 style="font-size: var(--font-size-h3); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-4);">
+                    Simple Integration
+                </h3>
+                <p style="color: var(--gray-500); margin-bottom: var(--space-6); line-height: 1.6;">
+                    Add human verification with just a few lines of code. Our JavaScript SDK handles all the complexity.
                 </p>
+                <div class="step-list">
+                    <div class="step-item">
+                        <div class="step-check completed"></div>
+                        <span>Install the Lemma SDK</span>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-check completed"></div>
+                        <span>Configure your API keys</span>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-check completed"></div>
+                        <span>Add verification to your forms</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="code-block">
                 <div class="code-preview">
-<span style="color: #7C7C7C;">// Protect any component with one line</span>
-<span style="color: #FF6B6B;">import</span> { <span style="color: #4ECDC4;">LemmaGate</span> } <span style="color: #FF6B6B;">from</span> <span style="color: #95E1D3;">'@lemma-network/react'</span>
+<span class="syntax-comment">// Add to your website</span>
+<span class="syntax-keyword">import</span> { <span class="syntax-variable">LemmaVerification</span> } <span class="syntax-keyword">from</span> <span class="syntax-string">'@lemma/sdk'</span>;
 
-<span style="color: #FF6B6B;">function</span> <span style="color: #4ECDC4;">App</span>() {
-  <span style="color: #FF6B6B;">return</span> (
-    &lt;<span style="color: #4ECDC4;">LemmaGate</span> <span style="color: #FFD93D;">apiKey</span>=<span style="color: #95E1D3;">"lemma_sk_..."</span>&gt;
-      &lt;<span style="color: #4ECDC4;">SecretContent</span> /&gt;
-    &lt;/<span style="color: #4ECDC4;">LemmaGate</span>&gt;
-  )
+<span class="syntax-keyword">const</span> <span class="syntax-variable">lemma</span> = <span class="syntax-keyword">new</span> <span class="syntax-function">LemmaVerification</span>({
+  <span class="syntax-variable">apiKey</span>: <span class="syntax-string">'your-api-key'</span>
+});
+
+<span class="syntax-comment">// Verify a user is human</span>
+<span class="syntax-keyword">const</span> <span class="syntax-variable">result</span> = <span class="syntax-keyword">await</span> <span class="syntax-variable">lemma</span>.<span class="syntax-function">verify</span>();
+<span class="syntax-keyword">if</span> (<span class="syntax-variable">result</span>.<span class="syntax-variable">isHuman</span>) {
+  <span class="syntax-comment">// User is verified!</span>
+  <span class="syntax-function">showProtectedContent</span>();
 }
                 </div>
+                <button class="copy-btn">📋</button>
             </div>
-            
-            <div>
-                <h3 style="margin-bottom: var(--space-4);">Backend Protection</h3>
-                <p style="margin-bottom: var(--space-6);">
-                    Middleware for Express, Django, Rails, and more. Protect API endpoints with a single decorator or middleware function.
-                </p>
-                <div class="code-preview">
-<span style="color: #7C7C7C;">// Protect API routes instantly</span>
-<span style="color: #FF6B6B;">const</span> { <span style="color: #4ECDC4;">requireHuman</span> } = <span style="color: #FF6B6B;">require</span>(<span style="color: #95E1D3;">'@lemma-network/node'</span>)
-
-<span style="color: #4ECDC4;">app</span>.<span style="color: #4ECDC4;">post</span>(<span style="color: #95E1D3;">'/api/sensitive'</span>, 
-  <span style="color: #4ECDC4;">requireHuman</span>(),
-  (<span style="color: #FFD93D;">req</span>, <span style="color: #FFD93D;">res</span>) => {
-    <span style="color: #7C7C7C;">// Only verified humans reach here</span>
-    <span style="color: #4ECDC4;">res</span>.<span style="color: #4ECDC4;">json</span>({ <span style="color: #FFD93D;">secret</span>: <span style="color: #95E1D3;">'🎉'</span> })
-  }
-)
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Pricing Section -->
-<section id="pricing" style="padding: var(--space-20) 0; background: var(--color-gray-50);">
-    <div class="container">
-        <div style="text-align: center; margin-bottom: var(--space-16);">
-            <h2 style="margin-bottom: var(--space-4);">Network Effect Pricing</h2>
-            <p style="font-size: 1.125rem; max-width: 600px; margin: 0 auto;">
-                The only pricing model that gets <span class="highlight">better as the network grows</span>. Your costs decrease as more businesses join.
-            </p>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-8); max-width: 1000px; margin: 0 auto;">
-            <!-- Free Tier -->
-            <div class="card">
-                <div class="card-body" style="text-align: center;">
-                    <h3 style="margin-bottom: var(--space-3);">Free</h3>
-                    <div style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary); margin-bottom: var(--space-2);">$0</div>
-                    <p style="color: var(--color-gray-600); margin-bottom: var(--space-6);">1,000 verifications/month</p>
-                    <ul style="text-align: left; margin-bottom: var(--space-8); list-style: none; padding: 0;">
-                        <li style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-gray-100);">✅ Human verification API</li>
-                        <li style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-gray-100);">✅ React & Node.js SDKs</li>
-                        <li style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-gray-100);">✅ Basic analytics</li>
-                        <li style="padding: var(--space-2) 0;">✅ Community support</li>
-                    </ul>
-                    <a href="{{ url_for('onboarding.start') }}" class="btn btn-secondary" style="width: 100%;">Get Started</a>
-                </div>
-            </div>
-            
-            <!-- Standard Tier -->
-            <div class="card" style="transform: scale(1.05); box-shadow: var(--shadow-lg); border-color: var(--color-primary);">
-                <div style="background: var(--color-primary); color: white; text-align: center; padding: var(--space-2); font-weight: 600; font-size: 0.875rem;">
-                    Most Popular
-                </div>
-                <div class="card-body" style="text-align: center;">
-                    <h3 style="margin-bottom: var(--space-3);">Standard</h3>
-                    <div style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary); margin-bottom: var(--space-2);">$0.10</div>
-                    <p style="color: var(--color-gray-600); margin-bottom: var(--space-6);">per verification (decreases with network growth)</p>
-                    <ul style="text-align: left; margin-bottom: var(--space-8); list-style: none; padding: 0;">
-                        <li style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-gray-100);">✅ Everything in Free</li>
-                        <li style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-gray-100);">✅ Priority support</li>
-                        <li style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-gray-100);">✅ Advanced analytics</li>
-                        <li style="padding: var(--space-2) 0;">✅ Network effect discounts</li>
-                    </ul>
-                    <a href="{{ url_for('onboarding.start') }}" class="btn btn-primary" style="width: 100%;">Start Free Trial</a>
-                </div>
-            </div>
-            
-            <!-- Enterprise Tier -->
-            <div class="card">
-                <div class="card-body" style="text-align: center;">
-                    <h3 style="margin-bottom: var(--space-3);">Enterprise</h3>
-                    <div style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary); margin-bottom: var(--space-2);">$0.08</div>
-                    <p style="color: var(--color-gray-600); margin-bottom: var(--space-6);">per verification (10K+/month)</p>
-                    <ul style="text-align: left; margin-bottom: var(--space-8); list-style: none; padding: 0;">
-                        <li style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-gray-100);">✅ Everything in Standard</li>
-                        <li style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-gray-100);">✅ Dedicated support</li>
-                        <li style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-gray-100);">✅ Custom SLAs</li>
-                        <li style="padding: var(--space-2) 0;">✅ White-label options</li>
-                    </ul>
-                    <a href="mailto:enterprise@lemma.network" class="btn btn-secondary" style="width: 100%;">Contact Sales</a>
-                </div>
-            </div>
-        </div>
-        
-        <div style="text-align: center; margin-top: var(--space-12);">
-            <p style="color: var(--color-gray-600);">
-                💡 <strong>Network Effect:</strong> As more businesses join, everyone's rate decreases. 
-                At 1,000+ businesses, rates drop to <strong>$0.045/verification</strong> (55% discount).
-            </p>
         </div>
     </div>
 </section>
 
 <!-- CTA Section -->
-<section style="padding: var(--space-20) 0; background: white;">
+<section class="cta-section">
     <div class="container">
-        <div class="cta-section">
-            <h2 style="margin-bottom: var(--space-4);">Ready to build the verified internet?</h2>
-            <p style="font-size: 1.125rem; margin-bottom: var(--space-8); max-width: 600px; margin-left: auto; margin-right: auto;">
-                Join the platform that's creating the infrastructure for internet trust. Start protecting your users today.
-            </p>
-            <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
-                <a href="{{ url_for('onboarding.start') }}" class="btn btn-primary btn-lg">
-                    🚀 Get Started Free
-                </a>
-                <a href="mailto:hello@lemma.network" class="btn btn-secondary btn-lg">
-                    💬 Talk to Sales
-                </a>
-            </div>
-            <p style="font-size: 0.875rem; color: var(--color-gray-500); margin-top: var(--space-6);">
-                No credit card required • 1,000 free verifications • Setup in under 10 minutes
-            </p>
+        <h2 style="font-size: var(--font-size-h2); font-weight: 700; color: var(--gray-800); margin-bottom: var(--space-4);">
+            Ready to build the trusted internet?
+        </h2>
+        <p style="font-size: var(--font-size-lg); color: var(--gray-500); margin-bottom: var(--space-8); max-width: 600px; margin-left: auto; margin-right: auto;">
+            Join the growing network of platforms using Lemma to verify their users and build digital trust.
+        </p>
+        <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
+            <a href="{{ url_for('onboarding.start') }}" class="btn btn-primary btn-lg">
+                Start Free Trial
+            </a>
+            <a href="#contact" class="btn btn-secondary btn-lg">
+                Contact Sales
+            </a>
         </div>
     </div>
 </section>
 
-<!-- Footer -->
-<footer style="background: var(--color-gray-900); color: var(--color-gray-400); padding: var(--space-16) 0;">
-    <div class="container">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-8);">
-            <div>
-                <div style="font-size: 1.25rem; font-weight: 700; color: white; margin-bottom: var(--space-4);">
-                    🛡️ Lemma
-                </div>
-                <p style="color: var(--color-gray-500); font-size: 0.875rem;">
-                    The essential verification protocol for digital trust.
-                </p>
-            </div>
-            <div>
-                <h4 style="color: white; margin-bottom: var(--space-3);">Product</h4>
-                <ul style="list-style: none; padding: 0; space-y: var(--space-2);">
-                    <li><a href="#features" style="color: var(--color-gray-400); font-size: 0.875rem;">Features</a></li>
-                    <li><a href="#pricing" style="color: var(--color-gray-400); font-size: 0.875rem;">Pricing</a></li>
-                    <li><a href="{{ url_for('onboarding.start') }}" style="color: var(--color-gray-400); font-size: 0.875rem;">Get Started</a></li>
-                </ul>
-            </div>
-            <div>
-                <h4 style="color: white; margin-bottom: var(--space-3);">Developers</h4>
-                <ul style="list-style: none; padding: 0;">
-                    <li><a href="#developers" style="color: var(--color-gray-400); font-size: 0.875rem;">Documentation</a></li>
-                    <li><a href="/api/health" style="color: var(--color-gray-400); font-size: 0.875rem;">API Status</a></li>
-                    <li><a href="mailto:support@lemma.network" style="color: var(--color-gray-400); font-size: 0.875rem;">Support</a></li>
-                </ul>
-            </div>
-            <div>
-                <h4 style="color: white; margin-bottom: var(--space-3);">Company</h4>
-                <ul style="list-style: none; padding: 0;">
-                    <li><a href="mailto:hello@lemma.network" style="color: var(--color-gray-400); font-size: 0.875rem;">Contact</a></li>
-                    <li><a href="mailto:enterprise@lemma.network" style="color: var(--color-gray-400); font-size: 0.875rem;">Enterprise</a></li>
-                </ul>
-            </div>
-        </div>
-        <div style="border-top: 1px solid var(--color-gray-800); margin-top: var(--space-12); padding-top: var(--space-8); text-align: center;">
-            <p style="font-size: 0.875rem; color: var(--color-gray-500);">
-                © 2025 Lemma. Building the infrastructure for internet trust.
-            </p>
-        </div>
-    </div>
-</footer>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Enhanced interactions
+document.addEventListener('DOMContentLoaded', function() {
+    // Animate stats on scroll
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('animate-in');
+            }
+        });
+    }, observerOptions);
+
+    // Observe all feature cards
+    document.querySelectorAll('.feature-card').forEach(card => {
+        observer.observe(card);
+    });
+
+    // Add smooth scrolling for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+
+    // Mark steps as completed with animation delay
+    setTimeout(() => {
+        document.querySelectorAll('.step-check').forEach((check, index) => {
+            setTimeout(() => {
+                check.classList.add('completed');
+            }, index * 200);
+        });
+    }, 1000);
+});
+
+// Add styles for animations
+const style = document.createElement('style');
+style.textContent = `
+    .feature-card {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: all 0.6s cubic-bezier(0.32, 0.72, 0.36, 0.95);
+    }
+    
+    .feature-card.animate-in {
+        opacity: 1;
+        transform: translateY(0);
+    }
+`;
+document.head.appendChild(style);
+</script>
 {% endblock %} 
