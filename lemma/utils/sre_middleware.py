@@ -174,10 +174,6 @@ def init_sre_monitoring(app: Flask):
     # Add metrics middleware
     middleware = SREMetricsMiddleware(app)
     
-    # Register SRE monitoring blueprint
-    from lemma.routes.sre_monitoring import sre_bp
-    app.register_blueprint(sre_bp, url_prefix='/api/sre')
-    
     # Start background metrics updater
     metrics_updater.start()
     

@@ -41,11 +41,11 @@
       "Requests tested: 50",
       "Successful requests: 50",
       "Success rate: 100.0%",
-      "Average latency: 589.0ms",
-      "P95 latency: 675.1ms",
-      "\u274c P95 latency too high: 675.1ms > 250ms",
+      "Average latency: 542.7ms",
+      "P95 latency: 650.5ms",
+      "\u274c P95 latency too high: 650.5ms > 250ms",
       "\u2705 Success rate requirement met (\u226595%)",
-      "\u26a0\ufe0f  Average latency: 589.0ms"
+      "\u26a0\ufe0f  Average latency: 542.7ms"
     ]
   },
   "\ud83d\udd27 Client-side Error Tracking": {
