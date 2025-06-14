@@ -582,35 +582,15 @@ def api_logout():
 
 @main_bp.route('/api-docs')
 def api_docs():
-    """Render the API documentation page that requires human verification."""
-    # Check if user has valid verification in session
-    user_id = session.get('verified_user_id')
-    credential_data = session.get('verified_credential')
-    is_verified_human = session.get('verified_human', False)
-    
-    # Strict verification check - require both user_id and credentials
-    if not user_id or not credential_data or not is_verified_human:
-        # Log the unauthorized access attempt
-        current_app.logger.warning(f"Unauthorized API docs access attempt. Session data: user_id={user_id}, has_credential={credential_data is not None}, is_verified_human={is_verified_human}")
-        
-        # Only set a flash message if this appears to be a direct access attempt (not a redirect from main page)
-        referer = request.headers.get('Referer', '')
-        if not ('/' in referer or '/index' in referer):
-            flash("Please verify your Lemma to access the API documentation", "warning")
-        
-        # Redirect to main page instead of API widget demo
-        return redirect(url_for('main.index'))
-    
-    # Ensure proper serialization for template
-    session_credential = json.dumps(credential_data) if credential_data and isinstance(credential_data, dict) else None
-    
-    return render_template(
-        'api_docs.html',
-        user_id=user_id,
-        session_credential=session_credential,
-        verification_time=session.get('verification_time'),
-        verification_expiry=session.get('verification_expiry')
-    )
+    """Render the API documentation page - publicly accessible."""
+    return render_template('api_docs.html')
+
+@main_bp.route('/error')
+def error_page():
+    """Render the error page."""
+    error_code = request.args.get('code', '404')
+    error_message = request.args.get('message', 'Page not found')
+    return render_template('error.html', error_code=error_code, error_message=error_message)
 
 @main_bp.route('/api/generate-csrf')
 def generate_csrf_endpoint():

@@ -1,0 +1,107 @@
+{% extends "layout.html" %}
+
+{% block title %}Verify Your Humanity - Lemma{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Verify Your Humanity</h1>
+            <p class="text-lg text-gray-600">Complete human verification to access protected content</p>
+        </div>
+
+        <!-- Verification Card -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            {% if session.get('verified_user_id') %}
+                <!-- Already Verified -->
+                <div class="text-center">
+                    <div class="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-4">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-semibold text-gray-900 mb-2">Already Verified</h2>
+                    <p class="text-gray-600 mb-6">You have already completed human verification.</p>
+                    <a href="/protected" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        Access Protected Content
+                        <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
+                </div>
+            {% else %}
+                <!-- Start Verification -->
+                <div class="text-center">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Start Verification Process</h2>
+                    <p class="text-gray-600 mb-6">We'll verify your identity using secure document verification. This process takes about 2 minutes.</p>
+                    
+                    <!-- Verification Steps -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                        <div class="text-center">
+                            <div class="inline-flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full mb-2">
+                                <span class="text-sm font-semibold text-blue-600">1</span>
+                            </div>
+                            <p class="text-sm text-gray-600">Upload ID Document</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="inline-flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full mb-2">
+                                <span class="text-sm font-semibold text-blue-600">2</span>
+                            </div>
+                            <p class="text-sm text-gray-600">Take Selfie</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="inline-flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full mb-2">
+                                <span class="text-sm font-semibold text-blue-600">3</span>
+                            </div>
+                            <p class="text-sm text-gray-600">Get Verified</p>
+                        </div>
+                    </div>
+
+                    <!-- Start Button -->
+                    <button onclick="startVerification()" class="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                        <svg class="mr-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Start Verification
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Privacy Notice -->
+        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+            <div class="flex items-start">
+                <svg class="w-5 h-5 text-gray-400 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                <div>
+                    <h3 class="text-sm font-medium text-gray-900 mb-1">Privacy Protected</h3>
+                    <p class="text-sm text-gray-600">We only verify that you're human. No personal information is stored or shared. Your verification credential is stored securely in your browser.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function startVerification() {
+    // Generate a user ID for this verification
+    const userId = 'user_' + Math.random().toString(36).substr(2, 9);
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Starting...';
+    button.disabled = true;
+    
+    // Redirect to verification start
+    window.location.href = `/start-verification/${userId}`;
+}
+</script>
+{% endblock %} 

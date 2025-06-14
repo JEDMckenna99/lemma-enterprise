@@ -1,0 +1,494 @@
+{% extends "layout.html" %}
+
+{% block title %}API Documentation - Lemma{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Lemma API Documentation</h1>
+            <p class="text-lg text-gray-600">Complete API reference for integrating human verification</p>
+        </div>
+
+        <!-- Quick Start -->
+        <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 mb-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">Quick Start</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-semibold text-gray-900 mb-2">1. Get API Key</h3>
+                    <p class="text-sm text-gray-600 mb-3">Register for a free account to get your API key</p>
+                    <a href="/onboarding/register" class="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium">
+                        Get Started
+                        <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-900 mb-2">2. Make Your First Call</h3>
+                    <p class="text-sm text-gray-600 mb-3">Test the API with a simple health check</p>
+                    <button onclick="testHealthEndpoint()" class="inline-flex items-center text-green-600 hover:text-green-700 text-sm font-medium">
+                        Test Now
+                        <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Sections -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <!-- Sidebar Navigation -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sticky top-4">
+                    <h3 class="font-semibold text-gray-900 mb-4">API Sections</h3>
+                    <nav class="space-y-2">
+                        <a href="#authentication" class="block text-sm text-gray-600 hover:text-blue-600 py-1">Authentication</a>
+                        <a href="#core-endpoints" class="block text-sm text-gray-600 hover:text-blue-600 py-1">Core Endpoints</a>
+                        <a href="#verification" class="block text-sm text-gray-600 hover:text-blue-600 py-1">Verification</a>
+                        <a href="#credentials" class="block text-sm text-gray-600 hover:text-blue-600 py-1">Credentials</a>
+                        <a href="#billing" class="block text-sm text-gray-600 hover:text-blue-600 py-1">Billing</a>
+                        <a href="#sre" class="block text-sm text-gray-600 hover:text-blue-600 py-1">SRE Monitoring</a>
+                        <a href="#examples" class="block text-sm text-gray-600 hover:text-blue-600 py-1">Code Examples</a>
+                        <a href="#sdks" class="block text-sm text-gray-600 hover:text-blue-600 py-1">SDKs</a>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="lg:col-span-3 space-y-8">
+                <!-- Authentication -->
+                <section id="authentication" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Authentication</h2>
+                    <p class="text-gray-600 mb-4">All API requests require authentication using an API key in the header.</p>
+                    
+                    <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                        <h3 class="font-medium text-gray-900 mb-2">Header Format</h3>
+                        <pre class="text-sm text-gray-700"><code>X-API-Key: your_api_key_here</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div>
+                                <h4 class="font-medium text-blue-900 mb-1">API Key Security</h4>
+                                <p class="text-sm text-blue-700">Keep your API key secure and never expose it in client-side code. Use environment variables or secure configuration management.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Core Endpoints -->
+                <section id="core-endpoints" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Core Endpoints</h2>
+                    
+                    <!-- Health Check -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-semibold text-gray-900">Health Check</h3>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">GET</span>
+                        </div>
+                        <p class="text-gray-600 mb-3">Check if the API is operational</p>
+                        <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                            <code class="text-sm text-gray-700">GET /api/health</code>
+                        </div>
+                        <button onclick="testEndpoint('/api/health', 'GET')" class="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                            Test Endpoint
+                        </button>
+                    </div>
+
+                    <!-- Generate Challenge -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-semibold text-gray-900">Generate Challenge</h3>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">GET</span>
+                        </div>
+                        <p class="text-gray-600 mb-3">Generate a cryptographic challenge for verification</p>
+                        <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                            <code class="text-sm text-gray-700">GET /api/generate-challenge</code>
+                        </div>
+                        <button onclick="testEndpoint('/api/generate-challenge', 'GET')" class="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                            Test Endpoint
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Verification -->
+                <section id="verification" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Verification Endpoints</h2>
+                    
+                    <!-- Verify Credential -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-semibold text-gray-900">Verify Credential</h3>
+                            <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">POST</span>
+                        </div>
+                        <p class="text-gray-600 mb-3">Verify a Lemma credential presentation</p>
+                        <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                            <code class="text-sm text-gray-700">POST /api/verify-credential</code>
+                        </div>
+                        
+                        <h4 class="font-medium text-gray-900 mb-2">Request Body</h4>
+                        <pre class="bg-gray-100 rounded p-3 text-xs overflow-x-auto mb-3"><code>{
+  "presentation": {
+    "@context": ["https://www.w3.org/2018/credentials/v1"],
+    "type": ["VerifiablePresentation"],
+    "verifiableCredential": [...]
+  },
+  "challenge": "random_challenge_string"
+}</code></pre>
+                        
+                        <h4 class="font-medium text-gray-900 mb-2">Response</h4>
+                        <pre class="bg-gray-100 rounded p-3 text-xs overflow-x-auto mb-3"><code>{
+  "success": true,
+  "verified": true,
+  "isHuman": true,
+  "message": "Credential verified successfully"
+}</code></pre>
+                    </div>
+
+                    <!-- Verify Human -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-semibold text-gray-900">Verify Human</h3>
+                            <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">POST</span>
+                        </div>
+                        <p class="text-gray-600 mb-3">Complete human verification and set session</p>
+                        <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                            <code class="text-sm text-gray-700">POST /api/verify-human</code>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Credentials -->
+                <section id="credentials" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Credential Management</h2>
+                    
+                    <!-- Issue Credential -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-semibold text-gray-900">Issue Credential</h3>
+                            <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">POST</span>
+                        </div>
+                        <p class="text-gray-600 mb-3">Issue a new human verification credential</p>
+                        <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                            <code class="text-sm text-gray-700">POST /api/issue-credential</code>
+                        </div>
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <svg class="w-5 h-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                </svg>
+                                <div>
+                                    <h4 class="font-medium text-yellow-900 mb-1">Requires API Key</h4>
+                                    <p class="text-sm text-yellow-700">This endpoint requires authentication with a valid API key.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Get Credential -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-semibold text-gray-900">Get User Credential</h3>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">GET</span>
+                        </div>
+                        <p class="text-gray-600 mb-3">Retrieve a user's credential by ID</p>
+                        <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                            <code class="text-sm text-gray-700">GET /api/credential-lookup/{user_id}</code>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Billing -->
+                <section id="billing" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Billing API</h2>
+                    
+                    <!-- Billing Health -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-semibold text-gray-900">Billing Health</h3>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">GET</span>
+                        </div>
+                        <p class="text-gray-600 mb-3">Check billing system status</p>
+                        <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                            <code class="text-sm text-gray-700">GET /api/billing/health</code>
+                        </div>
+                        <button onclick="testEndpoint('/api/billing/health', 'GET')" class="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                            Test Endpoint
+                        </button>
+                    </div>
+
+                    <!-- Monthly Usage -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-semibold text-gray-900">Monthly Usage</h3>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">GET</span>
+                        </div>
+                        <p class="text-gray-600 mb-3">Get monthly usage metrics</p>
+                        <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                            <code class="text-sm text-gray-700">GET /api/billing/usage/monthly</code>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SRE Monitoring -->
+                <section id="sre" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">SRE Monitoring</h2>
+                    
+                    <!-- SRE Dashboard -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-semibold text-gray-900">SRE Dashboard</h3>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">GET</span>
+                        </div>
+                        <p class="text-gray-600 mb-3">Complete SRE metrics dashboard</p>
+                        <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                            <code class="text-sm text-gray-700">GET /api/sre/dashboard/metrics</code>
+                        </div>
+                        <button onclick="testEndpoint('/api/sre/dashboard/metrics', 'GET')" class="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                            Test Endpoint
+                        </button>
+                    </div>
+
+                    <!-- Prometheus Metrics -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-semibold text-gray-900">Prometheus Export</h3>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">GET</span>
+                        </div>
+                        <p class="text-gray-600 mb-3">Prometheus-compatible metrics export</p>
+                        <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                            <code class="text-sm text-gray-700">GET /api/sre/metrics/prometheus</code>
+                        </div>
+                        <button onclick="testEndpoint('/api/sre/metrics/prometheus', 'GET')" class="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                            Test Endpoint
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Code Examples -->
+                <section id="examples" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Code Examples</h2>
+                    
+                    <!-- JavaScript Example -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">JavaScript / Node.js</h3>
+                        <pre class="bg-gray-100 rounded p-4 text-sm overflow-x-auto"><code>// Basic verification check
+async function verifyWithLemma(credential, challenge) {
+  const response = await fetch('/api/verify-credential', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': 'your_api_key_here'
+    },
+    body: JSON.stringify({
+      presentation: credential,
+      challenge: challenge
+    })
+  });
+  
+  const result = await response.json();
+  return result.verified;
+}</code></pre>
+                    </div>
+
+                    <!-- Python Example -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Python</h3>
+                        <pre class="bg-gray-100 rounded p-4 text-sm overflow-x-auto"><code>import requests
+
+def verify_lemma_credential(credential, challenge, api_key):
+    """Verify a Lemma credential"""
+    response = requests.post(
+        'https://your-domain.com/api/verify-credential',
+        headers={'X-API-Key': api_key},
+        json={
+            'presentation': credential,
+            'challenge': challenge
+        }
+    )
+    
+    if response.status_code == 200:
+        return response.json().get('verified', False)
+    return False</code></pre>
+                    </div>
+
+                    <!-- cURL Example -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">cURL</h3>
+                        <pre class="bg-gray-100 rounded p-4 text-sm overflow-x-auto"><code># Health check
+curl -X GET "https://your-domain.com/api/health"
+
+# Generate challenge
+curl -X GET "https://your-domain.com/api/generate-challenge"
+
+# Verify credential
+curl -X POST "https://your-domain.com/api/verify-credential" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your_api_key_here" \
+  -d '{
+    "presentation": {...},
+    "challenge": "challenge_string"
+  }'</code></pre>
+                    </div>
+                </section>
+
+                <!-- SDKs -->
+                <section id="sdks" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">SDKs & Libraries</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h3 class="font-semibold text-gray-900 mb-2">JavaScript SDK</h3>
+                            <p class="text-sm text-gray-600 mb-3">Official JavaScript SDK for browser and Node.js</p>
+                            <div class="bg-gray-50 rounded p-2 text-xs font-mono mb-3">
+                                npm install @lemma/sdk
+                            </div>
+                            <a href="#" class="text-sm text-blue-600 hover:text-blue-700">View Documentation</a>
+                        </div>
+                        
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h3 class="font-semibold text-gray-900 mb-2">Python SDK</h3>
+                            <p class="text-sm text-gray-600 mb-3">Official Python SDK for server-side integration</p>
+                            <div class="bg-gray-50 rounded p-2 text-xs font-mono mb-3">
+                                pip install lemma-sdk
+                            </div>
+                            <a href="#" class="text-sm text-blue-600 hover:text-blue-700">View Documentation</a>
+                        </div>
+                        
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h3 class="font-semibold text-gray-900 mb-2">PHP SDK</h3>
+                            <p class="text-sm text-gray-600 mb-3">Official PHP SDK for web applications</p>
+                            <div class="bg-gray-50 rounded p-2 text-xs font-mono mb-3">
+                                composer require lemma/sdk
+                            </div>
+                            <a href="#" class="text-sm text-blue-600 hover:text-blue-700">View Documentation</a>
+                        </div>
+                        
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h3 class="font-semibold text-gray-900 mb-2">REST API</h3>
+                            <p class="text-sm text-gray-600 mb-3">Direct REST API for any programming language</p>
+                            <div class="bg-gray-50 rounded p-2 text-xs font-mono mb-3">
+                                https://api.lemma.network
+                            </div>
+                            <a href="#" class="text-sm text-blue-600 hover:text-blue-700">OpenAPI Spec</a>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Test Modal -->
+<div id="apiTestModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">API Test Result</h3>
+                <button onclick="closeApiTestModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="apiTestContent" class="text-sm">
+                Testing...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function testHealthEndpoint() {
+    testEndpoint('/api/health', 'GET');
+}
+
+function testEndpoint(endpoint, method) {
+    document.getElementById('apiTestModal').classList.remove('hidden');
+    document.getElementById('apiTestModal').classList.add('flex');
+    
+    const startTime = Date.now();
+    
+    fetch(endpoint, { method: method })
+        .then(response => response.json())
+        .then(data => {
+            const latency = Date.now() - startTime;
+            document.getElementById('apiTestContent').innerHTML = `
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium">Endpoint:</span>
+                        <span class="text-blue-600">${method} ${endpoint}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium">Status:</span>
+                        <span class="text-green-600">✅ Success</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium">Latency:</span>
+                        <span>${latency}ms</span>
+                    </div>
+                    <div>
+                        <span class="font-medium">Response:</span>
+                        <pre class="mt-2 p-3 bg-gray-100 rounded text-xs overflow-x-auto">${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                </div>
+            `;
+        })
+        .catch(error => {
+            document.getElementById('apiTestContent').innerHTML = `
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium">Endpoint:</span>
+                        <span class="text-blue-600">${method} ${endpoint}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium">Status:</span>
+                        <span class="text-red-600">❌ Error</span>
+                    </div>
+                    <div>
+                        <span class="font-medium">Error:</span>
+                        <pre class="mt-2 p-3 bg-red-50 rounded text-xs">${error.message}</pre>
+                    </div>
+                </div>
+            `;
+        });
+}
+
+function closeApiTestModal() {
+    document.getElementById('apiTestModal').classList.add('hidden');
+    document.getElementById('apiTestModal').classList.remove('flex');
+}
+
+// Close modal when clicking outside
+document.getElementById('apiTestModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeApiTestModal();
+    }
+});
+
+// Smooth scrolling for navigation links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
+    });
+});
+</script>
+{% endblock %} 

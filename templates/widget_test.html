@@ -1,0 +1,316 @@
+{% extends "layout.html" %}
+
+{% block title %}Widget Integration Test - Lemma{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">
+                <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Widget Integration Test</h1>
+            <p class="text-lg text-gray-600">Test Lemma verification widgets and integration components</p>
+        </div>
+
+        <!-- Test Sections -->
+        <div class="space-y-8">
+            <!-- Basic Verification Widget -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Basic Verification Widget</h2>
+                <p class="text-gray-600 mb-4">Test the basic Lemma verification widget integration.</p>
+                
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 mb-4">
+                    <div id="lemma-widget-basic" class="text-center">
+                        <div class="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-3">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-medium text-gray-900 mb-2">Verify with Lemma</h3>
+                        <p class="text-sm text-gray-600 mb-4">Prove you're human to access this content</p>
+                        <button onclick="testBasicVerification()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            Start Verification
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="text-sm text-gray-500">
+                    <strong>Integration Code:</strong>
+                    <pre class="mt-2 p-3 bg-gray-100 rounded text-xs overflow-x-auto"><code>&lt;div data-lemma="true"&gt;
+  &lt;!-- Protected content here --&gt;
+&lt;/div&gt;</code></pre>
+                </div>
+            </div>
+
+            <!-- Advanced Widget with Custom Styling -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Custom Styled Widget</h2>
+                <p class="text-gray-600 mb-4">Test custom styling and branding options.</p>
+                
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 mb-4">
+                    <div id="lemma-widget-custom" class="text-center">
+                        <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full mb-4">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900 mb-2">Premium Verification</h3>
+                        <p class="text-gray-600 mb-4">Enhanced verification with custom branding</p>
+                        <button onclick="testCustomVerification()" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105">
+                            Verify Premium Access
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="text-sm text-gray-500">
+                    <strong>Custom Configuration:</strong>
+                    <pre class="mt-2 p-3 bg-gray-100 rounded text-xs overflow-x-auto"><code>lemmaWidget.init({
+  theme: 'custom',
+  primaryColor: '#8B5CF6',
+  borderRadius: '8px',
+  showBranding: false
+});</code></pre>
+                </div>
+            </div>
+
+            <!-- Inline Verification -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Inline Verification</h2>
+                <p class="text-gray-600 mb-4">Test inline verification within content flow.</p>
+                
+                <div class="prose max-w-none">
+                    <p class="text-gray-700 mb-4">This is some sample content that anyone can read. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                    
+                    <div class="border-2 border-dashed border-yellow-300 rounded-lg p-4 my-6 bg-yellow-50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
+                                    <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-900 mb-1">Premium Content Below</p>
+                                    <p class="text-sm text-gray-600">Verify your humanity to continue reading</p>
+                                </div>
+                            </div>
+                            <button onclick="testInlineVerification()" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm">
+                                Unlock Content
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="protected-content" class="hidden">
+                        <p class="text-gray-700">🎉 <strong>Protected content unlocked!</strong> This content is only visible to verified humans. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Integration Test -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">API Integration Test</h2>
+                <p class="text-gray-600 mb-4">Test direct API integration and verification flow.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <h3 class="font-medium text-gray-900 mb-2">Test Actions</h3>
+                        <div class="space-y-2">
+                            <button onclick="testGenerateChallenge()" class="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm">
+                                Generate Challenge
+                            </button>
+                            <button onclick="testVerifyCredential()" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm">
+                                Verify Credential
+                            </button>
+                            <button onclick="testCreatePresentation()" class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm">
+                                Create Presentation
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-medium text-gray-900 mb-2">API Response</h3>
+                        <div id="api-response" class="p-3 bg-gray-100 rounded-lg text-xs font-mono h-32 overflow-y-auto">
+                            Click a test action to see API response...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Test -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Performance Test</h2>
+                <p class="text-gray-600 mb-4">Test widget loading performance and responsiveness.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="text-center p-4 bg-gray-50 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-600" id="load-time">--</div>
+                        <div class="text-sm text-gray-600">Load Time (ms)</div>
+                    </div>
+                    <div class="text-center p-4 bg-gray-50 rounded-lg">
+                        <div class="text-2xl font-bold text-green-600" id="api-latency">--</div>
+                        <div class="text-sm text-gray-600">API Latency (ms)</div>
+                    </div>
+                    <div class="text-center p-4 bg-gray-50 rounded-lg">
+                        <div class="text-2xl font-bold text-purple-600" id="verification-time">--</div>
+                        <div class="text-sm text-gray-600">Verification Time (ms)</div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 text-center">
+                    <button onclick="runPerformanceTest()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        Run Performance Test
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Test Functions
+function testBasicVerification() {
+    showLoading('lemma-widget-basic');
+    setTimeout(() => {
+        document.getElementById('lemma-widget-basic').innerHTML = `
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-3">
+                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h3 class="font-medium text-gray-900 mb-2">Verification Complete</h3>
+                <p class="text-sm text-green-600">Successfully verified as human</p>
+            </div>
+        `;
+    }, 2000);
+}
+
+function testCustomVerification() {
+    showLoading('lemma-widget-custom');
+    setTimeout(() => {
+        document.getElementById('lemma-widget-custom').innerHTML = `
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-500 to-blue-500 rounded-full mb-4">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Premium Verified</h3>
+                <p class="text-gray-600">Welcome to premium content access</p>
+            </div>
+        `;
+    }, 2500);
+}
+
+function testInlineVerification() {
+    const button = event.target;
+    button.innerHTML = 'Verifying...';
+    button.disabled = true;
+    
+    setTimeout(() => {
+        document.getElementById('protected-content').classList.remove('hidden');
+        button.parentElement.parentElement.innerHTML = `
+            <div class="flex items-center justify-center p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+                <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <span class="text-green-700 font-medium">Content unlocked successfully</span>
+            </div>
+        `;
+    }, 1500);
+}
+
+function testGenerateChallenge() {
+    const startTime = Date.now();
+    fetch('/api/generate-challenge')
+        .then(response => response.json())
+        .then(data => {
+            const latency = Date.now() - startTime;
+            document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+            document.getElementById('api-latency').textContent = latency;
+        })
+        .catch(error => {
+            document.getElementById('api-response').textContent = 'Error: ' + error.message;
+        });
+}
+
+function testVerifyCredential() {
+    const startTime = Date.now();
+    fetch('/api/health')
+        .then(response => response.json())
+        .then(data => {
+            const latency = Date.now() - startTime;
+            document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+            document.getElementById('api-latency').textContent = latency;
+        })
+        .catch(error => {
+            document.getElementById('api-response').textContent = 'Error: ' + error.message;
+        });
+}
+
+function testCreatePresentation() {
+    const mockPresentation = {
+        "@context": ["https://www.w3.org/2018/credentials/v1"],
+        "type": ["VerifiablePresentation"],
+        "verifiableCredential": [{
+            "@context": ["https://www.w3.org/2018/credentials/v1"],
+            "type": ["VerifiableCredential", "HumanVerificationCredential"],
+            "credentialSubject": {
+                "isHuman": true
+            }
+        }]
+    };
+    
+    document.getElementById('api-response').textContent = JSON.stringify(mockPresentation, null, 2);
+}
+
+function runPerformanceTest() {
+    const startTime = Date.now();
+    
+    // Simulate widget load time
+    setTimeout(() => {
+        const loadTime = Date.now() - startTime;
+        document.getElementById('load-time').textContent = loadTime;
+    }, Math.random() * 200 + 100);
+    
+    // Test API latency
+    const apiStart = Date.now();
+    fetch('/api/health')
+        .then(() => {
+            const apiLatency = Date.now() - apiStart;
+            document.getElementById('api-latency').textContent = apiLatency;
+        });
+    
+    // Simulate verification time
+    setTimeout(() => {
+        const verificationTime = Math.random() * 1000 + 500;
+        document.getElementById('verification-time').textContent = Math.round(verificationTime);
+    }, 1000);
+}
+
+function showLoading(elementId) {
+    document.getElementById(elementId).innerHTML = `
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-3">
+                <svg class="animate-spin w-6 h-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+            <h3 class="font-medium text-gray-900 mb-2">Verifying...</h3>
+            <p class="text-sm text-gray-600">Please wait while we verify your humanity</p>
+        </div>
+    `;
+}
+
+// Initialize performance metrics on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const pageLoadTime = Date.now() - performance.timing.navigationStart;
+    document.getElementById('load-time').textContent = pageLoadTime;
+});
+</script>
+{% endblock %} 

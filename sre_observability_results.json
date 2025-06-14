@@ -9,23 +9,23 @@
     "score": 100.0,
     "latency_data": {
       "/api/health": {
-        "avg_ms": 398.8036632537842,
-        "p95_ms": 460.89792251586914,
+        "avg_ms": 440.00511169433594,
+        "p95_ms": 451.3413906097412,
         "samples": 5
       },
       "/api/generate-challenge": {
-        "avg_ms": 402.66122817993164,
-        "p95_ms": 454.653263092041,
+        "avg_ms": 398.65612983703613,
+        "p95_ms": 418.2305335998535,
         "samples": 5
       },
       "/api/verify-presentation": {
-        "avg_ms": 790.8408641815186,
-        "p95_ms": 889.1654014587402,
+        "avg_ms": 795.4368591308594,
+        "p95_ms": 890.9056186676025,
         "samples": 5
       },
       "/api/billing/usage/monthly": {
-        "avg_ms": 366.65892601013184,
-        "p95_ms": 451.4048099517822,
+        "avg_ms": 414.1896724700928,
+        "p95_ms": 455.05571365356445,
         "samples": 5
       }
     },
@@ -59,8 +59,8 @@
   },
   "Load Test Performance": {
     "score": 40,
-    "p95_latency_ms": 1694.8065757751465,
-    "success_rate": 98.2,
+    "p95_latency_ms": 1724.2116928100586,
+    "success_rate": 100.0,
     "total_requests": 500,
     "details": "Load performance test"
   },
