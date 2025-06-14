@@ -37,9 +37,12 @@ class PerformanceMiddleware:
         g.perf_start = time.time()
         
         # Skip heavy operations for API health checks and fast endpoints
-        if request.path in ['/api/health', '/health', '/ping', '/api/ping', '/api/generate-challenge']:
+        if request.path in ['/api/health', '/health', '/ping', '/api/ping', '/api/fast-test']:
             g.skip_heavy_ops = True
             g.skip_sre_metrics = True  # Skip SRE metrics collection for ultra-fast paths
+        elif request.path in ['/api/generate-challenge']:
+            g.skip_heavy_ops = True
+            g.skip_sre_metrics = False  # Keep metrics for challenge generation
         else:
             g.skip_heavy_ops = False
             g.skip_sre_metrics = False
@@ -140,8 +143,9 @@ def performance_cache(seconds=300):
 def fast_did_cache(did_string):
     """Ultra-fast DID resolution cache."""
     try:
-        from lemma.core.did_resolver import resolve_did
-        return resolve_did(did_string)
+        from lemma.core.did_resolver import get_did_resolver
+        resolver = get_did_resolver()
+        return resolver.resolve(did_string) if resolver else None
     except Exception as e:
         logger.error(f"DID resolution error: {e}")
         return None
@@ -163,8 +167,9 @@ def fast_json_response(data, status=200):
 def cached_credential_verification(credential_data):
     """Cached credential verification for repeated checks."""
     try:
-        from lemma.core.credential_service import verify_credential_structure
-        return verify_credential_structure(credential_data)
+        from lemma.core.credential_service import get_credential_service
+        service = get_credential_service()
+        return service.verify_credential(credential_data) if service else False
     except Exception as e:
         logger.error(f"Credential verification error: {e}")
         return False

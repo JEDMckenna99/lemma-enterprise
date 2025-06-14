@@ -28,7 +28,7 @@
       "\u2705 bloom_filter_metrics: Available",
       "\u2705 billing_job_status: Available",
       "\u2705 alerts: Available",
-      "\u2705 Latency data: 4 endpoints monitored"
+      "\u2705 Latency data: 2 endpoints monitored"
     ]
   },
   "\u26a1 Real-time Metrics Collection": {
@@ -54,11 +54,11 @@
       "Requests tested: 50",
       "Successful requests: 50",
       "Success rate: 100.0%",
-      "Average latency: 526.4ms",
-      "P95 latency: 620.7ms",
-      "\u274c P95 latency too high: 620.7ms > 250ms",
+      "Average latency: 547.2ms",
+      "P95 latency: 627.5ms",
+      "\u274c P95 latency too high: 627.5ms > 250ms",
       "\u2705 Success rate requirement met (\u226595%)",
-      "\u26a0\ufe0f  Average latency: 526.4ms"
+      "\u26a0\ufe0f  Average latency: 547.2ms"
     ]
   },
   "\ud83d\udd27 Client-side Error Tracking": {
@@ -70,15 +70,15 @@
     ]
   },
   "\ud83c\udf1f Prometheus Integration": {
-    "score": 100.0,
+    "score": 60.0,
     "details": [
-      "\u2705 lemma_latency_ms",
-      "\u2705 lemma_error_rate",
+      "\u274c lemma_latency_ms",
+      "\u274c lemma_error_rate",
       "\u2705 lemma_mah_total",
       "\u2705 lemma_bloom_filter_size",
       "\u2705 lemma_revocation_lag_seconds",
       "\u2705 Prometheus format validation passed",
-      "Metrics response size: 479 bytes"
+      "Metrics response size: 100 bytes"
     ]
   },
   "\ud83d\udcb0 MAH Counter Validation": {

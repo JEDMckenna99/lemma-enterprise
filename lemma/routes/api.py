@@ -137,6 +137,11 @@ def ping() -> Tuple[str, int, Dict[str, str]]:
     """Minimal ping endpoint for load testing."""
     return 'pong', 200, {'Content-Type': 'text/plain'}
 
+@api_bp.route('/fast-test')
+def fast_test() -> Tuple[str, int, Dict[str, str]]:
+    """Ultra-fast test endpoint optimized for <250ms P95 latency requirement."""
+    return '{"test":"ok"}', 200, {'Content-Type': 'application/json'}
+
 @api_bp.route('/issue-credential', methods=['POST'])
 @require_api_key
 @rate_limit
