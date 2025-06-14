@@ -1,0 +1,530 @@
+openapi: 3.0.3
+info:
+  title: Lemma Enterprise API
+  description: |
+    **The Human Verification Protocol API**
+    
+    Lemma provides enterprise-grade human verification through W3C Verifiable Credentials, 
+    enabling reliable bot prevention with minimal user friction and strong privacy protections.
+    
+    ## 🚀 Quick Start
+    
+    1. **Get API Key**: Register at [lemma-enterprise.herokuapp.com/onboarding](https://lemma-enterprise-0f6ba17076c1.herokuapp.com/onboarding)
+    2. **Verify Domain**: Add DNS TXT record or HTML meta tag
+    3. **Test API**: Use the examples below with your API key
+    
+    ## 🔐 Authentication
+    
+    All API endpoints require an API key in the header:
+    ```
+    X-API-Key: your_api_key_here
+    ```
+    
+    ## 📊 Rate Limits
+    
+    - **Standard**: 1000 requests/hour
+    - **Enterprise**: 10,000 requests/hour
+    
+    ## 🌐 Base URL
+    
+    **Production**: `https://lemma-enterprise-0f6ba17076c1.herokuapp.com`
+    
+    ## 💡 Core Concepts
+    
+    - **Human Verification**: Proves a user is human without collecting personal data
+    - **Verifiable Credentials**: W3C standard credentials stored in user's browser
+    - **Minimal Data**: Only verifies humanity - no PII collected
+    - **Offline Capable**: Credentials work without constant internet connection
+    
+  version: 2.7.0
+  contact:
+    name: Lemma Support
+    email: support@lemma.network
+    url: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/onboarding
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/terms
+
+servers:
+  - url: https://lemma-enterprise-0f6ba17076c1.herokuapp.com
+    description: Production server
+  - url: http://localhost:5000
+    description: Development server
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+  schemas:
+    VerifiableCredential:
+      type: object
+      description: W3C Verifiable Credential proving human verification
+      properties:
+        "@context":
+          type: array
+          items:
+            type: string
+          example: ["https://www.w3.org/2018/credentials/v1"]
+        type:
+          type: array
+          items:
+            type: string
+          example: ["VerifiableCredential", "LemmaCredential", "HumanCredential"]
+        issuer:
+          type: string
+          description: DID of the issuing authority
+          example: "did:lemma:enterprise"
+        issuanceDate:
+          type: string
+          format: date-time
+          example: "2025-06-01T12:00:00Z"
+        expirationDate:
+          type: string
+          format: date-time
+          example: "2026-06-01T12:00:00Z"
+        credentialSubject:
+          type: object
+          properties:
+            id:
+              type: string
+              description: User ID (not personal information)
+              example: "user_12345"
+            isHuman:
+              type: boolean
+              example: true
+        proof:
+          type: object
+          description: Cryptographic proof (Ed25519 signature)
+
+    VerifiablePresentation:
+      type: object
+      description: Presentation of credentials for verification
+      properties:
+        "@context":
+          type: array
+          items:
+            type: string
+        type:
+          type: array
+          items:
+            type: string
+          example: ["VerifiablePresentation"]
+        verifiableCredential:
+          type: array
+          items:
+            $ref: '#/components/schemas/VerifiableCredential'
+        proof:
+          type: object
+          description: Presentation proof with challenge response
+
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the operation succeeded
+        message:
+          type: string
+          description: Human-readable message
+        data:
+          type: object
+          description: Response data (varies by endpoint)
+        error:
+          type: string
+          description: Error message if success is false
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "ok"
+        service:
+          type: string
+          example: "lemma-human-verification"
+        version:
+          type: string
+          example: "2.7.0"
+
+    UsageMetrics:
+      type: object
+      properties:
+        period:
+          type: string
+          example: "2025-06"
+        total_verifications:
+          type: integer
+          example: 1250
+        monthly_active_humans:
+          type: integer
+          example: 950
+        new_humans:
+          type: integer
+          example: 300
+        cost_breakdown:
+          type: object
+          properties:
+            mah_cost:
+              type: number
+              format: float
+              example: 95.00
+            new_human_cost:
+              type: number
+              format: float
+              example: 600.00
+            total_cost:
+              type: number
+              format: float
+              example: 695.00
+
+    Challenge:
+      type: object
+      properties:
+        challenge:
+          type: string
+          description: Random challenge string for presentation verification
+          example: "abc123def456"
+        expires_at:
+          type: string
+          format: date-time
+          example: "2025-06-01T12:05:00Z"
+
+paths:
+  /api/health:
+    get:
+      summary: Health Check
+      description: Check API health and service status
+      tags:
+        - Core
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: "ok"
+                service: "lemma-human-verification"
+                version: "2.7.0"
+
+  /api/verify-human:
+    post:
+      summary: Verify Human Credential
+      description: |
+        Verify that a user's credential proves they are human.
+        This is the primary endpoint for validating human verification.
+        
+        **Use Case**: When a user visits your protected content, send their 
+        credential to this endpoint to verify they are human.
+      tags:
+        - Verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                presentation:
+                  $ref: '#/components/schemas/VerifiablePresentation'
+                challenge:
+                  type: string
+                  description: Challenge string from /api/generate-challenge
+                domain:
+                  type: string
+                  description: Your domain for security verification
+                  example: "example.com"
+              required:
+                - presentation
+                - challenge
+            example:
+              presentation:
+                "@context": ["https://www.w3.org/2018/credentials/v1"]
+                type: ["VerifiablePresentation"]
+                verifiableCredential: [{}]
+                proof: {}
+              challenge: "abc123def456"
+              domain: "example.com"
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          verified:
+                            type: boolean
+                            description: Whether the user is verified as human
+                          user_id:
+                            type: string
+                            description: User identifier
+                          verification_time:
+                            type: string
+                            format: date-time
+              example:
+                success: true
+                message: "Human verification successful"
+                data:
+                  verified: true
+                  user_id: "user_12345"
+                  verification_time: "2025-06-01T12:00:00Z"
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                success: false
+                error: "Invalid presentation format"
+        '401':
+          description: Authentication failed
+        '429':
+          description: Rate limit exceeded
+
+  /api/generate-challenge:
+    get:
+      summary: Generate Verification Challenge
+      description: |
+        Generate a random challenge for secure credential presentation.
+        Challenges prevent replay attacks and ensure presentation freshness.
+        
+        **Use Case**: Call this before requesting credential verification
+        to get a fresh challenge string.
+      tags:
+        - Verification
+      responses:
+        '200':
+          description: Challenge generated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Challenge'
+              example:
+                success: true
+                message: "Challenge generated"
+                data:
+                  challenge: "abc123def456"
+                  expires_at: "2025-06-01T12:05:00Z"
+
+  /api/issue-credential:
+    post:
+      summary: Issue Human Verification Credential
+      description: |
+        Issue a new human verification credential for a user.
+        
+        **Note**: This endpoint requires KYC verification through Stripe Identity.
+        For testing, use the sandbox environment.
+      tags:
+        - Credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                  description: Unique user identifier
+                  example: "user_12345"
+                verification_method:
+                  type: string
+                  enum: ["stripe_identity", "manual_admin", "sandbox"]
+                  example: "stripe_identity"
+              required:
+                - user_id
+                - verification_method
+      responses:
+        '200':
+          description: Credential issued successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          credential:
+                            $ref: '#/components/schemas/VerifiableCredential'
+                          download_url:
+                            type: string
+                            description: URL to download credential
+
+  /api/billing/usage/monthly:
+    get:
+      summary: Get Monthly Usage Metrics
+      description: |
+        Retrieve detailed usage metrics for billing purposes.
+        Includes Monthly Active Humans (MAH) and new user counts.
+      tags:
+        - Billing
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+          example: 2025
+        - name: month
+          in: query
+          schema:
+            type: integer
+          example: 6
+      responses:
+        '200':
+          description: Usage metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UsageMetrics'
+
+  /api/billing/usage/daily:
+    get:
+      summary: Get Daily Usage Breakdown
+      description: |
+        Retrieve daily usage breakdown for detailed analytics.
+        Useful for tracking usage patterns and optimizing costs.
+      tags:
+        - Billing
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2025-06-01"
+      responses:
+        '200':
+          description: Daily usage retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          date:
+                            type: string
+                            format: date
+                          verifications:
+                            type: integer
+                          unique_users:
+                            type: integer
+                          new_users:
+                            type: integer
+
+  /api/sandbox/credentials:
+    get:
+      summary: List Sandbox Credentials
+      description: |
+        **SANDBOX ONLY**: Get test credentials for development and testing.
+        These credentials are for testing only and cannot be used in production.
+      tags:
+        - Sandbox
+      security: []
+      responses:
+        '200':
+          description: Sandbox credentials retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  test_credentials:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user_id:
+                          type: string
+                        credential:
+                          $ref: '#/components/schemas/VerifiableCredential'
+                        description:
+                          type: string
+
+  /api/sandbox/revocation/events:
+    get:
+      summary: Get Sandbox Revocation Events
+      description: |
+        **SANDBOX ONLY**: Get test revocation events for testing
+        revocation handling in your application.
+      tags:
+        - Sandbox
+      security: []
+      responses:
+        '200':
+          description: Sandbox revocation events retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revocation_events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        credential_id:
+                          type: string
+                        revoked_at:
+                          type: string
+                          format: date-time
+                        reason:
+                          type: string
+
+tags:
+  - name: Core
+    description: Essential API endpoints for health checks and status
+  - name: Verification
+    description: Human verification and credential validation
+  - name: Credentials
+    description: Credential issuance and management
+  - name: Billing
+    description: Usage tracking and billing information
+  - name: Sandbox
+    description: Testing and development endpoints
+
+x-tagGroups:
+  - name: Quick Start
+    tags:
+      - Core
+      - Verification
+  - name: Advanced
+    tags:
+      - Credentials
+      - Billing
+  - name: Development
+    tags:
+      - Sandbox 
