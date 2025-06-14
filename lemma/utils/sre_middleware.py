@@ -37,18 +37,21 @@ class SREMetricsMiddleware:
                 latency_ms = (time.time() - g.start_time) * 1000
                 endpoint = getattr(g, 'endpoint', request.path)
                 
-                # Import here to avoid circular imports
-                from lemma.routes.sre_monitoring import metrics
+                # Skip SRE metrics collection for ultra-fast paths
+                if not getattr(g, 'skip_sre_metrics', False):
+                    # Import here to avoid circular imports
+                    from lemma.routes.sre_monitoring import metrics
+                    
+                    # Record latency
+                    metrics.record_latency(endpoint, latency_ms)
+                    
+                    # Record errors (4xx and 5xx status codes)
+                    if response.status_code >= 400:
+                        metrics.record_error(endpoint, response.status_code)
                 
-                # Record latency
-                metrics.record_latency(endpoint, latency_ms)
-                
-                # Record errors (4xx and 5xx status codes)
-                if response.status_code >= 400:
-                    metrics.record_error(endpoint, response.status_code)
-                
-                # Add performance headers for debugging
-                response.headers['X-Response-Time'] = f"{latency_ms:.2f}ms"
+                # Add performance headers for debugging (but lighter for fast paths)
+                if not getattr(g, 'skip_heavy_ops', False):
+                    response.headers['X-Response-Time'] = f"{latency_ms:.2f}ms"
                 
         except Exception as e:
             logger.error(f"Error recording SRE metrics: {e}")

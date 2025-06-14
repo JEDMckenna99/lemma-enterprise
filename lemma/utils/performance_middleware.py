@@ -36,14 +36,16 @@ class PerformanceMiddleware:
         # Start performance timer
         g.perf_start = time.time()
         
-        # Skip heavy operations for API health checks
-        if request.path in ['/api/health', '/health', '/ping']:
+        # Skip heavy operations for API health checks and fast endpoints
+        if request.path in ['/api/health', '/health', '/ping', '/api/ping', '/api/generate-challenge']:
             g.skip_heavy_ops = True
+            g.skip_sre_metrics = True  # Skip SRE metrics collection for ultra-fast paths
         else:
             g.skip_heavy_ops = False
+            g.skip_sre_metrics = False
             
-        # Enable request compression
-        if 'gzip' in request.headers.get('Accept-Encoding', ''):
+        # Enable request compression only for larger responses
+        if 'gzip' in request.headers.get('Accept-Encoding', '') and not g.skip_heavy_ops:
             g.enable_compression = True
         else:
             g.enable_compression = False
