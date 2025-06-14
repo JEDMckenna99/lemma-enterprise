@@ -14,7 +14,7 @@ from typing import Dict, List, Any, Optional
 from flask import Blueprint, request, jsonify, current_app
 import logging
 
-from ..core.credential_service import CredentialService
+from ..core.credential_service import get_credential_service
 from ..auth.security import api_key_required
 from ..utils.input_validation import validate_input, ValidationError
 
@@ -402,7 +402,7 @@ def get_test_scenarios():
 def _generate_test_credential(profile: Dict[str, Any]) -> Dict[str, Any]:
     """Generate a test credential for sandbox use."""
     try:
-        credential_service = CredentialService()
+        credential_service = get_credential_service()
         
         # Create test credential with sandbox issuer
         credential_data = {
