@@ -84,13 +84,14 @@ def create_app(test_config=None):
     from lemma.auth.csrf_config import configure_csrf
     configure_csrf(app)
     
-    # Initialize Flask-Minify for performance optimization
-    if MINIFY_AVAILABLE and not is_development:
+    # Initialize Flask-Minify for performance optimization (temporarily disabled)
+    # Note: Disabled due to compatibility issues - CloudFlare provides minification
+    if False and MINIFY_AVAILABLE and not is_development:
         Minify(app=app, html=True, js=True, cssless=True, 
                fail_safe=True, bypass=['/api/', '/admin/'])
         app.logger.info("Flask-Minify enabled for production")
-    elif is_development:
-        app.logger.info("Flask-Minify disabled in development mode")
+    else:
+        app.logger.info("Flask-Minify disabled - using CloudFlare minification instead")
     
     # Load default configuration
     app.config.from_mapping(
