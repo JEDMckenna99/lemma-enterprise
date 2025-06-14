@@ -227,6 +227,16 @@ def create_app(test_config=None):
     except Exception as e:
         app.logger.error(f"Error initializing SRE monitoring: {e}")
 
+    # Initialize performance optimizations
+    try:
+        from lemma.utils.performance_middleware import init_performance_middleware
+        init_performance_middleware(app)
+        app.logger.info("Performance optimizations initialized - targeting <250ms response times")
+    except ImportError as e:
+        app.logger.warning(f"Performance middleware not available: {e}")
+    except Exception as e:
+        app.logger.error(f"Error initializing performance middleware: {e}")
+
     # Clean up resources at the end of requests
     @app.teardown_appcontext
     def teardown_db(exception):
