@@ -197,6 +197,36 @@ def create_app(test_config=None):
     except ImportError as e:
         app.logger.warning(f"Enhanced API not available: {e}")
 
+    # Register compliance API blueprint
+    try:
+        from lemma.routes.compliance import compliance_bp
+        app.register_blueprint(compliance_bp)
+        app.logger.info("Compliance API endpoints registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Compliance API not available: {e}")
+    except Exception as e:
+        app.logger.error(f"Error registering compliance API: {e}")
+
+    # Register SRE monitoring blueprint
+    try:
+        from lemma.routes.sre_monitoring import sre_bp
+        app.register_blueprint(sre_bp, url_prefix='/api/sre')
+        app.logger.info("SRE monitoring endpoints registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"SRE monitoring not available: {e}")
+    except Exception as e:
+        app.logger.error(f"Error registering SRE monitoring: {e}")
+
+    # Initialize SRE monitoring system
+    try:
+        from lemma.utils.sre_middleware import init_sre_monitoring
+        init_sre_monitoring(app)
+        app.logger.info("SRE monitoring system initialized successfully")
+    except ImportError as e:
+        app.logger.warning(f"SRE monitoring not available: {e}")
+    except Exception as e:
+        app.logger.error(f"Error initializing SRE monitoring: {e}")
+
     # Clean up resources at the end of requests
     @app.teardown_appcontext
     def teardown_db(exception):

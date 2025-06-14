@@ -3,155 +3,182 @@
 {% block title %}Verify Domain Ownership{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8 max-w-4xl">
-    <!-- Header -->
-    <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">
-            🔐 Verify Domain Ownership
-        </h1>
-        <p class="text-gray-600 mb-4">
-            Verify that you own <strong>{{ customer.domain }}</strong> to complete your registration
-        </p>
-        <div class="inline-flex items-center bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2">
-            <span class="text-yellow-800 text-sm">⚠️ You must verify your domain before getting API access</span>
-        </div>
-    </div>
-
-    <!-- Verification Methods -->
-    <div class="grid md:grid-cols-2 gap-8 mb-8">
-        <!-- DNS Method -->
-        <div class="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
-            <div class="flex items-center mb-4">
-                <div class="bg-blue-100 rounded-full w-10 h-10 flex items-center justify-center mr-3">
-                    <span class="text-blue-600 font-bold">🌐</span>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold">DNS TXT Record</h3>
-                    <p class="text-sm text-gray-600">Recommended method</p>
-                </div>
+<div class="lemma-container">
+    <div class="verify-page">
+        <!-- Header Section -->
+        <div class="verify-header">
+            <div class="verify-logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="verify-icon">
+                    <path d="M9 12l2 2 4-4"/>
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span class="verify-brand">Lemma</span>
             </div>
-            
-            <div class="space-y-4">
-                <p class="text-sm text-gray-700">
-                    Add this TXT record to your DNS settings:
-                </p>
-                
-                <div class="bg-gray-50 rounded-md p-4 border">
-                    <div class="space-y-2">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm font-medium text-gray-700">Name/Host:</span>
-                            <div class="flex items-center">
-                                <code class="bg-gray-100 px-2 py-1 rounded text-sm" id="dnsName">_lemma-verification.{{ customer.domain }}</code>
-                                <button onclick="copyToClipboard('dnsName')" class="ml-2 text-blue-600 hover:text-blue-800">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm font-medium text-gray-700">Value:</span>
-                            <div class="flex items-center">
-                                <code class="bg-gray-100 px-2 py-1 rounded text-sm font-mono" id="dnsValue">{{ customer.verification_token }}</code>
-                                <button onclick="copyToClipboard('dnsValue')" class="ml-2 text-blue-600 hover:text-blue-800">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm font-medium text-gray-700">Type:</span>
-                            <code class="bg-gray-100 px-2 py-1 rounded text-sm">TXT</code>
-                        </div>
+            <h1 class="verify-title">Verify Domain Ownership</h1>
+            <p class="verify-subtitle">
+                Verify that you own <strong>{{ customer.domain }}</strong> to complete your registration
+            </p>
+            <div class="verify-alert">
+                <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span>You must verify your domain before getting API access</span>
+            </div>
+        </div>
+
+        <!-- Verification Methods -->
+        <div class="verify-methods">
+            <!-- DNS Method -->
+            <div class="method-card method-dns">
+                <div class="method-header">
+                    <div class="method-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                    </div>
+                    <div class="method-info">
+                        <h3 class="method-title">DNS TXT Record</h3>
+                        <p class="method-subtitle">Recommended method</p>
                     </div>
                 </div>
                 
-                <div class="text-xs text-gray-500">
-                    <p>💡 Most DNS providers take 5-60 minutes to propagate changes</p>
+                <div class="method-content">
+                    <p class="method-description">
+                        Add this TXT record to your DNS settings:
+                    </p>
+                    
+                    <div class="dns-record">
+                        <div class="record-field">
+                            <label class="record-label">Name/Host:</label>
+                            <div class="record-value">
+                                <code id="dnsName">_lemma-verification.{{ customer.domain }}</code>
+                                <button onclick="copyToClipboard('dnsName')" class="copy-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="record-field">
+                            <label class="record-label">Value:</label>
+                            <div class="record-value">
+                                <code id="dnsValue" class="record-token">{{ customer.verification_token }}</code>
+                                <button onclick="copyToClipboard('dnsValue')" class="copy-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="record-field">
+                            <label class="record-label">Type:</label>
+                            <div class="record-value">
+                                <code>TXT</code>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="method-note">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span>Most DNS providers take 5-60 minutes to propagate changes</span>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Meta Tag Method -->
-        <div class="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
-            <div class="flex items-center mb-4">
-                <div class="bg-green-100 rounded-full w-10 h-10 flex items-center justify-center mr-3">
-                    <span class="text-green-600 font-bold">📝</span>
+            <!-- Meta Tag Method -->
+            <div class="method-card method-meta">
+                <div class="method-header">
+                    <div class="method-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <polyline points="16 18 22 12 16 6"/>
+                            <polyline points="8 6 2 12 8 18"/>
+                        </svg>
+                    </div>
+                    <div class="method-info">
+                        <h3 class="method-title">HTML Meta Tag</h3>
+                        <p class="method-subtitle">Alternative method</p>
+                    </div>
                 </div>
-                <div>
-                    <h3 class="text-lg font-semibold">HTML Meta Tag</h3>
-                    <p class="text-sm text-gray-600">Alternative method</p>
-                </div>
-            </div>
-            
-            <div class="space-y-4">
-                <p class="text-sm text-gray-700">
-                    Add this meta tag to your homepage's &lt;head&gt; section:
-                </p>
                 
-                <div class="bg-gray-50 rounded-md p-4 border">
-                    <div class="flex items-center justify-between">
-                        <code class="text-sm font-mono break-all" id="metaTag">&lt;meta name="lemma-verification" content="{{ customer.verification_token }}"&gt;</code>
-                        <button onclick="copyToClipboard('metaTag')" class="ml-2 text-blue-600 hover:text-blue-800 flex-shrink-0">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                <div class="method-content">
+                    <p class="method-description">
+                        Add this meta tag to your homepage's &lt;head&gt; section:
+                    </p>
+                    
+                    <div class="meta-tag">
+                        <code id="metaTag">&lt;meta name="lemma-verification" content="{{ customer.verification_token }}"&gt;</code>
+                        <button onclick="copyToClipboard('metaTag')" class="copy-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                             </svg>
                         </button>
                     </div>
-                </div>
-                
-                <div class="text-xs text-gray-500">
-                    <p>💡 The meta tag should be accessible at https://{{ customer.domain }}</p>
+                    
+                    <div class="method-note">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span>The meta tag should be accessible at https://{{ customer.domain }}</span>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Verification Button -->
-    <div class="text-center mb-8">
-        <button id="verifyBtn" 
-                onclick="verifyDomain()"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-            🔍 Check Verification
-        </button>
-        
-        <!-- Loading State -->
-        <div id="verifyLoading" class="hidden mt-4">
-            <div class="inline-flex items-center text-blue-600">
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        <!-- Verification Button -->
+        <div class="verify-action">
+            <button id="verifyBtn" onclick="verifyDomain()" class="btn btn-primary btn-large">
+                <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="M21 21l-4.35-4.35"/>
                 </svg>
-                Checking verification...
+                <span class="btn-text">Check Verification</span>
+            </button>
+            
+            <!-- Loading State -->
+            <div id="verifyLoading" class="loading-state hidden">
+                <div class="loading-spinner"></div>
+                <span>Checking verification...</span>
             </div>
         </div>
-    </div>
 
-    <!-- Status Messages -->
-    <div id="statusMessage" class="max-w-md mx-auto"></div>
+        <!-- Status Messages -->
+        <div id="statusMessage" class="status-container"></div>
 
-    <!-- Help Section -->
-    <div class="bg-blue-50 rounded-lg border border-blue-200 p-6 max-w-3xl mx-auto">
-        <h3 class="text-lg font-semibold text-blue-800 mb-3">📚 Need Help?</h3>
-        <div class="space-y-3 text-sm text-blue-700">
-            <div>
-                <strong>For DNS verification:</strong>
-                <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
-                    <li>Log into your domain registrar or DNS provider</li>
-                    <li>Add a new TXT record with the name and value shown above</li>
-                    <li>Wait 5-60 minutes for DNS propagation</li>
-                </ul>
-            </div>
-            <div>
-                <strong>For HTML verification:</strong>
-                <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
-                    <li>Add the meta tag to your homepage's HTML &lt;head&gt; section</li>
-                    <li>Ensure the page is accessible at https://{{ customer.domain }}</li>
-                    <li>Make sure the meta tag contains the exact verification token</li>
-                </ul>
+        <!-- Help Section -->
+        <div class="help-section">
+            <h3 class="help-title">Need Help?</h3>
+            <div class="help-content">
+                <div class="help-item">
+                    <h4 class="help-method">For DNS verification:</h4>
+                    <ul class="help-list">
+                        <li>Log into your domain registrar or DNS provider</li>
+                        <li>Add a new TXT record with the name and value shown above</li>
+                        <li>Wait 5-60 minutes for DNS propagation</li>
+                    </ul>
+                </div>
+                <div class="help-item">
+                    <h4 class="help-method">For HTML verification:</h4>
+                    <ul class="help-list">
+                        <li>Add the meta tag to your homepage's HTML &lt;head&gt; section</li>
+                        <li>Ensure the page is accessible at https://{{ customer.domain }}</li>
+                        <li>Make sure the meta tag contains the exact verification token</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -181,136 +208,465 @@ async function verifyDomain() {
         if (result.success && result.verified) {
             // Success! Show success message and redirect
             statusDiv.innerHTML = `
-                <div class="bg-green-50 border border-green-200 rounded-md p-4">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                            </svg>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm text-green-700">
-                                <strong>✅ Domain verified successfully!</strong><br>
-                                Verified via ${result.method}. Redirecting to your dashboard...
-                            </p>
-                        </div>
+                <div class="alert alert-success">
+                    <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 12l2 2 4-4"/>
+                        <circle cx="12" cy="12" r="9"/>
+                    </svg>
+                    <div class="alert-content">
+                        <strong>Domain verified successfully!</strong><br>
+                        Verified via ${result.method}. Redirecting to your dashboard...
                     </div>
                 </div>
             `;
             
-            // Redirect after 2 seconds
             setTimeout(() => {
                 window.location.href = '{{ url_for("onboarding.dashboard") }}';
             }, 2000);
-            
         } else {
-            // Verification failed
-            const methodsText = Array.isArray(result.methods_tried) ? result.methods_tried.join(', ') : 'DNS and meta tag';
+            // Show error
             statusDiv.innerHTML = `
-                <div class="bg-red-50 border border-red-200 rounded-md p-4">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                            </svg>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm text-red-700">
-                                <strong>❌ Verification failed</strong><br>
-                                ${result.message}<br>
-                                <span class="text-xs">Methods checked: ${methodsText}</span>
-                            </p>
-                        </div>
+                <div class="alert alert-error">
+                    <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    <div class="alert-content">
+                        <strong>Verification failed</strong><br>
+                        ${result.error || 'Please check your DNS settings or meta tag and try again.'}
                     </div>
                 </div>
             `;
             
             // Reset form state
-            verifyBtn.style.display = 'block';
+            verifyBtn.style.display = 'flex';
             loadingDiv.classList.add('hidden');
         }
     } catch (error) {
         console.error('Verification error:', error);
         statusDiv.innerHTML = `
-            <div class="bg-red-50 border border-red-200 rounded-md p-4">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-red-700">
-                            <strong>Network error</strong><br>
-                            Please check your connection and try again.
-                        </p>
-                    </div>
+            <div class="alert alert-error">
+                <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                <div class="alert-content">
+                    <strong>Network error</strong><br>
+                    Please check your connection and try again.
                 </div>
             </div>
         `;
         
         // Reset form state
-        verifyBtn.style.display = 'block';
+        verifyBtn.style.display = 'flex';
         loadingDiv.classList.add('hidden');
     }
 }
 
+// Copy to clipboard functionality
 function copyToClipboard(elementId) {
     const element = document.getElementById(elementId);
     const text = element.textContent;
     
     navigator.clipboard.writeText(text).then(() => {
-        // Show temporary success feedback
-        const originalText = element.textContent;
-        element.textContent = 'Copied!';
-        element.classList.add('bg-green-100');
+        // Show feedback
+        const button = element.nextElementSibling;
+        const originalHTML = button.innerHTML;
+        
+        button.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 12l2 2 4-4"/>
+                <circle cx="12" cy="12" r="9"/>
+            </svg>
+        `;
+        button.style.color = 'var(--color-success)';
         
         setTimeout(() => {
-            element.textContent = originalText;
-            element.classList.remove('bg-green-100');
+            button.innerHTML = originalHTML;
+            button.style.color = '';
         }, 1000);
-    }).catch(err => {
-        console.error('Failed to copy text: ', err);
     });
 }
-
-// Auto-check verification every 30 seconds if user is waiting
-let autoCheckInterval;
-function startAutoCheck() {
-    autoCheckInterval = setInterval(() => {
-        verifyDomain();
-    }, 30000);
-}
-
-// Start auto-checking after page load
-setTimeout(startAutoCheck, 5000);
-
-// Stop auto-checking when page is hidden
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden && autoCheckInterval) {
-        clearInterval(autoCheckInterval);
-    } else if (!document.hidden && !autoCheckInterval) {
-        startAutoCheck();
-    }
-});
 </script>
 
 <style>
-.container {
-    animation: fadeIn 0.6s ease-in-out;
+.verify-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: var(--spacing-6) var(--spacing-4);
+    animation: slideInUp 0.6s var(--easing-swift-out);
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+.verify-header {
+    text-align: center;
+    margin-bottom: var(--spacing-8);
 }
 
-code {
+.verify-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-4);
+}
+
+.verify-icon {
+    color: var(--color-primary);
+}
+
+.verify-brand {
+    font-size: 1.5rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-gray-900);
+}
+
+.verify-title {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-gray-900);
+    margin-bottom: var(--spacing-2);
+    line-height: var(--line-height-tight);
+}
+
+.verify-subtitle {
+    font-size: var(--font-size-base);
+    color: var(--color-gray-600);
+    line-height: var(--line-height-relaxed);
+    margin-bottom: var(--spacing-4);
+}
+
+.verify-alert {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    background: var(--color-warning-bg);
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-3) var(--spacing-4);
+    font-size: var(--font-size-sm);
+    color: var(--color-warning-text);
+}
+
+.verify-methods {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: var(--spacing-6);
+    margin-bottom: var(--spacing-8);
+}
+
+.method-card {
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-6);
+    box-shadow: var(--shadow-subtle);
+}
+
+.method-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-4);
+}
+
+.method-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--border-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.method-dns .method-icon {
+    background: var(--color-primary-alpha-10);
+    color: var(--color-primary);
+}
+
+.method-meta .method-icon {
+    background: var(--color-success-alpha-10);
+    color: var(--color-success);
+}
+
+.method-info {
+    flex: 1;
+}
+
+.method-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-gray-900);
+    margin-bottom: 2px;
+}
+
+.method-subtitle {
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-600);
+}
+
+.method-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-4);
+}
+
+.method-description {
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-700);
+    margin: 0;
+}
+
+.dns-record, .meta-tag {
+    background: var(--color-gray-50);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-4);
+}
+
+.record-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-3);
+}
+
+.record-field:last-child {
+    margin-bottom: 0;
+}
+
+.record-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-gray-700);
+    min-width: 80px;
+}
+
+.record-value {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.record-value code {
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-2) var(--spacing-3);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-900);
+}
+
+.record-token {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.meta-tag {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.meta-tag code {
+    flex: 1;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-3);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-900);
     word-break: break-all;
 }
 
-button:hover {
-    transform: translateY(-1px);
+.copy-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-sm);
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast) var(--easing-swift-out);
+    flex-shrink: 0;
+}
+
+.copy-btn:hover {
+    background: var(--color-gray-50);
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.method-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-gray-500);
+}
+
+.method-note svg {
+    color: var(--color-primary);
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.verify-action {
+    text-align: center;
+    margin-bottom: var(--spacing-8);
+}
+
+.btn-large {
+    padding: var(--spacing-3) var(--spacing-6);
+    font-size: var(--font-size-lg);
+}
+
+.btn-icon {
+    order: -1;
+}
+
+.loading-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    padding: var(--spacing-4);
+    color: var(--color-gray-600);
+    font-size: var(--font-size-sm);
+}
+
+.loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--color-gray-200);
+    border-top: 2px solid var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.status-container {
+    margin-bottom: var(--spacing-6);
+}
+
+.help-section {
+    background: var(--color-primary-alpha-5);
+    border: 1px solid var(--color-primary-alpha-20);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-6);
+}
+
+.help-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-primary);
+    margin-bottom: var(--spacing-4);
+}
+
+.help-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-4);
+}
+
+.help-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+}
+
+.help-method {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-gray-900);
+}
+
+.help-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+}
+
+.help-list li {
+    position: relative;
+    padding-left: var(--spacing-4);
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-700);
+    line-height: var(--line-height-relaxed);
+}
+
+.help-list li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: var(--color-primary);
+    font-weight: bold;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .verify-page {
+        padding: var(--spacing-4) var(--spacing-3);
+    }
+    
+    .verify-methods {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-4);
+    }
+    
+    .method-card {
+        padding: var(--spacing-4);
+    }
+    
+    .verify-title {
+        font-size: var(--font-size-xl);
+    }
+    
+    .help-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .record-field {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-2);
+    }
+    
+    .record-value {
+        width: 100%;
+    }
+    
+    .record-value code {
+        flex: 1;
+        min-width: 0;
+    }
 }
 </style>
 {% endblock %} 

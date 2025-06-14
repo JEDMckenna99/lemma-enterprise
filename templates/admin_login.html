@@ -1,177 +1,255 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - Lemma</title>
-    <!-- Include the Lemma wallet initializer -->
-    <script src="/static/js/lemma-wallet-init.js"></script>
-    <style>
-        :root {
-            --primary-color: #6B3FA0;
-            --secondary-color: #4A2C71;
-            --accent-color: #8F6BC1;
-            --text-color: #333333;
-            --light-bg: #F8F9FA;
-            --white: #FFFFFF;
-            --success: #28A745;
-            --error: #DC3545;
-        }
-        
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            line-height: 1.6;
-            color: var(--text-color);
-            background-color: var(--light-bg);
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        
-        .container {
-            max-width: 400px;
-            width: 100%;
-        }
-        
-        .logo {
-            width: 60px;
-            height: 60px;
-            background-color: var(--primary-color);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-        }
-        
-        .logo span {
-            color: var(--white);
-            font-size: 28px;
-            font-weight: bold;
-        }
-        
-        h1 {
-            color: var(--primary-color);
-            font-size: 24px;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .card {
-            background-color: var(--white);
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            padding: 30px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-        
-        input[type="text"],
-        input[type="password"] {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 16px;
-        }
-        
-        input[type="text"]:focus,
-        input[type="password"]:focus {
-            border-color: var(--primary-color);
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(107, 63, 160, 0.2);
-        }
-        
-        .button {
-            display: block;
-            width: 100%;
-            padding: 12px;
-            background-color: var(--primary-color);
-            color: var(--white);
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            text-align: center;
-        }
-        
-        .button:hover {
-            background-color: var(--secondary-color);
-        }
-        
-        .error-message {
-            color: var(--error);
-            margin-bottom: 20px;
-            padding: 10px;
-            background-color: #FDE8EC;
-            border-radius: 6px;
-        }
-        
-        footer {
-            text-align: center;
-            margin-top: 30px;
-            color: #666;
-        }
-        
-        footer a {
-            color: var(--primary-color);
-            text-decoration: none;
-        }
-        
-        footer a:hover {
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="logo">
-            <span>L</span>
+{% extends "layout.html" %}
+
+{% block title %}Admin Login{% endblock %}
+
+{% block content %}
+<div class="lemma-container">
+    <div class="login-page">
+        <!-- Header Section -->
+        <div class="login-header">
+            <div class="login-logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="login-icon">
+                    <path d="M12 15l3-3-3-3"/>
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16,17 21,12 16,7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                <span class="login-brand">Lemma</span>
+            </div>
+            <h1 class="login-title">Admin Dashboard</h1>
+            <p class="login-subtitle">
+                Sign in to manage credentials and system settings
+            </p>
         </div>
-        <h1>Admin Login</h1>
-        
-        <div class="card">
+
+        <!-- Login Card -->
+        <div class="login-card">
             {% if error %}
-            <div class="error-message">
-                {{ error }}
+            <div class="alert alert-error">
+                <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                <span>{{ error }}</span>
             </div>
             {% endif %}
             
-            <form action="/admin/login" method="post">
+            <form action="/admin/login" method="post" class="login-form">
+                <!-- Username Field -->
                 <div class="form-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" name="username" required>
+                    <label for="username" class="form-label">
+                        Username
+                    </label>
+                    <input 
+                        type="text" 
+                        id="username" 
+                        name="username" 
+                        required 
+                        class="form-input"
+                        placeholder="Enter admin username"
+                        autocomplete="username"
+                    >
                 </div>
-                
+
+                <!-- Password Field -->
                 <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required>
+                    <label for="password" class="form-label">
+                        Password
+                    </label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        required 
+                        class="form-input"
+                        placeholder="Enter admin password"
+                        autocomplete="current-password"
+                    >
                 </div>
-                
-                <button type="submit" class="button">Login</button>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn btn-primary btn-full">
+                    <span class="btn-text">Sign in</span>
+                    <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </button>
             </form>
         </div>
-        
-        <footer>
-            <p>Return to <a href="/">Lemma Home</a></p>
-        </footer>
+
+        <!-- Footer -->
+        <div class="login-footer">
+            <p class="footer-text">
+                <a href="{{ url_for('index') }}" class="footer-link">← Return to Lemma Home</a>
+            </p>
+            <div class="footer-security">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span>Secure admin access</span>
+            </div>
+        </div>
     </div>
-</body>
-</html>
+</div>
+
+<style>
+.login-page {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: var(--spacing-8) var(--spacing-4);
+    animation: slideInUp 0.6s var(--easing-swift-out);
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: var(--spacing-8);
+}
+
+.login-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-4);
+}
+
+.login-icon {
+    color: var(--color-primary);
+}
+
+.login-brand {
+    font-size: 1.5rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-gray-900);
+}
+
+.login-title {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-gray-900);
+    margin-bottom: var(--spacing-2);
+    line-height: var(--line-height-tight);
+}
+
+.login-subtitle {
+    font-size: var(--font-size-base);
+    color: var(--color-gray-600);
+    line-height: var(--line-height-relaxed);
+}
+
+.login-card {
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-6);
+    box-shadow: var(--shadow-subtle);
+    margin-bottom: var(--spacing-6);
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-4);
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+}
+
+.form-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-gray-700);
+}
+
+.form-input {
+    height: 44px;
+    padding: 0 var(--spacing-3);
+    border: 2px solid var(--color-gray-200);
+    border-radius: var(--border-radius-md);
+    font-size: var(--font-size-base);
+    transition: all var(--transition-fast) var(--easing-swift-out);
+    background-color: var(--color-white);
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-alpha-20);
+    transform: scale(1.01);
+}
+
+.form-input::placeholder {
+    color: var(--color-gray-400);
+}
+
+.btn-full {
+    width: 100%;
+    margin-top: var(--spacing-2);
+}
+
+.login-footer {
+    text-align: center;
+    padding-top: var(--spacing-6);
+    border-top: 1px solid var(--color-gray-100);
+}
+
+.footer-text {
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-600);
+    margin-bottom: var(--spacing-3);
+}
+
+.footer-link {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: var(--font-weight-medium);
+}
+
+.footer-link:hover {
+    text-decoration: underline;
+}
+
+.footer-security {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-1);
+    font-size: var(--font-size-xs);
+    color: var(--color-gray-500);
+}
+
+.footer-security svg {
+    color: var(--color-primary);
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .login-page {
+        padding: var(--spacing-6) var(--spacing-3);
+    }
+    
+    .login-card {
+        padding: var(--spacing-4);
+    }
+    
+    .login-title {
+        font-size: var(--font-size-xl);
+    }
+}
+</style>
+{% endblock %}

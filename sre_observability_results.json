@@ -1,0 +1,75 @@
+{
+  "Dashboard Metrics Availability": {
+    "score": 66.66666666666666,
+    "available_metrics": 4,
+    "total_metrics": 6,
+    "details": "Dashboard metrics availability test"
+  },
+  "Latency Monitoring": {
+    "score": 100.0,
+    "latency_data": {
+      "/api/health": {
+        "avg_ms": 398.8036632537842,
+        "p95_ms": 460.89792251586914,
+        "samples": 5
+      },
+      "/api/generate-challenge": {
+        "avg_ms": 402.66122817993164,
+        "p95_ms": 454.653263092041,
+        "samples": 5
+      },
+      "/api/verify-presentation": {
+        "avg_ms": 790.8408641815186,
+        "p95_ms": 889.1654014587402,
+        "samples": 5
+      },
+      "/api/billing/usage/monthly": {
+        "avg_ms": 366.65892601013184,
+        "p95_ms": 451.4048099517822,
+        "samples": 5
+      }
+    },
+    "details": "Latency monitoring test"
+  },
+  "Error Rate Tracking": {
+    "score": 80,
+    "error_rate": 100.0,
+    "total_errors": 12,
+    "total_requests": 12,
+    "details": "Error rate tracking test"
+  },
+  "MAH Counter Metrics": {
+    "score": 0,
+    "details": "MAH counter metrics test"
+  },
+  "Revocation Push Lag": {
+    "score": 0,
+    "details": "Revocation push lag monitoring test"
+  },
+  "Wallet JS Error Tracking": {
+    "score": 20,
+    "available_endpoints": 0,
+    "details": "Wallet JS error tracking test"
+  },
+  "Alerting Infrastructure": {
+    "score": 66.66666666666666,
+    "available_alerts": 2,
+    "total_alerts": 3,
+    "details": "Alerting infrastructure test"
+  },
+  "Load Test Performance": {
+    "score": 40,
+    "p95_latency_ms": 1694.8065757751465,
+    "success_rate": 98.2,
+    "total_requests": 500,
+    "details": "Load performance test"
+  },
+  "Billing Job Monitoring": {
+    "score": 90,
+    "details": "Billing job monitoring test"
+  },
+  "Bloom Filter Monitoring": {
+    "score": 0,
+    "details": "Bloom filter monitoring test"
+  }
+}
