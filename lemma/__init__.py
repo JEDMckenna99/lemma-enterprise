@@ -24,6 +24,13 @@ except ImportError:
 from flask_cors import CORS
 import platform
 
+# Optional Flask-Minify import
+try:
+    from flask_minify import Minify
+    MINIFY_AVAILABLE = True
+except ImportError:
+    MINIFY_AVAILABLE = False
+
 # Create logger
 logger = logging.getLogger(__name__)
 
@@ -76,6 +83,14 @@ def create_app(test_config=None):
     # Initialize CSRF protection
     from lemma.auth.csrf_config import configure_csrf
     configure_csrf(app)
+    
+    # Initialize Flask-Minify for performance optimization
+    if MINIFY_AVAILABLE and not is_development:
+        Minify(app=app, html=True, js=True, cssless=True, 
+               fail_safe=True, bypass=['/api/', '/admin/'])
+        app.logger.info("Flask-Minify enabled for production")
+    elif is_development:
+        app.logger.info("Flask-Minify disabled in development mode")
     
     # Load default configuration
     app.config.from_mapping(
