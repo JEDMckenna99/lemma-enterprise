@@ -42,12 +42,18 @@ class SREMetricsMiddleware:
                     # Import here to avoid circular imports
                     from lemma.routes.sre_monitoring import metrics
                     
-                    # Record latency
+                    # Record latency for all requests
                     metrics.record_latency(endpoint, latency_ms)
                     
                     # Record errors (4xx and 5xx status codes)
                     if response.status_code >= 400:
                         metrics.record_error(endpoint, response.status_code)
+                        logger.info(f"SRE: Recorded error {response.status_code} for {endpoint}")
+                    
+                    # Also record successful requests (for error rate calculation baseline)
+                    elif response.status_code < 400:
+                        # Record successful request for error rate baseline calculation
+                        pass  # Latency recording above is sufficient for success tracking
                 
                 # Add performance headers for debugging (but lighter for fast paths)
                 if not getattr(g, 'skip_heavy_ops', False):

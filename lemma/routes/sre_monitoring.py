@@ -525,22 +525,49 @@ def prometheus_metrics():
     """Export metrics in Prometheus format."""
     output = []
     
+    # Add metric metadata comments for Prometheus
+    output.append('# HELP lemma_latency_ms Average response latency in milliseconds')
+    output.append('# TYPE lemma_latency_ms gauge')
+    output.append('# HELP lemma_error_rate Error rate per second')
+    output.append('# TYPE lemma_error_rate gauge')
+    output.append('# HELP lemma_mah_total Total Monthly Active Humans')
+    output.append('# TYPE lemma_mah_total counter')
+    output.append('# HELP lemma_bloom_filter_size Current bloom filter size')
+    output.append('# TYPE lemma_bloom_filter_size gauge')
+    output.append('# HELP lemma_revocation_lag_seconds Revocation sync lag in seconds')
+    output.append('# TYPE lemma_revocation_lag_seconds gauge')
+    output.append('')
+    
     # Latency metrics
     for endpoint, samples in metrics.latency_samples.items():
         if samples:
             recent_samples = [s for s in samples if time.time() - s["timestamp"] <= 300]
             if recent_samples:
                 avg_latency = sum(s["latency_ms"] for s in recent_samples) / len(recent_samples)
-                output.append(f'lemma_latency_ms{{endpoint="{endpoint}"}} {avg_latency}')
+                output.append(f'lemma_latency_ms{{endpoint="{endpoint}"}} {avg_latency:.2f}')
     
-    # Error rate metrics
-    for endpoint, errors in metrics.error_rates.items():
-        error_rate = len(errors) / 300.0
-        output.append(f'lemma_error_rate{{endpoint="{endpoint}"}} {error_rate}')
+    # Error rate metrics - ensure we always export error rates even if zero
+    all_endpoints = set(metrics.latency_samples.keys()) | set(metrics.error_rates.keys())
+    for endpoint in all_endpoints:
+        # Get recent errors (last 5 minutes)
+        errors = metrics.error_rates.get(endpoint, [])
+        recent_errors = [e for e in errors if time.time() - e["timestamp"] <= 300]
+        
+        # Calculate error rate as errors per second over 5-minute window
+        error_rate = len(recent_errors) / 300.0
+        output.append(f'lemma_error_rate{{endpoint="{endpoint}"}} {error_rate:.6f}')
+    
+    # Ensure we always have at least one error rate metric even if no endpoints have been hit
+    if not all_endpoints:
+        output.append('lemma_error_rate{endpoint="/api/health"} 0.000000')
     
     # MAH counters
     for site_id, count in metrics.mah_counters.items():
         output.append(f'lemma_mah_total{{site_id="{site_id}"}} {count}')
+    
+    # Ensure MAH metric exists even if no data
+    if not metrics.mah_counters:
+        output.append('lemma_mah_total{site_id="default"} 0')
     
     # Bloom filter size
     bloom_size = metrics.bloom_filter_metrics["size"]
