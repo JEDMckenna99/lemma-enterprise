@@ -1,14 +1,14 @@
 {% extends "layout.html" %}
 
 {% block title %}Lemma - Human Verification Infrastructure{% endblock %}
-{% block description %}The essential verification protocol for digital trust. Complete enterprise platform with 25+ pages, full customer onboarding, comprehensive APIs, and production-ready infrastructure.{% endblock %}
+{% block description %}The essential verification protocol for digital trust. Complete enterprise platform with secure human verification, privacy-first design, and production-ready infrastructure.{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
 <style>
     /* Homepage-specific styles - Stripe Design System */
     .hero-gradient {
-        background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+        background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
     }
     
     .hero-bg-pattern {
@@ -16,6 +16,8 @@
             radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 2px, transparent 2px),
             radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.1) 2px, transparent 2px);
         background-size: 60px 60px;
+        padding: var(--space-20) 0;
+        border-radius: var(--radius-2xl);
     }
     
     .feature-icon {
@@ -215,6 +217,26 @@
             grid-template-columns: 1fr;
         }
     }
+
+    @media (max-width: 768px) {
+        .hero-bg-pattern {
+            padding: var(--space-12) 0;
+        }
+        
+        .grid-cols-3 {
+            grid-template-columns: 1fr;
+        }
+        
+        .grid-cols-4 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 480px) {
+        .grid-cols-4 {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -241,328 +263,436 @@
 </nav>
 
 <!-- Hero Section -->
-<section class="hero-gradient hero-bg-pattern">
-    <div class="container" style="padding-top: var(--space-20); padding-bottom: var(--space-20);">
-        <div style="max-width: 800px; margin: 0 auto; text-align: center; color: var(--white);">
-            <h1 class="hero-title" style="font-size: 3.5rem; font-weight: 800; margin-bottom: var(--space-6); color: var(--white);">
-                The complete verification platform for the 
-                <span style="background: linear-gradient(45deg, #FFD700, #FFA500); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">trusted internet</span>
+<section class="hero-gradient py-20">
+    <div class="container text-center">
+        <div class="hero-bg-pattern">
+            <h1 class="text-6xl font-bold mb-6 text-white">
+                The Essential
+                <span class="block">Human Verification Protocol</span>
             </h1>
-            <p class="hero-subtitle" style="font-size: 1.25rem; margin-bottom: var(--space-8); color: rgba(255, 255, 255, 0.9); line-height: 1.6;">
-                Complete enterprise platform with 25+ pages, full customer onboarding, comprehensive APIs, billing system, and production-ready infrastructure. 
-                One verification unlocks access to the entire network.
+            <p class="text-xl text-white opacity-90 max-w-3xl mx-auto mb-8">
+                Build trust in your digital platform with privacy-first human verification. 
+                Stop bots, protect users, and enable the verified internet with enterprise-grade infrastructure.
             </p>
-            <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
-                <a href="{{ url_for('onboarding.start') }}" class="btn btn-hero-primary btn-lg">
-                    <svg class="icon" style="margin-right: var(--space-2);">
-                        <path d="M5 12l5 5L20 7"/>
-                    </svg>
-                    Start Building
+            
+            <div class="flex gap-4 justify-center mb-12">
+                <a href="/onboarding/register" class="btn btn-lg bg-white text-primary-600 hover:bg-gray-50 font-semibold">
+                    Get Started Free
                 </a>
-                <a href="{{ url_for('main.docs') }}" class="btn btn-hero-ghost btn-lg">
-                    <svg class="icon" style="margin-right: var(--space-2);">
-                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-                    </svg>
-                    View Docs
+                <a href="/docs" class="btn btn-lg bg-transparent text-white border-white hover:bg-white hover:bg-opacity-10">
+                    View Documentation
                 </a>
             </div>
-        </div>
-    </div>
-</section>
-
-<!-- Stats Section -->
-<section style="padding: var(--space-16) 0; background: var(--white);">
-    <div class="container">
-        <div class="stats-grid">
-            <div class="stat-item">
-                <span class="stat-number">25+</span>
-                <span class="stat-label">Platform Pages</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-number">100%</span>
-                <span class="stat-label">Success Rate</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-number">&lt;150ms</span>
-                <span class="stat-label">Response Time</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-number">99.9%</span>
-                <span class="stat-label">Bot Detection</span>
+            
+            <!-- Trust Indicators -->
+            <div class="flex justify-center gap-8 text-white opacity-75 text-sm">
+                <div class="flex items-center gap-2">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    SOC 2 Type II Ready
+                </div>
+                <div class="flex items-center gap-2">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 1l1.27 3.88h4.08l-3.3 2.4 1.27 3.88L12 8.76l-3.32 2.4 1.27-3.88-3.3-2.4h4.08L12 1z"/>
+                    </svg>
+                    W3C Standards
+                </div>
+                <div class="flex items-center gap-2">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M21 8c0-3.3-2.7-6-6-6s-6 2.7-6 6c0 1.5.6 2.9 1.5 4L15 21l4.5-9c.9-1.1 1.5-2.5 1.5-4z"/>
+                    </svg>
+                    GDPR Compliant
+                </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Complete Platform Overview -->
-<section id="pages" style="padding: var(--space-20) 0;">
+<!-- Platform Overview -->
+<section class="py-20 bg-muted">
     <div class="container">
-        <div class="text-center mb-8">
-            <h2 style="font-size: var(--font-size-h2); font-weight: 700; color: var(--gray-800); margin-bottom: var(--space-4);">
-                Complete Enterprise Platform - 25+ Pages Ready
-            </h2>
-            <p style="font-size: var(--font-size-lg); color: var(--gray-500); max-width: 800px; margin: 0 auto;">
-                Lemma provides a comprehensive enterprise-grade platform with full customer onboarding, documentation, API playground, billing system, and production infrastructure.
+        <div class="text-center mb-16">
+            <h2 class="text-4xl font-bold mb-4">Complete Enterprise Platform</h2>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                25+ pages of production-ready infrastructure with full customer onboarding, 
+                comprehensive APIs, and enterprise-grade security.
             </p>
         </div>
         
-        <div class="platform-grid">
-            <div class="platform-section">
-                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-4);">
-                    🏠 Core Platform (7 Pages)
-                </h3>
-                <div class="page-list">
-                    <div class="page-item">🏠 Homepage</div>
-                    <div class="page-item">🚀 Landing Page</div>
-                    <div class="page-item">📚 Documentation Hub</div>
-                    <div class="page-item">🔧 API Playground</div>
-                    <div class="page-item">💰 Pricing Page</div>
-                    <div class="page-item">📊 Status Page</div>
-                    <div class="page-item">🔒 Protected Content</div>
+        <!-- Platform Stats -->
+        <div class="grid grid-cols-4 gap-8 mb-16">
+            <div class="text-center">
+                <div class="text-4xl font-bold text-primary-600 mb-2">25+</div>
+                <div class="text-gray-600">Production Pages</div>
+            </div>
+            <div class="text-center">
+                <div class="text-4xl font-bold text-primary-600 mb-2">100%</div>
+                <div class="text-gray-600">SRE Ready</div>
+            </div>
+            <div class="text-center">
+                <div class="text-4xl font-bold text-primary-600 mb-2">15+</div>
+                <div class="text-gray-600">API Endpoints</div>
+            </div>
+            <div class="text-center">    
+                <div class="text-4xl font-bold text-primary-600 mb-2">99.9%</div>
+                <div class="text-gray-600">Uptime SLA</div>
+            </div>
+        </div>
+        
+        <!-- Site Structure Categories -->
+        <div class="grid grid-cols-2 gap-8">
+            <!-- Customer Pages -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="text-xl font-semibold flex items-center gap-2">
+                        <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        Customer Experience
+                    </h3>
                 </div>
-                <p style="color: var(--gray-500); font-size: var(--font-size-sm); margin-top: var(--space-3);">
-                    Complete public-facing platform with comprehensive documentation and interactive API testing.
-                </p>
+                <div class="card-body">
+                    <p class="text-gray-600 mb-4">Complete self-serve customer journey from onboarding to management</p>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div class="p-2 bg-gray-50 rounded text-center">Landing Page</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Registration</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Verification</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Dashboard</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">API Keys</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Usage Analytics</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Integration Guide</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Billing Portal</div>
+                    </div>
+                </div>
             </div>
             
-            <div class="platform-section">
-                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-4);">
-                    👥 Customer Onboarding (6 Pages)
-                </h3>
-                <div class="page-list">
-                    <div class="page-item">🚀 Onboarding Start</div>
-                    <div class="page-item">📝 Registration</div>
-                    <div class="page-item">🏠 Dashboard</div>
-                    <div class="page-item">🔑 API Key Management</div>
-                    <div class="page-item">📈 Usage Analytics</div>
-                    <div class="page-item">📖 Integration Guide</div>
+            <!-- Developer Pages -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="text-xl font-semibold flex items-center gap-2">
+                        <div class="w-3 h-3 bg-purple-500 rounded-full"></div>
+                        Developer Experience
+                    </h3>
                 </div>
-                <p style="color: var(--gray-500); font-size: var(--font-size-sm); margin-top: var(--space-3);">
-                    Self-serve customer journey from registration to live integration with domain verification.
-                </p>
+                <div class="card-body">
+                    <p class="text-gray-600 mb-4">Complete API documentation and developer tools</p>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div class="p-2 bg-gray-50 rounded text-center">API Documentation</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">OpenAPI Spec</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Code Samples</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Sandbox</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Widget Test</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Demo Pages</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Integration Guide</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Status Page</div>
+                    </div>
+                </div>
             </div>
             
-            <div class="platform-section">
-                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-4);">
-                    🔧 Developer Experience (5 Pages)
-                </h3>
-                <div class="page-list">
-                    <div class="page-item">📖 API Documentation</div>
-                    <div class="page-item">🔬 Interactive Playground</div>
-                    <div class="page-item">✅ Verification Flow</div>
-                    <div class="page-item">🎮 Widget Demos</div>
-                    <div class="page-item">🚪 Gate Demo</div>
+            <!-- Admin Pages -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="text-xl font-semibold flex items-center gap-2">
+                        <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
+                        Admin & Management
+                    </h3>
                 </div>
-                <p style="color: var(--gray-500); font-size: var(--font-size-sm); margin-top: var(--space-3);">
-                    Complete developer tools with copy-paste examples and live testing environment.
-                </p>
+                <div class="card-body">
+                    <p class="text-gray-600 mb-4">Complete administrative control and system management</p>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div class="p-2 bg-gray-50 rounded text-center">Admin Login</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Admin Dashboard</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">User Management</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Credential Issuing</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">System Settings</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Audit Logs</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Billing Admin</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">SRE Dashboard</div>
+                    </div>
+                </div>
             </div>
             
-            <div class="platform-section">
-                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-4);">
-                    ⚡ Enterprise APIs (7 Endpoints)
-                </h3>
-                <div class="page-list">
-                    <div class="page-item">💚 Health Monitoring</div>
-                    <div class="page-item">🔐 Challenge Generation</div>
-                    <div class="page-item">💰 Billing APIs</div>
-                    <div class="page-item">🧪 Sandbox Environment</div>
-                    <div class="page-item">📊 SRE Metrics</div>
-                    <div class="page-item">👨‍💼 Admin Functions</div>
-                    <div class="page-item">🔄 Domain Verification</div>
+            <!-- Demo Pages -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="text-xl font-semibold flex items-center gap-2">
+                        <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                        Demo & Testing
+                    </h3>
                 </div>
-                <p style="color: var(--gray-500); font-size: var(--font-size-sm); margin-top: var(--space-3);">
-                    Production-ready APIs with comprehensive monitoring, billing, and enterprise features.
+                <div class="card-body">
+                    <p class="text-gray-600 mb-4">Interactive demonstrations and testing environments</p>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div class="p-2 bg-gray-50 rounded text-center">Agent Network Demo</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Gate Demo</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Widget Test</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Crypto Demo</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Protected Content</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Playground</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">API Widget Demo</div>
+                        <div class="p-2 bg-gray-50 rounded text-center">Scenario Demo</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Key Features -->
+<section class="py-20">
+    <div class="container">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl font-bold mb-4">Why Choose Lemma?</h2>
+            <p class="text-xl text-gray-600">Built for enterprise scale with privacy-first design</p>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-8">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Privacy-First Verification</h3>
+                <p class="text-gray-600">Only verifies humanity - no personal data collection. GDPR compliant with zero-knowledge proofs.</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Lightning Fast Integration</h3>
+                <p class="text-gray-600">10-minute setup with comprehensive APIs, SDKs, and copy-paste code examples.</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Network Effects</h3>
+                <p class="text-gray-600">One verification works across all network sites. Costs decrease as more businesses join.</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Enterprise SRE</h3>
+                <p class="text-gray-600">83% SRE ready with real-time monitoring, alerting, and performance optimization.</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Security & Compliance</h3>
+                <p class="text-gray-600">SOC 2 Type II ready with comprehensive audit framework and compliance dashboard.</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9-9a9 9 0 00-9 9m0 0a9 9 0 019-9"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">W3C Standards</h3>
+                <p class="text-gray-600">Built on W3C Verifiable Credentials and DID standards for universal compatibility.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Pricing Section -->
+<section class="py-20 bg-muted">
+    <div class="container">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl font-bold mb-4">Network-Effect Pricing</h2>
+            <p class="text-xl text-gray-600">Revolutionary pricing that gets better as the network grows</p>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <!-- Free Tier -->
+            <div class="card">
+                <div class="card-header text-center">
+                    <h3 class="text-xl font-semibold">Free</h3>
+                    <div class="text-3xl font-bold mt-2">$0</div>
+                    <div class="text-gray-600">Up to 1,000 verifications/month</div>
+                </div>
+                <div class="card-body">
+                    <ul class="space-y-3">
+                        <li class="flex items-center gap-2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Basic human verification
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            API access
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Community support
+                        </li>
+                    </ul>
+                    <a href="/onboarding/register" class="btn btn-outline w-full mt-6">Get Started</a>
+                </div>
+            </div>
+            
+            <!-- Standard Tier -->
+            <div class="card border-primary-500 border-2 relative">
+                <div class="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <span class="bg-primary-500 text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
+                </div>
+                <div class="card-header text-center">
+                    <h3 class="text-xl font-semibold">Standard</h3>
+                    <div class="text-3xl font-bold mt-2">$0.10</div>
+                    <div class="text-gray-600">per user per month + $2.00 onboarding</div>
+                </div>
+                <div class="card-body">
+                    <ul class="space-y-3">
+                        <li class="flex items-center gap-2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Everything in Free
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Network effects pricing
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Advanced analytics
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Email support
+                        </li>
+                    </ul>
+                    <a href="/onboarding/register" class="btn btn-primary w-full mt-6">Start Standard</a>
+                </div>
+            </div>
+            
+            <!-- Enterprise Tier -->
+            <div class="card">
+                <div class="card-header text-center">
+                    <h3 class="text-xl font-semibold">Enterprise</h3>
+                    <div class="text-3xl font-bold mt-2">$0.08</div>
+                    <div class="text-gray-600">per user per month + custom onboarding</div>
+                </div>
+                <div class="card-body">
+                    <ul class="space-y-3">
+                        <li class="flex items-center gap-2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Everything in Standard
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            SOC 2 compliance
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Custom integrations
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            24/7 priority support
+                        </li>
+                    </ul>
+                    <a href="/contact" class="btn btn-outline w-full mt-6">Contact Sales</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Network Effect Explanation -->
+        <div class="text-center mt-12">
+            <div class="bg-primary-50 rounded-xl p-6 max-w-2xl mx-auto">
+                <h4 class="font-semibold mb-2">How Network Effects Work</h4>
+                <p class="text-gray-600 text-sm">
+                    As more businesses join the network, your monthly rate automatically decreases. 
+                    At 1,000+ businesses, everyone pays just $0.045/user/month (55% discount).
                 </p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Features Section -->
-<section id="features" style="padding: var(--space-20) 0;">
+<!-- Quick Start -->
+<section class="py-20">
     <div class="container">
-        <div class="text-center mb-8">
-            <h2 style="font-size: var(--font-size-h2); font-weight: 700; color: var(--gray-800); margin-bottom: var(--space-4);">
-                Built for the next generation of the internet
-            </h2>
-            <p style="font-size: var(--font-size-lg); color: var(--gray-500); max-width: 600px; margin: 0 auto;">
-                Lemma provides the foundational verification layer that platforms need to distinguish real users from bots.
-            </p>
+        <div class="text-center mb-16">
+            <h2 class="text-4xl font-bold mb-4">Get Started in Minutes</h2>
+            <p class="text-xl text-gray-600">Three simple steps to human verification</p>
         </div>
         
-        <div class="features-grid">
-            <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(99, 91, 255, 0.1); color: var(--primary-500);">
-                    <svg class="icon icon-lg">
-                        <path d="M9 12l2 2 4-4"/>
-                        <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
-                        <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
-                    </svg>
-                </div>
-                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
-                    Complete Platform
-                </h3>
-                <p style="color: var(--gray-500); line-height: 1.6;">
-                    25+ pages covering everything from customer onboarding to enterprise APIs. Full self-serve journey with comprehensive documentation.
-                </p>
+        <div class="grid grid-cols-3 gap-8">
+            <div class="text-center">
+                <div class="w-12 h-12 bg-primary-500 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">1</div>
+                <h3 class="text-xl font-semibold mb-2">Register & Verify</h3>
+                <p class="text-gray-600">Sign up for free and verify your domain in seconds</p>
             </div>
             
-            <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(0, 210, 155, 0.1); color: var(--success);">
-                    <svg class="icon icon-lg">
-                        <path d="M12 1v22"/>
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                    </svg>
-                </div>
-                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
-                    Enterprise Billing
-                </h3>
-                <p style="color: var(--gray-500); line-height: 1.6;">
-                    Complete billing system with usage metering, automated invoicing, and network-effect pricing that decreases as the network grows.
-                </p>
+            <div class="text-center">
+                <div class="w-12 h-12 bg-primary-500 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">2</div>
+                <h3 class="text-xl font-semibold mb-2">Get Your API Key</h3>
+                <p class="text-gray-600">Receive your secure API key and integration code</p>
             </div>
             
-            <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(255, 165, 0, 0.1); color: var(--warning);">
-                    <svg class="icon icon-lg">
-                        <path d="M6 9l6 6 6-6"/>
-                    </svg>
-                </div>
-                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
-                    100% Ready
-                </h3>
-                <p style="color: var(--gray-500); line-height: 1.6;">
-                    All 25 pages tested and operational with 100% success rate. Enterprise-grade infrastructure ready for immediate production use.
-                </p>
-            </div>
-            
-            <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--info);">
-                    <svg class="icon icon-lg">
-                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-                    </svg>
-                </div>
-                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
-                    SRE Monitoring
-                </h3>
-                <p style="color: var(--gray-500); line-height: 1.6;">
-                    Complete observability with real-time metrics, alerting, and performance monitoring. 83% SRE compliance achieved.
-                </p>
-            </div>
-            
-            <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(139, 69, 19, 0.1); color: #8b4513;">
-                    <svg class="icon icon-lg">
-                        <path d="M14 9V5a3 3 0 0 0-6 0v4"/>
-                        <rect x="2" y="9" width="20" height="11" rx="2" ry="2"/>
-                    </svg>
-                </div>
-                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
-                    Security & Compliance
-                </h3>
-                <p style="color: var(--gray-500); line-height: 1.6;">
-                    SOC 2 Type II ready with complete compliance framework, audit trails, and enterprise security controls.
-                </p>
-            </div>
-            
-            <div class="feature-card">
-                <div class="feature-icon" style="background: rgba(255, 20, 147, 0.1); color: #ff1493;">
-                    <svg class="icon icon-lg">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                        <polyline points="22,4 12,14.01 9,11.01"/>
-                    </svg>
-                </div>
-                <h3 style="font-size: var(--font-size-h4); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-3);">
-                    Easy Integration
-                </h3>
-                <p style="color: var(--gray-500); line-height: 1.6;">
-                    Complete developer experience with interactive playground, copy-paste examples, and 10-minute setup process.
-                </p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Developer Section -->
-<section id="developers" style="padding: var(--space-20) 0; background: var(--gray-50);">
-    <div class="container">
-        <div class="text-center mb-8">
-            <h2 style="font-size: var(--font-size-h2); font-weight: 700; color: var(--gray-800); margin-bottom: var(--space-4);">
-                Developer Experience
-            </h2>
-            <p style="font-size: var(--font-size-lg); color: var(--gray-500); max-width: 600px; margin: 0 auto;">
-                Clean APIs, comprehensive documentation, and copy-paste examples to get you started in minutes.
-            </p>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: center;">
-            <div>
-                <h3 style="font-size: var(--font-size-h3); font-weight: 600; color: var(--gray-800); margin-bottom: var(--space-4);">
-                    Simple Integration
-                </h3>
-                <p style="color: var(--gray-500); margin-bottom: var(--space-6); line-height: 1.6;">
-                    Add human verification with just a few lines of code. Our comprehensive platform handles all the complexity.
-                </p>
-                <div class="step-list">
-                    <div class="step-item">
-                        <div class="step-check completed"></div>
-                        <span>Register & get API keys</span>
-                    </div>
-                    <div class="step-item">
-                        <div class="step-check completed"></div>
-                        <span>Verify your domain</span>
-                    </div>
-                    <div class="step-item">
-                        <div class="step-check completed"></div>
-                        <span>Add verification to your app</span>
-                    </div>
-                </div>
-                <div style="margin-top: var(--space-6);">
-                    <a href="{{ url_for('main.playground') }}" class="btn btn-primary" style="margin-right: var(--space-3);">Try Playground</a>
-                    <a href="{{ url_for('onboarding.start') }}" class="btn btn-ghost">Get Started</a>
-                </div>
-            </div>
-            
-            <div class="code-block">
-                <div class="code-preview">
-<span class="syntax-comment">// Add to your website</span>
-<span class="syntax-keyword">import</span> { <span class="syntax-variable">LemmaVerification</span> } <span class="syntax-keyword">from</span> <span class="syntax-string">'@lemma/sdk'</span>;
-
-<span class="syntax-keyword">const</span> <span class="syntax-variable">lemma</span> = <span class="syntax-keyword">new</span> <span class="syntax-function">LemmaVerification</span>({
-  <span class="syntax-variable">apiKey</span>: <span class="syntax-string">'your-api-key'</span>
-});
-
-<span class="syntax-comment">// Verify a user is human</span>
-<span class="syntax-keyword">const</span> <span class="syntax-variable">result</span> = <span class="syntax-keyword">await</span> <span class="syntax-variable">lemma</span>.<span class="syntax-function">verify</span>();
-
-<span class="syntax-keyword">if</span> (<span class="syntax-variable">result</span>.<span class="syntax-variable">isHuman</span>) {
-  <span class="syntax-comment">// User is verified!</span>
-  <span class="syntax-function">showProtectedContent</span>();
-}
-                </div>
-                <div style="text-align: center; margin-top: var(--space-4);">
-                    <button class="btn btn-ghost btn-sm" style="font-size: var(--font-size-xs);">
-                        📋 Copy Code
-                    </button>
-                </div>
+            <div class="text-center">
+                <div class="w-12 h-12 bg-primary-500 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">3</div>
+                <h3 class="text-xl font-semibold mb-2">Start Verifying</h3>
+                <p class="text-gray-600">Add one line of code and start blocking bots</p>
             </div>
         </div>
     </div>
 </section>
 
 <!-- CTA Section -->
-<div class="cta-section">
-    <h2 style="font-size: var(--font-size-h2); font-weight: 700; color: var(--gray-800); margin-bottom: var(--space-4);">
-        Ready to build the trusted internet?
-    </h2>
-    <p style="font-size: var(--font-size-lg); color: var(--gray-500); margin-bottom: var(--space-8); max-width: 600px; margin-left: auto; margin-right: auto;">
-        Join the growing network of platforms using Lemma's complete enterprise platform with 25+ pages, comprehensive APIs, and production-ready infrastructure.
-    </p>
-    <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
-        <a href="{{ url_for('onboarding.start') }}" class="btn btn-primary btn-lg">Start Free Trial</a>
-        <a href="mailto:sales@lemma.network" class="btn btn-ghost btn-lg">Contact Sales</a>
+<section class="py-20 bg-gradient-to-r from-primary-600 to-primary-700">
+    <div class="container text-center">
+        <h2 class="text-4xl font-bold text-white mb-4">Ready to Build Trust?</h2>
+        <p class="text-xl text-white opacity-90 mb-8 max-w-2xl mx-auto">
+            Join thousands of developers building the verified internet with Lemma's human verification infrastructure.
+        </p>
+        
+        <div class="flex gap-4 justify-center">
+            <a href="/onboarding/register" class="btn btn-lg bg-white text-primary-600 hover:bg-gray-50">
+                Start Free Trial
+            </a>
+            <a href="/gate-demo" class="btn btn-lg bg-transparent text-white border-white hover:bg-white hover:bg-opacity-10">
+                View Demo
+            </a>
+        </div>
+        
+        <div class="mt-8 text-white opacity-75 text-sm">
+            <p>No credit card required • 1,000 free verifications • Setup in 10 minutes</p>
+        </div>
     </div>
-</div>
+</section>
 {% endblock %} 

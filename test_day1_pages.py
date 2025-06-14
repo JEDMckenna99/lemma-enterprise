@@ -12,6 +12,7 @@ from urllib.parse import urljoin
 # Test configuration
 BASE_URL = "https://lemma-enterprise-0f6ba17076c1.herokuapp.com"
 TIMEOUT = 10
+API_KEY = "63d3c76faad6b305b3630575524d7e1b829527526e29b5ea18757b42e4de771e"  # Production API key
 
 # Day-1 Priority Pages to test
 DAY1_PAGES = [
@@ -46,22 +47,26 @@ DAY1_PAGES = [
     ("/api-widget-demo", "API Widget Demo"),
 ]
 
-# API Endpoints to test
+# API Endpoints to test (public - no auth required)
 API_ENDPOINTS = [
     ("/api/health", "API Health Check"),
     ("/api/generate-challenge", "Challenge Generation"),
     ("/api/billing/health", "Billing Health"),
     ("/api/sandbox/status", "Sandbox Status"),
+]
+
+# Protected API Endpoints (require API key)
+PROTECTED_API_ENDPOINTS = [
     ("/api/sre/dashboard/metrics", "SRE Metrics"),
 ]
 
-def test_page(url, name, expected_status=200):
+def test_page(url, name, expected_status=200, headers=None):
     """Test a single page and return results"""
     try:
         print(f"Testing {name:.<50} ", end="", flush=True)
         
         start_time = time.time()
-        response = requests.get(url, timeout=TIMEOUT, allow_redirects=True)
+        response = requests.get(url, timeout=TIMEOUT, allow_redirects=True, headers=headers)
         response_time = int((time.time() - start_time) * 1000)
         
         if response.status_code == expected_status:
@@ -91,6 +96,7 @@ def main():
     print("=" * 80)
     print(f"Testing: {BASE_URL}")
     print(f"Timeout: {TIMEOUT}s")
+    print(f"API Key: {API_KEY}")
     print()
     
     total_tests = 0
@@ -113,13 +119,31 @@ def main():
     
     print()
     
-    # Test API endpoints
-    print("🔌 API ENDPOINTS")
+    # Test public API endpoints
+    print("🔌 PUBLIC API ENDPOINTS")
     print("-" * 50)
     
     for path, name in API_ENDPOINTS:
         url = urljoin(BASE_URL, path)
         success, status, response_time, error = test_page(url, name)
+        
+        total_tests += 1
+        if success:
+            passed_tests += 1
+        else:
+            failed_tests.append((name, path, status, error))
+    
+    print()
+    
+    # Test protected API endpoints (with authentication)
+    print("🔐 PROTECTED API ENDPOINTS")
+    print("-" * 50)
+    
+    auth_headers = {"X-API-Key": API_KEY}
+    
+    for path, name in PROTECTED_API_ENDPOINTS:
+        url = urljoin(BASE_URL, path)
+        success, status, response_time, error = test_page(url, name, headers=auth_headers)
         
         total_tests += 1
         if success:
@@ -140,11 +164,14 @@ def main():
     
     for path, name in auth_pages:
         url = urljoin(BASE_URL, path)
-        success, status, response_time, error = test_redirect_page(url, name)
+        # For these pages, 200 (working) or 302 (redirect) are both acceptable
+        success, status, response_time, error = test_page(url, name, expected_status=200)
         
         total_tests += 1
-        if success or status in [302, 301, 200]:  # Allow redirects or success
+        if status in [200, 302, 301]:  # Accept working pages or redirects
             passed_tests += 1
+            if not success:  # If it wasn't counted as success due to expecting different status
+                print(f"✅ {status} (working correctly)")
         else:
             failed_tests.append((name, path, status, error))
     
@@ -174,13 +201,16 @@ def main():
     
     # Overall assessment
     print("=" * 80)
-    if success_rate >= 90:
+    if success_rate >= 100:
+        print("🎉 PERFECT! 100% Day-1 pages success rate achieved!")
+        print("✅ Platform is enterprise-grade ready for immediate launch")
+    elif success_rate >= 95:
         print("🎉 EXCELLENT! Day-1 pages are ready for customers")
         print("✅ Platform is ready for production onboarding")
-    elif success_rate >= 80:
+    elif success_rate >= 90:
         print("✅ GOOD! Most Day-1 pages are working")
         print("⚠️  Minor issues need attention before full launch")
-    elif success_rate >= 70:
+    elif success_rate >= 80:
         print("⚠️  NEEDS WORK! Several critical pages have issues")
         print("🔧 Fixes required before customer onboarding")
     else:
@@ -190,7 +220,7 @@ def main():
     print("=" * 80)
     
     # Return appropriate exit code
-    return 0 if success_rate >= 90 else 1
+    return 0 if success_rate >= 100 else 1
 
 if __name__ == "__main__":
     exit_code = main()
