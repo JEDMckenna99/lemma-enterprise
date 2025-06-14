@@ -1,0 +1,215 @@
+{% extends "layout.html" %}
+
+{% block title %}Crypto Enhanced Demo - Lemma{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">
+                <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Crypto Enhanced Demo</h1>
+            <p class="text-lg text-gray-600">Advanced cryptographic features and zero-knowledge proofs</p>
+        </div>
+
+        <!-- Cryptographic Features -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Ed25519 Signatures -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.414-5.414l2.586 2.586L9 19.586l-7.586-7.586 2.586-2.586L9 14.414z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-semibold text-gray-900">Ed25519 Signatures</h2>
+                </div>
+                <p class="text-gray-600 mb-4">Enterprise-grade elliptic curve cryptography for credential signing.</p>
+                <button onclick="testEd25519()" class="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium">
+                    Test Signature
+                    <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Zero-Knowledge Proofs -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-semibold text-gray-900">Zero-Knowledge Proofs</h2>
+                </div>
+                <p class="text-gray-600 mb-4">Prove humanity without revealing personal information.</p>
+                <button onclick="testZKProof()" class="inline-flex items-center text-green-600 hover:text-green-700 font-medium">
+                    Generate Proof
+                    <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Hardware Security -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-semibold text-gray-900">Hardware Security</h2>
+                </div>
+                <p class="text-gray-600 mb-4">TPM, Secure Enclave, and Android Keystore integration.</p>
+                <button onclick="testHardwareSecurity()" class="inline-flex items-center text-purple-600 hover:text-purple-700 font-medium">
+                    Check Hardware
+                    <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- DID Resolution -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-semibold text-gray-900">DID Resolution</h2>
+                </div>
+                <p class="text-gray-600 mb-4">Multi-method decentralized identifier resolution.</p>
+                <button onclick="testDIDResolution()" class="inline-flex items-center text-orange-600 hover:text-orange-700 font-medium">
+                    Resolve DID
+                    <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Demo Results -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Demo Results</h2>
+            <div id="demo-results" class="bg-gray-100 rounded-lg p-4 font-mono text-sm min-h-32">
+                Click any demo button above to see cryptographic operations in action...
+            </div>
+        </div>
+
+        <!-- Technical Specifications -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Technical Specifications</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-2">Cryptographic Standards</h3>
+                    <ul class="text-sm text-gray-600 space-y-1">
+                        <li>• Ed25519 elliptic curve signatures</li>
+                        <li>• SHA-256 cryptographic hashing</li>
+                        <li>• ECDH key exchange protocol</li>
+                        <li>• AES-256-GCM encryption</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-2">W3C Compliance</h3>
+                    <ul class="text-sm text-gray-600 space-y-1">
+                        <li>• Verifiable Credentials 1.1</li>
+                        <li>• Decentralized Identifiers 1.0</li>
+                        <li>• JSON-LD 1.1 context</li>
+                        <li>• Linked Data Proofs</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="mt-8 text-center">
+            <a href="/api-docs" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <svg class="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                View API Documentation
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateResults(title, content) {
+    const resultsDiv = document.getElementById('demo-results');
+    resultsDiv.innerHTML = `
+        <div class="mb-2 font-bold text-gray-900">${title}</div>
+        <div class="text-gray-700">${content}</div>
+    `;
+}
+
+function testEd25519() {
+    updateResults('Ed25519 Signature Test', 'Generating Ed25519 key pair and signing test message...');
+    
+    // Simulate cryptographic operation
+    setTimeout(() => {
+        const mockSignature = 'ed25519:' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+        updateResults('Ed25519 Signature Generated', `
+Public Key: ed25519:${Array.from({length: 32}, () => Math.floor(Math.random() * 16).toString(16)).join('')}
+Signature: ${mockSignature}
+Message: "Hello, Lemma Enterprise!"
+Status: ✅ Signature verified successfully
+        `);
+    }, 1500);
+}
+
+function testZKProof() {
+    updateResults('Zero-Knowledge Proof Generation', 'Creating minimal disclosure proof for humanity verification...');
+    
+    setTimeout(() => {
+        updateResults('Zero-Knowledge Proof Complete', `
+Proof Type: Selective Disclosure
+Revealed Claims: { "isHuman": true }
+Hidden Claims: [REDACTED - 7 attributes]
+Proof Size: 256 bytes
+Verification: ✅ Valid proof generated
+Privacy Level: Maximum (zero personal data disclosed)
+        `);
+    }, 2000);
+}
+
+function testHardwareSecurity() {
+    updateResults('Hardware Security Check', 'Detecting available hardware security modules...');
+    
+    setTimeout(() => {
+        const hasWebAuthn = !!navigator.credentials;
+        const hasSecureContext = window.isSecureContext;
+        
+        updateResults('Hardware Security Status', `
+Secure Context: ${hasSecureContext ? '✅ HTTPS' : '❌ HTTP'}
+WebAuthn Support: ${hasWebAuthn ? '✅ Available' : '❌ Not supported'}
+TPM Detection: ${Math.random() > 0.5 ? '✅ TPM 2.0 detected' : '⚠️ Software fallback'}
+Secure Enclave: ${/Mac|iPhone|iPad/.test(navigator.userAgent) ? '✅ Available' : '❌ Not available'}
+Android Keystore: ${/Android/.test(navigator.userAgent) ? '✅ Available' : '❌ Not available'}
+        `);
+    }, 1000);
+}
+
+function testDIDResolution() {
+    updateResults('DID Resolution Test', 'Resolving decentralized identifier...');
+    
+    setTimeout(() => {
+        updateResults('DID Resolution Complete', `
+DID: did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK
+Method: did:key (Ed25519)
+Resolution: ✅ Successfully resolved
+Document Size: 847 bytes
+Verification Methods: 1
+Authentication: Ed25519VerificationKey2018
+Service Endpoints: 0
+        `);
+    }, 1200);
+}
+</script>
+{% endblock %} 

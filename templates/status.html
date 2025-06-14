@@ -1,0 +1,113 @@
+{% extends "layout.html" %}
+
+{% block title %}System Status - Lemma Verified Network{% endblock %}
+{% block description %}Real-time status and uptime monitoring for the Lemma Verified Network platform.{% endblock %}
+
+{% block content %}
+<!-- Status Header -->
+<div style="padding: var(--space-12) 0; text-align: center;">
+    <div class="container">
+        <div style="display: flex; align-items: center; justify-content: center; gap: var(--space-3); margin-bottom: var(--space-4);">
+            <div style="width: 12px; height: 12px; border-radius: 50%; background-color: var(--success);"></div>
+            <h1 style="font-size: var(--font-size-h1); font-weight: 600; margin: 0;">System Status</h1>
+        </div>
+        <p style="font-size: var(--font-size-lg); color: var(--gray-500);">All systems operational</p>
+    </div>
+</div>
+
+<!-- Services Status -->
+<div style="padding: 0 0 var(--space-16) 0;">
+    <div class="container">
+        <div class="card">
+            <div class="card-body">
+                <!-- API Service -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) 0; border-bottom: 1px solid var(--gray-200);">
+                    <div>
+                        <h3 style="font-size: var(--font-size-h5); font-weight: 600; margin-bottom: var(--space-1);">Core API</h3>
+                        <p style="font-size: var(--font-size-sm); color: var(--gray-500); margin: 0;">Human verification and credential issuance</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-2);">
+                        <div style="width: 8px; height: 8px; border-radius: 50%; background-color: var(--success);"></div>
+                        <span style="font-size: var(--font-size-sm); color: var(--success); font-weight: 500;">Operational</span>
+                    </div>
+                </div>
+
+                <!-- Verification Service -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) 0; border-bottom: 1px solid var(--gray-200);">
+                    <div>
+                        <h3 style="font-size: var(--font-size-h5); font-weight: 600; margin-bottom: var(--space-1);">Verification Service</h3>
+                        <p style="font-size: var(--font-size-sm); color: var(--gray-500); margin: 0;">Identity verification and KYC processing</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-2);">
+                        <div style="width: 8px; height: 8px; border-radius: 50%; background-color: var(--success);"></div>
+                        <span style="font-size: var(--font-size-sm); color: var(--success); font-weight: 500;">Operational</span>
+                    </div>
+                </div>
+
+                <!-- Billing System -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) 0; border-bottom: 1px solid var(--gray-200);">
+                    <div>
+                        <h3 style="font-size: var(--font-size-h5); font-weight: 600; margin-bottom: var(--space-1);">Billing System</h3>
+                        <p style="font-size: var(--font-size-sm); color: var(--gray-500); margin: 0;">Usage tracking and invoice generation</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-2);">
+                        <div style="width: 8px; height: 8px; border-radius: 50%; background-color: var(--success);"></div>
+                        <span style="font-size: var(--font-size-sm); color: var(--success); font-weight: 500;">Operational</span>
+                    </div>
+                </div>
+
+                <!-- Dashboard -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) 0;">
+                    <div>
+                        <h3 style="font-size: var(--font-size-h5); font-weight: 600; margin-bottom: var(--space-1);">Customer Dashboard</h3>
+                        <p style="font-size: var(--font-size-sm); color: var(--gray-500); margin: 0;">Analytics and account management</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-2);">
+                        <div style="width: 8px; height: 8px; border-radius: 50%; background-color: var(--success);"></div>
+                        <span style="font-size: var(--font-size-sm); color: var(--success); font-weight: 500;">Operational</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Incidents -->
+<div style="padding: 0 0 var(--space-16) 0;">
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h2 style="font-size: var(--font-size-h3); font-weight: 600; margin: 0;">Recent Incidents</h2>
+            </div>
+            <div class="card-body">
+                <div style="text-align: center; color: var(--gray-500);">
+                    <svg style="width: 40px; height: 40px; margin: 0 auto var(--space-3) auto; opacity: 0.5;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                    </svg>
+                    <p style="font-size: var(--font-size-sm);">No incidents in the last 30 days</p>
+                    <p style="font-size: var(--font-size-xs); margin-top: var(--space-1);">99.98% uptime overall</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Subscribe Section -->
+<div style="padding: 0 0 var(--space-20) 0;">
+    <div class="container">
+        <div class="card" style="background: var(--primary-500); border: none;">
+            <div class="card-body" style="text-align: center;">
+                <h2 style="font-size: var(--font-size-h3); font-weight: 600; margin-bottom: var(--space-4); color: var(--white);">Stay Updated</h2>
+                <p style="font-size: var(--font-size-lg); margin-bottom: var(--space-6); color: var(--white); opacity: 0.9;">
+                    Get notified of incidents and maintenance windows.
+                </p>
+                <div style="display: flex; gap: var(--space-4); justify-content: center;">
+                    <a href="#" class="btn" style="background-color: var(--white); color: var(--primary-500);">Subscribe to Updates</a>
+                    <a href="#" class="btn" style="background-color: transparent; color: var(--white); border-color: var(--white);">RSS Feed</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %} 

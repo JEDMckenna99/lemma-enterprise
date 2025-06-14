@@ -1,0 +1,287 @@
+{% extends "layout.html" %}
+
+{% block title %}Gate Scenario Demo - Lemma{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-4">
+                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.414-5.414l2.586 2.586L9 19.586l-7.586-7.586 2.586-2.586L9 14.414z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Gate Scenario Demo</h1>
+            <p class="text-lg text-gray-600">Interactive demonstration of Lemma Gate protection scenarios</p>
+        </div>
+
+        <!-- Scenario Selection -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Choose a Protection Scenario</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="loadScenario('premium-content')" class="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors text-left">
+                    <div class="flex items-center mb-2">
+                        <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-semibold text-gray-900">Premium Content</h3>
+                    </div>
+                    <p class="text-sm text-gray-600">Protect premium articles, videos, or downloads</p>
+                </button>
+                
+                <button onclick="loadScenario('user-registration')" class="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors text-left">
+                    <div class="flex items-center mb-2">
+                        <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-semibold text-gray-900">User Registration</h3>
+                    </div>
+                    <p class="text-sm text-gray-600">Prevent bot registrations and fake accounts</p>
+                </button>
+                
+                <button onclick="loadScenario('comment-system')" class="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors text-left">
+                    <div class="flex items-center mb-2">
+                        <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-semibold text-gray-900">Comment System</h3>
+                    </div>
+                    <p class="text-sm text-gray-600">Stop spam comments and trolling</p>
+                </button>
+                
+                <button onclick="loadScenario('api-access')" class="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors text-left">
+                    <div class="flex items-center mb-2">
+                        <div class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-semibold text-gray-900">API Access</h3>
+                    </div>
+                    <p class="text-sm text-gray-600">Protect API endpoints from automated abuse</p>
+                </button>
+            </div>
+        </div>
+
+        <!-- Demo Container -->
+        <div id="scenario-demo" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <div class="text-center text-gray-500 py-8">
+                <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 0h10m-10 0a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2m-5 4v6m-3-3h6"></path>
+                </svg>
+                <p>Select a scenario above to see the interactive demo</p>
+            </div>
+        </div>
+
+        <!-- Implementation Guide -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Implementation Guide</h2>
+            
+            <div class="space-y-6">
+                <!-- Basic Setup -->
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-2">1. Basic Gate Setup</h3>
+                    <pre class="text-sm text-gray-800 bg-gray-100 p-3 rounded overflow-x-auto"><code>&lt;!-- Include Lemma Gate --&gt;
+&lt;script src="https://your-lemma-instance.com/static/js/lemma-gate.js"&gt;&lt;/script&gt;
+
+&lt;!-- Protected Content --&gt;
+&lt;div data-lemma-gate="true" data-scenario="premium-content"&gt;
+  &lt;h2&gt;Premium Article&lt;/h2&gt;
+  &lt;p&gt;This content requires human verification to access.&lt;/p&gt;
+&lt;/div&gt;</code></pre>
+                </div>
+                
+                <!-- Advanced Configuration -->
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-2">2. Advanced Configuration</h3>
+                    <pre class="text-sm text-gray-800 bg-gray-100 p-3 rounded overflow-x-auto"><code>// Configure gate behavior
+window.lemmaGateConfig = {
+  scenario: 'premium-content',
+  fallbackMessage: 'Please verify you are human to continue',
+  redirectUrl: '/verify',
+  allowOffline: true,
+  cacheCredentials: true
+};</code></pre>
+                </div>
+                
+                <!-- Backend Integration -->
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-2">3. Backend Verification</h3>
+                    <pre class="text-sm text-gray-800 bg-gray-100 p-3 rounded overflow-x-auto"><code>// Express.js middleware example
+app.use('/premium/*', async (req, res, next) => {
+  const credential = req.headers['x-lemma-credential'];
+  
+  if (await verifyLemmaCredential(credential)) {
+    next(); // User is verified human
+  } else {
+    res.status(401).json({ error: 'Human verification required' });
+  }
+});</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="mt-8 text-center">
+            <a href="/protected" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mr-4">
+                <svg class="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                Protected Content
+            </a>
+            <a href="/api-docs" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                <svg class="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                API Documentation
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function loadScenario(scenario) {
+    const demoContainer = document.getElementById('scenario-demo');
+    
+    const scenarios = {
+        'premium-content': {
+            title: 'Premium Content Protection',
+            description: 'Protect premium articles, videos, or downloads from unauthorized access',
+            demo: `
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50">
+                    <div class="text-center mb-4">
+                        <div class="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-3">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900">Premium Article</h3>
+                        <p class="text-gray-600 mb-4">This content requires human verification</p>
+                        <button onclick="simulateVerification('premium')" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                            Verify to Read
+                        </button>
+                    </div>
+                </div>
+            `,
+            code: `data-lemma-gate="true" data-scenario="premium-content"`
+        },
+        'user-registration': {
+            title: 'User Registration Protection',
+            description: 'Prevent bot registrations and ensure only real humans create accounts',
+            demo: `
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50">
+                    <form class="max-w-md mx-auto">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Create Account</h3>
+                        <div class="space-y-4">
+                            <input type="email" placeholder="Email" class="w-full px-3 py-2 border border-gray-300 rounded-lg" disabled>
+                            <input type="password" placeholder="Password" class="w-full px-3 py-2 border border-gray-300 rounded-lg" disabled>
+                            <div class="text-center">
+                                <button onclick="simulateVerification('registration')" type="button" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                                    Verify Human & Register
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            `,
+            code: `data-lemma-gate="true" data-scenario="user-registration"`
+        },
+        'comment-system': {
+            title: 'Comment System Protection',
+            description: 'Stop spam comments and ensure only verified humans can participate',
+            demo: `
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50">
+                    <div class="space-y-4">
+                        <div class="bg-white p-3 rounded border">
+                            <div class="flex items-center mb-2">
+                                <div class="w-8 h-8 bg-blue-100 rounded-full mr-2"></div>
+                                <span class="font-medium text-gray-900">Verified User</span>
+                                <span class="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">✓ Human</span>
+                            </div>
+                            <p class="text-gray-700">Great article! Thanks for sharing.</p>
+                        </div>
+                        <div class="bg-white p-3 rounded border">
+                            <textarea placeholder="Add a comment..." class="w-full p-2 border border-gray-300 rounded" rows="3" disabled></textarea>
+                            <div class="mt-2 text-center">
+                                <button onclick="simulateVerification('comment')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                    Verify to Comment
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `,
+            code: `data-lemma-gate="true" data-scenario="comment-system"`
+        },
+        'api-access': {
+            title: 'API Access Protection',
+            description: 'Protect API endpoints from automated abuse and bot traffic',
+            demo: `
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50">
+                    <div class="text-center">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">API Access</h3>
+                        <div class="bg-white p-4 rounded border mb-4">
+                            <code class="text-sm text-gray-800">GET /api/premium-data</code>
+                        </div>
+                        <p class="text-gray-600 mb-4">This API requires human verification</p>
+                        <button onclick="simulateVerification('api')" class="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
+                            Verify & Access API
+                        </button>
+                    </div>
+                </div>
+            `,
+            code: `data-lemma-gate="true" data-scenario="api-access"`
+        }
+    };
+    
+    const scenarioData = scenarios[scenario];
+    if (!scenarioData) return;
+    
+    demoContainer.innerHTML = `
+        <h2 class="text-xl font-semibold text-gray-900 mb-2">${scenarioData.title}</h2>
+        <p class="text-gray-600 mb-6">${scenarioData.description}</p>
+        
+        <div class="mb-6">
+            <h3 class="font-medium text-gray-900 mb-3">Live Demo</h3>
+            ${scenarioData.demo}
+        </div>
+        
+        <div>
+            <h3 class="font-medium text-gray-900 mb-2">Implementation</h3>
+            <pre class="text-sm text-gray-800 bg-gray-100 p-3 rounded overflow-x-auto"><code>&lt;div ${scenarioData.code}&gt;
+  &lt;!-- Your protected content here --&gt;
+&lt;/div&gt;</code></pre>
+        </div>
+    `;
+}
+
+function simulateVerification(type) {
+    const messages = {
+        premium: 'Verification complete! You can now access premium content.',
+        registration: 'Human verified! Account registration enabled.',
+        comment: 'Verification successful! You can now post comments.',
+        api: 'Human verification complete! API access granted.'
+    };
+    
+    // Show loading state
+    event.target.innerHTML = 'Verifying...';
+    event.target.disabled = true;
+    
+    // Simulate verification process
+    setTimeout(() => {
+        alert(messages[type] || 'Verification complete!');
+        event.target.innerHTML = 'Verified ✓';
+        event.target.className = event.target.className.replace(/bg-\w+-600/, 'bg-green-600');
+    }, 2000);
+}
+</script>
+{% endblock %} 

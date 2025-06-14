@@ -183,6 +183,7 @@ def create_app(test_config=None):
         from lemma.routes.onboarding import onboarding_bp
         from lemma.routes.billing import billing_bp
         from lemma.routes.gate_demo import gate_demo
+        from lemma.routes.sandbox import sandbox_bp
         
         app.register_blueprint(main_bp)
         app.register_blueprint(admin_bp, url_prefix='/admin')
@@ -190,7 +191,8 @@ def create_app(test_config=None):
         app.register_blueprint(onboarding_bp, url_prefix='/onboarding')
         app.register_blueprint(billing_bp, url_prefix='/billing')
         app.register_blueprint(gate_demo)  # No prefix for gate demo routes
-        app.logger.info("Successfully registered all blueprints including gate demo")
+        app.register_blueprint(sandbox_bp)  # Already has url_prefix='/api/sandbox'
+        app.logger.info("Successfully registered all blueprints including gate demo and sandbox")
     except Exception as e:
         app.logger.error(f"Error registering blueprints: {e}")
         raise  # This is critical - we need the routes

@@ -1,0 +1,264 @@
+{% extends "layout.html" %}
+
+{% block title %}API Widget Demo - Lemma{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">API Widget Demo</h1>
+            <p class="text-lg text-gray-600">Interactive demonstration of Lemma API integration</p>
+            {% if user_id %}
+            <p class="text-sm text-gray-500 mt-2">User ID: {{ user_id }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Widget Demo Section -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Live Widget Integration</h2>
+            <p class="text-gray-600 mb-6">This demonstrates how the Lemma widget appears on external websites.</p>
+            
+            <!-- Demo Widget Container -->
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 bg-gray-50">
+                <div id="lemma-widget-container" class="text-center">
+                    <div class="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Verify with Lemma</h3>
+                    <p class="text-gray-600 mb-4">Prove you're human to access protected content</p>
+                    <button onclick="startVerification()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        Start Verification
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Testing Section -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">API Testing Interface</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- API Controls -->
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-3">API Operations</h3>
+                    <div class="space-y-2">
+                        <button onclick="testHealthCheck()" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm">
+                            Health Check
+                        </button>
+                        <button onclick="testGenerateChallenge()" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                            Generate Challenge
+                        </button>
+                        <button onclick="testCredentialLookup()" class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm">
+                            Credential Lookup
+                        </button>
+                        <button onclick="testVerifyPresentation()" class="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm">
+                            Verify Presentation
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- API Response -->
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-3">API Response</h3>
+                    <div id="api-response" class="bg-gray-100 rounded-lg p-3 font-mono text-xs h-48 overflow-y-auto">
+                        Click an API operation to see the response...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Integration Code Examples -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Integration Examples</h2>
+            
+            <div class="space-y-6">
+                <!-- HTML Integration -->
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-2">HTML Integration</h3>
+                    <pre class="text-sm text-gray-800 bg-gray-100 p-3 rounded overflow-x-auto"><code>&lt;!-- Include Lemma Scripts --&gt;
+&lt;script src="https://your-lemma-instance.com/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://your-lemma-instance.com/static/js/lemma-wallet-init.js"&gt;&lt;/script&gt;
+
+&lt;!-- Protected Content --&gt;
+&lt;div data-lemma="true"&gt;
+  &lt;h2&gt;Premium Content&lt;/h2&gt;
+  &lt;p&gt;This content requires human verification.&lt;/p&gt;
+&lt;/div&gt;</code></pre>
+                </div>
+                
+                <!-- JavaScript Integration -->
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-2">JavaScript Integration</h3>
+                    <pre class="text-sm text-gray-800 bg-gray-100 p-3 rounded overflow-x-auto"><code>// Check if user is verified
+if (window.lemmaWallet) {
+  const credential = await window.lemmaWallet.getFirstCredential();
+  if (credential) {
+    // User is verified, show protected content
+    showProtectedContent();
+  } else {
+    // Redirect to verification
+    window.location.href = '/verify';
+  }
+}</code></pre>
+                </div>
+                
+                <!-- Backend Integration -->
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-2">Backend Verification</h3>
+                    <pre class="text-sm text-gray-800 bg-gray-100 p-3 rounded overflow-x-auto"><code>// Verify presentation on your backend
+const response = await fetch('/api/verify-presentation', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    presentation: userPresentation,
+    challenge: generatedChallenge
+  })
+});
+
+const result = await response.json();
+if (result.valid) {
+  // User is verified human
+  grantAccess();
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="mt-8 text-center">
+            <a href="/widget-test" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mr-4">
+                <svg class="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Widget Test Page
+            </a>
+            <a href="/api-docs" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                <svg class="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                API Documentation
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateApiResponse(title, content) {
+    const responseDiv = document.getElementById('api-response');
+    responseDiv.innerHTML = `
+        <div class="mb-2 font-bold text-gray-900">${title}</div>
+        <div class="text-gray-700 whitespace-pre-wrap">${content}</div>
+    `;
+}
+
+function startVerification() {
+    const container = document.getElementById('lemma-widget-container');
+    container.innerHTML = `
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-full mb-4">
+                <svg class="w-6 h-6 text-yellow-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Verifying...</h3>
+            <p class="text-gray-600">Please complete the verification process</p>
+        </div>
+    `;
+    
+    // Simulate verification process
+    setTimeout(() => {
+        container.innerHTML = `
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-4">
+                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Verification Complete!</h3>
+                <p class="text-green-600">You are verified as human</p>
+            </div>
+        `;
+    }, 3000);
+}
+
+async function testHealthCheck() {
+    updateApiResponse('Health Check', 'Checking API health...');
+    
+    try {
+        const response = await fetch('/api/health');
+        const data = await response.json();
+        updateApiResponse('Health Check Response', JSON.stringify(data, null, 2));
+    } catch (error) {
+        updateApiResponse('Health Check Error', `Error: ${error.message}`);
+    }
+}
+
+async function testGenerateChallenge() {
+    updateApiResponse('Generate Challenge', 'Generating verification challenge...');
+    
+    try {
+        const response = await fetch('/api/generate-challenge');
+        const data = await response.json();
+        updateApiResponse('Challenge Generated', JSON.stringify(data, null, 2));
+    } catch (error) {
+        updateApiResponse('Challenge Error', `Error: ${error.message}`);
+    }
+}
+
+async function testCredentialLookup() {
+    updateApiResponse('Credential Lookup', 'Looking up user credential...');
+    
+    const userId = '{{ user_id }}' || 'demo_user_' + Math.random().toString(36).substr(2, 9);
+    
+    try {
+        const response = await fetch(`/api/credential-lookup/${userId}`);
+        const data = await response.json();
+        updateApiResponse('Credential Lookup Response', JSON.stringify(data, null, 2));
+    } catch (error) {
+        updateApiResponse('Credential Lookup Error', `Error: ${error.message}`);
+    }
+}
+
+async function testVerifyPresentation() {
+    updateApiResponse('Verify Presentation', 'Testing presentation verification...');
+    
+    // Mock presentation data for demo
+    const mockPresentation = {
+        "@context": ["https://www.w3.org/2018/credentials/v1"],
+        "type": ["VerifiablePresentation"],
+        "verifiableCredential": [{
+            "@context": ["https://www.w3.org/2018/credentials/v1"],
+            "type": ["VerifiableCredential", "LemmaHumanCredential"],
+            "credentialSubject": {
+                "isHuman": true
+            }
+        }]
+    };
+    
+    try {
+        const response = await fetch('/api/verify-presentation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                presentation: mockPresentation,
+                challenge: 'demo_challenge_' + Date.now()
+            })
+        });
+        const data = await response.json();
+        updateApiResponse('Presentation Verification Response', JSON.stringify(data, null, 2));
+    } catch (error) {
+        updateApiResponse('Presentation Verification Error', `Error: ${error.message}`);
+    }
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,164 @@
+{% extends "layout.html" %}
+
+{% block title %}Start Verification - Lemma{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Human Verification</h1>
+            <p class="text-lg text-gray-600">Prove you're human to access protected content</p>
+            {% if user_id %}
+            <p class="text-sm text-gray-500 mt-2">User ID: {{ user_id }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Verification Process -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Verification Process</h2>
+            
+            <!-- Steps -->
+            <div class="space-y-4 mb-6">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                        <span class="text-sm font-medium text-blue-600">1</span>
+                    </div>
+                    <div>
+                        <h3 class="font-medium text-gray-900">Identity Verification</h3>
+                        <p class="text-sm text-gray-600">Upload a government-issued ID and take a selfie</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                        <span class="text-sm font-medium text-blue-600">2</span>
+                    </div>
+                    <div>
+                        <h3 class="font-medium text-gray-900">Credential Issuance</h3>
+                        <p class="text-sm text-gray-600">Receive your Lemma human verification credential</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                        <span class="text-sm font-medium text-blue-600">3</span>
+                    </div>
+                    <div>
+                        <h3 class="font-medium text-gray-900">Network Access</h3>
+                        <p class="text-sm text-gray-600">Use your credential across all Lemma-enabled sites</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Start Button -->
+            <div class="text-center">
+                <button onclick="startVerification()" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                    Start Verification Process
+                </button>
+            </div>
+        </div>
+
+        <!-- Privacy Information -->
+        <div class="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
+            <div class="flex items-start">
+                <svg class="w-5 h-5 text-green-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                <div>
+                    <h3 class="font-medium text-green-800 mb-2">Privacy Protected</h3>
+                    <ul class="text-sm text-green-700 space-y-1">
+                        <li>• Your personal information is processed securely by Stripe Identity</li>
+                        <li>• Lemma only receives confirmation that you're human</li>
+                        <li>• No personal data is stored in our systems</li>
+                        <li>• Your credential works offline and across devices</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Benefits -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Benefits of Verification</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex items-start">
+                    <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3 mt-1">
+                        <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-gray-900">Cross-Site Access</h3>
+                        <p class="text-sm text-gray-600">One verification works everywhere</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start">
+                    <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3 mt-1">
+                        <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-gray-900">Privacy First</h3>
+                        <p class="text-sm text-gray-600">Zero-knowledge verification</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start">
+                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3 mt-1">
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-gray-900">Offline Capable</h3>
+                        <p class="text-sm text-gray-600">Works without internet</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start">
+                    <div class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3 mt-1">
+                        <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-gray-900">Network Effects</h3>
+                        <p class="text-sm text-gray-600">Growing ecosystem of sites</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="mt-8 text-center">
+            <a href="/" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                <svg class="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Back to Home
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function startVerification() {
+    {% if user_id %}
+    // Redirect to the verification flow with the user ID
+    window.location.href = '/start-verification/{{ user_id }}';
+    {% else %}
+    // Generate a new user ID and start verification
+    const userId = 'user_' + Math.random().toString(36).substr(2, 9);
+    window.location.href = '/start-verification/' + userId;
+    {% endif %}
+}
+</script>
+{% endblock %} 

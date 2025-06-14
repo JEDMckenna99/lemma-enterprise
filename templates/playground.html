@@ -1,0 +1,1044 @@
+{% extends "layout.html" %}
+
+{% block title %}API Playground - Lemma Verified Network{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <!-- Hero Section -->
+    <div class="playground-hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    <i data-lucide="play-circle" class="hero-icon"></i>
+                    API Playground
+                </h1>
+                <p class="hero-subtitle">
+                    Test Lemma API endpoints directly in your browser
+                </p>
+                <div class="hero-badges">
+                    <span class="badge badge-success">
+                        <i data-lucide="shield-check"></i>
+                        Live Environment
+                    </span>
+                    <span class="badge badge-info">
+                        <i data-lucide="zap"></i>
+                        Real-time Testing
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- API Configuration -->
+        <div class="config-section">
+            <div class="config-header">
+                <h2>
+                    <i data-lucide="settings" class="section-icon"></i>
+                    Configuration
+                </h2>
+                <p>Set up your API credentials to test authenticated endpoints</p>
+            </div>
+            <div class="config-form">
+                <div class="form-group">
+                    <label for="api-key">API Key</label>
+                    <div class="input-with-icon">
+                        <input type="password" id="api-key" placeholder="Enter your API key">
+                        <button type="button" class="toggle-visibility" onclick="togglePasswordVisibility('api-key')">
+                            <i data-lucide="eye-off"></i>
+                        </button>
+                    </div>
+                    <small class="form-hint">
+                        Get your API key from the <a href="/onboarding/api-keys">API Keys page</a>
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label for="base-url">Base URL</label>
+                    <input type="text" id="base-url" value="{{ request.host_url }}api/" readonly>
+                </div>
+            </div>
+        </div>
+
+        <!-- Endpoint Tabs -->
+        <div class="endpoint-tabs">
+            <div class="tab-nav">
+                <button class="tab-btn active" data-tab="health">Health Check</button>
+                <button class="tab-btn" data-tab="credential">Credentials</button>
+                <button class="tab-btn" data-tab="verification">Verification</button>
+                <button class="tab-btn" data-tab="billing">Billing</button>
+                <button class="tab-btn" data-tab="sandbox">Sandbox</button>
+            </div>
+
+            <!-- Health Check Tab -->
+            <div class="tab-content active" id="health-tab">
+                <div class="endpoint-card">
+                    <div class="endpoint-header">
+                        <div class="endpoint-method get">GET</div>
+                        <h3>/health</h3>
+                        <span class="endpoint-badge">No Auth Required</span>
+                    </div>
+                    <p class="endpoint-description">Check the health status of the Lemma API</p>
+                    
+                    <div class="endpoint-form">
+                        <button class="btn btn-primary" onclick="testEndpoint('health')">
+                            <i data-lucide="play"></i>
+                            Test Endpoint
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Credential Tab -->
+            <div class="tab-content" id="credential-tab">
+                <div class="endpoint-card">
+                    <div class="endpoint-header">
+                        <div class="endpoint-method post">POST</div>
+                        <h3>/issue-credential</h3>
+                        <span class="endpoint-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-description">Issue a new verifiable credential for a user</p>
+                    
+                    <div class="endpoint-form">
+                        <div class="form-group">
+                            <label for="user-id">User ID</label>
+                            <input type="text" id="user-id" placeholder="Enter user ID">
+                        </div>
+                        <button class="btn btn-primary" onclick="testEndpoint('issue-credential')">
+                            <i data-lucide="play"></i>
+                            Issue Credential
+                        </button>
+                    </div>
+                </div>
+
+                <div class="endpoint-card">
+                    <div class="endpoint-header">
+                        <div class="endpoint-method post">POST</div>
+                        <h3>/verify-credential</h3>
+                        <span class="endpoint-badge">No Auth Required</span>
+                    </div>
+                    <p class="endpoint-description">Verify a verifiable credential presentation</p>
+                    
+                    <div class="endpoint-form">
+                        <div class="form-group">
+                            <label for="credential-json">Credential JSON</label>
+                            <textarea id="credential-json" rows="6" placeholder="Paste credential JSON here"></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="testEndpoint('verify-credential')">
+                            <i data-lucide="play"></i>
+                            Verify Credential
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verification Tab -->
+            <div class="tab-content" id="verification-tab">
+                <div class="endpoint-card">
+                    <div class="endpoint-header">
+                        <div class="endpoint-method get">GET</div>
+                        <h3>/generate-challenge</h3>
+                        <span class="endpoint-badge">No Auth Required</span>
+                    </div>
+                    <p class="endpoint-description">Generate a challenge for verification presentation</p>
+                    
+                    <div class="endpoint-form">
+                        <button class="btn btn-primary" onclick="testEndpoint('generate-challenge')">
+                            <i data-lucide="play"></i>
+                            Generate Challenge
+                        </button>
+                    </div>
+                </div>
+
+                <div class="endpoint-card">
+                    <div class="endpoint-header">
+                        <div class="endpoint-method post">POST</div>
+                        <h3>/verify-presentation</h3>
+                        <span class="endpoint-badge">No Auth Required</span>
+                    </div>
+                    <p class="endpoint-description">Verify a presentation with challenge</p>
+                    
+                    <div class="endpoint-form">
+                        <div class="form-group">
+                            <label for="presentation-json">Presentation JSON</label>
+                            <textarea id="presentation-json" rows="6" placeholder="Paste presentation JSON here"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="challenge">Challenge</label>
+                            <input type="text" id="challenge" placeholder="Enter challenge">
+                        </div>
+                        <button class="btn btn-primary" onclick="testEndpoint('verify-presentation')">
+                            <i data-lucide="play"></i>
+                            Verify Presentation
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Billing Tab -->
+            <div class="tab-content" id="billing-tab">
+                <div class="endpoint-card">
+                    <div class="endpoint-header">
+                        <div class="endpoint-method get">GET</div>
+                        <h3>/billing/health</h3>
+                        <span class="endpoint-badge">No Auth Required</span>
+                    </div>
+                    <p class="endpoint-description">Check billing system health</p>
+                    
+                    <div class="endpoint-form">
+                        <button class="btn btn-primary" onclick="testEndpoint('billing-health')">
+                            <i data-lucide="play"></i>
+                            Check Billing Health
+                        </button>
+                    </div>
+                </div>
+
+                <div class="endpoint-card">
+                    <div class="endpoint-header">
+                        <div class="endpoint-method get">GET</div>
+                        <h3>/billing/usage/monthly</h3>
+                        <span class="endpoint-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-description">Get monthly usage metrics</p>
+                    
+                    <div class="endpoint-form">
+                        <div class="form-group">
+                            <label for="month">Month (YYYY-MM)</label>
+                            <input type="text" id="month" placeholder="2024-12" value="{{ current_month }}">
+                        </div>
+                        <button class="btn btn-primary" onclick="testEndpoint('billing-monthly')">
+                            <i data-lucide="play"></i>
+                            Get Usage
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sandbox Tab -->
+            <div class="tab-content" id="sandbox-tab">
+                <div class="endpoint-card">
+                    <div class="endpoint-header">
+                        <div class="endpoint-method get">GET</div>
+                        <h3>/sandbox/status</h3>
+                        <span class="endpoint-badge">No Auth Required</span>
+                    </div>
+                    <p class="endpoint-description">Check sandbox environment status</p>
+                    
+                    <div class="endpoint-form">
+                        <button class="btn btn-primary" onclick="testEndpoint('sandbox-status')">
+                            <i data-lucide="play"></i>
+                            Check Sandbox
+                        </button>
+                    </div>
+                </div>
+
+                <div class="endpoint-card">
+                    <div class="endpoint-header">
+                        <div class="endpoint-method get">GET</div>
+                        <h3>/sandbox/credentials</h3>
+                        <span class="endpoint-badge">No Auth Required</span>
+                    </div>
+                    <p class="endpoint-description">Get test credentials for development</p>
+                    
+                    <div class="endpoint-form">
+                        <button class="btn btn-primary" onclick="testEndpoint('sandbox-credentials')">
+                            <i data-lucide="play"></i>
+                            Get Test Credentials
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Response Section -->
+        <div class="response-section">
+            <div class="response-header">
+                <h2>
+                    <i data-lucide="terminal" class="section-icon"></i>
+                    Response
+                </h2>
+                <div class="response-controls">
+                    <button class="btn btn-outline btn-sm" onclick="clearResponse()">
+                        <i data-lucide="trash-2"></i>
+                        Clear
+                    </button>
+                    <button class="btn btn-outline btn-sm" onclick="copyResponse()">
+                        <i data-lucide="copy"></i>
+                        Copy
+                    </button>
+                </div>
+            </div>
+            <div class="response-container">
+                <div class="response-placeholder">
+                    <i data-lucide="play-circle" class="placeholder-icon"></i>
+                    <p>Run an API request to see the response here</p>
+                </div>
+                <div class="response-content" style="display: none;">
+                    <div class="response-meta">
+                        <span class="response-status"></span>
+                        <span class="response-time"></span>
+                    </div>
+                    <pre class="response-body"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Code Examples -->
+        <div class="code-examples">
+            <div class="examples-header">
+                <h2>
+                    <i data-lucide="code" class="section-icon"></i>
+                    Code Examples
+                </h2>
+                <div class="language-tabs">
+                    <button class="lang-btn active" data-lang="javascript">JavaScript</button>
+                    <button class="lang-btn" data-lang="python">Python</button>
+                    <button class="lang-btn" data-lang="curl">cURL</button>
+                </div>
+            </div>
+            <div class="code-container">
+                <div class="code-content active" id="javascript-code">
+                    <pre><code id="js-example">// Select an endpoint to see code examples</code></pre>
+                </div>
+                <div class="code-content" id="python-code">
+                    <pre><code id="py-example"># Select an endpoint to see code examples</code></pre>
+                </div>
+                <div class="code-content" id="curl-code">
+                    <pre><code id="curl-example"># Select an endpoint to see code examples</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Playground Styles */
+.playground-hero {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    padding: 80px 0;
+    text-align: center;
+}
+
+.hero-content {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.hero-title {
+    font-size: 48px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+}
+
+.hero-icon {
+    width: 48px;
+    height: 48px;
+}
+
+.hero-subtitle {
+    font-size: 20px;
+    margin-bottom: 32px;
+    opacity: 0.9;
+}
+
+.hero-badges {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.badge-success {
+    background: rgba(34, 197, 94, 0.2);
+    color: #dcfce7;
+}
+
+.badge-info {
+    background: rgba(59, 130, 246, 0.2);
+    color: #dbeafe;
+}
+
+.config-section {
+    background: #f8fafc;
+    padding: 32px;
+    border-radius: 12px;
+    margin: 64px 0 32px;
+}
+
+.config-header {
+    margin-bottom: 24px;
+}
+
+.config-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+    color: #1e293b;
+}
+
+.section-icon {
+    width: 24px;
+    height: 24px;
+    color: #6366f1;
+}
+
+.config-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 14px;
+}
+
+.input-with-icon {
+    position: relative;
+}
+
+.input-with-icon input {
+    padding-right: 48px;
+}
+
+.toggle-visibility {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.toggle-visibility:hover {
+    background: #f3f4f6;
+}
+
+.form-hint {
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.form-hint a {
+    color: #6366f1;
+    text-decoration: none;
+}
+
+.form-hint a:hover {
+    text-decoration: underline;
+}
+
+.endpoint-tabs {
+    margin: 32px 0;
+}
+
+.tab-nav {
+    display: flex;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 32px;
+    gap: 4px;
+}
+
+.tab-btn {
+    padding: 12px 24px;
+    background: none;
+    border: none;
+    color: #6b7280;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s ease;
+}
+
+.tab-btn:hover {
+    color: #374151;
+}
+
+.tab-btn.active {
+    color: #6366f1;
+    border-bottom-color: #6366f1;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.endpoint-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.endpoint-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.endpoint-method {
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.endpoint-method.get {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.endpoint-method.post {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.endpoint-header h3 {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0;
+}
+
+.endpoint-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.endpoint-badge.auth-required {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.endpoint-description {
+    color: #64748b;
+    margin-bottom: 24px;
+}
+
+.endpoint-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.endpoint-form .form-group {
+    max-width: 400px;
+}
+
+.response-section {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 32px 0;
+}
+
+.response-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    color: white;
+}
+
+.response-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+}
+
+.response-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.response-container {
+    background: #0f172a;
+    border-radius: 8px;
+    min-height: 200px;
+}
+
+.response-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: #64748b;
+    text-align: center;
+}
+
+.placeholder-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.response-content {
+    padding: 16px;
+}
+
+.response-meta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+.response-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.response-status.success {
+    background: #065f46;
+    color: #34d399;
+}
+
+.response-status.error {
+    background: #7f1d1d;
+    color: #f87171;
+}
+
+.response-time {
+    color: #94a3b8;
+}
+
+.response-body {
+    color: #e2e8f0;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+    overflow-x: auto;
+}
+
+.code-examples {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 32px 0;
+}
+
+.examples-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.examples-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    color: #1e293b;
+}
+
+.language-tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.lang-btn {
+    padding: 8px 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+}
+
+.lang-btn:hover {
+    background: #f1f5f9;
+    color: #374151;
+}
+
+.lang-btn.active {
+    background: #6366f1;
+    color: white;
+    border-color: #6366f1;
+}
+
+.code-container {
+    position: relative;
+}
+
+.code-content {
+    display: none;
+}
+
+.code-content.active {
+    display: block;
+}
+
+.code-content pre {
+    background: #f8fafc;
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 0;
+}
+
+.code-content code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 14px;
+    color: #374151;
+}
+
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 36px;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .config-form {
+        grid-template-columns: 1fr;
+    }
+    
+    .tab-nav {
+        flex-wrap: wrap;
+    }
+    
+    .endpoint-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .response-header {
+        flex-direction: column;
+        gap: 16px;
+        align-items: flex-start;
+    }
+    
+    .examples-header {
+        flex-direction: column;
+        gap: 16px;
+        align-items: flex-start;
+    }
+}
+</style>
+
+<script>
+// Tab functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tab functionality
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetTab = btn.dataset.tab;
+            
+            // Update active tab button
+            tabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            // Update active tab content
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(targetTab + '-tab').classList.add('active');
+        });
+    });
+    
+    // Initialize language tabs
+    const langBtns = document.querySelectorAll('.lang-btn');
+    const codeContents = document.querySelectorAll('.code-content');
+    
+    langBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetLang = btn.dataset.lang;
+            
+            // Update active language button
+            langBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            // Update active code content
+            codeContents.forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(targetLang + '-code').classList.add('active');
+        });
+    });
+    
+    // Initialize Lucide icons
+    lucide.createIcons();
+});
+
+// Password visibility toggle
+function togglePasswordVisibility(inputId) {
+    const input = document.getElementById(inputId);
+    const btn = input.nextElementSibling;
+    const icon = btn.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.setAttribute('data-lucide', 'eye');
+    } else {
+        input.type = 'password';
+        icon.setAttribute('data-lucide', 'eye-off');
+    }
+    
+    lucide.createIcons();
+}
+
+// API testing functionality
+async function testEndpoint(endpoint) {
+    const startTime = Date.now();
+    const apiKey = document.getElementById('api-key').value;
+    const baseUrl = document.getElementById('base-url').value;
+    
+    let url, method = 'GET', body = null, headers = {
+        'Content-Type': 'application/json'
+    };
+    
+    // Add API key if provided and required
+    if (apiKey && ['issue-credential', 'billing-monthly'].includes(endpoint)) {
+        headers['X-API-Key'] = apiKey;
+    }
+    
+    // Configure endpoint-specific parameters
+    switch (endpoint) {
+        case 'health':
+            url = baseUrl + 'health';
+            break;
+        case 'issue-credential':
+            url = baseUrl + 'issue-credential';
+            method = 'POST';
+            body = JSON.stringify({
+                user_id: document.getElementById('user-id').value || 'test-user-' + Date.now()
+            });
+            break;
+        case 'verify-credential':
+            url = baseUrl + 'verify-credential';
+            method = 'POST';
+            const credentialJson = document.getElementById('credential-json').value;
+            if (credentialJson) {
+                try {
+                    body = JSON.stringify({ credential: JSON.parse(credentialJson) });
+                } catch (e) {
+                    showResponse(null, 400, { error: 'Invalid JSON in credential field' }, Date.now() - startTime);
+                    return;
+                }
+            } else {
+                showResponse(null, 400, { error: 'Credential JSON is required' }, Date.now() - startTime);
+                return;
+            }
+            break;
+        case 'generate-challenge':
+            url = baseUrl + 'generate-challenge';
+            break;
+        case 'verify-presentation':
+            url = baseUrl + 'verify-presentation';
+            method = 'POST';
+            const presentationJson = document.getElementById('presentation-json').value;
+            const challenge = document.getElementById('challenge').value;
+            if (presentationJson && challenge) {
+                try {
+                    body = JSON.stringify({
+                        presentation: JSON.parse(presentationJson),
+                        challenge: challenge
+                    });
+                } catch (e) {
+                    showResponse(null, 400, { error: 'Invalid JSON in presentation field' }, Date.now() - startTime);
+                    return;
+                }
+            } else {
+                showResponse(null, 400, { error: 'Presentation JSON and challenge are required' }, Date.now() - startTime);
+                return;
+            }
+            break;
+        case 'billing-health':
+            url = baseUrl + 'billing/health';
+            break;
+        case 'billing-monthly':
+            const month = document.getElementById('month').value || '2024-12';
+            url = baseUrl + `billing/usage/monthly?month=${month}`;
+            break;
+        case 'sandbox-status':
+            url = baseUrl + 'sandbox/status';
+            break;
+        case 'sandbox-credentials':
+            url = baseUrl + 'sandbox/credentials';
+            break;
+        default:
+            showResponse(null, 400, { error: 'Unknown endpoint' }, Date.now() - startTime);
+            return;
+    }
+    
+    // Update code examples
+    updateCodeExamples(endpoint, url, method, headers, body);
+    
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: headers,
+            body: body
+        });
+        
+        const responseTime = Date.now() - startTime;
+        const responseData = await response.json();
+        
+        showResponse(response, response.status, responseData, responseTime);
+    } catch (error) {
+        const responseTime = Date.now() - startTime;
+        showResponse(null, 0, { error: error.message }, responseTime);
+    }
+}
+
+function showResponse(response, status, data, responseTime) {
+    const placeholder = document.querySelector('.response-placeholder');
+    const content = document.querySelector('.response-content');
+    const statusEl = document.querySelector('.response-status');
+    const timeEl = document.querySelector('.response-time');
+    const bodyEl = document.querySelector('.response-body');
+    
+    placeholder.style.display = 'none';
+    content.style.display = 'block';
+    
+    // Update status
+    statusEl.textContent = status;
+    statusEl.className = 'response-status ' + (status >= 200 && status < 300 ? 'success' : 'error');
+    
+    // Update time
+    timeEl.textContent = responseTime + 'ms';
+    
+    // Update body
+    bodyEl.textContent = JSON.stringify(data, null, 2);
+}
+
+function clearResponse() {
+    const placeholder = document.querySelector('.response-placeholder');
+    const content = document.querySelector('.response-content');
+    
+    placeholder.style.display = 'flex';
+    content.style.display = 'none';
+}
+
+function copyResponse() {
+    const bodyEl = document.querySelector('.response-body');
+    if (bodyEl.textContent) {
+        navigator.clipboard.writeText(bodyEl.textContent);
+        
+        // Show feedback
+        const originalText = 'Copy';
+        const btn = event.target.closest('button');
+        const span = btn.querySelector('span') || btn;
+        span.innerHTML = '<i data-lucide="check"></i> Copied';
+        
+        setTimeout(() => {
+            span.innerHTML = '<i data-lucide="copy"></i> Copy';
+            lucide.createIcons();
+        }, 2000);
+        
+        lucide.createIcons();
+    }
+}
+
+function updateCodeExamples(endpoint, url, method, headers, body) {
+    const jsCode = generateJavaScriptExample(url, method, headers, body);
+    const pyCode = generatePythonExample(url, method, headers, body);
+    const curlCode = generateCurlExample(url, method, headers, body);
+    
+    document.getElementById('js-example').textContent = jsCode;
+    document.getElementById('py-example').textContent = pyCode;
+    document.getElementById('curl-example').textContent = curlCode;
+}
+
+function generateJavaScriptExample(url, method, headers, body) {
+    let code = `// ${method} ${url}\n`;
+    code += `const response = await fetch('${url}', {\n`;
+    code += `  method: '${method}',\n`;
+    code += `  headers: ${JSON.stringify(headers, null, 4).replace(/^/gm, '  ')},\n`;
+    if (body) {
+        code += `  body: ${JSON.stringify(body, null, 4).replace(/^/gm, '  ')}\n`;
+    }
+    code += `});\n\n`;
+    code += `const data = await response.json();\n`;
+    code += `console.log(data);`;
+    return code;
+}
+
+function generatePythonExample(url, method, headers, body) {
+    let code = `import requests\n\n`;
+    code += `# ${method} ${url}\n`;
+    code += `response = requests.${method.toLowerCase()}(\n`;
+    code += `    '${url}',\n`;
+    if (Object.keys(headers).length > 0) {
+        code += `    headers=${JSON.stringify(headers, null, 4).replace(/^/gm, '    ')},\n`;
+    }
+    if (body) {
+        code += `    json=${body.replace(/^/gm, '    ')}\n`;
+    }
+    code += `)\n\n`;
+    code += `data = response.json()\n`;
+    code += `print(data)`;
+    return code;
+}
+
+function generateCurlExample(url, method, headers, body) {
+    let code = `# ${method} ${url}\n`;
+    code += `curl -X ${method} \\\n`;
+    code += `  '${url}' \\\n`;
+    
+    Object.entries(headers).forEach(([key, value]) => {
+        code += `  -H '${key}: ${value}' \\\n`;
+    });
+    
+    if (body) {
+        code += `  -d '${body}' \\\n`;
+    }
+    
+    code = code.slice(0, -3); // Remove last backslash
+    return code;
+}
+</script>
+{% endblock %} 

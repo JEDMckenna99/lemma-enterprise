@@ -1,0 +1,151 @@
+{% extends "layout.html" %}
+
+{% block title %}Gate Integration Guide - Lemma{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Lemma Gate Integration Guide</h1>
+            <p class="text-lg text-gray-600">Complete guide to integrating Lemma Gate protection</p>
+        </div>
+
+        <!-- Quick Start -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Quick Start</h2>
+            <div class="space-y-4">
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="font-medium text-gray-900 mb-2">1. Include Lemma Scripts</h3>
+                    <pre class="text-sm text-gray-800 bg-white p-3 rounded border"><code>&lt;script src="https://your-lemma-instance.com/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://your-lemma-instance.com/static/js/lemma-gate.js"&gt;&lt;/script&gt;</code></pre>
+                </div>
+                
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="font-medium text-gray-900 mb-2">2. Add Gate Protection</h3>
+                    <pre class="text-sm text-gray-800 bg-white p-3 rounded border"><code>&lt;div data-lemma-gate="true"&gt;
+  &lt;!-- Your protected content here --&gt;
+  &lt;h2&gt;Premium Content&lt;/h2&gt;
+  &lt;p&gt;This content requires human verification.&lt;/p&gt;
+&lt;/div&gt;</code></pre>
+                </div>
+                
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="font-medium text-gray-900 mb-2">3. Initialize (Optional)</h3>
+                    <pre class="text-sm text-gray-800 bg-white p-3 rounded border"><code>&lt;script&gt;
+  LemmaGate.init({
+    apiEndpoint: 'https://your-lemma-instance.com',
+    theme: 'default',
+    showBranding: true
+  });
+&lt;/script&gt;</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Options -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Configuration Options</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Option</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Default</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">apiEndpoint</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">string</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">current domain</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">Lemma API endpoint URL</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">theme</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">string</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">'default'</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">UI theme: 'default', 'minimal', 'custom'</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">showBranding</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">boolean</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">true</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">Show "Powered by Lemma" branding</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">autoInit</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">boolean</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">true</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">Automatically initialize gates on page load</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Advanced Usage -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Advanced Usage</h2>
+            
+            <div class="space-y-6">
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-2">Custom Verification Handler</h3>
+                    <pre class="text-sm text-gray-800 bg-gray-100 p-3 rounded"><code>LemmaGate.onVerification = function(result) {
+  if (result.verified) {
+    console.log('User verified:', result.userId);
+    // Custom logic for verified users
+  } else {
+    console.log('Verification failed:', result.error);
+    // Handle verification failure
+  }
+};</code></pre>
+                </div>
+                
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-2">Programmatic Gate Control</h3>
+                    <pre class="text-sm text-gray-800 bg-gray-100 p-3 rounded"><code>// Check if user is verified
+if (LemmaGate.isVerified()) {
+  // Show premium content
+}
+
+// Manually trigger verification
+LemmaGate.verify().then(result => {
+  if (result.verified) {
+    // User is now verified
+  }
+});</code></pre>
+                </div>
+                
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-2">Multiple Gates</h3>
+                    <pre class="text-sm text-gray-800 bg-gray-100 p-3 rounded"><code>&lt;div data-lemma-gate="premium" data-gate-level="premium"&gt;
+  Premium content
+&lt;/div&gt;
+
+&lt;div data-lemma-gate="basic" data-gate-level="basic"&gt;
+  Basic protected content
+&lt;/div&gt;</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="mt-8 text-center">
+            <a href="/gate-demo" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <svg class="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Back to Gate Demo
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %} 

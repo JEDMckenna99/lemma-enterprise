@@ -1,0 +1,1080 @@
+{% extends "layout.html" %}
+
+{% block title %}Lemma Verified Network - Human Verification Protocol{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-text">
+                    <div class="hero-badge">
+                        <span class="badge-text">
+                            <i data-lucide="shield-check"></i>
+                            Trusted by 1,000+ platforms
+                        </span>
+                    </div>
+                    <h1 class="hero-title">
+                        The essential <span class="gradient-text">User Trust Protocol</span> for digital platforms
+                    </h1>
+                    <p class="hero-subtitle">
+                        Prove users are human with minimal data collection. W3C-compliant verifiable credentials that work across platforms. Stop bots, enable trust.
+                    </p>
+                    <div class="hero-cta">
+                        <a href="/onboarding" class="btn btn-primary btn-lg">
+                            <i data-lucide="rocket"></i>
+                            Start Integration
+                        </a>
+                        <a href="/playground" class="btn btn-outline btn-lg">
+                            <i data-lucide="play-circle"></i>
+                            Try API Playground
+                        </a>
+                    </div>
+                    <div class="hero-stats">
+                        <div class="stat">
+                            <div class="stat-number">99.8%</div>
+                            <div class="stat-label">Bot detection accuracy</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number">&lt;150ms</div>
+                            <div class="stat-label">Verification latency</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number">10min</div>
+                            <div class="stat-label">Integration time</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="verification-demo">
+                        <div class="demo-card">
+                            <div class="demo-header">
+                                <div class="demo-icon success">
+                                    <i data-lucide="shield-check"></i>
+                                </div>
+                                <div class="demo-content">
+                                    <h3>Human Verified</h3>
+                                    <p>Credential issued by Lemma Network</p>
+                                </div>
+                            </div>
+                            <div class="demo-details">
+                                <div class="detail-row">
+                                    <span class="detail-label">Verification Method:</span>
+                                    <span class="detail-value">Identity Document + Biometric</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Status:</span>
+                                    <span class="detail-value success">Active</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Network Access:</span>
+                                    <span class="detail-value">1,247 platforms</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="network-visualization">
+                            <div class="network-node central">
+                                <i data-lucide="user-check"></i>
+                            </div>
+                            <div class="network-connections">
+                                <div class="connection-line"></div>
+                                <div class="connection-line"></div>
+                                <div class="connection-line"></div>
+                                <div class="connection-line"></div>
+                            </div>
+                            <div class="network-platforms">
+                                <div class="platform-node">E-commerce</div>
+                                <div class="platform-node">Social</div>
+                                <div class="platform-node">Finance</div>
+                                <div class="platform-node">Gaming</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Social Proof Section -->
+    <div class="social-proof-section">
+        <div class="container">
+            <p class="proof-text">Trusted by leading platforms worldwide</p>
+            <div class="proof-logos">
+                <div class="proof-logo">TechCorp</div>
+                <div class="proof-logo">FinanceApp</div>
+                <div class="proof-logo">SocialNet</div>
+                <div class="proof-logo">GamePlatform</div>
+                <div class="proof-logo">ECommerce</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <div class="features-section">
+        <div class="container">
+            <div class="section-header">
+                <h2>Why choose Lemma for human verification?</h2>
+                <p>The only verification system designed for the AI era</p>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="eye-off"></i>
+                    </div>
+                    <h3>Privacy by Design</h3>
+                    <p>Only verifies humanity - no personal data stored. Zero-knowledge proofs and minimal data collection.</p>
+                    <div class="feature-details">
+                        <span class="detail-badge">GDPR Compliant</span>
+                        <span class="detail-badge">Zero-Knowledge</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="network"></i>
+                    </div>
+                    <h3>Network Effects</h3>
+                    <p>One verification works across all integrated platforms. Your costs decrease as the network grows.</p>
+                    <div class="feature-details">
+                        <span class="detail-badge">Cross-Platform</span>
+                        <span class="detail-badge">Cost Decreases</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="zap"></i>
+                    </div>
+                    <h3>Lightning Fast</h3>
+                    <p>Sub-150ms verification with offline capability. No API calls required for verification.</p>
+                    <div class="feature-details">
+                        <span class="detail-badge">&lt;150ms</span>
+                        <span class="detail-badge">Offline Ready</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="shield"></i>
+                    </div>
+                    <h3>Enterprise Security</h3>
+                    <p>SOC 2 Type II ready with comprehensive audit trails and enterprise-grade cryptography.</p>
+                    <div class="feature-details">
+                        <span class="detail-badge">SOC 2 Ready</span>
+                        <span class="detail-badge">Ed25519</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="check-circle"></i>
+                    </div>
+                    <h3>W3C Standards</h3>
+                    <p>Built on Verifiable Credentials and DIDs for future-proof interoperability.</p>
+                    <div class="feature-details">
+                        <span class="detail-badge">W3C VCs</span>
+                        <span class="detail-badge">Future-Proof</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="code"></i>
+                    </div>
+                    <h3>Developer First</h3>
+                    <p>10-minute integration with comprehensive SDKs, playground, and documentation.</p>
+                    <div class="feature-details">
+                        <span class="detail-badge">10min Setup</span>
+                        <span class="detail-badge">Full APIs</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works -->
+    <div class="how-it-works-section">
+        <div class="container">
+            <div class="section-header">
+                <h2>How it works</h2>
+                <p>Simple integration, powerful verification</p>
+            </div>
+            
+            <div class="steps-container">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>User Verification</h3>
+                        <p>User completes one-time human verification via identity document and biometric check</p>
+                        <div class="step-visual">
+                            <div class="verification-flow">
+                                <i data-lucide="id-card"></i>
+                                <span>+</span>
+                                <i data-lucide="scan-face"></i>
+                                <span>=</span>
+                                <i data-lucide="shield-check"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Credential Issuance</h3>
+                        <p>Lemma issues a W3C Verifiable Credential stored securely in the user's device</p>
+                        <div class="step-visual">
+                            <div class="credential-visual">
+                                <div class="credential-card">
+                                    <div class="credential-header">
+                                        <i data-lucide="shield-check"></i>
+                                        <span>Human Verified</span>
+                                    </div>
+                                    <div class="credential-details">
+                                        <div class="credential-field">
+                                            <span>Status:</span>
+                                            <span class="verified">Active</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Network Access</h3>
+                        <p>User gains instant access to all Lemma-integrated platforms without re-verification</p>
+                        <div class="step-visual">
+                            <div class="platform-grid">
+                                <div class="platform-item">E-commerce</div>
+                                <div class="platform-item">Social Media</div>
+                                <div class="platform-item">Finance</div>
+                                <div class="platform-item">Gaming</div>
+                                <div class="platform-item">+1,243 more</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pricing Teaser -->
+    <div class="pricing-teaser-section">
+        <div class="container">
+            <div class="pricing-content">
+                <div class="pricing-text">
+                    <h2>Revolutionary Network-Effect Pricing</h2>
+                    <p>Unlike traditional SaaS, your costs decrease as more businesses join the network</p>
+                    <div class="pricing-highlight">
+                        <div class="pricing-item">
+                            <span class="pricing-label">Starting at</span>
+                            <span class="pricing-value">$0.10/user/month</span>
+                        </div>
+                        <div class="pricing-item">
+                            <span class="pricing-label">Onboarding fee</span>
+                            <span class="pricing-value">$2.00/new user</span>
+                        </div>
+                    </div>
+                    <p class="pricing-note">
+                        <i data-lucide="trending-down"></i>
+                        Prices automatically decrease as network grows (up to 55% discount)
+                    </p>
+                    <a href="/pricing" class="btn btn-primary">
+                        <i data-lucide="calculator"></i>
+                        View Full Pricing
+                    </a>
+                </div>
+                <div class="pricing-visual">
+                    <div class="pricing-chart">
+                        <div class="chart-title">Cost per User Decreases with Network Growth</div>
+                        <div class="chart-bars">
+                            <div class="chart-bar">
+                                <div class="bar-fill" style="height: 100%"></div>
+                                <div class="bar-label">$0.10<br>Today</div>
+                            </div>
+                            <div class="chart-bar">
+                                <div class="bar-fill" style="height: 82%"></div>
+                                <div class="bar-label">$0.08<br>100 sites</div>
+                            </div>
+                            <div class="chart-bar">
+                                <div class="bar-fill" style="height: 55%"></div>
+                                <div class="bar-label">$0.055<br>500 sites</div>
+                            </div>
+                            <div class="chart-bar">
+                                <div class="bar-fill" style="height: 45%"></div>
+                                <div class="bar-label">$0.045<br>1000+ sites</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA Section -->
+    <div class="cta-section">
+        <div class="container">
+            <div class="cta-content">
+                <h2>Ready to stop bots and enable trust?</h2>
+                <p>Join the growing network of platforms using Lemma for human verification</p>
+                <div class="cta-buttons">
+                    <a href="/onboarding" class="btn btn-primary btn-lg">
+                        <i data-lucide="rocket"></i>
+                        Start Free Integration
+                    </a>
+                    <a href="/docs" class="btn btn-outline btn-lg">
+                        <i data-lucide="book"></i>
+                        Read Documentation
+                    </a>
+                </div>
+                <div class="cta-features">
+                    <div class="cta-feature">
+                        <i data-lucide="check"></i>
+                        <span>10-minute setup</span>
+                    </div>
+                    <div class="cta-feature">
+                        <i data-lucide="check"></i>
+                        <span>No credit card required</span>
+                    </div>
+                    <div class="cta-feature">
+                        <i data-lucide="check"></i>
+                        <span>Free development sandbox</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Landing Page Styles */
+.hero-section {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    padding: 120px 0 80px;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.05"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.05"/><circle cx="50" cy="10" r="1" fill="white" opacity="0.03"/><circle cx="10" cy="90" r="1" fill="white" opacity="0.03"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+}
+
+.hero-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+}
+
+.hero-badge {
+    margin-bottom: 24px;
+}
+
+.badge-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+}
+
+.hero-title {
+    font-size: 56px;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 24px;
+}
+
+.gradient-text {
+    background: linear-gradient(45deg, #fbbf24, #f59e0b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.hero-subtitle {
+    font-size: 20px;
+    line-height: 1.6;
+    margin-bottom: 32px;
+    opacity: 0.9;
+}
+
+.hero-cta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 48px;
+    flex-wrap: wrap;
+}
+
+.btn-lg {
+    padding: 16px 24px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.hero-stats {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+}
+
+.stat {
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.hero-visual {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.verification-demo {
+    position: relative;
+}
+
+.demo-card {
+    background: white;
+    color: #1e293b;
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    margin-bottom: 24px;
+    min-width: 320px;
+}
+
+.demo-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.demo-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.demo-icon.success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.demo-content h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.demo-content p {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+}
+
+.demo-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+
+.detail-label {
+    color: #64748b;
+}
+
+.detail-value {
+    font-weight: 500;
+}
+
+.detail-value.success {
+    color: #059669;
+}
+
+.network-visualization {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+}
+
+.network-node.central {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    background: #6366f1;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    z-index: 2;
+}
+
+.network-connections {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.connection-line {
+    position: absolute;
+    width: 2px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.3);
+    transform-origin: bottom center;
+}
+
+.connection-line:nth-child(1) {
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) rotate(0deg);
+}
+
+.connection-line:nth-child(2) {
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%) rotate(90deg);
+}
+
+.connection-line:nth-child(3) {
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) rotate(180deg);
+}
+
+.connection-line:nth-child(4) {
+    top: 50%;
+    left: 20px;
+    transform: translateY(-50%) rotate(270deg);
+}
+
+.network-platforms {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.platform-node {
+    position: absolute;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+}
+
+.platform-node:nth-child(1) {
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.platform-node:nth-child(2) {
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+}
+
+.platform-node:nth-child(3) {
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.platform-node:nth-child(4) {
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+}
+
+.social-proof-section {
+    background: #f8fafc;
+    padding: 32px 0;
+    text-align: center;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.proof-text {
+    color: #64748b;
+    margin-bottom: 24px;
+    font-size: 14px;
+}
+
+.proof-logos {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 48px;
+    flex-wrap: wrap;
+}
+
+.proof-logo {
+    color: #94a3b8;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.features-section {
+    padding: 120px 0;
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 80px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.section-header h2 {
+    font-size: 40px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: #1e293b;
+}
+
+.section-header p {
+    font-size: 20px;
+    color: #64748b;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 32px;
+}
+
+.feature-card {
+    padding: 32px;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    text-align: center;
+    transition: all 0.15s ease;
+    background: white;
+}
+
+.feature-card:hover {
+    border-color: #6366f1;
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.1);
+    transform: translateY(-4px);
+}
+
+.feature-icon {
+    width: 64px;
+    height: 64px;
+    background: #f1f5f9;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+    color: #6366f1;
+}
+
+.feature-card h3 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1e293b;
+}
+
+.feature-card p {
+    color: #64748b;
+    line-height: 1.6;
+    margin-bottom: 16px;
+}
+
+.feature-details {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.detail-badge {
+    padding: 4px 8px;
+    background: #f1f5f9;
+    color: #64748b;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.how-it-works-section {
+    background: #f8fafc;
+    padding: 120px 0;
+}
+
+.steps-container {
+    display: flex;
+    flex-direction: column;
+    gap: 80px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.step {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+}
+
+.step-number {
+    width: 48px;
+    height: 48px;
+    background: #6366f1;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.step-content h3 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1e293b;
+}
+
+.step-content p {
+    color: #64748b;
+    line-height: 1.6;
+    margin-bottom: 24px;
+}
+
+.verification-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    font-size: 24px;
+    color: #6366f1;
+}
+
+.verification-flow span {
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.credential-visual {
+    display: flex;
+    justify-content: center;
+}
+
+.credential-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 240px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.credential-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: #059669;
+    font-weight: 600;
+}
+
+.credential-field {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    color: #64748b;
+}
+
+.credential-field .verified {
+    color: #059669;
+    font-weight: 500;
+}
+
+.platform-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    max-width: 300px;
+}
+
+.platform-item {
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    text-align: center;
+    font-weight: 500;
+}
+
+.platform-item:last-child {
+    grid-column: 1 / -1;
+    background: #6366f1;
+    color: white;
+}
+
+.pricing-teaser-section {
+    padding: 120px 0;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: white;
+}
+
+.pricing-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+}
+
+.pricing-content h2 {
+    font-size: 36px;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.pricing-content > p {
+    font-size: 18px;
+    margin-bottom: 32px;
+    opacity: 0.9;
+}
+
+.pricing-highlight {
+    display: flex;
+    gap: 32px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.pricing-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pricing-label {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.pricing-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: #fbbf24;
+}
+
+.pricing-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    margin-bottom: 32px;
+    opacity: 0.9;
+}
+
+.pricing-chart {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 32px;
+    border-radius: 16px;
+    backdrop-filter: blur(10px);
+}
+
+.chart-title {
+    text-align: center;
+    margin-bottom: 24px;
+    font-weight: 600;
+}
+
+.chart-bars {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    height: 200px;
+    gap: 16px;
+}
+
+.chart-bar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+}
+
+.bar-fill {
+    background: linear-gradient(to top, #fbbf24, #f59e0b);
+    width: 100%;
+    border-radius: 4px 4px 0 0;
+    min-height: 20px;
+    margin-bottom: 12px;
+}
+
+.bar-label {
+    font-size: 12px;
+    text-align: center;
+    font-weight: 500;
+}
+
+.cta-section {
+    padding: 120px 0;
+    background: #f8fafc;
+    text-align: center;
+}
+
+.cta-content h2 {
+    font-size: 40px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: #1e293b;
+}
+
+.cta-content > p {
+    font-size: 20px;
+    color: #64748b;
+    margin-bottom: 40px;
+}
+
+.cta-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+}
+
+.cta-features {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    flex-wrap: wrap;
+}
+
+.cta-feature {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #059669;
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .hero-content {
+        grid-template-columns: 1fr;
+        gap: 48px;
+        text-align: center;
+    }
+    
+    .hero-title {
+        font-size: 40px;
+    }
+    
+    .hero-stats {
+        justify-content: center;
+    }
+    
+    .pricing-content {
+        grid-template-columns: 1fr;
+        gap: 48px;
+        text-align: center;
+    }
+    
+    .step {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Lucide icons
+    lucide.createIcons();
+    
+    // Add animation to network visualization
+    const networkLines = document.querySelectorAll('.connection-line');
+    networkLines.forEach((line, index) => {
+        line.style.animationDelay = `${index * 0.2}s`;
+    });
+    
+    // Add intersection observer for animations
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+    
+    // Observe feature cards
+    document.querySelectorAll('.feature-card').forEach(card => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(card);
+    });
+});
+</script>
+{% endblock %} 

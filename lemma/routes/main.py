@@ -767,11 +767,38 @@ def widget_test():
 @main_bp.route('/verification-start/<user_id>')
 def verification_start(user_id=None):
     """Show the enhanced verification start page."""
-    # Generate a user ID if not provided
     if not user_id:
-        user_id = f"user_{int(time.time())}_{random.randint(1000, 9999)}"
+        user_id = f"user_{secrets.token_hex(8)}"
+        return redirect(url_for('main.verification_start', user_id=user_id))
     
     return render_template('verification_start.html', user_id=user_id)
+
+@main_bp.route('/docs')
+def docs():
+    """Render the comprehensive documentation hub."""
+    return render_template('docs.html')
+
+@main_bp.route('/playground')
+def playground():
+    """Render the interactive API playground."""
+    from datetime import datetime
+    current_month = datetime.now().strftime('%Y-%m')
+    return render_template('playground.html', current_month=current_month)
+
+@main_bp.route('/landing')
+def landing():
+    """Render the modern marketing landing page."""
+    return render_template('landing.html')
+
+@main_bp.route('/pricing')
+def pricing():
+    """Render the pricing page with network-effect pricing model."""
+    return render_template('pricing.html')
+
+@main_bp.route('/status')
+def status():
+    """Render the system status page."""
+    return render_template('status.html')
 
 @main_bp.route('/gate-demo')
 def gate_demo():

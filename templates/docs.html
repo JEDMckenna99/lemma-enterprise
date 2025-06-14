@@ -1,0 +1,722 @@
+{% extends "layout.html" %}
+
+{% block title %}Documentation - Lemma Verified Network{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <!-- Hero Section -->
+    <div class="docs-hero">
+        <div class="container">
+            <div class="docs-hero-content">
+                <h1 class="docs-hero-title">
+                    <i data-lucide="book-open" class="docs-hero-icon"></i>
+                    Documentation
+                </h1>
+                <p class="docs-hero-subtitle">
+                    Everything you need to integrate human verification into your platform
+                </p>
+                <div class="docs-search">
+                    <input type="text" id="docs-search" placeholder="Search documentation..." class="docs-search-input">
+                    <i data-lucide="search" class="docs-search-icon"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Start Banner -->
+    <div class="quick-start-banner">
+        <div class="container">
+            <div class="quick-start-content">
+                <div class="quick-start-text">
+                    <h3>
+                        <i data-lucide="zap" class="banner-icon"></i>
+                        Get started in under 10 minutes
+                    </h3>
+                    <p>Add human verification to your site with just a few lines of code</p>
+                </div>
+                <a href="/onboarding" class="btn btn-primary">Start Integration</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documentation Grid -->
+    <div class="container">
+        <div class="docs-grid">
+            <!-- Getting Started -->
+            <div class="docs-section">
+                <div class="docs-section-header">
+                    <i data-lucide="play-circle" class="docs-section-icon"></i>
+                    <h2>Getting Started</h2>
+                </div>
+                <div class="docs-cards">
+                    <a href="#quick-start" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="rocket" class="docs-card-icon"></i>
+                            <h3>Quick Start Guide</h3>
+                        </div>
+                        <p>Get up and running with Lemma verification in minutes</p>
+                        <span class="docs-card-time">5 min read</span>
+                    </a>
+                    <a href="#authentication" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="key" class="docs-card-icon"></i>
+                            <h3>Authentication</h3>
+                        </div>
+                        <p>Learn how to authenticate with the Lemma API</p>
+                        <span class="docs-card-time">3 min read</span>
+                    </a>
+                    <a href="#concepts" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="lightbulb" class="docs-card-icon"></i>
+                            <h3>Core Concepts</h3>
+                        </div>
+                        <p>Understand verifiable credentials and DIDs</p>
+                        <span class="docs-card-time">8 min read</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- API Reference -->
+            <div class="docs-section">
+                <div class="docs-section-header">
+                    <i data-lucide="code" class="docs-section-icon"></i>
+                    <h2>API Reference</h2>
+                </div>
+                <div class="docs-cards">
+                    <a href="/api-docs" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="book" class="docs-card-icon"></i>
+                            <h3>Full API Documentation</h3>
+                        </div>
+                        <p>Complete reference for all Lemma API endpoints</p>
+                        <span class="docs-card-badge">OpenAPI 3.0</span>
+                    </a>
+                    <a href="#playground" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="play" class="docs-card-icon"></i>
+                            <h3>API Playground</h3>
+                        </div>
+                        <p>Test API endpoints directly in your browser</p>
+                        <span class="docs-card-badge">Interactive</span>
+                    </a>
+                    <a href="#webhooks" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="webhook" class="docs-card-icon"></i>
+                            <h3>Webhooks</h3>
+                        </div>
+                        <p>Real-time notifications for verification events</p>
+                        <span class="docs-card-time">4 min read</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Integration Guides -->
+            <div class="docs-section">
+                <div class="docs-section-header">
+                    <i data-lucide="puzzle" class="docs-section-icon"></i>
+                    <h2>Integration Guides</h2>
+                </div>
+                <div class="docs-cards">
+                    <a href="/onboarding/integration" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="react" class="docs-card-icon"></i>
+                            <h3>React Integration</h3>
+                        </div>
+                        <p>Hooks, components, and patterns for React apps</p>
+                        <span class="docs-card-time">10 min read</span>
+                    </a>
+                    <a href="#node-guide" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="server" class="docs-card-icon"></i>
+                            <h3>Node.js Backend</h3>
+                        </div>
+                        <p>Express middleware and server-side verification</p>
+                        <span class="docs-card-time">12 min read</span>
+                    </a>
+                    <a href="#mobile-guide" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="smartphone" class="docs-card-icon"></i>
+                            <h3>Mobile Apps</h3>
+                        </div>
+                        <p>iOS and Android integration patterns</p>
+                        <span class="docs-card-time">15 min read</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- SDK & Tools -->
+            <div class="docs-section">
+                <div class="docs-section-header">
+                    <i data-lucide="package" class="docs-section-icon"></i>
+                    <h2>SDKs & Tools</h2>
+                </div>
+                <div class="docs-cards">
+                    <a href="#javascript-sdk" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="code-2" class="docs-card-icon"></i>
+                            <h3>JavaScript SDK</h3>
+                        </div>
+                        <p>Official client library for web applications</p>
+                        <span class="docs-card-badge">npm install</span>
+                    </a>
+                    <a href="#cli" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="terminal" class="docs-card-icon"></i>
+                            <h3>CLI Tool</h3>
+                        </div>
+                        <p>Command-line interface for testing and automation</p>
+                        <span class="docs-card-badge">npm install -g</span>
+                    </a>
+                    <a href="/api/sandbox/status" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="test-tube" class="docs-card-icon"></i>
+                            <h3>Sandbox Environment</h3>
+                        </div>
+                        <p>Test your integration without real users</p>
+                        <span class="docs-card-badge">Testing</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Use Cases -->
+            <div class="docs-section">
+                <div class="docs-section-header">
+                    <i data-lucide="target" class="docs-section-icon"></i>
+                    <h2>Use Cases</h2>
+                </div>
+                <div class="docs-cards">
+                    <a href="#bot-protection" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="shield" class="docs-card-icon"></i>
+                            <h3>Bot Protection</h3>
+                        </div>
+                        <p>Prevent automated abuse and spam</p>
+                        <span class="docs-card-time">6 min read</span>
+                    </a>
+                    <a href="#agent-networks" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="users" class="docs-card-icon"></i>
+                            <h3>Agent Networks</h3>
+                        </div>
+                        <p>Verify professional agents across platforms</p>
+                        <span class="docs-card-time">8 min read</span>
+                    </a>
+                    <a href="#compliance" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="check-circle" class="docs-card-icon"></i>
+                            <h3>Compliance & KYC</h3>
+                        </div>
+                        <p>Meet regulatory requirements with verified humans</p>
+                        <span class="docs-card-time">10 min read</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Advanced Topics -->
+            <div class="docs-section">
+                <div class="docs-section-header">
+                    <i data-lucide="settings" class="docs-section-icon"></i>
+                    <h2>Advanced Topics</h2>
+                </div>
+                <div class="docs-cards">
+                    <a href="#privacy" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="eye-off" class="docs-card-icon"></i>
+                            <h3>Privacy & Security</h3>
+                        </div>
+                        <p>Zero-knowledge proofs and minimal data collection</p>
+                        <span class="docs-card-time">12 min read</span>
+                    </a>
+                    <a href="#revocation" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="x-circle" class="docs-card-icon"></i>
+                            <h3>Credential Revocation</h3>
+                        </div>
+                        <p>OPRF-based revocation system</p>
+                        <span class="docs-card-time">15 min read</span>
+                    </a>
+                    <a href="#network-effects" class="docs-card">
+                        <div class="docs-card-header">
+                            <i data-lucide="network" class="docs-card-icon"></i>
+                            <h3>Network Effects</h3>
+                        </div>
+                        <p>Cross-platform verification and pricing benefits</p>
+                        <span class="docs-card-time">8 min read</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Reference -->
+        <div class="quick-reference">
+            <h2>
+                <i data-lucide="bookmark" class="section-icon"></i>
+                Quick Reference
+            </h2>
+            <div class="reference-grid">
+                <div class="reference-card">
+                    <h3>Base URL</h3>
+                    <code class="reference-code">{{ request.host_url }}api/</code>
+                    <button class="copy-btn" onclick="copyToClipboard('{{ request.host_url }}api/')">
+                        <i data-lucide="copy"></i>
+                    </button>
+                </div>
+                <div class="reference-card">
+                    <h3>Authentication</h3>
+                    <code class="reference-code">X-API-Key: your_api_key</code>
+                    <button class="copy-btn" onclick="copyToClipboard('X-API-Key: your_api_key')">
+                        <i data-lucide="copy"></i>
+                    </button>
+                </div>
+                <div class="reference-card">
+                    <h3>Content Type</h3>
+                    <code class="reference-code">application/json</code>
+                    <button class="copy-btn" onclick="copyToClipboard('application/json')">
+                        <i data-lucide="copy"></i>
+                    </button>
+                </div>
+                <div class="reference-card">
+                    <h3>Rate Limit</h3>
+                    <code class="reference-code">1000/hour</code>
+                    <span class="reference-note">Per API key</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Support Section -->
+        <div class="docs-support">
+            <div class="support-content">
+                <h2>
+                    <i data-lucide="help-circle" class="section-icon"></i>
+                    Need Help?
+                </h2>
+                <p>Can't find what you're looking for? We're here to help.</p>
+                <div class="support-options">
+                    <a href="mailto:support@lemma.network" class="support-option">
+                        <i data-lucide="mail" class="support-icon"></i>
+                        <div>
+                            <h3>Email Support</h3>
+                            <p>Get help from our team</p>
+                        </div>
+                    </a>
+                    <a href="https://github.com/lemma-network/lemma-enterprise" class="support-option">
+                        <i data-lucide="github" class="support-icon"></i>
+                        <div>
+                            <h3>GitHub Issues</h3>
+                            <p>Report bugs and feature requests</p>
+                        </div>
+                    </a>
+                    <a href="/status" class="support-option">
+                        <i data-lucide="activity" class="support-icon"></i>
+                        <div>
+                            <h3>System Status</h3>
+                            <p>Check service health</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Documentation Styles */
+.docs-hero {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    padding: 80px 0;
+    text-align: center;
+}
+
+.docs-hero-content {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.docs-hero-title {
+    font-size: 48px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+}
+
+.docs-hero-icon {
+    width: 48px;
+    height: 48px;
+}
+
+.docs-hero-subtitle {
+    font-size: 20px;
+    margin-bottom: 32px;
+    opacity: 0.9;
+}
+
+.docs-search {
+    position: relative;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.docs-search-input {
+    width: 100%;
+    padding: 16px 48px 16px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 16px;
+    backdrop-filter: blur(10px);
+}
+
+.docs-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.docs-search-icon {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    opacity: 0.7;
+}
+
+.quick-start-banner {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 24px 0;
+}
+
+.quick-start-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.quick-start-text h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    color: #1e293b;
+}
+
+.banner-icon {
+    width: 20px;
+    height: 20px;
+    color: #f59e0b;
+}
+
+.docs-grid {
+    padding: 64px 0;
+}
+
+.docs-section {
+    margin-bottom: 64px;
+}
+
+.docs-section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.docs-section-icon {
+    width: 24px;
+    height: 24px;
+    color: #6366f1;
+}
+
+.docs-section h2 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0;
+}
+
+.docs-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.docs-card {
+    display: block;
+    padding: 24px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.15s ease;
+    background: white;
+}
+
+.docs-card:hover {
+    border-color: #6366f1;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+    transform: translateY(-2px);
+}
+
+.docs-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.docs-card-icon {
+    width: 20px;
+    height: 20px;
+    color: #6366f1;
+}
+
+.docs-card h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0;
+}
+
+.docs-card p {
+    color: #64748b;
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+.docs-card-time {
+    display: inline-block;
+    padding: 4px 8px;
+    background: #f1f5f9;
+    color: #64748b;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.docs-card-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    background: #6366f1;
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.quick-reference {
+    background: #f8fafc;
+    padding: 32px;
+    border-radius: 12px;
+    margin-bottom: 64px;
+}
+
+.quick-reference h2 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    color: #1e293b;
+}
+
+.section-icon {
+    width: 24px;
+    height: 24px;
+    color: #6366f1;
+}
+
+.reference-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+}
+
+.reference-card {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    position: relative;
+}
+
+.reference-card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.reference-code {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 14px;
+    color: #1e293b;
+    background: #f8fafc;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 8px;
+}
+
+.copy-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 4px;
+    border: none;
+    background: none;
+    color: #64748b;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+}
+
+.copy-btn:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+.reference-note {
+    font-size: 12px;
+    color: #64748b;
+    font-style: italic;
+}
+
+.docs-support {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: white;
+    padding: 48px 32px;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.support-content h2 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.support-content p {
+    font-size: 18px;
+    margin-bottom: 32px;
+    opacity: 0.9;
+}
+
+.support-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+}
+
+.support-option {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.15s ease;
+    backdrop-filter: blur(10px);
+}
+
+.support-option:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.support-icon {
+    width: 24px;
+    height: 24px;
+    color: #60a5fa;
+}
+
+.support-option h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.support-option p {
+    font-size: 14px;
+    opacity: 0.8;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .docs-hero-title {
+        font-size: 36px;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .quick-start-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .docs-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .reference-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .support-options {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+// Search functionality
+document.getElementById('docs-search').addEventListener('input', function(e) {
+    const query = e.target.value.toLowerCase();
+    const cards = document.querySelectorAll('.docs-card');
+    
+    cards.forEach(card => {
+        const title = card.querySelector('h3').textContent.toLowerCase();
+        const content = card.querySelector('p').textContent.toLowerCase();
+        
+        if (title.includes(query) || content.includes(query)) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = query ? 'none' : 'block';
+        }
+    });
+});
+
+// Copy to clipboard function
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        // Show success feedback
+        const btn = event.target.closest('.copy-btn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i data-lucide="check"></i>';
+        btn.style.color = '#22c55e';
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.style.color = '';
+            lucide.createIcons();
+        }, 1000);
+    });
+}
+
+// Initialize Lucide icons
+document.addEventListener('DOMContentLoaded', function() {
+    lucide.createIcons();
+});
+</script>
+{% endblock %} 

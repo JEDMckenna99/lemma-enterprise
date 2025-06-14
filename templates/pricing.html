@@ -1,0 +1,414 @@
+{% extends "layout.html" %}
+
+{% block title %}Pricing - Lemma Verified Network{% endblock %}
+{% block description %}Revolutionary network-effect pricing that gets better as more businesses join. Start at $0.10/user/month and watch costs decrease automatically.{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/lemma-stripe-system.css') }}">
+<script src="{{ url_for('static', filename='js/lemma-stripe-components.js') }}"></script>
+
+<!-- Hero Section -->
+<section class="py-20 text-center">
+    <div class="container">
+        <h1 style="font-size: var(--font-size-h1); font-weight: 600; margin-bottom: var(--space-6); color: var(--gray-800);">
+            Pricing that gets <span style="color: var(--primary-500);">better</span> as the network grows
+        </h1>
+        <p style="font-size: var(--font-size-lg); color: var(--gray-500); margin-bottom: var(--space-8); max-width: 48rem; margin-left: auto; margin-right: auto;">
+            Unlike traditional SaaS pricing, Lemma implements network-effect pricing where costs decrease for everyone as more businesses join the ecosystem.
+        </p>
+        
+        <!-- Pricing Toggle -->
+        <div style="display: flex; align-items: center; justify-content: center; gap: var(--space-4); margin-bottom: var(--space-12);">
+            <span style="color: var(--gray-500);">Monthly</span>
+            <button class="pricing-toggle" style="position: relative; width: 48px; height: 24px; background-color: var(--gray-200); border-radius: 12px; border: none; cursor: pointer; transition: background-color 200ms cubic-bezier(0.32, 0.72, 0.36, 0.95);" onclick="togglePricing()">
+                <div class="toggle-slider" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; background: var(--white); border-radius: 8px; box-shadow: var(--shadow-sm); transition: transform 200ms cubic-bezier(0.32, 0.72, 0.36, 0.95);"></div>
+            </button>
+            <span style="color: var(--gray-800); font-weight: 500;">Annual <span style="font-size: var(--font-size-sm); color: var(--success);">(Save 20%)</span></span>
+        </div>
+    </div>
+</section>
+
+<!-- Network Effect Visualization -->
+<section style="padding: var(--space-16) 0; background-color: var(--white);">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: var(--space-12);">
+            <h2 style="font-size: var(--font-size-h2); font-weight: 600; margin-bottom: var(--space-4);">How Network Pricing Works</h2>
+            <p style="font-size: var(--font-size-lg); color: var(--gray-500);">Your costs automatically decrease as more businesses join the network</p>
+        </div>
+        
+        <div class="card" style="max-width: 64rem; margin-left: auto; margin-right: auto;">
+            <div class="card-body">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-8); align-items: center;">
+                    <div>
+                        <h3 style="font-size: var(--font-size-h4); font-weight: 600; margin-bottom: var(--space-4);">Network Growth Pricing</h3>
+                        <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-3); border-radius: var(--radius-sm); background-color: var(--gray-50);">
+                                <span style="font-size: var(--font-size-sm);">10 businesses</span>
+                                <span style="font-family: var(--font-mono); color: var(--primary-500);">$0.098/user/month</span>
+                                <span style="font-size: var(--font-size-xs); color: var(--gray-500);">2% discount</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-3); border-radius: var(--radius-sm); background-color: var(--gray-50);">
+                                <span style="font-size: var(--font-size-sm);">50 businesses</span>
+                                <span style="font-family: var(--font-mono); color: var(--primary-500);">$0.090/user/month</span>
+                                <span style="font-size: var(--font-size-xs); color: var(--gray-500);">10% discount</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-3); border-radius: var(--radius-sm); background-color: var(--gray-50);">
+                                <span style="font-size: var(--font-size-sm);">100 businesses</span>
+                                <span style="font-family: var(--font-mono); color: var(--primary-500);">$0.082/user/month</span>
+                                <span style="font-size: var(--font-size-xs); color: var(--gray-500);">18% discount</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-3); border-radius: var(--radius-sm); background-color: var(--gray-50);">
+                                <span style="font-size: var(--font-size-sm);">500 businesses</span>
+                                <span style="font-family: var(--font-mono); color: var(--primary-500);">$0.055/user/month</span>
+                                <span style="font-size: var(--font-size-xs); color: var(--gray-500);">45% discount</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-3); border-radius: var(--radius-sm); background-color: var(--primary-500); color: var(--white);">
+                                <span style="font-size: var(--font-size-sm); font-weight: 500;">1000+ businesses</span>
+                                <span style="font-family: var(--font-mono); font-weight: 600;">$0.045/user/month</span>
+                                <span style="font-size: var(--font-size-xs);">55% maximum</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 192px; height: 192px; margin: 0 auto var(--space-4) auto; position: relative;">
+                            <!-- Network visualization -->
+                            <svg viewBox="0 0 200 200" style="width: 100%; height: 100%;">
+                                <defs>
+                                    <linearGradient id="networkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#635bff;stop-opacity:0.8" />
+                                        <stop offset="100%" style="stop-color:#5544ff;stop-opacity:0.4" />
+                                    </linearGradient>
+                                </defs>
+                                <!-- Network nodes -->
+                                <circle cx="100" cy="100" r="8" fill="var(--primary-500)" />
+                                <circle cx="60" cy="60" r="6" fill="var(--primary-500)" opacity="0.8" />
+                                <circle cx="140" cy="60" r="6" fill="var(--primary-500)" opacity="0.8" />
+                                <circle cx="60" cy="140" r="6" fill="var(--primary-500)" opacity="0.8" />
+                                <circle cx="140" cy="140" r="6" fill="var(--primary-500)" opacity="0.8" />
+                                <circle cx="100" cy="40" r="4" fill="var(--primary-500)" opacity="0.6" />
+                                <circle cx="160" cy="100" r="4" fill="var(--primary-500)" opacity="0.6" />
+                                <circle cx="100" cy="160" r="4" fill="var(--primary-500)" opacity="0.6" />
+                                <circle cx="40" cy="100" r="4" fill="var(--primary-500)" opacity="0.6" />
+                                <!-- Network connections -->
+                                <line x1="100" y1="100" x2="60" y2="60" stroke="var(--primary-500)" stroke-width="2" opacity="0.3" />
+                                <line x1="100" y1="100" x2="140" y2="60" stroke="var(--primary-500)" stroke-width="2" opacity="0.3" />
+                                <line x1="100" y1="100" x2="60" y2="140" stroke="var(--primary-500)" stroke-width="2" opacity="0.3" />
+                                <line x1="100" y1="100" x2="140" y2="140" stroke="var(--primary-500)" stroke-width="2" opacity="0.3" />
+                                <line x1="60" y1="60" x2="140" y2="60" stroke="var(--primary-500)" stroke-width="1" opacity="0.2" />
+                                <line x1="60" y1="140" x2="140" y2="140" stroke="var(--primary-500)" stroke-width="1" opacity="0.2" />
+                            </svg>
+                        </div>
+                        <p style="font-size: var(--font-size-sm); color: var(--gray-500);">Network effects in action</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Pricing Cards -->
+<section style="padding: var(--space-16) 0;">
+    <div class="container">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-6); max-width: 72rem; margin-left: auto; margin-right: auto;">
+            
+            <!-- Free Tier -->
+            <div class="card" style="border: 2px solid var(--gray-200);">
+                <div class="card-header" style="text-align: center;">
+                    <h3 style="font-size: var(--font-size-h4); font-weight: 600;">Free</h3>
+                    <p style="color: var(--gray-500); font-size: var(--font-size-sm);">Perfect for testing</p>
+                </div>
+                <div class="card-body" style="text-align: center;">
+                    <div style="margin-bottom: var(--space-6);">
+                        <span style="font-size: 2.5rem; font-weight: 700;">$0</span>
+                        <span style="color: var(--gray-500);">/month</span>
+                    </div>
+                    <div style="text-align: left; display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-8);">
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">1,000 verifications/month</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">Basic API access</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">Community support</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">Documentation & guides</span>
+                        </div>
+                    </div>
+                    <a href="/onboarding/start" class="btn btn-secondary" style="width: 100%;">Get Started</a>
+                </div>
+            </div>
+
+            <!-- Standard Tier -->
+            <div class="card" style="border: 2px solid var(--primary-500); position: relative;">
+                <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%);">
+                    <span style="background-color: var(--primary-500); color: var(--white); padding: 4px 16px; border-radius: 12px; font-size: var(--font-size-xs); font-weight: 500;">Most Popular</span>
+                </div>
+                <div class="card-header" style="text-align: center;">
+                    <h3 style="font-size: var(--font-size-h4); font-weight: 600;">Standard</h3>
+                    <p style="color: var(--gray-500); font-size: var(--font-size-sm);">For growing businesses</p>
+                </div>
+                <div class="card-body" style="text-align: center;">
+                    <div style="margin-bottom: var(--space-6);">
+                        <span class="pricing-amount" data-monthly="0.10" data-annual="0.08" style="font-size: 2.5rem; font-weight: 700;">$0.10</span>
+                        <span style="color: var(--gray-500);">/user/month</span>
+                        <div style="font-size: var(--font-size-xs); color: var(--gray-400); margin-top: 4px;">+ $2.00 onboarding fee per new user</div>
+                        <div style="font-size: var(--font-size-xs); color: var(--primary-500); margin-top: 4px; font-weight: 500;">Rate decreases with network growth</div>
+                    </div>
+                    <div style="text-align: left; display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-8);">
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">Unlimited verifications</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">Full API & SDK access</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">Email support (24h response)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">Usage analytics dashboard</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">Network effect pricing</span>
+                        </div>
+                    </div>
+                    <a href="/onboarding/start" class="btn btn-primary" style="width: 100%;">Start Free Trial</a>
+                </div>
+            </div>
+
+            <!-- Enterprise Tier -->
+            <div class="card" style="border: 2px solid var(--gray-200);">
+                <div class="card-header" style="text-align: center;">
+                    <h3 style="font-size: var(--font-size-h4); font-weight: 600;">Enterprise</h3>
+                    <p style="color: var(--gray-500); font-size: var(--font-size-sm);">For large organizations</p>
+                </div>
+                <div class="card-body" style="text-align: center;">
+                    <div style="margin-bottom: var(--space-6);">
+                        <span class="pricing-amount" data-monthly="0.08" data-annual="0.064" style="font-size: 2.5rem; font-weight: 700;">$0.08</span>
+                        <span style="color: var(--gray-500);">/user/month</span>
+                        <div style="font-size: var(--font-size-xs); color: var(--gray-400); margin-top: 4px;">+ $2.00 onboarding fee per new user</div>
+                        <div style="font-size: var(--font-size-xs); color: var(--primary-500); margin-top: 4px; font-weight: 500;">Maximum network discounts</div>
+                    </div>
+                    <div style="text-align: left; display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-8);">
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">Everything in Standard</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">Priority support (4h response)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">SLA guarantees</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">SOC 2 & compliance</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-3);">
+                            <svg style="width: 16px; height: 16px; color: var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span style="font-size: var(--font-size-sm);">Dedicated account manager</span>
+                        </div>
+                    </div>
+                    <a href="mailto:enterprise@lemma.network" class="btn btn-secondary" style="width: 100%;">Contact Sales</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ Section -->
+<section class="py-16 bg-white">
+    <div class="container">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl font-bold mb-4">Frequently Asked Questions</h2>
+            <p class="text-lg text-gray-500">Everything you need to know about Lemma pricing</p>
+        </div>
+        
+        <div class="max-w-3xl mx-auto space-y-6">
+            <div class="card" data-faq>
+                <div class="card-body">
+                    <button class="w-full text-left flex justify-between items-center" onclick="toggleFAQ(this)">
+                        <h3 class="font-semibold">How does network-effect pricing work?</h3>
+                        <svg class="icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div class="faq-content hidden mt-4">
+                        <p class="text-gray-500">As more businesses join the Lemma network, the monthly rate automatically decreases for everyone. You start at $0.10/user/month and can get as low as $0.045/user/month when 1000+ businesses are in the network. This creates a flywheel effect where everyone benefits from network growth.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card" data-faq>
+                <div class="card-body">
+                    <button class="w-full text-left flex justify-between items-center" onclick="toggleFAQ(this)">
+                        <h3 class="font-semibold">What's the $2.00 onboarding fee?</h3>
+                        <svg class="icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div class="faq-content hidden mt-4">
+                        <p class="text-gray-500">This one-time fee covers the cost of bringing a new user into the Lemma network through our identity verification process. Once verified, that user can access all network partners without additional onboarding fees.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card" data-faq>
+                <div class="card-body">
+                    <button class="w-full text-left flex justify-between items-center" onclick="toggleFAQ(this)">
+                        <h3 class="font-semibold">How are Monthly Active Humans (MAH) calculated?</h3>
+                        <svg class="icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div class="faq-content hidden mt-4">
+                        <p class="text-gray-500">MAH counts unique verified humans who interact with your platform each month. We use privacy-preserving techniques to track usage without storing personal information, ensuring accurate billing while protecting user privacy.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card" data-faq>
+                <div class="card-body">
+                    <button class="w-full text-left flex justify-between items-center" onclick="toggleFAQ(this)">
+                        <h3 class="font-semibold">Can I change plans at any time?</h3>
+                        <svg class="icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div class="faq-content hidden mt-4">
+                        <p class="text-gray-500">Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately, and billing is prorated. The network-effect pricing benefits apply regardless of your plan tier.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section style="padding: var(--space-20) 0; text-align: center;">
+    <div class="container">
+        <div style="max-width: 32rem; margin-left: auto; margin-right: auto;">
+            <h2 style="font-size: var(--font-size-h1); font-weight: 600; margin-bottom: var(--space-6);">Ready to join the network?</h2>
+            <p style="font-size: var(--font-size-xl); color: var(--gray-500); margin-bottom: var(--space-8);">
+                Start with our free tier and watch your costs decrease as the network grows.
+            </p>
+            <div style="display: flex; gap: var(--space-4); justify-content: center;">
+                <a href="/onboarding/start" class="btn btn-primary">Start Free Trial</a>
+                <a href="/docs" class="btn btn-secondary">View Documentation</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+function togglePricing() {
+    const toggle = document.querySelector('.pricing-toggle');
+    const slider = document.querySelector('.toggle-slider');
+    const amounts = document.querySelectorAll('.pricing-amount');
+    
+    const isAnnual = toggle.classList.contains('active');
+    
+    if (isAnnual) {
+        // Switch to monthly
+        toggle.classList.remove('active');
+        slider.style.transform = 'translateX(0)';
+        toggle.style.backgroundColor = 'var(--gray-200)';
+        
+        amounts.forEach(amount => {
+            const monthly = amount.getAttribute('data-monthly');
+            amount.textContent = '$' + monthly;
+        });
+    } else {
+        // Switch to annual
+        toggle.classList.add('active');
+        slider.style.transform = 'translateX(24px)';
+        toggle.style.backgroundColor = 'var(--primary-500)';
+        
+        amounts.forEach(amount => {
+            const annual = amount.getAttribute('data-annual');
+            amount.textContent = '$' + annual;
+        });
+    }
+}
+
+function toggleFAQ(button) {
+    const content = button.parentNode.querySelector('.faq-content');
+    const icon = button.querySelector('svg');
+    
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        content.classList.add('hidden');
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+</script>
+
+<style>
+.pricing-toggle {
+    background-color: var(--gray-200);
+    transition: background-color 200ms cubic-bezier(0.32, 0.72, 0.36, 0.95);
+}
+
+.pricing-toggle.active {
+    background-color: var(--primary-500);
+}
+
+.toggle-slider {
+    transition: transform 200ms cubic-bezier(0.32, 0.72, 0.36, 0.95);
+}
+
+.faq-content {
+    transition: all 200ms cubic-bezier(0.32, 0.72, 0.36, 0.95);
+}
+
+@media (max-width: 767px) {
+    .grid-3 {
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+    }
+}
+</style>
+
+{% endblock %} 
