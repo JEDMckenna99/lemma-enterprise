@@ -68,6 +68,10 @@ class PerformanceMiddleware:
     
     def optimize_response(self, response):
         """Optimize outgoing responses."""
+        # Skip optimization for static files to prevent RuntimeError
+        if request.path.startswith('/static/'):
+            return response
+            
         # Calculate response time
         if hasattr(g, 'perf_start'):
             response_time = (time.time() - g.perf_start) * 1000
