@@ -37,6 +37,10 @@ class SREMetricsMiddleware:
                 latency_ms = (time.time() - g.start_time) * 1000
                 endpoint = getattr(g, 'endpoint', request.path)
                 
+                # Skip SRE metrics collection for static files to prevent issues
+                if request.path.startswith('/static/'):
+                    return response
+                
                 # Skip SRE metrics collection for ultra-fast paths
                 if not getattr(g, 'skip_sre_metrics', False):
                     # Import here to avoid circular imports
