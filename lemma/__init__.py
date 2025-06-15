@@ -196,16 +196,6 @@ def create_app(test_config=None):
     app.register_blueprint(compliance_bp)
     app.register_blueprint(admin_security_bp)
 
-    # Register billing API blueprint
-    try:
-        from lemma.routes.billing_api import billing_api
-        app.register_blueprint(billing_api)
-        app.logger.info("Billing API endpoints registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"Billing API not available: {e}")
-    except Exception as e:
-        app.logger.error(f"Error registering billing API: {e}")
-
     # Register enhanced API blueprint
     try:
         from lemma.routes.api_enhanced import api_enhanced
@@ -213,26 +203,8 @@ def create_app(test_config=None):
         app.logger.info("Enhanced API v2 endpoints registered successfully")
     except ImportError as e:
         app.logger.warning(f"Enhanced API not available: {e}")
-
-    # Register compliance API blueprint
-    try:
-        from lemma.routes.compliance import compliance_bp
-        app.register_blueprint(compliance_bp)
-        app.logger.info("Compliance API endpoints registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"Compliance API not available: {e}")
     except Exception as e:
-        app.logger.error(f"Error registering compliance API: {e}")
-
-    # Register SRE monitoring blueprint
-    try:
-        from lemma.routes.sre_monitoring import sre_bp
-        app.register_blueprint(sre_bp, url_prefix='/api/sre')
-        app.logger.info("SRE monitoring endpoints registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"SRE monitoring not available: {e}")
-    except Exception as e:
-        app.logger.error(f"Error registering SRE monitoring: {e}")
+        app.logger.error(f"Error registering enhanced API: {e}")
 
     # Initialize SRE monitoring system
     try:
