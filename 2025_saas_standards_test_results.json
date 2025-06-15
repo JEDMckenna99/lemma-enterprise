@@ -1,0 +1,37 @@
+{
+  "deployment_status": "\u274c 2025 SaaS STANDARDS NEEDS WORK",
+  "tests": [
+    {
+      "name": "1. Consistent Get Started CTAs",
+      "status": "FAIL",
+      "message": "Inconsistent Get Started CTA on /"
+    },
+    {
+      "name": "2. Progress Bar with 3 Steps & Time Estimate",
+      "status": "FAIL",
+      "message": "Failed to load /onboarding/register: 500"
+    },
+    {
+      "name": "3. Post-verification Toast with API Keys Link",
+      "status": "FAIL",
+      "message": "Missing enhanced verification toast implementation"
+    },
+    {
+      "name": "4. Contextual Help Icons on Dashboard Cards",
+      "status": "PASS",
+      "message": "Dashboard contextual help icons implemented (template verified)"
+    },
+    {
+      "name": "5. Overall SaaS Design Quality",
+      "status": "FAIL",
+      "message": "Failed to load onboarding start page: 404"
+    }
+  ],
+  "timestamp": "2025-06-14T21:45:24.055149",
+  "summary": {
+    "total": 5,
+    "passed": 1,
+    "failed": 4,
+    "success_rate": 20.0
+  }
+}
