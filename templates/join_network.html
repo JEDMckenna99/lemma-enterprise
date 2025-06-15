@@ -5,9 +5,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
-<!-- Ensure wallet is loaded for gate functionality -->
-<script src="{{ url_for('static', filename='js/lemma-wallet.js') }}"></script>
-<script src="{{ url_for('static', filename='js/lemma-wallet-init.js') }}"></script>
+<!-- Wallet scripts are loaded in layout.html to prevent duplicates -->
 <style>
     /* Lemma Gate Protection Styles */
     .lemma-gate-overlay {

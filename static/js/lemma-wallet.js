@@ -3,6 +3,9 @@
  * Provides a low-friction way to store and manage Lemma credentials
  */
 
+// Prevent redeclaration if already loaded
+if (typeof window.LemmaWallet === 'undefined') {
+
 class LemmaWallet {
     /**
      * Initialize the Lemma wallet
@@ -1068,9 +1071,15 @@ class LemmaWalletUI {
     }
 }
 
-// Export classes to global scope for external use
-window.LemmaWallet = LemmaWallet;
-window.LemmaWalletUI = LemmaWalletUI;
+} // End of redeclaration guard
+
+// Export classes to global scope for external use (only if not already defined)
+if (typeof window.LemmaWallet === 'undefined') {
+    window.LemmaWallet = LemmaWallet;
+}
+if (typeof window.LemmaWalletUI === 'undefined') {
+    window.LemmaWalletUI = LemmaWalletUI;
+}
 
 // Initialize the wallet when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
