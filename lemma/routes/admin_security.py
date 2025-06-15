@@ -12,6 +12,7 @@ Enterprise-grade admin security endpoints implementing:
 import os
 import json
 import logging
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 from flask import Blueprint, request, jsonify, session, redirect, url_for, current_app, render_template, flash
@@ -669,7 +670,7 @@ def api_security_status():
 
 @admin_security_bp.route('/api/security/rotate-api-key', methods=['POST'])
 @require_admin_role(['SUPERADMIN', 'SRE'])
-@audit_admin_action
+@audit_admin_action("rotate_api_key")
 def rotate_api_key():
     """Rotate API key with immediate invalidation of old key."""
     try:
@@ -740,7 +741,7 @@ def rotate_api_key():
 
 @admin_security_bp.route('/api/security/test-bloom-filter-alert', methods=['POST'])
 @require_admin_role(['SUPERADMIN', 'SRE'])
-@audit_admin_action
+@audit_admin_action("test_bloom_filter_alert")
 def test_bloom_filter_alert():
     """Test bloom filter alert system by simulating failure conditions."""
     try:
@@ -749,7 +750,7 @@ def test_bloom_filter_alert():
         
         if simulate_failure:
             # Trigger a test alert condition
-            from ...monitoring.alert_manager import get_alert_manager
+            from lemma.monitoring.alert_manager import get_alert_manager
             
             alert_manager = get_alert_manager()
             
