@@ -253,6 +253,7 @@
             </div>
             <div class="nav-links d-md-none">
                 <a href="#features" class="nav-link">Platform</a>
+                <a href="{{ url_for('main.join_network') }}" class="nav-link">Join Network</a>
                 <a href="#pages" class="nav-link">25 Pages</a>
                 <a href="#developers" class="nav-link">Developers</a>
                 <a href="{{ url_for('main.pricing') }}" class="nav-link">Pricing</a>
@@ -287,6 +288,9 @@
             <div class="flex justify-center gap-6 mb-8">
                 <a href="/verify" target="_blank" class="btn btn-sm" style="background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); font-size: var(--font-size-xs); padding: var(--space-2) var(--space-3);" onclick="trackCTAClick('try_demo', 'hero')">
                     Try Demo
+                </a>
+                <a href="/join-network" class="btn btn-sm" style="background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); font-size: var(--font-size-xs); padding: var(--space-2) var(--space-3);" onclick="trackCTAClick('join_network', 'hero')">
+                    Join Network
                 </a>
                 <a href="/api-docs" class="btn btn-sm" style="background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); font-size: var(--font-size-xs); padding: var(--space-2) var(--space-3);" onclick="trackCTAClick('explore_api', 'hero')">
                     Explore API

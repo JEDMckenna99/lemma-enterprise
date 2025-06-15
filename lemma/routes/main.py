@@ -993,3 +993,35 @@ paths:
     except Exception as e:
         current_app.logger.error(f"Error serving OpenAPI spec: {e}")
         return jsonify({'error': f'Error serving OpenAPI specification: {str(e)}'}), 500
+
+@main_bp.route('/join-network')
+def join_network():
+    """Join the Lemma Verification Network - Protected by Lemma Gate."""
+    current_app.logger.info("Join Network page accessed - using Lemma gate protection")
+    
+    # Add cache-busting timestamp to force template refresh
+    import time
+    cache_bust = int(time.time())
+    
+    # This page uses the same Lemma gate approach as the protected page
+    # All verification is handled client-side using the LemmaReferenceIntegration
+    response = make_response(render_template('join_network.html', cache_bust=cache_bust))
+    
+    # Set cookie to enable the wallet if not already set
+    if not request.cookies.get('lemma_wallet_enabled'):
+        secure = not current_app.config.get('TESTING', False)  # Secure in production, not in testing
+        response.set_cookie(
+            'lemma_wallet_enabled', 
+            'true', 
+            max_age=31536000,  # 1 year
+            secure=secure, 
+            httponly=False,  # JavaScript needs access
+            samesite='Lax'
+        )
+    
+    # Add cache-busting headers to force template refresh
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    
+    return response

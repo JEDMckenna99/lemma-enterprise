@@ -50,6 +50,9 @@ class PagerDutyIntegration:
     
     def __init__(self):
         self.integration_key = os.getenv('PAGERDUTY_INTEGRATION_KEY')
+        self.enabled = bool(self.integration_key)
+        if not self.enabled:
+            logger.warning("PagerDuty integration disabled - PAGERDUTY_INTEGRATION_KEY not set")
         self.api_token = os.getenv('PAGERDUTY_API_TOKEN')
         self.service_id = os.getenv('PAGERDUTY_SERVICE_ID')
         self.base_url = "https://api.pagerduty.com"
@@ -57,33 +60,34 @@ class PagerDutyIntegration:
         
     def create_incident(self, alert: Alert) -> Optional[str]:
         """Create a PagerDuty incident"""
-        if not self.integration_key:
-            logger.warning("PagerDuty integration key not configured")
+        if not self.enabled:
             return None
             
-        payload = {
-            "routing_key": self.integration_key,
-            "event_action": "trigger",
-            "dedup_key": f"lemma-{alert.id}",
-            "payload": {
-                "summary": f"Lemma Alert: {alert.name}",
-                "source": "lemma-enterprise",
-                "severity": alert.severity.value,
-                "component": "lemma-monitoring",
-                "group": "sre",
-                "class": "infrastructure",
-                "custom_details": {
-                    "alert_id": alert.id,
-                    "threshold": alert.threshold,
-                    "current_value": str(alert.current_value),
-                    "triggered_at": alert.triggered_at.isoformat(),
-                    "auto_action": alert.auto_action,
-                    "dashboard_url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/admin"
-                }
-            }
-        }
-        
         try:
+            payload = {
+                "routing_key": self.integration_key,
+                "event_action": "trigger",
+                "dedup_key": f"lemma-{alert.id}",
+                "payload": {
+                    "summary": f"Lemma Alert: {alert.name}",
+                    "source": "lemma-enterprise",
+                    "severity": alert.severity.value,
+                    "component": "lemma-monitoring",
+                    "group": "sre",
+                    "class": "infrastructure",
+                    "custom_details": {
+                        "alert_id": alert.id,
+                        "threshold": alert.threshold,
+                        "current_value": str(alert.current_value),
+                        "triggered_at": alert.triggered_at.isoformat(),
+                        "auto_action": alert.auto_action,
+                        "dashboard_url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/admin"
+                    }
+                },
+                "client": "Lemma Enterprise",
+                "client_url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com"
+            }
+            
             response = requests.post(self.events_url, json=payload, timeout=10)
             if response.status_code == 202:
                 data = response.json()
@@ -99,16 +103,16 @@ class PagerDutyIntegration:
     
     def resolve_incident(self, alert: Alert) -> bool:
         """Resolve a PagerDuty incident"""
-        if not self.integration_key or not alert.pagerduty_incident_id:
+        if not self.enabled or not alert.pagerduty_incident_id:
             return False
             
-        payload = {
-            "routing_key": self.integration_key,
-            "event_action": "resolve",
-            "dedup_key": alert.pagerduty_incident_id
-        }
-        
         try:
+            payload = {
+                "routing_key": self.integration_key,
+                "event_action": "resolve",
+                "dedup_key": alert.pagerduty_incident_id
+            }
+            
             response = requests.post(self.events_url, json=payload, timeout=10)
             if response.status_code == 202:
                 logger.info(f"PagerDuty incident resolved: {alert.pagerduty_incident_id}")
@@ -126,12 +130,14 @@ class StatusPageIntegration:
     def __init__(self):
         self.api_key = os.getenv('STATUSPAGE_API_KEY')
         self.page_id = os.getenv('STATUSPAGE_PAGE_ID')
+        self.enabled = bool(self.api_key and self.page_id)
+        if not self.enabled:
+            logger.warning("Status page integration disabled - missing STATUSPAGE_API_KEY or STATUSPAGE_PAGE_ID")
         self.base_url = f"https://api.statuspage.io/v1/pages/{self.page_id}"
         
     def create_incident(self, alert: Alert) -> Optional[str]:
         """Create a status page incident"""
-        if not self.api_key or not self.page_id:
-            logger.warning("Status page credentials not configured")
+        if not self.enabled:
             return None
             
         headers = {
@@ -179,51 +185,74 @@ class SlackIntegration:
     """Slack integration for team notifications"""
     
     def __init__(self):
-        self.webhook_url = os.getenv('SLACK_WEBHOOK_URL')
-        self.sec_ops_webhook = os.getenv('SLACK_SEC_OPS_WEBHOOK')
-        
+        self.webhook_urls = {
+            "general": os.getenv('SLACK_WEBHOOK_GENERAL'),
+            "sre": os.getenv('SLACK_WEBHOOK_SRE'),
+            "security": os.getenv('SLACK_WEBHOOK_SECURITY'),
+            "billing": os.getenv('SLACK_WEBHOOK_BILLING')
+        }
+        self.enabled = any(self.webhook_urls.values())
+        if not self.enabled:
+            logger.warning("Slack integration disabled - no webhook URLs configured")
+    
     def send_alert(self, alert: Alert, channel: str = "general") -> bool:
         """Send alert to Slack channel"""
-        webhook_url = self.sec_ops_webhook if channel == "sec-ops" else self.webhook_url
-        
+        webhook_url = self.webhook_urls.get(channel)
         if not webhook_url:
-            logger.warning(f"Slack webhook for {channel} not configured")
+            logger.warning(f"No webhook URL configured for channel: {channel}")
             return False
             
-        # Color coding for alerts
-        color_map = {
-            AlertSeverity.CRITICAL: "#ff0000",
-            AlertSeverity.WARNING: "#ffaa00",
-            AlertSeverity.INFO: "#0099ff"
-        }
-        
-        payload = {
-            "attachments": [{
-                "color": color_map.get(alert.severity, "#0099ff"),
-                "title": f"🚨 Lemma Alert: {alert.name}",
-                "text": alert.description,
-                "fields": [
-                    {"title": "Threshold", "value": alert.threshold, "short": True},
-                    {"title": "Current Value", "value": str(alert.current_value), "short": True},
-                    {"title": "Severity", "value": alert.severity.value.upper(), "short": True},
-                    {"title": "Auto Action", "value": alert.auto_action or "None", "short": True}
-                ],
-                "footer": "Lemma Enterprise Monitoring",
-                "ts": int(alert.triggered_at.timestamp())
-            }]
-        }
-        
         try:
+            # Color coding for alerts
+            color_map = {
+                AlertSeverity.CRITICAL: "#FF0000",  # Red
+                AlertSeverity.WARNING: "#FFA500",   # Orange  
+                AlertSeverity.INFO: "#0000FF"       # Blue
+            }
+            
+            emoji_map = {
+                AlertSeverity.CRITICAL: "🚨",
+                AlertSeverity.WARNING: "⚠️",
+                AlertSeverity.INFO: "ℹ️"
+            }
+            
+            payload = {
+                "text": f"{emoji_map[alert.severity]} *{alert.name}*",
+                "attachments": [
+                    {
+                        "color": color_map[alert.severity],
+                        "fields": [
+                            {"title": "Description", "value": alert.description, "short": False},
+                            {"title": "Current Value", "value": str(alert.current_value), "short": True},
+                            {"title": "Threshold", "value": alert.threshold, "short": True},
+                            {"title": "Severity", "value": alert.severity.value.title(), "short": True},
+                            {"title": "Triggered At", "value": alert.triggered_at.strftime("%Y-%m-%d %H:%M:%S UTC"), "short": True}
+                        ],
+                        "footer": "Lemma Enterprise SRE",
+                        "ts": int(alert.triggered_at.timestamp())
+                    }
+                ]
+            }
+            
+            if alert.auto_action:
+                payload["attachments"][0]["fields"].append({
+                    "title": "Auto Action", 
+                    "value": alert.auto_action, 
+                    "short": False
+                })
+            
             response = requests.post(webhook_url, json=payload, timeout=10)
+            
             if response.status_code == 200:
                 logger.info(f"Slack alert sent to {channel}")
                 return True
             else:
-                logger.error(f"Slack notification failed: {response.status_code}")
-                return False
+                logger.error(f"Slack webhook error: {response.status_code}")
+                
         except Exception as e:
-            logger.error(f"Slack API error: {e}")
-            return False
+            logger.error(f"Error sending Slack alert: {e}")
+        
+        return False
 
 class AutoActionExecutor:
     """Execute automated actions based on alert triggers"""
@@ -331,12 +360,21 @@ class AutoActionExecutor:
     
     def _notify_sec_ops(self, alert: Alert) -> bool:
         """Notify security operations team"""
-        return self.slack.send_alert(alert, channel="sec-ops")
+        return self.slack.send_alert(alert, channel="security")
 
 class AlertManager:
     """Main alert manager coordinating monitoring and responses"""
     
     def __init__(self):
+        # Get API key from environment  
+        self.api_key = os.getenv('LEMMA_API_KEY')
+        if not self.api_key:
+            logger.warning("LEMMA_API_KEY not set - alert checks may fail")
+        
+        # Base URL for API calls
+        self.base_url = os.getenv('HEROKU_APP_URL', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com')
+        
+        # Initialize integrations
         self.pagerduty = PagerDutyIntegration()
         self.auto_actions = AutoActionExecutor()
         self.active_alerts: Dict[str, Alert] = {}
@@ -391,30 +429,57 @@ class AlertManager:
             }
         }
     
-    def check_verify_error_rate(self) -> Optional[Alert]:
-        """Check verification error rate"""
+    def _make_api_request(self, endpoint: str) -> Optional[Dict]:
+        """Make authenticated API request with error handling"""
+        if not self.api_key:
+            logger.error("No API key available for request")
+            return None
+            
         try:
-            response = requests.get(
-                "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/sre/metrics/errors",
-                timeout=10
-            )
+            headers = {"X-API-Key": self.api_key}
+            url = f"{self.base_url}{endpoint}"
+            
+            response = requests.get(url, headers=headers, timeout=10)
             
             if response.status_code == 200:
-                data = response.json()
-                error_rate = data.get('error_rate_5min', 0)
+                return response.json()
+            elif response.status_code == 401:
+                logger.error(f"API key authentication failed for {endpoint}")
+            elif response.status_code == 404:
+                logger.error(f"Endpoint not found: {endpoint}")
+            else:
+                logger.error(f"API error {response.status_code} for {endpoint}: {response.text}")
                 
-                if error_rate >= 0.01:  # 1%
-                    return Alert(
-                        id="verify_error_rate",
-                        name=self.alert_configs["verify_error_rate"]["name"],
-                        description=self.alert_configs["verify_error_rate"]["description"],
-                        severity=self.alert_configs["verify_error_rate"]["severity"],
-                        status=AlertStatus.ACTIVE,
-                        threshold=self.alert_configs["verify_error_rate"]["threshold"],
-                        current_value=f"{error_rate * 100:.2f}%",
-                        triggered_at=datetime.utcnow(),
-                        auto_action=self.alert_configs["verify_error_rate"]["auto_action"]
-                    )
+        except requests.exceptions.Timeout:
+            logger.error(f"API request timeout for {endpoint}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"API request failed for {endpoint}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error calling {endpoint}: {e}")
+        
+        return None
+    
+    def check_verify_error_rate(self) -> Optional[Alert]:
+        """Check verification error rate"""
+        data = self._make_api_request("/api/sre/metrics/errors")
+        if not data:
+            return None
+            
+        try:
+            error_rate = data.get('error_rate_5min', 0)
+            
+            if error_rate >= 0.01:  # 1%
+                return Alert(
+                    id="verify_error_rate",
+                    name=self.alert_configs["verify_error_rate"]["name"],
+                    description=self.alert_configs["verify_error_rate"]["description"],
+                    severity=self.alert_configs["verify_error_rate"]["severity"],
+                    status=AlertStatus.ACTIVE,
+                    threshold=self.alert_configs["verify_error_rate"]["threshold"],
+                    current_value=f"{error_rate * 100:.2f}%",
+                    triggered_at=datetime.utcnow(),
+                    auto_action=self.alert_configs["verify_error_rate"]["auto_action"]
+                )
         except Exception as e:
             logger.error(f"Error checking verify error rate: {e}")
         
@@ -422,28 +487,25 @@ class AlertManager:
     
     def check_p95_latency(self) -> Optional[Alert]:
         """Check P95 latency"""
-        try:
-            response = requests.get(
-                "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/sre/metrics/latency",
-                timeout=10
-            )
+        data = self._make_api_request("/api/sre/metrics/latency")
+        if not data:
+            return None
             
-            if response.status_code == 200:
-                data = response.json()
-                p95_latency = data.get('p95_latency_ms', 0)
-                
-                if p95_latency > 250:
-                    return Alert(
-                        id="p95_latency",
-                        name=self.alert_configs["p95_latency"]["name"],
-                        description=self.alert_configs["p95_latency"]["description"],
-                        severity=self.alert_configs["p95_latency"]["severity"],
-                        status=AlertStatus.ACTIVE,
-                        threshold=self.alert_configs["p95_latency"]["threshold"],
-                        current_value=f"{p95_latency}ms",
-                        triggered_at=datetime.utcnow(),
-                        auto_action=self.alert_configs["p95_latency"]["auto_action"]
-                    )
+        try:
+            p95_latency = data.get('p95_latency_ms', 0)
+            
+            if p95_latency > 250:
+                return Alert(
+                    id="p95_latency",
+                    name=self.alert_configs["p95_latency"]["name"],
+                    description=self.alert_configs["p95_latency"]["description"],
+                    severity=self.alert_configs["p95_latency"]["severity"],
+                    status=AlertStatus.ACTIVE,
+                    threshold=self.alert_configs["p95_latency"]["threshold"],
+                    current_value=f"{p95_latency}ms",
+                    triggered_at=datetime.utcnow(),
+                    auto_action=self.alert_configs["p95_latency"]["auto_action"]
+                )
         except Exception as e:
             logger.error(f"Error checking P95 latency: {e}")
         
@@ -451,33 +513,30 @@ class AlertManager:
     
     def check_bloom_filter(self) -> Optional[Alert]:
         """Check bloom filter status"""
-        try:
-            response = requests.get(
-                "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/sre/metrics/bloom-filter",
-                timeout=10
-            )
+        data = self._make_api_request("/api/sre/metrics/bloom-filter")
+        if not data:
+            return None
             
-            if response.status_code == 200:
-                data = response.json()
-                size_bytes = data.get('bloom_filter_size_bytes', 0)
-                download_success = data.get('last_download_success', True)
-                median_size = data.get('median_size_bytes', size_bytes / 2)  # Fallback
+        try:
+            size_bytes = data.get('bloom_filter_size_bytes', 0)
+            download_success = data.get('last_download_success', True)
+            median_size = data.get('median_size_bytes', size_bytes / 2)  # Fallback
+            
+            # Check for download failure or size > 4× median
+            if not download_success or size_bytes > (median_size * 4):
+                issue_type = "Download failed" if not download_success else f"Size {size_bytes} > 4× median {median_size}"
                 
-                # Check for download failure or size > 4× median
-                if not download_success or size_bytes > (median_size * 4):
-                    issue_type = "Download failed" if not download_success else f"Size {size_bytes} > 4× median {median_size}"
-                    
-                    return Alert(
-                        id="bloom_filter_issue",
-                        name=self.alert_configs["bloom_filter_issue"]["name"],
-                        description=self.alert_configs["bloom_filter_issue"]["description"],
-                        severity=self.alert_configs["bloom_filter_issue"]["severity"],
-                        status=AlertStatus.ACTIVE,
-                        threshold=self.alert_configs["bloom_filter_issue"]["threshold"],
-                        current_value=issue_type,
-                        triggered_at=datetime.utcnow(),
-                        auto_action=self.alert_configs["bloom_filter_issue"]["auto_action"]
-                    )
+                return Alert(
+                    id="bloom_filter_issue",
+                    name=self.alert_configs["bloom_filter_issue"]["name"],
+                    description=self.alert_configs["bloom_filter_issue"]["description"],
+                    severity=self.alert_configs["bloom_filter_issue"]["severity"],
+                    status=AlertStatus.ACTIVE,
+                    threshold=self.alert_configs["bloom_filter_issue"]["threshold"],
+                    current_value=issue_type,
+                    triggered_at=datetime.utcnow(),
+                    auto_action=self.alert_configs["bloom_filter_issue"]["auto_action"]
+                )
         except Exception as e:
             logger.error(f"Error checking bloom filter: {e}")
         
@@ -485,35 +544,32 @@ class AlertManager:
     
     def check_billing_rollup(self) -> Optional[Alert]:
         """Check if billing rollup missed 02:00 UTC deadline"""
-        try:
-            response = requests.get(
-                "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/sre/metrics/billing-jobs",
-                timeout=10
-            )
+        data = self._make_api_request("/api/sre/metrics/billing-jobs")
+        if not data:
+            return None
             
-            if response.status_code == 200:
-                data = response.json()
-                last_job_time = data.get('last_job_time')
-                current_utc = datetime.utcnow()
+        try:
+            last_job_time = data.get('last_job_time')
+            current_utc = datetime.utcnow()
+            
+            # Check if we're past 02:00 UTC and no job ran today
+            if current_utc.hour >= 2:
+                today_2am = current_utc.replace(hour=2, minute=0, second=0, microsecond=0)
                 
-                # Check if we're past 02:00 UTC and no job ran today
-                if current_utc.hour >= 2:
-                    today_2am = current_utc.replace(hour=2, minute=0, second=0, microsecond=0)
-                    
-                    if last_job_time:
-                        last_job_dt = datetime.fromisoformat(last_job_time.replace('Z', '+00:00'))
-                        if last_job_dt < today_2am:
-                            return Alert(
-                                id="billing_rollup_miss",
-                                name=self.alert_configs["billing_rollup_miss"]["name"],
-                                description=self.alert_configs["billing_rollup_miss"]["description"],
-                                severity=self.alert_configs["billing_rollup_miss"]["severity"],
-                                status=AlertStatus.ACTIVE,
-                                threshold=self.alert_configs["billing_rollup_miss"]["threshold"],
-                                current_value=f"Last run: {last_job_time}",
-                                triggered_at=datetime.utcnow(),
-                                auto_action=self.alert_configs["billing_rollup_miss"]["auto_action"]
-                            )
+                if last_job_time:
+                    last_job_dt = datetime.fromisoformat(last_job_time.replace('Z', '+00:00'))
+                    if last_job_dt < today_2am:
+                        return Alert(
+                            id="billing_rollup_miss",
+                            name=self.alert_configs["billing_rollup_miss"]["name"],
+                            description=self.alert_configs["billing_rollup_miss"]["description"],
+                            severity=self.alert_configs["billing_rollup_miss"]["severity"],
+                            status=AlertStatus.ACTIVE,
+                            threshold=self.alert_configs["billing_rollup_miss"]["threshold"],
+                            current_value=f"Last run: {last_job_time}",
+                            triggered_at=datetime.utcnow(),
+                            auto_action=self.alert_configs["billing_rollup_miss"]["auto_action"]
+                        )
         except Exception as e:
             logger.error(f"Error checking billing rollup: {e}")
         
@@ -521,31 +577,28 @@ class AlertManager:
     
     def check_secrets_rotation(self) -> Optional[Alert]:
         """Check for overdue secrets rotation"""
-        try:
-            response = requests.get(
-                "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/compliance/secrets/status",
-                timeout=10
-            )
+        data = self._make_api_request("/api/compliance/secrets/status")
+        if not data:
+            return None
             
-            if response.status_code == 200:
-                data = response.json()
-                overdue_secrets = data.get('overdue_secrets', [])
+        try:
+            overdue_secrets = data.get('overdue_secrets', [])
+            
+            if overdue_secrets:
+                overdue_count = len(overdue_secrets)
+                oldest_days = max([s.get('days_overdue', 0) for s in overdue_secrets])
                 
-                if overdue_secrets:
-                    overdue_count = len(overdue_secrets)
-                    oldest_days = max([s.get('days_overdue', 0) for s in overdue_secrets])
-                    
-                    return Alert(
-                        id="secrets_overdue",
-                        name=self.alert_configs["secrets_overdue"]["name"],
-                        description=self.alert_configs["secrets_overdue"]["description"],
-                        severity=self.alert_configs["secrets_overdue"]["severity"],
-                        status=AlertStatus.ACTIVE,
-                        threshold=self.alert_configs["secrets_overdue"]["threshold"],
-                        current_value=f"{overdue_count} secrets, oldest {oldest_days} days",
-                        triggered_at=datetime.utcnow(),
-                        auto_action=self.alert_configs["secrets_overdue"]["auto_action"]
-                    )
+                return Alert(
+                    id="secrets_overdue",
+                    name=self.alert_configs["secrets_overdue"]["name"],
+                    description=self.alert_configs["secrets_overdue"]["description"],
+                    severity=self.alert_configs["secrets_overdue"]["severity"],
+                    status=AlertStatus.ACTIVE,
+                    threshold=self.alert_configs["secrets_overdue"]["threshold"],
+                    current_value=f"{overdue_count} secrets, oldest {oldest_days} days",
+                    triggered_at=datetime.utcnow(),
+                    auto_action=self.alert_configs["secrets_overdue"]["auto_action"]
+                )
         except Exception as e:
             logger.error(f"Error checking secrets rotation: {e}")
         
