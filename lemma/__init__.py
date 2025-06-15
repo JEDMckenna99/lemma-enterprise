@@ -186,6 +186,7 @@ def create_app(test_config=None):
     from lemma.routes.sre_monitoring import sre_bp
     from lemma.routes.compliance import compliance_bp
     from lemma.routes.admin_security import admin_security_bp
+    from lemma.routes.gate_api import gate_api
     
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp)
@@ -195,6 +196,7 @@ def create_app(test_config=None):
     app.register_blueprint(sre_bp)
     app.register_blueprint(compliance_bp)
     app.register_blueprint(admin_security_bp)
+    app.register_blueprint(gate_api)
 
     # Register enhanced API blueprint
     try:
