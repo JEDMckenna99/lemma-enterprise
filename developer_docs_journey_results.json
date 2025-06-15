@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-06-14T22:38:54.445544",
+  "base_url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com",
+  "total_tests": 3,
+  "passed_tests": 2,
+  "percentage": 66.66666666666666,
+  "status": "INCOMPLETE",
+  "results": [
+    {
+      "test": "Landing View Docs \u2192 /docs#quick-start",
+      "passed": false,
+      "message": "\u274c Docs page missing quick-start anchor"
+    },
+    {
+      "test": "Copy cURL + API Key Injection",
+      "passed": true,
+      "message": "\u2705 Copy cURL buttons implemented (5 found) with API key injection"
+    },
+    {
+      "test": "OpenAPI Download + Version/Status Badges",
+      "passed": true,
+      "message": "\u2705 OpenAPI download working with version/status badges on endpoint pages"
+    }
+  ]
+}

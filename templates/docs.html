@@ -247,6 +247,91 @@
             </div>
         </div>
 
+        <!-- Quick Start Section -->
+        <div id="quick-start" class="docs-content-section">
+            <h2>
+                <i data-lucide="rocket" class="section-icon"></i>
+                Quick Start Guide
+            </h2>
+            <p class="section-intro">Get up and running with Lemma verification in under 10 minutes. This guide will walk you through the essential steps to integrate human verification into your application.</p>
+            
+            <div class="quick-start-steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Get Your API Key</h3>
+                        <p>Sign up and get your API key from the <a href="/onboarding">onboarding console</a>.</p>
+                        <div class="code-block">
+                            <code>X-API-Key: your_api_key_here</code>
+                            <button class="copy-btn" onclick="copyToClipboard('X-API-Key: your_api_key_here')">
+                                <i data-lucide="copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Verify a Human</h3>
+                        <p>Make a simple API call to verify that a user is human.</p>
+                        <div class="code-block">
+                            <code>curl -X POST {{ request.host_url }}api/verify-human \
+  -H "X-API-Key: your_api_key_here" \
+  -H "Content-Type: application/json"</code>
+                            <button class="copy-btn" onclick="copyVerifyHumanCurl()">
+                                <i data-lucide="copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Integrate with Your App</h3>
+                        <p>Add the verification check to your application logic.</p>
+                        <div class="code-block">
+                            <code>if (response.verified && response.isHuman) {
+  // User is verified human
+  allowAccess();
+}</code>
+                            <button class="copy-btn" onclick="copyIntegrationCode()">
+                                <i data-lucide="copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="next-steps">
+                <h3>Next Steps</h3>
+                <div class="next-steps-grid">
+                    <a href="/api-docs" class="next-step-card">
+                        <i data-lucide="book" class="next-step-icon"></i>
+                        <div>
+                            <h4>Explore the API</h4>
+                            <p>Full API documentation with examples</p>
+                        </div>
+                    </a>
+                    <a href="/onboarding/integration" class="next-step-card">
+                        <i data-lucide="code" class="next-step-icon"></i>
+                        <div>
+                            <h4>Integration Guides</h4>
+                            <p>Framework-specific examples</p>
+                        </div>
+                    </a>
+                    <a href="/api/sandbox/status" class="next-step-card">
+                        <i data-lucide="test-tube" class="next-step-icon"></i>
+                        <div>
+                            <h4>Test in Sandbox</h4>
+                            <p>Try it out without real users</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <!-- Quick Reference -->
         <div class="quick-reference">
             <h2>
@@ -653,6 +738,165 @@
     margin: 0;
 }
 
+/* Quick Start Section Styles */
+.docs-content-section {
+    margin-bottom: 64px;
+    padding: 32px;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+.docs-content-section h2 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    color: #1e293b;
+    font-size: 28px;
+    font-weight: 600;
+}
+
+.section-intro {
+    font-size: 18px;
+    color: #64748b;
+    margin-bottom: 32px;
+    line-height: 1.6;
+}
+
+.quick-start-steps {
+    margin-bottom: 48px;
+}
+
+.step {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 32px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.step:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.step-number {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    background: #6366f1;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 18px;
+}
+
+.step-content h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 8px;
+}
+
+.step-content p {
+    color: #64748b;
+    margin-bottom: 16px;
+    line-height: 1.6;
+}
+
+.code-block {
+    position: relative;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.code-block code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 14px;
+    color: #1e293b;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.code-block .copy-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 8px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.code-block .copy-btn:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+    border-color: #d1d5db;
+}
+
+.next-steps h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 16px;
+}
+
+.next-steps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+}
+
+.next-step-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.15s ease;
+}
+
+.next-step-card:hover {
+    background: white;
+    border-color: #6366f1;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+}
+
+.next-step-icon {
+    width: 24px;
+    height: 24px;
+    color: #6366f1;
+    flex-shrink: 0;
+}
+
+.next-step-card h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.next-step-card p {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+}
+
 @media (max-width: 768px) {
     .docs-hero-title {
         font-size: 36px;
@@ -674,6 +918,15 @@
     }
     
     .support-options {
+        grid-template-columns: 1fr;
+    }
+    
+    .step {
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .next-steps-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -712,6 +965,22 @@ function copyToClipboard(text) {
             lucide.createIcons();
         }, 1000);
     });
+}
+
+// Quick Start specific copy functions
+function copyVerifyHumanCurl() {
+    const curlCommand = 'curl -X POST {{ request.host_url }}api/verify-human \\\n' +
+                       '  -H "X-API-Key: your_api_key_here" \\\n' +
+                       '  -H "Content-Type: application/json"';
+    copyToClipboard(curlCommand);
+}
+
+function copyIntegrationCode() {
+    const code = 'if (response.verified && response.isHuman) {\n' +
+                '  // User is verified human\n' +
+                '  allowAccess();\n' +
+                '}';
+    copyToClipboard(code);
 }
 
 // Initialize Lucide icons
