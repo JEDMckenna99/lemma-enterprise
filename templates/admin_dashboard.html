@@ -1,0 +1,838 @@
+{% extends "layout.html" %}
+
+{% block title %}Admin Dashboard - Lemma Enterprise{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
+<style>
+/* Admin Dashboard Specific Styles - 8-point grid system */
+.admin-layout {
+    display: flex;
+    min-height: calc(100vh - 80px);
+    background: var(--gray-50);
+}
+
+/* Left Rail Navigation - Fixed 250px */
+.admin-sidebar {
+    width: 250px;
+    background: var(--white);
+    border-right: 1px solid var(--gray-200);
+    position: fixed;
+    height: calc(100vh - 80px);
+    overflow-y: auto;
+    z-index: 30;
+}
+
+.admin-content {
+    margin-left: 250px;
+    flex: 1;
+    padding: var(--space-6);
+}
+
+/* At-a-glance Header with #635bff accents */
+.admin-header {
+    background: var(--white);
+    border-bottom: 1px solid var(--gray-200);
+    padding: var(--space-4) var(--space-6);
+    margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-6)) var(--space-6) calc(-1 * var(--space-6));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+}
+
+.admin-header-left h1 {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0;
+}
+
+.admin-header-stats {
+    display: flex;
+    gap: var(--space-6);
+    align-items: center;
+}
+
+.header-stat {
+    text-align: center;
+}
+
+.header-stat-value {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: #635bff;
+    display: block;
+}
+
+.header-stat-label {
+    font-size: var(--font-size-sm);
+    color: var(--gray-600);
+    margin-top: var(--space-1);
+}
+
+.error-badge {
+    background: var(--red-100);
+    color: var(--red-800);
+    border: 1px solid var(--red-200);
+    border-radius: var(--radius-full);
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.error-badge.zero {
+    background: var(--green-100);
+    color: var(--green-800);
+    border-color: var(--green-200);
+}
+
+/* Sidebar Navigation with system-UI font */
+.nav-section {
+    padding: var(--space-4);
+}
+
+.nav-section-title {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-3);
+}
+
+.nav-menu {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-item {
+    margin-bottom: var(--space-1);
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius);
+    color: var(--gray-700);
+    text-decoration: none;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    transition: all var(--duration-fast) var(--ease-swift-out);
+}
+
+.nav-link:hover {
+    background: var(--gray-100);
+    color: var(--gray-900);
+}
+
+.nav-link.active {
+    background: #f0f0ff;
+    color: #635bff;
+}
+
+.nav-icon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2;
+}
+
+.nav-badge {
+    background: var(--red-500);
+    color: var(--white);
+    border-radius: var(--radius-full);
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: auto;
+}
+
+/* Dashboard Grid - 8-point grid spacing */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-6);
+    margin-bottom: var(--space-6);
+}
+
+.dashboard-section {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.section-header {
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.section-title {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+}
+
+.section-content {
+    padding: var(--space-4);
+}
+
+/* Status Indicators */
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-operational .status-dot {
+    background: var(--green-500);
+}
+
+.status-warning .status-dot {
+    background: var(--yellow-500);
+}
+
+.status-error .status-dot {
+    background: var(--red-500);
+}
+
+/* Metrics Display */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+}
+
+.metric-item {
+    text-align: center;
+}
+
+.metric-value {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: #635bff;
+    display: block;
+}
+
+.metric-label {
+    font-size: var(--font-size-sm);
+    color: var(--gray-600);
+    margin-top: var(--space-1);
+}
+
+/* Loading States */
+.loading {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--gray-500);
+}
+
+.spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--gray-300);
+    border-top: 2px solid #635bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .admin-sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+    
+    .admin-sidebar.open {
+        transform: translateX(0);
+    }
+    
+    .admin-content {
+        margin-left: 0;
+    }
+    
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .admin-header-stats {
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+    <!-- Left Rail Navigation (Fixed 250px) -->
+    <aside class="admin-sidebar">
+        <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#overview" class="nav-link active" data-section="overview">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 5v2m8-2v2"/>
+                        </svg>
+                        Overview
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#usage" class="nav-link" data-section="usage">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        Usage
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#revocation" class="nav-link" data-section="revocation">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                        Revocation
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#billing" class="nav-link" data-section="billing">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                        Billing
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#sre" class="nav-link" data-section="sre">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        SRE
+                        <span class="nav-badge" id="sre-alerts-badge" style="display: none;">0</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#compliance" class="nav-link" data-section="compliance">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                        Compliance
+                    </a>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Management</div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#users" class="nav-link" data-section="users">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
+                        </svg>
+                        Users
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#issuers" class="nav-link" data-section="issuers">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H5m4 0V9a2 2 0 011-1h4a2 2 0 011 1v12m-6 0h6"/>
+                        </svg>
+                        Issuers
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="admin-content">
+        <!-- At-a-glance Header -->
+        <header class="admin-header">
+            <div class="admin-header-left">
+                <h1>Admin Dashboard</h1>
+            </div>
+            <div class="admin-header-stats">
+                <div class="header-stat">
+                    <span class="header-stat-value" id="last-rollup-status">Loading...</span>
+                    <div class="header-stat-label">Last Rollup</div>
+                </div>
+                <div class="header-stat">
+                    <span class="header-stat-value" id="mah-total">Loading...</span>
+                    <div class="header-stat-label">MAH Total</div>
+                </div>
+                <div class="header-stat">
+                    <span class="error-badge" id="error-badge">
+                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        <span id="error-count">Loading...</span> Errors
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Overview Section -->
+        <div id="overview-section" class="dashboard-section-container">
+            <div class="dashboard-grid">
+                <!-- System Health -->
+                <div class="dashboard-section">
+                    <div class="section-header">
+                        <h2 class="section-title">System Health</h2>
+                        <span class="status-indicator" id="system-health-status">
+                            <span class="status-dot"></span>
+                            <span class="loading">Checking...</span>
+                        </span>
+                    </div>
+                    <div class="section-content">
+                        <div class="metrics-grid">
+                            <div class="metric-item">
+                                <span class="metric-value" id="p95-latency">-</span>
+                                <div class="metric-label">P95 Latency</div>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-value" id="error-rate">-</span>
+                                <div class="metric-label">Error Rate</div>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-value" id="uptime">-</span>
+                                <div class="metric-label">Uptime</div>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-value" id="active-users">-</span>
+                                <div class="metric-label">Active Users</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="dashboard-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Recent Activity</h2>
+                        <a href="#usage" class="btn btn-ghost btn-sm" data-section="usage">View All</a>
+                    </div>
+                    <div class="section-content">
+                        <div id="recent-activity">
+                            <div class="loading">
+                                <span class="spinner"></span>
+                                Loading recent activity...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Billing Summary -->
+                <div class="dashboard-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Billing Summary</h2>
+                        <a href="#billing" class="btn btn-ghost btn-sm" data-section="billing">Manage</a>
+                    </div>
+                    <div class="section-content">
+                        <div class="metrics-grid">
+                            <div class="metric-item">
+                                <span class="metric-value" id="monthly-revenue">-</span>
+                                <div class="metric-label">Monthly Revenue</div>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-value" id="active-customers">-</span>
+                                <div class="metric-label">Active Customers</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Compliance Status -->
+                <div class="dashboard-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Compliance Status</h2>
+                        <a href="#compliance" class="btn btn-ghost btn-sm" data-section="compliance">Details</a>
+                    </div>
+                    <div class="section-content">
+                        <div class="metrics-grid">
+                            <div class="metric-item">
+                                <span class="metric-value" id="compliance-score">-</span>
+                                <div class="metric-label">Overall Score</div>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-value" id="audit-readiness">-</span>
+                                <div class="metric-label">Audit Ready</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Other sections (loaded dynamically) -->
+        <div id="usage-section" class="dashboard-section-container" style="display: none;">
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2 class="section-title">Usage Analytics</h2>
+                </div>
+                <div class="section-content">
+                    <p>Usage analytics content will be loaded here...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="revocation-section" class="dashboard-section-container" style="display: none;">
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2 class="section-title">Revocation Management</h2>
+                </div>
+                <div class="section-content">
+                    <p>Revocation management content will be loaded here...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="billing-section" class="dashboard-section-container" style="display: none;">
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2 class="section-title">Billing Management</h2>
+                </div>
+                <div class="section-content">
+                    <p>Billing management content will be loaded here...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="sre-section" class="dashboard-section-container" style="display: none;">
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2 class="section-title">SRE Monitoring</h2>
+                </div>
+                <div class="section-content">
+                    <p>SRE monitoring content will be loaded here...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="compliance-section" class="dashboard-section-container" style="display: none;">
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2 class="section-title">Compliance Management</h2>
+                </div>
+                <div class="section-content">
+                    <p>Compliance management content will be loaded here...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="users-section" class="dashboard-section-container" style="display: none;">
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2 class="section-title">User Management</h2>
+                </div>
+                <div class="section-content">
+                    <p>User management content will be loaded here...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="issuers-section" class="dashboard-section-container" style="display: none;">
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2 class="section-title">Issuer Management</h2>
+                </div>
+                <div class="section-content">
+                    <p>Issuer management content will be loaded here...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+// Admin Dashboard JavaScript
+class AdminDashboard {
+    constructor() {
+        this.currentSection = 'overview';
+        this.refreshInterval = 30000; // 30 seconds
+        this.init();
+    }
+
+    init() {
+        this.setupNavigation();
+        this.loadDashboardData();
+        this.startAutoRefresh();
+    }
+
+    setupNavigation() {
+        // Handle navigation clicks
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const section = link.dataset.section;
+                if (section) {
+                    this.switchSection(section);
+                }
+            });
+        });
+
+        // Handle section navigation from other buttons
+        document.querySelectorAll('[data-section]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const section = button.dataset.section;
+                if (section && section !== this.currentSection) {
+                    e.preventDefault();
+                    this.switchSection(section);
+                }
+            });
+        });
+    }
+
+    switchSection(section) {
+        // Update navigation
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+        });
+        document.querySelector(`[data-section="${section}"]`).classList.add('active');
+
+        // Update sections
+        document.querySelectorAll('.dashboard-section-container').forEach(container => {
+            container.style.display = 'none';
+        });
+        
+        const targetSection = document.getElementById(`${section}-section`);
+        if (targetSection) {
+            targetSection.style.display = 'block';
+        }
+
+        this.currentSection = section;
+
+        // Load section-specific data
+        this.loadSectionData(section);
+    }
+
+    async loadDashboardData() {
+        try {
+            // Load overview data
+            await Promise.all([
+                this.loadSystemHealth(),
+                this.loadBillingSummary(),
+                this.loadComplianceStatus(),
+                this.loadRecentActivity()
+            ]);
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+        }
+    }
+
+    async loadSystemHealth() {
+        try {
+            const response = await fetch('/admin/api/dashboard/data');
+            const data = await response.json();
+            
+            // Update header stats
+            document.getElementById('last-rollup-status').textContent = 
+                data.header_stats?.last_rollup_status || 'Unknown';
+            document.getElementById('mah-total').textContent = 
+                (data.header_stats?.mah_total || 0).toLocaleString();
+            
+            // Update error badge
+            const errorCount = data.header_stats?.error_count || 0;
+            const errorBadge = document.getElementById('error-badge');
+            const errorCountEl = document.getElementById('error-count');
+            errorCountEl.textContent = errorCount;
+            
+            if (errorCount === 0) {
+                errorBadge.classList.add('zero');
+            } else {
+                errorBadge.classList.remove('zero');
+            }
+
+            // Update system health status
+            const healthStatus = document.getElementById('system-health-status');
+            const statusClass = errorCount === 0 ? 'status-operational' : 
+                               errorCount < 5 ? 'status-warning' : 'status-error';
+            healthStatus.className = `status-indicator ${statusClass}`;
+            healthStatus.innerHTML = `
+                <span class="status-dot"></span>
+                <span>${errorCount === 0 ? 'Operational' : errorCount < 5 ? 'Warning' : 'Critical'}</span>
+            `;
+
+            // Update metrics from system_health
+            const sysHealth = data.system_health || {};
+            document.getElementById('p95-latency').textContent = 
+                (sysHealth.p95_latency || 0) + 'ms';
+            document.getElementById('error-rate').textContent = 
+                ((sysHealth.error_rate || 0) * 100).toFixed(2) + '%';
+            document.getElementById('uptime').textContent = 
+                (sysHealth.uptime || 99.9).toFixed(1) + '%';
+            document.getElementById('active-users').textContent = 
+                (sysHealth.active_users || 0).toLocaleString();
+
+        } catch (error) {
+            console.error('Error loading system health:', error);
+            document.getElementById('system-health-status').innerHTML = `
+                <span class="status-dot" style="background: var(--red-500);"></span>
+                <span>Error</span>
+            `;
+        }
+    }
+
+    async loadBillingSummary() {
+        try {
+            const response = await fetch('/admin/api/dashboard/data');
+            const data = await response.json();
+            const billing = data.billing_summary || {};
+            
+            document.getElementById('monthly-revenue').textContent = 
+                '$' + (billing.monthly_revenue || 0).toLocaleString();
+            document.getElementById('active-customers').textContent = 
+                (billing.active_customers || 0).toLocaleString();
+
+        } catch (error) {
+            console.error('Error loading billing summary:', error);
+            document.getElementById('monthly-revenue').textContent = 'Error';
+            document.getElementById('active-customers').textContent = 'Error';
+        }
+    }
+
+    async loadComplianceStatus() {
+        try {
+            const response = await fetch('/admin/api/dashboard/data');
+            const data = await response.json();
+            const compliance = data.compliance_status || {};
+            
+            document.getElementById('compliance-score').textContent = 
+                (compliance.overall_score || 0).toFixed(1) + '%';
+            document.getElementById('audit-readiness').textContent = 
+                compliance.audit_ready ? 'Ready' : 'Pending';
+
+        } catch (error) {
+            console.error('Error loading compliance status:', error);
+            document.getElementById('compliance-score').textContent = 'Error';
+            document.getElementById('audit-readiness').textContent = 'Error';
+        }
+    }
+
+    async loadRecentActivity() {
+        try {
+            const response = await fetch('/admin/api/dashboard/data');
+            const data = await response.json();
+            
+            const activityContainer = document.getElementById('recent-activity');
+            
+            if (data.recent_activity && data.recent_activity.length > 0) {
+                activityContainer.innerHTML = data.recent_activity.map(activity => `
+                    <div style="padding: var(--space-2) 0; border-bottom: 1px solid var(--gray-200);">
+                        <div style="font-weight: 500; color: var(--gray-900);">${activity.description}</div>
+                        <div style="font-size: var(--font-size-sm); color: var(--gray-600);">${activity.timestamp}</div>
+                    </div>
+                `).join('');
+            } else {
+                activityContainer.innerHTML = '<p style="color: var(--gray-600);">No recent activity</p>';
+            }
+
+        } catch (error) {
+            console.error('Error loading recent activity:', error);
+            document.getElementById('recent-activity').innerHTML = 
+                '<p style="color: var(--red-600);">Error loading activity</p>';
+        }
+    }
+
+    async loadSectionData(section) {
+        // Load data specific to each section
+        switch (section) {
+            case 'sre':
+                await this.loadSREData();
+                break;
+            case 'compliance':
+                await this.loadComplianceData();
+                break;
+            case 'billing':
+                await this.loadBillingData();
+                break;
+            case 'usage':
+                await this.loadUsageData();
+                break;
+            case 'revocation':
+                await this.loadRevocationData();
+                break;
+            case 'users':
+                await this.loadUsersData();
+                break;
+            case 'issuers':
+                await this.loadIssuersData();
+                break;
+        }
+    }
+
+    async loadSREData() {
+        console.log('Loading SRE data...');
+    }
+
+    async loadComplianceData() {
+        console.log('Loading compliance data...');
+    }
+
+    async loadBillingData() {
+        console.log('Loading billing data...');
+    }
+
+    async loadUsageData() {
+        console.log('Loading usage data...');
+    }
+
+    async loadRevocationData() {
+        console.log('Loading revocation data...');
+    }
+
+    async loadUsersData() {
+        console.log('Loading users data...');
+    }
+
+    async loadIssuersData() {
+        console.log('Loading issuers data...');
+    }
+
+    startAutoRefresh() {
+        setInterval(() => {
+            if (this.currentSection === 'overview') {
+                this.loadDashboardData();
+            } else {
+                this.loadSectionData(this.currentSection);
+            }
+        }, this.refreshInterval);
+    }
+}
+
+// Initialize dashboard when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    new AdminDashboard();
+});
+</script>
+{% endblock %} 

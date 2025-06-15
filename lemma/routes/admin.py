@@ -98,7 +98,7 @@ def logout():
 @admin_bp.route('/')
 @admin_required
 def dashboard():
-    """Admin dashboard with credential management."""
+    """Admin dashboard with comprehensive management interface."""
     credential_service = get_credential_service()
     credentials = credential_service.list_credentials()
     
@@ -106,15 +106,15 @@ def dashboard():
     form = IssueCredentialForm()
     
     try:
-        current_app.logger.info(f"Rendering admin.html template. Template path: {current_app.template_folder}")
+        current_app.logger.info(f"Rendering admin_dashboard.html template. Template path: {current_app.template_folder}")
         return render_template(
-            'admin.html',
+            'admin_dashboard.html',
             credentials=credentials,
             admin_username=session.get('admin_username'),
             form=form
         )
     except Exception as e:
-        current_app.logger.error(f"Error rendering admin.html: {str(e)}")
+        current_app.logger.error(f"Error rendering admin_dashboard.html: {str(e)}")
         current_app.logger.error(f"Template folder: {current_app.template_folder}")
         current_app.logger.error(f"Template folder exists: {os.path.exists(current_app.template_folder)}")
         if os.path.exists(current_app.template_folder):
@@ -196,4 +196,57 @@ def list_credentials():
         credentials = credential_service.list_credentials()
         return jsonify(credentials)
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@admin_bp.route('/api/dashboard/data')
+@admin_required
+def dashboard_data():
+    """API endpoint to get comprehensive admin dashboard data."""
+    try:
+        # Simulate data collection from various services
+        dashboard_data = {
+            "system_health": {
+                "status": "operational",
+                "p95_latency": 440,
+                "error_rate": 0.001,
+                "uptime": 99.9,
+                "active_users": 1250
+            },
+            "billing_summary": {
+                "monthly_revenue": 12540,
+                "active_customers": 85,
+                "pending_invoices": 3
+            },
+            "compliance_status": {
+                "overall_score": 83.0,
+                "audit_ready": True,
+                "last_assessment": "2025-01-15"
+            },
+            "recent_activity": [
+                {
+                    "description": "New customer registered: example.com",
+                    "timestamp": "2 minutes ago",
+                    "type": "registration"
+                },
+                {
+                    "description": "SRE alert resolved: P95 latency normal",
+                    "timestamp": "15 minutes ago", 
+                    "type": "alert"
+                },
+                {
+                    "description": "Monthly billing rollup completed",
+                    "timestamp": "1 hour ago",
+                    "type": "billing"
+                }
+            ],
+            "header_stats": {
+                "last_rollup_status": "Success (02:00 UTC)",
+                "mah_total": 15847,
+                "error_count": 0
+            }
+        }
+        
+        return jsonify(dashboard_data)
+    except Exception as e:
+        current_app.logger.error(f"Error getting dashboard data: {str(e)}")
         return jsonify({"error": str(e)}), 500
