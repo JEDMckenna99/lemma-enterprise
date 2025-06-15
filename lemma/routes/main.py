@@ -10,7 +10,7 @@ import time
 import random
 from flask import (
     Blueprint, render_template, request, redirect, 
-    url_for, session, jsonify, abort, flash, current_app, make_response
+    url_for, session, jsonify, abort, flash, current_app, make_response, send_file
 )
 from lemma.core.credential_service import get_credential_service
 from lemma.auth.csrf_config import generate_csrf, csrf_protect
@@ -589,10 +589,59 @@ def api_logout():
             "error": "Error during logout process"
         }), 500
 
+@main_bp.route('/docs')
+def docs():
+    """Render the comprehensive documentation hub."""
+    # Check if customer is logged in and get their API key for code examples
+    customer_api_key = None
+    if session.get('customer_id'):
+        try:
+            from lemma.routes.onboarding import get_customer_data, get_customer_api_key_info
+            customer_data = get_customer_data(session['customer_id'])
+            if customer_data:
+                api_key_info = get_customer_api_key_info(customer_data)
+                if api_key_info.get('format') == 'hashed':
+                    # For hashed keys, we can't show the actual key, use placeholder
+                    customer_api_key = "your_api_key_here"
+                elif api_key_info.get('format') == 'plain':
+                    # This shouldn't happen in production, but handle legacy keys
+                    customer_api_key = "your_api_key_here"
+                else:
+                    customer_api_key = "your_api_key_here"
+        except Exception as e:
+            current_app.logger.error(f"Error getting customer API key for docs: {e}")
+            customer_api_key = "your_api_key_here"
+    else:
+        customer_api_key = "your_api_key_here"
+    
+    return render_template('docs.html', customer_api_key=customer_api_key)
+
 @main_bp.route('/api-docs')
 def api_docs():
     """Render the API documentation page - publicly accessible."""
-    return render_template('api_docs.html')
+    # Check if customer is logged in and get their API key for code examples
+    customer_api_key = None
+    if session.get('customer_id'):
+        try:
+            from lemma.routes.onboarding import get_customer_data, get_customer_api_key_info
+            customer_data = get_customer_data(session['customer_id'])
+            if customer_data:
+                api_key_info = get_customer_api_key_info(customer_data)
+                if api_key_info.get('format') == 'hashed':
+                    # For hashed keys, we can't show the actual key, use placeholder
+                    customer_api_key = "your_api_key_here"
+                elif api_key_info.get('format') == 'plain':
+                    # This shouldn't happen in production, but handle legacy keys
+                    customer_api_key = "your_api_key_here"
+                else:
+                    customer_api_key = "your_api_key_here"
+        except Exception as e:
+            current_app.logger.error(f"Error getting customer API key for API docs: {e}")
+            customer_api_key = "your_api_key_here"
+    else:
+        customer_api_key = "your_api_key_here"
+    
+    return render_template('api_docs.html', customer_api_key=customer_api_key)
 
 @main_bp.route('/error')
 def error_page():
@@ -782,11 +831,6 @@ def verification_start(user_id=None):
     
     return render_template('verification_start.html', user_id=user_id)
 
-@main_bp.route('/docs')
-def docs():
-    """Render the comprehensive documentation hub."""
-    return render_template('docs.html')
-
 @main_bp.route('/playground')
 def playground():
     """Render the interactive API playground."""
@@ -890,3 +934,24 @@ def terms():
 def security():
     """Security page"""
     return render_template('security.html')
+
+@main_bp.route('/api/openapi.yaml')
+def openapi_spec():
+    """Serve the OpenAPI specification file for download."""
+    try:
+        # Path to the OpenAPI spec file
+        spec_path = os.path.join(current_app.root_path, '..', 'docs', 'openapi.yaml')
+        
+        if os.path.exists(spec_path):
+            return send_file(
+                spec_path,
+                as_attachment=True,
+                download_name='lemma-openapi-spec.yaml',
+                mimetype='application/x-yaml'
+            )
+        else:
+            return jsonify({'error': 'OpenAPI specification not found'}), 404
+            
+    except Exception as e:
+        current_app.logger.error(f"Error serving OpenAPI spec: {e}")
+        return jsonify({'error': 'Error serving OpenAPI specification'}), 500
