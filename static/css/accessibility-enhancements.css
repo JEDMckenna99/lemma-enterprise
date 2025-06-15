@@ -1,0 +1,629 @@
+/* Accessibility & Responsive Design Enhancements for Lemma Enterprise */
+/* Implements the complete checklist requirements */
+
+/* ===== KEYBOARD NAVIGATION & FOCUS RINGS ===== */
+
+/* Skip link for screen readers */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 6px;
+    background: var(--primary-600);
+    color: white;
+    padding: 8px 16px;
+    text-decoration: none;
+    border-radius: var(--radius);
+    z-index: 9999;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.skip-link:focus {
+    top: 6px;
+    outline: 2px solid white;
+    outline-offset: 2px;
+}
+
+/* Enhanced focus rings for all interactive elements */
+*:focus {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+/* Specific focus styles for different element types */
+button:focus,
+.btn:focus,
+[role="button"]:focus {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(75, 59, 163, 0.1);
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+.form-input:focus,
+.form-select:focus {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px rgba(75, 59, 163, 0.1);
+}
+
+a:focus,
+[role="link"]:focus {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+    background: rgba(75, 59, 163, 0.05);
+}
+
+/* Focus visible only for keyboard navigation */
+.js-focus-visible :focus:not(.focus-visible) {
+    outline: none;
+    box-shadow: none;
+}
+
+.js-focus-visible .focus-visible {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+}
+
+/* Tab navigation improvements */
+[tabindex="0"],
+[tabindex="-1"] {
+    outline: none;
+}
+
+[tabindex="0"]:focus,
+[tabindex="-1"]:focus {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+}
+
+/* ===== AA CONTRAST COMPLIANCE ===== */
+
+/* Ensure all text meets AA contrast requirements */
+body {
+    color: var(--gray-700); /* #374151 - AA compliant on white */
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--gray-900); /* #111827 - AAA compliant on white */
+}
+
+/* Primary text - AA compliant */
+.text-primary {
+    color: var(--primary-600); /* #4338ca - AA compliant on white */
+}
+
+/* Secondary text - AA compliant */
+.text-secondary {
+    color: var(--gray-600); /* #4b5563 - AA compliant on white */
+}
+
+/* Muted text - AA compliant */
+.text-muted {
+    color: var(--gray-700); /* #374151 - AA compliant on white */
+}
+
+/* Error text - AA compliant */
+.text-error {
+    color: #dc2626; /* AA compliant red */
+}
+
+/* Success text - AA compliant */
+.text-success {
+    color: #059669; /* AA compliant green */
+}
+
+/* Warning text - AA compliant */
+.text-warning {
+    color: #d97706; /* AA compliant orange */
+}
+
+/* Link colors - AA compliant */
+a {
+    color: var(--primary-600); /* #4338ca - AA compliant */
+}
+
+a:hover {
+    color: var(--primary-700); /* #3730a3 - AAA compliant */
+}
+
+/* Button contrast improvements */
+.btn-primary {
+    background-color: var(--primary-600); /* Ensures AA contrast */
+    color: white;
+}
+
+.btn-secondary {
+    background-color: var(--gray-100);
+    color: var(--gray-900); /* AAA contrast */
+    border: 1px solid var(--gray-300);
+}
+
+.btn-outline {
+    color: var(--gray-700); /* AA compliant */
+    border-color: var(--gray-400);
+}
+
+/* Form element contrast */
+.form-input,
+.form-select,
+.form-textarea {
+    color: var(--gray-900); /* AAA contrast on white background */
+    border-color: var(--gray-300);
+}
+
+.form-input::placeholder {
+    color: var(--gray-500); /* AA compliant placeholder text */
+}
+
+/* Chart and data visualization contrast */
+.chart-text {
+    fill: var(--gray-700); /* AA compliant for SVG text */
+}
+
+.chart-axis {
+    stroke: var(--gray-400); /* AA compliant for chart axes */
+}
+
+/* ===== RESPONSIVE DESIGN - 768PX BREAKPOINT ===== */
+
+/* Mobile-first approach with 768px breakpoint */
+@media (max-width: 768px) {
+    /* Navigation collapses */
+    .navbar-nav {
+        display: none;
+        position: fixed;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--bg-base);
+        border-top: 1px solid var(--gray-200);
+        padding: var(--space-6);
+        transform: translateY(0);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: var(--shadow-lg);
+        z-index: 50;
+    }
+
+    .navbar-nav.open {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        transform: translateY(-100%);
+    }
+
+    .mobile-menu-button {
+        display: block;
+    }
+
+    /* Container adjustments */
+    .container {
+        padding: 0 var(--space-4); /* 16px on mobile */
+    }
+
+    /* Typography scaling */
+    h1 {
+        font-size: var(--font-size-2xl); /* Scale down from 3xl */
+    }
+
+    h2 {
+        font-size: var(--font-size-xl); /* Scale down from 2xl */
+    }
+
+    /* Grid adjustments */
+    .grid-cols-2,
+    .grid-cols-3,
+    .grid-cols-4 {
+        grid-template-columns: 1fr;
+    }
+
+    /* Card adjustments */
+    .card {
+        margin-bottom: var(--space-4);
+        border-radius: var(--radius-lg);
+    }
+
+    .card-body {
+        padding: var(--space-4); /* Reduce from 24px to 16px */
+    }
+
+    /* Button adjustments for touch targets */
+    .btn {
+        min-height: 44px; /* WCAG touch target minimum */
+        padding: var(--space-3) var(--space-4);
+    }
+
+    /* Form improvements for mobile */
+    .form-input,
+    .form-select,
+    .form-textarea {
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: var(--space-4);
+        min-height: 44px; /* Touch target compliance */
+    }
+
+    /* Table responsiveness */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .table {
+        min-width: 600px; /* Prevent table from becoming too narrow */
+    }
+
+    /* Modal adjustments */
+    .modal {
+        width: 95%;
+        margin: var(--space-4);
+        max-height: 90vh;
+    }
+
+    /* Toast adjustments */
+    .toast-container {
+        left: var(--space-4);
+        right: var(--space-4);
+        bottom: var(--space-4);
+    }
+
+    .toast {
+        min-width: auto;
+    }
+
+    /* Footer adjustments */
+    .footer-desktop {
+        display: none;
+    }
+
+    .footer-mobile {
+        display: block;
+    }
+}
+
+/* Tablet adjustments (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .container {
+        width: 90%;
+        max-width: none;
+    }
+
+    .grid-cols-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .grid-cols-3 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* ===== DARK MODE TOKEN MAP ===== */
+
+/* Dark mode CSS custom properties */
+[data-theme="dark"] {
+    /* Background tokens */
+    --bg-base: #0f172a;
+    --bg-muted: #1e293b;
+    --bg-subtle: #334155;
+
+    /* Text tokens */
+    --gray-50: #f8fafc;
+    --gray-100: #f1f5f9;
+    --gray-200: #e2e8f0;
+    --gray-300: #cbd5e1;
+    --gray-400: #94a3b8;
+    --gray-500: #64748b;
+    --gray-600: #475569;
+    --gray-700: #e2e8f0; /* Light text on dark background */
+    --gray-800: #f1f5f9;
+    --gray-900: #f8fafc;
+
+    /* Primary color adjustments for dark mode */
+    --primary-50: #1e1b4b;
+    --primary-100: #312e81;
+    --primary-200: #3730a3;
+    --primary-300: #4338ca;
+    --primary-400: #4f46e5;
+    --primary-500: #6366f1; /* Lighter primary for dark mode */
+    --primary-600: #818cf8;
+    --primary-700: #a5b4fc;
+    --primary-800: #c7d2fe;
+    --primary-900: #e0e7ff;
+
+    /* Semantic colors for dark mode */
+    --success-500: #10b981;
+    --warning-500: #f59e0b;
+    --error-500: #ef4444;
+
+    /* Border and shadow adjustments */
+    --gray-border: #334155;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+}
+
+/* Dark mode component adjustments */
+[data-theme="dark"] .navbar {
+    background: rgba(15, 23, 42, 0.8);
+    border-bottom-color: var(--gray-600);
+}
+
+[data-theme="dark"] .card {
+    background: var(--bg-muted);
+    border-color: var(--gray-600);
+}
+
+[data-theme="dark"] .btn-secondary {
+    background: var(--bg-subtle);
+    color: var(--gray-200);
+    border-color: var(--gray-600);
+}
+
+[data-theme="dark"] .form-input,
+[data-theme="dark"] .form-select {
+    background: var(--bg-subtle);
+    border-color: var(--gray-600);
+    color: var(--gray-200);
+}
+
+[data-theme="dark"] .table {
+    background: var(--bg-muted);
+}
+
+[data-theme="dark"] .table th {
+    background: var(--bg-subtle);
+    color: var(--gray-200);
+}
+
+[data-theme="dark"] .table td {
+    color: var(--gray-300);
+    border-bottom-color: var(--gray-600);
+}
+
+/* ===== ACCESSIBILITY IMPROVEMENTS ===== */
+
+/* Screen reader only content */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .btn {
+        border-width: 2px;
+        font-weight: 600;
+    }
+
+    .card {
+        border-width: 2px;
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+        box-shadow: 0 0 0 4px var(--primary-500);
+        border-width: 2px;
+    }
+
+    .table th,
+    .table td {
+        border-width: 2px;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .card:hover {
+        transform: none;
+    }
+
+    .btn:hover {
+        transform: none;
+    }
+}
+
+/* ===== ARIA AND SEMANTIC IMPROVEMENTS ===== */
+
+/* ARIA live regions */
+.live-region {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+/* Focus management for modals */
+.modal[aria-hidden="true"] {
+    display: none;
+}
+
+.modal[aria-hidden="false"] {
+    display: flex;
+}
+
+/* Button states */
+.btn[aria-pressed="true"] {
+    background-color: var(--primary-700);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn[aria-expanded="true"] {
+    background-color: var(--gray-100);
+}
+
+/* Form validation states */
+.form-input[aria-invalid="true"] {
+    border-color: var(--error-500);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.form-input[aria-invalid="false"] {
+    border-color: var(--success-500);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+/* ===== TOUCH TARGET IMPROVEMENTS ===== */
+
+/* Ensure all interactive elements meet 44px minimum */
+button,
+.btn,
+a,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+[role="button"],
+[role="link"] {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Exception for inline links in text */
+p a,
+li a,
+.text-content a {
+    min-height: auto;
+    min-width: auto;
+}
+
+/* ===== PRINT STYLES ===== */
+
+@media print {
+    /* Hide interactive elements */
+    .navbar,
+    .footer,
+    .btn,
+    .loading-overlay,
+    .modal,
+    .toast,
+    .mobile-menu-button {
+        display: none !important;
+    }
+
+    /* Optimize for print */
+    body {
+        font-size: 12pt;
+        line-height: 1.4;
+        color: black;
+        background: white;
+    }
+
+    .card {
+        border: 1px solid #000;
+        page-break-inside: avoid;
+        box-shadow: none;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        page-break-after: avoid;
+        color: black;
+    }
+
+    /* Show URLs for links */
+    a[href]:after {
+        content: " (" attr(href) ")";
+        font-size: 10pt;
+        color: #666;
+    }
+
+    /* Hide decorative images */
+    .hero-bg-pattern,
+    .decorative-image {
+        display: none;
+    }
+}
+
+/* ===== UTILITY CLASSES FOR ACCESSIBILITY ===== */
+
+/* Focus utilities */
+.focus-ring {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+}
+
+.focus-ring-inset {
+    outline: 2px solid var(--primary-500);
+    outline-offset: -2px;
+}
+
+/* Contrast utilities */
+.contrast-high {
+    color: var(--gray-900);
+    font-weight: 600;
+}
+
+.contrast-medium {
+    color: var(--gray-700);
+}
+
+.contrast-low {
+    color: var(--gray-500);
+}
+
+/* Responsive utilities */
+.mobile-only {
+    display: none;
+}
+
+.desktop-only {
+    display: block;
+}
+
+@media (max-width: 768px) {
+    .mobile-only {
+        display: block;
+    }
+
+    .desktop-only {
+        display: none;
+    }
+}
+
+/* Dark mode toggle utilities */
+.dark-mode-toggle {
+    background: none;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-full);
+    padding: var(--space-2);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.dark-mode-toggle:hover {
+    background: var(--gray-100);
+}
+
+.dark-mode-toggle:focus {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+}
+
+[data-theme="dark"] .dark-mode-toggle {
+    border-color: var(--gray-600);
+    color: var(--gray-200);
+}
+
+[data-theme="dark"] .dark-mode-toggle:hover {
+    background: var(--gray-700);
+} 

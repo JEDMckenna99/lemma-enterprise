@@ -742,6 +742,12 @@
     {% block head %}{% endblock %}
 </head>
 <body>
+    <!-- Skip link for accessibility -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <!-- Live region for screen reader announcements -->
+    <div aria-live="polite" aria-atomic="true" class="sr-only" id="live-region"></div>
+    
     <!-- Modern SaaS Navigation -->
     <nav class="navbar">
         <div class="navbar-container">
@@ -770,35 +776,50 @@
             </div>
 
             <!-- Mobile Menu Button -->
-            <button class="mobile-menu-button" data-mobile-menu aria-expanded="false">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button class="mobile-menu-button" data-mobile-menu aria-expanded="false" aria-label="Toggle navigation menu">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <line x1="3" y1="6" x2="21" y2="6"></line>
                     <line x1="3" y1="12" x2="21" y2="12"></line>
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
+            
+            <!-- Dark Mode Toggle -->
+            <button class="dark-mode-toggle" id="dark-mode-toggle" aria-label="Toggle dark mode">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+            </button>
         </div>
 
         <!-- Mobile Menu -->
-        <div class="mobile-menu navbar-nav" id="mobile-menu">
+        <div class="mobile-menu navbar-nav" id="mobile-menu" role="navigation" aria-label="Mobile navigation">
             <div class="container py-4">
-                <div class="grid gap-4">
-                    <a href="/" class="btn btn-ghost">Home</a>
-                    <a href="/docs" class="btn btn-ghost">Documentation</a>
-                    <a href="/pricing" class="btn btn-ghost">Pricing</a>
-                    <a href="/api-docs" class="btn btn-ghost">API</a>
-                    <a href="/status" class="btn btn-ghost">Status</a>
-                    <hr style="border: none; height: 1px; background: var(--gray-200); margin: var(--space-4) 0;">
-                    <a href="/onboarding" class="btn btn-outline">Sign In</a>
-                    <a href="{{ url_for('onboarding.start') }}" class="btn btn-primary">Get Started</a>
+                <div class="grid gap-4" role="menu">
+                    <a href="/" class="btn btn-ghost" role="menuitem">Home</a>
+                    <a href="/docs" class="btn btn-ghost" role="menuitem">Documentation</a>
+                    <a href="/pricing" class="btn btn-ghost" role="menuitem">Pricing</a>
+                    <a href="/api-docs" class="btn btn-ghost" role="menuitem">API</a>
+                    <a href="/status" class="btn btn-ghost" role="menuitem">Status</a>
+                    <hr style="border: none; height: 1px; background: var(--gray-200); margin: var(--space-4) 0;" role="separator">
+                    <a href="/onboarding" class="btn btn-outline" role="menuitem">Sign In</a>
+                    <a href="{{ url_for('onboarding.start') }}" class="btn btn-primary" role="menuitem">Get Started</a>
                 </div>
             </div>
         </div>
     </nav>
 
     <!-- Main Content -->
-    <main>
-    {% block content %}{% endblock %}
+    <main id="main-content" tabindex="-1">
+        {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
@@ -861,13 +882,17 @@
                 <!-- Mobile Accordion Items -->
                 <div class="footer-accordion">
                     <div class="accordion-item border-b border-gray-200">
-                        <button class="accordion-header w-full py-4 text-left flex justify-between items-center" onclick="toggleFooterAccordion(this)">
+                        <button class="accordion-header w-full py-4 text-left flex justify-between items-center" 
+                                onclick="toggleFooterAccordion(this)" 
+                                aria-expanded="false" 
+                                aria-controls="product-menu"
+                                id="product-button">
                             <span class="font-semibold text-gray-900">Product</span>
-                            <svg class="accordion-icon w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="accordion-icon w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
                         </button>
-                        <div class="accordion-content hidden pb-4">
+                        <div class="accordion-content hidden pb-4" id="product-menu" aria-labelledby="product-button">
                             <ul class="space-y-2 text-sm">
                                 <li><a href="/docs" class="text-gray-600 hover:text-primary-500 transition-colors">Documentation</a></li>
                                 <li><a href="/api-docs" class="text-gray-600 hover:text-primary-500 transition-colors">API Reference</a></li>
@@ -1201,8 +1226,9 @@
 
     <!-- Lemma Core Scripts - Enhanced 2025 SaaS -->
     <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wallet-init.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lemma-verification-flow.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lemma-wallet-init.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lemma-verification-flow.js') }}"></script>
+<script src="{{ url_for('static', filename='js/accessibility.js') }}"></script>
     
     <!-- Enhanced Lemma Integration Check -->
     <script>
