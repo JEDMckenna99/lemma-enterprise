@@ -23,7 +23,7 @@ def rate_limit(f):
     return f
 
 # Create blueprint
-sre_bp = Blueprint('sre_monitoring', __name__)
+sre_bp = Blueprint('sre_monitoring', __name__, url_prefix='/api/sre')
 logger = logging.getLogger(__name__)
 
 # Global metrics collectors

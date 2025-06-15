@@ -180,6 +180,26 @@ def run_secrets_rotation_drill():
             'error': 'Failed to run secrets rotation drill'
         }), 500
 
+@compliance_bp.route('/secrets/status', methods=['GET'])
+@admin_required
+def get_secrets_status():
+    """Get secrets management system status."""
+    try:
+        secrets_manager = get_secrets_manager()
+        status = secrets_manager.get_status()
+        
+        return jsonify({
+            'success': True,
+            'secrets_status': status
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get secrets status: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to retrieve secrets status'
+        }), 500
+
 # ============================================================================
 # DATA PROTECTION & GDPR/CCPA COMPLIANCE
 # ============================================================================
