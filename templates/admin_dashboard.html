@@ -157,6 +157,96 @@
     margin-left: auto;
 }
 
+/* Key Metrics Grid */
+.key-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+}
+
+.metric-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    border: 1px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    transition: all var(--duration-fast) var(--ease-swift-out);
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card:hover {
+    border-color: #635bff;
+    box-shadow: 0 4px 12px rgba(99, 91, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.metric-icon {
+    font-size: 24px;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    background: var(--gray-50);
+    flex-shrink: 0;
+}
+
+.metric-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.metric-label {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: var(--space-1);
+}
+
+.metric-value {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: var(--space-1);
+    font-variant-numeric: tabular-nums;
+}
+
+.metric-source {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-bottom: 2px;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+.metric-purpose {
+    font-size: var(--font-size-xs);
+    color: var(--gray-600);
+    font-style: italic;
+}
+
+/* Metric Type Colors */
+.billing-metric .metric-icon { background: #e3f2fd; }
+.growth-metric .metric-icon { background: #e8f5e8; }
+.performance-metric .metric-icon { background: #fff3e0; }
+.error-metric .metric-icon { background: #ffebee; }
+.security-metric .metric-icon { background: #f3e5f5; }
+.storage-metric .metric-icon { background: #e0f2f1; }
+.billing-job-metric .metric-icon { background: #e1f5fe; }
+.alerts-metric .metric-icon { background: #fce4ec; }
+
+/* Status Indicators */
+.metric-value.status-good { color: var(--green-600); }
+.metric-value.status-warning { color: var(--yellow-600); }
+.metric-value.status-error { color: var(--red-600); }
+.metric-value.status-loading { color: var(--gray-500); }
+
 /* Dashboard Grid - 8-point grid spacing */
 .dashboard-grid {
     display: grid;
@@ -402,9 +492,116 @@
             </div>
         </header>
 
-        <!-- Dashboard Overview Section -->
-        <div id="overview-section" class="dashboard-section-container">
+        <!-- Overview Section -->
+        <div id="overview-section" class="admin-section active">
+            <div class="section-header">
+                <h2>Overview Dashboard</h2>
+                <p>Real-time operational metrics and system health</p>
+            </div>
+            
+            <!-- Key Metrics Dashboard -->
+            <div class="key-metrics-grid">
+                <div class="metric-card billing-metric">
+                    <div class="metric-icon">📊</div>
+                    <div class="metric-content">
+                        <div class="metric-label">MAH Today / Month-to-Date</div>
+                        <div class="metric-value" id="mah-metric">Loading...</div>
+                        <div class="metric-source">nightly roll-up</div>
+                        <div class="metric-purpose">Billing, growth pulse</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card growth-metric">
+                    <div class="metric-icon">👥</div>
+                    <div class="metric-content">
+                        <div class="metric-label">New Humans (Δ 24h)</div>
+                        <div class="metric-value" id="new-humans-metric">Loading...</div>
+                        <div class="metric-source">nightly roll-up</div>
+                        <div class="metric-purpose">KYC throughput</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card performance-metric">
+                    <div class="metric-icon">⚡</div>
+                    <div class="metric-content">
+                        <div class="metric-label">Verify P95 Latency</div>
+                        <div class="metric-value" id="p95-latency-metric">Loading...</div>
+                        <div class="metric-source">/api/sre/metrics/latency</div>
+                        <div class="metric-purpose">SLA guardrail</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card error-metric">
+                    <div class="metric-icon">🚨</div>
+                    <div class="metric-content">
+                        <div class="metric-label">5-min Error Rate</div>
+                        <div class="metric-value" id="error-rate-metric">Loading...</div>
+                        <div class="metric-source">/api/sre/metrics/errors</div>
+                        <div class="metric-purpose">Outage early-warning</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card security-metric">
+                    <div class="metric-icon">🔄</div>
+                    <div class="metric-content">
+                        <div class="metric-label">Revocation Lag</div>
+                        <div class="metric-value" id="revocation-lag-metric">Loading...</div>
+                        <div class="metric-source">/api/sre/metrics/revocation-lag</div>
+                        <div class="metric-purpose">Fraud-window size</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card storage-metric">
+                    <div class="metric-icon">💾</div>
+                    <div class="metric-content">
+                        <div class="metric-label">Bloom Filter Size</div>
+                        <div class="metric-value" id="bloom-filter-metric">Loading...</div>
+                        <div class="metric-source">/api/sre/metrics/bloom-filter</div>
+                        <div class="metric-purpose">DoS/growth watch</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card billing-job-metric">
+                    <div class="metric-icon">💳</div>
+                    <div class="metric-content">
+                        <div class="metric-label">Billing Job Status</div>
+                        <div class="metric-value" id="billing-job-metric">Loading...</div>
+                        <div class="metric-source">/api/sre/metrics/billing-jobs</div>
+                        <div class="metric-purpose">Invoice correctness</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card alerts-metric">
+                    <div class="metric-icon">🔔</div>
+                    <div class="metric-content">
+                        <div class="metric-label">Outstanding Alerts</div>
+                        <div class="metric-value" id="alerts-metric">Loading...</div>
+                        <div class="metric-source">/api/sre/alerts/current</div>
+                        <div class="metric-purpose">Ops attention queue</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Existing dashboard content -->
             <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <h3>System Health</h3>
+                    <div class="health-indicators">
+                        <div class="health-item">
+                            <span class="health-label">API Status</span>
+                            <span class="health-status" id="api-status">Checking...</span>
+                        </div>
+                        <div class="health-item">
+                            <span class="health-label">Database</span>
+                            <span class="health-status" id="db-status">Checking...</span>
+                        </div>
+                        <div class="health-item">
+                            <span class="health-label">SRE Monitoring</span>
+                            <span class="health-status" id="sre-status">Checking...</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- System Health -->
                 <div class="dashboard-section">
                     <div class="section-header">
@@ -640,6 +837,7 @@ class AdminDashboard {
         try {
             // Load overview data
             await Promise.all([
+                this.loadKeyMetrics(),
                 this.loadSystemHealth(),
                 this.loadBillingSummary(),
                 this.loadComplianceStatus(),
@@ -647,6 +845,229 @@ class AdminDashboard {
             ]);
         } catch (error) {
             console.error('Error loading dashboard data:', error);
+        }
+    }
+
+    async loadKeyMetrics() {
+        try {
+            // Load all key metrics in parallel
+            await Promise.all([
+                this.loadMAHMetric(),
+                this.loadNewHumansMetric(),
+                this.loadP95LatencyMetric(),
+                this.loadErrorRateMetric(),
+                this.loadRevocationLagMetric(),
+                this.loadBloomFilterMetric(),
+                this.loadBillingJobMetric(),
+                this.loadAlertsMetric()
+            ]);
+        } catch (error) {
+            console.error('Error loading key metrics:', error);
+        }
+    }
+
+    async loadMAHMetric() {
+        try {
+            const response = await fetch('/api/sre/metrics/mah');
+            const data = await response.json();
+            
+            const today = data.today || 0;
+            const monthToDate = data.month_to_date || 0;
+            
+            const element = document.getElementById('mah-metric');
+            element.textContent = `${today.toLocaleString()} / ${monthToDate.toLocaleString()}`;
+            element.className = 'metric-value status-good';
+        } catch (error) {
+            console.error('Error loading MAH metric:', error);
+            document.getElementById('mah-metric').textContent = 'Error';
+            document.getElementById('mah-metric').className = 'metric-value status-error';
+        }
+    }
+
+    async loadNewHumansMetric() {
+        try {
+            const response = await fetch('/api/sre/metrics/mah');
+            const data = await response.json();
+            
+            const newHumans24h = data.new_humans_24h || 0;
+            
+            const element = document.getElementById('new-humans-metric');
+            element.textContent = `+${newHumans24h.toLocaleString()}`;
+            element.className = newHumans24h > 0 ? 'metric-value status-good' : 'metric-value status-warning';
+        } catch (error) {
+            console.error('Error loading new humans metric:', error);
+            document.getElementById('new-humans-metric').textContent = 'Error';
+            document.getElementById('new-humans-metric').className = 'metric-value status-error';
+        }
+    }
+
+    async loadP95LatencyMetric() {
+        try {
+            const response = await fetch('/api/sre/metrics/latency');
+            const data = await response.json();
+            
+            const p95Latency = data.p95_latency_ms || 0;
+            
+            const element = document.getElementById('p95-latency-metric');
+            element.textContent = `${p95Latency}ms`;
+            
+            // Color based on SLA: <250ms good, <500ms warning, >500ms error
+            if (p95Latency < 250) {
+                element.className = 'metric-value status-good';
+            } else if (p95Latency < 500) {
+                element.className = 'metric-value status-warning';
+            } else {
+                element.className = 'metric-value status-error';
+            }
+        } catch (error) {
+            console.error('Error loading P95 latency metric:', error);
+            document.getElementById('p95-latency-metric').textContent = 'Error';
+            document.getElementById('p95-latency-metric').className = 'metric-value status-error';
+        }
+    }
+
+    async loadErrorRateMetric() {
+        try {
+            const response = await fetch('/api/sre/metrics/errors');
+            const data = await response.json();
+            
+            const errorRate = data.error_rate_5min || 0;
+            
+            const element = document.getElementById('error-rate-metric');
+            element.textContent = `${(errorRate * 100).toFixed(2)}%`;
+            
+            // Color based on thresholds: <1% good, <5% warning, >5% error
+            if (errorRate < 0.01) {
+                element.className = 'metric-value status-good';
+            } else if (errorRate < 0.05) {
+                element.className = 'metric-value status-warning';
+            } else {
+                element.className = 'metric-value status-error';
+            }
+        } catch (error) {
+            console.error('Error loading error rate metric:', error);
+            document.getElementById('error-rate-metric').textContent = 'Error';
+            document.getElementById('error-rate-metric').className = 'metric-value status-error';
+        }
+    }
+
+    async loadRevocationLagMetric() {
+        try {
+            const response = await fetch('/api/sre/metrics/revocation-lag');
+            const data = await response.json();
+            
+            const lagSeconds = data.revocation_lag_seconds || 0;
+            
+            const element = document.getElementById('revocation-lag-metric');
+            
+            // Format lag time appropriately
+            if (lagSeconds < 60) {
+                element.textContent = `${lagSeconds}s`;
+            } else if (lagSeconds < 3600) {
+                element.textContent = `${Math.round(lagSeconds / 60)}m`;
+            } else {
+                element.textContent = `${Math.round(lagSeconds / 3600)}h`;
+            }
+            
+            // Color based on fraud window: <300s good, <900s warning, >900s error
+            if (lagSeconds < 300) {
+                element.className = 'metric-value status-good';
+            } else if (lagSeconds < 900) {
+                element.className = 'metric-value status-warning';
+            } else {
+                element.className = 'metric-value status-error';
+            }
+        } catch (error) {
+            console.error('Error loading revocation lag metric:', error);
+            document.getElementById('revocation-lag-metric').textContent = 'Error';
+            document.getElementById('revocation-lag-metric').className = 'metric-value status-error';
+        }
+    }
+
+    async loadBloomFilterMetric() {
+        try {
+            const response = await fetch('/api/sre/metrics/bloom-filter');
+            const data = await response.json();
+            
+            const sizeBytes = data.bloom_filter_size_bytes || 0;
+            
+            const element = document.getElementById('bloom-filter-metric');
+            
+            // Format size appropriately
+            if (sizeBytes < 1024 * 1024) {
+                element.textContent = `${Math.round(sizeBytes / 1024)}KB`;
+            } else {
+                element.textContent = `${(sizeBytes / (1024 * 1024)).toFixed(1)}MB`;
+            }
+            
+            // Color based on size: <10MB good, <50MB warning, >50MB error
+            const sizeMB = sizeBytes / (1024 * 1024);
+            if (sizeMB < 10) {
+                element.className = 'metric-value status-good';
+            } else if (sizeMB < 50) {
+                element.className = 'metric-value status-warning';
+            } else {
+                element.className = 'metric-value status-error';
+            }
+        } catch (error) {
+            console.error('Error loading bloom filter metric:', error);
+            document.getElementById('bloom-filter-metric').textContent = 'Error';
+            document.getElementById('bloom-filter-metric').className = 'metric-value status-error';
+        }
+    }
+
+    async loadBillingJobMetric() {
+        try {
+            const response = await fetch('/api/sre/metrics/billing-jobs');
+            const data = await response.json();
+            
+            const status = data.last_job_status || 'unknown';
+            const onTime = data.last_job_on_time || false;
+            
+            const element = document.getElementById('billing-job-metric');
+            
+            if (status === 'completed' && onTime) {
+                element.textContent = 'On Time';
+                element.className = 'metric-value status-good';
+            } else if (status === 'completed' && !onTime) {
+                element.textContent = 'Late';
+                element.className = 'metric-value status-warning';
+            } else if (status === 'failed') {
+                element.textContent = 'Failed';
+                element.className = 'metric-value status-error';
+            } else {
+                element.textContent = 'Running';
+                element.className = 'metric-value status-loading';
+            }
+        } catch (error) {
+            console.error('Error loading billing job metric:', error);
+            document.getElementById('billing-job-metric').textContent = 'Error';
+            document.getElementById('billing-job-metric').className = 'metric-value status-error';
+        }
+    }
+
+    async loadAlertsMetric() {
+        try {
+            const response = await fetch('/api/sre/alerts/current');
+            const data = await response.json();
+            
+            const alertCount = data.active_alerts ? data.active_alerts.length : 0;
+            
+            const element = document.getElementById('alerts-metric');
+            element.textContent = alertCount.toString();
+            
+            // Color based on alert count
+            if (alertCount === 0) {
+                element.className = 'metric-value status-good';
+            } else if (alertCount < 5) {
+                element.className = 'metric-value status-warning';
+            } else {
+                element.className = 'metric-value status-error';
+            }
+        } catch (error) {
+            console.error('Error loading alerts metric:', error);
+            document.getElementById('alerts-metric').textContent = 'Error';
+            document.getElementById('alerts-metric').className = 'metric-value status-error';
         }
     }
 
@@ -820,6 +1241,7 @@ class AdminDashboard {
     }
 
     startAutoRefresh() {
+        // Main dashboard refresh every 30 seconds
         setInterval(() => {
             if (this.currentSection === 'overview') {
                 this.loadDashboardData();
@@ -827,6 +1249,13 @@ class AdminDashboard {
                 this.loadSectionData(this.currentSection);
             }
         }, this.refreshInterval);
+        
+        // Key metrics refresh more frequently (every 15 seconds)
+        setInterval(() => {
+            if (this.currentSection === 'overview') {
+                this.loadKeyMetrics();
+            }
+        }, 15000);
     }
 }
 
