@@ -431,134 +431,261 @@
     </div>
 </div>
 
-<!-- Lemma Gate API Integration -->
+<!-- Enhanced Lemma Gate API Integration with Enterprise Security Controls -->
 <script src="{{ url_for('static', filename='js/lemma-gate-api.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Initializing API-driven Lemma Gate for Join Network page');
+    console.log('🔐 Initializing Enhanced Lemma Gate API for Join Network page');
     
-    // Initialize API-driven Lemma Gate
+    // Get security level from URL parameters or default to 'standard'
+    const urlParams = new URLSearchParams(window.location.search);
+    const securityLevel = urlParams.get('security_level') || 'standard';
+    
+    // Initialize the enhanced API-driven gate
     const lemmaGate = new LemmaGateAPI({
         protectedContent: '#networkContent',
         gateContainer: '#lemmaGateOverlay',
-        gateTitle: '🌐 Join the Lemma Network',
-        gateMessage: 'This network is protected. Please verify you are human to join and explore the verified community.',
-        verifyButtonText: '🔐 Verify with Lemma',
-        loadingText: '🔍 Checking your verification...',
-        debug: true,
+        securityLevel: securityLevel,
+        enableBackgroundChecks: true,
+        autoCheckInterval: 30000, // Check every 30 seconds
+        showDetailedErrors: true,
+        
         onVerified: function(data) {
             console.log('✅ User verified for network access:', data);
             showNetworkWelcome(data);
-            updateGateStatus('success', '✅ Verification confirmed - Welcome to the network!');
+            updateGateStatus('success', `✅ Verified! Security Level: ${data.security_level?.toUpperCase() || 'STANDARD'}`);
         },
+        
+        onRevoked: function(data) {
+            console.log('❌ Credential revoked:', data);
+            showErrorMessage(`Your verification credential has been revoked: ${data.revocation_reason || 'Unknown reason'}`);
+            updateGateStatus('error', '❌ Credential revoked - Please get new verification');
+        },
+        
+        onReverificationRequired: function(data) {
+            console.log('⚠️ Re-verification required:', data);
+            showWarningMessage(`Re-verification required: ${data.reason || 'Security policy'}`);
+            updateGateStatus('warning', '⚠️ Re-verification required');
+        },
+        
+        onStatusChange: function(action, data) {
+            console.log(`🔍 Gate status changed: ${action}`, data);
+            
+            // Update page title with security status
+            const originalTitle = document.title;
+            if (action === 'allow_access') {
+                document.title = `✅ ${originalTitle}`;
+            } else if (action === 'require_reverification') {
+                document.title = `⚠️ ${originalTitle}`;
+            } else if (action === 'credential_revoked') {
+                document.title = `❌ ${originalTitle}`;
+            }
+        },
+        
         onError: function(error) {
             console.error('❌ Network verification error:', error);
-            showErrorMessage('Verification failed. Please try again.');
+            showErrorMessage(`Verification error: ${error.message || 'Please try again'}`);
             updateGateStatus('error', '❌ Verification error. Please try again.');
-        },
-        onGateShown: function() {
-            console.log('🛡️ Network gate shown');
-            updateGateStatus('warning', '⚠️ Verification required to access network features');
-        },
-        onGateHidden: function() {
-            console.log('✨ Network gate hidden - user verified');
-            // Show verification status
-            const verificationStatus = document.getElementById('verificationStatus');
-            if (verificationStatus) {
-                verificationStatus.classList.add('show');
-            }
         }
     });
+    
+    // Add security level controls
+    addSecurityControls(lemmaGate, securityLevel);
     
     // Make gate available globally for debugging
     window.networkGate = lemmaGate;
     
-    // Network-specific UI helper functions
-    function updateGateStatus(type, message) {
-        const statusDiv = document.getElementById('lemmaGateStatus');
-        const verifyBtn = document.getElementById('lemmaVerifyBtn');
-        
-        if (statusDiv) {
-            statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
-        }
-        
-        if (verifyBtn && type !== 'error') {
-            if (type === 'success') {
-                verifyBtn.style.display = 'none';
-            } else {
-                verifyBtn.disabled = false;
-                verifyBtn.innerHTML = `
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span>Verify with Lemma</span>
-                `;
-            }
-        }
-    }
-    
-    function showNetworkWelcome(data) {
-        const welcomeDiv = document.createElement('div');
-        welcomeDiv.innerHTML = `
-            <div style="
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #10b981;
-                color: white;
-                padding: 1rem;
-                border-radius: 8px;
-                z-index: 1000;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                font-family: system-ui, -apple-system, sans-serif;
-            ">
-                <strong>🎉 Welcome to the Network!</strong><br>
-                <small>Verification successful. Explore the verified community.</small>
-            </div>
-        `;
-        document.body.appendChild(welcomeDiv);
-        
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            if (welcomeDiv.parentNode) {
-                welcomeDiv.parentNode.removeChild(welcomeDiv);
-            }
-        }, 5000);
-    }
-    
-    function showErrorMessage(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.innerHTML = `
-            <div style="
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #ef4444;
-                color: white;
-                padding: 1rem;
-                border-radius: 8px;
-                z-index: 1000;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                font-family: system-ui, -apple-system, sans-serif;
-            ">
-                <strong>⚠️ Verification Error</strong><br>
-                <small>${message}</small>
-            </div>
-        `;
-        document.body.appendChild(errorDiv);
-        
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            if (errorDiv.parentNode) {
-                errorDiv.parentNode.removeChild(errorDiv);
-            }
-        }, 5000);
-    }
+    console.log('✅ Enhanced Lemma Gate API initialized with security level:', securityLevel);
 });
 
-// Global function for the verify button
+function addSecurityControls(gate, currentLevel) {
+    const controlsDiv = document.createElement('div');
+    controlsDiv.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        z-index: 10000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        max-width: 280px;
+    `;
+    
+    controlsDiv.innerHTML = `
+        <div style="margin-bottom: 8px; font-weight: 600; color: #374151;">
+            🔒 Security Level Controls
+        </div>
+        <select id="security-level-select" style="
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        ">
+            <option value="basic" ${currentLevel === 'basic' ? 'selected' : ''}>Basic (24h session)</option>
+            <option value="standard" ${currentLevel === 'standard' ? 'selected' : ''}>Standard (8h session)</option>
+            <option value="high" ${currentLevel === 'high' ? 'selected' : ''}>High (4h session)</option>
+            <option value="maximum" ${currentLevel === 'maximum' ? 'selected' : ''}>Maximum (1h session)</option>
+        </select>
+        <button id="force-recheck-btn" style="
+            width: 100%;
+            padding: 8px;
+            background: #635bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-bottom: 4px;
+        ">
+            🔄 Force Recheck
+        </button>
+        <div id="gate-status-display" style="
+            font-size: 12px;
+            color: #6b7280;
+            text-align: center;
+            padding: 4px;
+        ">
+            Current: ${currentLevel.toUpperCase()}
+        </div>
+    `;
+    
+    document.body.appendChild(controlsDiv);
+    
+    // Add event listeners for controls
+    document.getElementById('security-level-select').addEventListener('change', async (e) => {
+        const newLevel = e.target.value;
+        console.log(`🔒 Changing security level to: ${newLevel}`);
+        
+        try {
+            await gate.setSecurityLevel(newLevel);
+            
+            // Update URL
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('security_level', newLevel);
+            window.history.replaceState({}, '', newUrl);
+            
+            // Update status display
+            document.getElementById('gate-status-display').textContent = `Current: ${newLevel.toUpperCase()}`;
+            
+        } catch (error) {
+            console.error('Failed to change security level:', error);
+            showErrorMessage('Failed to change security level: ' + error.message);
+        }
+    });
+    
+    document.getElementById('force-recheck-btn').addEventListener('click', async () => {
+        console.log('🔄 Forcing status recheck...');
+        await gate.forceRecheck();
+    });
+}
+
+// Network-specific UI helper functions
+function updateGateStatus(type, message) {
+    const statusDiv = document.getElementById('lemmaGateStatus');
+    
+    if (statusDiv) {
+        statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+    }
+}
+
+function showNetworkWelcome(data) {
+    const welcomeDiv = document.createElement('div');
+    welcomeDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10001;
+        font-family: system-ui, sans-serif;
+        font-weight: 600;
+        max-width: 320px;
+    `;
+    welcomeDiv.innerHTML = `
+        🎉 Welcome to the Network!
+        <br><small>Security Level: ${data.security_level?.toUpperCase() || 'STANDARD'}</small>
+        <br><small>Session expires in ${Math.round((data.session_timeout || 28800) / 3600)}h</small>
+    `;
+    document.body.appendChild(welcomeDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (welcomeDiv.parentNode) {
+            welcomeDiv.parentNode.removeChild(welcomeDiv);
+        }
+    }, 5000);
+}
+
+function showWarningMessage(message) {
+    const warningDiv = document.createElement('div');
+    warningDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #f59e0b;
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10001;
+        font-family: system-ui, sans-serif;
+        font-weight: 600;
+        max-width: 320px;
+    `;
+    warningDiv.innerHTML = `
+        ⚠️ Re-verification Required
+        <br><small>${message}</small>
+    `;
+    document.body.appendChild(warningDiv);
+    
+    setTimeout(() => {
+        if (warningDiv.parentNode) {
+            warningDiv.parentNode.removeChild(warningDiv);
+        }
+    }, 8000);
+}
+
+function showErrorMessage(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ef4444;
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10001;
+        font-family: system-ui, sans-serif;
+        font-weight: 600;
+        max-width: 320px;
+    `;
+    errorDiv.innerHTML = `
+        ❌ Verification Error
+        <br><small>${message}</small>
+    `;
+    document.body.appendChild(errorDiv);
+    
+    // Auto-remove after 8 seconds
+    setTimeout(() => {
+        if (errorDiv.parentNode) {
+            errorDiv.parentNode.removeChild(errorDiv);
+        }
+    }, 8000);
+}
+
+// Global function for the verify button (backward compatibility)
 function startLemmaVerification() {
-    console.log('🚀 Starting verification via gate API...');
+    console.log('🚀 Starting verification via enhanced gate API...');
     if (window.networkGate) {
         window.networkGate.startVerification();
     } else {

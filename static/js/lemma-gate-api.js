@@ -1,18 +1,22 @@
 /**
  * Lemma Gate API Client - Clean API-Driven Implementation
+ * Enhanced with enterprise security controls and configurable protection levels
  * 
  * This client handles all gate functionality through centralized API endpoints.
  * All verification logic, session management, and security is handled server-side.
  * 
  * Perfect Flow:
- * 1. Call API to check status
+ * 1. Call API to check status with security level
  * 2. If has credentials → API handles background verification automatically
  * 3. If no credentials → Show gate → Direct to verification flow
+ * 4. Support for credential revocation and re-verification
  * 
  * Usage:
  * const gate = new LemmaGateAPI({
  *   protectedContent: '#protected-content',
+ *   securityLevel: 'standard', // basic, standard, high, maximum
  *   onVerified: () => console.log('User verified!'),
+ *   onRevoked: () => console.log('Credential revoked!'),
  *   onError: (error) => console.error('Gate error:', error)
  * });
  */
@@ -22,305 +26,336 @@ class LemmaGateAPI {
         this.options = {
             // UI Elements
             protectedContent: options.protectedContent || '#protected-content',
-            gateContainer: options.gateContainer || '#lemma-gate',
+            gateContainer: options.gateContainer || '#lemma-gate-overlay',
             
-            // API Configuration 
+            // Security Configuration
+            securityLevel: options.securityLevel || 'standard',
+            autoCheckInterval: options.autoCheckInterval || 30000, // 30 seconds
+            
+            // API Configuration
             apiBase: options.apiBase || '',
-            
-            // UI Customization
-            gateTitle: options.gateTitle || '🛡️ Human Verification Required',
-            gateMessage: options.gateMessage || 'This content is protected. Please verify you are human to continue.',
-            verifyButtonText: options.verifyButtonText || '✨ Verify with Lemma',
-            loadingText: options.loadingText || 'Verifying...',
             
             // Callbacks
             onVerified: options.onVerified || (() => {}),
+            onRevoked: options.onRevoked || (() => {}),
+            onReverificationRequired: options.onReverificationRequired || (() => {}),
             onError: options.onError || ((error) => console.error('Lemma Gate Error:', error)),
-            onGateShown: options.onGateShown || (() => {}),
-            onGateHidden: options.onGateHidden || (() => {}),
+            onStatusChange: options.onStatusChange || (() => {}),
             
             // Advanced Options
-            autoInit: options.autoInit !== false, // Default true
+            enableBackgroundChecks: options.enableBackgroundChecks !== false,
+            showDetailedErrors: options.showDetailedErrors || false,
             retryAttempts: options.retryAttempts || 3,
-            retryDelay: options.retryDelay || 1000,
-            debug: options.debug || false,
-            
-            ...options
+            retryDelay: options.retryDelay || 1000
         };
         
-        // State
-        this.isInitialized = false;
-        this.isVerifying = false;
-        this.isVerified = false;
+        this.state = {
+            initialized: false,
+            checking: false,
+            verified: false,
+            credentialId: null,
+            securityLevel: this.options.securityLevel,
+            lastCheck: 0,
+            checkInterval: null,
+            retryCount: 0
+        };
+        
         this.config = null;
-        this.retryCount = 0;
+        this.wallet = null;
         
-        // DOM elements
-        this.protectedElement = null;
-        this.gateElement = null;
-        
-        if (this.options.autoInit) {
-            this.init();
-        }
+        // Initialize the gate
+        this.init();
     }
     
-    /**
-     * Initialize the gate
-     */
     async init() {
-        if (this.isInitialized) {
-            this.log('Gate already initialized');
-            return;
-        }
-        
-        this.log('Initializing Lemma Gate API...');
-        
         try {
-            // Get API configuration
+            console.log('🔐 Initializing Lemma Gate API with security level:', this.state.securityLevel);
+            
+            // Load gate configuration
             await this.loadConfig();
             
-            // Set up DOM elements
-            this.setupDOM();
+            // Wait for wallet to be available
+            await this.waitForWallet();
             
-            // Start verification flow
-            await this.checkVerificationStatus();
+            // Perform initial status check
+            await this.checkStatus();
             
-            this.isInitialized = true;
-            this.log('Lemma Gate initialized successfully');
+            // Set up background checking if enabled
+            if (this.options.enableBackgroundChecks) {
+                this.startBackgroundChecks();
+            }
+            
+            this.state.initialized = true;
+            console.log('✅ Lemma Gate API initialized successfully');
             
         } catch (error) {
-            this.error('Gate initialization failed:', error);
-            this.showError('Failed to initialize human verification system');
+            console.error('❌ Failed to initialize Lemma Gate API:', error);
+            this.options.onError(error);
         }
     }
     
-    /**
-     * Load gate configuration from API
-     */
     async loadConfig() {
         try {
-            const response = await fetch(`${this.options.apiBase}/api/gate/config`);
-            
+            const response = await fetch(`${this.options.apiBase}/api/gate/config?security_level=${this.state.securityLevel}`);
             if (!response.ok) {
-                throw new Error(`Config request failed: ${response.status}`);
+                throw new Error(`Config load failed: ${response.status}`);
             }
             
             const result = await response.json();
-            
             if (!result.success) {
                 throw new Error(result.error || 'Failed to load configuration');
             }
             
             this.config = result.config;
-            this.log('Configuration loaded:', this.config);
+            console.log('📋 Gate configuration loaded:', this.config);
             
         } catch (error) {
-            this.error('Failed to load configuration:', error);
-            // Use default config as fallback
-            this.config = {
-                endpoints: {
-                    status: '/api/gate/status',
-                    verify_credentials: '/api/gate/verify-credentials',
-                    challenge: '/api/gate/challenge',
-                    start_verification: '/api/gate/start-verification'
-                },
-                settings: {
-                    verification_timeout: 300,
-                    session_timeout: 86400,
-                    retry_attempts: 3,
-                    retry_delay: 1000
+            console.error('❌ Failed to load gate configuration:', error);
+            throw error;
+        }
+    }
+    
+    async waitForWallet() {
+        return new Promise((resolve, reject) => {
+            let attempts = 0;
+            const maxAttempts = 50; // 5 seconds max wait
+            
+            const checkWallet = () => {
+                if (window.lemmaWallet) {
+                    this.wallet = window.lemmaWallet;
+                    console.log('💳 Lemma wallet found');
+                    resolve();
+                    return;
                 }
+                
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    console.log('⚠️ Wallet not available after waiting');
+                    reject(new Error('Wallet not available'));
+                    return;
+                }
+                
+                setTimeout(checkWallet, 100);
             };
-        }
-    }
-    
-    /**
-     * Set up DOM elements
-     */
-    setupDOM() {
-        // Find protected content element
-        this.protectedElement = document.querySelector(this.options.protectedContent);
-        if (!this.protectedElement) {
-            throw new Error(`Protected content element not found: ${this.options.protectedContent}`);
-        }
-        
-        // Create or find gate element
-        this.gateElement = document.querySelector(this.options.gateContainer);
-        if (!this.gateElement) {
-            this.gateElement = this.createGateElement();
-            document.body.appendChild(this.gateElement);
-        }
-        
-        this.log('DOM elements set up successfully');
-    }
-    
-    /**
-     * Create gate overlay element
-     */
-    createGateElement() {
-        const gateDiv = document.createElement('div');
-        gateDiv.id = 'lemma-gate';
-        gateDiv.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            font-family: system-ui, -apple-system, sans-serif;
-        `;
-        
-        gateDiv.innerHTML = `
-            <div style="
-                background: white;
-                padding: 2rem;
-                border-radius: 12px;
-                text-align: center;
-                max-width: 400px;
-                margin: 1rem;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-            ">
-                <div id="gate-content">
-                    <h2 style="margin: 0 0 1rem 0; color: #333; font-size: 1.5rem;">
-                        ${this.options.gateTitle}
-                    </h2>
-                    <p style="margin: 0 0 1.5rem 0; color: #666; line-height: 1.5;">
-                        ${this.options.gateMessage}  
-                    </p>
-                    <button id="verify-button" style="
-                        background: #635bff;
-                        color: white;
-                        border: none;
-                        padding: 12px 24px;
-                        border-radius: 6px;
-                        font-size: 1rem;
-                        cursor: pointer;
-                        transition: background 0.2s;
-                    ">
-                        ${this.options.verifyButtonText}
-                    </button>
-                    <div id="gate-loading" style="display: none; margin-top: 1rem;">
-                        <div style="color: #666;">${this.options.loadingText}</div>
-                    </div>
-                    <div id="gate-error" style="display: none; margin-top: 1rem; color: #d63384;"></div>
-                </div>
-            </div>
-        `;
-        
-        // Add event listeners
-        const verifyButton = gateDiv.querySelector('#verify-button');
-        verifyButton.addEventListener('click', () => this.startVerification());
-        
-        // Hover effects
-        verifyButton.addEventListener('mouseenter', () => {
-            verifyButton.style.background = '#5a52d5';
+            
+            checkWallet();
         });
-        verifyButton.addEventListener('mouseleave', () => {
-            verifyButton.style.background = '#635bff';
-        });
-        
-        return gateDiv;
     }
     
-    /**
-     * Check verification status with the API
-     */
-    async checkVerificationStatus() {
-        this.log('Checking verification status...');
-        this.isVerifying = true;
+    async checkStatus() {
+        if (this.state.checking) {
+            return;
+        }
+        
+        this.state.checking = true;
+        this.state.lastCheck = Date.now();
         
         try {
-            // First check if user is already verified in session
-            const statusResponse = await fetch(`${this.options.apiBase}${this.config.endpoints.status}`, {
+            const response = await fetch(`${this.options.apiBase}/api/gate/status?security_level=${this.state.securityLevel}`, {
                 method: 'GET',
-                credentials: 'include',
+                credentials: 'same-origin',
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'Content-Type': 'application/json'
                 }
             });
             
-            if (statusResponse.ok) {
-                const statusResult = await statusResponse.json();
-                
-                if (statusResult.success) {
-                    await this.handleGateAction(statusResult.gate_action, statusResult.data, statusResult.message);
-                    return;
-                }
+            if (!response.ok) {
+                throw new Error(`Status check failed: ${response.status}`);
             }
             
-            // If status check failed, check for wallet credentials
-            await this.checkWalletCredentials();
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || 'Status check failed');
+            }
+            
+            await this.handleStatusResult(result);
             
         } catch (error) {
-            this.error('Status check failed:', error);
-            this.showGate(); // Fallback to showing gate
+            console.error('❌ Status check error:', error);
+            await this.handleError(error);
         } finally {
-            this.isVerifying = false;
+            this.state.checking = false;
         }
     }
     
-    /**
-     * Check for wallet credentials and verify them
-     */
-    async checkWalletCredentials() {
+    async handleStatusResult(result) {
+        const { gate_action, data, message } = result;
+        
+        console.log(`🔍 Gate status: ${gate_action}`, data);
+        
+        switch (gate_action) {
+            case 'allow_access':
+                await this.handleAllowAccess(data);
+                break;
+                
+            case 'check_credentials':
+                await this.handleCheckCredentials(data);
+                break;
+                
+            case 'verify_did':
+                await this.handleVerifyDID(data);
+                break;
+                
+            case 'check_revocation':
+                await this.handleCheckRevocation(data);
+                break;
+                
+            case 'require_reverification':
+                await this.handleRequireReverification(data);
+                break;
+                
+            case 'credential_revoked':
+                await this.handleCredentialRevoked(data);
+                break;
+                
+            default:
+                console.warn('⚠️ Unknown gate action:', gate_action);
+                await this.showGate();
+        }
+        
+        this.options.onStatusChange(gate_action, data);
+    }
+    
+    async handleAllowAccess(data) {
+        this.state.verified = true;
+        this.state.credentialId = data.credential_id;
+        
+        console.log('✅ Access allowed - user verified');
+        this.hideGate();
+        this.showProtectedContent();
+        this.options.onVerified(data);
+    }
+    
+    async handleCheckCredentials(data) {
+        console.log('🔍 Checking user credentials...');
+        
+        if (!this.wallet) {
+            console.log('❌ No wallet available - showing gate');
+            await this.showGate();
+            return;
+        }
+        
         try {
-            // Check if Lemma wallet is available
-            if (!window.lemmaWallet) {
-                this.log('No Lemma wallet found');
-                this.showGate();
-                return;
-            }
-            
-            // Get credentials from wallet
-            const credentials = await window.lemmaWallet.getAllCredentials();
-            
+            const credentials = await this.wallet.getCredentials();
             if (!credentials || credentials.length === 0) {
-                this.log('No credentials in wallet');
-                this.showGate();
+                console.log('❌ No credentials found - showing gate');
+                await this.showGate();
                 return;
             }
             
-            this.log('Found credentials in wallet, verifying...');
-            await this.verifyCredentialsWithAPI(credentials);
+            // Verify credentials with the API
+            await this.verifyCredentials(credentials);
             
         } catch (error) {
-            this.error('Wallet credential check failed:', error);
-            this.showGate();
+            console.error('❌ Credential check failed:', error);
+            await this.showGate();
         }
     }
     
-    /**
-     * Verify credentials with the API
-     */
-    async verifyCredentialsWithAPI(credentials) {
+    async handleVerifyDID(data) {
+        console.log('🔍 DID verification required...');
+        
         try {
-            // Get challenge from API
-            const challengeResponse = await fetch(`${this.options.apiBase}${this.config.endpoints.challenge}`, {
+            const credentials = await this.wallet.getCredentials();
+            if (!credentials || credentials.length === 0) {
+                await this.showGate();
+                return;
+            }
+            
+            // Perform background DID verification
+            await this.verifyCredentials(credentials, { background_did_check: true });
+            
+        } catch (error) {
+            console.error('❌ DID verification failed:', error);
+            await this.handleRequireReverification(data);
+        }
+    }
+    
+    async handleCheckRevocation(data) {
+        console.log('🔍 Revocation check required...');
+        
+        try {
+            const credentials = await this.wallet.getCredentials();
+            if (!credentials || credentials.length === 0) {
+                await this.showGate();
+                return;
+            }
+            
+            // Perform background revocation check
+            await this.verifyCredentials(credentials, { background_revocation_check: true });
+            
+        } catch (error) {
+            console.error('❌ Revocation check failed:', error);
+            await this.handleRequireReverification(data);
+        }
+    }
+    
+    async handleRequireReverification(data) {
+        console.log('⚠️ Re-verification required:', data.reason);
+        
+        this.state.verified = false;
+        this.hideProtectedContent();
+        
+        // Show re-verification gate
+        await this.showGate({
+            title: 'Re-verification Required',
+            message: `Your verification has expired. Please verify again to continue.`,
+            reason: data.reason,
+            isReverification: true
+        });
+        
+        this.options.onReverificationRequired(data);
+    }
+    
+    async handleCredentialRevoked(data) {
+        console.log('❌ Credential has been revoked:', data.revocation_reason);
+        
+        this.state.verified = false;
+        this.state.credentialId = null;
+        
+        // Clear revoked credential from wallet
+        if (this.wallet && data.credential_id) {
+            try {
+                await this.wallet.removeCredential(data.credential_id);
+            } catch (error) {
+                console.error('Failed to remove revoked credential:', error);
+            }
+        }
+        
+        this.hideProtectedContent();
+        
+        // Show revocation notice
+        await this.showGate({
+            title: 'Credential Revoked',
+            message: `Your verification credential has been revoked: ${data.revocation_reason}`,
+            reason: data.revocation_reason,
+            isRevoked: true
+        });
+        
+        this.options.onRevoked(data);
+    }
+    
+    async verifyCredentials(credentials, options = {}) {
+        try {
+            // Generate challenge
+            const challengeResponse = await fetch(`${this.options.apiBase}/api/gate/challenge`, {
                 method: 'GET',
-                credentials: 'include',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
+                credentials: 'same-origin'
             });
             
             if (!challengeResponse.ok) {
-                throw new Error(`Challenge request failed: ${challengeResponse.status}`);
+                throw new Error('Failed to generate challenge');
             }
             
             const challengeResult = await challengeResponse.json();
-            
             if (!challengeResult.success) {
-                throw new Error(challengeResult.error || 'Failed to get challenge');
+                throw new Error(challengeResult.error || 'Challenge generation failed');
             }
             
             // Verify credentials with API
-            const verifyResponse = await fetch(`${this.options.apiBase}${this.config.endpoints.verify_credentials}`, {
+            const verifyResponse = await fetch(`${this.options.apiBase}/api/gate/verify-credentials`, {
                 method: 'POST',
-                credentials: 'include',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
@@ -328,265 +363,437 @@ class LemmaGateAPI {
                 body: JSON.stringify({
                     credentials: credentials,
                     challenge: challengeResult.challenge,
-                    domain: window.location.hostname
+                    domain: window.location.hostname,
+                    security_level: this.state.securityLevel,
+                    force_reverification: options.force_reverification || false,
+                    background_did_check: options.background_did_check || false,
+                    background_revocation_check: options.background_revocation_check || false
                 })
             });
             
             if (!verifyResponse.ok) {
-                const errorData = await verifyResponse.json().catch(() => ({}));
-                throw new Error(errorData.error || `Verification failed: ${verifyResponse.status}`);
+                const errorResult = await verifyResponse.json();
+                throw new Error(errorResult.error || 'Verification failed');
             }
             
-            const verifyResult = await verifyResponse.json();
-            
-            if (verifyResult.success) {
-                await this.handleGateAction(verifyResult.gate_action, verifyResult.data, verifyResult.message);
-            } else {
-                throw new Error(verifyResult.error || 'Verification failed');
+            const result = await verifyResponse.json();
+            if (!result.success) {
+                throw new Error(result.error || 'Verification failed');
             }
+            
+            // Handle successful verification
+            await this.handleAllowAccess(result.data);
             
         } catch (error) {
-            this.error('Credential verification failed:', error);
-            this.showGate();
+            console.error('❌ Credential verification failed:', error);
+            throw error;
         }
     }
     
-    /**
-     * Handle gate action from API response
-     */
-    async handleGateAction(action, data = {}, message = '') {
-        this.log(`Gate action: ${action}`, data, message);
+    async showGate(options = {}) {
+        console.log('🚪 Showing Lemma Gate');
         
-        switch (action) {
-            case 'allow_access':
-                await this.grantAccess(data);
-                break;
-                
-            case 'check_credentials':
-                await this.checkWalletCredentials();
-                break;
-                
-            case 'show_gate':
-            default:
-                this.showGate();
-                break;
+        this.hideProtectedContent();
+        
+        const gateContainer = document.querySelector(this.options.gateContainer);
+        if (!gateContainer) {
+            // Create gate container if it doesn't exist
+            this.createGateContainer(options);
+        } else {
+            // Update existing gate
+            this.updateGateContent(gateContainer, options);
+        }
+        
+        // Show the gate
+        const gate = document.querySelector(this.options.gateContainer);
+        if (gate) {
+            gate.style.display = 'flex';
+            gate.classList.add('lemma-gate-visible');
         }
     }
     
-    /**
-     * Grant access to protected content
-     */
-    async grantAccess(data = {}) {
-        this.log('Access granted', data);
+    createGateContainer(options = {}) {
+        const gate = document.createElement('div');
+        gate.id = this.options.gateContainer.replace('#', '');
+        gate.className = 'lemma-gate-overlay';
         
-        this.isVerified = true;
-        this.hideGate();
-        this.showProtectedContent();
+        const title = options.title || 'Human Verification Required';
+        const message = options.message || 'Please verify that you are human to access this content.';
+        const isReverification = options.isReverification || false;
+        const isRevoked = options.isRevoked || false;
         
-        // Call success callback
-        try {
-            await this.options.onVerified(data);
-        } catch (error) {
-            this.error('onVerified callback error:', error);
-        }
+        gate.innerHTML = `
+            <div class="lemma-gate-modal">
+                <div class="lemma-gate-header">
+                    <h2>${title}</h2>
+                    ${isRevoked ? '<div class="lemma-gate-status revoked">Credential Revoked</div>' : ''}
+                    ${isReverification ? '<div class="lemma-gate-status reverify">Re-verification Required</div>' : ''}
+                </div>
+                <div class="lemma-gate-content">
+                    <p>${message}</p>
+                    <div class="lemma-gate-security-info">
+                        <strong>Security Level:</strong> ${this.state.securityLevel.toUpperCase()}
+                        ${this.config ? `<br><small>Session timeout: ${Math.round(this.config.settings.session_timeout / 3600)}h</small>` : ''}
+                    </div>
+                </div>
+                <div class="lemma-gate-actions">
+                    ${isRevoked ? 
+                        '<button class="lemma-gate-btn primary" onclick="window.location.reload()">Get New Verification</button>' :
+                        '<button class="lemma-gate-btn primary" id="lemma-verify-btn">Verify Human</button>'
+                    }
+                    <button class="lemma-gate-btn secondary" id="lemma-gate-close">Close</button>
+                </div>
+            </div>
+        `;
+        
+        // Add styles
+        this.addGateStyles();
+        
+        // Add event listeners
+        this.addGateEventListeners(gate, options);
+        
+        document.body.appendChild(gate);
     }
     
-    /**
-     * Show the gate overlay
-     */
-    showGate() {
-        this.log('Showing gate');
+    updateGateContent(gateContainer, options = {}) {
+        const title = options.title || 'Human Verification Required';
+        const message = options.message || 'Please verify that you are human to access this content.';
         
-        if (this.gateElement) {
-            this.gateElement.style.display = 'flex';
-            this.hideProtectedContent();
-            
-            // Call gate shown callback
-            try {
-                this.options.onGateShown();
-            } catch (error) {
-                this.error('onGateShown callback error:', error);
+        const header = gateContainer.querySelector('.lemma-gate-header h2');
+        const content = gateContainer.querySelector('.lemma-gate-content p');
+        
+        if (header) header.textContent = title;
+        if (content) content.textContent = message;
+    }
+    
+    addGateEventListeners(gate, options = {}) {
+        const verifyBtn = gate.querySelector('#lemma-verify-btn');
+        const closeBtn = gate.querySelector('#lemma-gate-close');
+        
+        if (verifyBtn) {
+            verifyBtn.addEventListener('click', async () => {
+                await this.startVerification(options);
+            });
+        }
+        
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.hideGate();
+            });
+        }
+        
+        // Close on overlay click
+        gate.addEventListener('click', (e) => {
+            if (e.target === gate) {
+                this.hideGate();
             }
-        }
+        });
     }
     
-    /**
-     * Hide the gate overlay
-     */
-    hideGate() {
-        this.log('Hiding gate');
-        
-        if (this.gateElement) {
-            this.gateElement.style.display = 'none';
-            
-            // Call gate hidden callback
-            try {
-                this.options.onGateHidden();
-            } catch (error) {
-                this.error('onGateHidden callback error:', error);
-            }
-        }
-    }
-    
-    /**
-     * Show protected content
-     */
-    showProtectedContent() {
-        if (this.protectedElement) {
-            this.protectedElement.style.display = '';
-        }
-    }
-    
-    /**
-     * Hide protected content
-     */
-    hideProtectedContent() {
-        if (this.protectedElement) {
-            this.protectedElement.style.display = 'none';
-        }
-    }
-    
-    /**
-     * Start verification process
-     */
-    async startVerification() {
-        this.log('Starting verification process...');
-        
+    async startVerification(options = {}) {
         try {
-            this.showLoading();
-            
-            const response = await fetch(`${this.options.apiBase}${this.config.endpoints.start_verification}`, {
+            const response = await fetch(`${this.options.apiBase}/api/gate/start-verification`, {
                 method: 'POST',
-                credentials: 'include',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: JSON.stringify({
-                    return_url: window.location.href
+                    return_url: window.location.href,
+                    security_level: this.state.securityLevel,
+                    force_reverification: options.isReverification || false
                 })
             });
             
             if (!response.ok) {
-                throw new Error(`Start verification failed: ${response.status}`);
+                throw new Error('Failed to start verification');
             }
             
             const result = await response.json();
-            
-            if (result.success && result.verification_url) {
-                // Redirect to verification flow
-                window.location.href = result.verification_url;
-            } else {
-                throw new Error(result.error || 'Failed to start verification');
+            if (!result.success) {
+                throw new Error(result.error || 'Verification start failed');
             }
+            
+            // Redirect to verification
+            window.location.href = result.verification_url;
             
         } catch (error) {
-            this.error('Start verification failed:', error);
-            this.showError('Failed to start verification process');
+            console.error('❌ Failed to start verification:', error);
+            this.options.onError(error);
         }
     }
     
-    /**
-     * Show loading state
-     */
-    showLoading() {
-        if (this.gateElement) {
-            const button = this.gateElement.querySelector('#verify-button');
-            const loading = this.gateElement.querySelector('#gate-loading');
-            const errorDiv = this.gateElement.querySelector('#gate-error');
-            
-            if (button) button.style.display = 'none';
-            if (loading) loading.style.display = 'block';
-            if (errorDiv) errorDiv.style.display = 'none';
+    hideGate() {
+        const gate = document.querySelector(this.options.gateContainer);
+        if (gate) {
+            gate.style.display = 'none';
+            gate.classList.remove('lemma-gate-visible');
         }
     }
     
-    /**
-     * Show error message
-     */
-    showError(message) {
-        this.error('Showing error:', message);
+    showProtectedContent() {
+        const content = document.querySelector(this.options.protectedContent);
+        if (content) {
+            content.style.display = 'block';
+            content.classList.add('lemma-content-visible');
+        }
+    }
+    
+    hideProtectedContent() {
+        const content = document.querySelector(this.options.protectedContent);
+        if (content) {
+            content.style.display = 'none';
+            content.classList.remove('lemma-content-visible');
+        }
+    }
+    
+    startBackgroundChecks() {
+        if (this.state.checkInterval) {
+            clearInterval(this.state.checkInterval);
+        }
         
-        if (this.gateElement) {
-            const button = this.gateElement.querySelector('#verify-button');
-            const loading = this.gateElement.querySelector('#gate-loading');
-            const errorDiv = this.gateElement.querySelector('#gate-error');
-            
-            if (button) button.style.display = 'inline-block';
-            if (loading) loading.style.display = 'none';
-            if (errorDiv) {
-                errorDiv.textContent = message;
-                errorDiv.style.display = 'block';
+        this.state.checkInterval = setInterval(async () => {
+            if (!this.state.checking && this.state.initialized) {
+                await this.checkStatus();
             }
-        }
+        }, this.options.autoCheckInterval);
         
-        // Call error callback
-        try {
-            this.options.onError(new Error(message));
-        } catch (callbackError) {
-            this.error('onError callback error:', callbackError);  
+        console.log(`🔄 Background checks started (every ${this.options.autoCheckInterval / 1000}s)`);
+    }
+    
+    stopBackgroundChecks() {
+        if (this.state.checkInterval) {
+            clearInterval(this.state.checkInterval);
+            this.state.checkInterval = null;
+            console.log('⏹️ Background checks stopped');
         }
     }
     
-    /**
-     * Retry verification check
-     */
-    async retry() {
-        if (this.retryCount >= this.options.retryAttempts) {
-            this.showError('Maximum retry attempts reached');
-            return;
+    async handleError(error) {
+        this.state.retryCount++;
+        
+        if (this.state.retryCount < this.options.retryAttempts) {
+            console.log(`🔄 Retrying... (${this.state.retryCount}/${this.options.retryAttempts})`);
+            setTimeout(() => {
+                this.checkStatus();
+            }, this.options.retryDelay * this.state.retryCount);
+        } else {
+            console.error('❌ Max retries reached, showing gate');
+            this.state.retryCount = 0;
+            await this.showGate({
+                title: 'Verification Error',
+                message: 'Unable to verify your status. Please try again.',
+                error: this.options.showDetailedErrors ? error.message : undefined
+            });
         }
         
-        this.retryCount++;
-        this.log(`Retrying verification check (attempt ${this.retryCount}/${this.options.retryAttempts})`);
-        
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, this.options.retryDelay));
-        
-        await this.checkVerificationStatus();
+        this.options.onError(error);
     }
     
-    /**
-     * Force recheck verification status
-     */
+    addGateStyles() {
+        if (document.getElementById('lemma-gate-styles')) {
+            return; // Styles already added
+        }
+        
+        const styles = document.createElement('style');
+        styles.id = 'lemma-gate-styles';
+        styles.textContent = `
+            .lemma-gate-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+            
+            .lemma-gate-modal {
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                max-width: 480px;
+                width: 90%;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+                text-align: center;
+            }
+            
+            .lemma-gate-header h2 {
+                margin: 0 0 16px 0;
+                color: #1a1a1a;
+                font-size: 24px;
+                font-weight: 600;
+            }
+            
+            .lemma-gate-status {
+                display: inline-block;
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 600;
+                text-transform: uppercase;
+                margin-bottom: 16px;
+            }
+            
+            .lemma-gate-status.revoked {
+                background: #fee;
+                color: #c53030;
+                border: 1px solid #fed7d7;
+            }
+            
+            .lemma-gate-status.reverify {
+                background: #fff3cd;
+                color: #856404;
+                border: 1px solid #ffeaa7;
+            }
+            
+            .lemma-gate-content p {
+                margin: 0 0 24px 0;
+                color: #4a5568;
+                font-size: 16px;
+                line-height: 1.5;
+            }
+            
+            .lemma-gate-security-info {
+                background: #f7fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 16px;
+                margin: 16px 0;
+                font-size: 14px;
+                color: #2d3748;
+            }
+            
+            .lemma-gate-actions {
+                display: flex;
+                gap: 12px;
+                justify-content: center;
+                margin-top: 24px;
+            }
+            
+            .lemma-gate-btn {
+                padding: 12px 24px;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+                min-width: 120px;
+            }
+            
+            .lemma-gate-btn.primary {
+                background: #635bff;
+                color: white;
+            }
+            
+            .lemma-gate-btn.primary:hover {
+                background: #5a52ff;
+                transform: translateY(-1px);
+            }
+            
+            .lemma-gate-btn.secondary {
+                background: #f7fafc;
+                color: #4a5568;
+                border: 1px solid #e2e8f0;
+            }
+            
+            .lemma-gate-btn.secondary:hover {
+                background: #edf2f7;
+            }
+            
+            @media (max-width: 640px) {
+                .lemma-gate-modal {
+                    padding: 24px;
+                    margin: 16px;
+                }
+                
+                .lemma-gate-actions {
+                    flex-direction: column;
+                }
+            }
+        `;
+        
+        document.head.appendChild(styles);
+    }
+    
+    // Public API methods
+    
+    async setSecurityLevel(level) {
+        if (!['basic', 'standard', 'high', 'maximum'].includes(level)) {
+            throw new Error('Invalid security level');
+        }
+        
+        this.state.securityLevel = level;
+        await this.loadConfig();
+        await this.checkStatus();
+        
+        console.log(`🔒 Security level changed to: ${level}`);
+    }
+    
     async forceRecheck() {
-        this.log('Forcing verification recheck...');
-        this.retryCount = 0;
-        this.isVerified = false;
-        await this.checkVerificationStatus();
+        console.log('🔄 Forcing status recheck...');
+        await this.checkStatus();
     }
     
-    /**
-     * Get current gate status
-     */
     getStatus() {
         return {
-            isInitialized: this.isInitialized,
-            isVerifying: this.isVerifying,
-            isVerified: this.isVerified,
-            retryCount: this.retryCount,
+            initialized: this.state.initialized,
+            verified: this.state.verified,
+            credentialId: this.state.credentialId,
+            securityLevel: this.state.securityLevel,
+            lastCheck: this.state.lastCheck,
             config: this.config
         };
     }
     
-    /**
-     * Logging helper
-     */
-    log(...args) {
-        if (this.options.debug) {
-            console.log('[Lemma Gate API]', ...args);
+    destroy() {
+        this.stopBackgroundChecks();
+        this.hideGate();
+        
+        // Remove gate container
+        const gate = document.querySelector(this.options.gateContainer);
+        if (gate) {
+            gate.remove();
         }
-    }
-    
-    /**
-     * Error logging helper
-     */
-    error(...args) {
-        console.error('[Lemma Gate API]', ...args);
+        
+        // Remove styles
+        const styles = document.getElementById('lemma-gate-styles');
+        if (styles) {
+            styles.remove();
+        }
+        
+        console.log('🗑️ Lemma Gate API destroyed');
     }
 }
 
-// Export for module usage
+// Auto-initialize if data-lemma-gate attribute is present
+document.addEventListener('DOMContentLoaded', () => {
+    const gateElements = document.querySelectorAll('[data-lemma-gate]');
+    
+    gateElements.forEach(element => {
+        const securityLevel = element.getAttribute('data-security-level') || 'standard';
+        const protectedContent = element.getAttribute('data-protected-content') || element;
+        
+        new LemmaGateAPI({
+            protectedContent: protectedContent,
+            securityLevel: securityLevel,
+            onVerified: () => {
+                console.log('✅ Auto-initialized Lemma Gate: User verified');
+            },
+            onError: (error) => {
+                console.error('❌ Auto-initialized Lemma Gate error:', error);
+            }
+        });
+    });
+});
+
+// Export for module systems
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = LemmaGateAPI;
 }
