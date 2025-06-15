@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Management - Lemma Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
+    <style>
+        .customer-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        
+        .customer-table th,
+        .customer-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e6ebf1;
+        }
+        
+        .customer-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #425466;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
+        .status-active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-suspended {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .action-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .btn-suspend {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .btn-activate {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .search-filters {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            align-items: center;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+        }
+        
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background-color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Left Navigation -->
+        <nav class="admin-sidebar">
+            <div class="sidebar-header">
+                <h2>Lemma Admin</h2>
+            </div>
+            <ul class="sidebar-nav">
+                <li><a href="/admin">Overview</a></li>
+                <li><a href="/admin/customers" class="active">Customers</a></li>
+                <li><a href="/admin/api-keys">API Keys</a></li>
+                <li><a href="/admin/credentials">Credentials</a></li>
+                <li><a href="/admin/revocation">Revocation</a></li>
+                <li><a href="/admin/billing">Billing</a></li>
+                <li><a href="/admin/webhooks">Webhooks</a></li>
+                <li><a href="/admin/sre">SRE</a></li>
+                <li><a href="/admin/alerts">Alerts</a></li>
+                <li><a href="/admin/compliance">Compliance</a></li>
+                <li><a href="/admin/audit">Audit</a></li>
+                <li><a href="/admin/settings">Settings</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <div class="admin-header">
+                <h1>Customer Management</h1>
+                <p>Manage customer accounts, domains, and API access</p>
+            </div>
+
+            <div class="admin-content">
+                <!-- Search and Filters -->
+                <div class="search-filters">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search by email or domain...">
+                    <select id="statusFilter" class="filter-select">
+                        <option value="all">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="suspended">Suspended</option>
+                    </select>
+                    <button onclick="loadCustomers()" class="btn btn-primary">Refresh</button>
+                </div>
+
+                <!-- Customer Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Customer Accounts</h3>
+                        <span id="customerCount" class="text-muted">Loading...</span>
+                    </div>
+                    <div class="card-body">
+                        <table class="customer-table">
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Domain</th>
+                                    <th>Status</th>
+                                    <th>API Scopes</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customerTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center">Loading customers...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let customers = [];
+
+        async function loadCustomers() {
+            try {
+                const search = document.getElementById('searchInput').value;
+                const status = document.getElementById('statusFilter').value;
+                
+                const params = new URLSearchParams();
+                if (search) params.append('search', search);
+                if (status !== 'all') params.append('status', status);
+                
+                const response = await fetch(`/admin/api/customers?${params}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                customers = data.customers;
+                renderCustomers();
+                document.getElementById('customerCount').textContent = `${data.total} customers`;
+                
+            } catch (error) {
+                console.error('Error loading customers:', error);
+                document.getElementById('customerTableBody').innerHTML = 
+                    `<tr><td colspan="6" class="text-center text-danger">Error: ${error.message}</td></tr>`;
+            }
+        }
+
+        function renderCustomers() {
+            const tbody = document.getElementById('customerTableBody');
+            
+            if (customers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No customers found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = customers.map(customer => `
+                <tr>
+                    <td>${customer.email || 'N/A'}</td>
+                    <td>${customer.domain || 'N/A'}</td>
+                    <td>
+                        <span class="status-badge status-${customer.status || 'active'}">
+                            ${(customer.status || 'active').toUpperCase()}
+                        </span>
+                    </td>
+                    <td>${(customer.api_scopes || []).join(', ') || 'VERIFY'}</td>
+                    <td>${formatDate(customer.created || customer.registered)}</td>
+                    <td>
+                        <button 
+                            onclick="toggleCustomerStatus('${customer.id}')" 
+                            class="action-btn ${customer.status === 'suspended' ? 'btn-activate' : 'btn-suspend'}">
+                            ${customer.status === 'suspended' ? 'Activate' : 'Suspend'}
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function toggleCustomerStatus(customerId) {
+            try {
+                const response = await fetch(`/admin/api/customers/${customerId}/toggle-status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                // Reload customers to reflect changes
+                await loadCustomers();
+                
+                // Show success message
+                showNotification(`Customer ${data.new_status === 'active' ? 'activated' : 'suspended'} successfully`, 'success');
+                
+            } catch (error) {
+                console.error('Error toggling customer status:', error);
+                showNotification(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                return new Date(dateString).toLocaleDateString();
+            } catch {
+                return dateString;
+            }
+        }
+
+        function showNotification(message, type) {
+            // Simple notification system
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 16px;
+                border-radius: 4px;
+                color: white;
+                background-color: ${type === 'success' ? '#28a745' : '#dc3545'};
+                z-index: 1000;
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('input', debounce(loadCustomers, 300));
+        document.getElementById('statusFilter').addEventListener('change', loadCustomers);
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Load customers on page load
+        document.addEventListener('DOMContentLoaded', loadCustomers);
+    </script>
+</body>
+</html> 

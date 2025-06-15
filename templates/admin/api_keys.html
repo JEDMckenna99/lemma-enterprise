@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Key Management - Lemma Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
+    <style>
+        .api-key-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        
+        .api-key-table th,
+        .api-key-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e6ebf1;
+        }
+        
+        .api-key-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #425466;
+        }
+        
+        .key-display {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background-color: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .scope-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        
+        .scope-tag {
+            background-color: #635bff;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .btn-rotate {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-revoke {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .create-key-form {
+            background-color: #f8f9fa;
+            padding: 24px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .scope-checkboxes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .scope-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 24px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Left Navigation -->
+        <nav class="admin-sidebar">
+            <div class="sidebar-header">
+                <h2>Lemma Admin</h2>
+            </div>
+            <ul class="sidebar-nav">
+                <li><a href="/admin">Overview</a></li>
+                <li><a href="/admin/customers">Customers</a></li>
+                <li><a href="/admin/api-keys" class="active">API Keys</a></li>
+                <li><a href="/admin/credentials">Credentials</a></li>
+                <li><a href="/admin/revocation">Revocation</a></li>
+                <li><a href="/admin/billing">Billing</a></li>
+                <li><a href="/admin/webhooks">Webhooks</a></li>
+                <li><a href="/admin/sre">SRE</a></li>
+                <li><a href="/admin/alerts">Alerts</a></li>
+                <li><a href="/admin/compliance">Compliance</a></li>
+                <li><a href="/admin/audit">Audit</a></li>
+                <li><a href="/admin/settings">Settings</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <div class="admin-header">
+                <h1>API Key Management</h1>
+                <p>Create, rotate, and manage API keys with scoped permissions</p>
+            </div>
+
+            <div class="admin-content">
+                <!-- Create New API Key -->
+                <div class="create-key-form">
+                    <h3>Create New API Key</h3>
+                    <form id="createKeyForm">
+                        <div class="form-group">
+                            <label class="form-label" for="keyName">Key Name</label>
+                            <input type="text" id="keyName" class="form-input" placeholder="e.g., Production API Key" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Scopes</label>
+                            <div class="scope-checkboxes">
+                                <label class="scope-checkbox">
+                                    <input type="checkbox" value="VERIFY" checked>
+                                    <span>VERIFY</span>
+                                </label>
+                                <label class="scope-checkbox">
+                                    <input type="checkbox" value="ISSUE">
+                                    <span>ISSUE</span>
+                                </label>
+                                <label class="scope-checkbox">
+                                    <input type="checkbox" value="BILLING">
+                                    <span>BILLING</span>
+                                </label>
+                                <label class="scope-checkbox">
+                                    <input type="checkbox" value="ADMIN">
+                                    <span>ADMIN</span>
+                                </label>
+                                <label class="scope-checkbox">
+                                    <input type="checkbox" value="READONLY">
+                                    <span>READONLY</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Create API Key</button>
+                    </form>
+                </div>
+
+                <!-- API Keys Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>API Keys</h3>
+                        <span id="keyCount" class="text-muted">Loading...</span>
+                    </div>
+                    <div class="card-body">
+                        <table class="api-key-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Key</th>
+                                    <th>Scopes</th>
+                                    <th>Created</th>
+                                    <th>Last Used</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="keyTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center">Loading API keys...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- New Key Modal -->
+    <div id="newKeyModal" class="modal">
+        <div class="modal-content">
+            <h3>New API Key Created</h3>
+            <p>Your new API key has been created. <strong>Save this key now - you won't be able to see it again!</strong></p>
+            <div class="key-display" id="newKeyDisplay" style="margin: 16px 0; padding: 12px; font-size: 14px;"></div>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button onclick="copyToClipboard()" class="btn btn-secondary">Copy Key</button>
+                <button onclick="closeModal()" class="btn btn-primary">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let apiKeys = [];
+        let newApiKey = '';
+
+        async function loadApiKeys() {
+            try {
+                const response = await fetch('/admin/api/api-keys');
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                apiKeys = data.api_keys;
+                renderApiKeys();
+                document.getElementById('keyCount').textContent = `${data.total} keys`;
+                
+            } catch (error) {
+                console.error('Error loading API keys:', error);
+                document.getElementById('keyTableBody').innerHTML = 
+                    `<tr><td colspan="6" class="text-center text-danger">Error: ${error.message}</td></tr>`;
+            }
+        }
+
+        function renderApiKeys() {
+            const tbody = document.getElementById('keyTableBody');
+            
+            if (apiKeys.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No API keys found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = apiKeys.map(key => `
+                <tr>
+                    <td>${key.name || 'Unnamed'}</td>
+                    <td><code class="key-display">${key.masked_key || 'N/A'}</code></td>
+                    <td>
+                        <div class="scope-tags">
+                            ${(key.scopes || ['VERIFY']).map(scope => 
+                                `<span class="scope-tag">${scope}</span>`
+                            ).join('')}
+                        </div>
+                    </td>
+                    <td>${formatDate(key.created_display)}</td>
+                    <td>${key.last_used_display || 'Never'}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button onclick="rotateKey('${key.id}')" class="btn-small btn-rotate">Rotate</button>
+                            <button onclick="revokeKey('${key.id}')" class="btn-small btn-revoke">Revoke</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function createApiKey(event) {
+            event.preventDefault();
+            
+            try {
+                const name = document.getElementById('keyName').value;
+                const scopes = Array.from(document.querySelectorAll('.scope-checkbox input:checked'))
+                    .map(cb => cb.value);
+                
+                if (scopes.length === 0) {
+                    throw new Error('At least one scope must be selected');
+                }
+                
+                const response = await fetch('/admin/api/api-keys/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, scopes })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                // Show the new key in modal
+                newApiKey = data.api_key;
+                document.getElementById('newKeyDisplay').textContent = newApiKey;
+                document.getElementById('newKeyModal').style.display = 'block';
+                
+                // Reset form
+                document.getElementById('createKeyForm').reset();
+                document.querySelector('.scope-checkbox input[value="VERIFY"]').checked = true;
+                
+                // Reload keys
+                await loadApiKeys();
+                
+            } catch (error) {
+                console.error('Error creating API key:', error);
+                showNotification(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function rotateKey(keyId) {
+            if (!confirm('Are you sure you want to rotate this API key? The old key will be invalidated.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/admin/api/api-keys/${keyId}/rotate`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                showNotification('API key rotated successfully', 'success');
+                await loadApiKeys();
+                
+            } catch (error) {
+                console.error('Error rotating API key:', error);
+                showNotification(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function revokeKey(keyId) {
+            if (!confirm('Are you sure you want to revoke this API key? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/admin/api/api-keys/${keyId}/revoke`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                showNotification('API key revoked successfully', 'success');
+                await loadApiKeys();
+                
+            } catch (error) {
+                console.error('Error revoking API key:', error);
+                showNotification(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function copyToClipboard() {
+            navigator.clipboard.writeText(newApiKey).then(() => {
+                showNotification('API key copied to clipboard', 'success');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = newApiKey;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showNotification('API key copied to clipboard', 'success');
+            });
+        }
+
+        function closeModal() {
+            document.getElementById('newKeyModal').style.display = 'none';
+            newApiKey = '';
+        }
+
+        function formatDate(dateString) {
+            if (!dateString || dateString === 'Unknown') return 'N/A';
+            try {
+                return new Date(dateString).toLocaleDateString();
+            } catch {
+                return dateString;
+            }
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 16px;
+                border-radius: 4px;
+                color: white;
+                background-color: ${type === 'success' ? '#28a745' : '#dc3545'};
+                z-index: 1000;
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Event listeners
+        document.getElementById('createKeyForm').addEventListener('submit', createApiKey);
+
+        // Close modal when clicking outside
+        document.getElementById('newKeyModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                closeModal();
+            }
+        });
+
+        // Load API keys on page load
+        document.addEventListener('DOMContentLoaded', loadApiKeys);
+    </script>
+</body>
+</html> 
