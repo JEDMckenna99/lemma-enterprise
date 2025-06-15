@@ -198,7 +198,71 @@
 
         p {
             margin-bottom: var(--space-4);
-            color: var(--gray-600);
+        }
+
+        /* Enhanced 2025 SaaS Styles - Protected Page Components */
+        .lemma-verification-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            padding: 8px 16px;
+            background: #10b981;
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+
+        .lemma-verification-status.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .credential-sync-indicator {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 8px;
+            padding: 2px 6px;
+            background: #f3f4f6;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .credential-sync-indicator.synced {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .credential-sync-indicator.syncing {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .credential-management-enhanced {
+            position: relative;
+        }
+
+        .credential-management-enhanced::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+            border-radius: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .credential-management-enhanced:hover::before {
+            opacity: 0.1;
         }
 
         a {
