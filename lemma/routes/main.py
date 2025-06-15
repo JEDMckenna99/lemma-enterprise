@@ -10,7 +10,7 @@ import time
 import random
 from flask import (
     Blueprint, render_template, request, redirect, 
-    url_for, session, jsonify, abort, flash, current_app, make_response, send_file
+    url_for, session, jsonify, abort, flash, current_app, make_response, send_file, Response
 )
 from lemma.core.credential_service import get_credential_service
 from lemma.auth.csrf_config import generate_csrf, csrf_protect
