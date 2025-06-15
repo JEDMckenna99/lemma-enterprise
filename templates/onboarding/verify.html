@@ -4,6 +4,10 @@
 
 {% block content %}
 <div class="lemma-container">
+    <!-- 2025 SaaS Standards: Progress Bar -->
+    {% set step = 2 %}
+    {% include 'onboarding/components/progress_bar.html' %}
+    
     <div class="verify-page">
         <!-- Header Section -->
         <div class="verify-header">
@@ -206,23 +210,51 @@ async function verifyDomain() {
         const result = await response.json();
         
         if (result.success && result.verified) {
-            // Success! Show success message and redirect
+            // 2025 SaaS Standards: Post-verification toast with direct API Keys link
             statusDiv.innerHTML = `
-                <div class="alert alert-success">
-                    <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 12l2 2 4-4"/>
-                        <circle cx="12" cy="12" r="9"/>
-                    </svg>
-                    <div class="alert-content">
-                        <strong>Domain verified successfully!</strong><br>
-                        Verified via ${result.method}. Redirecting to your dashboard...
+                <div class="alert alert-success verification-success-toast">
+                    <div class="toast-content">
+                        <div class="toast-header">
+                            <svg class="toast-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 12l2 2 4-4"/>
+                                <circle cx="12" cy="12" r="9"/>
+                            </svg>
+                            <strong>🎉 Domain verified successfully!</strong>
+                        </div>
+                        <div class="toast-body">
+                            <p>Verified via ${result.method}. You're ready to integrate!</p>
+                            <div class="toast-actions">
+                                <a href="{{ url_for('onboarding.api_keys') }}" class="btn btn-primary btn-sm">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                        <circle cx="12" cy="16" r="1"/>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                    </svg>
+                                    Get API Keys
+                                </a>
+                                <a href="{{ url_for('onboarding.dashboard') }}" class="btn btn-secondary btn-sm">
+                                    View Dashboard
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="toast-progress">
+                        <div class="toast-progress-bar"></div>
                     </div>
                 </div>
             `;
             
-            setTimeout(() => {
-                window.location.href = '{{ url_for("onboarding.dashboard") }}';
-            }, 2000);
+            // Animate progress bar over 5 seconds, then auto-redirect if no action taken
+            const progressBar = statusDiv.querySelector('.toast-progress-bar');
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 2;
+                progressBar.style.width = progress + '%';
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    window.location.href = '{{ url_for("onboarding.dashboard") }}';
+                }
+            }, 100);
         } else {
             // Show error
             statusDiv.innerHTML = `
@@ -666,6 +698,126 @@ function copyToClipboard(elementId) {
     .record-value code {
         flex: 1;
         min-width: 0;
+    }
+}
+
+/* 2025 SaaS Standards: Enhanced Post-Verification Toast */
+.verification-success-toast {
+    background: var(--color-white);
+    border: 1px solid var(--color-success);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    position: relative;
+    animation: toastSlideIn 0.4s var(--easing-swift-out);
+}
+
+.toast-content {
+    padding: var(--spacing-4);
+}
+
+.toast-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-3);
+}
+
+.toast-icon {
+    color: var(--color-success);
+    flex-shrink: 0;
+}
+
+.toast-header strong {
+    color: var(--color-success);
+    font-size: var(--font-size-base);
+}
+
+.toast-body p {
+    color: var(--color-gray-600);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-4);
+}
+
+.toast-actions {
+    display: flex;
+    gap: var(--spacing-2);
+    flex-wrap: wrap;
+}
+
+.btn-sm {
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    border-radius: var(--border-radius-md);
+    text-decoration: none;
+    transition: all var(--transition-fast) var(--easing-swift-out);
+}
+
+.btn-primary.btn-sm {
+    background: var(--color-primary);
+    color: var(--color-white);
+    border: 1px solid var(--color-primary);
+}
+
+.btn-primary.btn-sm:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary.btn-sm {
+    background: var(--color-white);
+    color: var(--color-gray-700);
+    border: 1px solid var(--color-gray-300);
+}
+
+.btn-secondary.btn-sm:hover {
+    background: var(--color-gray-50);
+    border-color: var(--color-gray-400);
+    transform: translateY(-1px);
+}
+
+.toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--color-gray-100);
+}
+
+.toast-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-success), var(--color-success-light));
+    width: 0%;
+    transition: width 0.1s linear;
+}
+
+@keyframes toastSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Mobile responsiveness for toast */
+@media (max-width: 768px) {
+    .toast-actions {
+        flex-direction: column;
+    }
+    
+    .btn-sm {
+        justify-content: center;
+        width: 100%;
     }
 }
 </style>
