@@ -15,6 +15,7 @@ import threading
 from dataclasses import dataclass, asdict
 
 from lemma.routes.api import require_api_key
+from lemma.monitoring.alert_manager import get_alert_manager
 
 # Simple rate limiting decorator
 def rate_limit(f):
@@ -375,44 +376,221 @@ def get_billing_job_dashboard():
 @require_api_key
 @rate_limit
 def get_current_alerts():
-    """Get currently triggered alerts."""
-    triggered_alerts = alert_manager.check_alerts()
-    
-    return jsonify({
-        "success": True,
-        "alerts": triggered_alerts,
-        "alert_count": len(triggered_alerts),
-        "timestamp": datetime.now().isoformat()
-    })
+    """Get all currently active alerts"""
+    try:
+        alert_manager = get_alert_manager()
+        active_alerts = alert_manager.get_active_alerts()
+        
+        return jsonify({
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat(),
+            "active_alerts": active_alerts,
+            "alert_count": len(active_alerts)
+        })
+    except Exception as e:
+        logger.error(f"Error getting current alerts: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to retrieve current alerts"
+        }), 500
 
 @sre_bp.route('/alerts/history', methods=['GET'])
 @require_api_key
 @rate_limit
-def get_alerts_history():
-    """Get alerts history."""
-    limit = int(request.args.get('limit', 100))
-    
-    recent_alerts = list(alert_manager.alerts_history)[-limit:]
-    
-    return jsonify({
-        "success": True,
-        "alerts_history": recent_alerts,
-        "total_alerts": len(alert_manager.alerts_history),
-        "timestamp": datetime.now().isoformat()
-    })
+def get_alert_history():
+    """Get alert history"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        alert_manager = get_alert_manager()
+        alert_history = alert_manager.get_alert_history(limit=limit)
+        
+        return jsonify({
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat(),
+            "alert_history": alert_history,
+            "history_count": len(alert_history)
+        })
+    except Exception as e:
+        logger.error(f"Error getting alert history: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to retrieve alert history"
+        }), 500
 
 @sre_bp.route('/alerts/rules', methods=['GET'])
 @require_api_key
 @rate_limit
 def get_alert_rules():
-    """Get configured alert rules."""
-    rules = [asdict(rule) for rule in alert_manager.rules]
-    
-    return jsonify({
-        "success": True,
-        "alert_rules": rules,
-        "timestamp": datetime.now().isoformat()
-    })
+    """Get configured alert rules and thresholds"""
+    try:
+        alert_manager = get_alert_manager()
+        
+        rules = [
+            {
+                "id": "verify_error_rate",
+                "name": "Verify Error Rate High",
+                "threshold": "≥ 1% for 5 min",
+                "severity": "critical",
+                "auto_action": "Create status-page incident",
+                "description": "Notify SRE-OnCall when verification error rate exceeds 1% for 5 minutes"
+            },
+            {
+                "id": "p95_latency",
+                "name": "P95 Latency High", 
+                "threshold": "> 250ms for 15 min",
+                "severity": "warning",
+                "auto_action": "Scale pods / CDN purge",
+                "description": "Auto-scale and purge CDN when P95 latency exceeds 250ms for 15 minutes"
+            },
+            {
+                "id": "bloom_filter_issue",
+                "name": "Bloom Filter Issue",
+                "threshold": "Download fail or size > 4× median",
+                "severity": "critical", 
+                "auto_action": "Roll back to previous epoch",
+                "description": "Auto-rollback bloom filter on download failure or size anomaly"
+            },
+            {
+                "id": "billing_rollup_miss",
+                "name": "Billing Rollup Missed",
+                "threshold": "Misses 02:00 UTC",
+                "severity": "critical",
+                "auto_action": "Page Billing-Ops",
+                "description": "Page billing operations team when rollup misses 02:00 UTC deadline"
+            },
+            {
+                "id": "secrets_overdue",
+                "name": "Secrets Rotation Overdue",
+                "threshold": "> 90 days",
+                "severity": "warning",
+                "auto_action": "Slack #sec-ops",
+                "description": "Notify security operations when secrets rotation is overdue"
+            }
+        ]
+        
+        return jsonify({
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat(),
+            "alert_rules": rules,
+            "rule_count": len(rules)
+        })
+    except Exception as e:
+        logger.error(f"Error getting alert rules: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to retrieve alert rules"
+        }), 500
+
+@sre_bp.route('/alerts/run-check', methods=['POST'])
+def run_alert_check():
+    """Manually trigger alert monitoring cycle"""
+    try:
+        alert_manager = get_alert_manager()
+        results = alert_manager.run_monitoring_cycle()
+        
+        return jsonify({
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat(),
+            "monitoring_results": results
+        })
+    except Exception as e:
+        logger.error(f"Error running alert check: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to run alert check"
+        }), 500
+
+@sre_bp.route('/alerts/resolve/<alert_id>', methods=['POST'])
+def resolve_alert(alert_id):
+    """Manually resolve an active alert"""
+    try:
+        alert_manager = get_alert_manager()
+        success = alert_manager.resolve_alert(alert_id)
+        
+        if success:
+            return jsonify({
+                "success": True,
+                "timestamp": datetime.utcnow().isoformat(),
+                "message": f"Alert {alert_id} resolved successfully"
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": f"Alert {alert_id} not found or already resolved"
+            }), 404
+    except Exception as e:
+        logger.error(f"Error resolving alert {alert_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to resolve alert"
+        }), 500
+
+@sre_bp.route('/alerts/test-pagerduty', methods=['POST'])
+def test_pagerduty_integration():
+    """Test PagerDuty integration with a test alert"""
+    try:
+        from lemma.monitoring.alert_manager import Alert, AlertSeverity, AlertStatus
+        
+        # Create a test alert
+        test_alert = Alert(
+            id="test_alert",
+            name="Test Alert",
+            description="This is a test alert to verify PagerDuty integration",
+            severity=AlertSeverity.INFO,
+            status=AlertStatus.ACTIVE,
+            threshold="Test threshold",
+            current_value="Test value",
+            triggered_at=datetime.utcnow(),
+            auto_action="Test action"
+        )
+        
+        alert_manager = get_alert_manager()
+        incident_id = alert_manager.pagerduty.create_incident(test_alert)
+        
+        if incident_id:
+            return jsonify({
+                "success": True,
+                "timestamp": datetime.utcnow().isoformat(),
+                "message": "PagerDuty test alert sent successfully",
+                "incident_id": incident_id
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "PagerDuty integration not configured or failed"
+            }), 500
+    except Exception as e:
+        logger.error(f"Error testing PagerDuty integration: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to test PagerDuty integration"
+        }), 500
+
+@sre_bp.route('/alerts/monitor-status', methods=['GET'])
+def get_monitor_status():
+    """Get background monitoring service status"""
+    try:
+        from lemma.monitoring.background_monitor import get_background_monitor
+        
+        monitor = get_background_monitor()
+        status = monitor.get_status()
+        
+        return jsonify({
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat(),
+            "monitor_status": status,
+            "integrations": {
+                "pagerduty_configured": bool(os.getenv('PAGERDUTY_INTEGRATION_KEY')),
+                "slack_configured": bool(os.getenv('SLACK_WEBHOOK_URL')),
+                "statuspage_configured": bool(os.getenv('STATUSPAGE_API_KEY'))
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error getting monitor status: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to get monitor status"
+        }), 500
 
 # Data Collection Endpoints
 

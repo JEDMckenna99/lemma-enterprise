@@ -255,6 +255,16 @@ def create_app(test_config=None):
     except Exception as e:
         app.logger.error(f"Error initializing performance middleware: {e}")
 
+    # Initialize background monitoring for alerts
+    try:
+        from lemma.monitoring.background_monitor import start_background_monitoring
+        start_background_monitoring()
+        app.logger.info("Background monitoring service started - PagerDuty alerts enabled")
+    except ImportError as e:
+        app.logger.warning(f"Background monitoring not available: {e}")
+    except Exception as e:
+        app.logger.error(f"Error starting background monitoring: {e}")
+
     # Clean up resources at the end of requests
     @app.teardown_appcontext
     def teardown_db(exception):
