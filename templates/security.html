@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+
+{% block title %}Security & Compliance - Lemma{% endblock %}
+{% block description %}Learn about Lemma's enterprise-grade security, SOC 2 compliance, and privacy-first approach to human verification.{% endblock %}
+
+{% block content %}
+<div class="container py-20">
+    <!-- Hero Section -->
+    <div class="text-center mb-16">
+        <h1 class="text-4xl font-bold mb-4">Security & Compliance</h1>
+        <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+            Enterprise-grade security and privacy-first design built into every layer of our human verification infrastructure.
+        </p>
+    </div>
+    
+    <!-- Security Stats -->
+    <div class="grid grid-cols-4 gap-8 mb-16">
+        <div class="text-center">
+            <div class="text-3xl font-bold text-primary-600 mb-2">SOC 2</div>
+            <div class="text-gray-600">Type II Ready</div>
+        </div>
+        <div class="text-center">
+            <div class="text-3xl font-bold text-primary-600 mb-2">99.9%</div>
+            <div class="text-gray-600">Uptime SLA</div>
+        </div>
+        <div class="text-center">
+            <div class="text-3xl font-bold text-primary-600 mb-2">256-bit</div>
+            <div class="text-gray-600">AES Encryption</div>
+        </div>
+        <div class="text-center">
+            <div class="text-3xl font-bold text-primary-600 mb-2">24/7</div>
+            <div class="text-gray-600">Security Monitoring</div>
+        </div>
+    </div>
+    
+    <!-- Security Contact -->
+    <div class="text-center">
+        <h2 class="text-2xl font-bold mb-4">Security Questions?</h2>
+        <p class="text-gray-600 mb-6">
+            Have security questions or want to report a vulnerability? Our security team is here to help.
+        </p>
+        <div class="flex justify-center gap-4">
+            <a href="/contact" class="btn btn-primary">Contact Security Team</a>
+            <a href="/status" class="btn btn-outline">View System Status</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

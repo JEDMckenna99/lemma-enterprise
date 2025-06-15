@@ -1,0 +1,158 @@
+{% extends "layout.html" %}
+
+{% block title %}Contact Us - Lemma{% endblock %}
+{% block description %}Get in touch with the Lemma team for support, partnerships, or enterprise inquiries.{% endblock %}
+
+{% block content %}
+<div class="container py-20">
+    <div class="text-center mb-16">
+        <h1 class="text-4xl font-bold mb-4">Get in Touch</h1>
+        <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+            Have questions about Lemma? We're here to help you build trust in your digital platform.
+        </p>
+    </div>
+    
+    <div class="grid grid-cols-2 gap-12 max-w-6xl mx-auto">
+        <!-- Contact Form -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="text-2xl font-semibold">Send us a message</h2>
+                <p class="text-gray-600">We'll get back to you within 24 hours.</p>
+            </div>
+            <div class="card-body">
+                <form class="space-y-6">
+                    <div class="form-group">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-input" placeholder="Your name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" placeholder="your@email.com" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Company</label>
+                        <input type="text" class="form-input" placeholder="Your company (optional)">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Subject</label>
+                        <select class="form-input">
+                            <option>General Inquiry</option>
+                            <option>Technical Support</option>
+                            <option>Enterprise Sales</option>
+                            <option>Partnership</option>
+                            <option>Security Question</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Message</label>
+                        <textarea class="form-input" rows="4" placeholder="Tell us how we can help..." required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-full">Send Message</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Contact Information -->
+        <div class="space-y-8">
+            <!-- Support -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192L5.636 18.364M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold mb-2">Technical Support</h3>
+                            <p class="text-gray-600 text-sm mb-3">Need help with integration or troubleshooting?</p>
+                            <a href="/docs" class="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                                View Documentation →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sales -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2V6"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold mb-2">Enterprise Sales</h3>
+                            <p class="text-gray-600 text-sm mb-3">Ready for enterprise deployment?</p>
+                            <a href="/onboarding/register" class="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                                Start Enterprise Trial →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Security -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold mb-2">Security & Compliance</h3>
+                            <p class="text-gray-600 text-sm mb-3">Questions about our security practices?</p>
+                            <a href="/security" class="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                                View Security Details →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Response Times -->
+            <div class="bg-gray-50 rounded-lg p-6">
+                <h3 class="font-semibold mb-4">Response Times</h3>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">General Inquiries</span>
+                        <span class="font-medium">24 hours</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Technical Support</span>
+                        <span class="font-medium">4 hours</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Enterprise Sales</span>
+                        <span class="font-medium">1 hour</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Security Issues</span>
+                        <span class="font-medium text-red-600">Immediate</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Links -->
+    <div class="text-center mt-16">
+        <h3 class="text-xl font-semibold mb-6">Looking for something specific?</h3>
+        <div class="flex justify-center gap-4">
+            <a href="/api-docs" class="btn btn-outline">API Documentation</a>
+            <a href="/status" class="btn btn-outline">System Status</a>
+            <a href="/gate-demo" class="btn btn-outline">Live Demo</a>
+            <a href="/pricing" class="btn btn-outline">Pricing</a>
+        </div>
+    </div>
+</div>
+{% endblock %} 

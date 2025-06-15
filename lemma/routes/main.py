@@ -846,3 +846,38 @@ def gate_demo():
         </body>
         </html>
         """
+
+@main_bp.route('/contact')
+def contact():
+    """Contact page"""
+    return render_template('contact.html')
+
+@main_bp.route('/about')
+def about():
+    """About page"""
+    return render_template('about.html')
+
+@main_bp.route('/blog')
+def blog():
+    """Blog page"""
+    return render_template('blog.html')
+
+@main_bp.route('/careers')
+def careers():
+    """Careers page"""
+    return render_template('careers.html')
+
+@main_bp.route('/privacy')
+def privacy():
+    """Privacy policy page"""
+    return render_template('privacy.html')
+
+@main_bp.route('/terms')
+def terms():
+    """Terms of service page"""
+    return render_template('terms.html')
+
+@main_bp.route('/security')
+def security():
+    """Security page"""
+    return render_template('security.html')
