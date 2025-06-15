@@ -175,27 +175,24 @@ def create_app(test_config=None):
         app.logger.error(f"Error initializing components: {e}")
         # Continue anyway - some components may work
     
-    # Register blueprints directly from their modules
-    try:
-        from lemma.routes.main import main_bp
-        from lemma.routes.admin import admin_bp 
-        from lemma.routes.api import api_bp
-        from lemma.routes.onboarding import onboarding_bp
-        from lemma.routes.billing import billing_bp
-        from lemma.routes.gate_demo import gate_demo
-        from lemma.routes.sandbox import sandbox_bp
-        
-        app.register_blueprint(main_bp)
-        app.register_blueprint(admin_bp, url_prefix='/admin')
-        app.register_blueprint(api_bp, url_prefix='/api')
-        app.register_blueprint(onboarding_bp, url_prefix='/onboarding')
-        app.register_blueprint(billing_bp, url_prefix='/billing')
-        app.register_blueprint(gate_demo)  # No prefix for gate demo routes
-        app.register_blueprint(sandbox_bp)  # Already has url_prefix='/api/sandbox'
-        app.logger.info("Successfully registered all blueprints including gate demo and sandbox")
-    except Exception as e:
-        app.logger.error(f"Error registering blueprints: {e}")
-        raise  # This is critical - we need the routes
+    # Register blueprints
+    from lemma.routes.main import main_bp
+    from lemma.routes.api import api_bp
+    from lemma.routes.admin import admin_bp
+    from lemma.routes.onboarding import onboarding_bp
+    from lemma.routes.billing_api import billing_api
+    from lemma.routes.sre_monitoring import sre_bp
+    from lemma.routes.compliance import compliance_bp
+    from lemma.routes.admin_security import admin_security_bp
+    
+    app.register_blueprint(main_bp)
+    app.register_blueprint(api_bp)
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(onboarding_bp)
+    app.register_blueprint(billing_api)
+    app.register_blueprint(sre_bp)
+    app.register_blueprint(compliance_bp)
+    app.register_blueprint(admin_security_bp)
 
     # Register billing API blueprint
     try:
