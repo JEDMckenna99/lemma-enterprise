@@ -627,10 +627,17 @@
 
     <!-- Mobile Menu Script -->
     <script>
-        document.getElementById('mobile-menu-button').addEventListener('click', function() {
+        document.addEventListener('DOMContentLoaded', function() {
+            const mobileMenuBtn = document.querySelector('[data-mobile-menu]');
             const mobileMenu = document.getElementById('mobile-menu');
-            const isHidden = mobileMenu.style.display === 'none' || mobileMenu.style.display === '';
-            mobileMenu.style.display = isHidden ? 'block' : 'none';
+            
+            if (mobileMenuBtn && mobileMenu) {
+                mobileMenuBtn.addEventListener('click', function() {
+                    const isHidden = mobileMenu.style.display === 'none' || mobileMenu.style.display === '';
+                    mobileMenu.style.display = isHidden ? 'block' : 'none';
+                    this.setAttribute('aria-expanded', !isHidden);
+                });
+            }
         });
     </script>
 
@@ -649,20 +656,26 @@
                 }, 200);
             }
             
-            // Add loading states to navigation links
+            // Add subtle loading states to navigation links
             const navLinks = document.querySelectorAll('nav a, .navbar a');
             navLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
-                    // Don't add loading for same-page links or external links
-                    if (this.href.includes('#') || this.href.includes('http') && !this.href.includes(window.location.hostname)) {
+                    // Don't add loading for same-page links, external links, or buttons
+                    if (this.href.includes('#') || 
+                        (this.href.includes('http') && !this.href.includes(window.location.hostname)) ||
+                        this.classList.contains('btn')) {
                         return;
                     }
                     
-                    // Create loading overlay
-                    const overlay = document.createElement('div');
-                    overlay.className = 'loading-overlay';
-                    overlay.innerHTML = '<div class="spinner"></div>';
-                    document.body.appendChild(overlay);
+                    // Add subtle loading indicator to the link itself
+                    this.style.opacity = '0.7';
+                    this.style.pointerEvents = 'none';
+                    
+                    // Reset after 3 seconds (fallback)
+                    setTimeout(() => {
+                        this.style.opacity = '';
+                        this.style.pointerEvents = '';
+                    }, 3000);
                 });
             });
             
@@ -809,13 +822,17 @@
             }
         });
         
-        // Show loading overlay on initial page load
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
-                const overlay = document.createElement('div');
-                overlay.className = 'loading-overlay';
-                overlay.innerHTML = '<div class="spinner"></div>';
-                document.body.appendChild(overlay);
+        // Performance optimization: Preload critical resources
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(function() {
+                // Preload critical pages
+                const criticalPages = ['/docs', '/pricing', '/api-docs'];
+                criticalPages.forEach(page => {
+                    const link = document.createElement('link');
+                    link.rel = 'prefetch';
+                    link.href = page;
+                    document.head.appendChild(link);
+                });
             });
         }
     </script>
