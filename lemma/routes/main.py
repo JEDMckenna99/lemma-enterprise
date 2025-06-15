@@ -939,32 +939,8 @@ def security():
 def openapi_spec():
     """Serve the OpenAPI specification file for download."""
     try:
-        import os
-        
-        # Try multiple possible paths for the OpenAPI spec file
-        possible_paths = [
-            os.path.join(current_app.root_path, '..', 'docs', 'openapi.yaml'),
-            os.path.join(current_app.root_path, 'docs', 'openapi.yaml'),
-            os.path.join(os.getcwd(), 'docs', 'openapi.yaml'),
-            'docs/openapi.yaml'
-        ]
-        
-        spec_path = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                spec_path = path
-                break
-        
-        if spec_path:
-            return send_file(
-                spec_path,
-                as_attachment=True,
-                download_name='lemma-openapi-spec.yaml',
-                mimetype='application/x-yaml'
-            )
-        else:
-            # If file not found, return a basic OpenAPI spec
-            basic_spec = """openapi: 3.0.0
+        # Return a basic OpenAPI spec directly
+        basic_spec = """openapi: 3.0.0
 info:
   title: Lemma API
   version: 2.7.0
@@ -984,13 +960,35 @@ paths:
       responses:
         '200':
           description: Challenge generated successfully
+  /verify-credential:
+    post:
+      summary: Verify a credential presentation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                presentation:
+                  type: object
+                challenge:
+                  type: string
+      responses:
+        '200':
+          description: Credential verified successfully
+  /verify-human:
+    post:
+      summary: Complete human verification
+      responses:
+        '200':
+          description: Human verification completed
 """
-            from flask import Response
-            return Response(
-                basic_spec,
-                mimetype='application/x-yaml',
-                headers={'Content-Disposition': 'attachment; filename=lemma-openapi-spec.yaml'}
-            )
+        return Response(
+            basic_spec,
+            mimetype='application/x-yaml',
+            headers={'Content-Disposition': 'attachment; filename=lemma-openapi-spec.yaml'}
+        )
             
     except Exception as e:
         current_app.logger.error(f"Error serving OpenAPI spec: {e}")
