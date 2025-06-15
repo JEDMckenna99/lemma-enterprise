@@ -486,6 +486,39 @@ class LemmaWallet {
     }
     
     /**
+     * Create a basic Verifiable Presentation
+     * @param {Object} credential - The credential to create a presentation for
+     * @param {string} challenge - The challenge to sign
+     * @returns {Promise} Promise that resolves with the presentation
+     */
+    async createPresentation(credential, challenge) {
+        // Check if this is a wallet credential object or raw credential
+        const rawCredential = credential.credential || credential;
+        
+        try {
+            const response = await fetch('/api/presentation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    credential: rawCredential,
+                    challenge: challenge
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Failed to create presentation:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Create a presentation that includes a revocation witness
      * @param {Object} credential - The credential to create a presentation for
      * @param {string} challenge - The challenge to sign

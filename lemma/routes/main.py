@@ -82,19 +82,26 @@ def verify():
     """Handle verification directly on main page."""
     # Check for user_id parameter - try both user_id and user for backward compatibility
     user_id = request.args.get('user_id') or request.args.get('user')
+    redirect_url = request.args.get('redirect')
     
     if not user_id:
         # Generate a random user ID if none provided
         user_id = f"user_{secrets.token_hex(8)}"
     
-    # Store user ID in session for later use
+    # Store user ID and redirect URL in session for later use
     session['verification_user_id'] = user_id
+    if redirect_url:
+        session['verification_redirect_url'] = redirect_url
     
     # Add flash message for verification
     flash("Please complete verification to access protected content", "info")
     
-    # Redirect to the main page with the user_id
-    return redirect(url_for('main.index', user_id=user_id))
+    # Redirect to the main page with the user_id and redirect_url
+    redirect_params = {'user_id': user_id}
+    if redirect_url:
+        redirect_params['redirect'] = redirect_url
+    
+    return redirect(url_for('main.index', **redirect_params))
 
 @main_bp.route('/start-verification/<user_id>', methods=['GET', 'POST'])
 def start_verification(user_id):
@@ -200,17 +207,29 @@ def verification_callback():
             # Set success message
             flash("Identity verified successfully! Your Lemma credential is being prepared.", "success")
             
-            # Redirect to home page with verification success parameters
-            # The frontend will handle credential retrieval and wallet storage via API
-            return_url = url_for('main.index', 
-                               user_id=user_id, 
-                               verification_success='true',
-                               session_id=stripe_session_id,
-                               _external=True)
+            # Check if there's a redirect URL from the original request
+            redirect_url = session.get('verification_redirect_url')
+            session.pop('verification_redirect_url', None)  # Clear it after use
             
-            current_app.logger.info(f"Redirecting verified user {user_id} to home page for API-driven credential retrieval: {return_url}")
-            
-            return redirect(return_url)
+            if redirect_url:
+                # Redirect back to the original page with verification success
+                # Add query parameters to indicate verification completion
+                separator = '&' if '?' in redirect_url else '?'
+                return_url = f"{redirect_url}{separator}verified=true&user_id={user_id}&session_id={stripe_session_id}"
+                current_app.logger.info(f"Redirecting verified user {user_id} back to original page: {return_url}")
+                return redirect(return_url)
+            else:
+                # Redirect to home page with verification success parameters
+                # The frontend will handle credential retrieval and wallet storage via API
+                return_url = url_for('main.index', 
+                                   user_id=user_id, 
+                                   verification_success='true',
+                                   session_id=stripe_session_id,
+                                   _external=True)
+                
+                current_app.logger.info(f"Redirecting verified user {user_id} to home page for API-driven credential retrieval: {return_url}")
+                
+                return redirect(return_url)
         else:
             # Handle verification failure
             error_message = verification_status.get("error_message", "Unknown error")

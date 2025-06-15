@@ -5,7 +5,9 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
-<script src="{{ url_for('static', filename='js/lemma-verification-flow.js') }}"></script>
+<!-- Ensure wallet is loaded for gate functionality -->
+<script src="{{ url_for('static', filename='js/lemma-wallet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lemma-wallet-init.js') }}"></script>
 <style>
     /* Lemma Gate Protection Styles */
     .lemma-gate-overlay {
@@ -49,16 +51,16 @@
     
     .verification-status {
         position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 1000;
-        padding: var(--space-3) var(--space-4);
-        background: var(--success-500);
+        top: var(--space-4);
+        right: var(--space-4);
+        background: linear-gradient(135deg, var(--green-500), var(--green-600));
         color: var(--white);
-        border-radius: var(--radius-lg);
-        font-size: var(--font-size-sm);
+        padding: var(--space-2) var(--space-4);
+        border-radius: var(--radius-full);
+        font-size: var(--text-sm);
         font-weight: 600;
         box-shadow: var(--shadow-lg);
+        z-index: 1000;
         opacity: 0;
         transform: translateX(100%);
         transition: all 0.3s ease;
@@ -71,11 +73,9 @@
     
     .network-hero {
         background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
-        border-radius: var(--radius-2xl);
+        color: var(--white);
         padding: var(--space-20) var(--space-8);
         text-align: center;
-        color: var(--white);
-        margin-bottom: var(--space-16);
         position: relative;
         overflow: hidden;
     }
@@ -87,98 +87,89 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background-image: 
-            radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 2px, transparent 2px),
-            radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.1) 2px, transparent 2px);
-        background-size: 60px 60px;
-        pointer-events: none;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+        z-index: 0;
     }
     
     .network-hero-content {
         position: relative;
-        z-index: 2;
+        z-index: 1;
+        max-width: 800px;
+        margin: 0 auto;
     }
-    
+
     .network-stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: var(--space-8);
         margin: var(--space-16) 0;
+        max-width: 1000px;
+        margin-left: auto;
+        margin-right: auto;
     }
     
     .stat-card {
         background: var(--white);
-        border-radius: var(--radius-lg);
         padding: var(--space-8);
+        border-radius: var(--radius-xl);
         text-align: center;
-        box-shadow: var(--shadow-card);
-        border: 1px solid var(--gray-200);
-        transition: all var(--duration-base) var(--ease-swift-out);
-    }
-    
-    .stat-card:hover {
-        transform: translateY(-2px);
         box-shadow: var(--shadow-lg);
-        border-color: var(--primary-300);
+        border: 1px solid var(--gray-200);
     }
-    
-    .stat-number {
-        font-size: 3rem;
+
+    .stat-value {
+        font-size: 2.5rem;
         font-weight: 700;
-        color: var(--primary-500);
+        color: var(--primary-600);
         display: block;
         margin-bottom: var(--space-2);
     }
-    
+
     .stat-label {
         color: var(--gray-600);
-        font-size: var(--font-size-base);
+        font-size: var(--text-sm);
         font-weight: 500;
     }
-    
-    .stat-description {
-        color: var(--gray-500);
-        font-size: var(--font-size-sm);
-        margin-top: var(--space-2);
+
+    .benefits-section {
+        padding: var(--space-20) var(--space-8);
+        background: var(--gray-50);
     }
-    
+
     .benefits-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: var(--space-8);
-        margin: var(--space-16) 0;
+        max-width: 1200px;
+        margin: 0 auto;
     }
-    
+
     .benefit-card {
         background: var(--white);
-        border-radius: var(--radius-lg);
         padding: var(--space-8);
+        border-radius: var(--radius-xl);
+        text-align: center;
+        box-shadow: var(--shadow-sm);
         border: 1px solid var(--gray-200);
-        transition: all var(--duration-base) var(--ease-swift-out);
+        transition: all 0.2s ease;
     }
-    
+
     .benefit-card:hover {
-        transform: translateY(-2px);
         box-shadow: var(--shadow-lg);
-        border-color: var(--gray-300);
+        transform: translateY(-2px);
     }
-    
+
     .benefit-icon {
-        width: 56px;
-        height: 56px;
+        width: 60px;
+        height: 60px;
+        margin: 0 auto var(--space-4);
         border-radius: var(--radius-lg);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.5rem;
-        margin-bottom: var(--space-4);
         color: var(--white);
     }
-    
-    .benefit-icon.security {
-        background: linear-gradient(135deg, var(--success-500), var(--success-600));
-    }
-    
+
     .benefit-icon.network {
         background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
     }
@@ -202,6 +193,38 @@
     
     .hidden {
         display: none !important;
+    }
+
+    .status-message {
+        margin: var(--space-4) 0;
+        padding: var(--space-2) var(--space-4);
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
+        display: inline-block;
+    }
+
+    .status-checking {
+        background: var(--blue-50);
+        color: var(--blue-700);
+        border: 1px solid var(--blue-200);
+    }
+
+    .status-success {
+        background: var(--green-50);
+        color: var(--green-700);
+        border: 1px solid var(--green-200);
+    }
+
+    .status-error {
+        background: var(--red-50);
+        color: var(--red-700);
+        border: 1px solid var(--red-200);
+    }
+
+    .status-warning {
+        background: var(--orange-50);
+        color: var(--orange-700);
+        border: 1px solid var(--orange-200);
     }
     
     @media (max-width: 768px) {
@@ -235,15 +258,15 @@
         <p class="text-gray-600 mb-6">This page is protected by the Lemma Verification Network. Please verify your humanity to continue.</p>
         
         <div id="lemmaGateStatus" class="mb-6">
-            <div class="text-gray-500 text-sm">Checking for existing verification...</div>
+            <div class="status-message status-checking">🔍 Checking for existing verification...</div>
         </div>
         
         <div class="flex flex-col gap-3">
-            <button id="lemmaVerifyBtn" onclick="startLemmaVerification()" class="btn btn-primary btn-lg disabled:opacity-50" disabled>
+            <button id="lemmaVerifyBtn" onclick="startLemmaVerification()" class="btn btn-primary btn-lg" disabled>
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                Verify with Lemma
+                <span>Starting verification...</span>
             </button>
             <a href="/" class="text-gray-500 text-sm hover:text-gray-700">← Back to Home</a>
         </div>
@@ -261,7 +284,7 @@
 </div>
 
 <!-- Main Content - Hidden until verified -->
-<div id="networkContent" class="hidden">
+<div id="networkContent" class="hidden" data-lemma="true">
     <div class="container">
         <!-- Network Hero Section -->
         <section class="network-hero">
@@ -278,85 +301,71 @@
                 </div>
             </div>
         </section>
-
+        
         <!-- Network Statistics -->
         <section class="network-stats">
             <div class="stat-card">
-                <span class="stat-number">2,847</span>
-                <div class="stat-label">Verified Humans</div>
-                <div class="stat-description">Join thousands of real users</div>
+                <span class="stat-value">2,847</span>
+                <span class="stat-label">Verified Humans</span>
             </div>
             <div class="stat-card">
-                <span class="stat-number">156</span>
-                <div class="stat-label">Partner Sites</div>
-                <div class="stat-description">Growing network daily</div>
+                <span class="stat-value">156</span>
+                <span class="stat-label">Partner Sites</span>
             </div>
             <div class="stat-card">
-                <span class="stat-number">99.8%</span>
-                <div class="stat-label">Bot Prevention</div>
-                <div class="stat-description">Industry-leading security</div>
+                <span class="stat-value">99.97%</span>
+                <span class="stat-label">Bot Prevention Rate</span>
             </div>
             <div class="stat-card">
-                <span class="stat-number">24/7</span>
-                <div class="stat-label">Network Access</div>
-                <div class="stat-description">Always available</div>
+                <span class="stat-value">24/7</span>
+                <span class="stat-label">Network Uptime</span>
             </div>
         </section>
-
+        
         <!-- Benefits Section -->
-        <section class="py-16">
-            <div class="text-center mb-12">
-                <h2 class="text-4xl font-bold text-gray-900 mb-4">Your Network Benefits</h2>
-                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-                    As a verified member of the Lemma Network, you get access to exclusive features and a seamless experience across all partner sites.
-                </p>
-            </div>
-            
-            <div class="benefits-grid">
-                <div class="benefit-card">
-                    <div class="benefit-icon security">
-                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                        </svg>
-                    </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Enhanced Security</h3>
-                    <p class="text-gray-600">Your verification is cryptographically secure and follows W3C standards. No personal data is shared - only proof of humanity.</p>
+        <section class="benefits-section">
+            <div class="container px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold text-gray-900 mb-4">Your Network Benefits</h2>
+                    <p class="text-lg text-gray-600">As a verified member, you gain access to exclusive features and services</p>
                 </div>
                 
-                <div class="benefit-card">
-                    <div class="benefit-icon network">
-                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"/>
-                        </svg>
+                <div class="benefits-grid">
+                    <div class="benefit-card">
+                        <div class="benefit-icon network">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3">Cross-Site Access</h3>
+                        <p class="text-gray-600">Use your verification across all Lemma partner sites. One verification unlocks the entire network - no more repetitive bot checks.</p>
                     </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Cross-Site Access</h3>
-                    <p class="text-gray-600">Use your verification across all Lemma partner sites. One verification unlocks the entire network - no more repetitive bot checks.</p>
-                </div>
-                
-                <div class="benefit-card">
-                    <div class="benefit-icon privacy">
-                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L12 12m-3.122-3.122l4.242 4.242M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        </svg>
+                    
+                    <div class="benefit-card">
+                        <div class="benefit-icon privacy">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3">Privacy First</h3>
+                        <p class="text-gray-600">Zero-knowledge verification means sites only learn you're human - nothing else. Your privacy is completely protected.</p>
                     </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Privacy First</h3>
-                    <p class="text-gray-600">Zero-knowledge verification means sites only learn you're human - nothing else. Your privacy is completely protected.</p>
-                </div>
-                
-                <div class="benefit-card">
-                    <div class="benefit-icon future">
-                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                        </svg>
+                    
+                    <div class="benefit-card">
+                        <div class="benefit-icon future">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3">Future Ready</h3>
+                        <p class="text-gray-600">Built on W3C standards for maximum compatibility. Your credentials work with future identity systems and emerging technologies.</p>
                     </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Future Ready</h3>
-                    <p class="text-gray-600">Built on open standards that work with any wallet or identity system. Your verification grows with the evolving web.</p>
                 </div>
             </div>
         </section>
 
         <!-- Network Directory -->
-        <section class="py-16 bg-gray-50 rounded-2xl">
+        <section class="py-20">
             <div class="container px-8">
                 <div class="text-center mb-12">
                     <h2 class="text-3xl font-bold text-gray-900 mb-4">Explore the Network</h2>
@@ -377,21 +386,21 @@
                     <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                         <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
                             <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 3H2M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17M17 13v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6.5"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v5m0-5l2.5 5"/>
                             </svg>
                         </div>
                         <h3 class="text-lg font-semibold text-gray-900 mb-2">E-commerce</h3>
-                        <p class="text-gray-600 text-sm">Shop on trusted platforms with verified reviews</p>
+                        <p class="text-gray-600 text-sm">Shop on platforms with verified human reviews</p>
                     </div>
                     
                     <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                         <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
                             <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                             </svg>
                         </div>
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Innovation Labs</h3>
-                        <p class="text-gray-600 text-sm">Access cutting-edge platforms building the future</p>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Business Services</h3>
+                        <p class="text-gray-600 text-sm">Access professional services with verified participants</p>
                     </div>
                 </div>
                 
@@ -425,33 +434,71 @@
 </div>
 
 <script>
-// Lemma Gate Protection Logic
+// Lemma Gate Protection Logic - Fixed Implementation
 let isVerified = false;
+let isChecking = false;
+
+// Wait for wallet to be available
+function waitForWallet() {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const maxAttempts = 50; // 5 seconds max wait
+        
+        function checkWallet() {
+            if (window.lemmaWallet) {
+                console.log('Lemma wallet found');
+                resolve(window.lemmaWallet);
+                return;
+            }
+            
+            attempts++;
+            if (attempts >= maxAttempts) {
+                console.log('Wallet not available after waiting');
+                reject(new Error('Wallet not available'));
+                return;
+            }
+            
+            setTimeout(checkWallet, 100);
+        }
+        
+        checkWallet();
+    });
+}
 
 // Initialize Lemma gate when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Initializing Lemma Gate for Join Network page');
-    initializeLemmaGate();
+    setTimeout(initializeLemmaGate, 500); // Small delay to ensure wallet loads
 });
 
 async function initializeLemmaGate() {
+    if (isChecking) return;
+    
     const overlay = document.getElementById('lemmaGateOverlay');
     const content = document.getElementById('networkContent');
     const statusDiv = document.getElementById('lemmaGateStatus');
     const verifyBtn = document.getElementById('lemmaVerifyBtn');
     const verificationStatus = document.getElementById('verificationStatus');
     
-    // Update status
-    statusDiv.innerHTML = '<div class="text-blue-600 text-sm">🔍 Checking your verification status...</div>';
+    isChecking = true;
+    
+    // Update status to checking
+    statusDiv.innerHTML = '<div class="status-message status-checking">🔍 Checking your verification status...</div>';
     
     try {
+        // Wait for wallet to be available
+        const wallet = await waitForWallet();
+        console.log('Wallet available, checking for credentials');
+        
         // Check if user has valid Lemma credential
-        const hasCredential = await checkLemmaCredential();
+        const hasCredential = await checkLemmaCredential(wallet);
         
         if (hasCredential) {
             // User is verified - hide gate and show content
             console.log('User verified - showing network content');
             isVerified = true;
+            
+            statusDiv.innerHTML = '<div class="status-message status-success">✅ Verification confirmed - Welcome to the network!</div>';
             
             // Hide gate overlay with animation
             overlay.style.opacity = '0';
@@ -464,67 +511,107 @@ async function initializeLemmaGate() {
         } else {
             // User needs verification
             console.log('User not verified - showing gate');
-            statusDiv.innerHTML = '<div class="text-orange-600 text-sm">⚠️ Verification required to access network features</div>';
+            statusDiv.innerHTML = '<div class="status-message status-warning">⚠️ Verification required to access network features</div>';
             verifyBtn.disabled = false;
-            verifyBtn.textContent = 'Verify with Lemma';
+            verifyBtn.innerHTML = `
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>Verify with Lemma</span>
+            `;
         }
     } catch (error) {
         console.error('Error checking Lemma credential:', error);
-        statusDiv.innerHTML = '<div class="text-red-600 text-sm">❌ Error checking verification. Please try again.</div>';
+        statusDiv.innerHTML = '<div class="status-message status-error">❌ Error checking verification. Please try again.</div>';
         verifyBtn.disabled = false;
-        verifyBtn.textContent = 'Start Verification';
+        verifyBtn.innerHTML = `
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>Start Verification</span>
+        `;
+    } finally {
+        isChecking = false;
     }
 }
 
-async function checkLemmaCredential() {
-    // Use the live Lemma API to check for valid credential
+async function checkLemmaCredential(wallet) {
+    // Check for existing credentials in wallet
     try {
-        // First check if lemmaWallet is available
-        if (typeof window.lemmaWallet === 'undefined') {
-            console.log('Lemma wallet not available yet, waiting...');
-            // Wait a bit for wallet to load
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            if (typeof window.lemmaWallet === 'undefined') {
-                return false;
-            }
-        }
+        const credentials = await wallet.getAllCredentials();
         
-        // Check for existing credential
-        const credential = await window.lemmaWallet.getFirstCredential();
-        if (!credential) {
-            console.log('No credential found in wallet');
+        if (!credentials || credentials.length === 0) {
+            console.log('No credentials found in wallet');
             return false;
         }
         
-        // Verify the credential is still valid using live API
+        console.log(`Found ${credentials.length} credential(s) in wallet`);
+        
+        // Get the first/most recent credential
+        const credentialEntry = credentials[0];
+        const credential = credentialEntry.credential;
+        
+        if (!credential) {
+            console.log('Invalid credential format');
+            return false;
+        }
+        
+        // Perform background verification with server
         const challenge = generateChallenge();
-        const presentation = await window.lemmaWallet.createPresentation(credential, challenge);
+        
+        console.log('Creating presentation for background verification');
+        
+        // Create presentation using wallet
+        const presentation = await wallet.createPresentation(credential, challenge);
         
         if (!presentation) {
             console.log('Could not create presentation');
             return false;
         }
         
-        // Verify with live Lemma API
-        const response = await fetch('/api/verify-presentation', {
+        // Verify with server (includes DID resolution and revocation checking)
+        console.log('Verifying presentation with server');
+        const isValid = await verifyWithServer(presentation, challenge);
+        
+        console.log('Background verification result:', isValid);
+        return isValid;
+        
+    } catch (error) {
+        console.error('Error checking credential:', error);
+        return false;
+    }
+}
+
+
+
+async function verifyWithServer(presentation, challenge) {
+    try {
+        const response = await fetch('/api/verify-human', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-Token': await getCSRFToken()
             },
+            credentials: 'include',
             body: JSON.stringify({
                 presentation: presentation,
-                challenge: challenge
+                challenge: challenge,
+                domain: window.location.hostname
             })
         });
         
-        const result = await response.json();
-        console.log('Live API verification result:', result);
+        if (!response.ok) {
+            console.error('Server verification failed:', response.status);
+            return false;
+        }
         
-        return result.valid === true;
+        const result = await response.json();
+        console.log('Server verification result:', result);
+        
+        return result.success === true || result.verified === true;
         
     } catch (error) {
-        console.error('Error verifying credential:', error);
+        console.error('Error verifying with server:', error);
         return false;
     }
 }
@@ -535,15 +622,28 @@ async function startLemmaVerification() {
     
     try {
         verifyBtn.disabled = true;
-        statusDiv.innerHTML = '<div class="text-blue-600 text-sm">🚀 Starting verification process...</div>';
+        verifyBtn.innerHTML = `
+            <svg class="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span>Starting verification...</span>
+        `;
+        statusDiv.innerHTML = '<div class="status-message status-checking">🚀 Starting verification process...</div>';
         
-        // Redirect to verification page
-        window.location.href = '/verify';
+        // Redirect to verification page with return URL
+        const returnUrl = encodeURIComponent(window.location.href);
+        window.location.href = `/verify?redirect=${returnUrl}`;
         
     } catch (error) {
         console.error('Error starting verification:', error);
-        statusDiv.innerHTML = '<div class="text-red-600 text-sm">❌ Error starting verification. Please try again.</div>';
+        statusDiv.innerHTML = '<div class="status-message status-error">❌ Error starting verification. Please try again.</div>';
         verifyBtn.disabled = false;
+        verifyBtn.innerHTML = `
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>Try Again</span>
+        `;
     }
 }
 
@@ -555,7 +655,7 @@ function generateChallenge() {
 
 async function getCSRFToken() {
     try {
-        const response = await fetch('/api/generate-csrf');
+        const response = await fetch('/api/generate-csrf-token');
         const data = await response.json();
         return data.csrf_token;
     } catch (error) {
@@ -564,24 +664,23 @@ async function getCSRFToken() {
     }
 }
 
-// Update network stats with live data (optional enhancement)
-async function updateNetworkStats() {
-    try {
-        // This could fetch real network statistics from your API
-        // For now, we'll use the static values in the template
-        console.log('Network stats would be updated here with live data');
-    } catch (error) {
-        console.error('Error updating network stats:', error);
-    }
-}
-
-// Handle page visibility changes
+// Handle page visibility changes - recheck when page becomes visible
 document.addEventListener('visibilitychange', function() {
-    if (!document.hidden && !isVerified) {
-        // Page became visible and user not verified - recheck
+    if (!document.hidden && !isVerified && !isChecking) {
         console.log('Page visible again, rechecking verification');
-        initializeLemmaGate();
+        setTimeout(initializeLemmaGate, 500);
     }
 });
+
+// Handle verification completion redirect
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('verified') === 'true') {
+    console.log('Verification completed, forcing recheck');
+    setTimeout(() => {
+        // Force recheck after verification
+        isVerified = false;
+        initializeLemmaGate();
+    }, 1000);
+}
 </script>
 {% endblock %} 
