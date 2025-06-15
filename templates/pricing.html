@@ -155,9 +155,9 @@
             <!-- Standard Tier -->
             <div class="card" style="border: 2px solid var(--primary-500); position: relative;">
                 <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%);">
-                    <span style="background-color: var(--primary-500); color: var(--white); padding: 4px 16px; border-radius: 12px; font-size: var(--font-size-xs); font-weight: 500;">Most Popular</span>
+                    <span style="background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-hover) 100%); color: var(--white); padding: 6px 18px; border-radius: 16px; font-size: var(--font-size-xs); font-weight: 600; box-shadow: var(--shadow-indigo); letter-spacing: 0.025em;">Most Popular</span>
                 </div>
-                <div class="card-header" style="text-align: center;">
+                <div class="card-header" style="text-align: center; background: rgba(75, 59, 163, 0.12); border-bottom: 1px solid rgba(75, 59, 163, 0.2);">
                     <h3 style="font-size: var(--font-size-h4); font-weight: 600;">Standard</h3>
                     <p style="color: var(--gray-500); font-size: var(--font-size-sm);">For growing businesses</p>
                 </div>
@@ -341,6 +341,28 @@
 </section>
 
 <script>
+// Initialize pricing toggle with localStorage support
+document.addEventListener('DOMContentLoaded', function() {
+    const toggle = document.querySelector('.pricing-toggle');
+    const slider = document.querySelector('.toggle-slider');
+    const amounts = document.querySelectorAll('.pricing-amount');
+    
+    // Load saved preference from localStorage
+    const savedPricing = localStorage.getItem('lemma_pricing_preference') || 'monthly';
+    
+    // Initialize based on saved preference
+    if (savedPricing === 'annual') {
+        toggle.classList.add('active');
+        slider.style.transform = 'translateX(24px)';
+        toggle.style.backgroundColor = 'var(--primary-500)';
+        
+        amounts.forEach(amount => {
+            const annual = amount.getAttribute('data-annual');
+            amount.textContent = '$' + annual;
+        });
+    }
+});
+
 function togglePricing() {
     const toggle = document.querySelector('.pricing-toggle');
     const slider = document.querySelector('.toggle-slider');
@@ -358,6 +380,18 @@ function togglePricing() {
             const monthly = amount.getAttribute('data-monthly');
             amount.textContent = '$' + monthly;
         });
+        
+        // Save preference to localStorage
+        localStorage.setItem('lemma_pricing_preference', 'monthly');
+        
+        // Fire analytics event
+        if (typeof gtag !== 'undefined') {
+            gtag('event', 'pricing_toggle', {
+                'plan_type': 'monthly',
+                'event_category': 'pricing',
+                'event_label': 'pricing_toggle_change'
+            });
+        }
     } else {
         // Switch to annual
         toggle.classList.add('active');
@@ -368,6 +402,18 @@ function togglePricing() {
             const annual = amount.getAttribute('data-annual');
             amount.textContent = '$' + annual;
         });
+        
+        // Save preference to localStorage
+        localStorage.setItem('lemma_pricing_preference', 'annual');
+        
+        // Fire analytics event
+        if (typeof gtag !== 'undefined') {
+            gtag('event', 'pricing_toggle', {
+                'plan_type': 'annual',
+                'event_category': 'pricing',
+                'event_label': 'pricing_toggle_change'
+            });
+        }
     }
 }
 
@@ -378,11 +424,61 @@ function toggleFAQ(button) {
     if (content.classList.contains('hidden')) {
         content.classList.remove('hidden');
         icon.style.transform = 'rotate(180deg)';
+        
+        // Analytics for FAQ interaction
+        if (typeof gtag !== 'undefined') {
+            const question = button.querySelector('h3').textContent;
+            gtag('event', 'faq_expand', {
+                'event_category': 'engagement',
+                'event_label': question,
+                'question': question
+            });
+        }
     } else {
         content.classList.add('hidden');
         icon.style.transform = 'rotate(0deg)';
     }
 }
+
+// Add analytics for CTA clicks
+document.addEventListener('DOMContentLoaded', function() {
+    // Track pricing CTA clicks
+    const pricingCTAs = document.querySelectorAll('a[href*="onboarding"], a[href*="contact"], a[href*="mailto"]');
+    pricingCTAs.forEach(cta => {
+        cta.addEventListener('click', function() {
+            // Determine plan based on parent card
+            const card = this.closest('.card');
+            let planType = 'unknown';
+            
+            if (card) {
+                const cardText = card.textContent.toLowerCase();
+                if (cardText.includes('free')) planType = 'free';
+                else if (cardText.includes('standard')) planType = 'standard';
+                else if (cardText.includes('enterprise')) planType = 'enterprise';
+            }
+            
+            // Fire analytics event
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'pricing_cta_click', {
+                    'plan': planType,
+                    'event_category': 'conversion',
+                    'event_label': 'pricing_page_cta',
+                    'cta_text': this.textContent.trim(),
+                    'cta_url': this.href
+                });
+            }
+        });
+    });
+    
+    // Track page view
+    if (typeof gtag !== 'undefined') {
+        gtag('event', 'page_view', {
+            'page_title': 'Pricing',
+            'page_location': window.location.href,
+            'event_category': 'engagement'
+        });
+    }
+});
 </script>
 
 <style>

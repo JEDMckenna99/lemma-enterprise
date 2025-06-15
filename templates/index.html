@@ -266,34 +266,33 @@
 <section class="hero-gradient py-20">
     <div class="container text-center">
         <div class="hero-bg-pattern">
-            <h1 class="text-6xl font-bold mb-6 text-white">
-                The Essential
-                <span class="block">Human Verification Protocol</span>
+            <h1 class="text-6xl font-bold mb-6 text-white hero-title">
+                The Essential Human Verification Protocol
             </h1>
-            <p class="text-xl text-white opacity-90 max-w-3xl mx-auto mb-8">
-                Build trust in your digital platform with privacy-first human verification. 
-                Stop bots, protect users, and enable the verified internet with enterprise-grade infrastructure.
+            <p class="text-xl text-white opacity-90 max-w-3xl mx-auto mb-8 hero-subtitle">
+                Prevent bots, protect users, build the verified internet with enterprise-grade infrastructure.
             </p>
             
+            <!-- Primary CTAs -->
             <div class="flex gap-4 justify-center mb-12">
-                <a href="/onboarding/register" class="btn btn-lg btn-hero-primary">
+                <a href="/onboarding/register" class="btn btn-lg btn-hero-primary" onclick="trackCTAClick('get_started_free', 'hero')">
                     Get Started Free
                 </a>
-                <a href="/docs" class="btn btn-lg btn-hero-ghost">
+                <a href="/docs#quick-start" class="btn btn-lg btn-hero-ghost" onclick="trackCTAClick('view_documentation', 'hero')">
                     View Documentation
                 </a>
             </div>
             
-            <!-- Quick Actions -->
+            <!-- Secondary Actions - Tertiary Ghost Buttons -->
             <div class="flex justify-center gap-6 mb-8">
-                <a href="/verify" class="text-white opacity-75 hover:opacity-100 transition-opacity text-sm">
-                    → Try Demo Verification
+                <a href="/verify" target="_blank" class="btn btn-sm" style="background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); font-size: var(--font-size-xs); padding: var(--space-2) var(--space-3);" onclick="trackCTAClick('try_demo', 'hero')">
+                    Try Demo
                 </a>
-                <a href="/api-docs" class="text-white opacity-75 hover:opacity-100 transition-opacity text-sm">
-                    → Explore API
+                <a href="/api-docs" class="btn btn-sm" style="background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); font-size: var(--font-size-xs); padding: var(--space-2) var(--space-3);" onclick="trackCTAClick('explore_api', 'hero')">
+                    Explore API
                 </a>
-                <a href="/gate-demo" class="text-white opacity-75 hover:opacity-100 transition-opacity text-sm">
-                    → See Agent Demo
+                <a href="/gate-demo" class="btn btn-sm" style="background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); font-size: var(--font-size-xs); padding: var(--space-2) var(--space-3);" onclick="trackCTAClick('see_agent_demo', 'hero')">
+                    See Agent Demo
                 </a>
             </div>
             
@@ -708,4 +707,100 @@
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Analytics tracking functions
+function trackCTAClick(action, location) {
+    // Fire analytics event
+    if (typeof gtag !== 'undefined') {
+        gtag('event', 'cta_click', {
+            'event_category': 'conversion',
+            'event_label': `${location}_${action}`,
+            'cta_action': action,
+            'cta_location': location,
+            'page': 'homepage'
+        });
+    }
+    
+    // Console log for debugging
+    console.log(`CTA Click: ${action} from ${location}`);
+}
+
+// Page view tracking
+document.addEventListener('DOMContentLoaded', function() {
+    // Track page view
+    if (typeof gtag !== 'undefined') {
+        gtag('event', 'page_view', {
+            'page_title': 'Homepage',
+            'page_location': window.location.href,
+            'event_category': 'engagement'
+        });
+    }
+    
+    // Track scroll depth
+    let maxScroll = 0;
+    let scrollEvents = [25, 50, 75, 90];
+    
+    window.addEventListener('scroll', function() {
+        const scrollPercent = Math.round((window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100);
+        
+        if (scrollPercent > maxScroll) {
+            maxScroll = scrollPercent;
+            
+            // Fire scroll depth events
+            scrollEvents.forEach(threshold => {
+                if (scrollPercent >= threshold && maxScroll < threshold + 1) {
+                    if (typeof gtag !== 'undefined') {
+                        gtag('event', 'scroll_depth', {
+                            'event_category': 'engagement',
+                            'event_label': `${threshold}%`,
+                            'scroll_depth': threshold,
+                            'page': 'homepage'
+                        });
+                    }
+                }
+            });
+        }
+    });
+    
+    // Track feature card interactions
+    const featureCards = document.querySelectorAll('.feature-card, .platform-card');
+    featureCards.forEach((card, index) => {
+        card.addEventListener('click', function() {
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'feature_card_click', {
+                    'event_category': 'engagement',
+                    'event_label': this.textContent.trim().substring(0, 50),
+                    'card_index': index,
+                    'page': 'homepage'
+                });
+            }
+        });
+    });
+    
+    // Track section views with intersection observer
+    const sections = document.querySelectorAll('section[id], .platform-section, .cta-section');
+    const sectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const sectionName = entry.target.id || entry.target.className.split(' ')[0] || 'unnamed_section';
+                
+                if (typeof gtag !== 'undefined') {
+                    gtag('event', 'section_view', {
+                        'event_category': 'engagement',
+                        'event_label': sectionName,
+                        'page': 'homepage'
+                    });
+                }
+            }
+        });
+    }, { threshold: 0.5 });
+    
+    sections.forEach(section => {
+        sectionObserver.observe(section);
+    });
+});
+</script>
 {% endblock %} 

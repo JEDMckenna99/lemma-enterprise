@@ -1,0 +1,17 @@
+{
+  "health": true,
+  "protected_page": true,
+  "verification_flow_script": false,
+  "enhanced_styles": false,
+  "modal_functionality": false,
+  "verification_script": false,
+  "indexeddb_support": false,
+  "session_mirroring": false,
+  "modal_implementation": false,
+  "sre_endpoints": {
+    "/api/sre/dashboard/metrics": false,
+    "/api/sre/metrics/latency": false,
+    "/api/sre/metrics/errors": false
+  },
+  "billing_health": true
+}
