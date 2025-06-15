@@ -317,9 +317,13 @@ def protected():
     
     current_app.logger.info("Protected page accessed - using reference implementation approach")
     
+    # Add cache-busting timestamp to force template refresh
+    import time
+    cache_bust = int(time.time())
+    
     # Simply render the template - all verification is handled client-side
     # using the same LemmaReferenceIntegration that external sites would use
-    response = make_response(render_template('protected.html'))
+    response = make_response(render_template('protected.html', cache_bust=cache_bust))
     
     # Set cookie to enable the wallet if not already set
     if not request.cookies.get('lemma_wallet_enabled'):
@@ -332,6 +336,11 @@ def protected():
             httponly=False,  # JavaScript needs access
             samesite='Lax'
         )
+    
+    # Add cache-busting headers to force template refresh
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
     
     return response
 
