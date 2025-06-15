@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}Admin Dashboard - Lemma Enterprise{% endblock %}
+{% block title %}Control Center - Lemma Enterprise{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
@@ -478,7 +478,7 @@
         <!-- At-a-glance Header -->
         <header class="admin-header">
             <div class="admin-header-left">
-                <h1>Admin Dashboard</h1>
+                <h1>Platform Control Center</h1>
             </div>
             <div class="admin-header-stats">
                 <div class="header-stat">
@@ -503,8 +503,8 @@
         <!-- Overview Section -->
         <div id="overview-section" class="admin-section active">
             <div class="section-header">
-                <h2>Overview Dashboard</h2>
-                <p>Real-time operational metrics and system health</p>
+                <h2>System Overview</h2>
+                <p>Everything's running smoothly - here's what's happening right now</p>
             </div>
             
             <!-- Key Metrics Dashboard -->
@@ -512,40 +512,40 @@
                 <div class="metric-card billing-metric">
                     <div class="metric-icon">📊</div>
                     <div class="metric-content">
-                        <div class="metric-label">MAH Today / Month-to-Date</div>
+                        <div class="metric-label">Active Users Today</div>
                         <div class="metric-value" id="mah-metric">Loading...</div>
                         <div class="metric-source">nightly roll-up</div>
-                        <div class="metric-purpose">Billing, growth pulse</div>
+                        <div class="metric-purpose">Growth tracking</div>
                     </div>
                 </div>
                 
                 <div class="metric-card growth-metric">
                     <div class="metric-icon">👥</div>
                     <div class="metric-content">
-                        <div class="metric-label">New Humans (Δ 24h)</div>
+                        <div class="metric-label">New Users (Last 24h)</div>
                         <div class="metric-value" id="new-humans-metric">Loading...</div>
                         <div class="metric-source">nightly roll-up</div>
-                        <div class="metric-purpose">KYC throughput</div>
+                        <div class="metric-purpose">User growth</div>
                     </div>
                 </div>
                 
                 <div class="metric-card performance-metric">
                     <div class="metric-icon">⚡</div>
                     <div class="metric-content">
-                        <div class="metric-label">Verify P95 Latency</div>
+                        <div class="metric-label">Response Speed</div>
                         <div class="metric-value" id="p95-latency-metric">Loading...</div>
                         <div class="metric-source">/api/sre/metrics/latency</div>
-                        <div class="metric-purpose">SLA guardrail</div>
+                        <div class="metric-purpose">User experience</div>
                     </div>
                 </div>
                 
                 <div class="metric-card error-metric">
                     <div class="metric-icon">🚨</div>
                     <div class="metric-content">
-                        <div class="metric-label">5-min Error Rate</div>
+                        <div class="metric-label">System Health</div>
                         <div class="metric-value" id="error-rate-metric">Loading...</div>
                         <div class="metric-source">/api/sre/metrics/errors</div>
-                        <div class="metric-purpose">Outage early-warning</div>
+                        <div class="metric-purpose">Error monitoring</div>
                     </div>
                 </div>
                 

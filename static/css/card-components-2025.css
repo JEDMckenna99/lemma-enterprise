@@ -1,0 +1,409 @@
+/* 2025 SaaS Card Components */
+
+/* Base Card */
+.card-2025 {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+    transition: all 0.15s ease;
+    overflow: hidden;
+}
+
+.card-2025:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+}
+
+/* Card Header */
+.card-header-2025 {
+    padding: 24px 24px 0 24px;
+    border-bottom: none;
+}
+
+.card-header-2025 h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 8px 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.card-header-2025 p {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Card Body */
+.card-body-2025 {
+    padding: 24px;
+}
+
+.card-body-2025:first-child {
+    padding-top: 24px;
+}
+
+.card-body-2025:last-child {
+    padding-bottom: 24px;
+}
+
+/* Card Footer */
+.card-footer-2025 {
+    padding: 16px 24px 24px 24px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    margin-top: auto;
+}
+
+/* Feature Cards */
+.feature-card-2025 {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    transition: all 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.feature-card-2025:hover {
+    border-color: #2563eb;
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.1);
+    transform: translateY(-2px);
+}
+
+.feature-icon-2025 {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px auto;
+    color: white;
+    font-size: 24px;
+}
+
+.feature-title-2025 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 12px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.feature-description-2025 {
+    font-size: 16px;
+    color: #64748b;
+    line-height: 1.6;
+    margin-bottom: 24px;
+    flex-grow: 1;
+}
+
+.feature-link-2025 {
+    color: #2563eb;
+    font-weight: 500;
+    text-decoration: none;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.15s ease;
+}
+
+.feature-link-2025:hover {
+    color: #1d4ed8;
+}
+
+/* Stat Cards */
+.stat-card-2025 {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    transition: all 0.15s ease;
+}
+
+.stat-card-2025:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.stat-number-2025 {
+    font-size: 36px;
+    font-weight: 700;
+    color: #2563eb;
+    display: block;
+    margin-bottom: 8px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.stat-label-2025 {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Pricing Cards */
+.pricing-card-2025 {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    transition: all 0.2s ease;
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.pricing-card-2025.featured {
+    border-color: #2563eb;
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.15);
+    transform: scale(1.05);
+}
+
+.pricing-badge-2025 {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2563eb;
+    color: white;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.pricing-title-2025 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 8px;
+}
+
+.pricing-description-2025 {
+    font-size: 16px;
+    color: #64748b;
+    margin-bottom: 24px;
+}
+
+.pricing-price-2025 {
+    font-size: 48px;
+    font-weight: 800;
+    color: #1e293b;
+    margin-bottom: 8px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.pricing-period-2025 {
+    font-size: 16px;
+    color: #64748b;
+    margin-bottom: 32px;
+}
+
+.pricing-features-2025 {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 32px 0;
+    flex-grow: 1;
+}
+
+.pricing-features-2025 li {
+    padding: 8px 0;
+    font-size: 16px;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pricing-features-2025 li::before {
+    content: '✓';
+    color: #10b981;
+    font-weight: 600;
+    font-size: 18px;
+}
+
+/* Testimonial Cards */
+.testimonial-card-2025 {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 32px;
+    transition: all 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.testimonial-card-2025:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+}
+
+.testimonial-quote-2025 {
+    font-size: 18px;
+    color: #374155;
+    line-height: 1.6;
+    margin-bottom: 24px;
+    flex-grow: 1;
+    font-style: italic;
+}
+
+.testimonial-author-2025 {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.testimonial-avatar-2025 {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.testimonial-info-2025 h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 4px 0;
+}
+
+.testimonial-info-2025 p {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+}
+
+/* Grid Layouts */
+.card-grid-2025 {
+    display: grid;
+    gap: 24px;
+}
+
+.card-grid-2025.cols-1 {
+    grid-template-columns: 1fr;
+}
+
+.card-grid-2025.cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.card-grid-2025.cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.card-grid-2025.cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.card-grid-2025.responsive {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .card-grid-2025.cols-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .card-grid-2025.cols-3 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .card-grid-2025.cols-4,
+    .card-grid-2025.cols-3,
+    .card-grid-2025.cols-2 {
+        grid-template-columns: 1fr;
+    }
+    
+    .feature-card-2025,
+    .pricing-card-2025,
+    .testimonial-card-2025 {
+        padding: 24px;
+    }
+    
+    .card-header-2025,
+    .card-body-2025 {
+        padding: 20px;
+    }
+    
+    .pricing-card-2025.featured {
+        transform: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .card-grid-2025 {
+        gap: 16px;
+    }
+    
+    .feature-card-2025,
+    .pricing-card-2025,
+    .testimonial-card-2025 {
+        padding: 20px;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .card-2025,
+    .feature-card-2025,
+    .stat-card-2025,
+    .pricing-card-2025,
+    .testimonial-card-2025 {
+        background: #1e293b;
+        border-color: #334155;
+    }
+    
+    .card-footer-2025 {
+        background: #0f172a;
+        border-color: #334155;
+    }
+    
+    .feature-title-2025,
+    .pricing-title-2025,
+    .testimonial-info-2025 h4 {
+        color: #f1f5f9;
+    }
+    
+    .feature-description-2025,
+    .pricing-description-2025,
+    .testimonial-quote-2025 {
+        color: #cbd5e1;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .card-2025,
+    .feature-card-2025,
+    .stat-card-2025,
+    .pricing-card-2025,
+    .testimonial-card-2025 {
+        transition: none;
+    }
+} 
