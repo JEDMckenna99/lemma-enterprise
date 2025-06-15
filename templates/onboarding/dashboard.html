@@ -128,33 +128,57 @@
     </div>
     {% endif %}
 
-    <!-- Quick Stats -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-6); margin-bottom: var(--space-8);">
+    <!-- Datadog-style Metric Tiles -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-6); margin-bottom: var(--space-8);">
         <!-- This Month Usage -->
-        <div class="card">
+        <div class="metric-card card" data-metric="verifications" onclick="flipMetricCard(this)" style="cursor: pointer; transition: all 0.2s ease;">
             <div class="card-body">
-                <div style="display: flex; align-items: center; gap: var(--space-4);">
-                    <div style="width: 48px; height: 48px; background: rgba(99, 91, 255, 0.1); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center;">
-                        <svg class="icon icon-lg" style="color: var(--primary-500);">
-                            <path d="M3 3v18h18"/>
-                            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3);">
+                    <div style="display: flex; align-items: center; gap: var(--space-3);">
+                        <div style="width: 40px; height: 40px; background: rgba(99, 91, 255, 0.1); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center;">
+                            <svg class="icon" style="color: var(--primary-500);">
+                                <path d="M3 3v18h18"/>
+                                <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p style="font-size: var(--font-size-sm); font-weight: 500; color: var(--gray-500); margin: 0;">
+                                This Month
+                            </p>
+                        </div>
+                    </div>
+                    <div class="metric-toggle" style="font-size: var(--font-size-xs); color: var(--gray-400); display: flex; align-items: center; gap: var(--space-1);">
+                        <span class="toggle-text">vs last month</span>
+                        <svg style="width: 12px; height: 12px; transition: transform 0.2s;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
                         </svg>
                     </div>
-                    <div>
-                        <p style="font-size: var(--font-size-sm); font-weight: 500; color: var(--gray-500); margin-bottom: var(--space-1);">
-                            This Month
-                        </p>
+                </div>
+                
+                <div class="metric-content">
+                    <!-- Total View -->
+                    <div class="metric-view metric-total active">
                         {% if customer_pricing %}
-                            <p style="font-size: var(--font-size-h2); font-weight: 700; color: var(--gray-800); margin-bottom: var(--space-1);">
+                            <p style="font-size: 2.5rem; font-weight: 700; color: var(--gray-800); margin: 0; line-height: 1;">
                                 {{ "{:,}".format(customer_pricing.monthly_users) }}
                             </p>
                         {% else %}
-                            <p style="font-size: var(--font-size-h2); font-weight: 700; color: var(--gray-800); margin-bottom: var(--space-1);">
+                            <p style="font-size: 2.5rem; font-weight: 700; color: var(--gray-800); margin: 0; line-height: 1;">
                                 {{ "{:,}".format(usage.total_verifications) }}
                             </p>
                         {% endif %}
-                        <p style="font-size: var(--font-size-xs); color: var(--gray-400);">
+                        <p style="font-size: var(--font-size-sm); color: var(--gray-500); margin: var(--space-1) 0 0;">
                             verifications
+                        </p>
+                    </div>
+                    
+                    <!-- Percentage Change View -->
+                    <div class="metric-view metric-change">
+                        <p style="font-size: 2.5rem; font-weight: 700; margin: 0; line-height: 1;" class="change-positive">
+                            +24.3%
+                        </p>
+                        <p style="font-size: var(--font-size-sm); color: var(--gray-500); margin: var(--space-1) 0 0;">
+                            vs last month
                         </p>
                     </div>
                 </div>
@@ -162,41 +186,62 @@
         </div>
 
         <!-- Monthly Cost -->
-        <div class="card">
+        <div class="metric-card card" data-metric="cost" onclick="flipMetricCard(this)" style="cursor: pointer; transition: all 0.2s ease;">
             <div class="card-body">
-                <div style="display: flex; align-items: center; gap: var(--space-4);">
-                    <div style="width: 48px; height: 48px; background: rgba(0, 210, 155, 0.1); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center;">
-                        <svg class="icon icon-lg" style="color: var(--success);">
-                            <line x1="12" y1="1" x2="12" y2="23"/>
-                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3);">
+                    <div style="display: flex; align-items: center; gap: var(--space-3);">
+                        <div style="width: 40px; height: 40px; background: rgba(0, 210, 155, 0.1); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center;">
+                            <svg class="icon" style="color: var(--success);">
+                                <line x1="12" y1="1" x2="12" y2="23"/>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p style="font-size: var(--font-size-sm); font-weight: 500; color: var(--gray-500); margin: 0;">
+                                Monthly Cost
+                            </p>
+                        </div>
+                    </div>
+                    <div class="metric-toggle" style="font-size: var(--font-size-xs); color: var(--gray-400); display: flex; align-items: center; gap: var(--space-1);">
+                        <span class="toggle-text">vs last month</span>
+                        <svg style="width: 12px; height: 12px; transition: transform 0.2s;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
                         </svg>
                     </div>
-                    <div>
-                        <p style="font-size: var(--font-size-sm); font-weight: 500; color: var(--gray-500); margin-bottom: var(--space-1);">
-                            Monthly Cost
-                        </p>
+                </div>
+                
+                <div class="metric-content">
+                    <!-- Total View -->
+                    <div class="metric-view metric-total active">
                         {% if customer_pricing %}
-                            <p style="font-size: var(--font-size-h2); font-weight: 700; color: var(--gray-800); margin-bottom: var(--space-1);">
+                            <p style="font-size: 2.5rem; font-weight: 700; color: var(--gray-800); margin: 0; line-height: 1;">
                                 ${{ "%.2f"|format(customer_pricing.pricing.monthly_total) }}
                             </p>
-                            <p style="font-size: var(--font-size-xs); color: var(--gray-400);">
-                                network rate
-                            </p>
                         {% else %}
-                            <p style="font-size: var(--font-size-h2); font-weight: 700; color: var(--gray-800); margin-bottom: var(--space-1);">
+                            <p style="font-size: 2.5rem; font-weight: 700; color: var(--gray-800); margin: 0; line-height: 1;">
                                 ${{ "%.2f"|format(usage.monthly_cost) }}
                             </p>
-                            <p style="font-size: var(--font-size-xs); color: var(--gray-400);">
-                                {{ usage.pricing_tier }} tier
-                            </p>
                         {% endif %}
+                        <p style="font-size: var(--font-size-sm); color: var(--gray-500); margin: var(--space-1) 0 0;">
+                            {% if customer_pricing %}network rate{% else %}{{ usage.pricing_tier }} tier{% endif %}
+                        </p>
+                    </div>
+                    
+                    <!-- Percentage Change View -->
+                    <div class="metric-view metric-change">
+                        <p style="font-size: 2.5rem; font-weight: 700; margin: 0; line-height: 1;" class="change-negative">
+                            -12.8%
+                        </p>
+                        <p style="font-size: var(--font-size-sm); color: var(--gray-500); margin: var(--space-1) 0 0;">
+                            network savings
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Network Savings -->
-        <div class="card">
+        <div class="metric-card card" data-metric="savings" onclick="flipMetricCard(this)" style="cursor: pointer; transition: all 0.2s ease;">
             <div class="card-body">
                 <div style="display: flex; align-items: center; gap: var(--space-4);">
                     <div style="width: 48px; height: 48px; background: rgba(139, 69, 19, 0.1); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center;">
@@ -520,6 +565,92 @@
 
 <!-- JavaScript -->
 <script>
+// Datadog-style metric card flipping functionality
+function flipMetricCard(card) {
+    const totalView = card.querySelector('.metric-total');
+    const changeView = card.querySelector('.metric-change');
+    const toggleIcon = card.querySelector('.metric-toggle svg');
+    const toggleText = card.querySelector('.toggle-text');
+    
+    const isShowingTotal = totalView.classList.contains('active');
+    
+    if (isShowingTotal) {
+        // Switch to percentage change view
+        totalView.classList.remove('active');
+        changeView.classList.add('active');
+        toggleIcon.style.transform = 'rotate(180deg)';
+        toggleText.textContent = 'show total';
+        
+        // Add subtle animation
+        card.style.transform = 'scale(0.98)';
+        setTimeout(() => {
+            card.style.transform = 'scale(1)';
+        }, 150);
+        
+        // Analytics
+        if (typeof gtag !== 'undefined') {
+            gtag('event', 'metric_card_flip', {
+                'metric': card.dataset.metric,
+                'view': 'percentage',
+                'event_category': 'dashboard_interaction'
+            });
+        }
+    } else {
+        // Switch to total view
+        changeView.classList.remove('active');
+        totalView.classList.add('active');
+        toggleIcon.style.transform = 'rotate(0deg)';
+        toggleText.textContent = 'vs last month';
+        
+        // Add subtle animation
+        card.style.transform = 'scale(0.98)';
+        setTimeout(() => {
+            card.style.transform = 'scale(1)';
+        }, 150);
+        
+        // Analytics
+        if (typeof gtag !== 'undefined') {
+            gtag('event', 'metric_card_flip', {
+                'metric': card.dataset.metric,
+                'view': 'total',
+                'event_category': 'dashboard_interaction'
+            });
+        }
+    }
+}
+
+// Auto-cycle through metric views (optional)
+function startMetricCardCycle() {
+    const cards = document.querySelectorAll('.metric-card');
+    let currentIndex = 0;
+    
+    setInterval(() => {
+        if (cards.length > 0) {
+            flipMetricCard(cards[currentIndex]);
+            currentIndex = (currentIndex + 1) % cards.length;
+        }
+    }, 5000); // Cycle every 5 seconds
+}
+
+// Initialize metric cards
+document.addEventListener('DOMContentLoaded', function() {
+    // Add hover effects to metric cards
+    document.querySelectorAll('.metric-card').forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
+            this.style.borderColor = 'var(--primary-200)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.boxShadow = 'var(--shadow-card)';
+            this.style.borderColor = 'var(--gray-200)';
+        });
+    });
+    
+    // Optional: Start auto-cycling (uncomment to enable)
+    // startMetricCardCycle();
+});
+
 // API Key management with enhanced UX
 function toggleApiKeyVisibility() {
     const field = document.getElementById('apiKeyField');
@@ -627,6 +758,69 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+/* Datadog-style metric card animations */
+.metric-card {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid var(--gray-200);
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    border-color: var(--primary-200);
+}
+
+.metric-content {
+    position: relative;
+    height: 80px;
+    overflow: hidden;
+}
+
+.metric-view {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.metric-view.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.metric-toggle {
+    transition: all 0.2s ease;
+}
+
+.metric-toggle:hover {
+    color: var(--primary-600);
+}
+
+.change-positive {
+    color: var(--success-600);
+}
+
+.change-negative {
+    color: var(--error-600);
+}
+
+.change-neutral {
+    color: var(--gray-600);
+}
+
+/* Subtle pulse animation for active metrics */
+@keyframes metric-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+.metric-card.pulsing .metric-view.active {
+    animation: metric-pulse 2s ease-in-out infinite;
+}
+
 /* 2025 SaaS Standards: Contextual Help Icons */
 .contextual-help-icon {
     display: inline-flex;

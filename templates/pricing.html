@@ -17,13 +17,35 @@
             Unlike traditional SaaS pricing, Lemma implements network-effect pricing where costs decrease for everyone as more businesses join the ecosystem.
         </p>
         
-        <!-- Pricing Toggle -->
-        <div style="display: flex; align-items: center; justify-content: center; gap: var(--space-4); margin-bottom: var(--space-12);">
-            <span style="color: var(--gray-500);">Monthly</span>
-            <button class="pricing-toggle" style="position: relative; width: 48px; height: 24px; background-color: var(--gray-200); border-radius: 12px; border: none; cursor: pointer; transition: background-color 200ms cubic-bezier(0.32, 0.72, 0.36, 0.95);" onclick="togglePricing()">
-                <div class="toggle-slider" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; background: var(--white); border-radius: 8px; box-shadow: var(--shadow-sm); transition: transform 200ms cubic-bezier(0.32, 0.72, 0.36, 0.95);"></div>
-            </button>
-            <span style="color: var(--gray-800); font-weight: 500;">Annual <span style="font-size: var(--font-size-sm); color: var(--success);">(Save 20%)</span></span>
+        <!-- Auth0-style Pricing Toggle -->
+        <div class="pricing-controls" style="display: flex; flex-direction: column; align-items: center; gap: var(--space-6); margin-bottom: var(--space-12);">
+            <!-- Billing Period Toggle -->
+            <div class="billing-toggle" style="display: flex; align-items: center; gap: var(--space-4);">
+                <span class="toggle-label" data-period="monthly" style="color: var(--gray-900); font-weight: 500; cursor: pointer; transition: color 0.2s;">Monthly</span>
+                <div class="toggle-switch" style="position: relative; width: 52px; height: 28px; background: var(--primary-500); border-radius: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);" onclick="toggleBillingPeriod()">
+                    <div class="toggle-slider" style="position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; background: var(--white); border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);"></div>
+                </div>
+                <span class="toggle-label" data-period="annual" style="color: var(--gray-500); font-weight: 500; cursor: pointer; transition: color 0.2s;">
+                    Annual 
+                    <span class="savings-badge" style="display: inline-block; background: var(--success-100); color: var(--success-700); padding: 2px 6px; border-radius: 4px; font-size: var(--font-size-xs); font-weight: 600; margin-left: 4px;">Save 20%</span>
+                </span>
+            </div>
+            
+            <!-- Volume Tier Selector -->
+            <div class="volume-selector" style="display: flex; align-items: center; gap: var(--space-3); background: var(--gray-50); padding: var(--space-2); border-radius: var(--radius-lg); border: 1px solid var(--gray-200);">
+                <label style="font-size: var(--font-size-sm); color: var(--gray-700); font-weight: 500;">Monthly Active Users:</label>
+                <select id="volume-tier" class="volume-select" style="background: var(--white); border: 1px solid var(--gray-300); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); font-size: var(--font-size-sm); color: var(--gray-900); cursor: pointer; min-width: 120px;" onchange="updateVolumePrice()">
+                    <option value="1000">1K - 10K</option>
+                    <option value="10000">10K - 50K</option>
+                    <option value="50000" selected>50K - 100K</option>
+                    <option value="100000">100K - 500K</option>
+                    <option value="500000">500K - 1M</option>
+                    <option value="1000000">1M+</option>
+                </select>
+                <div class="volume-discount" style="font-size: var(--font-size-xs); color: var(--primary-600); font-weight: 600; padding: var(--space-1) var(--space-2); background: var(--primary-50); border-radius: var(--radius-sm);">
+                    <span id="volume-discount-text">15% volume discount</span>
+                </div>
+            </div>
         </div>
     </div>
 </section>
@@ -341,80 +363,142 @@
 </section>
 
 <script>
-// Initialize pricing toggle with localStorage support
+// Auth0-style pricing controls with volume tiers
+let currentBillingPeriod = 'monthly';
+let currentVolumeTier = 50000;
+
+// Volume tier pricing structure
+const volumeTiers = {
+    1000: { discount: 0, label: '0% discount' },
+    10000: { discount: 5, label: '5% volume discount' },
+    50000: { discount: 15, label: '15% volume discount' },
+    100000: { discount: 25, label: '25% volume discount' },
+    500000: { discount: 35, label: '35% volume discount' },
+    1000000: { discount: 45, label: '45% enterprise discount' }
+};
+
+// Base pricing
+const basePricing = {
+    standard: { monthly: 0.10, annual: 0.08 },
+    enterprise: { monthly: 0.08, annual: 0.064 }
+};
+
+// Initialize pricing controls
 document.addEventListener('DOMContentLoaded', function() {
-    const toggle = document.querySelector('.pricing-toggle');
-    const slider = document.querySelector('.toggle-slider');
-    const amounts = document.querySelectorAll('.pricing-amount');
+    // Load saved preferences
+    currentBillingPeriod = localStorage.getItem('lemma_billing_period') || 'monthly';
+    currentVolumeTier = parseInt(localStorage.getItem('lemma_volume_tier')) || 50000;
     
-    // Load saved preference from localStorage
-    const savedPricing = localStorage.getItem('lemma_pricing_preference') || 'monthly';
-    
-    // Initialize based on saved preference
-    if (savedPricing === 'annual') {
-        toggle.classList.add('active');
-        slider.style.transform = 'translateX(24px)';
-        toggle.style.backgroundColor = 'var(--primary-500)';
-        
-        amounts.forEach(amount => {
-            const annual = amount.getAttribute('data-annual');
-            amount.textContent = '$' + annual;
-        });
-    }
+    // Initialize UI
+    updateBillingToggle();
+    updateVolumeSelector();
+    updateAllPricing();
 });
 
-function togglePricing() {
-    const toggle = document.querySelector('.pricing-toggle');
-    const slider = document.querySelector('.toggle-slider');
-    const amounts = document.querySelectorAll('.pricing-amount');
+function toggleBillingPeriod() {
+    currentBillingPeriod = currentBillingPeriod === 'monthly' ? 'annual' : 'monthly';
+    localStorage.setItem('lemma_billing_period', currentBillingPeriod);
     
-    const isAnnual = toggle.classList.contains('active');
+    updateBillingToggle();
+    updateAllPricing();
     
-    if (isAnnual) {
-        // Switch to monthly
-        toggle.classList.remove('active');
-        slider.style.transform = 'translateX(0)';
-        toggle.style.backgroundColor = 'var(--gray-200)';
-        
-        amounts.forEach(amount => {
-            const monthly = amount.getAttribute('data-monthly');
-            amount.textContent = '$' + monthly;
+    // Analytics
+    if (typeof gtag !== 'undefined') {
+        gtag('event', 'billing_period_toggle', {
+            'period': currentBillingPeriod,
+            'event_category': 'pricing',
+            'event_label': 'billing_toggle'
         });
-        
-        // Save preference to localStorage
-        localStorage.setItem('lemma_pricing_preference', 'monthly');
-        
-        // Fire analytics event
-        if (typeof gtag !== 'undefined') {
-            gtag('event', 'pricing_toggle', {
-                'plan_type': 'monthly',
-                'event_category': 'pricing',
-                'event_label': 'pricing_toggle_change'
-            });
-        }
-    } else {
-        // Switch to annual
-        toggle.classList.add('active');
-        slider.style.transform = 'translateX(24px)';
-        toggle.style.backgroundColor = 'var(--primary-500)';
-        
-        amounts.forEach(amount => {
-            const annual = amount.getAttribute('data-annual');
-            amount.textContent = '$' + annual;
-        });
-        
-        // Save preference to localStorage
-        localStorage.setItem('lemma_pricing_preference', 'annual');
-        
-        // Fire analytics event
-        if (typeof gtag !== 'undefined') {
-            gtag('event', 'pricing_toggle', {
-                'plan_type': 'annual',
-                'event_category': 'pricing',
-                'event_label': 'pricing_toggle_change'
-            });
-        }
     }
+}
+
+function updateVolumePrice() {
+    const selector = document.getElementById('volume-tier');
+    currentVolumeTier = parseInt(selector.value);
+    localStorage.setItem('lemma_volume_tier', currentVolumeTier);
+    
+    updateVolumeSelector();
+    updateAllPricing();
+    
+    // Analytics
+    if (typeof gtag !== 'undefined') {
+        gtag('event', 'volume_tier_change', {
+            'volume_tier': currentVolumeTier,
+            'discount': volumeTiers[currentVolumeTier].discount,
+            'event_category': 'pricing',
+            'event_label': 'volume_selector'
+        });
+    }
+}
+
+function updateBillingToggle() {
+    const toggle = document.querySelector('.toggle-switch');
+    const slider = document.querySelector('.toggle-slider');
+    const labels = document.querySelectorAll('.toggle-label');
+    
+    if (currentBillingPeriod === 'annual') {
+        slider.style.transform = 'translateX(26px)';
+        toggle.style.background = 'var(--primary-600)';
+        
+        labels.forEach(label => {
+            if (label.dataset.period === 'annual') {
+                label.style.color = 'var(--gray-900)';
+                label.style.fontWeight = '600';
+            } else {
+                label.style.color = 'var(--gray-500)';
+                label.style.fontWeight = '500';
+            }
+        });
+    } else {
+        slider.style.transform = 'translateX(2px)';
+        toggle.style.background = 'var(--gray-400)';
+        
+        labels.forEach(label => {
+            if (label.dataset.period === 'monthly') {
+                label.style.color = 'var(--gray-900)';
+                label.style.fontWeight = '600';
+            } else {
+                label.style.color = 'var(--gray-500)';
+                label.style.fontWeight = '500';
+            }
+        });
+    }
+}
+
+function updateVolumeSelector() {
+    const selector = document.getElementById('volume-tier');
+    const discountText = document.getElementById('volume-discount-text');
+    
+    selector.value = currentVolumeTier;
+    discountText.textContent = volumeTiers[currentVolumeTier].label;
+}
+
+function updateAllPricing() {
+    const amounts = document.querySelectorAll('.pricing-amount');
+    const volumeDiscount = volumeTiers[currentVolumeTier].discount / 100;
+    
+    amounts.forEach(amount => {
+        const plan = amount.closest('.card').textContent.toLowerCase().includes('standard') ? 'standard' : 'enterprise';
+        const basePrice = basePricing[plan][currentBillingPeriod];
+        const finalPrice = basePrice * (1 - volumeDiscount);
+        
+        amount.textContent = '$' + finalPrice.toFixed(3);
+        
+        // Add animation
+        amount.style.transform = 'scale(1.05)';
+        amount.style.color = 'var(--primary-600)';
+        
+        setTimeout(() => {
+            amount.style.transform = 'scale(1)';
+            amount.style.color = '';
+        }, 200);
+    });
+    
+    // Update period labels
+    const periodLabels = document.querySelectorAll('.pricing-period');
+    periodLabels.forEach(label => {
+        label.textContent = currentBillingPeriod === 'annual' ? '/user/year' : '/user/month';
+    });
 }
 
 function toggleFAQ(button) {
