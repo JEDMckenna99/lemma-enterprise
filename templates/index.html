@@ -275,7 +275,7 @@
             
             <!-- Primary CTAs -->
             <div class="flex gap-4 justify-center mb-12">
-                <a href="/onboarding/register" class="btn btn-lg btn-hero-primary" onclick="trackCTAClick('get_started_free', 'hero')">
+                <a href="{{ url_for('onboarding.start') }}" class="btn btn-lg btn-hero-primary" onclick="trackCTAClick('get_started_free', 'hero')">
                     Get Started Free
                 </a>
                 <a href="/docs#quick-start" class="btn btn-lg btn-hero-ghost" onclick="trackCTAClick('view_documentation', 'hero')">
