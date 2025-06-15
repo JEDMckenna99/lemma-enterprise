@@ -8,11 +8,13 @@ import os
 import sys
 import secrets
 import logging
-from flask import Flask, request, session, g, redirect, jsonify
+from flask import Flask, request, session, g, redirect, jsonify, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 from logging.handlers import RotatingFileHandler
 import socket
 import shutil
+import json
+from datetime import datetime
 
 # Optional CSRF protection import
 try:
@@ -288,44 +290,96 @@ def create_app(test_config=None):
                 url = request.url.replace('http://', 'https://', 1)
                 return redirect(url, code=301)
 
-    # Configure security headers
+    # Add CSP headers for security
     @app.after_request
     def add_security_headers(response):
-        # Add security headers based on environment
+        """Add security headers including CSP."""
+        # Content Security Policy
+        csp_policy = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' https://cdn.jsdelivr.net; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'; "
+            "report-uri /api/csp-report"
+        )
+        
+        response.headers['Content-Security-Policy'] = csp_policy
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         
-        # Only add HSTS in production
-        if not is_development and not app.config.get('TESTING'):
+        if request.is_secure:
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         
-        # Ensure session cookies have proper security flags
-        if 'Set-Cookie' in response.headers:
-            cookies = response.headers.getlist('Set-Cookie')
-            new_cookies = []
-            
-            for cookie in cookies:
-                # Apply security flags to session cookies
-                if 'session=' in cookie:
-                    # Ensure HttpOnly is present for session cookies
-                    if 'HttpOnly' not in cookie:
-                        cookie += '; HttpOnly'
-                    # In production, ensure secure flag is present for HTTPS
-                    if not is_development and 'Secure' not in cookie:
-                        cookie += '; Secure'
-                    # Ensure SameSite is set correctly
-                    if 'SameSite' not in cookie:
-                        samesite_value = 'Strict' if not is_development else 'Lax'
-                        cookie += f'; SameSite={samesite_value}'
-                new_cookies.append(cookie)
-            
-            # Replace all cookies
-            response.headers.pop('Set-Cookie')
-            for cookie in new_cookies:
-                response.headers.add('Set-Cookie', cookie)
-        
         return response
+
+    # CSP violation reporting endpoint
+    @app.route('/api/csp-report', methods=['POST'])
+    def csp_report():
+        """Handle CSP violation reports."""
+        try:
+            violation_data = request.get_json()
+            
+            # Log CSP violation
+            logger.warning(f"CSP Violation: {violation_data}")
+            
+            # Store violation for analysis (in production, use proper storage)
+            violation_log_dir = os.path.join(app.instance_path, 'security', 'csp_violations')
+            os.makedirs(violation_log_dir, exist_ok=True)
+            
+            violation_entry = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "violation": violation_data,
+                "user_agent": request.headers.get('User-Agent'),
+                "ip_address": request.remote_addr
+            }
+            
+            violation_file = os.path.join(violation_log_dir, f"violations_{datetime.utcnow().strftime('%Y-%m-%d')}.jsonl")
+            with open(violation_file, 'a') as f:
+                f.write(json.dumps(violation_entry) + '\n')
+            
+            return '', 204  # No content response for CSP reports
+            
+        except Exception as e:
+            logger.error(f"Error handling CSP report: {e}")
+            return '', 204  # Still return 204 to avoid browser errors
+
+    # Client-side error logging endpoint
+    @app.route('/api/client-errors', methods=['POST'])
+    def client_errors():
+        """Handle client-side error reports."""
+        try:
+            error_data = request.get_json()
+            
+            # Log client-side error
+            logger.info(f"Client Error: {error_data}")
+            
+            # Store error for analysis
+            error_log_dir = os.path.join(app.instance_path, 'monitoring', 'client_errors')
+            os.makedirs(error_log_dir, exist_ok=True)
+            
+            error_entry = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "error": error_data,
+                "user_agent": request.headers.get('User-Agent'),
+                "ip_address": request.remote_addr,
+                "referer": request.headers.get('Referer')
+            }
+            
+            error_file = os.path.join(error_log_dir, f"client_errors_{datetime.utcnow().strftime('%Y-%m-%d')}.jsonl")
+            with open(error_file, 'a') as f:
+                f.write(json.dumps(error_entry) + '\n')
+            
+            return jsonify({"status": "logged", "timestamp": error_entry["timestamp"]})
+            
+        except Exception as e:
+            logger.error(f"Error handling client error report: {e}")
+            return jsonify({"error": "Failed to log client error"}), 500
 
     # Ensure secure sessions
     @app.before_request
@@ -369,6 +423,12 @@ def create_app(test_config=None):
 
     # Set debug mode explicitly for security
     app.debug = is_development and not is_heroku
+
+    # Widget security test page
+    @app.route('/widget-test')
+    def widget_test():
+        """Widget security test page for CSP and injection testing."""
+        return render_template('widget_test_security.html')
 
     return app
 

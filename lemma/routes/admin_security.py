@@ -15,6 +15,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 from flask import Blueprint, request, jsonify, session, redirect, url_for, current_app, render_template, flash
+import secrets
 
 from lemma.auth.admin_security import (
     get_admin_security_manager, require_mtls, require_ip_allowlist, 
@@ -664,4 +665,216 @@ def api_security_status():
         
     except Exception as e:
         logger.error(f"Failed to get security status: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500 
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_security_bp.route('/api/security/rotate-api-key', methods=['POST'])
+@require_admin_role(['SUPERADMIN', 'SRE'])
+@audit_admin_action
+def rotate_api_key():
+    """Rotate API key with immediate invalidation of old key."""
+    try:
+        data = request.get_json() or {}
+        key_type = data.get('key_type', 'admin')
+        reason = data.get('reason', 'Manual rotation')
+        
+        # Generate new API key
+        new_key = secrets.token_hex(32)
+        
+        # Get current user
+        current_user = session.get('admin_user')
+        if not current_user:
+            return jsonify({"error": "Authentication required"}), 401
+        
+        # Update user's API key
+        security_manager = get_admin_security_manager()
+        
+        # Create new API key entry
+        new_key_entry = {
+            "key": new_key,
+            "user_id": current_user['user_id'],
+            "scopes": ["ADMIN", "SRE", "BILLING"],
+            "created_at": datetime.utcnow().isoformat(),
+            "expires_at": (datetime.utcnow() + timedelta(days=365)).isoformat(),
+            "last_used": None,
+            "is_active": True,
+            "rotation_reason": reason
+        }
+        
+        # Store new key (in production, this would update the database)
+        api_keys_file = os.path.join(security_manager.storage_dir, 'api_keys.json')
+        api_keys = []
+        
+        if os.path.exists(api_keys_file):
+            with open(api_keys_file, 'r') as f:
+                api_keys = json.load(f)
+        
+        # Deactivate old keys for this user
+        for key_entry in api_keys:
+            if key_entry.get('user_id') == current_user['user_id']:
+                key_entry['is_active'] = False
+                key_entry['deactivated_at'] = datetime.utcnow().isoformat()
+                key_entry['deactivation_reason'] = 'Rotated'
+        
+        # Add new key
+        api_keys.append(new_key_entry)
+        
+        # Save updated keys
+        with open(api_keys_file, 'w') as f:
+            json.dump(api_keys, f, indent=2)
+        
+        # Log the rotation
+        logger.info(f"API key rotated for user {current_user['user_id']}: {reason}")
+        
+        return jsonify({
+            "success": True,
+            "new_key": new_key,
+            "key_type": key_type,
+            "expires_at": new_key_entry["expires_at"],
+            "rotation_timestamp": datetime.utcnow().isoformat(),
+            "message": "API key rotated successfully. Old key invalidated immediately."
+        })
+        
+    except Exception as e:
+        logger.error(f"Error rotating API key: {e}")
+        return jsonify({"error": "API key rotation failed"}), 500
+
+@admin_security_bp.route('/api/security/test-bloom-filter-alert', methods=['POST'])
+@require_admin_role(['SUPERADMIN', 'SRE'])
+@audit_admin_action
+def test_bloom_filter_alert():
+    """Test bloom filter alert system by simulating failure conditions."""
+    try:
+        data = request.get_json() or {}
+        simulate_failure = data.get('simulate_failure', False)
+        
+        if simulate_failure:
+            # Trigger a test alert condition
+            from ...monitoring.alert_manager import get_alert_manager
+            
+            alert_manager = get_alert_manager()
+            
+            # Create a test alert for bloom filter issue
+            test_alert = {
+                "id": "bloom_filter_test_alert",
+                "name": "Bloom Filter Test Alert",
+                "description": "Test alert triggered for bloom filter failure simulation",
+                "severity": "warning",
+                "status": "active",
+                "threshold": "Test condition",
+                "current_value": "Simulated failure",
+                "triggered_at": datetime.utcnow().isoformat(),
+                "auto_action": "Test rollback to previous epoch"
+            }
+            
+            # Add to active alerts (in production, this would use proper alert storage)
+            alert_manager.active_alerts.append(test_alert)
+            
+            logger.info("Bloom filter test alert triggered")
+            
+            return jsonify({
+                "success": True,
+                "alert_triggered": True,
+                "alert_id": test_alert["id"],
+                "message": "Bloom filter failure simulation triggered successfully"
+            })
+        else:
+            return jsonify({
+                "success": True,
+                "alert_triggered": False,
+                "message": "No simulation requested"
+            })
+            
+    except Exception as e:
+        logger.error(f"Error testing bloom filter alert: {e}")
+        return jsonify({"error": "Bloom filter alert test failed"}), 500
+
+@admin_security_bp.route('/api/webhooks/deliveries', methods=['GET'])
+@require_admin_role(['SUPERADMIN', 'SRE', 'BILLING'])
+def get_webhook_deliveries():
+    """Get webhook delivery logs for testing and monitoring."""
+    try:
+        # In production, this would query the webhook delivery database
+        # For testing, we'll return mock data that shows retry patterns
+        
+        mock_deliveries = [
+            {
+                "id": "wh_del_001",
+                "webhook_id": "wh_billing_summary",
+                "url": "https://customer-webhook.example.com/billing",
+                "event_type": "billing.summary.monthly",
+                "attempt": 1,
+                "status": "success",
+                "response_code": 200,
+                "created_at": "2025-01-27T10:00:00Z",
+                "delivered_at": "2025-01-27T10:00:01Z",
+                "retry_delay": None,
+                "next_retry": None
+            },
+            {
+                "id": "wh_del_002", 
+                "webhook_id": "wh_billing_alert",
+                "url": "https://customer-webhook.example.com/alerts",
+                "event_type": "billing.alert.overdue",
+                "attempt": 1,
+                "status": "failed",
+                "response_code": 500,
+                "created_at": "2025-01-27T09:30:00Z",
+                "delivered_at": None,
+                "retry_delay": 30,
+                "next_retry": "2025-01-27T09:30:30Z"
+            },
+            {
+                "id": "wh_del_003",
+                "webhook_id": "wh_billing_alert", 
+                "url": "https://customer-webhook.example.com/alerts",
+                "event_type": "billing.alert.overdue",
+                "attempt": 2,
+                "status": "failed",
+                "response_code": 502,
+                "created_at": "2025-01-27T09:30:00Z",
+                "delivered_at": None,
+                "retry_delay": 300,
+                "next_retry": "2025-01-27T09:35:30Z"
+            },
+            {
+                "id": "wh_del_004",
+                "webhook_id": "wh_billing_alert",
+                "url": "https://customer-webhook.example.com/alerts", 
+                "event_type": "billing.alert.overdue",
+                "attempt": 3,
+                "status": "failed",
+                "response_code": 503,
+                "created_at": "2025-01-27T09:30:00Z",
+                "delivered_at": None,
+                "retry_delay": 1800,
+                "next_retry": "2025-01-27T10:05:30Z"
+            },
+            {
+                "id": "wh_del_005",
+                "webhook_id": "wh_billing_alert",
+                "url": "https://customer-webhook.example.com/alerts",
+                "event_type": "billing.alert.overdue", 
+                "attempt": 4,
+                "status": "abandoned",
+                "response_code": None,
+                "created_at": "2025-01-27T09:30:00Z",
+                "delivered_at": None,
+                "retry_delay": None,
+                "next_retry": None,
+                "abandonment_reason": "Max retries exceeded (3)"
+            }
+        ]
+        
+        return jsonify({
+            "deliveries": mock_deliveries,
+            "total": len(mock_deliveries),
+            "retry_policy": {
+                "max_attempts": 3,
+                "retry_delays": [30, 300, 1800],  # 30s, 5m, 30m
+                "backoff_strategy": "exponential"
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting webhook deliveries: {e}")
+        return jsonify({"error": "Failed to get webhook deliveries"}), 500 

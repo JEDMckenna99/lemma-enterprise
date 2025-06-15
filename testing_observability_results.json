@@ -1,0 +1,36 @@
+{
+  "1. Load-test Dashboard 10\u00d7 QPS": {
+    "score": 0,
+    "error": "1985 (of 3000) futures unfinished"
+  },
+  "2. Fail Bloom-filter CDN": {
+    "score": 0,
+    "max_score": 100,
+    "details": [
+      "\u274c Could not check current bloom filter status"
+    ]
+  },
+  "3. Rotate API Key via UI": {
+    "score": 20,
+    "max_score": 100,
+    "details": [
+      "\u2705 Successfully logged into admin interface",
+      "\u274c Current API key not working"
+    ]
+  },
+  "4. Webhook Redelivery": {
+    "score": 10,
+    "max_score": 100,
+    "details": [
+      "\u26a0\ufe0f  Webhook service status unclear",
+      "\u274c Error during webhook redelivery test: Expecting value: line 1 column 1 (char 0)"
+    ]
+  },
+  "5. Broken Widget Injection": {
+    "score": 0,
+    "max_score": 100,
+    "details": [
+      "\u274c No Content-Security-Policy header found"
+    ]
+  }
+}
