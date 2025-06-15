@@ -31,7 +31,7 @@
             /* Typography Scale */
             --font-size-xs: 0.75rem;   /* 12px */
             --font-size-sm: 0.875rem;  /* 14px */
-            --font-size-base: 1rem;    /* 16px */
+            --font-size-base: 1rem;    /* 16px - Base type */
             --font-size-lg: 1.125rem;  /* 18px */
             --font-size-xl: 1.25rem;   /* 20px */
             --font-size-2xl: 1.5rem;   /* 24px */
@@ -40,7 +40,7 @@
             --font-size-5xl: 3rem;     /* 48px */
             --font-size-6xl: 3.75rem;  /* 60px */
             
-            /* Spacing Scale - 4px base unit */
+            /* Spacing Scale - 8px base unit for 8-point grid */
             --space-0: 0;
             --space-px: 1px;
             --space-0-5: 0.125rem; /* 2px */
@@ -66,18 +66,23 @@
             --space-28: 7rem;      /* 112px */
             --space-32: 8rem;      /* 128px */
             
-            /* Color Palette - Modern SaaS */
-            --primary-50: #eff6ff;
-            --primary-100: #dbeafe;
-            --primary-200: #bfdbfe;
-            --primary-300: #93c5fd;
-            --primary-400: #60a5fa;
-            --primary-500: #3b82f6;
-            --primary-600: #2563eb;
-            --primary-700: #1d4ed8;
-            --primary-800: #1e40af;
-            --primary-900: #1e3a8a;
+            /* Color Palette - Indigo Core Brand */
+            --primary-50: #eef2ff;
+            --primary-100: #e0e7ff;
+            --primary-200: #c7d2fe;
+            --primary-300: #a5b4fc;
+            --primary-400: #818cf8;
+            --primary-500: #4B3BA3;  /* Core indigo brand token */
+            --primary-600: #4338ca;
+            --primary-700: #3730a3;
+            --primary-800: #312e81;
+            --primary-900: #1e1b4b;
             
+            /* Primary Tint for Hovers/Secondary States */
+            --primary-hover: #5b4bb3;
+            --primary-light: #6366f1;
+            
+            /* Neutral Gray Scale */
             --gray-50: #f9fafb;
             --gray-100: #f3f4f6;
             --gray-200: #e5e7eb;
@@ -108,23 +113,24 @@
             --bg-muted: var(--gray-50);
             --bg-subtle: var(--gray-100);
             
-            /* Border Radius */
+            /* Border Radius - Standardized 4-6px for buttons */
             --radius-none: 0;
             --radius-sm: 0.25rem;   /* 4px */
-            --radius: 0.375rem;     /* 6px */
+            --radius: 0.375rem;     /* 6px - Standard button radius */
             --radius-md: 0.5rem;    /* 8px */
             --radius-lg: 0.75rem;   /* 12px */
             --radius-xl: 1rem;      /* 16px */
             --radius-2xl: 1.5rem;   /* 24px */
             --radius-full: 9999px;
             
-            /* Shadows */
+            /* Shadows - Consistent depth */
             --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
             --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
             --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
             --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
             --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
             --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+            --shadow-indigo: 0 4px 6px -1px rgb(75 59 163 / 0.1), 0 2px 4px -2px rgb(75 59 163 / 0.05);
             
             /* Container */
             --container-xs: 20rem;    /* 320px */
@@ -137,7 +143,7 @@
             --container-4xl: 56rem;   /* 896px */
             --container-5xl: 64rem;   /* 1024px */
             --container-6xl: 72rem;   /* 1152px */
-            --container-7xl: 80rem;   /* 1280px */
+            --container-7xl: 80rem;   /* 1280px - Max width */
             
             /* Transitions */
             --transition-none: none;
@@ -145,6 +151,16 @@
             --transition-colors: color, background-color, border-color, text-decoration-color, fill, stroke 150ms cubic-bezier(0.4, 0, 0.2, 1);
             --transition-opacity: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
             --transition-transform: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            
+            /* Motion Preferences */
+            --animation-duration: 0.15s;
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            :root {
+                --animation-duration: 0.01ms;
+            }
         }
 
         /* Base Styles */
@@ -209,16 +225,31 @@
             background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--gray-200);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .navbar.scrolled {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--primary-500);
+            box-shadow: 0 1px 0 0 var(--primary-500), var(--shadow-indigo);
         }
 
         .navbar-container {
             max-width: var(--container-7xl);
             margin: 0 auto;
-            padding: 0 var(--space-4);
+            padding: 0 var(--space-16);
             display: flex;
             align-items: center;
             justify-content: space-between;
             height: 4rem;
+        }
+
+        /* Responsive padding */
+        @media (max-width: 640px) {
+            .navbar-container {
+                padding: 0 var(--space-6);
+            }
         }
 
         .navbar-brand {
@@ -232,7 +263,7 @@
         }
 
         .navbar-brand:hover {
-            color: var(--primary-600);
+            color: var(--primary-500);
         }
 
         .navbar-nav {
@@ -247,10 +278,17 @@
             color: var(--gray-600);
             transition: var(--transition-colors);
             padding: var(--space-2) 0;
+            position: relative;
         }
 
         .navbar-nav a:hover {
             color: var(--gray-900);
+        }
+
+        .navbar-nav a:focus {
+            outline: 2px solid var(--primary-500);
+            outline-offset: 2px;
+            border-radius: var(--radius-sm);
         }
 
         .navbar-actions {
@@ -275,6 +313,13 @@
             transition: var(--transition-all);
             text-decoration: none;
             white-space: nowrap;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:focus {
+            outline: 2px solid var(--primary-500);
+            outline-offset: 2px;
         }
 
         .btn:disabled {
@@ -290,18 +335,27 @@
         .btn-lg {
             padding: var(--space-3) var(--space-6);
             font-size: var(--font-size-base);
+            height: 48px;
         }
 
         .btn-primary {
-            background-color: var(--primary-600);
+            background-color: var(--primary-500);
             color: white;
-            border-color: var(--primary-600);
+            border-color: var(--primary-500);
+            box-shadow: var(--shadow-sm);
         }
 
         .btn-primary:hover:not(:disabled) {
-            background-color: var(--primary-700);
-            border-color: var(--primary-700);
+            background-color: var(--primary-hover);
+            border-color: var(--primary-hover);
             color: white;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-indigo);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: var(--shadow-sm);
         }
 
         .btn-secondary {
@@ -313,6 +367,8 @@
         .btn-secondary:hover:not(:disabled) {
             background-color: var(--gray-200);
             color: var(--gray-800);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
 
         .btn-outline {
@@ -324,6 +380,9 @@
         .btn-outline:hover:not(:disabled) {
             background-color: var(--gray-50);
             color: var(--gray-900);
+            border-color: var(--gray-400);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
 
         .btn-ghost {
@@ -335,6 +394,31 @@
         .btn-ghost:hover:not(:disabled) {
             background-color: var(--gray-100);
             color: var(--gray-900);
+            transform: translateY(-1px);
+        }
+
+        /* Loading state for buttons */
+        .btn.loading {
+            color: transparent;
+            pointer-events: none;
+        }
+
+        .btn.loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px;
+            height: 16px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         /* Card Component */
@@ -362,9 +446,27 @@
 
         /* Container */
         .container {
-            max-width: var(--container-7xl);
+            max-width: var(--container-7xl); /* 1280px max-width */
             margin: 0 auto;
-            padding: 0 var(--space-4);
+            padding: 0 var(--space-16); /* 64px section padding */
+        }
+
+        /* Section padding */
+        section {
+            padding-left: var(--space-16); /* 64px */
+            padding-right: var(--space-16); /* 64px */
+        }
+
+        /* Responsive container and section padding */
+        @media (max-width: 640px) {
+            .container {
+                padding: 0 var(--space-6); /* 24px on mobile */
+            }
+            
+            section {
+                padding-left: var(--space-6); /* 24px on mobile */
+                padding-right: var(--space-6); /* 24px on mobile */
+            }
         }
 
         .container-sm { max-width: var(--container-sm); }
@@ -451,19 +553,56 @@
         .py-20 { padding-top: var(--space-20); padding-bottom: var(--space-20); }
 
         /* Mobile Navigation */
-        .mobile-menu {
-            display: none;
-        }
-
         .mobile-menu-button {
             display: none;
-            padding: var(--space-2);
-            border: none;
             background: none;
+            border: none;
+            color: var(--gray-600);
+            padding: var(--space-2);
+            border-radius: var(--radius);
             cursor: pointer;
+            transition: var(--transition-colors);
         }
 
-        /* Responsive Design */
+        .mobile-menu-button:hover {
+            color: var(--gray-900);
+            background-color: var(--gray-100);
+        }
+
+        .mobile-menu-button:focus {
+            outline: 2px solid var(--primary-500);
+            outline-offset: 2px;
+        }
+
+        .mobile-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg-base);
+            border-bottom: 1px solid var(--gray-200);
+            box-shadow: var(--shadow-lg);
+            z-index: 40;
+        }
+
+        .mobile-menu.open {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive Navigation */
         @media (max-width: 768px) {
             .navbar-nav {
                 display: none;
@@ -473,22 +612,66 @@
                 display: block;
             }
 
-            .grid-cols-2 { grid-template-columns: 1fr; }
-            .grid-cols-3 { grid-template-columns: 1fr; }
-            .grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
-            .container {
-                padding: 0 var(--space-4);
+            .navbar-actions .btn {
+                display: none;
             }
 
-            h1 { font-size: var(--font-size-3xl); }
-            h2 { font-size: var(--font-size-2xl); }
+            .navbar-actions .btn-primary {
+                display: inline-flex;
+            }
         }
 
-        @media (max-width: 480px) {
-            .grid-cols-4 { grid-template-columns: 1fr; }
-            
-            h1 { font-size: var(--font-size-2xl); }
+        @media (max-width: 640px) {
+            .navbar-actions .btn-primary {
+                padding: var(--space-2) var(--space-3);
+                font-size: var(--font-size-xs);
+            }
+        }
+
+        /* Footer Responsive Behavior */
+        .footer-mobile {
+            display: none;
+        }
+
+        .footer-desktop {
+            display: grid;
+        }
+
+        /* Mobile Footer Accordion */
+        @media (max-width: 768px) {
+            .footer-desktop {
+                display: none;
+            }
+
+            .footer-mobile {
+                display: block;
+            }
+
+            .footer-bottom {
+                flex-direction: column;
+                gap: var(--space-4);
+                text-align: center;
+            }
+
+            .footer-bottom .flex {
+                order: -1;
+            }
+        }
+
+        .accordion-header {
+            transition: var(--transition-colors);
+        }
+
+        .accordion-header:hover {
+            color: var(--primary-500);
+        }
+
+        .accordion-icon {
+            transition: transform 0.2s ease;
+        }
+
+        .accordion-content {
+            transition: all 0.2s ease;
         }
     </style>
     
@@ -557,7 +740,8 @@
     <!-- Footer -->
     <footer class="bg-muted py-12 mt-20">
         <div class="container">
-            <div class="grid grid-cols-4 gap-8">
+            <!-- Desktop Footer -->
+            <div class="footer-desktop grid grid-cols-4 gap-8">
                 <div>
                     <div class="navbar-brand mb-4">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -573,49 +757,106 @@
                 <div>
                     <h6 class="font-semibold text-gray-900 mb-3">Product</h6>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/docs" class="text-gray-600 hover:text-gray-900">Documentation</a></li>
-                        <li><a href="/api-docs" class="text-gray-600 hover:text-gray-900">API Reference</a></li>
-                        <li><a href="/pricing" class="text-gray-600 hover:text-gray-900">Pricing</a></li>
-                        <li><a href="/status" class="text-gray-600 hover:text-gray-900">Status</a></li>
+                        <li><a href="/docs" class="text-gray-600 hover:text-primary-500 transition-colors">Documentation</a></li>
+                        <li><a href="/api-docs" class="text-gray-600 hover:text-primary-500 transition-colors">API Reference</a></li>
+                        <li><a href="/pricing" class="text-gray-600 hover:text-primary-500 transition-colors">Pricing</a></li>
+                        <li><a href="/status" class="text-gray-600 hover:text-primary-500 transition-colors">Status</a></li>
                     </ul>
                 </div>
                 
                 <div>
                     <h6 class="font-semibold text-gray-900 mb-3">Company</h6>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/about" class="text-gray-600 hover:text-gray-900">About</a></li>
-                        <li><a href="/blog" class="text-gray-600 hover:text-gray-900">Blog</a></li>
-                        <li><a href="/careers" class="text-gray-600 hover:text-gray-900">Careers</a></li>
-                        <li><a href="/contact" class="text-gray-600 hover:text-gray-900">Contact</a></li>
+                        <li><a href="/about" class="text-gray-600 hover:text-primary-500 transition-colors">About</a></li>
+                        <li><a href="/contact" class="text-gray-600 hover:text-primary-500 transition-colors">Contact</a></li>
                     </ul>
                 </div>
                 
                 <div>
                     <h6 class="font-semibold text-gray-900 mb-3">Legal</h6>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/privacy" class="text-gray-600 hover:text-gray-900">Privacy Policy</a></li>
-                        <li><a href="/terms" class="text-gray-600 hover:text-gray-900">Terms of Service</a></li>
-                        <li><a href="/security" class="text-gray-600 hover:text-gray-900">Security</a></li>
+                        <li><a href="/privacy" class="text-gray-600 hover:text-primary-500 transition-colors">Privacy Policy</a></li>
+                        <li><a href="/terms" class="text-gray-600 hover:text-primary-500 transition-colors">Terms of Service</a></li>
+                        <li><a href="/security" class="text-gray-600 hover:text-primary-500 transition-colors">Security</a></li>
                     </ul>
+                </div>
+            </div>
+
+            <!-- Mobile Footer Accordion -->
+            <div class="footer-mobile">
+                <div class="navbar-brand mb-6">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                    </svg>
+                    Lemma
+                </div>
+                <p class="text-sm text-gray-600 mb-6">The essential verification protocol for digital trust.</p>
+                
+                <!-- Mobile Accordion Items -->
+                <div class="footer-accordion">
+                    <div class="accordion-item border-b border-gray-200">
+                        <button class="accordion-header w-full py-4 text-left flex justify-between items-center" onclick="toggleFooterAccordion(this)">
+                            <span class="font-semibold text-gray-900">Product</span>
+                            <svg class="accordion-icon w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div class="accordion-content hidden pb-4">
+                            <ul class="space-y-2 text-sm">
+                                <li><a href="/docs" class="text-gray-600 hover:text-primary-500 transition-colors">Documentation</a></li>
+                                <li><a href="/api-docs" class="text-gray-600 hover:text-primary-500 transition-colors">API Reference</a></li>
+                                <li><a href="/pricing" class="text-gray-600 hover:text-primary-500 transition-colors">Pricing</a></li>
+                                <li><a href="/status" class="text-gray-600 hover:text-primary-500 transition-colors">Status</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item border-b border-gray-200">
+                        <button class="accordion-header w-full py-4 text-left flex justify-between items-center" onclick="toggleFooterAccordion(this)">
+                            <span class="font-semibold text-gray-900">Company</span>
+                            <svg class="accordion-icon w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div class="accordion-content hidden pb-4">
+                            <ul class="space-y-2 text-sm">
+                                <li><a href="/about" class="text-gray-600 hover:text-primary-500 transition-colors">About</a></li>
+                                <li><a href="/contact" class="text-gray-600 hover:text-primary-500 transition-colors">Contact</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item border-b border-gray-200">
+                        <button class="accordion-header w-full py-4 text-left flex justify-between items-center" onclick="toggleFooterAccordion(this)">
+                            <span class="font-semibold text-gray-900">Legal</span>
+                            <svg class="accordion-icon w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div class="accordion-content hidden pb-4">
+                            <ul class="space-y-2 text-sm">
+                                <li><a href="/privacy" class="text-gray-600 hover:text-primary-500 transition-colors">Privacy Policy</a></li>
+                                <li><a href="/terms" class="text-gray-600 hover:text-primary-500 transition-colors">Terms of Service</a></li>
+                                <li><a href="/security" class="text-gray-600 hover:text-primary-500 transition-colors">Security</a></li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
             
             <hr style="border: none; height: 1px; background: var(--gray-300); margin: var(--space-8) 0;">
             
-            <div class="flex justify-between items-center">
+            <div class="flex justify-between items-center footer-bottom">
                 <p class="text-sm text-gray-500">© 2025 Lemma. All rights reserved.</p>
                 <div class="flex gap-4">
-                    <a href="#" class="text-gray-400 hover:text-gray-600">
+                    <a href="#" class="text-gray-400 hover:text-primary-500 transition-colors" aria-label="Twitter">
                         <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
                         </svg>
                     </a>
-                    <a href="#" class="text-gray-400 hover:text-gray-600">
-                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M22.46 6c-.77.35-1.6.58-2.46.69.88-.53 1.56-1.37 1.88-2.38-.83.5-1.75.85-2.72 1.05C18.37 4.5 17.26 4 16 4c-2.35 0-4.27 1.92-4.27 4.29 0 .34.04.67.11.98C8.28 9.09 5.11 7.38 3 4.79c-.37.63-.58 1.37-.58 2.15 0 1.49.75 2.81 1.91 3.56-.71 0-1.37-.2-1.95-.5v.03c0 2.08 1.48 3.82 3.44 4.21a4.22 4.22 0 0 1-1.93.07 4.28 4.28 0 0 0 4 2.98 8.521 8.521 0 0 1-5.33 1.84c-.34 0-.68-.02-1.02-.06C3.44 20.29 5.7 21 8.12 21 16 21 20.33 14.46 20.33 8.79c0-.19 0-.37-.01-.56.84-.6 1.56-1.36 2.14-2.23z"/>
-                        </svg>
-                    </a>
-                    <a href="#" class="text-gray-400 hover:text-gray-600">
+                    <a href="#" class="text-gray-400 hover:text-primary-500 transition-colors" aria-label="LinkedIn">
                         <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
                         </svg>
@@ -633,15 +874,60 @@
             
             if (mobileMenuBtn && mobileMenu) {
                 mobileMenuBtn.addEventListener('click', function() {
-                    const isHidden = mobileMenu.style.display === 'none' || mobileMenu.style.display === '';
-                    mobileMenu.style.display = isHidden ? 'block' : 'none';
-                    this.setAttribute('aria-expanded', !isHidden);
+                    const isOpen = mobileMenu.classList.contains('open');
+                    
+                    if (isOpen) {
+                        mobileMenu.classList.remove('open');
+                        mobileMenu.style.display = 'none';
+                    } else {
+                        mobileMenu.classList.add('open');
+                        mobileMenu.style.display = 'block';
+                    }
+                    
+                    this.setAttribute('aria-expanded', !isOpen);
+                });
+
+                // Close mobile menu when clicking outside
+                document.addEventListener('click', function(e) {
+                    if (!mobileMenuBtn.contains(e.target) && !mobileMenu.contains(e.target)) {
+                        mobileMenu.classList.remove('open');
+                        mobileMenu.style.display = 'none';
+                        mobileMenuBtn.setAttribute('aria-expanded', 'false');
+                    }
                 });
             }
         });
     </script>
 
     {% block scripts %}{% endblock %}
+    
+    <!-- Footer Accordion Script -->
+    <script>
+        function toggleFooterAccordion(button) {
+            const content = button.parentNode.querySelector('.accordion-content');
+            const icon = button.querySelector('.accordion-icon');
+            
+            // Close other open accordion items
+            const allItems = document.querySelectorAll('.footer-accordion .accordion-item');
+            allItems.forEach(item => {
+                if (item !== button.parentNode) {
+                    const otherContent = item.querySelector('.accordion-content');
+                    const otherIcon = item.querySelector('.accordion-icon');
+                    otherContent.classList.add('hidden');
+                    otherIcon.style.transform = 'rotate(0deg)';
+                }
+            });
+            
+            // Toggle current item
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                content.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+    </script>
     
     <!-- Modern SaaS Interactions -->
     <script>
@@ -650,7 +936,7 @@
             // Remove loading overlay if it exists
             const loadingOverlay = document.querySelector('.loading-overlay');
             if (loadingOverlay) {
-        setTimeout(() => {
+                setTimeout(() => {
                     loadingOverlay.style.opacity = '0';
                     setTimeout(() => loadingOverlay.remove(), 300);
                 }, 200);
@@ -712,7 +998,7 @@
                 });
             });
             
-            // Navbar scroll behavior
+            // Navbar scroll behavior - sticky after 150px
             const navbar = document.querySelector('.navbar');
             if (navbar) {
                 let lastScrollY = window.scrollY;
@@ -720,8 +1006,8 @@
                 window.addEventListener('scroll', () => {
                     const currentScrollY = window.scrollY;
                     
-                    // Add scrolled class for styling
-                    if (currentScrollY > 50) {
+                    // Add scrolled class after 150px for indigo shadow
+                    if (currentScrollY > 150) {
                         navbar.classList.add('scrolled');
                     } else {
                         navbar.classList.remove('scrolled');
@@ -782,7 +1068,9 @@
             const cards = document.querySelectorAll('.card, .feature-card, .platform-card');
             cards.forEach(card => {
                 card.addEventListener('mouseenter', function() {
-                    this.style.transform = 'translateY(-2px)';
+                    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                        this.style.transform = 'translateY(-2px)';
+                    }
                 });
                 
                 card.addEventListener('mouseleave', function() {
@@ -801,40 +1089,95 @@
                     }
                 });
             });
+
+            // Back to top button - appears after 1200px
+            const backToTop = document.createElement('button');
+            backToTop.innerHTML = '↑';
+            backToTop.className = 'back-to-top';
+            backToTop.style.cssText = `
+                position: fixed;
+                bottom: 2rem;
+                right: 2rem;
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                background: var(--primary-500);
+                color: white;
+                border: none;
+                font-size: 1.5rem;
+                cursor: pointer;
+                opacity: 0;
+                transform: translateY(20px);
+                transition: all 0.3s ease;
+                z-index: 100;
+                box-shadow: var(--shadow-lg);
+            `;
             
-            // Mobile menu toggle
-            const mobileMenuBtn = document.querySelector('[data-mobile-menu]');
-            const mobileMenu = document.querySelector('.navbar-nav');
+            document.body.appendChild(backToTop);
             
-            if (mobileMenuBtn && mobileMenu) {
-                mobileMenuBtn.addEventListener('click', function() {
-                    mobileMenu.classList.toggle('open');
-                    this.setAttribute('aria-expanded', mobileMenu.classList.contains('open'));
-                });
-                
-                // Close mobile menu when clicking outside
-                document.addEventListener('click', function(e) {
-                    if (!mobileMenuBtn.contains(e.target) && !mobileMenu.contains(e.target)) {
-                        mobileMenu.classList.remove('open');
-                        mobileMenuBtn.setAttribute('aria-expanded', 'false');
-                    }
-                });
-            }
-        });
-        
-        // Performance optimization: Preload critical resources
-        if ('requestIdleCallback' in window) {
-            requestIdleCallback(function() {
-                // Preload critical pages
-                const criticalPages = ['/docs', '/pricing', '/api-docs'];
-                criticalPages.forEach(page => {
-                    const link = document.createElement('link');
-                    link.rel = 'prefetch';
-                    link.href = page;
-                    document.head.appendChild(link);
+            backToTop.addEventListener('click', () => {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
                 });
             });
-        }
+            
+            // Show/hide back to top button
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 1200) {
+                    backToTop.style.opacity = '1';
+                    backToTop.style.transform = 'translateY(0)';
+                } else {
+                    backToTop.style.opacity = '0';
+                    backToTop.style.transform = 'translateY(20px)';
+                }
+            });
+        });
+    </script>
+
+    <!-- Lemma Core Scripts - Enhanced 2025 SaaS -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet-init.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lemma-verification-flow.js') }}"></script>
+    
+    <!-- Enhanced Lemma Integration Check -->
+    <script>
+        // Auto-initialize Lemma integration for pages with data-lemma attributes
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if page has Lemma integration points
+            const lemmaElements = document.querySelectorAll('[data-lemma]');
+            
+            if (lemmaElements.length > 0) {
+                console.log('[LEMMA-LAYOUT] Found ' + lemmaElements.length + ' Lemma integration points');
+                
+                // Emit event for other components
+                window.dispatchEvent(new CustomEvent('lemma-integration-detected', {
+                    detail: { elementCount: lemmaElements.length }
+                }));
+            }
+            
+            // Add Lemma-specific keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                // Ctrl/Cmd + L = Quick Lemma access
+                if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+                    e.preventDefault();
+                    const verifyBtn = document.querySelector('[data-action="verify-lemma"], .verify-button, #lemma-verify-button');
+                    if (verifyBtn) {
+                        verifyBtn.click();
+                    }
+                }
+                
+                // Ctrl/Cmd + Shift + L = View Lemma credential
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'L') {
+                    e.preventDefault();
+                    if (typeof viewCredentialEnhanced === 'function') {
+                        viewCredentialEnhanced();
+                    } else if (typeof viewCredential === 'function') {
+                        viewCredential();
+                    }
+                }
+            });
+        });
     </script>
 </body>
 </html> 

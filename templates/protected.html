@@ -2,24 +2,108 @@
 
 {% block title %}Protected Content - Lemma{% endblock %}
 
+{% block extra_head %}
+<script src="{{ url_for('static', filename='js/lemma-verification-flow.js') }}"></script>
+<style>
+/* Enhanced 2025 SaaS Styles */
+.lemma-verification-status {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    padding: 8px 16px;
+    background: #10b981;
+    color: white;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+}
+
+.lemma-verification-status.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.credential-sync-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    padding: 2px 6px;
+    background: #f3f4f6;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.credential-sync-indicator.synced {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.credential-sync-indicator.syncing {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.credential-management-enhanced {
+    position: relative;
+}
+
+.credential-management-enhanced::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+    border-radius: 10px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.credential-management-enhanced:hover::before {
+    opacity: 0.1;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-4xl mx-auto">
-        {% if session.get('verified_user_id') %}
-            <!-- Verified User Content -->
-            <div class="text-center mb-8">
+        {% if session.get('verified') or session.get('verified_user_id') %}
+            <!-- Verification Status Indicator -->
+            <div id="verificationStatus" class="lemma-verification-status">
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Verified Human
+                    <span id="syncIndicator" class="credential-sync-indicator">
+                        <span class="sync-status">Synced</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Header -->
+            <div class="text-center mb-12">
                 <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
                     <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">Welcome, Verified Human!</h1>
-                <p class="text-lg text-gray-600">You have successfully verified your humanity and can access protected content.</p>
+                <h1 class="text-4xl font-bold text-gray-900 mb-2">Protected Content</h1>
+                <p class="text-xl text-gray-600">Welcome to the Lemma verified network</p>
+                <p class="text-sm text-gray-500 mt-2">User ID: {{ session.get('verified_user_id', 'Unknown') }}</p>
             </div>
 
-            <!-- Protected Content Sections -->
+            <!-- Feature Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <!-- Lemma Network Access -->
+                <!-- Network Access -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                     <div class="flex items-center mb-4">
                         <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
@@ -38,8 +122,8 @@
                     </a>
                 </div>
 
-                <!-- Credential Management -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <!-- Enhanced Credential Management -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 credential-management-enhanced">
                     <div class="flex items-center mb-4">
                         <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
                             <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,14 +131,28 @@
                             </svg>
                         </div>
                         <h2 class="text-xl font-semibold text-gray-900">Your Credential</h2>
+                        <span id="credentialSyncStatus" class="credential-sync-indicator synced ml-auto">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Synced
+                        </span>
                     </div>
-                    <p class="text-gray-600 mb-4">Manage your Lemma verification credential and settings.</p>
-                    <button onclick="viewCredential()" class="inline-flex items-center text-purple-600 hover:text-purple-700 font-medium">
-                        View Details
-                        <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                        </svg>
-                    </button>
+                    <p class="text-gray-600 mb-4">Manage your Lemma verification credential across all devices and storage systems.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="viewCredentialEnhanced()" class="inline-flex items-center text-purple-600 hover:text-purple-700 font-medium">
+                            View Details
+                            <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
+                        <button onclick="syncCredentials()" class="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium ml-4">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            Sync Now
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -112,7 +210,7 @@
                     </svg>
                     API Documentation
                 </a>
-                <button onclick="clearCredential()" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                <button onclick="clearCredentialEnhanced()" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
                     <svg class="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                     </svg>
@@ -142,60 +240,256 @@
     </div>
 </div>
 
-<!-- Credential Modal -->
-<div id="credentialModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+<!-- Enhanced Credential Modal -->
+<div id="credentialModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
         <div class="p-6">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Your Lemma Credential</h3>
-                <button onclick="closeCredentialModal()" class="text-gray-400 hover:text-gray-600">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">Lemma Verification Credential</h3>
+                </div>
+                <button onclick="closeCredentialModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
             <div id="credentialContent" class="text-sm text-gray-600">
-                Loading credential details...
+                <div class="flex items-center justify-center py-8">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading credential details...
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-function viewCredential() {
-    document.getElementById('credentialModal').classList.remove('hidden');
-    document.getElementById('credentialModal').classList.add('flex');
+// Enhanced credential management with 2025 SaaS standards
+let verificationFlow = null;
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Show verification status
+    setTimeout(() => {
+        const statusEl = document.getElementById('verificationStatus');
+        if (statusEl) {
+            statusEl.classList.add('show');
+        }
+    }, 500);
     
-    // Load credential from wallet or session
-    if (window.lemmaWallet) {
-        window.lemmaWallet.getFirstCredential().then(credential => {
-            if (credential) {
-                document.getElementById('credentialContent').innerHTML = `
-                    <div class="space-y-3">
-                        <div>
-                            <span class="font-medium">Type:</span> Human Verification Credential
-                        </div>
-                        <div>
-                            <span class="font-medium">Issued:</span> ${new Date(credential.issuanceDate).toLocaleDateString()}
-                        </div>
-                        <div>
-                            <span class="font-medium">Status:</span> <span class="text-green-600">Valid</span>
-                        </div>
-                        <div>
-                            <span class="font-medium">Network Access:</span> All Lemma-enabled sites
-                        </div>
-                    </div>
+    // Listen for verification flow events
+    window.addEventListener('lemma-flow-ready', function() {
+        console.log('Verification flow ready');
+        verificationFlow = window.lemmaVerificationFlow;
+        updateSyncStatus();
+    });
+    
+    window.addEventListener('lemma-session-state-changed', function(event) {
+        console.log('Session state changed:', event.detail);
+        updateSyncStatus();
+    });
+    
+    // Update sync status periodically
+    setInterval(updateSyncStatus, 30000);
+});
+
+function updateSyncStatus() {
+    const syncIndicator = document.getElementById('syncIndicator');
+    const credentialSyncStatus = document.getElementById('credentialSyncStatus');
+    
+    if (verificationFlow && verificationFlow.initialized) {
+        // Check if credentials are synced
+        verificationFlow.verifyCredentialIntegrity().then(() => {
+            if (syncIndicator) {
+                syncIndicator.className = 'credential-sync-indicator synced';
+                syncIndicator.innerHTML = '<span class="sync-status">Synced</span>';
+            }
+            if (credentialSyncStatus) {
+                credentialSyncStatus.className = 'credential-sync-indicator synced';
+                credentialSyncStatus.innerHTML = `
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Synced
+                `;
+            }
+        }).catch(() => {
+            if (syncIndicator) {
+                syncIndicator.className = 'credential-sync-indicator';
+                syncIndicator.innerHTML = '<span class="sync-status">Out of sync</span>';
+            }
+            if (credentialSyncStatus) {
+                credentialSyncStatus.className = 'credential-sync-indicator';
+                credentialSyncStatus.innerHTML = `
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                    Out of sync
                 `;
             }
         });
-    } else {
-        document.getElementById('credentialContent').innerHTML = `
-            <div class="text-center py-4">
-                <p>Credential stored in session</p>
-                <p class="text-sm text-gray-500 mt-2">User ID: {{ session.get('verified_user_id', 'Unknown') }}</p>
-            </div>
+    }
+}
+
+async function syncCredentials() {
+    const credentialSyncStatus = document.getElementById('credentialSyncStatus');
+    
+    if (credentialSyncStatus) {
+        credentialSyncStatus.className = 'credential-sync-indicator syncing';
+        credentialSyncStatus.innerHTML = `
+            <svg class="animate-spin w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Syncing...
         `;
     }
+    
+    try {
+        if (verificationFlow) {
+            await verificationFlow.syncSessionState();
+            verificationFlow.showToast('✅ Credentials synced successfully', 'success');
+        }
+    } catch (error) {
+        console.error('Sync failed:', error);
+        if (verificationFlow) {
+            verificationFlow.showToast('❌ Sync failed: ' + error.message, 'error');
+        }
+    }
+    
+    // Update status after sync
+    setTimeout(updateSyncStatus, 1000);
+}
+
+function viewCredentialEnhanced() {
+    document.getElementById('credentialModal').classList.remove('hidden');
+    document.getElementById('credentialModal').classList.add('flex');
+    
+    // Enhanced credential loading with multiple storage sources
+    const contentEl = document.getElementById('credentialContent');
+    
+    // Try loading from verification flow first
+    if (verificationFlow && verificationFlow.initialized) {
+        verificationFlow.getAllCredentialsFromIndexedDB().then(credentials => {
+            if (credentials && credentials.length > 0) {
+                const credential = credentials[0];
+                displayCredentialDetails(credential);
+            } else {
+                // Fallback to wallet
+                loadFromWallet();
+            }
+        }).catch(error => {
+            console.error('Failed to load from IndexedDB:', error);
+            loadFromWallet();
+        });
+    } else {
+        loadFromWallet();
+    }
+}
+
+function loadFromWallet() {
+    const contentEl = document.getElementById('credentialContent');
+    
+    if (window.lemmaWallet) {
+        window.lemmaWallet.getFirstCredential().then(credential => {
+            if (credential) {
+                displayCredentialDetails(credential);
+            } else {
+                displaySessionCredential();
+            }
+        }).catch(error => {
+            console.error('Failed to load from wallet:', error);
+            displaySessionCredential();
+        });
+    } else {
+        displaySessionCredential();
+    }
+}
+
+function displayCredentialDetails(credential) {
+    const contentEl = document.getElementById('credentialContent');
+    const credentialData = credential.credential || credential;
+    
+    contentEl.innerHTML = `
+        <div class="space-y-4">
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="font-medium text-green-800">Verified Human Credential</span>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <span class="font-medium text-gray-700">Type:</span>
+                    <p class="text-gray-900">Human Verification</p>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-700">Status:</span>
+                    <p class="text-green-600 font-medium">✅ Valid</p>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-700">Issued:</span>
+                    <p class="text-gray-900">${new Date(credentialData.issuanceDate).toLocaleDateString()}</p>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-700">Network Access:</span>
+                    <p class="text-gray-900">All Lemma sites</p>
+                </div>
+            </div>
+            
+            <div class="border-t pt-4">
+                <span class="font-medium text-gray-700">Storage Status:</span>
+                <div class="mt-2 space-y-2">
+                    <div class="flex items-center text-sm text-gray-600">
+                        <svg class="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        IndexedDB: Stored
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <svg class="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Session: Synchronized
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <svg class="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Wallet: Active
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function displaySessionCredential() {
+    const contentEl = document.getElementById('credentialContent');
+    contentEl.innerHTML = `
+        <div class="text-center py-8">
+            <div class="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h4 class="text-lg font-medium text-gray-900 mb-2">Session Credential</h4>
+            <p class="text-gray-600 mb-4">Your credential is stored in the current session</p>
+            <p class="text-sm text-gray-500">User ID: {{ session.get('verified_user_id', 'Unknown') }}</p>
+        </div>
+    `;
 }
 
 function closeCredentialModal() {
@@ -203,18 +497,23 @@ function closeCredentialModal() {
     document.getElementById('credentialModal').classList.remove('flex');
 }
 
-function clearCredential() {
-    if (confirm('Are you sure you want to clear your verification credential? You will need to verify again to access protected content.')) {
-        // Clear from wallet if available
-        if (window.lemmaWallet) {
-            window.lemmaWallet.clearCredentials();
+async function clearCredentialEnhanced() {
+    if (verificationFlow && verificationFlow.initialized) {
+        // Use the enhanced clear credential modal
+        await verificationFlow.showClearCredentialModal();
+    } else {
+        // Fallback to basic confirmation
+        if (confirm('Are you sure you want to clear your verification credential? You will need to verify again to access protected content.')) {
+            // Basic clear functionality
+            if (window.lemmaWallet) {
+                window.lemmaWallet.clearCredentials();
+            }
+            
+            fetch('/api/logout', { method: 'POST' })
+                .then(() => {
+                    window.location.href = '/';
+                });
         }
-        
-        // Clear session
-        fetch('/api/logout', { method: 'POST' })
-            .then(() => {
-                window.location.href = '/';
-            });
     }
 }
 
@@ -222,6 +521,16 @@ function clearCredential() {
 document.getElementById('credentialModal').addEventListener('click', function(e) {
     if (e.target === this) {
         closeCredentialModal();
+    }
+});
+
+// Keyboard accessibility
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('credentialModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            closeCredentialModal();
+        }
     }
 });
 </script>
