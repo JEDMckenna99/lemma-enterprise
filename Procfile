@@ -1,2 +1,2 @@
-web: gunicorn --worker-class gevent --workers 4 --worker-connections 1000 --timeout 30 --keep-alive 2 --max-requests 1000 --max-requests-jitter 50 --bind 0.0.0.0:$PORT wsgi:app
+web: gunicorn --worker-class gevent --workers 1 --worker-connections 1000 --timeout 30 --keep-alive 2 --max-requests 1000 --max-requests-jitter 50 --bind 0.0.0.0:$PORT wsgi:app
 oprf: ./bin/oprf-service --port=${OPRF_PORT:-8080} --rate-limit=${OPRF_RATE_LIMIT:-60}
