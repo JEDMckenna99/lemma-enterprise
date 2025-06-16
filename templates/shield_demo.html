@@ -238,26 +238,29 @@
     </div>
     
     <!-- Load Lemma Components -->
-    <script src="/static/js/lemma-wallet.js"></script>
     <script src="/static/js/shield.js"></script>
     <script src="/static/js/lemma-wallet-sre.js"></script>
     
     <script>
         // Demo functions
         function clearCredentials() {
-            if (window.lemmaWallet) {
-                window.lemmaWallet.clearAllCredentials();
-                updateStatus('Credentials cleared. Refresh page to test new user flow.');
-                
-                // Reset the shield
-                setTimeout(() => {
-                    if (window.lemmaShield) {
-                        window.lemmaShield.forceRecheck();
-                    }
-                }, 500);
-            } else {
-                updateStatus('Wallet not available');
-            }
+            // Clear localStorage and sessionStorage
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            // Clear cookies
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+            
+            updateStatus('Credentials cleared. Refresh page to test new user flow.');
+            
+            // Reset the shield
+            setTimeout(() => {
+                if (window.lemmaShield) {
+                    window.lemmaShield.forceRecheck();
+                }
+            }, 500);
         }
         
         function showStatus() {
@@ -274,17 +277,13 @@
                 status += 'Shield: Not initialized\n';
             }
             
-            // Wallet status
-            if (window.lemmaWallet) {
-                window.lemmaWallet.getAllCredentials().then(credentials => {
-                    status += `Wallet: ${credentials.length} credentials\n`;
-                    status += `Credentials: ${JSON.stringify(credentials, null, 2)}`;
-                    statusDiv.textContent = status;
-                });
-            } else {
-                status += 'Wallet: Not available';
-                statusDiv.textContent = status;
-            }
+            // Storage status
+            const localStorageKeys = Object.keys(localStorage);
+            const sessionStorageKeys = Object.keys(sessionStorage);
+            status += `LocalStorage: ${localStorageKeys.length} items\n`;
+            status += `SessionStorage: ${sessionStorageKeys.length} items\n`;
+            status += `Cookies: ${document.cookie.split(';').length} items`;
+            statusDiv.textContent = status;
         }
         
         function updateStatus(message) {
@@ -299,27 +298,28 @@
         }
         
         async function downloadCredential() {
-            if (window.lemmaWallet) {
-                try {
-                    const credentials = await window.lemmaWallet.getAllCredentials();
-                    if (credentials.length > 0) {
-                        const dataStr = JSON.stringify(credentials[0], null, 2);
-                        const dataBlob = new Blob([dataStr], {type: 'application/json'});
-                        const url = URL.createObjectURL(dataBlob);
-                        
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = 'lemma-credential.json';
-                        link.click();
-                        
-                        URL.revokeObjectURL(url);
-                        updateStatus('Credential downloaded!');
-                    } else {
-                        updateStatus('No credentials to download');
-                    }
-                } catch (error) {
-                    updateStatus('Error downloading credential: ' + error.message);
-                }
+            try {
+                // Get all storage data
+                const storageData = {
+                    localStorage: {...localStorage},
+                    sessionStorage: {...sessionStorage},
+                    cookies: document.cookie,
+                    timestamp: new Date().toISOString()
+                };
+                
+                const dataStr = JSON.stringify(storageData, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'lemma-storage-data.json';
+                link.click();
+                
+                URL.revokeObjectURL(url);
+                updateStatus('Storage data downloaded!');
+            } catch (error) {
+                updateStatus('Error downloading data: ' + error.message);
             }
         }
         

@@ -227,14 +227,19 @@ class LemmaVerificationFlow {
       // Get credentials from IndexedDB
       const indexedDBCredentials = await this.getAllCredentialsFromIndexedDB();
       
-      // Get credentials from wallet if available
+      // Get credentials from storage (wallet UI removed, using direct storage access)
       let walletCredentials = [];
-      if (window.lemmaWallet && typeof window.lemmaWallet.getAllCredentials === 'function') {
-        try {
-          walletCredentials = await window.lemmaWallet.getAllCredentials();
-        } catch (error) {
-          console.log('[LEMMA-FLOW] Wallet not ready yet, skipping wallet sync:', error.message);
+      try {
+        // Check localStorage for credentials
+        const storedCredentials = localStorage.getItem('lemma_credentials');
+        if (storedCredentials) {
+          walletCredentials = JSON.parse(storedCredentials);
+          if (!Array.isArray(walletCredentials)) {
+            walletCredentials = [walletCredentials];
+          }
         }
+      } catch (error) {
+        console.log('[LEMMA-FLOW] Error accessing stored credentials:', error.message);
       }
       
       // Compare and sync if needed
@@ -359,13 +364,18 @@ class LemmaVerificationFlow {
       }
 
       for (const [fingerprint, credential] of indexedDBMap) {
-        if (!walletMap.has(fingerprint) && window.lemmaWallet && typeof window.lemmaWallet.storeCredential === 'function') {
+        if (!walletMap.has(fingerprint)) {
           try {
-            // Credential exists in IndexedDB but not in wallet
-            await window.lemmaWallet.storeCredential(credential);
-            console.log('[LEMMA-FLOW] Synced credential from IndexedDB to wallet:', fingerprint);
+            // Credential exists in IndexedDB but not in localStorage - sync it
+            const existingCredentials = JSON.parse(localStorage.getItem('lemma_credentials') || '[]');
+            if (!Array.isArray(existingCredentials)) {
+              existingCredentials = [existingCredentials];
+            }
+            existingCredentials.push(credential);
+            localStorage.setItem('lemma_credentials', JSON.stringify(existingCredentials));
+            console.log('[LEMMA-FLOW] Synced credential from IndexedDB to localStorage:', fingerprint);
           } catch (error) {
-            console.log('[LEMMA-FLOW] Failed to sync credential to wallet:', error.message);
+            console.log('[LEMMA-FLOW] Failed to sync credential to localStorage:', error.message);
           }
         }
       }
@@ -580,13 +590,12 @@ class LemmaVerificationFlow {
       // Clear from IndexedDB
       await this.clearIndexedDBCredentials();
       
-      // Clear from wallet if available
-      if (window.lemmaWallet && typeof window.lemmaWallet.clearCredentials === 'function') {
-        try {
-          await window.lemmaWallet.clearCredentials();
-        } catch (error) {
-          console.log('[LEMMA-FLOW] Failed to clear wallet credentials:', error.message);
-        }
+      // Clear from localStorage
+      try {
+        localStorage.removeItem('lemma_credentials');
+        console.log('[LEMMA-FLOW] Cleared credentials from localStorage');
+      } catch (error) {
+        console.log('[LEMMA-FLOW] Failed to clear localStorage credentials:', error.message);
       }
       
       // Clear from localStorage
