@@ -1071,8 +1071,6 @@ class LemmaWalletUI {
     }
 }
 
-} // End of redeclaration guard
-
 // Export classes to global scope for external use (only if not already defined)
 if (typeof window.LemmaWallet === 'undefined') {
     window.LemmaWallet = LemmaWallet;
@@ -1081,6 +1079,8 @@ if (typeof window.LemmaWalletUI === 'undefined') {
     window.LemmaWalletUI = LemmaWalletUI;
 }
 
+} // End of redeclaration guard
+
 // Initialize the wallet when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Check if the wallet should be initialized
@@ -1088,12 +1088,17 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (shouldInitWallet) {
         console.log('Initializing Lemma wallet');
-        const wallet = new LemmaWallet();
-        const walletUI = new LemmaWalletUI(wallet);
-        walletUI.init();
-        
-        // Store the wallet instances in the window object for debugging
-        window.lemmaWallet = wallet;
-        window.lemmaWalletUI = walletUI;
+        // Only initialize if classes are available
+        if (typeof window.LemmaWallet !== 'undefined' && typeof window.LemmaWalletUI !== 'undefined') {
+            const wallet = new window.LemmaWallet();
+            const walletUI = new window.LemmaWalletUI(wallet);
+            walletUI.init();
+            
+            // Store the wallet instances in the window object for debugging
+            window.lemmaWallet = wallet;
+            window.lemmaWalletUI = walletUI;
+        } else {
+            console.error('LemmaWallet or LemmaWalletUI classes not available');
+        }
     }
 }); 

@@ -50,7 +50,6 @@ SECURITY_LEVELS = {
 }
 
 @shield_api.route('/api/shield/status', methods=['GET'])
-@csrf_protect()
 @rate_limit
 def shield_status():
     """
@@ -538,7 +537,6 @@ def get_security_levels():
         }), 500
 
 @shield_api.route('/api/shield/challenge', methods=['GET'])
-@csrf_protect()
 @rate_limit
 def generate_shield_challenge():
     """
