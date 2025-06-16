@@ -260,11 +260,11 @@
         </div>
         
         <div class="flex flex-col gap-3">
-            <button id="lemmaVerifyBtn" onclick="startLemmaVerification()" class="btn btn-primary btn-lg" disabled>
+            <button id="lemmaVerifyBtn" onclick="startLemmaVerification()" class="btn btn-primary btn-lg">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <span>Starting verification...</span>
+                <span>Verify Human</span>
             </button>
             <a href="/" class="text-gray-500 text-sm hover:text-gray-700">← Back to Home</a>
         </div>
@@ -496,6 +496,16 @@ document.addEventListener('DOMContentLoaded', function() {
     window.networkShield = lemmaShield;
     
     console.log('✅ Enhanced Lemma Shield API initialized with security level:', securityLevel);
+    
+    // Enable the verify button once Shield API is ready
+    const verifyButton = document.getElementById('lemmaVerifyBtn');
+    if (verifyButton) {
+        verifyButton.disabled = false;
+        const buttonText = verifyButton.querySelector('span');
+        if (buttonText && buttonText.textContent === 'Starting verification...') {
+            buttonText.textContent = 'Verify Human';
+        }
+    }
 });
 
 function addSecurityControls(shield, currentLevel) {
@@ -686,10 +696,25 @@ function showErrorMessage(message) {
 // Global function for the verify button (backward compatibility)
 function startLemmaVerification() {
     console.log('🚀 Starting verification via enhanced shield API...');
+    
+    const button = document.getElementById('lemmaVerifyBtn');
+    const buttonText = button.querySelector('span');
+    
     if (window.networkShield) {
-        window.networkShield.startVerification();
+        // Update button state
+        button.disabled = true;
+        buttonText.textContent = 'Starting verification...';
+        
+        // Start verification
+        window.networkShield.startVerification().catch(error => {
+            // Re-enable button on error
+            button.disabled = false;
+            buttonText.textContent = 'Verify Human';
+            console.error('Verification failed:', error);
+        });
     } else {
         console.error('Network shield not available');
+        updateShieldStatus('error', '❌ Shield API not available. Please refresh the page.');
     }
 }
 
