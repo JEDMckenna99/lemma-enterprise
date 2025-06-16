@@ -247,7 +247,8 @@ class LemmaShieldAPI {
         }
         
         try {
-            const credentials = await this.wallet.getCredentials();
+            // Use getAllCredentials method which is the correct method name for LemmaWallet
+            const credentials = await this.wallet.getAllCredentials();
             if (!credentials || credentials.length === 0) {
                 console.log('❌ No credentials found - showing shield');
                 await this.showshield();
@@ -267,7 +268,7 @@ class LemmaShieldAPI {
         console.log('🔍 DID verification required...');
         
         try {
-            const credentials = await this.wallet.getCredentials();
+            const credentials = await this.wallet.getAllCredentials();
             if (!credentials || credentials.length === 0) {
                 await this.showshield();
                 return;
@@ -286,7 +287,7 @@ class LemmaShieldAPI {
         console.log('🔍 Revocation check required...');
         
         try {
-            const credentials = await this.wallet.getCredentials();
+            const credentials = await this.wallet.getAllCredentials();
             if (!credentials || credentials.length === 0) {
                 await this.showshield();
                 return;
