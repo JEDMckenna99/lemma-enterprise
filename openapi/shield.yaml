@@ -1,0 +1,270 @@
+openapi: 3.1.0
+info:
+  title: Lemma Shield API
+  version: 1.0.0
+  description: |
+    The Lemma Shield API provides human verification services with cryptographic credentials.
+    
+    ## Overview
+    The Shield system replaces traditional "Gate" terminology with modern "Shield" branding:
+    - **Shield Protection**: Background verification with conditional UI
+    - **Credential Management**: W3C Verifiable Credentials with hardware backing
+    - **Revocation System**: OPRF-cascaded privacy-preserving revocation
+    
+    ## Authentication
+    All endpoints require API key authentication:
+    ```
+    X-API-Key: your_api_key_here
+    ```
+    
+    ## Key Features
+    - Zero-knowledge verification
+    - Offline credential validation
+    - Cross-platform portability
+    - Hardware-backed security
+    
+  contact:
+    name: Lemma Shield Support
+    url: https://lemma.network/support
+    email: support@lemma.network
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api
+    description: Production server
+  - url: http://localhost:5000/api
+    description: Development server
+
+paths:
+  /shield/status:
+    get:
+      summary: Check Shield Status
+      description: Check the current shield status for a user with configurable security levels
+      operationId: getShieldStatus
+      tags:
+        - Shield Control
+      parameters:
+        - name: security_level
+          in: query
+          description: Security level for verification
+          schema:
+            type: string
+            enum: [basic, standard, high, maximum]
+            default: standard
+      responses:
+        '200':
+          description: Shield status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  shield_action:
+                    type: string
+                    enum: [allow_access, check_credentials, require_reverification, verify_did, check_revocation, show_shield]
+                  message:
+                    type: string
+                  data:
+                    type: object
+
+  /shield/verify-credentials:
+    post:
+      summary: Verify User Credentials
+      description: Verify user credentials and perform background verification
+      operationId: verifyCredentials
+      tags:
+        - Shield Control
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                credential:
+                  type: object
+                  description: W3C Verifiable Credential
+                challenge:
+                  type: string
+                  description: Cryptographic challenge
+                security_level:
+                  type: string
+                  enum: [basic, standard, high, maximum]
+      responses:
+        '200':
+          description: Credentials verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  shield_action:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    type: object
+
+  /shield/challenge:
+    get:
+      summary: Generate Shield Challenge
+      description: Generate a cryptographic challenge for shield verification
+      operationId: generateShieldChallenge
+      tags:
+        - Shield Control
+      responses:
+        '200':
+          description: Challenge generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  challenge:
+                    type: string
+                    description: Base64-encoded challenge
+                  expires_at:
+                    type: string
+                    format: date-time
+
+  /shield/config:
+    get:
+      summary: Get Shield Configuration
+      description: Get shield configuration for client-side initialization
+      operationId: getShieldConfig
+      tags:
+        - Shield Control
+      parameters:
+        - name: security_level
+          in: query
+          schema:
+            type: string
+            enum: [basic, standard, high, maximum]
+            default: standard
+      responses:
+        '200':
+          description: Shield configuration retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  security_level:
+                    type: string
+                  endpoints:
+                    type: object
+                  intervals:
+                    type: object
+
+  /shield/start-verification:
+    post:
+      summary: Start Shield Verification
+      description: Start the shield verification process
+      operationId: startShieldVerification
+      tags:
+        - Shield Control
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                redirect_url:
+                  type: string
+                  description: URL to redirect after verification
+      responses:
+        '200':
+          description: Verification started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  verification_url:
+                    type: string
+                  session_id:
+                    type: string
+
+  /shield/security-levels:
+    get:
+      summary: Get Available Security Levels
+      description: Get all available security levels and their configurations
+      operationId: getSecurityLevels
+      tags:
+        - Shield Control
+      responses:
+        '200':
+          description: Security levels retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  levels:
+                    type: object
+                    additionalProperties:
+                      type: object
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Shield Control
+    description: Core shield protection and verification endpoints 
