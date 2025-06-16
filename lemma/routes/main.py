@@ -79,13 +79,33 @@ def index():
 
 @main_bp.route('/verify')
 def verify():
-    """Handle verification directly on main page."""
-    # Check for user_id parameter - try both user_id and user for backward compatibility
-    user_id = request.args.get('user_id') or request.args.get('user')
+    """Handle verification page - either from Shield or direct access."""
+    # Check for Shield parameters
+    session_id = request.args.get('session_id')
     redirect_url = request.args.get('redirect')
+    security_level = request.args.get('security_level', 'standard')
+    user_id = request.args.get('user_id') or request.args.get('user')
     
+    # If coming from Shield, validate session_id
+    if session_id:
+        stored_session_id = session.get('verification_session_id')
+        if session_id == stored_session_id:
+            # Valid Shield verification session
+            user_id = user_id or f"user_{secrets.token_hex(8)}"
+            session['verification_user_id'] = user_id
+            if redirect_url:
+                session['verification_redirect_url'] = redirect_url
+            session['requested_security_level'] = security_level
+            
+            # Render the verification template directly
+            return render_template('verify.html', 
+                                   user_id=user_id, 
+                                   redirect_url=redirect_url,
+                                   security_level=security_level,
+                                   from_shield=True)
+    
+    # Handle legacy/direct verification access
     if not user_id:
-        # Generate a random user ID if none provided
         user_id = f"user_{secrets.token_hex(8)}"
     
     # Store user ID and redirect URL in session for later use
@@ -93,15 +113,8 @@ def verify():
     if redirect_url:
         session['verification_redirect_url'] = redirect_url
     
-    # Add flash message for verification
-    flash("Please complete verification to access protected content", "info")
-    
-    # Redirect to the main page with the user_id and redirect_url
-    redirect_params = {'user_id': user_id}
-    if redirect_url:
-        redirect_params['redirect'] = redirect_url
-    
-    return redirect(url_for('main.index', **redirect_params))
+    # Render the verification template
+    return render_template('verify.html', user_id=user_id, redirect_url=redirect_url)
 
 @main_bp.route('/start-verification/<user_id>', methods=['GET', 'POST'])
 def start_verification(user_id):
