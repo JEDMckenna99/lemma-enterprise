@@ -76,7 +76,12 @@ class LemmaShieldWidget {
     
     async checkStatus() {
         try {
-            // First check if user has credentials
+            // First check if user is returning from Stripe verification
+            if (this.checkForReturnFromVerification()) {
+                return; // checkForReturnFromVerification will handle the rest
+            }
+            
+            // Check if user has credentials
             if (this.wallet) {
                 const credentials = await this.wallet.getAllCredentials();
                 if (credentials && credentials.length > 0) {
@@ -370,7 +375,8 @@ class LemmaShieldWidget {
     
     async startVerificationSession() {
         try {
-            const response = await fetch(`${this.options.apiBase}/api/complete-verification-flow`, {
+            // Start the verification session with Shield API
+            const response = await fetch(`${this.options.apiBase}/api/shield/start-verification`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
@@ -378,9 +384,8 @@ class LemmaShieldWidget {
                     'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: JSON.stringify({
-                    user_id: this.state.userId,
-                    callback_url: window.location.href,
-                    check_only: false
+                    return_url: window.location.href,
+                    security_level: this.options.securityLevel || 'standard'
                 })
             });
             
@@ -389,11 +394,6 @@ class LemmaShieldWidget {
             }
             
             const result = await response.json();
-            
-            // Add success flag for compatibility
-            if (result.status === 'initiated' && result.verification_url) {
-                result.success = true;
-            }
             
             return result;
             
@@ -409,37 +409,38 @@ class LemmaShieldWidget {
             sessionStorage.setItem('lemma_verification_state', JSON.stringify({
                 userId: this.state.userId,
                 sessionId: verificationSession.session_id,
-                returnUrl: window.location.href
+                returnUrl: window.location.href,
+                widgetState: this.state
             }));
             
-            // Open verification in a new window/tab
-            const stripeWindow = window.open(
-                verificationSession.verification_url,
-                'lemma-verification',
-                'width=600,height=800,scrollbars=yes,resizable=yes'
-            );
-            
-            // Monitor the verification window
-            this.monitorVerificationWindow(stripeWindow);
+            // Redirect to verification in the same window
+            console.log('🔄 Redirecting to Stripe verification...');
+            window.location.href = verificationSession.verification_url;
         }
     }
     
-    monitorVerificationWindow(stripeWindow) {
-        const checkWindow = () => {
-            if (stripeWindow.closed) {
-                console.log('🔍 Verification window closed, checking status...');
-                this.checkVerificationStatus();
-            } else {
-                setTimeout(checkWindow, 1000);
-            }
-        };
+    // Check if user is returning from Stripe verification
+    checkForReturnFromVerification() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const verificationState = sessionStorage.getItem('lemma_verification_state');
         
-        setTimeout(checkWindow, 1000);
+        if (verificationState && (urlParams.get('verified') === 'true' || urlParams.get('return_url'))) {
+            console.log('🔄 User returned from Stripe verification, checking status...');
+            const state = JSON.parse(verificationState);
+            this.state.userId = state.userId;
+            this.state.verificationSessionId = state.sessionId;
+            
+            // Check verification status
+            this.checkVerificationStatus();
+            return true;
+        }
+        
+        return false;
     }
     
     async checkVerificationStatus() {
         try {
-            const response = await fetch(`${this.options.apiBase}/api/complete-verification-flow`, {
+            const response = await fetch(`${this.options.apiBase}/api/shield/verify-credentials`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
@@ -448,27 +449,42 @@ class LemmaShieldWidget {
                 },
                 body: JSON.stringify({
                     user_id: this.state.userId,
-                    stripe_session_id: this.state.verificationSessionId,
-                    check_only: true
+                    session_id: this.state.verificationSessionId
                 })
             });
             
             if (response.ok) {
                 const result = await response.json();
                 
-                if (result.status === 'verified') {
+                if (result.success && result.verified) {
                     // Store credential and grant access
-                    if (result.store_credential && this.wallet) {
-                        await this.wallet.storeCredential(result.store_credential);
+                    if (result.credential && this.wallet) {
+                        await this.wallet.storeCredential(result.credential);
                     }
                     this.showSuccessAndGrantAccess();
-                } else if (result.status === 'processing') {
+                } else if (result.status === 'processing' || result.message === 'Verification in progress') {
                     // Still processing, try again in a few seconds
                     setTimeout(() => this.checkVerificationStatus(), 3000);
                 } else {
                     // Failed
                     this.showError(null, result.message || 'Verification failed');
                 }
+            } else {
+                // Try to get credential directly if verification check failed
+                const credentialResponse = await fetch(`${this.options.apiBase}/api/credential-lookup/${this.state.userId}`, {
+                    credentials: 'same-origin'
+                });
+                
+                if (credentialResponse.ok) {
+                    const credentialResult = await credentialResponse.json();
+                    if (credentialResult.success && credentialResult.credential) {
+                        await this.wallet.storeCredential(credentialResult.credential);
+                        this.showSuccessAndGrantAccess();
+                        return;
+                    }
+                }
+                
+                this.showError(null, 'Failed to verify credentials');
             }
             
         } catch (error) {
@@ -529,6 +545,13 @@ class LemmaShieldWidget {
         
         // Clear stored verification state
         sessionStorage.removeItem('lemma_verification_state');
+        
+        // Clean up URL parameters from Stripe return
+        const url = new URL(window.location);
+        url.searchParams.delete('verified');
+        url.searchParams.delete('return_url');
+        url.searchParams.delete('user_id');
+        window.history.replaceState({}, document.title, url.toString());
         
         // Notify listeners
         this.options.onVerified();

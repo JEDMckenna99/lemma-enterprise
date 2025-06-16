@@ -221,8 +221,10 @@ def verification_callback():
             flash("Identity verified successfully! Your Lemma credential is being prepared.", "success")
             
             # Check if there's a redirect URL from the original request
-            redirect_url = session.get('verification_redirect_url')
-            session.pop('verification_redirect_url', None)  # Clear it after use
+            # Check both Shield API and legacy session keys
+            redirect_url = session.get('verification_return_url') or session.get('verification_redirect_url')
+            session.pop('verification_return_url', None)  # Clear Shield API key
+            session.pop('verification_redirect_url', None)  # Clear legacy key
             
             if redirect_url:
                 # Redirect back to the original page with verification success
