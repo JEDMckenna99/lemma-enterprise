@@ -74,7 +74,7 @@ class LemmaShieldAPI {
             // Load shield configuration
             await this.loadConfig();
             
-            // Wait for wallet to be available
+            // Wait for wallet to be available (doesn't fail if wallet isn't available)
             await this.waitForWallet();
             
             // Perform initial status check
@@ -90,6 +90,17 @@ class LemmaShieldAPI {
             
         } catch (error) {
             console.error('❌ Failed to initialize Lemma shield API:', error);
+            
+            // Still show the shield even if initialization fails
+            try {
+                await this.showshield({
+                    title: 'Verification System Loading',
+                    message: 'Please wait while the verification system initializes...'
+                });
+            } catch (shieldError) {
+                console.error('❌ Failed to show shield after init error:', shieldError);
+            }
+            
             this.options.onError(error);
         }
     }
@@ -116,7 +127,7 @@ class LemmaShieldAPI {
     }
     
     async waitForWallet() {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             let attempts = 0;
             const maxAttempts = 50; // 5 seconds max wait
             
@@ -130,8 +141,8 @@ class LemmaShieldAPI {
                 
                 attempts++;
                 if (attempts >= maxAttempts) {
-                    console.log('⚠️ Wallet not available after waiting');
-                    reject(new Error('Wallet not available'));
+                    console.log('⚠️ Wallet not available after waiting - proceeding without wallet for new users');
+                    resolve(); // Don't reject, just proceed without wallet
                     return;
                 }
                 
