@@ -1044,3 +1044,25 @@ def join_network():
     response.headers['Expires'] = '0'
     
     return response
+
+@main_bp.route('/shield-protected')
+def shield_protected():
+    """A page protected by the actual Lemma Shield API - not just a demo."""
+    current_app.logger.info("Shield protected page accessed")
+    
+    # This page is protected by the real Shield API
+    response = make_response(render_template('shield_protected.html'))
+    
+    # Set cookie to enable the wallet if not already set
+    if not request.cookies.get('lemma_wallet_enabled'):
+        secure = not current_app.config.get('TESTING', False)  # Secure in production, not in testing
+        response.set_cookie(
+            'lemma_wallet_enabled', 
+            'true', 
+            max_age=31536000,  # 1 year
+            secure=secure, 
+            httponly=False,  # JavaScript needs access
+            samesite='Lax'
+        )
+    
+    return response

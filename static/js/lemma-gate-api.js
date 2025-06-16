@@ -1,32 +1,32 @@
 /**
- * Lemma Gate API Client - Clean API-Driven Implementation
+ * Lemma Shield API Client - Clean API-Driven Implementation
  * Enhanced with enterprise security controls and configurable protection levels
  * 
- * This client handles all gate functionality through centralized API endpoints.
+ * This client handles all shield functionality through centralized API endpoints.
  * All verification logic, session management, and security is handled server-side.
  * 
  * Perfect Flow:
  * 1. Call API to check status with security level
  * 2. If has credentials → API handles background verification automatically
- * 3. If no credentials → Show gate → Direct to verification flow
+ * 3. If no credentials → Show shield → Direct to verification flow
  * 4. Support for credential revocation and re-verification
  * 
  * Usage:
- * const gate = new LemmaGateAPI({
+ * const shield = new LemmaShieldAPI({
  *   protectedContent: '#protected-content',
  *   securityLevel: 'standard', // basic, standard, high, maximum
  *   onVerified: () => console.log('User verified!'),
  *   onRevoked: () => console.log('Credential revoked!'),
- *   onError: (error) => console.error('Gate error:', error)
+ *   onError: (error) => console.error('Shield error:', error)
  * });
  */
 
-class LemmaGateAPI {
+class LemmaShieldAPI {
     constructor(options = {}) {
         this.options = {
             // UI Elements
             protectedContent: options.protectedContent || '#protected-content',
-            gateContainer: options.gateContainer || '#lemma-gate-overlay',
+            shieldContainer: options.shieldContainer || '#lemma-shield-overlay',
             
             // Security Configuration
             securityLevel: options.securityLevel || 'standard',
@@ -39,7 +39,7 @@ class LemmaGateAPI {
             onVerified: options.onVerified || (() => {}),
             onRevoked: options.onRevoked || (() => {}),
             onReverificationRequired: options.onReverificationRequired || (() => {}),
-            onError: options.onError || ((error) => console.error('Lemma Gate Error:', error)),
+            onError: options.onError || ((error) => console.error('Lemma Shield Error:', error)),
             onStatusChange: options.onStatusChange || (() => {}),
             
             // Advanced Options
@@ -63,15 +63,15 @@ class LemmaGateAPI {
         this.config = null;
         this.wallet = null;
         
-        // Initialize the gate
+        // Initialize the shield
         this.init();
     }
     
     async init() {
         try {
-            console.log('🔐 Initializing Lemma Gate API with security level:', this.state.securityLevel);
+            console.log('🛡️ Initializing Lemma Shield API with security level:', this.state.securityLevel);
             
-            // Load gate configuration
+            // Load shield configuration
             await this.loadConfig();
             
             // Wait for wallet to be available
@@ -86,17 +86,17 @@ class LemmaGateAPI {
             }
             
             this.state.initialized = true;
-            console.log('✅ Lemma Gate API initialized successfully');
+            console.log('✅ Lemma Shield API initialized successfully');
             
         } catch (error) {
-            console.error('❌ Failed to initialize Lemma Gate API:', error);
+            console.error('❌ Failed to initialize Lemma Shield API:', error);
             this.options.onError(error);
         }
     }
     
     async loadConfig() {
         try {
-            const response = await fetch(`${this.options.apiBase}/api/gate/config?security_level=${this.state.securityLevel}`);
+            const response = await fetch(`${this.options.apiBase}/api/shield/config?security_level=${this.state.securityLevel}`);
             if (!response.ok) {
                 throw new Error(`Config load failed: ${response.status}`);
             }
@@ -107,10 +107,10 @@ class LemmaGateAPI {
             }
             
             this.config = result.config;
-            console.log('📋 Gate configuration loaded:', this.config);
+            console.log('📋 Shield configuration loaded:', this.config);
             
         } catch (error) {
-            console.error('❌ Failed to load gate configuration:', error);
+            console.error('❌ Failed to load shield configuration:', error);
             throw error;
         }
     }
@@ -151,7 +151,7 @@ class LemmaGateAPI {
         this.state.lastCheck = Date.now();
         
         try {
-            const response = await fetch(`${this.options.apiBase}/api/gate/status?security_level=${this.state.securityLevel}`, {
+            const response = await fetch(`${this.options.apiBase}/api/shield/status?security_level=${this.state.securityLevel}`, {
                 method: 'GET',
                 credentials: 'same-origin',
                 headers: {
@@ -179,11 +179,11 @@ class LemmaGateAPI {
     }
     
     async handleStatusResult(result) {
-        const { gate_action, data, message } = result;
+        const { shield_action, data, message } = result;
         
-        console.log(`🔍 Gate status: ${gate_action}`, data);
+        console.log(`🔍 Shield status: ${shield_action}`, data);
         
-        switch (gate_action) {
+        switch (shield_action) {
             case 'allow_access':
                 await this.handleAllowAccess(data);
                 break;
@@ -208,12 +208,13 @@ class LemmaGateAPI {
                 await this.handleCredentialRevoked(data);
                 break;
                 
+            case 'show_shield':
             default:
-                console.warn('⚠️ Unknown gate action:', gate_action);
-                await this.showGate();
+                await this.showShield({ message, data });
+                break;
         }
         
-        this.options.onStatusChange(gate_action, data);
+        this.options.onStatusChange(shield_action, data);
     }
     
     async handleAllowAccess(data) {
@@ -221,7 +222,7 @@ class LemmaGateAPI {
         this.state.credentialId = data.credential_id;
         
         console.log('✅ Access allowed - user verified');
-        this.hideGate();
+        this.hideShield();
         this.showProtectedContent();
         this.options.onVerified(data);
     }
@@ -230,16 +231,16 @@ class LemmaGateAPI {
         console.log('🔍 Checking user credentials...');
         
         if (!this.wallet) {
-            console.log('❌ No wallet available - showing gate');
-            await this.showGate();
+            console.log('❌ No wallet available - showing shield');
+            await this.showShield();
             return;
         }
         
         try {
             const credentials = await this.wallet.getCredentials();
             if (!credentials || credentials.length === 0) {
-                console.log('❌ No credentials found - showing gate');
-                await this.showGate();
+                console.log('❌ No credentials found - showing shield');
+                await this.showShield();
                 return;
             }
             
@@ -248,7 +249,7 @@ class LemmaGateAPI {
             
         } catch (error) {
             console.error('❌ Credential check failed:', error);
-            await this.showGate();
+            await this.showShield();
         }
     }
     
@@ -258,7 +259,7 @@ class LemmaGateAPI {
         try {
             const credentials = await this.wallet.getCredentials();
             if (!credentials || credentials.length === 0) {
-                await this.showGate();
+                await this.showShield();
                 return;
             }
             
@@ -277,7 +278,7 @@ class LemmaGateAPI {
         try {
             const credentials = await this.wallet.getCredentials();
             if (!credentials || credentials.length === 0) {
-                await this.showGate();
+                await this.showShield();
                 return;
             }
             
@@ -296,8 +297,8 @@ class LemmaGateAPI {
         this.state.verified = false;
         this.hideProtectedContent();
         
-        // Show re-verification gate
-        await this.showGate({
+        // Show re-verification shield
+        await this.showShield({
             title: 'Re-verification Required',
             message: `Your verification has expired. Please verify again to continue.`,
             reason: data.reason,
@@ -325,7 +326,7 @@ class LemmaGateAPI {
         this.hideProtectedContent();
         
         // Show revocation notice
-        await this.showGate({
+        await this.showShield({
             title: 'Credential Revoked',
             message: `Your verification credential has been revoked: ${data.revocation_reason}`,
             reason: data.revocation_reason,
@@ -338,7 +339,7 @@ class LemmaGateAPI {
     async verifyCredentials(credentials, options = {}) {
         try {
             // Generate challenge
-            const challengeResponse = await fetch(`${this.options.apiBase}/api/gate/challenge`, {
+            const challengeResponse = await fetch(`${this.options.apiBase}/api/shield/challenge`, {
                 method: 'GET',
                 credentials: 'same-origin'
             });
@@ -353,7 +354,7 @@ class LemmaGateAPI {
             }
             
             // Verify credentials with API
-            const verifyResponse = await fetch(`${this.options.apiBase}/api/gate/verify-credentials`, {
+            const verifyResponse = await fetch(`${this.options.apiBase}/api/shield/verify-credentials`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
@@ -390,85 +391,85 @@ class LemmaGateAPI {
         }
     }
     
-    async showGate(options = {}) {
-        console.log('🚪 Showing Lemma Gate');
+    async showShield(options = {}) {
+        console.log('🛡️ Showing Lemma Shield');
         
         this.hideProtectedContent();
         
-        const gateContainer = document.querySelector(this.options.gateContainer);
-        if (!gateContainer) {
-            // Create gate container if it doesn't exist
-            this.createGateContainer(options);
+        const shieldContainer = document.querySelector(this.options.shieldContainer);
+        if (!shieldContainer) {
+            // Create shield container if it doesn't exist
+            this.createShieldContainer(options);
         } else {
-            // Update existing gate
-            this.updateGateContent(gateContainer, options);
+            // Update existing shield
+            this.updateShieldContent(shieldContainer, options);
         }
         
-        // Show the gate
-        const gate = document.querySelector(this.options.gateContainer);
-        if (gate) {
-            gate.style.display = 'flex';
-            gate.classList.add('lemma-gate-visible');
+        // Show the shield
+        const shield = document.querySelector(this.options.shieldContainer);
+        if (shield) {
+            shield.style.display = 'flex';
+            shield.classList.add('lemma-shield-visible');
         }
     }
     
-    createGateContainer(options = {}) {
-        const gate = document.createElement('div');
-        gate.id = this.options.gateContainer.replace('#', '');
-        gate.className = 'lemma-gate-overlay';
+    createShieldContainer(options = {}) {
+        const shield = document.createElement('div');
+        shield.id = this.options.shieldContainer.replace('#', '');
+        shield.className = 'lemma-shield-overlay';
         
         const title = options.title || 'Human Verification Required';
         const message = options.message || 'Please verify that you are human to access this content.';
         const isReverification = options.isReverification || false;
         const isRevoked = options.isRevoked || false;
         
-        gate.innerHTML = `
-            <div class="lemma-gate-modal">
-                <div class="lemma-gate-header">
+        shield.innerHTML = `
+            <div class="lemma-shield-modal">
+                <div class="lemma-shield-header">
                     <h2>${title}</h2>
-                    ${isRevoked ? '<div class="lemma-gate-status revoked">Credential Revoked</div>' : ''}
-                    ${isReverification ? '<div class="lemma-gate-status reverify">Re-verification Required</div>' : ''}
+                    ${isRevoked ? '<div class="lemma-shield-status revoked">Credential Revoked</div>' : ''}
+                    ${isReverification ? '<div class="lemma-shield-status reverify">Re-verification Required</div>' : ''}
                 </div>
-                <div class="lemma-gate-content">
+                <div class="lemma-shield-content">
                     <p>${message}</p>
-                    <div class="lemma-gate-security-info">
+                    <div class="lemma-shield-security-info">
                         <strong>Security Level:</strong> ${this.state.securityLevel.toUpperCase()}
                         ${this.config ? `<br><small>Session timeout: ${Math.round(this.config.settings.session_timeout / 3600)}h</small>` : ''}
                     </div>
                 </div>
-                <div class="lemma-gate-actions">
+                <div class="lemma-shield-actions">
                     ${isRevoked ? 
-                        '<button class="lemma-gate-btn primary" onclick="window.location.reload()">Get New Verification</button>' :
-                        '<button class="lemma-gate-btn primary" id="lemma-verify-btn">Verify Human</button>'
+                        '<button class="lemma-shield-btn primary" onclick="window.location.reload()">Get New Verification</button>' :
+                        '<button class="lemma-shield-btn primary" id="lemma-verify-btn">Verify Human</button>'
                     }
-                    <button class="lemma-gate-btn secondary" id="lemma-gate-close">Close</button>
+                    <button class="lemma-shield-btn secondary" id="lemma-shield-close">Close</button>
                 </div>
             </div>
         `;
         
         // Add styles
-        this.addGateStyles();
+        this.addShieldStyles();
         
         // Add event listeners
-        this.addGateEventListeners(gate, options);
+        this.addShieldEventListeners(shield, options);
         
-        document.body.appendChild(gate);
+        document.body.appendChild(shield);
     }
     
-    updateGateContent(gateContainer, options = {}) {
+    updateShieldContent(shieldContainer, options = {}) {
         const title = options.title || 'Human Verification Required';
         const message = options.message || 'Please verify that you are human to access this content.';
         
-        const header = gateContainer.querySelector('.lemma-gate-header h2');
-        const content = gateContainer.querySelector('.lemma-gate-content p');
+        const header = shieldContainer.querySelector('.lemma-shield-header h2');
+        const content = shieldContainer.querySelector('.lemma-shield-content p');
         
         if (header) header.textContent = title;
         if (content) content.textContent = message;
     }
     
-    addGateEventListeners(gate, options = {}) {
-        const verifyBtn = gate.querySelector('#lemma-verify-btn');
-        const closeBtn = gate.querySelector('#lemma-gate-close');
+    addShieldEventListeners(shield, options = {}) {
+        const verifyBtn = shield.querySelector('#lemma-verify-btn');
+        const closeBtn = shield.querySelector('#lemma-shield-close');
         
         if (verifyBtn) {
             verifyBtn.addEventListener('click', async () => {
@@ -478,21 +479,21 @@ class LemmaGateAPI {
         
         if (closeBtn) {
             closeBtn.addEventListener('click', () => {
-                this.hideGate();
+                this.hideShield();
             });
         }
         
         // Close on overlay click
-        gate.addEventListener('click', (e) => {
-            if (e.target === gate) {
-                this.hideGate();
+        shield.addEventListener('click', (e) => {
+            if (e.target === shield) {
+                this.hideShield();
             }
         });
     }
     
     async startVerification(options = {}) {
         try {
-            const response = await fetch(`${this.options.apiBase}/api/gate/start-verification`, {
+            const response = await fetch(`${this.options.apiBase}/api/shield/start-verification`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
@@ -524,11 +525,11 @@ class LemmaGateAPI {
         }
     }
     
-    hideGate() {
-        const gate = document.querySelector(this.options.gateContainer);
-        if (gate) {
-            gate.style.display = 'none';
-            gate.classList.remove('lemma-gate-visible');
+    hideShield() {
+        const shield = document.querySelector(this.options.shieldContainer);
+        if (shield) {
+            shield.style.display = 'none';
+            shield.classList.remove('lemma-shield-visible');
         }
     }
     
@@ -579,9 +580,9 @@ class LemmaGateAPI {
                 this.checkStatus();
             }, this.options.retryDelay * this.state.retryCount);
         } else {
-            console.error('❌ Max retries reached, showing gate');
+            console.error('❌ Max retries reached, showing shield');
             this.state.retryCount = 0;
-            await this.showGate({
+            await this.showShield({
                 title: 'Verification Error',
                 message: 'Unable to verify your status. Please try again.',
                 error: this.options.showDetailedErrors ? error.message : undefined
@@ -591,15 +592,15 @@ class LemmaGateAPI {
         this.options.onError(error);
     }
     
-    addGateStyles() {
-        if (document.getElementById('lemma-gate-styles')) {
+    addShieldStyles() {
+        if (document.getElementById('lemma-shield-styles')) {
             return; // Styles already added
         }
         
         const styles = document.createElement('style');
-        styles.id = 'lemma-gate-styles';
+        styles.id = 'lemma-shield-styles';
         styles.textContent = `
-            .lemma-gate-overlay {
+            .lemma-shield-overlay {
                 position: fixed;
                 top: 0;
                 left: 0;
@@ -613,7 +614,7 @@ class LemmaGateAPI {
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
             
-            .lemma-gate-modal {
+            .lemma-shield-modal {
                 background: white;
                 border-radius: 12px;
                 padding: 32px;
@@ -623,14 +624,14 @@ class LemmaGateAPI {
                 text-align: center;
             }
             
-            .lemma-gate-header h2 {
+            .lemma-shield-header h2 {
                 margin: 0 0 16px 0;
                 color: #1a1a1a;
                 font-size: 24px;
                 font-weight: 600;
             }
             
-            .lemma-gate-status {
+            .lemma-shield-status {
                 display: inline-block;
                 padding: 6px 12px;
                 border-radius: 6px;
@@ -640,26 +641,26 @@ class LemmaGateAPI {
                 margin-bottom: 16px;
             }
             
-            .lemma-gate-status.revoked {
+            .lemma-shield-status.revoked {
                 background: #fee;
                 color: #c53030;
                 border: 1px solid #fed7d7;
             }
             
-            .lemma-gate-status.reverify {
+            .lemma-shield-status.reverify {
                 background: #fff3cd;
                 color: #856404;
                 border: 1px solid #ffeaa7;
             }
             
-            .lemma-gate-content p {
+            .lemma-shield-content p {
                 margin: 0 0 24px 0;
                 color: #4a5568;
                 font-size: 16px;
                 line-height: 1.5;
             }
             
-            .lemma-gate-security-info {
+            .lemma-shield-security-info {
                 background: #f7fafc;
                 border: 1px solid #e2e8f0;
                 border-radius: 8px;
@@ -669,14 +670,14 @@ class LemmaGateAPI {
                 color: #2d3748;
             }
             
-            .lemma-gate-actions {
+            .lemma-shield-actions {
                 display: flex;
                 gap: 12px;
                 justify-content: center;
                 margin-top: 24px;
             }
             
-            .lemma-gate-btn {
+            .lemma-shield-btn {
                 padding: 12px 24px;
                 border: none;
                 border-radius: 8px;
@@ -687,33 +688,33 @@ class LemmaGateAPI {
                 min-width: 120px;
             }
             
-            .lemma-gate-btn.primary {
+            .lemma-shield-btn.primary {
                 background: #635bff;
                 color: white;
             }
             
-            .lemma-gate-btn.primary:hover {
+            .lemma-shield-btn.primary:hover {
                 background: #5a52ff;
                 transform: translateY(-1px);
             }
             
-            .lemma-gate-btn.secondary {
+            .lemma-shield-btn.secondary {
                 background: #f7fafc;
                 color: #4a5568;
                 border: 1px solid #e2e8f0;
             }
             
-            .lemma-gate-btn.secondary:hover {
+            .lemma-shield-btn.secondary:hover {
                 background: #edf2f7;
             }
             
             @media (max-width: 640px) {
-                .lemma-gate-modal {
+                .lemma-shield-modal {
                     padding: 24px;
                     margin: 16px;
                 }
                 
-                .lemma-gate-actions {
+                .lemma-shield-actions {
                     flex-direction: column;
                 }
             }
@@ -733,7 +734,7 @@ class LemmaGateAPI {
         await this.loadConfig();
         await this.checkStatus();
         
-        console.log(`🔒 Security level changed to: ${level}`);
+        console.log(`🛡️ Security level changed to: ${level}`);
     }
     
     async forceRecheck() {
@@ -754,40 +755,40 @@ class LemmaGateAPI {
     
     destroy() {
         this.stopBackgroundChecks();
-        this.hideGate();
+        this.hideShield();
         
-        // Remove gate container
-        const gate = document.querySelector(this.options.gateContainer);
-        if (gate) {
-            gate.remove();
+        // Remove shield container
+        const shield = document.querySelector(this.options.shieldContainer);
+        if (shield) {
+            shield.remove();
         }
         
         // Remove styles
-        const styles = document.getElementById('lemma-gate-styles');
+        const styles = document.getElementById('lemma-shield-styles');
         if (styles) {
             styles.remove();
         }
         
-        console.log('🗑️ Lemma Gate API destroyed');
+        console.log('🗑️ Lemma Shield API destroyed');
     }
 }
 
-// Auto-initialize if data-lemma-gate attribute is present
+// Auto-initialize if data-lemma-shield attribute is present
 document.addEventListener('DOMContentLoaded', () => {
-    const gateElements = document.querySelectorAll('[data-lemma-gate]');
+    const shieldElements = document.querySelectorAll('[data-lemma-shield]');
     
-    gateElements.forEach(element => {
+    shieldElements.forEach(element => {
         const securityLevel = element.getAttribute('data-security-level') || 'standard';
         const protectedContent = element.getAttribute('data-protected-content') || element;
         
-        new LemmaGateAPI({
+        new LemmaShieldAPI({
             protectedContent: protectedContent,
             securityLevel: securityLevel,
             onVerified: () => {
-                console.log('✅ Auto-initialized Lemma Gate: User verified');
+                console.log('✅ Auto-initialized Lemma Shield: User verified');
             },
             onError: (error) => {
-                console.error('❌ Auto-initialized Lemma Gate error:', error);
+                console.error('❌ Auto-initialized Lemma Shield error:', error);
             }
         });
     });
@@ -795,8 +796,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Export for module systems
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = LemmaGateAPI;
+    module.exports = LemmaShieldAPI;
 }
 
 // Global access
-window.LemmaGateAPI = LemmaGateAPI; 
+window.LemmaShieldAPI = LemmaShieldAPI; 

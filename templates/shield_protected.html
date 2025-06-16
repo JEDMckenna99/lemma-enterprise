@@ -1,0 +1,403 @@
+{% extends "layout.html" %}
+
+{% block title %}Shield Protected Content{% endblock %}
+{% block description %}This page is protected by the Lemma Shield - real verification required.{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
+<style>
+    .shield-protected-page {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        padding: var(--space-8);
+    }
+    
+    .shield-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: var(--space-12);
+    }
+    
+    .shield-header {
+        text-align: center;
+        margin-bottom: var(--space-12);
+        padding: var(--space-8);
+        background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+        color: white;
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-xl);
+    }
+    
+    .shield-icon {
+        font-size: 4rem;
+        margin-bottom: var(--space-4);
+        display: block;
+    }
+    
+    .protected-content {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: var(--space-10);
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--gray-200);
+        display: none; /* Hidden until verified */
+    }
+    
+    .protected-content.verified {
+        display: block;
+    }
+    
+    .security-info {
+        background: var(--gray-50);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: var(--space-6);
+        margin: var(--space-6) 0;
+    }
+    
+    .verification-status {
+        position: fixed;
+        top: var(--space-4);
+        right: var(--space-4);
+        padding: var(--space-3) var(--space-6);
+        border-radius: var(--radius-full);
+        font-weight: 600;
+        font-size: var(--text-sm);
+        box-shadow: var(--shadow-lg);
+        z-index: 1000;
+        transition: all 0.3s ease;
+    }
+    
+    .verification-status.verified {
+        background: linear-gradient(135deg, var(--green-500), var(--green-600));
+        color: white;
+    }
+    
+    .verification-status.checking {
+        background: linear-gradient(135deg, var(--yellow-500), var(--yellow-600));
+        color: white;
+    }
+    
+    .verification-status.error {
+        background: linear-gradient(135deg, var(--red-500), var(--red-600));
+        color: white;
+    }
+    
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: var(--space-6);
+        margin: var(--space-8) 0;
+    }
+    
+    .feature-card {
+        background: var(--gray-50);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: var(--space-6);
+        text-align: center;
+    }
+    
+    .feature-icon {
+        font-size: 2rem;
+        margin-bottom: var(--space-3);
+        display: block;
+    }
+    
+    .loading-indicator {
+        text-align: center;
+        padding: var(--space-20);
+        color: var(--gray-500);
+    }
+    
+    .spinner {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        border: 4px solid var(--gray-200);
+        border-top: 4px solid var(--primary-600);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: var(--space-4);
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .debug-panel {
+        position: fixed;
+        bottom: var(--space-4);
+        left: var(--space-4);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: var(--space-4);
+        border-radius: var(--radius-lg);
+        font-family: monospace;
+        font-size: var(--text-xs);
+        max-width: 300px;
+        z-index: 999;
+    }
+    
+    .security-controls {
+        position: fixed;
+        top: var(--space-4);
+        left: var(--space-4);
+        background: white;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: var(--space-4);
+        box-shadow: var(--shadow-lg);
+        z-index: 998;
+        font-size: var(--text-sm);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shield-protected-page">
+    <!-- Verification Status Indicator -->
+    <div id="verification-status" class="verification-status checking">
+        🔍 Checking Shield Status...
+    </div>
+    
+    <!-- Security Controls (Debug) -->
+    <div class="security-controls">
+        <div style="font-weight: 600; margin-bottom: var(--space-2);">🛡️ Shield Controls</div>
+        <select id="security-level" style="width: 100%; margin-bottom: var(--space-2); padding: 4px;">
+            <option value="basic">Basic (24h session)</option>
+            <option value="standard" selected>Standard (8h session)</option>
+            <option value="high">High (4h session)</option>
+            <option value="maximum">Maximum (1h session)</option>
+        </select>
+        <button id="force-recheck" style="width: 100%; padding: 4px; background: var(--primary-600); color: white; border: none; border-radius: 4px; cursor: pointer;">
+            🔄 Force Recheck
+        </button>
+    </div>
+    
+    <!-- Debug Panel -->
+    <div id="debug-panel" class="debug-panel">
+        <div style="font-weight: bold; margin-bottom: 8px;">🔍 Shield Debug</div>
+        <div id="debug-info">Initializing...</div>
+    </div>
+    
+    <div class="shield-container">
+        <!-- Header -->
+        <div class="shield-header">
+            <span class="shield-icon">🛡️</span>
+            <h1>Shield Protected Content</h1>
+            <p>This page is protected by the actual Lemma Shield API. Real verification is required to access the content below.</p>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="loading-state" class="loading-indicator">
+            <div class="spinner"></div>
+            <h3>Checking Shield Status...</h3>
+            <p>The Lemma Shield is verifying your credentials...</p>
+        </div>
+        
+        <!-- Protected Content (Hidden until verified) -->
+        <div id="protected-content" class="protected-content">
+            <h2>🎉 Welcome to the Protected Area!</h2>
+            
+            <div class="security-info">
+                <h4>🔒 Security Information</h4>
+                <p><strong>Security Level:</strong> <span id="current-security-level">STANDARD</span></p>
+                <p><strong>Session Timeout:</strong> <span id="session-timeout">8 hours</span></p>
+                <p><strong>Last Verified:</strong> <span id="last-verified">Just now</span></p>
+            </div>
+            
+            <p>Congratulations! You have been verified as a human by the Lemma Shield. This content is only accessible to verified users.</p>
+            
+            <h3>🌟 Shield Features</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <span class="feature-icon">⚡</span>
+                    <h4>Background Verification</h4>
+                    <p>Continuous validation without user interaction</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🔐</span>
+                    <h4>Configurable Security</h4>
+                    <p>Multiple security levels for different needs</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🚀</span>
+                    <h4>Real-time Protection</h4>
+                    <p>Automatic revocation checking and session management</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">💳</span>
+                    <h4>Credential Management</h4>
+                    <p>W3C Verifiable Credentials with hardware backing</p>
+                </div>
+            </div>
+            
+            <h3>📊 Your Verification Details</h3>
+            <div id="verification-details" class="security-info">
+                <p>Loading verification details...</p>
+            </div>
+            
+            <h3>🔄 Test Shield Functionality</h3>
+            <p>Try changing the security level above or forcing a recheck to see the Shield in action.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Shield Overlay Container (created dynamically) -->
+<div id="lemma-shield-overlay" style="display: none;"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/lemma-wallet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lemma-gate-api.js') }}"></script>
+
+<script>
+console.log('🛡️ Initializing Shield Protected Page');
+
+// Initialize shield with enhanced debugging
+const shield = new LemmaShieldAPI({
+    protectedContent: '#protected-content',
+    securityLevel: 'standard',
+    enableBackgroundChecks: true,
+    showDetailedErrors: true,
+    
+    onVerified: (data) => {
+        console.log('✅ Shield: User verified', data);
+        updateVerificationStatus('verified', '✅ Verified Human');
+        updateProtectedContent(data);
+        hideLoadingState();
+    },
+    
+    onRevoked: (data) => {
+        console.log('❌ Shield: Credential revoked', data);
+        updateVerificationStatus('error', '❌ Credential Revoked');
+        hideProtectedContent();
+    },
+    
+    onReverificationRequired: (data) => {
+        console.log('⚠️ Shield: Re-verification required', data);
+        updateVerificationStatus('checking', '⚠️ Re-verification Required');
+        hideProtectedContent();
+    },
+    
+    onError: (error) => {
+        console.error('❌ Shield Error:', error);
+        updateVerificationStatus('error', '❌ Shield Error');
+        updateDebugInfo(`Error: ${error.message}`);
+    },
+    
+    onStatusChange: (action, data) => {
+        console.log(`🔍 Shield status changed: ${action}`, data);
+        updateDebugInfo(`Status: ${action}${data ? ` (${JSON.stringify(data, null, 2)})` : ''}`);
+        
+        if (action === 'check_credentials' || action === 'show_shield') {
+            updateVerificationStatus('checking', '🔍 Verification Required');
+        }
+    }
+});
+
+// Store shield globally for debug controls
+window.shieldInstance = shield;
+
+// UI Update Functions
+function updateVerificationStatus(type, message) {
+    const statusEl = document.getElementById('verification-status');
+    if (statusEl) {
+        statusEl.className = `verification-status ${type}`;
+        statusEl.textContent = message;
+    }
+}
+
+function updateProtectedContent(data) {
+    const contentEl = document.getElementById('protected-content');
+    if (contentEl) {
+        contentEl.classList.add('verified');
+        
+        // Update security info
+        if (data && data.security_level) {
+            const levelEl = document.getElementById('current-security-level');
+            if (levelEl) levelEl.textContent = data.security_level.toUpperCase();
+        }
+        
+        if (data && data.session_timeout) {
+            const timeoutEl = document.getElementById('session-timeout');
+            if (timeoutEl) timeoutEl.textContent = `${Math.round(data.session_timeout / 3600)} hours`;
+        }
+        
+        if (data && data.verification_time) {
+            const verifiedEl = document.getElementById('last-verified');
+            if (verifiedEl) {
+                const date = new Date(data.verification_time * 1000);
+                verifiedEl.textContent = date.toLocaleString();
+            }
+        }
+        
+        // Update verification details
+        const detailsEl = document.getElementById('verification-details');
+        if (detailsEl && data) {
+            detailsEl.innerHTML = `
+                <p><strong>Credential ID:</strong> ${data.credential_id || 'N/A'}</p>
+                <p><strong>User ID:</strong> ${data.user_id || 'N/A'}</p>
+                <p><strong>Verification Age:</strong> ${data.verification_age_hours ? data.verification_age_hours.toFixed(1) + ' hours' : 'N/A'}</p>
+                <p><strong>Next DID Check:</strong> ${data.next_did_check_in ? Math.round(data.next_did_check_in / 60) + ' minutes' : 'N/A'}</p>
+                <p><strong>Next Revocation Check:</strong> ${data.next_revocation_check_in ? Math.round(data.next_revocation_check_in / 60) + ' minutes' : 'N/A'}</p>
+            `;
+        }
+    }
+}
+
+function hideProtectedContent() {
+    const contentEl = document.getElementById('protected-content');
+    if (contentEl) {
+        contentEl.classList.remove('verified');
+    }
+}
+
+function hideLoadingState() {
+    const loadingEl = document.getElementById('loading-state');
+    if (loadingEl) {
+        loadingEl.style.display = 'none';
+    }
+}
+
+function updateDebugInfo(message) {
+    const debugEl = document.getElementById('debug-info');
+    if (debugEl) {
+        const timestamp = new Date().toLocaleTimeString();
+        debugEl.innerHTML = `[${timestamp}] ${message}`;
+    }
+}
+
+// Debug Controls
+document.getElementById('security-level').addEventListener('change', async (e) => {
+    const newLevel = e.target.value;
+    console.log(`🔧 Changing security level to: ${newLevel}`);
+    
+    try {
+        await shield.setSecurityLevel(newLevel);
+        updateDebugInfo(`Security level changed to: ${newLevel}`);
+    } catch (error) {
+        console.error('Failed to change security level:', error);
+        updateDebugInfo(`Failed to change security level: ${error.message}`);
+    }
+});
+
+document.getElementById('force-recheck').addEventListener('click', async () => {
+    console.log('🔄 Forcing shield recheck...');
+    updateVerificationStatus('checking', '🔍 Rechecking...');
+    
+    try {
+        await shield.forceRecheck();
+        updateDebugInfo('Forced recheck completed');
+    } catch (error) {
+        console.error('Force recheck failed:', error);
+        updateDebugInfo(`Force recheck failed: ${error.message}`);
+    }
+});
+
+// Initial debug info
+updateDebugInfo('Shield initializing...');
+</script>
+{% endblock %} 
