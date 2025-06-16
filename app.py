@@ -10,7 +10,7 @@ import time
 import datetime
 import random
 import json
-from flask import Flask, redirect, request, jsonify
+from flask import Flask, redirect, request, jsonify, render_template
 from lemma import create_app as lemma_create_app
 import requests
 
@@ -201,10 +201,86 @@ def create_app():
     # Shield Demo Route
     @app.route('/shield-demo')
     def shield_demo():
-        """Demo page showing background wallet and conditional Shield UI"""
-        from flask import render_template
+        """Shield demo page."""
         return render_template('shield_demo.html')
+
+    # Add route to serve OpenAPI Shield specification
+    @app.route('/openapi/shield.yaml')
+    def shield_openapi_spec():
+        """Serve the Shield OpenAPI specification."""
+        try:
+            openapi_file = os.path.join(os.path.dirname(__file__), 'openapi', 'shield.yaml')
+            if os.path.exists(openapi_file):
+                with open(openapi_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                response = app.response_class(
+                    content,
+                    mimetype='application/x-yaml',
+                    headers={'Content-Disposition': 'inline; filename=shield.yaml'}
+                )
+                return response
+            else:
+                return jsonify({"error": "Shield OpenAPI specification not found"}), 404
+        except Exception as e:
+            logger.error(f"Error serving OpenAPI spec: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+
+    # Add route to serve Shield integration example
+    @app.route('/docs/shield-integration-example.html')
+    def shield_integration_example():
+        """Serve the Shield integration example."""
+        try:
+            docs_file = os.path.join(os.path.dirname(__file__), 'docs', 'shield-integration-example.html')
+            if os.path.exists(docs_file):
+                with open(docs_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                response = app.response_class(
+                    content,
+                    mimetype='text/html'
+                )
+                return response
+            else:
+                return jsonify({"error": "Shield integration example not found"}), 404
+        except Exception as e:
+            logger.error(f"Error serving integration example: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+
+    # Debug endpoint to check registered blueprints and routes
+    @app.route('/api/debug/routes')
+    def debug_routes():
+        """Debug endpoint to check all registered routes."""
+        try:
+            routes = []
+            for rule in app.url_map.iter_rules():
+                routes.append({
+                    'endpoint': rule.endpoint,
+                    'methods': list(rule.methods),
+                    'rule': str(rule),
+                    'blueprint': rule.endpoint.split('.')[0] if '.' in rule.endpoint else 'main'
+                })
             
+            # Sort by blueprint and rule
+            routes.sort(key=lambda x: (x['blueprint'], x['rule']))
+            
+            # Group by blueprint
+            blueprints = {}
+            for route in routes:
+                bp_name = route['blueprint'] 
+                if bp_name not in blueprints:
+                    blueprints[bp_name] = []
+                blueprints[bp_name].append(route)
+            
+            return jsonify({
+                'total_routes': len(routes),
+                'blueprints': list(blueprints.keys()),
+                'shield_api_registered': 'shield_api' in blueprints,
+                'shield_routes': blueprints.get('shield_api', []),
+                'all_routes': blueprints
+            })
+        except Exception as e:
+            logger.error(f"Error in debug routes: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+
     @app.route('/api/credentials/verify', methods=['POST'])
     def verify_credential():
         """API endpoint to verify credentials with OPRF revocation check."""
