@@ -180,6 +180,14 @@ def create_app(test_config=None):
     # Register blueprints - Maintain backward compatibility
     from lemma.routes.shield_api import shield_api
     from lemma.routes.api import api_bp
+    from lemma.routes.main import main_bp
+    from lemma.routes.onboarding import onboarding_bp
+    
+    # Register the main routes (homepage, etc.)
+    app.register_blueprint(main_bp)
+    
+    # Register the onboarding routes for customer self-serve
+    app.register_blueprint(onboarding_bp, url_prefix='/onboarding')
     
     # Register the clean Shield API v1 (new market-ready API)
     app.register_blueprint(shield_api)
