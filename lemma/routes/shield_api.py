@@ -4,7 +4,7 @@ All shield logic is handled server-side for security and consistency
 Enhanced with enterprise security controls and revocation management
 """
 
-from flask import Blueprint, request, session, jsonify, current_app
+from flask import Blueprint, request, session, jsonify, current_app, render_template
 from lemma.routes.api import require_api_key, csrf_protect, rate_limit
 from lemma.core.credential_service import get_credential_service
 from lemma.utils.input_validation import ValidationError, InputValidator
@@ -655,6 +655,15 @@ def shield_config():
             'success': False,
             'error': 'Failed to get configuration'
         }), 500
+
+@shield_api.route('/shield-widget-demo')
+@rate_limit
+def shield_widget_demo():
+    """
+    Demo page for the new Shield Widget with inline verification experience
+    Shows how to integrate the widget with proper UI/UX flow
+    """
+    return render_template('shield_widget_demo.html')
 
 # Helper functions
 

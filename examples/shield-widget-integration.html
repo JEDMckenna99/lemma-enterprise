@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma Shield Widget Integration Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            background: #f9fafb;
+            color: #1f2937;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .header h1 {
+            color: #635BFF;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            color: #6b7280;
+        }
+        
+        /* Your site's existing styles */
+        .content-section {
+            max-width: 800px;
+            margin: 0 auto 2rem auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .integration-info {
+            background: #f3f4f6;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            border-left: 4px solid #635BFF;
+        }
+        
+        .integration-info h3 {
+            margin: 0 0 1rem 0;
+            color: #635BFF;
+        }
+        
+        .integration-info p {
+            margin: 0 0 0.5rem 0;
+            color: #4b5563;
+        }
+        
+        .code-block {
+            background: #1f2937;
+            color: #e5e7eb;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            margin: 1rem 0;
+        }
+        
+        /* Protected content that will be hidden until verification */
+        #protected-content {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .premium-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        
+        .feature {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature h4 {
+            margin: 0 0 0.5rem 0;
+        }
+        
+        .feature p {
+            margin: 0;
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ Lemma Shield Widget Integration</h1>
+        <p>Simple copy-paste integration for any website</p>
+    </div>
+    
+    <!-- Public content (always visible) -->
+    <div class="content-section">
+        <div class="integration-info">
+            <h3>📋 How to Integrate</h3>
+            <p><strong>Step 1:</strong> Include the Lemma scripts in your page</p>
+            <p><strong>Step 2:</strong> Wrap your protected content in a div with id="protected-content"</p>
+            <p><strong>Step 3:</strong> Initialize the widget with one line of JavaScript</p>
+            <p><strong>Step 4:</strong> That's it! The widget handles everything else automatically</p>
+        </div>
+        
+        <h3>📄 Complete Integration Code</h3>
+        <div class="code-block">
+&lt;!-- Include Lemma scripts --&gt;
+&lt;script src="https://your-lemma-instance.com/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://your-lemma-instance.com/static/js/lemma-shield-widget.js"&gt;&lt;/script&gt;
+
+&lt;!-- Your protected content --&gt;
+&lt;div id="protected-content"&gt;
+  &lt;!-- This content will be hidden until user verifies --&gt;
+  &lt;h2&gt;🎉 Premium Content&lt;/h2&gt;
+  &lt;p&gt;This content is only visible to verified humans!&lt;/p&gt;
+&lt;/div&gt;
+
+&lt;!-- Initialize the widget --&gt;
+&lt;script&gt;
+  document.addEventListener('DOMContentLoaded', function() {
+    const shield = new LemmaShieldWidget({
+      protectedContent: '#protected-content',
+      apiBase: 'https://your-lemma-instance.com',
+      onVerified: () =&gt; console.log('User verified!'),
+      onError: (error) =&gt; console.error('Error:', error)
+    });
+  });
+&lt;/script&gt;
+        </div>
+        
+        <h3>⚙️ Configuration Options</h3>
+        <div class="code-block">
+const shield = new LemmaShieldWidget({
+  // Required: Selector for content to protect
+  protectedContent: '#protected-content',
+  
+  // Optional: API base URL (defaults to current domain)
+  apiBase: 'https://your-lemma-instance.com',
+  
+  // Optional: Security level (basic, standard, high, maximum)
+  securityLevel: 'standard',
+  
+  // Optional: Custom widget container selector
+  widgetContainer: '#lemma-shield-widget',
+  
+  // Optional: Callbacks
+  onVerified: () =&gt; console.log('Access granted!'),
+  onError: (error) =&gt; console.error('Error:', error),
+  onStepChange: (step) =&gt; console.log('Step:', step),
+  
+  // Optional: UI customization
+  showBranding: true,
+  animationDuration: 300
+});
+        </div>
+        
+        <h3>🔧 Widget Features</h3>
+        <ul>
+            <li><strong>🎯 Inline Experience:</strong> No redirects - everything happens on your page</li>
+            <li><strong>🔒 Privacy-First:</strong> Clear disclaimer about data collection and privacy</li>
+            <li><strong>⚡ Background Verification:</strong> Returning users get instant access</li>
+            <li><strong>📱 Responsive Design:</strong> Works perfectly on mobile and desktop</li>
+            <li><strong>🛡️ Secure Integration:</strong> Uses Stripe Identity for verification</li>
+            <li><strong>🌐 Network Effect:</strong> One verification works across all Lemma sites</li>
+        </ul>
+    </div>
+    
+    <!-- Protected Content Example -->
+    <div id="protected-content">
+        <h2>🎉 Premium Content Unlocked!</h2>
+        <p>Congratulations! You've successfully verified as human and gained access to this protected content.</p>
+        
+        <div class="premium-features">
+            <div class="feature">
+                <div class="feature-icon">🔐</div>
+                <h4>Secure Access</h4>
+                <p>Your identity is verified without storing personal data</p>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">🌐</div>
+                <h4>Network Benefits</h4>
+                <p>Works across all Lemma-protected websites</p>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <h4>Fast Re-access</h4>
+                <p>Background verification for instant future access</p>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <h4>Privacy Protected</h4>
+                <p>Minimal data collection with maximum privacy</p>
+            </div>
+        </div>
+        
+        <p style="margin-top: 2rem; opacity: 0.9;">
+            Your Lemma credential is stored securely in your browser and will provide 
+            seamless access to this and other Lemma-protected sites in the future.
+        </p>
+    </div>
+    
+    <!-- Lemma Shield Widget (will be created automatically) -->
+    <div id="lemma-shield-widget"></div>
+    
+    <!-- Lemma Scripts -->
+    <script src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/static/js/lemma-wallet.js"></script>
+    <script src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/static/js/lemma-shield-widget.js"></script>
+    
+    <!-- Initialize Widget -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Initializing Lemma Shield Widget');
+            
+            // Create the shield widget
+            const shield = new LemmaShieldWidget({
+                protectedContent: '#protected-content',
+                apiBase: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com',
+                securityLevel: 'standard',
+                onVerified: () => {
+                    console.log('✅ User verified successfully!');
+                    // Optional: Track verification event
+                    // analytics.track('lemma_verification_success');
+                },
+                onError: (error) => {
+                    console.error('❌ Widget error:', error);
+                    // Optional: Track errors
+                    // analytics.track('lemma_verification_error', { error: error.message });
+                },
+                onStepChange: (step) => {
+                    console.log(`🔄 Verification step: ${step}`);
+                    // Optional: Track user flow
+                    // analytics.track('lemma_verification_step', { step });
+                },
+                showBranding: true
+            });
+            
+            console.log('🛡️ Shield Widget initialized and ready');
+            
+            // Optional: Add debugging controls (remove in production)
+            window.lemmaShield = shield;
+            window.clearLemmaCredentials = function() {
+                localStorage.removeItem('lemma_wallet_credentials');
+                sessionStorage.removeItem('lemma_verification_state');
+                location.reload();
+            };
+        });
+    </script>
+    
+    <!-- Optional: Debugging info (remove in production) -->
+    <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 8px; font-size: 12px;">
+        <strong>Debug:</strong><br>
+        Press F12 and type <code>clearLemmaCredentials()</code> to reset
+    </div>
+</body>
+</html> 

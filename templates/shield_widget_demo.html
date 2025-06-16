@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma Shield Widget Demo - Inline Verification</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f9fafb;
+            color: #1f2937;
+        }
+        
+        .demo-header {
+            background: linear-gradient(135deg, #635BFF 0%, #4F46E5 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .demo-header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 2rem;
+        }
+        
+        .demo-header p {
+            margin: 0;
+            opacity: 0.9;
+        }
+        
+        .demo-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .demo-info {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .demo-info h2 {
+            margin: 0 0 1rem 0;
+            color: #374151;
+        }
+        
+        .flow-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        
+        .flow-step {
+            padding: 1.5rem;
+            background: #f9fafb;
+            border-radius: 8px;
+            border-left: 4px solid #635BFF;
+        }
+        
+        .flow-step h3 {
+            margin: 0 0 0.5rem 0;
+            color: #635BFF;
+            font-size: 1.1rem;
+        }
+        
+        .flow-step p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .controls {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            margin: 0.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: #635BFF;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #4F46E5;
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #374151;
+            border: 1px solid #d1d5db;
+        }
+        
+        .btn-secondary:hover {
+            background: #f3f4f6;
+        }
+        
+        .status {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 8px;
+            background: #f3f4f6;
+            color: #374151;
+        }
+        
+        /* Protected content styles */
+        #protected-content {
+            display: none;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .protected-header {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .protected-content {
+            padding: 2rem;
+        }
+        
+        .success-message {
+            background: #D1FAE5;
+            color: #065F46;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .protected-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        
+        .feature {
+            padding: 1rem;
+            background: #f3f4f6;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature h4 {
+            margin: 0 0 0.5rem 0;
+            color: #374151;
+        }
+        
+        .feature p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .demo-footer {
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+        }
+        
+        @media (max-width: 768px) {
+            .demo-container {
+                padding: 1rem;
+            }
+            
+            .demo-info, .controls, #protected-content {
+                margin-bottom: 1rem;
+            }
+            
+            .flow-steps, .protected-features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Demo Header -->
+    <div class="demo-header">
+        <h1>🛡️ Lemma Shield Widget Demo</h1>
+        <p>Experience the new inline verification flow</p>
+    </div>
+    
+    <div class="demo-container">
+        <!-- Demo Information -->
+        <div class="demo-info">
+            <h2>🚀 New Widget Experience</h2>
+            <p>The Shield Widget provides a seamless inline verification experience that happens directly on your protected page. No more redirects or separate verification pages!</p>
+            
+            <div class="flow-steps">
+                <div class="flow-step">
+                    <h3>1️⃣ Verify Button</h3>
+                    <p>Click "Verify Human Identity" to start the process</p>
+                </div>
+                
+                <div class="flow-step">
+                    <h3>2️⃣ Privacy Disclaimer</h3>
+                    <p>Learn about Lemma's privacy-first approach and what information is needed</p>
+                </div>
+                
+                <div class="flow-step">
+                    <h3>3️⃣ Stripe Verification</h3>
+                    <p>Secure identity verification processed by Stripe Identity</p>
+                </div>
+                
+                <div class="flow-step">
+                    <h3>4️⃣ Access Granted</h3>
+                    <p>Shield protection is removed and content becomes accessible</p>
+                </div>
+            </div>
+            
+            <p><strong>Integration:</strong> Just include the widget script and call <code>new LemmaShieldWidget()</code> with your protected content selector.</p>
+        </div>
+        
+        <!-- Demo Controls -->
+        <div class="controls">
+            <h3>Demo Controls</h3>
+            <button class="btn btn-primary" onclick="triggerDemoFlow()">
+                🎭 Trigger Demo Flow
+            </button>
+            
+            <button class="btn btn-secondary" onclick="clearCredentials()">
+                🗑️ Clear Credentials
+            </button>
+            
+            <button class="btn btn-secondary" onclick="showWidgetStatus()">
+                📊 Widget Status
+            </button>
+            
+            <div id="status" class="status" style="display: none;"></div>
+        </div>
+        
+        <!-- Protected Content (shown after verification) -->
+        <div id="protected-content">
+            <div class="protected-header">
+                <h1>🎉 Welcome to Protected Content!</h1>
+                <p>You've successfully verified as human using Lemma Shield</p>
+            </div>
+            
+            <div class="protected-content">
+                <div class="success-message">
+                    <strong>✅ Verification Complete!</strong> Your Lemma credential has been stored securely in your browser and will work across all Lemma-protected sites.
+                </div>
+                
+                <h3>🔒 What You Get With Verification</h3>
+                
+                <div class="protected-features">
+                    <div class="feature">
+                        <div class="feature-icon">🌐</div>
+                        <h4>Network Access</h4>
+                        <p>One verification works across all Lemma-protected sites</p>
+                    </div>
+                    
+                    <div class="feature">
+                        <div class="feature-icon">🔒</div>
+                        <h4>Privacy Protected</h4>
+                        <p>Your identity is verified without storing personal data</p>
+                    </div>
+                    
+                    <div class="feature">
+                        <div class="feature-icon">⚡</div>
+                        <h4>Fast Access</h4>
+                        <p>Background verification for instant access on return visits</p>
+                    </div>
+                    
+                    <div class="feature">
+                        <div class="feature-icon">📱</div>
+                        <h4>Cross-Device</h4>
+                        <p>Export and import your credentials across devices</p>
+                    </div>
+                </div>
+                
+                <h3>📊 Integration Example</h3>
+                <div style="background: #f3f4f6; padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.875rem;">
+&lt;script src="/static/js/lemma-wallet.js"&gt;&lt;/script&gt;<br>
+&lt;script src="/static/js/lemma-shield-widget.js"&gt;&lt;/script&gt;<br><br>
+
+&lt;div id="protected-content"&gt;<br>
+&nbsp;&nbsp;&lt;!-- Your protected content here --&gt;<br>
+&lt;/div&gt;<br><br>
+
+&lt;script&gt;<br>
+&nbsp;&nbsp;const widget = new LemmaShieldWidget({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;protectedContent: '#protected-content',<br>
+&nbsp;&nbsp;&nbsp;&nbsp;onVerified: () =&gt; console.log('Access granted!'),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;onError: (error) =&gt; console.error('Error:', error)<br>
+&nbsp;&nbsp;});<br>
+&lt;/script&gt;
+                </div>
+                
+                <div style="margin-top: 2rem; text-align: center;">
+                    <button class="btn btn-secondary" onclick="clearCredentials()">
+                        🔄 Reset Demo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="demo-footer">
+        <p>Powered by <strong>Lemma Human Verification</strong> - The essential trust protocol for digital platforms</p>
+    </div>
+    
+    <!-- Widget container (will be created automatically) -->
+    <div id="lemma-shield-widget"></div>
+    
+    <!-- Required Scripts -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lemma-shield-widget.js') }}"></script>
+    
+    <script>
+        // Global widget instance
+        let shieldWidget;
+        
+        // Initialize the widget when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Initializing Shield Widget Demo');
+            
+            // Create the widget instance
+            shieldWidget = new LemmaShieldWidget({
+                protectedContent: '#protected-content',
+                widgetContainer: '#lemma-shield-widget',
+                apiBase: '',
+                securityLevel: 'standard',
+                onVerified: () => {
+                    console.log('✅ User verified successfully!');
+                    updateStatus('success', '✅ Verification successful! Access granted to protected content.');
+                },
+                onError: (error) => {
+                    console.error('❌ Widget error:', error);
+                    updateStatus('error', `❌ Error: ${error.message}`);
+                },
+                onStepChange: (step) => {
+                    console.log(`🔄 Step changed to: ${step}`);
+                    updateStatus('info', `Current step: ${step}`);
+                },
+                showBranding: true
+            });
+            
+            console.log('🛡️ Shield Widget initialized');
+        });
+        
+        // Demo control functions
+        function triggerDemoFlow() {
+            console.log('🎭 Triggering demo verification flow');
+            
+            // Clear any existing credentials first
+            clearCredentials();
+            
+            // Small delay to ensure credentials are cleared
+            setTimeout(() => {
+                // Hide protected content and show widget
+                const protectedEl = document.querySelector('#protected-content');
+                if (protectedEl) {
+                    protectedEl.style.display = 'none';
+                }
+                
+                // Re-initialize widget to trigger flow
+                if (shieldWidget) {
+                    shieldWidget.showVerificationWidget();
+                }
+                
+                updateStatus('info', '🎭 Demo flow triggered. Widget should appear for verification.');
+            }, 500);
+        }
+        
+        function clearCredentials() {
+            console.log('🗑️ Clearing stored credentials');
+            
+            try {
+                // Clear local storage
+                localStorage.removeItem('lemma_wallet_credentials');
+                localStorage.removeItem('lemma_credentials');
+                
+                // Clear session storage
+                sessionStorage.removeItem('lemma_verification_state');
+                sessionStorage.removeItem('lemma_verification_user_id');
+                
+                // Clear IndexedDB if available
+                if (window.LemmaWallet) {
+                    const wallet = new window.LemmaWallet();
+                    wallet.clearAllCredentials().catch(e => console.log('No credentials to clear'));
+                }
+                
+                // Hide protected content
+                const protectedEl = document.querySelector('#protected-content');
+                if (protectedEl) {
+                    protectedEl.style.display = 'none';
+                }
+                
+                // Hide widget
+                const widgetEl = document.querySelector('#lemma-shield-widget');
+                if (widgetEl) {
+                    widgetEl.style.display = 'none';
+                }
+                
+                updateStatus('success', '🗑️ Credentials cleared. Ready for fresh verification.');
+                
+            } catch (error) {
+                console.error('Error clearing credentials:', error);
+                updateStatus('error', '❌ Error clearing credentials: ' + error.message);
+            }
+        }
+        
+        function showWidgetStatus() {
+            console.log('📊 Checking widget status');
+            
+            if (shieldWidget) {
+                const status = {
+                    currentStep: shieldWidget.state.currentStep,
+                    verified: shieldWidget.state.verified,
+                    userId: shieldWidget.state.userId,
+                    processing: shieldWidget.state.processing
+                };
+                
+                updateStatus('info', `📊 Widget Status: ${JSON.stringify(status, null, 2)}`);
+            } else {
+                updateStatus('error', '❌ Widget not initialized');
+            }
+        }
+        
+        function updateStatus(type, message) {
+            const statusEl = document.getElementById('status');
+            if (statusEl) {
+                statusEl.style.display = 'block';
+                statusEl.className = `status ${type}`;
+                statusEl.innerHTML = `<pre>${message}</pre>`;
+                
+                // Auto-hide after 10 seconds for non-error messages
+                if (type !== 'error') {
+                    setTimeout(() => {
+                        statusEl.style.display = 'none';
+                    }, 10000);
+                }
+            }
+        }
+        
+        // Add CSS for status types
+        const statusStyles = document.createElement('style');
+        statusStyles.textContent = `
+            .status.success {
+                background: #D1FAE5;
+                color: #065F46;
+                border: 1px solid #A7F3D0;
+            }
+            
+            .status.error {
+                background: #FEE2E2;
+                color: #991B1B;
+                border: 1px solid #FCA5A5;
+            }
+            
+            .status.info {
+                background: #DBEAFE;
+                color: #1E40AF;
+                border: 1px solid #93C5FD;
+            }
+            
+            .status pre {
+                margin: 0;
+                white-space: pre-wrap;
+                font-family: inherit;
+            }
+        `;
+        document.head.appendChild(statusStyles);
+    </script>
+</body>
+</html> 
