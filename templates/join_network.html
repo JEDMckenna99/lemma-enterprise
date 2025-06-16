@@ -335,28 +335,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize the Shield Widget - this is exactly how a customer would integrate it
     const lemmaShield = new LemmaShieldWidget({
         // Target the container that should be protected
-        protectedSelector: '[data-lemma-protected="true"]',
+        protectedContent: '[data-lemma-protected="true"]',
         
         // Configuration options
-        apiBaseUrl: window.location.origin,
-        onboardingRedirectUrl: '/verify',
-        
-        // UI customization
-        theme: {
-            primaryColor: '#635bff',
-            borderRadius: '8px',
-            fontFamily: 'system-ui, sans-serif'
-        },
+        apiBase: window.location.origin,
+        securityLevel: 'standard',
         
         // Event callbacks
-        onVerificationComplete: function(data) {
+        onVerified: function(data) {
             console.log('✅ User verified for network access:', data);
-            
-            // Show verification status indicator
-            const statusIndicator = document.getElementById('verificationStatus');
-            if (statusIndicator) {
-                statusIndicator.classList.add('show');
-            }
             
             // Optional: Track the verification event
             if (typeof gtag !== 'undefined') {
@@ -368,7 +355,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         
-        onVerificationFailed: function(error) {
+        onError: function(error) {
             console.error('❌ Network verification failed:', error);
             
             // Optional: Track the failure
@@ -381,26 +368,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         
-        onShieldShown: function() {
-            console.log('🛡️ Shield displayed - user needs verification');
+        onStepChange: function(step) {
+            console.log('🛡️ Shield step changed:', step);
             
-            // Optional: Track shield display
+            // Optional: Track step changes
             if (typeof gtag !== 'undefined') {
-                gtag('event', 'lemma_shield_shown', {
+                gtag('event', 'lemma_shield_step', {
                     event_category: 'verification',
-                    event_label: 'join_network'
-                });
-            }
-        },
-        
-        onContentRevealed: function() {
-            console.log('🎉 Content revealed - user has valid verification');
-            
-            // Optional: Track successful access
-            if (typeof gtag !== 'undefined') {
-                gtag('event', 'lemma_content_access', {
-                    event_category: 'verification',
-                    event_label: 'join_network'
+                    event_label: 'join_network',
+                    step: step
                 });
             }
         }
