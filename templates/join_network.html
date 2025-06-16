@@ -7,8 +7,8 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
 <!-- Wallet scripts are loaded in layout.html to prevent duplicates -->
 <style>
-    /* Lemma Gate Protection Styles */
-    .lemma-gate-overlay {
+    /* Lemma Shield Protection Styles */
+.lemma-shield-overlay {
         position: fixed;
         top: 0;
         left: 0;
@@ -23,7 +23,7 @@
         transition: all 0.3s ease;
     }
     
-    .lemma-gate-content {
+    .lemma-shield-content {
         background: var(--white);
         border-radius: var(--radius-xl);
         padding: var(--space-12);
@@ -34,7 +34,7 @@
         border: 1px solid var(--gray-200);
     }
     
-    .lemma-gate-icon {
+    .lemma-shield-icon {
         width: 80px;
         height: 80px;
         margin: 0 auto var(--space-6);
@@ -244,10 +244,10 @@
 {% endblock %}
 
 {% block content %}
-<!-- Lemma Gate Overlay - Shown until user is verified -->
-<div id="lemmaGateOverlay" class="lemma-gate-overlay">
-    <div class="lemma-gate-content">
-        <div class="lemma-gate-icon">
+    <!-- Lemma Shield Overlay - Shown until user is verified -->
+    <div id="lemmaShieldOverlay" class="lemma-shield-overlay">
+        <div class="lemma-shield-content">
+            <div class="lemma-shield-icon">
             <svg width="40" height="40" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 1l1.27 3.88h4.08l-3.3 2.4 1.27 3.88L12 8.76l-3.32 2.4 1.27-3.88-3.3-2.4h4.08L12 1z"/>
             </svg>
@@ -255,7 +255,7 @@
         <h2 class="text-2xl font-bold text-gray-900 mb-4">Verification Required</h2>
         <p class="text-gray-600 mb-6">This page is protected by the Lemma Verification Network. Please verify your humanity to continue.</p>
         
-        <div id="lemmaGateStatus" class="mb-6">
+                    <div id="lemmaShieldStatus" class="mb-6">
             <div class="status-message status-checking">🔍 Checking for existing verification...</div>
         </div>
         
@@ -403,7 +403,7 @@
                 </div>
                 
                 <div class="text-center mt-8">
-                    <a href="/gate-demo" class="btn btn-primary">
+                    <a href="/shield-demo" class="btn btn-primary">
                         View Full Network Directory
                         <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
@@ -431,20 +431,20 @@
     </div>
 </div>
 
-<!-- Enhanced Lemma Gate API Integration with Enterprise Security Controls -->
-<script src="{{ url_for('static', filename='js/lemma-gate-api.js') }}"></script>
+<!-- Enhanced Lemma Shield API Integration with Enterprise Security Controls -->
+<script src="{{ url_for('static', filename='js/lemma-shield-api.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🔐 Initializing Enhanced Lemma Gate API for Join Network page');
+    console.log('🔐 Initializing Enhanced Lemma Shield API for Join Network page');
     
     // Get security level from URL parameters or default to 'standard'
     const urlParams = new URLSearchParams(window.location.search);
     const securityLevel = urlParams.get('security_level') || 'standard';
     
-    // Initialize the enhanced API-driven gate
-    const lemmaGate = new LemmaShieldAPI({
+    // Initialize the enhanced API-driven shield
+    const lemmaShield = new LemmaShieldAPI({
         protectedContent: '#networkContent',
-        gateContainer: '#lemmaGateOverlay',
+        shieldContainer: '#lemmaShieldOverlay',
         securityLevel: securityLevel,
         enableBackgroundChecks: true,
         autoCheckInterval: 30000, // Check every 30 seconds
@@ -453,23 +453,23 @@ document.addEventListener('DOMContentLoaded', function() {
         onVerified: function(data) {
             console.log('✅ User verified for network access:', data);
             showNetworkWelcome(data);
-            updateGateStatus('success', `✅ Verified! Security Level: ${data.security_level?.toUpperCase() || 'STANDARD'}`);
+            updateShieldStatus('success', `✅ Verified! Security Level: ${data.security_level?.toUpperCase() || 'STANDARD'}`);
         },
         
         onRevoked: function(data) {
             console.log('❌ Credential revoked:', data);
             showErrorMessage(`Your verification credential has been revoked: ${data.revocation_reason || 'Unknown reason'}`);
-            updateGateStatus('error', '❌ Credential revoked - Please get new verification');
+            updateShieldStatus('error', '❌ Credential revoked - Please get new verification');
         },
         
         onReverificationRequired: function(data) {
             console.log('⚠️ Re-verification required:', data);
             showWarningMessage(`Re-verification required: ${data.reason || 'Security policy'}`);
-            updateGateStatus('warning', '⚠️ Re-verification required');
+            updateShieldStatus('warning', '⚠️ Re-verification required');
         },
         
         onStatusChange: function(action, data) {
-            console.log(`🔍 Gate status changed: ${action}`, data);
+            console.log(`🔍 Shield status changed: ${action}`, data);
             
             // Update page title with security status
             const originalTitle = document.title;
@@ -485,20 +485,20 @@ document.addEventListener('DOMContentLoaded', function() {
         onError: function(error) {
             console.error('❌ Network verification error:', error);
             showErrorMessage(`Verification error: ${error.message || 'Please try again'}`);
-            updateGateStatus('error', '❌ Verification error. Please try again.');
+            updateShieldStatus('error', '❌ Verification error. Please try again.');
         }
     });
     
     // Add security level controls
-    addSecurityControls(lemmaGate, securityLevel);
+    addSecurityControls(lemmaShield, securityLevel);
     
-    // Make gate available globally for debugging
-    window.networkGate = lemmaGate;
+    // Make shield available globally for debugging
+    window.networkShield = lemmaShield;
     
-    console.log('✅ Enhanced Lemma Gate API initialized with security level:', securityLevel);
+    console.log('✅ Enhanced Lemma Shield API initialized with security level:', securityLevel);
 });
 
-function addSecurityControls(gate, currentLevel) {
+function addSecurityControls(shield, currentLevel) {
     const controlsDiv = document.createElement('div');
     controlsDiv.style.cssText = `
         position: fixed;
@@ -544,7 +544,7 @@ function addSecurityControls(gate, currentLevel) {
         ">
             🔄 Force Recheck
         </button>
-        <div id="gate-status-display" style="
+        <div id="shield-status-display" style="
             font-size: 12px;
             color: #6b7280;
             text-align: center;
@@ -562,7 +562,7 @@ function addSecurityControls(gate, currentLevel) {
         console.log(`🔒 Changing security level to: ${newLevel}`);
         
         try {
-            await gate.setSecurityLevel(newLevel);
+            await shield.setSecurityLevel(newLevel);
             
             // Update URL
             const newUrl = new URL(window.location);
@@ -570,7 +570,7 @@ function addSecurityControls(gate, currentLevel) {
             window.history.replaceState({}, '', newUrl);
             
             // Update status display
-            document.getElementById('gate-status-display').textContent = `Current: ${newLevel.toUpperCase()}`;
+            document.getElementById('shield-status-display').textContent = `Current: ${newLevel.toUpperCase()}`;
             
         } catch (error) {
             console.error('Failed to change security level:', error);
@@ -580,13 +580,13 @@ function addSecurityControls(gate, currentLevel) {
     
     document.getElementById('force-recheck-btn').addEventListener('click', async () => {
         console.log('🔄 Forcing status recheck...');
-        await gate.forceRecheck();
+        await shield.forceRecheck();
     });
 }
 
 // Network-specific UI helper functions
-function updateGateStatus(type, message) {
-    const statusDiv = document.getElementById('lemmaGateStatus');
+function updateShieldStatus(type, message) {
+    const statusDiv = document.getElementById('lemmaShieldStatus');
     
     if (statusDiv) {
         statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
@@ -685,21 +685,21 @@ function showErrorMessage(message) {
 
 // Global function for the verify button (backward compatibility)
 function startLemmaVerification() {
-    console.log('🚀 Starting verification via enhanced gate API...');
-    if (window.networkGate) {
-        window.networkGate.startVerification();
+    console.log('🚀 Starting verification via enhanced shield API...');
+    if (window.networkShield) {
+        window.networkShield.startVerification();
     } else {
-        console.error('Network gate not available');
+        console.error('Network shield not available');
     }
 }
 
 // Handle verification completion redirect
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('verified') === 'true') {
-    console.log('✅ Verification completed, forcing gate recheck');
+    console.log('✅ Verification completed, forcing shield recheck');
     setTimeout(() => {
-        if (window.networkGate) {
-            window.networkGate.forceRecheck();
+        if (window.networkShield) {
+            window.networkShield.forceRecheck();
         }
     }, 1000);
 }

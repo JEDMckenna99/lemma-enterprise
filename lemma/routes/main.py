@@ -872,52 +872,7 @@ def status():
     """Render the system status page."""
     return render_template('status.html')
 
-@main_bp.route('/gate-demo')
-def gate_demo():
-    """Demo page showing the new Lemma Gate in action"""
-    try:
-        return render_template('gate_demo.html')
-    except Exception as e:
-        current_app.logger.error(f"Error rendering gate demo: {e}")
-        # Fallback to a simple HTML response for testing
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Lemma Gate Demo</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; margin: 2rem; }}
-                .container {{ max-width: 800px; margin: 0 auto; }}
-                .error {{ color: red; background: #ffe6e6; padding: 1rem; border-radius: 4px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>🔒 Lemma Gate Demo</h1>
-                <div class="error">
-                    <strong>Template Error:</strong> {str(e)}<br>
-                    This is a fallback response to test the route.
-                </div>
-                
-                <h2>Lemma Gate Integration Test</h2>
-                <p>This page should demonstrate the Lemma Gate functionality.</p>
-                
-                <!-- Gate Container -->
-                <div id="lemma-gate"></div>
-                
-                <!-- Protected Content -->
-                <div id="protected-content" style="display: none;">
-                    <h3>✅ Access Granted!</h3>
-                    <p>You've been verified as human.</p>
-                </div>
-                
-                <!-- Load Lemma Components -->
-                <script src="/static/js/lemma-wallet.js"></script>
-                <script src="/static/js/lemma-gate.js"></script>
-            </div>
-        </body>
-        </html>
-        """
+
 
 @main_bp.route('/contact')
 def contact():
