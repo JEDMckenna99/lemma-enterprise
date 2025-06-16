@@ -116,30 +116,42 @@ class LemmaShieldAPI {
     }
     
     async waitForWallet() {
-        return new Promise((resolve, reject) => {
-            let attempts = 0;
-            const maxAttempts = 50; // 5 seconds max wait
-            
-            const checkWallet = () => {
-                if (window.lemmaWallet) {
-                    this.wallet = window.lemmaWallet;
-                    console.log('💳 Lemma wallet found');
-                    resolve();
-                    return;
+        // No longer waiting for wallet UI - using direct storage access
+        console.log('🔧 Using direct storage access (wallet UI removed)');
+        this.wallet = {
+            // Implement storage access methods
+            getCredentials: async () => {
+                try {
+                    const storedCredentials = localStorage.getItem('lemma_credentials');
+                    if (storedCredentials) {
+                        const credentials = JSON.parse(storedCredentials);
+                        return Array.isArray(credentials) ? credentials : [credentials];
+                    }
+                    return [];
+                } catch (error) {
+                    console.error('Failed to get credentials from storage:', error);
+                    return [];
                 }
-                
-                attempts++;
-                if (attempts >= maxAttempts) {
-                    console.log('⚠️ Wallet not available after waiting');
-                    reject(new Error('Wallet not available'));
-                    return;
-                }
-                
-                setTimeout(checkWallet, 100);
-            };
+            },
             
-            checkWallet();
-        });
+            removeCredential: async (credentialId) => {
+                try {
+                    const storedCredentials = localStorage.getItem('lemma_credentials');
+                    if (storedCredentials) {
+                        const credentials = JSON.parse(storedCredentials);
+                        const filteredCredentials = Array.isArray(credentials) 
+                            ? credentials.filter(cred => cred.id !== credentialId)
+                            : [];
+                        localStorage.setItem('lemma_credentials', JSON.stringify(filteredCredentials));
+                    }
+                } catch (error) {
+                    console.error('Failed to remove credential from storage:', error);
+                }
+            }
+        };
+        
+        console.log('💾 Direct storage access initialized');
+        return Promise.resolve();
     }
     
     async checkStatus() {
