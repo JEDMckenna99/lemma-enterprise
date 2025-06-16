@@ -12,7 +12,7 @@
  * 4. Support for credential revocation and re-verification
  * 
  * Usage:
- * const shield = new LemmashieldAPI({
+ * const shield = new LemmaShieldAPI({
  *   protectedContent: '#protected-content',
  *   securityLevel: 'standard', // basic, standard, high, maximum
  *   onVerified: () => console.log('User verified!'),
@@ -21,7 +21,7 @@
  * });
  */
 
-class LemmashieldAPI {
+class LemmaShieldAPI {
     constructor(options = {}) {
         this.options = {
             // UI Elements
@@ -780,7 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const securityLevel = element.getAttribute('data-security-level') || 'standard';
         const protectedContent = element.getAttribute('data-protected-content') || element;
         
-        new LemmashieldAPI({
+        new LemmaShieldAPI({
             protectedContent: protectedContent,
             securityLevel: securityLevel,
             onVerified: () => {
@@ -795,8 +795,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Export for module systems
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = LemmashieldAPI;
+    module.exports = LemmaShieldAPI;
 }
 
 // Global access
-window.LemmashieldAPI = LemmashieldAPI; 
+window.LemmaShieldAPI = LemmaShieldAPI; 
