@@ -1,0 +1,17 @@
+{
+  "request": {
+    "user_id": "user_12345",
+    "callback_url": "https://customer-site.com/kyc-callback"
+  },
+  "response": {
+    "session_id": "vs_1234567890abcdef1234567890abcdef",
+    "verification_url": "https://lemma-instance.com/verify?session_id=vs_1234567890abcdef1234567890abcdef",
+    "expires_at": 1704067200
+  },
+  "error_response": {
+    "error": {
+      "code": "INVALID_REQUEST",
+      "message": "user_id is required"
+    }
+  }
+} 

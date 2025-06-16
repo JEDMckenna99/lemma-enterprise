@@ -197,6 +197,13 @@ def create_app():
                 "status": "error",
                 "error": str(e)
             }), 500
+    
+    # Shield Demo Route
+    @app.route('/shield-demo')
+    def shield_demo():
+        """Demo page showing background wallet and conditional Shield UI"""
+        from flask import render_template
+        return render_template('shield_demo.html')
             
     @app.route('/api/credentials/verify', methods=['POST'])
     def verify_credential():

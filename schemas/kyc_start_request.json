@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "KYC Start Request",
+  "description": "Request schema for starting KYC verification process",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Unique identifier for the user",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "callback_url": {
+      "type": "string",
+      "description": "URL to redirect user after KYC completion",
+      "format": "uri",
+      "default": null
+    }
+  },
+  "required": ["user_id"],
+  "additionalProperties": false
+} 

@@ -1,530 +1,669 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
-  title: Lemma Enterprise API
+  title: Lemma Shield API
+  version: 1.0.0
   description: |
-    **The Human Verification Protocol API**
+    Clean, market-ready API for human verification using the Lemma Shield system.
     
-    Lemma provides enterprise-grade human verification through W3C Verifiable Credentials, 
-    enabling reliable bot prevention with minimal user friction and strong privacy protections.
+    ## Overview
+    The Lemma Shield API provides two main services:
+    - **Shield (Issuer)**: KYC verification and credential issuance
+    - **Check (Verifier)**: Credential verification with challenge-response
     
-    ## 🚀 Quick Start
-    
-    1. **Get API Key**: Register at [lemma-enterprise.herokuapp.com/onboarding](https://lemma-enterprise-0f6ba17076c1.herokuapp.com/onboarding)
-    2. **Verify Domain**: Add DNS TXT record or HTML meta tag
-    3. **Test API**: Use the examples below with your API key
-    
-    ## 🔐 Authentication
-    
-    All API endpoints require an API key in the header:
+    ## Authentication
+    All customer-facing endpoints require a JWT-signed API key passed as a Bearer token:
     ```
-    X-API-Key: your_api_key_here
+    Authorization: Bearer <your-api-key>
     ```
     
-    ## 📊 Rate Limits
+    ## Rate Limiting
+    API endpoints are rate-limited to prevent abuse. Limits vary by endpoint.
     
-    - **Standard**: 1000 requests/hour
-    - **Enterprise**: 10,000 requests/hour
+    ## Error Handling
+    All errors follow a consistent format with machine-readable codes and human-readable messages.
     
-    ## 🌐 Base URL
-    
-    **Production**: `https://lemma-enterprise-0f6ba17076c1.herokuapp.com`
-    
-    ## 💡 Core Concepts
-    
-    - **Human Verification**: Proves a user is human without collecting personal data
-    - **Verifiable Credentials**: W3C standard credentials stored in user's browser
-    - **Minimal Data**: Only verifies humanity - no PII collected
-    - **Offline Capable**: Credentials work without constant internet connection
-    
-  version: 2.7.0
   contact:
-    name: Lemma Support
+    name: Lemma Shield API Support
+    url: https://lemma.network/support
     email: support@lemma.network
-    url: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/onboarding
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
-  termsOfService: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/terms
 
 servers:
-  - url: https://lemma-enterprise-0f6ba17076c1.herokuapp.com
+  - url: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1
     description: Production server
-  - url: http://localhost:5000
+  - url: http://localhost:5000/api/v1
     description: Development server
 
-security:
-  - ApiKeyAuth: []
-
-components:
-  securitySchemes:
-    ApiKeyAuth:
-      type: apiKey
-      in: header
-      name: X-API-Key
-      description: API key for authentication
-
-  schemas:
-    VerifiableCredential:
-      type: object
-      description: W3C Verifiable Credential proving human verification
-      properties:
-        "@context":
-          type: array
-          items:
-            type: string
-          example: ["https://www.w3.org/2018/credentials/v1"]
-        type:
-          type: array
-          items:
-            type: string
-          example: ["VerifiableCredential", "LemmaCredential", "HumanCredential"]
-        issuer:
-          type: string
-          description: DID of the issuing authority
-          example: "did:lemma:enterprise"
-        issuanceDate:
-          type: string
-          format: date-time
-          example: "2025-06-01T12:00:00Z"
-        expirationDate:
-          type: string
-          format: date-time
-          example: "2026-06-01T12:00:00Z"
-        credentialSubject:
-          type: object
-          properties:
-            id:
-              type: string
-              description: User ID (not personal information)
-              example: "user_12345"
-            isHuman:
-              type: boolean
-              example: true
-        proof:
-          type: object
-          description: Cryptographic proof (Ed25519 signature)
-
-    VerifiablePresentation:
-      type: object
-      description: Presentation of credentials for verification
-      properties:
-        "@context":
-          type: array
-          items:
-            type: string
-        type:
-          type: array
-          items:
-            type: string
-          example: ["VerifiablePresentation"]
-        verifiableCredential:
-          type: array
-          items:
-            $ref: '#/components/schemas/VerifiableCredential'
-        proof:
-          type: object
-          description: Presentation proof with challenge response
-
-    ApiResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          description: Whether the operation succeeded
-        message:
-          type: string
-          description: Human-readable message
-        data:
-          type: object
-          description: Response data (varies by endpoint)
-        error:
-          type: string
-          description: Error message if success is false
-
-    HealthStatus:
-      type: object
-      properties:
-        status:
-          type: string
-          example: "ok"
-        service:
-          type: string
-          example: "lemma-human-verification"
-        version:
-          type: string
-          example: "2.7.0"
-
-    UsageMetrics:
-      type: object
-      properties:
-        period:
-          type: string
-          example: "2025-06"
-        total_verifications:
-          type: integer
-          example: 1250
-        monthly_active_humans:
-          type: integer
-          example: 950
-        new_humans:
-          type: integer
-          example: 300
-        cost_breakdown:
-          type: object
-          properties:
-            mah_cost:
-              type: number
-              format: float
-              example: 95.00
-            new_human_cost:
-              type: number
-              format: float
-              example: 600.00
-            total_cost:
-              type: number
-              format: float
-              example: 695.00
-
-    Challenge:
-      type: object
-      properties:
-        challenge:
-          type: string
-          description: Random challenge string for presentation verification
-          example: "abc123def456"
-        expires_at:
-          type: string
-          format: date-time
-          example: "2025-06-01T12:05:00Z"
-
 paths:
-  /api/health:
-    get:
-      summary: Health Check
-      description: Check API health and service status
-      tags:
-        - Core
-      security: []
-      responses:
-        '200':
-          description: Service is healthy
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthStatus'
-              example:
-                status: "ok"
-                service: "lemma-human-verification"
-                version: "2.7.0"
-
-  /api/verify-human:
+  # Shield (Issuer) Endpoints
+  /kyc/start:
     post:
-      summary: Verify Human Credential
-      description: |
-        Verify that a user's credential proves they are human.
-        This is the primary endpoint for validating human verification.
-        
-        **Use Case**: When a user visits your protected content, send their 
-        credential to this endpoint to verify they are human.
+      summary: Start KYC Verification
+      description: Initiate KYC verification process with Stripe Identity
+      operationId: startKyc
       tags:
-        - Verification
+        - Shield (Issuer)
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                presentation:
-                  $ref: '#/components/schemas/VerifiablePresentation'
-                challenge:
-                  type: string
-                  description: Challenge string from /api/generate-challenge
-                domain:
-                  type: string
-                  description: Your domain for security verification
-                  example: "example.com"
-              required:
-                - presentation
-                - challenge
+              $ref: '#/components/schemas/KycStartRequest'
             example:
-              presentation:
-                "@context": ["https://www.w3.org/2018/credentials/v1"]
-                type: ["VerifiablePresentation"]
-                verifiableCredential: [{}]
-                proof: {}
-              challenge: "abc123def456"
-              domain: "example.com"
+              user_id: "user_12345"
+              callback_url: "https://customer-site.com/kyc-callback"
       responses:
         '200':
-          description: Verification result
+          description: KYC session created successfully
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          verified:
-                            type: boolean
-                            description: Whether the user is verified as human
-                          user_id:
-                            type: string
-                            description: User identifier
-                          verification_time:
-                            type: string
-                            format: date-time
-              example:
-                success: true
-                message: "Human verification successful"
-                data:
-                  verified: true
-                  user_id: "user_12345"
-                  verification_time: "2025-06-01T12:00:00Z"
+                $ref: '#/components/schemas/KycStartResponse'
         '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-              example:
-                success: false
-                error: "Invalid presentation format"
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Authentication failed
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          description: Rate limit exceeded
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
-  /api/generate-challenge:
-    get:
-      summary: Generate Verification Challenge
-      description: |
-        Generate a random challenge for secure credential presentation.
-        Challenges prevent replay attacks and ensure presentation freshness.
-        
-        **Use Case**: Call this before requesting credential verification
-        to get a fresh challenge string.
-      tags:
-        - Verification
-      responses:
-        '200':
-          description: Challenge generated successfully
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/Challenge'
-              example:
-                success: true
-                message: "Challenge generated"
-                data:
-                  challenge: "abc123def456"
-                  expires_at: "2025-06-01T12:05:00Z"
-
-  /api/issue-credential:
+  /vc/issue:
     post:
-      summary: Issue Human Verification Credential
-      description: |
-        Issue a new human verification credential for a user.
-        
-        **Note**: This endpoint requires KYC verification through Stripe Identity.
-        For testing, use the sandbox environment.
+      summary: Issue Verifiable Credential
+      description: Issue a W3C Verifiable Credential after successful KYC
+      operationId: issueCredential
       tags:
-        - Credentials
+        - Shield (Issuer)
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                user_id:
-                  type: string
-                  description: Unique user identifier
-                  example: "user_12345"
-                verification_method:
-                  type: string
-                  enum: ["stripe_identity", "manual_admin", "sandbox"]
-                  example: "stripe_identity"
-              required:
-                - user_id
-                - verification_method
+              $ref: '#/components/schemas/IssueCredentialRequest'
       responses:
         '200':
           description: Credential issued successfully
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          credential:
-                            $ref: '#/components/schemas/VerifiableCredential'
-                          download_url:
-                            type: string
-                            description: URL to download credential
+                $ref: '#/components/schemas/IssueCredentialResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
-  /api/billing/usage/monthly:
+  /wallet/script.js:
     get:
-      summary: Get Monthly Usage Metrics
-      description: |
-        Retrieve detailed usage metrics for billing purposes.
-        Includes Monthly Active Humans (MAH) and new user counts.
+      summary: Get Wallet Script
+      description: Lightweight JavaScript loader for client-side credential management
+      operationId: getWalletScript
       tags:
-        - Billing
-      parameters:
-        - name: year
-          in: query
-          schema:
-            type: integer
-          example: 2025
-        - name: month
-          in: query
-          schema:
-            type: integer
-          example: 6
+        - Shield (Issuer)
       responses:
         '200':
-          description: Usage metrics retrieved successfully
+          description: JavaScript wallet script
+          content:
+            application/javascript:
+              schema:
+                type: string
+          headers:
+            Cache-Control:
+              description: Caching policy for the script
+              schema:
+                type: string
+                example: "public, max-age=3600"
+
+  # Check (Verifier) Endpoints
+  /challenge:
+    get:
+      summary: Generate Challenge
+      description: Generate a cryptographic challenge (nonce) for verification
+      operationId: generateChallenge
+      tags:
+        - Check (Verifier)
+      responses:
+        '200':
+          description: Challenge generated successfully
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/UsageMetrics'
+                $ref: '#/components/schemas/ChallengeResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
-  /api/billing/usage/daily:
-    get:
-      summary: Get Daily Usage Breakdown
-      description: |
-        Retrieve daily usage breakdown for detailed analytics.
-        Useful for tracking usage patterns and optimizing costs.
+  /verify:
+    post:
+      summary: Verify Presentation
+      description: Verify a Verifiable Presentation with challenge
+      operationId: verifyPresentation
       tags:
-        - Billing
+        - Check (Verifier)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+      responses:
+        '200':
+          description: Verification completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # Revocation Endpoints
+  /revocation/filter/{issuerId}:
+    get:
+      summary: Get Revocation Filter
+      description: Get signed Bloom filter for revocation checking
+      operationId: getRevocationFilter
+      tags:
+        - Revocation
       parameters:
-        - name: date
-          in: query
+        - name: issuerId
+          in: path
+          required: true
+          description: DID of the credential issuer
           schema:
             type: string
-            format: date
-          example: "2025-06-01"
+            example: "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
       responses:
         '200':
-          description: Daily usage retrieved successfully
+          description: Revocation filter retrieved successfully
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          date:
-                            type: string
-                            format: date
-                          verifications:
-                            type: integer
-                          unique_users:
-                            type: integer
-                          new_users:
-                            type: integer
+                $ref: '#/components/schemas/RevocationFilterResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
-  /api/sandbox/credentials:
-    get:
-      summary: List Sandbox Credentials
-      description: |
-        **SANDBOX ONLY**: Get test credentials for development and testing.
-        These credentials are for testing only and cannot be used in production.
+  /revocation/webhook:
+    post:
+      summary: Register Revocation Webhook
+      description: Register customer callback URL for revocation notifications
+      operationId: registerRevocationWebhook
       tags:
-        - Sandbox
-      security: []
+        - Revocation
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookRequest'
       responses:
         '200':
-          description: Sandbox credentials retrieved
+          description: Webhook registered successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  test_credentials:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        user_id:
-                          type: string
-                        credential:
-                          $ref: '#/components/schemas/VerifiableCredential'
-                        description:
-                          type: string
+                $ref: '#/components/schemas/WebhookResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
-  /api/sandbox/revocation/events:
-    get:
-      summary: Get Sandbox Revocation Events
-      description: |
-        **SANDBOX ONLY**: Get test revocation events for testing
-        revocation handling in your application.
+  # Usage/Billing Endpoint
+  /usage/event:
+    post:
+      summary: Log Usage Event
+      description: Log usage event for billing with salted DID and timestamp
+      operationId: logUsageEvent
       tags:
-        - Sandbox
-      security: []
+        - Usage/Billing
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsageEventRequest'
       responses:
         '200':
-          description: Sandbox revocation events retrieved
+          description: Usage event logged successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  revocation_events:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        credential_id:
-                          type: string
-                        revoked_at:
-                          type: string
-                          format: date-time
-                        reason:
-                          type: string
+                $ref: '#/components/schemas/UsageEventResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # Meta Endpoints
+  /healthz:
+    get:
+      summary: Health Check
+      description: Check service health and status
+      operationId: healthCheck
+      tags:
+        - Meta
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnhealthyResponse'
+
+  /version:
+    get:
+      summary: Get Version
+      description: Get service version and build information
+      operationId: getVersion
+      tags:
+        - Meta
+      responses:
+        '200':
+          description: Version information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: JWT-signed API key for customer authentication
+
+  schemas:
+    # Request Schemas
+    KycStartRequest:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: Unique identifier for the user
+          minLength: 1
+          maxLength: 255
+          pattern: '^[a-zA-Z0-9_-]+$'
+          example: "user_12345"
+        callback_url:
+          type: string
+          format: uri
+          description: URL to redirect user after KYC completion
+          example: "https://customer-site.com/kyc-callback"
+
+    IssueCredentialRequest:
+      type: object
+      required:
+        - user_id
+        - session_id
+      properties:
+        user_id:
+          type: string
+          description: Unique identifier for the user
+          example: "user_12345"
+        session_id:
+          type: string
+          description: KYC session ID from /kyc/start
+          example: "vs_1234567890abcdef1234567890abcdef"
+
+    VerifyRequest:
+      type: object
+      required:
+        - presentation
+        - challenge
+      properties:
+        presentation:
+          type: object
+          description: W3C Verifiable Presentation
+        challenge:
+          type: string
+          description: Challenge obtained from /challenge endpoint
+          pattern: '^[a-f0-9]{64}$'
+          example: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+
+    WebhookRequest:
+      type: object
+      required:
+        - callback_url
+      properties:
+        callback_url:
+          type: string
+          format: uri
+          description: Customer callback URL for webhook notifications
+          example: "https://customer-site.com/webhooks/revocation"
+        events:
+          type: array
+          items:
+            type: string
+          default: ["credential.revoked"]
+          description: List of events to subscribe to
+          example: ["credential.revoked", "credential.suspended"]
+
+    UsageEventRequest:
+      type: object
+      required:
+        - salted_did
+      properties:
+        salted_did:
+          type: string
+          description: SHA-256 hash of salted DID for privacy
+          pattern: '^[a-f0-9]{64}$'
+          example: "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456"
+        timestamp:
+          type: integer
+          description: Unix timestamp of the event
+          example: 1704067200
+
+    # Response Schemas
+    KycStartResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          description: KYC session identifier
+          example: "vs_1234567890abcdef1234567890abcdef"
+        verification_url:
+          type: string
+          format: uri
+          description: URL for user to complete KYC verification
+          example: "https://lemma-instance.com/verify?session_id=vs_1234567890abcdef1234567890abcdef"
+        expires_at:
+          type: integer
+          description: Unix timestamp when session expires
+          example: 1704070800
+
+    IssueCredentialResponse:
+      type: object
+      properties:
+        credential:
+          type: object
+          description: W3C Verifiable Credential
+        issued_at:
+          type: integer
+          description: Unix timestamp when credential was issued
+          example: 1704067200
+        expires_at:
+          type: integer
+          description: Unix timestamp when credential expires
+          example: 1735689600
+
+    ChallengeResponse:
+      type: object
+      properties:
+        challenge:
+          type: string
+          description: Cryptographic challenge for verification
+          example: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        expires_at:
+          type: integer
+          description: Unix timestamp when challenge expires
+          example: 1704067500
+
+    VerifyResponse:
+      type: object
+      properties:
+        verified:
+          type: boolean
+          description: Whether the presentation was successfully verified
+          example: true
+        timestamp:
+          type: integer
+          description: Unix timestamp of verification
+          example: 1704067200
+
+    RevocationFilterResponse:
+      type: object
+      properties:
+        issuer_id:
+          type: string
+          description: DID of the credential issuer
+          example: "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+        filter:
+          type: string
+          description: Base64-encoded Bloom filter data
+          example: "mock_bloom_filter_data"
+        signature:
+          type: string
+          description: Digital signature of the filter
+          example: "mock_signature"
+        timestamp:
+          type: integer
+          description: Unix timestamp when filter was created
+          example: 1704067200
+        expires_at:
+          type: integer
+          description: Unix timestamp when filter expires
+          example: 1704153600
+
+    WebhookResponse:
+      type: object
+      properties:
+        webhook_id:
+          type: string
+          description: Unique identifier for the webhook
+          example: "wh_1234567890abcdef"
+        callback_url:
+          type: string
+          format: uri
+          description: Registered callback URL
+          example: "https://customer-site.com/webhooks/revocation"
+        events:
+          type: array
+          items:
+            type: string
+          description: Subscribed events
+          example: ["credential.revoked"]
+        status:
+          type: string
+          enum: [active, inactive]
+          description: Webhook status
+          example: "active"
+
+    UsageEventResponse:
+      type: object
+      properties:
+        logged:
+          type: boolean
+          description: Whether the event was successfully logged
+          example: true
+        timestamp:
+          type: integer
+          description: Unix timestamp of the logged event
+          example: 1704067200
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+          description: Overall service health status
+          example: "healthy"
+        timestamp:
+          type: integer
+          description: Unix timestamp of health check
+          example: 1704067200
+        version:
+          type: string
+          description: Service version
+          example: "1.0.0"
+
+    UnhealthyResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [unhealthy]
+          description: Service health status
+          example: "unhealthy"
+        error:
+          type: string
+          description: Error description
+          example: "Database connection failed"
+        timestamp:
+          type: integer
+          description: Unix timestamp of health check
+          example: 1704067200
+
+    VersionResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Semantic version number
+          example: "1.0.0"
+        git_sha:
+          type: string
+          description: Git commit SHA
+          example: "abc123def456"
+        api_version:
+          type: string
+          description: API version
+          example: "v1"
+        service:
+          type: string
+          description: Service name
+          example: "lemma-shield"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_REQUEST
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NOT_FOUND
+                - RATE_LIMITED
+                - INTERNAL_ERROR
+                - SERVICE_UNAVAILABLE
+              description: Machine-readable error code
+            message:
+              type: string
+              description: Human-readable error message
+            details:
+              type: string
+              description: Additional error details (optional)
+          required:
+            - code
+            - message
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "INVALID_REQUEST"
+              message: "user_id is required"
+
+    Unauthorized:
+      description: Authentication required or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "UNAUTHORIZED"
+              message: "API key required"
+
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "FORBIDDEN"
+              message: "KYC verification incomplete"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "NOT_FOUND"
+              message: "No revocation data for issuer"
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "RATE_LIMITED"
+              message: "Too many requests"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "INTERNAL_ERROR"
+              message: "Failed to process request"
 
 tags:
-  - name: Core
-    description: Essential API endpoints for health checks and status
-  - name: Verification
-    description: Human verification and credential validation
-  - name: Credentials
-    description: Credential issuance and management
-  - name: Billing
-    description: Usage tracking and billing information
-  - name: Sandbox
-    description: Testing and development endpoints
-
-x-tagGroups:
-  - name: Quick Start
-    tags:
-      - Core
-      - Verification
-  - name: Advanced
-    tags:
-      - Credentials
-      - Billing
-  - name: Development
-    tags:
-      - Sandbox 
+  - name: Shield (Issuer)
+    description: KYC verification and credential issuance endpoints
+  - name: Check (Verifier)
+    description: Credential verification endpoints
+  - name: Revocation
+    description: Credential revocation management
+  - name: Usage/Billing
+    description: Usage tracking for billing purposes
+  - name: Meta
+    description: Service metadata and health endpoints 

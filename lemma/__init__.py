@@ -177,66 +177,22 @@ def create_app(test_config=None):
         app.logger.error(f"Error initializing components: {e}")
         # Continue anyway - some components may work
     
-    # Register blueprints
-    from lemma.routes.main import main_bp
+    # Register blueprints - Maintain backward compatibility
+    from lemma.routes.shield_api import shield_api
     from lemma.routes.api import api_bp
-    from lemma.routes.admin import admin_bp
-    from lemma.routes.onboarding import onboarding_bp
-    from lemma.routes.billing_api import billing_api
-    from lemma.routes.sre_monitoring import sre_bp
-    from lemma.routes.compliance import compliance_bp
-    from lemma.routes.admin_security import admin_security_bp
-    from lemma.routes.gate_api import gate_api
     
-    app.register_blueprint(main_bp)
+    # Register the clean Shield API v1 (new market-ready API)
+    app.register_blueprint(shield_api)
+    
+    # Maintain backward compatibility with original API
     app.register_blueprint(api_bp)
+    
+    # Keep minimal admin routes for internal management
+    from lemma.routes.admin import admin_bp
     app.register_blueprint(admin_bp)
-    app.register_blueprint(onboarding_bp)
-    app.register_blueprint(billing_api)
-    app.register_blueprint(sre_bp)
-    app.register_blueprint(compliance_bp)
-    app.register_blueprint(admin_security_bp)
-    app.register_blueprint(gate_api)
 
-    # Register enhanced API blueprint
-    try:
-        from lemma.routes.api_enhanced import api_enhanced
-        app.register_blueprint(api_enhanced)
-        app.logger.info("Enhanced API v2 endpoints registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"Enhanced API not available: {e}")
-    except Exception as e:
-        app.logger.error(f"Error registering enhanced API: {e}")
-
-    # Initialize SRE monitoring system
-    try:
-        from lemma.utils.sre_middleware import init_sre_monitoring
-        init_sre_monitoring(app)
-        app.logger.info("SRE monitoring system initialized successfully")
-    except ImportError as e:
-        app.logger.warning(f"SRE monitoring not available: {e}")
-    except Exception as e:
-        app.logger.error(f"Error initializing SRE monitoring: {e}")
-
-    # Initialize performance optimizations
-    try:
-        from lemma.utils.performance_middleware import init_performance_middleware
-        init_performance_middleware(app)
-        app.logger.info("Performance optimizations initialized - targeting <250ms response times")
-    except ImportError as e:
-        app.logger.warning(f"Performance middleware not available: {e}")
-    except Exception as e:
-        app.logger.error(f"Error initializing performance middleware: {e}")
-
-    # Initialize background monitoring for alerts
-    try:
-        from lemma.monitoring.background_monitor import start_background_monitoring
-        start_background_monitoring()
-        app.logger.info("Background monitoring service started - PagerDuty alerts enabled")
-    except ImportError as e:
-        app.logger.warning(f"Background monitoring not available: {e}")
-    except Exception as e:
-        app.logger.error(f"Error starting background monitoring: {e}")
+    # Both Shield API v1 and legacy API available for backward compatibility
+    app.logger.info("Lemma Shield API v1.0 + Legacy API initialized - Market-ready with backward compatibility")
 
     # Clean up resources at the end of requests
     @app.teardown_appcontext

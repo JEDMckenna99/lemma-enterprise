@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Verify Presentation Request",
+  "description": "Request schema for verifying a Verifiable Presentation",
+  "type": "object",
+  "properties": {
+    "presentation": {
+      "type": "object",
+      "description": "W3C Verifiable Presentation object",
+      "properties": {
+        "@context": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "verifiableCredential": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "proof": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "challenge": {
+              "type": "string"
+            },
+            "created": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      },
+      "required": ["@context", "type", "verifiableCredential", "proof"]
+    },
+    "challenge": {
+      "type": "string",
+      "description": "Challenge string obtained from /challenge endpoint",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "required": ["presentation", "challenge"],
+  "additionalProperties": false
+} 

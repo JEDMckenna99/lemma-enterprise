@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma Shield Demo - Background Verification</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .demo-section {
+            background: white;
+            margin: 20px 0;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .status-indicator {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        
+        .status-loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        
+        .status-verified {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .status-unverified {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .protected-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .verification-gate {
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            color: #721c24;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        
+        .demo-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .log-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .feature-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .code-example {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ Lemma Shield Demo</h1>
+        <p>Background verification with conditional UI - Shield only appears when needed</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>🔍 Verification Status</h2>
+        <div id="verification-status" class="status-indicator status-loading">
+            🔄 Checking verification status...
+        </div>
+        
+        <div id="protected-content" class="protected-content">
+            <h3>🎉 Welcome, Verified Human!</h3>
+            <p>This content is only visible to verified users. The background wallet automatically verified your credentials without any UI intervention.</p>
+            <ul style="text-align: left; max-width: 500px; margin: 0 auto;">
+                <li>✅ No wallet UI appeared</li>
+                <li>✅ Verification happened in background</li>
+                <li>✅ Seamless user experience</li>
+                <li>✅ Privacy-preserving verification</li>
+            </ul>
+        </div>
+        
+        <div id="verification-gate" class="verification-gate">
+            <h3>🔒 Verification Required</h3>
+            <p>This site requires human verification to access protected content.</p>
+            <p><strong>Note:</strong> This is the ONLY time you'll see Lemma's UI - for initial verification.</p>
+            <button id="start-verification" class="btn">Start Verification Process</button>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>🎮 Demo Controls</h2>
+        <div class="demo-controls">
+            <button class="btn" onclick="checkVerificationStatus()">🔄 Check Status</button>
+            <button class="btn btn-success" onclick="simulateCredentialStore()">✅ Simulate Credential</button>
+            <button class="btn btn-warning" onclick="clearCredentials()">🗑️ Clear Credentials</button>
+            <button class="btn" onclick="testBackgroundVerification()">🧪 Test Background Verify</button>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>📊 Key Features</h2>
+        <div class="feature-list">
+            <div class="feature-item">
+                <h4>🚫 No Visible UI</h4>
+                <p>Wallet operates completely in background. Users never see wallet interface after initial verification.</p>
+            </div>
+            <div class="feature-item">
+                <h4>⚡ Auto Verification</h4>
+                <p>Automatic verification on page load. No user interaction required for verified users.</p>
+            </div>
+            <div class="feature-item">
+                <h4>🎯 Conditional Shield</h4>
+                <p>Verification UI only appears for new users or those with revoked credentials.</p>
+            </div>
+            <div class="feature-item">
+                <h4>🔄 Background Checks</h4>
+                <p>Revocation checking, DID verification, and presentation validation all happen silently.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>💻 Integration Code</h2>
+        <p>This is all the code needed to integrate Lemma Shield with background verification:</p>
+        <div class="code-example">
+&lt;!-- Load Lemma Shield Script --&gt;
+&lt;script src="/api/v1/wallet/script.js"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+// Optional: Listen for verification events
+if (window.lemmaWallet) {
+    window.lemmaWallet.onVerificationChange = (verified) => {
+        if (verified) {
+            showProtectedContent();
+        } else {
+            showVerificationGate();
+        }
+    };
+}
+&lt;/script&gt;
+        </div>
+        <p><strong>That's it!</strong> The wallet handles everything else automatically.</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>📝 Activity Log</h2>
+        <div id="activity-log" class="log-section">
+            <div>System initializing...</div>
+        </div>
+    </div>
+
+    <!-- Load the Lemma Shield wallet script -->
+    <script src="/api/v1/wallet/script.js"></script>
+    
+    <script>
+        let activityLog = [];
+        let verificationState = {
+            verified: false,
+            hasCredentials: false,
+            reason: 'unknown'
+        };
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            activityLog.push(`[${timestamp}] ${message}`);
+            updateActivityLog();
+            console.log(`[LEMMA-DEMO] ${message}`);
+        }
+
+        function updateActivityLog() {
+            const logElement = document.getElementById('activity-log');
+            logElement.innerHTML = activityLog.slice(-20).map(entry => `<div>${entry}</div>`).join('');
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function updateUI(state) {
+            const statusElement = document.getElementById('verification-status');
+            const protectedContent = document.getElementById('protected-content');
+            const verificationGate = document.getElementById('verification-gate');
+
+            if (state.verified) {
+                statusElement.className = 'status-indicator status-verified';
+                statusElement.innerHTML = '✅ <strong>Verified Human</strong> - Background verification successful!';
+                protectedContent.style.display = 'block';
+                verificationGate.style.display = 'none';
+                log('✅ User verified - showing protected content');
+            } else {
+                statusElement.className = 'status-indicator status-unverified';
+                statusElement.innerHTML = `❌ <strong>Not Verified</strong> - ${getReasonText(state.reason)}`;
+                protectedContent.style.display = 'none';
+                verificationGate.style.display = state.reason === 'no_credentials' ? 'block' : 'none';
+                log(`❌ User not verified: ${state.reason}`);
+            }
+
+            verificationState = state;
+        }
+
+        function getReasonText(reason) {
+            switch (reason) {
+                case 'no_credentials': return 'No verification credentials found';
+                case 'verification_failed': return 'Verification failed';
+                case 'revoked': return 'Credentials have been revoked';
+                case 'error': return 'Verification error occurred';
+                default: return 'Unknown status';
+            }
+        }
+
+        async function checkVerificationStatus() {
+            log('🔍 Checking verification status...');
+            
+            try {
+                // Check if we have credentials stored
+                const hasCredentials = await checkStoredCredentials();
+                
+                if (!hasCredentials) {
+                    updateUI({ verified: false, hasCredentials: false, reason: 'no_credentials' });
+                    return;
+                }
+
+                // Try background verification
+                const result = await performBackgroundVerification();
+                updateUI(result);
+
+            } catch (error) {
+                log(`❌ Status check failed: ${error.message}`);
+                updateUI({ verified: false, hasCredentials: false, reason: 'error' });
+            }
+        }
+
+        async function checkStoredCredentials() {
+            try {
+                const stored = localStorage.getItem('lemma_shield_credentials');
+                const credentials = stored ? JSON.parse(stored) : {};
+                const hasCredentials = Object.keys(credentials).length > 0;
+                log(`📱 Credentials check: ${hasCredentials ? 'Found' : 'None'}`);
+                return hasCredentials;
+            } catch (error) {
+                return false;
+            }
+        }
+
+        async function performBackgroundVerification() {
+            try {
+                // Get challenge
+                log('🎲 Getting verification challenge...');
+                const challengeResponse = await fetch('/api/v1/challenge');
+                const { challenge } = await challengeResponse.json();
+
+                // Get stored credentials
+                const stored = localStorage.getItem('lemma_shield_credentials');
+                const credentials = JSON.parse(stored);
+                const credentialIds = Object.keys(credentials);
+                const credential = credentials[credentialIds[0]];
+
+                // Create presentation
+                const presentation = {
+                    credential: credential,
+                    challenge: challenge,
+                    domain: window.location.hostname
+                };
+
+                // Verify
+                log('🔐 Performing background verification...');
+                const verifyResponse = await fetch('/api/v1/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ presentation, challenge })
+                });
+
+                const result = await verifyResponse.json();
+                const verified = result.verified || false;
+
+                log(`🎯 Verification result: ${verified ? 'SUCCESS' : 'FAILED'}`);
+
+                return {
+                    verified: verified,
+                    hasCredentials: true,
+                    reason: verified ? 'success' : 'verification_failed'
+                };
+
+            } catch (error) {
+                log(`❌ Background verification error: ${error.message}`);
+                return { verified: false, hasCredentials: true, reason: 'error' };
+            }
+        }
+
+        function simulateCredentialStore() {
+            log('🧪 Simulating credential storage...');
+            
+            // Create a mock credential
+            const mockCredential = {
+                id: 'cred_' + Date.now(),
+                type: ['VerifiableCredential'],
+                issuer: 'did:lemma:demo',
+                issuanceDate: new Date().toISOString(),
+                credentialSubject: {
+                    id: 'did:lemma:user:demo',
+                    type: 'Human'
+                }
+            };
+
+            // Store it
+            const credentials = { [mockCredential.id]: mockCredential };
+            localStorage.setItem('lemma_shield_credentials', JSON.stringify(credentials));
+            
+            log('✅ Mock credential stored');
+            setTimeout(checkVerificationStatus, 1000);
+        }
+
+        function clearCredentials() {
+            log('🗑️ Clearing stored credentials...');
+            localStorage.removeItem('lemma_shield_credentials');
+            log('✅ Credentials cleared');
+            setTimeout(checkVerificationStatus, 1000);
+        }
+
+        async function testBackgroundVerification() {
+            log('🧪 Testing background verification flow...');
+            await performBackgroundVerification();
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🚀 Lemma Shield Demo initialized');
+            log('🔍 Starting automatic verification check...');
+            
+            // Small delay to let wallet initialize
+            setTimeout(checkVerificationStatus, 1500);
+        });
+
+        // Set up verification button
+        document.getElementById('start-verification').addEventListener('click', () => {
+            log('🔗 Redirecting to verification flow...');
+            // In a real implementation, this would start your KYC flow
+            alert('In a real implementation, this would start your KYC verification process.');
+        });
+
+        // Listen for wallet events if available
+        if (window.lemmaWallet) {
+            log('📱 Background wallet detected');
+            
+            // Override wallet prompt to use our UI
+            window.lemmaWallet.showVerificationPrompt = () => {
+                updateUI({ verified: false, hasCredentials: false, reason: 'no_credentials' });
+            };
+            
+            window.lemmaWallet.hideVerificationPrompt = () => {
+                updateUI({ verified: true, hasCredentials: true, reason: 'success' });
+            };
+        }
+    </script>
+</body>
+</html> 

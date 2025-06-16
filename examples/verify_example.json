@@ -1,0 +1,46 @@
+{
+  "request": {
+    "presentation": {
+      "@context": [
+        "https://www.w3.org/2018/credentials/v1"
+      ],
+      "type": ["VerifiablePresentation"],
+      "verifiableCredential": [
+        {
+          "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://lemma.network/contexts/v1"
+          ],
+          "type": ["VerifiableCredential", "HumanVerificationCredential"],
+          "id": "urn:uuid:12345678-1234-5678-9012-123456789012",
+          "issuer": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+          "issuanceDate": "2024-01-01T00:00:00Z",
+          "credentialSubject": {
+            "id": "did:key:z6MkrJVnaZkeFzdQyQSSmJenMPc6vVriBfxzNmzEeTPqAEcx",
+            "isHuman": true
+          }
+        }
+      ],
+      "proof": {
+        "type": "Ed25519Signature2020",
+        "challenge": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+        "created": "2024-01-01T00:00:00Z"
+      }
+    },
+    "challenge": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+  },
+  "response_success": {
+    "verified": true,
+    "timestamp": 1704067200
+  },
+  "response_failure": {
+    "verified": false,
+    "timestamp": 1704067200
+  },
+  "error_response": {
+    "error": {
+      "code": "INVALID_REQUEST",
+      "message": "Challenge expired"
+    }
+  }
+} 

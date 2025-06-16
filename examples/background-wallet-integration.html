@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma Background Wallet - Simple Integration</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .verified { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .unverified { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .loading { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; }
+        .verify-btn { background-color: #007bff; color: white; }
+        .verify-btn:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>Lemma Background Wallet Integration</h1>
+    <p>This page demonstrates automatic background verification without visible wallet UI.</p>
+    
+    <div id="status" class="status loading">Checking verification status...</div>
+    
+    <div id="content" style="display: none;">
+        <h2>🎉 Protected Content</h2>
+        <p>This content is only visible to verified humans!</p>
+        <ul>
+            <li>No wallet UI required</li>
+            <li>Automatic background verification</li>
+            <li>Seamless user experience</li>
+        </ul>
+    </div>
+    
+    <div id="actions">
+        <button id="verify-btn" class="verify-btn" onclick="startVerification()" style="display: none;">
+            Get Verified
+        </button>
+        <button onclick="checkStatus()">Refresh Status</button>
+    </div>
+    
+    <h3>Integration Details</h3>
+    <pre><code>// Simple 3-line integration:
+&lt;script src="/static/js/lemma-wallet-background.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+window.lemmaBackgroundVerifier.onVerification(result => {
+    if (result.verified) {
+        showProtectedContent();
+    } else {
+        showVerificationPrompt();
+    }
+});
+&lt;/script&gt;</code></pre>
+
+    <!-- Load the background wallet -->
+    <script src="/static/js/lemma-wallet-background.js"></script>
+    
+    <script>
+        let verificationStatus = { verified: false, reason: 'unknown' };
+        
+        // Set up verification callback
+        window.lemmaBackgroundVerifier.onVerification(result => {
+            verificationStatus = result;
+            updateUI(result);
+        });
+        
+        function updateUI(result) {
+            const statusDiv = document.getElementById('status');
+            const contentDiv = document.getElementById('content');
+            const verifyBtn = document.getElementById('verify-btn');
+            
+            if (result.verified) {
+                statusDiv.className = 'status verified';
+                statusDiv.textContent = '✅ Verified Human - Background verification successful!';
+                contentDiv.style.display = 'block';
+                verifyBtn.style.display = 'none';
+            } else {
+                statusDiv.className = 'status unverified';
+                statusDiv.textContent = `❌ Not Verified - ${getReasonText(result.reason)}`;
+                contentDiv.style.display = 'none';
+                verifyBtn.style.display = result.reason === 'no_credentials' ? 'inline-block' : 'none';
+            }
+        }
+        
+        function getReasonText(reason) {
+            switch (reason) {
+                case 'no_credentials': return 'No verification credentials found';
+                case 'verification_failed': return 'Verification failed';
+                case 'error': return 'Verification error occurred';
+                default: return 'Unknown status';
+            }
+        }
+        
+        function startVerification() {
+            // In a real integration, this would redirect to your KYC flow
+            alert('In a real integration, this would start the KYC verification process.');
+        }
+        
+        async function checkStatus() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status loading';
+            statusDiv.textContent = 'Checking verification status...';
+            
+            // Force a new verification check
+            await window.lemmaBackgroundVerifier.performVerification();
+        }
+        
+        // Initial status check on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                if (verificationStatus.reason === 'unknown') {
+                    // Fallback if auto-verification didn't run
+                    checkStatus();
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html> 
