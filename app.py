@@ -225,25 +225,7 @@ def create_app():
             logger.error(f"Error serving OpenAPI spec: {str(e)}")
             return jsonify({"error": str(e)}), 500
 
-    # Add route to serve Shield integration example
-    @app.route('/docs/shield-integration-example.html')
-    def shield_integration_example():
-        """Serve the Shield integration example."""
-        try:
-            docs_file = os.path.join(os.path.dirname(__file__), 'docs', 'shield-integration-example.html')
-            if os.path.exists(docs_file):
-                with open(docs_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                response = app.response_class(
-                    content,
-                    mimetype='text/html'
-                )
-                return response
-            else:
-                return jsonify({"error": "Shield integration example not found"}), 404
-        except Exception as e:
-            logger.error(f"Error serving integration example: {str(e)}")
-            return jsonify({"error": str(e)}), 500
+
 
     # Debug endpoint to check registered blueprints and routes
     @app.route('/api/debug/routes')

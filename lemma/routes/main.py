@@ -1033,21 +1033,4 @@ def shield_protected():
     
     return response
 
-@main_bp.route('/shield-widget-demo')
-def shield_widget_demo():
-    """
-    Demo page for the new Shield Widget with inline verification experience
-    """
-    return render_template('shield_widget_demo.html')
 
-@main_bp.route('/shield-integration-example')
-def shield_integration_example():
-    """
-    Serve the integration example file for developers
-    """
-    from flask import send_from_directory
-    import os
-    return send_from_directory(
-        os.path.join(current_app.root_path, '..', 'examples'),
-        'shield-widget-integration.html'
-    )

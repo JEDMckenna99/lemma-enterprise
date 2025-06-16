@@ -656,14 +656,7 @@ def shield_config():
             'error': 'Failed to get configuration'
         }), 500
 
-@shield_api.route('/shield-widget-demo')
-@rate_limit
-def shield_widget_demo():
-    """
-    Demo page for the new Shield Widget with inline verification experience
-    Shows how to integrate the widget with proper UI/UX flow
-    """
-    return render_template('shield_widget_demo.html')
+
 
 # Helper functions
 

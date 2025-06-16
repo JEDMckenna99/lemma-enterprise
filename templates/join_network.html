@@ -5,70 +5,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
-<!-- Wallet scripts are loaded in layout.html to prevent duplicates -->
 <style>
-    /* Lemma Shield Protection Styles */
-.lemma-shield-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.8);
-        backdrop-filter: blur(8px);
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.3s ease;
-    }
-    
-    .lemma-shield-content {
-        background: var(--white);
-        border-radius: var(--radius-xl);
-        padding: var(--space-12);
-        max-width: 500px;
-        margin: var(--space-8);
-        text-align: center;
-        box-shadow: var(--shadow-2xl);
-        border: 1px solid var(--gray-200);
-    }
-    
-    .lemma-shield-icon {
-        width: 80px;
-        height: 80px;
-        margin: 0 auto var(--space-6);
-        background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
-        border-radius: var(--radius-full);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--white);
-        font-size: 2rem;
-    }
-    
-    .verification-status {
-        position: fixed;
-        top: var(--space-4);
-        right: var(--space-4);
-        background: linear-gradient(135deg, var(--green-500), var(--green-600));
-        color: var(--white);
-        padding: var(--space-2) var(--space-4);
-        border-radius: var(--radius-full);
-        font-size: var(--text-sm);
-        font-weight: 600;
-        box-shadow: var(--shadow-lg);
-        z-index: 1000;
-        opacity: 0;
-        transform: translateX(100%);
-        transition: all 0.3s ease;
-    }
-    
-    .verification-status.show {
-        opacity: 1;
-        transform: translateX(0);
-    }
-    
     .network-hero {
         background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
         color: var(--white);
@@ -189,40 +126,27 @@
         border: 1px solid var(--gray-200);
     }
     
-    .hidden {
-        display: none !important;
-    }
-
-    .status-message {
-        margin: var(--space-4) 0;
+    /* Verification Status Indicator */
+    .verification-status {
+        position: fixed;
+        top: var(--space-4);
+        right: var(--space-4);
+        background: linear-gradient(135deg, var(--green-500), var(--green-600));
+        color: var(--white);
         padding: var(--space-2) var(--space-4);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-full);
         font-size: var(--text-sm);
-        display: inline-block;
+        font-weight: 600;
+        box-shadow: var(--shadow-lg);
+        z-index: 1000;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease;
     }
-
-    .status-checking {
-        background: var(--blue-50);
-        color: var(--blue-700);
-        border: 1px solid var(--blue-200);
-    }
-
-    .status-success {
-        background: var(--green-50);
-        color: var(--green-700);
-        border: 1px solid var(--green-200);
-    }
-
-    .status-error {
-        background: var(--red-50);
-        color: var(--red-700);
-        border: 1px solid var(--red-200);
-    }
-
-    .status-warning {
-        background: var(--orange-50);
-        color: var(--orange-700);
-        border: 1px solid var(--orange-200);
+    
+    .verification-status.show {
+        opacity: 1;
+        transform: translateX(0);
     }
     
     @media (max-width: 768px) {
@@ -244,34 +168,7 @@
 {% endblock %}
 
 {% block content %}
-    <!-- Lemma Shield Overlay - Shown until user is verified -->
-    <div id="lemmaShieldOverlay" class="lemma-shield-overlay">
-        <div class="lemma-shield-content">
-            <div class="lemma-shield-icon">
-            <svg width="40" height="40" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 1l1.27 3.88h4.08l-3.3 2.4 1.27 3.88L12 8.76l-3.32 2.4 1.27-3.88-3.3-2.4h4.08L12 1z"/>
-            </svg>
-        </div>
-        <h2 class="text-2xl font-bold text-gray-900 mb-4">Verification Required</h2>
-        <p class="text-gray-600 mb-6">This page is protected by the Lemma Verification Network. Please verify your humanity to continue.</p>
-        
-                    <div id="lemmaShieldStatus" class="mb-6">
-            <div class="status-message status-checking">🔍 Checking for existing verification...</div>
-        </div>
-        
-        <div class="flex flex-col gap-3">
-            <button id="lemmaVerifyBtn" onclick="startLemmaVerification()" class="btn btn-primary btn-lg">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span>Verify Human</span>
-            </button>
-            <a href="/" class="text-gray-500 text-sm hover:text-gray-700">← Back to Home</a>
-        </div>
-    </div>
-</div>
-
-<!-- Verification Status Indicator -->
+<!-- Verification Status Indicator - Shows when user is verified -->
 <div id="verificationStatus" class="verification-status">
     <div class="flex items-center">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -281,452 +178,244 @@
     </div>
 </div>
 
-<!-- Main Content - Hidden until verified -->
-<div id="networkContent" class="hidden" data-lemma="true">
-    <div class="container">
-        <!-- Network Hero Section -->
-        <section class="network-hero">
-            <div class="network-hero-content">
-                <h1 class="text-5xl font-bold mb-6">Welcome to the Lemma Network</h1>
-                <p class="text-xl opacity-90 max-w-3xl mx-auto mb-8">
-                    You're now part of the growing network of verified humans building a bot-free internet. Your verification unlocks access to thousands of protected sites and services.
-                </p>
-                <div class="inline-flex items-center bg-white/20 rounded-lg px-4 py-2 text-sm">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Verification Active
-                </div>
-            </div>
-        </section>
-        
-        <!-- Network Statistics -->
-        <section class="network-stats">
-            <div class="stat-card">
-                <span class="stat-value">2,847</span>
-                <span class="stat-label">Verified Humans</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value">156</span>
-                <span class="stat-label">Partner Sites</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value">99.97%</span>
-                <span class="stat-label">Bot Prevention Rate</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value">24/7</span>
-                <span class="stat-label">Network Uptime</span>
-            </div>
-        </section>
-        
-        <!-- Benefits Section -->
-        <section class="benefits-section">
-            <div class="container px-8">
-                <div class="text-center mb-12">
-                    <h2 class="text-3xl font-bold text-gray-900 mb-4">Your Network Benefits</h2>
-                    <p class="text-lg text-gray-600">As a verified member, you gain access to exclusive features and services</p>
-                </div>
-                
-                <div class="benefits-grid">
-                    <div class="benefit-card">
-                        <div class="benefit-icon network">
-                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"/>
-                            </svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-gray-900 mb-3">Cross-Site Access</h3>
-                        <p class="text-gray-600">Use your verification across all Lemma partner sites. One verification unlocks the entire network - no more repetitive bot checks.</p>
-                    </div>
-                    
-                    <div class="benefit-card">
-                        <div class="benefit-icon privacy">
-                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                            </svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-gray-900 mb-3">Privacy First</h3>
-                        <p class="text-gray-600">Zero-knowledge verification means sites only learn you're human - nothing else. Your privacy is completely protected.</p>
-                    </div>
-                    
-                    <div class="benefit-card">
-                        <div class="benefit-icon future">
-                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                            </svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-gray-900 mb-3">Future Ready</h3>
-                        <p class="text-gray-600">Built on W3C standards for maximum compatibility. Your credentials work with future identity systems and emerging technologies.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Network Directory -->
-        <section class="py-20">
-            <div class="container px-8">
-                <div class="text-center mb-12">
-                    <h2 class="text-3xl font-bold text-gray-900 mb-4">Explore the Network</h2>
-                    <p class="text-lg text-gray-600">Discover sites and services that accept your Lemma verification</p>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                            </svg>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Social Platforms</h3>
-                        <p class="text-gray-600 text-sm">Join discussions on verified-human social networks</p>
-                    </div>
-                    
-                    <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v5m0-5l2.5 5"/>
-                            </svg>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2">E-commerce</h3>
-                        <p class="text-gray-600 text-sm">Shop on platforms with verified human reviews</p>
-                    </div>
-                    
-                    <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                            </svg>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Business Services</h3>
-                        <p class="text-gray-600 text-sm">Access professional services with verified participants</p>
-                    </div>
-                </div>
-                
-                <div class="text-center mt-8">
-                    <a href="/shield-demo" class="btn btn-primary">
-                        View Full Network Directory
-                        <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                        </svg>
-                    </a>
-                </div>
-            </div>
-        </section>
-
-        <!-- Call to Action -->
-        <section class="cta-section">
-            <h2 class="text-3xl font-bold text-gray-900 mb-4">Ready to Explore?</h2>
-            <p class="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-                Your Lemma verification is active and ready to use. Start exploring the network of verified-human platforms and services.
+<!-- Main Content - Protected by Lemma Shield Widget -->
+<div class="container" data-lemma-protected="true">
+    <!-- Network Hero Section -->
+    <section class="network-hero">
+        <div class="network-hero-content">
+            <h1 class="text-5xl font-bold mb-6">Welcome to the Lemma Network</h1>
+            <p class="text-xl opacity-90 max-w-3xl mx-auto mb-8">
+                You're now part of the growing network of verified humans building a bot-free internet. Your verification unlocks access to thousands of protected sites and services.
             </p>
-            <div class="flex justify-center gap-4">
-                <a href="/protected" class="btn btn-primary btn-lg">
-                    Access Protected Content
-                </a>
-                <a href="/onboarding/dashboard" class="btn btn-secondary btn-lg">
-                    View Your Dashboard
+            <div class="inline-flex items-center bg-white/20 rounded-lg px-4 py-2 text-sm">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Verification Active
+            </div>
+        </div>
+    </section>
+    
+    <!-- Network Statistics -->
+    <section class="network-stats">
+        <div class="stat-card">
+            <span class="stat-value">2,847</span>
+            <span class="stat-label">Verified Humans</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">156</span>
+            <span class="stat-label">Partner Sites</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">99.97%</span>
+            <span class="stat-label">Bot Prevention Rate</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">24/7</span>
+            <span class="stat-label">Network Uptime</span>
+        </div>
+    </section>
+    
+    <!-- Benefits Section -->
+    <section class="benefits-section">
+        <div class="container px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">Your Network Benefits</h2>
+                <p class="text-lg text-gray-600">As a verified member, you gain access to exclusive features and services</p>
+            </div>
+            
+            <div class="benefits-grid">
+                <div class="benefit-card">
+                    <div class="benefit-icon network">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Cross-Site Access</h3>
+                    <p class="text-gray-600">Use your verification across all Lemma partner sites. One verification unlocks the entire network - no more repetitive bot checks.</p>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon privacy">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Privacy First</h3>
+                    <p class="text-gray-600">Zero-knowledge verification means sites only learn you're human - nothing else. Your privacy is completely protected.</p>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon future">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Future Ready</h3>
+                    <p class="text-gray-600">Built on W3C standards for maximum compatibility. Your credentials work with future identity systems and emerging technologies.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Network Directory -->
+    <section class="py-20">
+        <div class="container px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">Explore the Network</h2>
+                <p class="text-lg text-gray-600">Discover sites and services that accept your Lemma verification</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Social Platforms</h3>
+                    <p class="text-gray-600 text-sm">Join discussions on verified-human social networks</p>
+                </div>
+                
+                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v5m0-5l2.5 5"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">E-commerce</h3>
+                    <p class="text-gray-600 text-sm">Shop on platforms with verified human reviews</p>
+                </div>
+                
+                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Business Services</h3>
+                    <p class="text-gray-600 text-sm">Access professional services with verified participants</p>
+                </div>
+            </div>
+            
+            <div class="text-center mt-8">
+                <a href="/protected" class="btn btn-primary">
+                    View More Protected Content
+                    <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
                 </a>
             </div>
-        </section>
-    </div>
+        </div>
+    </section>
+
+    <!-- Call to Action -->
+    <section class="cta-section">
+        <h2 class="text-3xl font-bold text-gray-900 mb-4">Ready to Explore?</h2>
+        <p class="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+            Your Lemma verification is active and ready to use. Start exploring the network of verified-human platforms and services.
+        </p>
+        <div class="flex justify-center gap-4">
+            <a href="/protected" class="btn btn-primary btn-lg">
+                Access Protected Content
+            </a>
+            <a href="/onboarding/dashboard" class="btn btn-secondary btn-lg">
+                View Your Dashboard
+            </a>
+        </div>
+    </section>
 </div>
 
-<!-- Enhanced Lemma Shield API Integration with Enterprise Security Controls -->
-<script src="{{ url_for('static', filename='js/lemma-shield-api.js') }}"></script>
+<!-- Lemma Shield Widget - Real Integration Example -->
+<script src="{{ url_for('static', filename='js/lemma-shield-widget.js') }}?v={{ cache_bust }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🔐 Initializing Enhanced Lemma Shield API for Join Network page');
+    console.log('🛡️ Initializing Lemma Shield Widget for Join Network page');
     
-    // Get security level from URL parameters or default to 'standard'
-    const urlParams = new URLSearchParams(window.location.search);
-    const securityLevel = urlParams.get('security_level') || 'standard';
-    
-    // Initialize the enhanced API-driven shield
-    const lemmaShield = new LemmaShieldAPI({
-        protectedContent: '#networkContent',
-        shieldContainer: '#lemmaShieldOverlay',
-        securityLevel: securityLevel,
-        enableBackgroundChecks: true,
-        autoCheckInterval: 30000, // Check every 30 seconds
-        showDetailedErrors: true,
+    // Initialize the Shield Widget - this is exactly how a customer would integrate it
+    const lemmaShield = new LemmaShieldWidget({
+        // Target the container that should be protected
+        protectedSelector: '[data-lemma-protected="true"]',
         
-        onVerified: function(data) {
+        // Configuration options
+        apiBaseUrl: window.location.origin,
+        onboardingRedirectUrl: '/verify',
+        
+        // UI customization
+        theme: {
+            primaryColor: '#635bff',
+            borderRadius: '8px',
+            fontFamily: 'system-ui, sans-serif'
+        },
+        
+        // Event callbacks
+        onVerificationComplete: function(data) {
             console.log('✅ User verified for network access:', data);
-            showNetworkWelcome(data);
-            updateShieldStatus('success', `✅ Verified! Security Level: ${data.security_level?.toUpperCase() || 'STANDARD'}`);
-        },
-        
-        onRevoked: function(data) {
-            console.log('❌ Credential revoked:', data);
-            showErrorMessage(`Your verification credential has been revoked: ${data.revocation_reason || 'Unknown reason'}`);
-            updateShieldStatus('error', '❌ Credential revoked - Please get new verification');
-        },
-        
-        onReverificationRequired: function(data) {
-            console.log('⚠️ Re-verification required:', data);
-            showWarningMessage(`Re-verification required: ${data.reason || 'Security policy'}`);
-            updateShieldStatus('warning', '⚠️ Re-verification required');
-        },
-        
-        onStatusChange: function(action, data) {
-            console.log(`🔍 Shield status changed: ${action}`, data);
             
-            // Update page title with security status
-            const originalTitle = document.title;
-            if (action === 'allow_access') {
-                document.title = `✅ ${originalTitle}`;
-            } else if (action === 'require_reverification') {
-                document.title = `⚠️ ${originalTitle}`;
-            } else if (action === 'credential_revoked') {
-                document.title = `❌ ${originalTitle}`;
+            // Show verification status indicator
+            const statusIndicator = document.getElementById('verificationStatus');
+            if (statusIndicator) {
+                statusIndicator.classList.add('show');
+            }
+            
+            // Optional: Track the verification event
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'lemma_verification_complete', {
+                    event_category: 'verification',
+                    event_label: 'join_network',
+                    user_type: data.user_type || 'human'
+                });
             }
         },
         
-        onError: function(error) {
-            console.error('❌ Network verification error:', error);
-            showErrorMessage(`Verification error: ${error.message || 'Please try again'}`);
-            updateShieldStatus('error', '❌ Verification error. Please try again.');
+        onVerificationFailed: function(error) {
+            console.error('❌ Network verification failed:', error);
+            
+            // Optional: Track the failure
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'lemma_verification_failed', {
+                    event_category: 'verification',
+                    event_label: 'join_network',
+                    error_message: error.message
+                });
+            }
+        },
+        
+        onShieldShown: function() {
+            console.log('🛡️ Shield displayed - user needs verification');
+            
+            // Optional: Track shield display
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'lemma_shield_shown', {
+                    event_category: 'verification',
+                    event_label: 'join_network'
+                });
+            }
+        },
+        
+        onContentRevealed: function() {
+            console.log('🎉 Content revealed - user has valid verification');
+            
+            // Optional: Track successful access
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'lemma_content_access', {
+                    event_category: 'verification',
+                    event_label: 'join_network'
+                });
+            }
         }
     });
     
-    // Add security level controls
-    addSecurityControls(lemmaShield, securityLevel);
+    // Make widget available globally for debugging (optional)
+    window.lemmaShield = lemmaShield;
     
-    // Make shield available globally for debugging
-    window.networkShield = lemmaShield;
-    
-    console.log('✅ Enhanced Lemma Shield API initialized with security level:', securityLevel);
-    
-    // Enable the verify button once Shield API is ready
-    const verifyButton = document.getElementById('lemmaVerifyBtn');
-    if (verifyButton) {
-        verifyButton.disabled = false;
-        const buttonText = verifyButton.querySelector('span');
-        if (buttonText && buttonText.textContent === 'Starting verification...') {
-            buttonText.textContent = 'Verify Human';
-        }
-    }
+    console.log('✅ Lemma Shield Widget initialized successfully');
 });
 
-function addSecurityControls(shield, currentLevel) {
-    const controlsDiv = document.createElement('div');
-    controlsDiv.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        z-index: 10000;
-        font-family: system-ui, sans-serif;
-        font-size: 14px;
-        max-width: 280px;
-    `;
-    
-    controlsDiv.innerHTML = `
-        <div style="margin-bottom: 8px; font-weight: 600; color: #374151;">
-            🔒 Security Level Controls
-        </div>
-        <select id="security-level-select" style="
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            margin-bottom: 8px;
-        ">
-            <option value="basic" ${currentLevel === 'basic' ? 'selected' : ''}>Basic (24h session)</option>
-            <option value="standard" ${currentLevel === 'standard' ? 'selected' : ''}>Standard (8h session)</option>
-            <option value="high" ${currentLevel === 'high' ? 'selected' : ''}>High (4h session)</option>
-            <option value="maximum" ${currentLevel === 'maximum' ? 'selected' : ''}>Maximum (1h session)</option>
-        </select>
-        <button id="force-recheck-btn" style="
-            width: 100%;
-            padding: 8px;
-            background: #635bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-bottom: 4px;
-        ">
-            🔄 Force Recheck
-        </button>
-        <div id="shield-status-display" style="
-            font-size: 12px;
-            color: #6b7280;
-            text-align: center;
-            padding: 4px;
-        ">
-            Current: ${currentLevel.toUpperCase()}
-        </div>
-    `;
-    
-    document.body.appendChild(controlsDiv);
-    
-    // Add event listeners for controls
-    document.getElementById('security-level-select').addEventListener('change', async (e) => {
-        const newLevel = e.target.value;
-        console.log(`🔒 Changing security level to: ${newLevel}`);
-        
-        try {
-            await shield.setSecurityLevel(newLevel);
-            
-            // Update URL
-            const newUrl = new URL(window.location);
-            newUrl.searchParams.set('security_level', newLevel);
-            window.history.replaceState({}, '', newUrl);
-            
-            // Update status display
-            document.getElementById('shield-status-display').textContent = `Current: ${newLevel.toUpperCase()}`;
-            
-        } catch (error) {
-            console.error('Failed to change security level:', error);
-            showErrorMessage('Failed to change security level: ' + error.message);
-        }
-    });
-    
-    document.getElementById('force-recheck-btn').addEventListener('click', async () => {
-        console.log('🔄 Forcing status recheck...');
-        await shield.forceRecheck();
-    });
-}
-
-// Network-specific UI helper functions
-function updateShieldStatus(type, message) {
-    const statusDiv = document.getElementById('lemmaShieldStatus');
-    
-    if (statusDiv) {
-        statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
-    }
-}
-
-function showNetworkWelcome(data) {
-    const welcomeDiv = document.createElement('div');
-    welcomeDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #10b981;
-        color: white;
-        padding: 16px 24px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 10001;
-        font-family: system-ui, sans-serif;
-        font-weight: 600;
-        max-width: 320px;
-    `;
-    welcomeDiv.innerHTML = `
-        🎉 Welcome to the Network!
-        <br><small>Security Level: ${data.security_level?.toUpperCase() || 'STANDARD'}</small>
-        <br><small>Session expires in ${Math.round((data.session_timeout || 28800) / 3600)}h</small>
-    `;
-    document.body.appendChild(welcomeDiv);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        if (welcomeDiv.parentNode) {
-            welcomeDiv.parentNode.removeChild(welcomeDiv);
-        }
-    }, 5000);
-}
-
-function showWarningMessage(message) {
-    const warningDiv = document.createElement('div');
-    warningDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #f59e0b;
-        color: white;
-        padding: 16px 24px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 10001;
-        font-family: system-ui, sans-serif;
-        font-weight: 600;
-        max-width: 320px;
-    `;
-    warningDiv.innerHTML = `
-        ⚠️ Re-verification Required
-        <br><small>${message}</small>
-    `;
-    document.body.appendChild(warningDiv);
-    
-    setTimeout(() => {
-        if (warningDiv.parentNode) {
-            warningDiv.parentNode.removeChild(warningDiv);
-        }
-    }, 8000);
-}
-
-function showErrorMessage(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #ef4444;
-        color: white;
-        padding: 16px 24px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 10001;
-        font-family: system-ui, sans-serif;
-        font-weight: 600;
-        max-width: 320px;
-    `;
-    errorDiv.innerHTML = `
-        ❌ Verification Error
-        <br><small>${message}</small>
-    `;
-    document.body.appendChild(errorDiv);
-    
-    // Auto-remove after 8 seconds
-    setTimeout(() => {
-        if (errorDiv.parentNode) {
-            errorDiv.parentNode.removeChild(errorDiv);
-        }
-    }, 8000);
-}
-
-// Global function for the verify button (backward compatibility)
-function startLemmaVerification() {
-    console.log('🚀 Starting verification via enhanced shield API...');
-    
-    const button = document.getElementById('lemmaVerifyBtn');
-    const buttonText = button.querySelector('span');
-    
-    if (window.networkShield) {
-        // Update button state
-        button.disabled = true;
-        buttonText.textContent = 'Starting verification...';
-        
-        // Start verification
-        window.networkShield.startVerification().catch(error => {
-            // Re-enable button on error
-            button.disabled = false;
-            buttonText.textContent = 'Verify Human';
-            console.error('Verification failed:', error);
-        });
-    } else {
-        console.error('Network shield not available');
-        updateShieldStatus('error', '❌ Shield API not available. Please refresh the page.');
-    }
-}
-
-// Handle verification completion redirect
+// Handle verification completion from redirect
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('verified') === 'true') {
-    console.log('✅ Verification completed, forcing shield recheck');
-    setTimeout(() => {
-        if (window.networkShield) {
-            window.networkShield.forceRecheck();
-        }
-    }, 1000);
+    console.log('✅ Verification completed via redirect, shield will recheck automatically');
 }
 </script>
 {% endblock %} 
