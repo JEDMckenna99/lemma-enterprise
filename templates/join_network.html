@@ -442,7 +442,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const securityLevel = urlParams.get('security_level') || 'standard';
     
     // Initialize the enhanced API-driven gate
-    const lemmaGate = new LemmaGateAPI({
+    const lemmaGate = new LemmaShieldAPI({
         protectedContent: '#networkContent',
         gateContainer: '#lemmaGateOverlay',
         securityLevel: securityLevel,

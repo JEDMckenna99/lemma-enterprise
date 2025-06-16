@@ -229,8 +229,12 @@ class LemmaVerificationFlow {
       
       // Get credentials from wallet if available
       let walletCredentials = [];
-      if (window.lemmaWallet) {
-        walletCredentials = await window.lemmaWallet.getAllCredentials();
+      if (window.lemmaWallet && typeof window.lemmaWallet.getAllCredentials === 'function') {
+        try {
+          walletCredentials = await window.lemmaWallet.getAllCredentials();
+        } catch (error) {
+          console.log('[LEMMA-FLOW] Wallet not ready yet, skipping wallet sync:', error.message);
+        }
       }
       
       // Compare and sync if needed
@@ -355,10 +359,14 @@ class LemmaVerificationFlow {
       }
 
       for (const [fingerprint, credential] of indexedDBMap) {
-        if (!walletMap.has(fingerprint) && window.lemmaWallet) {
-          // Credential exists in IndexedDB but not in wallet
-          await window.lemmaWallet.storeCredential(credential);
-          console.log('[LEMMA-FLOW] Synced credential from IndexedDB to wallet:', fingerprint);
+        if (!walletMap.has(fingerprint) && window.lemmaWallet && typeof window.lemmaWallet.storeCredential === 'function') {
+          try {
+            // Credential exists in IndexedDB but not in wallet
+            await window.lemmaWallet.storeCredential(credential);
+            console.log('[LEMMA-FLOW] Synced credential from IndexedDB to wallet:', fingerprint);
+          } catch (error) {
+            console.log('[LEMMA-FLOW] Failed to sync credential to wallet:', error.message);
+          }
         }
       }
       
@@ -574,7 +582,11 @@ class LemmaVerificationFlow {
       
       // Clear from wallet if available
       if (window.lemmaWallet && typeof window.lemmaWallet.clearCredentials === 'function') {
-        await window.lemmaWallet.clearCredentials();
+        try {
+          await window.lemmaWallet.clearCredentials();
+        } catch (error) {
+          console.log('[LEMMA-FLOW] Failed to clear wallet credentials:', error.message);
+        }
       }
       
       // Clear from localStorage
