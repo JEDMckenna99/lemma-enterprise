@@ -659,12 +659,22 @@ def start_verification():
         if inline_mode:
             # For inline verification, start Stripe Identity session
             try:
-                # Import Stripe (only when needed)
-                stripe = current_app.extensions.get('stripe')
-                if not stripe:
-                    import stripe as stripe_module
-                    stripe_module.api_key = current_app.config.get('STRIPE_SECRET_KEY')
-                    stripe = stripe_module
+                # Import and configure Stripe properly
+                import stripe
+                
+                # Get Stripe secret key from environment or config
+                stripe_secret_key = (
+                    current_app.config.get('STRIPE_SECRET_KEY') or 
+                    os.environ.get('STRIPE_SECRET_KEY')
+                )
+                
+                if not stripe_secret_key:
+                    current_app.logger.error("No Stripe secret key found in config or environment")
+                    raise Exception("Stripe not configured")
+                
+                # Set the API key
+                stripe.api_key = stripe_secret_key
+                current_app.logger.info(f"Stripe API key configured: {stripe_secret_key[:7]}...")
                 
                 # Create Stripe Identity verification session
                 stripe_session = stripe.identity.VerificationSession.create(
