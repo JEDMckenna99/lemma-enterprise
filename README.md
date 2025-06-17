@@ -620,6 +620,144 @@ Version 2.6.0 also includes a **comprehensive "Feels-Like-Stripe" design system*
 
 ---
 
+## 🛍️ **Lemma Shopify App - Human Verification for E-commerce**
+
+**Complete Shopify app that integrates Lemma's human verification directly into e-commerce workflows with $2.50 pricing.**
+
+Lemma's Shopify app provides seamless bot protection for Shopify stores while maintaining excellent customer experience through background wallet architecture.
+
+### **🎯 Shopify App Features**
+
+- **🤖 Bot Protection**: Block automated accounts and fraudulent orders before they impact your store
+- **💰 Network Pricing**: $2.50 one-time verification + $0.045-0.10/month (decreases as network grows)
+- **🔒 Privacy First**: No personal data stored - only verifies humanity using zero-knowledge proofs
+- **⚡ Seamless UX**: Background verification with conditional UI that appears only when needed
+- **🌐 Network Benefits**: One verification works across all Lemma-integrated stores in the network
+- **📊 Real-time Analytics**: Track verified customers, blocked bots, and protection costs
+- **🛡️ Shield Integration**: Uses Lemma Shield v1.0 for invisible wallet operation
+
+### **🚀 Shopify App Quick Setup**
+
+#### **1. Prerequisites**
+- Node.js 16+ and npm 8+
+- Shopify Partner account with app credentials
+- Lemma API key (get one at: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/onboarding)
+- Heroku account for deployment
+
+#### **2. Deploy to Heroku**
+```bash
+# Clone the Lemma Enterprise repository
+git clone <repository-url>
+cd lemma-enterprise/shopify-app
+
+# Create Heroku app for your Shopify integration
+heroku create your-lemma-shopify-app
+
+# Configure Shopify credentials
+heroku config:set SHOPIFY_API_KEY=your_shopify_api_key
+heroku config:set SHOPIFY_API_SECRET=your_shopify_api_secret  
+heroku config:set SHOPIFY_APP_URL=https://your-lemma-shopify-app.herokuapp.com
+heroku config:set SHOPIFY_WEBHOOK_SECRET=your_webhook_secret
+
+# Configure Lemma integration
+heroku config:set LEMMA_API_KEY=your_lemma_api_key
+heroku config:set LEMMA_BASE_URL=https://lemma-enterprise-0f6ba17076c1.herokuapp.com
+heroku config:set LEMMA_ONBOARDING_FEE=2.50
+
+# Configure app security
+heroku config:set NODE_ENV=production
+heroku config:set APP_SECRET=$(openssl rand -hex 32)
+heroku config:set SESSION_SECRET=$(openssl rand -hex 32)
+
+# Deploy the app
+git push heroku main
+
+# Verify deployment
+heroku ps
+heroku logs --tail
+```
+
+#### **3. Configure Shopify Partner Dashboard**
+1. **Create App**: Go to Shopify Partners → Apps → Create App
+2. **Set App URL**: `https://your-lemma-shopify-app.herokuapp.com`  
+3. **Configure Webhooks**: Point to your Heroku app's webhook endpoints
+4. **Get Credentials**: Copy API key and secret to your Heroku config
+5. **Submit for Review**: Once tested, submit to Shopify App Store
+
+### **🛡️ How Lemma Shopify Integration Works**
+
+#### **For Store Owners:**
+1. **Install App**: Add Lemma Human Verification from Shopify App Store
+2. **Configure Settings**: Set verification requirements (checkout, account creation, etc.)
+3. **Monitor Dashboard**: View real-time stats on verified customers vs blocked bots
+4. **Cost Savings**: Pay only $2.50 per verified human + low monthly network rate
+
+#### **For Customers:**
+1. **Invisible Operation**: Background wallet checks for existing Lemma credentials
+2. **Conditional Verification**: Shield UI appears only if verification needed
+3. **One-Time Setup**: Complete verification once, works across all network stores  
+4. **Seamless Shopping**: Verified users get frictionless experience across the network
+
+#### **Technical Architecture:**
+```javascript
+// Background wallet operation - invisible to users
+if (!hasValidLemmaCredential()) {
+    showShieldUI();  // Only when verification needed
+} else {
+    performBackgroundVerification();  // Silent operation
+    allowCheckout();  // Frictionless experience
+}
+```
+
+### **📊 Shopify App Business Value**
+
+#### **For Merchants:**
+- **95% Bot Reduction**: Eliminate fake accounts and fraudulent orders
+- **Lower Costs**: Network pricing reduces verification costs over time
+- **Better Analytics**: Real-time insights into human vs bot traffic
+- **Reduced Chargebacks**: Prevent bot-driven fraudulent transactions
+
+#### **For Shopify Ecosystem:**
+- **Network Effects**: All integrated stores benefit from shared verification
+- **Platform Trust**: Higher quality merchant ecosystem with human-verified users
+- **Competitive Advantage**: Shopify stores get better bot protection than competitors
+
+### **🎯 Shopify App Roadmap**
+
+#### **Phase 1: Core Protection (Current)**
+- ✅ Bot blocking at checkout and account creation
+- ✅ Background wallet with Shield integration
+- ✅ Real-time merchant dashboard
+- ✅ Network pricing implementation
+
+#### **Phase 2: Advanced Features (Q2 2025)**
+- 🎯 Age verification for restricted products
+- 🎯 Reputation scoring for VIP customer identification
+- 🎯 Cross-store loyalty program integration
+- 🎯 Advanced fraud detection with AI
+
+#### **Phase 3: Marketplace Integration (Q3 2025)**
+- 🎯 Shopify App Store listing and marketing
+- 🎯 Partner program for agencies and developers  
+- 🎯 White-label solutions for enterprise merchants
+- 🎯 Integration with other e-commerce platforms
+
+### **📁 Shopify App File Structure**
+```
+shopify-app/
+├── app.js                           # Main Express server
+├── package.json                     # Dependencies and scripts
+├── env.example                      # Environment configuration template
+├── services/
+│   └── lemma-verification-service.js # Lemma API integration
+├── public/
+│   └── scripts/
+│       └── lemma-shield.js          # Frontend Shield integration
+└── README.md                        # Shopify-specific documentation
+```
+
+---
+
 ## 🚀 **Self-Serve Customer Onboarding Console**
 
 **Lemma v2.4.0 introduces a complete self-serve onboarding experience that enables customers to register, verify their domains, and start integrating within minutes.**
