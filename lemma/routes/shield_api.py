@@ -225,6 +225,41 @@ def verify_credentials():
                 'error': 'No data provided'
             }), 400
         
+        # Handle inline verification status check first
+        if data.get('check_inline_verification'):
+            user_id = data.get('user_id')
+            session_id = data.get('session_id')
+            
+            if user_id and session_id:
+                # Check if verification was completed via Stripe callback
+                verification_result = check_stripe_verification_completion(user_id, session_id)
+                
+                if verification_result['success']:
+                    # Store verification status in session
+                    session['lemma_verified'] = True
+                    session['lemma_verification_time'] = time.time()
+                    session['lemma_user_id'] = user_id
+                    session['verified_user'] = True
+                    session['verified_human'] = True
+                    
+                    return jsonify({
+                        'success': True,
+                        'verified': True,
+                        'shield_action': 'allow_access',
+                        'verification_status': 'verified',
+                        'data': verification_result.get('claims', {}),
+                        'message': 'Inline verification completed successfully'
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'verified': False,
+                        'shield_action': 'show_shield',
+                        'verification_status': 'pending',
+                        'error': verification_result.get('error', 'Verification incomplete'),
+                        'message': 'Inline verification not yet completed'
+                    })
+        
         # Validate input
         try:
             credentials = InputValidator.validate_dict(data.get('credentials'), 'credentials')
@@ -595,13 +630,14 @@ def generate_shield_challenge():
 @rate_limit
 def start_verification():
     """
-    Start the verification process for users without credentials
-    This redirects to the appropriate verification flow
+    Start the inline verification process for users without credentials
+    Returns Stripe Identity session for inline verification
     """
     try:
         data = request.get_json() or {}
         return_url = data.get('return_url', request.referrer or '/')
         security_level = data.get('security_level', 'standard')
+        inline_mode = data.get('inline_mode', True)  # Default to inline verification
         
         # Validate return URL for security
         if not is_safe_url(return_url):
@@ -611,24 +647,68 @@ def start_verification():
         if security_level not in SECURITY_LEVELS:
             security_level = 'standard'
         
-        # Generate verification session
+        # Generate user ID and verification session
+        user_id = f"user_{int(time.time() * 1000)}"
         verification_session_id = secrets.token_urlsafe(32)
         session['verification_session_id'] = verification_session_id
         session['verification_return_url'] = return_url
         session['verification_started'] = time.time()
         session['requested_security_level'] = security_level
+        session['inline_verification'] = inline_mode
         
-        # Return onboarding URL for new users to complete verification
-        onboarding_url = f"/onboarding/start?return_url={return_url}&security_level={security_level}&session_id={verification_session_id}"
+        if inline_mode:
+            # For inline verification, start Stripe Identity session
+            try:
+                # Import Stripe (only when needed)
+                stripe = current_app.extensions.get('stripe')
+                if not stripe:
+                    import stripe as stripe_module
+                    stripe_module.api_key = current_app.config.get('STRIPE_SECRET_KEY')
+                    stripe = stripe_module
+                
+                # Create Stripe Identity verification session
+                stripe_session = stripe.identity.VerificationSession.create(
+                    type='document',
+                    metadata={
+                        'user_id': user_id,
+                        'lemma_session': verification_session_id,
+                        'return_url': return_url,
+                        'security_level': security_level
+                    }
+                )
+                
+                # Store Stripe session info
+                session[f'stripe_session_{user_id}'] = stripe_session.id
+                session['current_verification_user_id'] = user_id
+                
+                return jsonify({
+                    'success': True,
+                    'shield_action': 'inline_verification',
+                    'verification_type': 'stripe_identity',
+                    'stripe_client_secret': stripe_session.client_secret,
+                    'user_id': user_id,
+                    'session_id': verification_session_id,
+                    'security_level': security_level,
+                    'message': 'Inline verification session created'
+                })
+                
+            except Exception as stripe_error:
+                current_app.logger.error(f"Stripe Identity session creation failed: {stripe_error}")
+                # Fallback to redirect mode if Stripe fails
+                inline_mode = False
         
-        return jsonify({
-            'success': True,
-            'shield_action': 'start_verification',
-            'verification_url': onboarding_url,
-            'session_id': verification_session_id,
-            'security_level': security_level,
-            'message': 'Verification process started'
-        })
+        if not inline_mode:
+            # Fallback to redirect mode for compatibility
+            onboarding_url = f"/onboarding/start?return_url={return_url}&security_level={security_level}&session_id={verification_session_id}"
+            
+            return jsonify({
+                'success': True,
+                'shield_action': 'redirect_verification',
+                'verification_url': onboarding_url,
+                'session_id': verification_session_id,
+                'security_level': security_level,
+                'message': 'Verification redirect created'
+            })
         
     except Exception as e:
         current_app.logger.error(f"Start verification error: {e}")
@@ -847,4 +927,97 @@ def is_safe_url(url):
         return True
         
     except Exception:
-        return False 
+        return False
+
+def check_stripe_verification_completion(user_id, session_id):
+    """
+    Check if Stripe Identity verification was completed for a given user
+    """
+    try:
+        # Check if verification was completed in session
+        if session.get('current_verification_user_id') == user_id:
+            stripe_session_id = session.get(f'stripe_session_{user_id}')
+            if stripe_session_id:
+                try:
+                    # Try to import stripe
+                    import stripe as stripe_module
+                    stripe_module.api_key = current_app.config.get('STRIPE_SECRET_KEY')
+                    
+                    if stripe_module.api_key:
+                        # Check Stripe session status
+                        stripe_session = stripe_module.identity.VerificationSession.retrieve(stripe_session_id)
+                        
+                        if stripe_session.status == 'verified':
+                            return {
+                                'success': True,
+                                'verified': True,
+                                'claims': {
+                                    'isHuman': True,
+                                    'verification_method': 'stripe_identity',
+                                    'verified_at': time.time()
+                                }
+                            }
+                        elif stripe_session.status in ['requires_input', 'processing']:
+                            return {
+                                'success': False,
+                                'error': 'Verification still in progress'
+                            }
+                        else:
+                            return {
+                                'success': False,
+                                'error': f'Verification failed with status: {stripe_session.status}'
+                            }
+                    else:
+                        # No Stripe configured, check if session marked as complete
+                        if session.get('stripe_verification_success') and session.get('verified_user_id') == user_id:
+                            return {
+                                'success': True,
+                                'verified': True,
+                                'claims': {
+                                    'isHuman': True,
+                                    'verification_method': 'manual_override',
+                                    'verified_at': time.time()
+                                }
+                            }
+                        else:
+                            return {
+                                'success': False,
+                                'error': 'Stripe not configured and no manual verification found'
+                            }
+                        
+                except ImportError:
+                    current_app.logger.warning("Stripe not available for verification check")
+                    # Fallback to session-based check
+                    if session.get('stripe_verification_success') and session.get('verified_user_id') == user_id:
+                        return {
+                            'success': True,
+                            'verified': True,
+                            'claims': {
+                                'isHuman': True,
+                                'verification_method': 'session_based',
+                                'verified_at': time.time()
+                            }
+                        }
+                    else:
+                        return {
+                            'success': False,
+                            'error': 'Stripe not available and no session verification found'
+                        }
+                except Exception as e:
+                    current_app.logger.error(f"Stripe verification check error: {e}")
+                    return {
+                        'success': False,
+                        'error': f'Verification check failed: {str(e)}'
+                    }
+        
+        return {
+            'success': False,
+            'error': 'No verification session found for user'
+        }
+        
+    except Exception as e:
+        current_app.logger.error(f"Verification completion check error: {e}")
+        return {
+            'success': False,
+            'error': f'Failed to check verification status: {str(e)}'
+        } 

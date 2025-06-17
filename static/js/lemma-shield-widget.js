@@ -139,7 +139,7 @@ class LemmaShieldWidget {
     
     async startShieldVerification() {
         try {
-            console.log('🛡️ Starting Shield verification...');
+            console.log('🛡️ Starting Shield inline verification...');
             
             // Get CSRF token first
             const csrfResponse = await fetch(`${this.options.apiBase}/api/generate-csrf`, {
@@ -148,7 +148,7 @@ class LemmaShieldWidget {
             const csrfData = await csrfResponse.json();
             const csrfToken = csrfData.csrf_token;
             
-            // Start verification through Shield API
+            // Start inline verification through Shield API
             const response = await fetch(`${this.options.apiBase}/api/shield/start-verification`, {
                 method: 'POST',
                 credentials: 'same-origin',
@@ -159,7 +159,8 @@ class LemmaShieldWidget {
                 },
                 body: JSON.stringify({
                     return_url: window.location.href,
-                    security_level: this.options.securityLevel || 'standard'
+                    security_level: this.options.securityLevel || 'standard',
+                    inline_mode: true  // Request inline verification
                 })
             });
             
@@ -169,9 +170,16 @@ class LemmaShieldWidget {
             
             const result = await response.json();
             
-            if (result.success && result.verification_url) {
-                console.log('🛡️ Redirecting to verification:', result.verification_url);
-                window.location.href = result.verification_url;
+            if (result.success) {
+                if (result.shield_action === 'inline_verification' && result.stripe_client_secret) {
+                    console.log('🛡️ Starting inline Stripe Identity verification');
+                    this.handleInlineVerification(result);
+                } else if (result.shield_action === 'redirect_verification' && result.verification_url) {
+                    console.log('🛡️ Fallback to redirect verification:', result.verification_url);
+                    window.location.href = result.verification_url;
+                } else {
+                    throw new Error('Invalid verification response');
+                }
             } else {
                 throw new Error(result.error || 'Failed to start verification');
             }
@@ -179,6 +187,138 @@ class LemmaShieldWidget {
         } catch (error) {
             console.error('❌ Failed to start Shield verification:', error);
             this.options.onError(error);
+        }
+    }
+    
+    async handleInlineVerification(verificationData) {
+        try {
+            console.log('🛡️ Handling inline verification with Stripe Identity');
+            
+            // Store verification data
+            this.state.userId = verificationData.user_id;
+            this.state.sessionId = verificationData.session_id;
+            
+            // Load Stripe Elements if not already loaded
+            if (!window.Stripe) {
+                await this.loadStripeElements();
+            }
+            
+            const stripe = window.Stripe(this.options.stripePublishableKey || 'pk_test_...');
+            
+            // Show inline verification UI
+            this.showInlineVerificationUI(verificationData);
+            
+            // Initialize Stripe Identity verification
+            const { error } = await stripe.verifyIdentity(verificationData.stripe_client_secret);
+            
+            if (error) {
+                console.error('❌ Stripe Identity verification failed:', error);
+                this.options.onError(new Error(error.message));
+            } else {
+                console.log('✅ Stripe Identity verification completed');
+                // Check verification status and complete flow
+                await this.completeInlineVerification();
+            }
+            
+        } catch (error) {
+            console.error('❌ Inline verification error:', error);
+            this.options.onError(error);
+        }
+    }
+    
+    async loadStripeElements() {
+        return new Promise((resolve, reject) => {
+            if (window.Stripe) {
+                resolve();
+                return;
+            }
+            
+            const script = document.createElement('script');
+            script.src = 'https://js.stripe.com/v3/';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+    
+    showInlineVerificationUI(verificationData) {
+        const container = this.getShieldContainer();
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="lemma-shield-overlay">
+                <div class="lemma-shield-widget lemma-card">
+                    <div class="lemma-card-header">
+                        <h2>🛡️ Verify Your Identity</h2>
+                        <p>Complete identity verification to access protected content</p>
+                    </div>
+                    <div class="lemma-card-body">
+                        <div id="stripe-identity-verification-element">
+                            <!-- Stripe Identity element will be mounted here -->
+                        </div>
+                        <div class="verification-progress">
+                            <div class="lemma-spinner"></div>
+                            <p>Processing verification...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    async completeInlineVerification() {
+        try {
+            console.log('🛡️ Completing inline verification...');
+            
+            // Wait a moment for Stripe to process
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Check if verification was successful and get credential
+            const result = await this.checkVerificationStatus();
+            
+            if (result.success && result.verified) {
+                console.log('✅ Inline verification completed successfully');
+                this.options.onVerified(result);
+                this.hideShield();
+            } else {
+                console.error('❌ Verification not completed:', result.error);
+                this.options.onError(new Error(result.error || 'Verification incomplete'));
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to complete inline verification:', error);
+            this.options.onError(error);
+        }
+    }
+    
+    async checkVerificationStatus() {
+        try {
+            const response = await fetch(`${this.options.apiBase}/api/shield/verify-credentials`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    user_id: this.state.userId,
+                    session_id: this.state.sessionId,
+                    check_inline_verification: true
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to check verification status');
+            }
+            
+            return await response.json();
+            
+        } catch (error) {
+            console.error('❌ Verification status check failed:', error);
+            return {
+                success: false,
+                error: error.message
+            };
         }
     }
 
