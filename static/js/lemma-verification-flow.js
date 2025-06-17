@@ -753,6 +753,243 @@ class LemmaVerificationFlow {
     this.initialized = false;
     console.log('[LEMMA-FLOW] Verification flow destroyed');
   }
+
+  /**
+   * Automatic end-to-end verification test after credential operations
+   * This ensures the entire verification chain is working after minting/verification
+   */
+  async performEndToEndVerificationTest(options = {}) {
+    try {
+      console.log('[LEMMA-FLOW] Starting automatic end-to-end verification test');
+      
+      // Default test configuration
+      const testConfig = {
+        user_id: options.user_id || this.userId,
+        credential: options.credential || null,
+        force_new_credential: options.force_new_credential || false,
+        test_shield_flow: options.test_shield_flow !== false, // Default true
+        test_revocation: options.test_revocation !== false, // Default true
+        test_background_verification: options.test_background_verification !== false, // Default true
+        cleanup_test_data: options.cleanup_test_data !== false, // Default true
+        timeout_ms: options.timeout_ms || 10000 // 10 second timeout
+      };
+      
+      // Set timeout for the test
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), testConfig.timeout_ms);
+      
+      try {
+        const response = await fetch('/api/end-to-end-verification-test', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          credentials: 'same-origin',
+          signal: controller.signal,
+          body: JSON.stringify(testConfig)
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`E2E test failed with status: ${response.status}`);
+        }
+        
+        const testResults = await response.json();
+        
+        // Log comprehensive test results
+        console.group('[LEMMA-FLOW] End-to-End Verification Test Results');
+        console.log('📊 Overall Success:', testResults.overall_success);
+        console.log('📈 Success Rate:', `${testResults.success_rate}%`);
+        console.log('⏱️ Total Test Time:', `${testResults.performance?.total_test_time_ms}ms`);
+        console.log('🔍 Tests:', testResults.tests);
+        
+        if (testResults.errors?.length > 0) {
+          console.error('❌ Errors:', testResults.errors);
+        }
+        
+        if (testResults.warnings?.length > 0) {
+          console.warn('⚠️ Warnings:', testResults.warnings);
+        }
+        
+        // Show step-by-step validation
+        if (testResults.chain_validation?.length > 0) {
+          console.log('🔗 Chain Validation:');
+          testResults.chain_validation.forEach(step => console.log(`  ${step}`));
+        }
+        
+        console.groupEnd();
+        
+        // Report to monitoring/analytics if available
+        await this.logVerificationEvent('e2e_verification_test', {
+          test_id: testResults.test_id,
+          overall_success: testResults.overall_success,
+          success_rate: testResults.success_rate,
+          total_time_ms: testResults.performance?.total_test_time_ms,
+          tests_passed: testResults.summary?.tests_passed,
+          total_tests: testResults.summary?.total_tests,
+          errors_count: testResults.summary?.errors_count,
+          warnings_count: testResults.summary?.warnings_count
+        });
+        
+        // Return results for caller to handle
+        return {
+          success: testResults.overall_success,
+          results: testResults,
+          recommendation: testResults.summary?.recommendation
+        };
+        
+      } catch (error) {
+        clearTimeout(timeoutId);
+        
+        if (error.name === 'AbortError') {
+          console.error('[LEMMA-FLOW] E2E verification test timed out');
+          return {
+            success: false,
+            error: 'Test timed out',
+            recommendation: 'API may be slow or unresponsive'
+          };
+        }
+        
+        throw error;
+      }
+      
+    } catch (error) {
+      console.error('[LEMMA-FLOW] E2E verification test failed:', error);
+      
+      // Log the failure
+      await this.logVerificationEvent('e2e_verification_test', {
+        status: 'failed',
+        error: error.message,
+        user_id: options.user_id
+      });
+      
+      return {
+        success: false,
+        error: error.message,
+        recommendation: 'Manual verification recommended'
+      };
+    }
+  }
+
+  /**
+   * Automatic post-credential verification
+   * Call this immediately after issuing/storing a credential
+   */
+  async verifyCredentialAfterMinting(credential, user_id) {
+    try {
+      console.log('[LEMMA-FLOW] Performing automatic verification after credential minting');
+      
+      const testResult = await this.performEndToEndVerificationTest({
+        user_id: user_id,
+        credential: credential,
+        force_new_credential: false, // Use the provided credential
+        test_shield_flow: true,
+        test_revocation: true
+      });
+      
+      if (testResult.success) {
+        console.log('✅ Post-minting verification successful - credential chain operational');
+        return {
+          verified: true,
+          credential_operational: true,
+          message: 'Credential minted and verified successfully'
+        };
+      } else {
+        console.error('❌ Post-minting verification failed:', testResult.error);
+        return {
+          verified: false,
+          credential_operational: false,
+          message: testResult.error || 'Verification chain failed after minting',
+          recommendation: testResult.recommendation
+        };
+      }
+      
+    } catch (error) {
+      console.error('[LEMMA-FLOW] Post-minting verification error:', error);
+      return {
+        verified: false,
+        credential_operational: false,
+        message: `Verification error: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * Automatic post-Shield verification
+   * Call this after Shield verification completes
+   */
+  async verifyShieldAfterCompletion(shieldResult) {
+    try {
+      console.log('[LEMMA-FLOW] Performing automatic verification after Shield completion');
+      
+      const testResult = await this.performEndToEndVerificationTest({
+        user_id: shieldResult.user_id || this.userId,
+        test_shield_flow: true,
+        test_background_verification: true,
+        test_revocation: true
+      });
+      
+      if (testResult.success) {
+        console.log('✅ Post-Shield verification successful - complete flow operational');
+        return {
+          verified: true,
+          shield_operational: true,
+          message: 'Shield verification and chain operational'
+        };
+      } else {
+        console.error('❌ Post-Shield verification failed:', testResult.error);
+        return {
+          verified: false,
+          shield_operational: false,
+          message: testResult.error || 'Shield verification chain failed',
+          recommendation: testResult.recommendation
+        };
+      }
+      
+    } catch (error) {
+      console.error('[LEMMA-FLOW] Post-Shield verification error:', error);
+      return {
+        verified: false,
+        shield_operational: false,
+        message: `Shield verification error: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * Enhanced credential storage with automatic verification
+   */
+  async storeCredentialWithVerification(credential, walletMetadata = {}) {
+    try {
+      // Store the credential first
+      const storageResult = await this.storeInIndexedDB(credential, walletMetadata);
+      
+      if (storageResult.success) {
+        // Automatically verify the stored credential works
+        const verificationResult = await this.verifyCredentialAfterMinting(
+          credential, 
+          walletMetadata.holder_id || this.userId
+        );
+        
+        return {
+          ...storageResult,
+          post_storage_verification: verificationResult,
+          fully_operational: verificationResult.credential_operational
+        };
+      } else {
+        return storageResult;
+      }
+      
+    } catch (error) {
+      console.error('[LEMMA-FLOW] Enhanced credential storage failed:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
 }
 
 // Initialize global instance

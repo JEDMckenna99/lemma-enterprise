@@ -76,78 +76,112 @@ class LemmaShieldWidget {
     
     async checkStatus() {
         try {
-            // First check if user is returning from Stripe verification
-            if (this.checkForReturnFromVerification()) {
-                return; // checkForReturnFromVerification will handle the rest
-            }
-            
-            // Check if user has credentials
-            if (this.wallet) {
-                const credentials = await this.wallet.getAllCredentials();
-                if (credentials && credentials.length > 0) {
-                    console.log('🔍 Found existing credentials, checking validity...');
-                    await this.verifyExistingCredentials(credentials);
-                    return;
+            // Use Shield API to check status
+            const response = await fetch(`${this.options.apiBase}/api/shield/status?security_level=${this.options.securityLevel}`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json'
                 }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Shield status check failed: ${response.status}`);
             }
             
-            // No credentials found, show verification widget
-            this.showVerificationWidget();
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || 'Shield status check failed');
+            }
+            
+            await this.handleShieldAction(result);
             
         } catch (error) {
-            console.error('❌ Status check failed:', error);
+            console.error('❌ Shield status check failed:', error);
             this.showVerificationWidget();
         }
     }
     
-    async verifyExistingCredentials(credentials) {
+    async handleShieldAction(result) {
+        const action = result.shield_action;
+        console.log(`🛡️ Shield action: ${action}`);
+        
+        switch (action) {
+            case 'allow_access':
+                console.log('✅ Shield verification successful - allowing access');
+                this.grantAccess();
+                this.options.onVerified(result.data);
+                break;
+                
+            case 'check_credentials':
+            case 'show_shield':
+                console.log('🔍 Shield needs verification - showing widget');
+                this.showVerificationWidget();
+                break;
+                
+            case 'require_reverification':
+                console.log('⚠️ Shield requires re-verification');
+                this.showVerificationWidget();
+                break;
+                
+            case 'credential_revoked':
+                console.log('❌ Shield detected revoked credential');
+                this.showVerificationWidget();
+                break;
+                
+            default:
+                console.warn(`Unknown shield action: ${action}`);
+                this.showVerificationWidget();
+        }
+        
+        this.options.onStepChange(action);
+    }
+    
+    async startShieldVerification() {
         try {
-            // Generate challenge
-            const challengeResponse = await fetch(`${this.options.apiBase}/api/shield/challenge`, {
-                method: 'GET',
+            console.log('🛡️ Starting Shield verification...');
+            
+            // Get CSRF token first
+            const csrfResponse = await fetch(`${this.options.apiBase}/api/generate-csrf`, {
                 credentials: 'same-origin'
             });
+            const csrfData = await csrfResponse.json();
+            const csrfToken = csrfData.csrf_token;
             
-            if (!challengeResponse.ok) {
-                throw new Error('Failed to generate challenge');
-            }
-            
-            const challengeResult = await challengeResponse.json();
-            
-            // Verify credentials with API
-            const verifyResponse = await fetch(`${this.options.apiBase}/api/shield/verify-credentials`, {
+            // Start verification through Shield API
+            const response = await fetch(`${this.options.apiBase}/api/shield/start-verification`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken
                 },
                 body: JSON.stringify({
-                    credentials: credentials,
-                    challenge: challengeResult.challenge,
-                    domain: window.location.hostname,
-                    security_level: this.options.securityLevel
+                    return_url: window.location.href,
+                    security_level: this.options.securityLevel || 'standard'
                 })
             });
             
-            if (verifyResponse.ok) {
-                const result = await verifyResponse.json();
-                if (result.success && result.shield_action === 'allow_access') {
-                    console.log('✅ Background verification successful');
-                    this.grantAccess();
-                    return;
-                }
+            if (!response.ok) {
+                throw new Error('Failed to start Shield verification');
             }
             
-            // If verification failed, show widget
-            this.showVerificationWidget();
+            const result = await response.json();
+            
+            if (result.success && result.verification_url) {
+                console.log('🛡️ Redirecting to verification:', result.verification_url);
+                window.location.href = result.verification_url;
+            } else {
+                throw new Error(result.error || 'Failed to start verification');
+            }
             
         } catch (error) {
-            console.error('❌ Background verification failed:', error);
-            this.showVerificationWidget();
+            console.error('❌ Failed to start Shield verification:', error);
+            this.options.onError(error);
         }
     }
-    
+
     showVerificationWidget() {
         console.log('🛡️ Showing verification widget');
         
@@ -194,7 +228,7 @@ class LemmaShieldWidget {
         
         // Add event listeners
         document.getElementById('start-verification').addEventListener('click', () => {
-            this.showDisclaimerStep(container);
+            this.startShieldVerification();
         });
         
         // Add styles
@@ -509,35 +543,116 @@ class LemmaShieldWidget {
         }
     }
     
-    showSuccessAndGrantAccess() {
-        const container = document.querySelector(this.options.widgetContainer);
-        if (container) {
-            container.innerHTML = `
-                <div class="lemma-shield-overlay">
-                    <div class="lemma-shield-widget lemma-card success">
-                        <div class="lemma-card-header">
-                            <div class="success-icon">✅</div>
-                            <h2>Verification Complete!</h2>
-                        </div>
-                        <div class="lemma-card-body">
-                            <p>Your identity has been verified successfully.</p>
-                            <p>Your Lemma credential has been stored securely in your browser and will work across all Lemma-protected sites.</p>
-                            <div class="lemma-card-actions">
-                                <button class="lemma-btn lemma-btn-primary" id="access-content">
-                                    Access Protected Content
-                                </button>
-                            </div>
+    async showSuccessAndGrantAccess() {
+        this.hideError();
+        
+        // Show success message with verification animation
+        this.ui.shieldContent.innerHTML = `
+            <div class="lemma-success">
+                <div class="lemma-success-icon">✅</div>
+                <h3>Verification Complete!</h3>
+                <p>You've been verified as a real human. Welcome to the Lemma Network!</p>
+                <div class="lemma-success-details">
+                    <div class="lemma-status-item">
+                        <span class="lemma-status-label">Status:</span>
+                        <span class="lemma-status-value">Verified Human</span>
+                    </div>
+                    <div class="lemma-status-item">
+                        <span class="lemma-status-label">Network:</span>
+                        <span class="lemma-status-value">Lemma Verified Network</span>
+                    </div>
+                    <div class="lemma-status-item">
+                        <span class="lemma-status-label">Access:</span>
+                        <span class="lemma-status-value">Full Platform Access</span>
+                    </div>
+                    <div id="lemma-verification-test-status" style="margin-top: 15px;">
+                        <div class="lemma-status-item">
+                            <span class="lemma-status-label">System Check:</span>
+                            <span class="lemma-status-value" id="system-check-status">🔄 Verifying...</span>
                         </div>
                     </div>
                 </div>
-            `;
+                <div class="lemma-network-benefits">
+                    <h4>Your Lemma Benefits:</h4>
+                    <ul>
+                        <li>🚀 Instant access across all Lemma-integrated sites</li>
+                        <li>🔒 Privacy-first verification with minimal data collection</li>
+                        <li>⚡ Background verification - no more CAPTCHAs</li>
+                        <li>🌐 Portable identity that works everywhere</li>
+                    </ul>
+                </div>
+            </div>
+        `;
+        
+        // Automatically run end-to-end verification test
+        this.runPostVerificationTest();
+        
+        // Grant access after showing success message
+        setTimeout(() => {
+            this.grantAccess();
+        }, 3000); // Show success for 3 seconds, then grant access
+    }
+    
+    /**
+     * Run automatic end-to-end verification test after successful Shield verification
+     */
+    async runPostVerificationTest() {
+        try {
+            const statusElement = document.getElementById('system-check-status');
+            if (!statusElement) return;
+
+            // Update status to show testing
+            statusElement.textContent = '🔄 Running system verification...';
             
-            document.getElementById('access-content').addEventListener('click', () => {
-                this.grantAccess();
+            // Get verification flow instance
+            const verificationFlow = new LemmaVerificationFlow();
+            
+            // Run the end-to-end test
+            const testResult = await verificationFlow.verifyShieldAfterCompletion({
+                user_id: this.state.userId,
+                shield_result: this.state,
+                timeout_ms: 8000 // 8 second timeout for user experience
             });
             
-            // Auto-grant access after 3 seconds
-            setTimeout(() => this.grantAccess(), 3000);
+            if (testResult.success) {
+                statusElement.innerHTML = '✅ <span style="color: #28a745;">All systems operational</span>';
+                console.log('🎉 Shield verification chain fully operational');
+                
+                // Log success metric
+                this.options.onStepChange('post_verification_test_success');
+                
+            } else {
+                statusElement.innerHTML = '⚠️ <span style="color: #ffc107;">Verification chain issue detected</span>';
+                console.warn('⚠️ Post-Shield verification found issues:', testResult.error);
+                
+                // Show recommendation if available
+                if (testResult.recommendation) {
+                    const detailsElement = document.querySelector('.lemma-success-details');
+                    if (detailsElement) {
+                        const recommendationDiv = document.createElement('div');
+                        recommendationDiv.className = 'lemma-status-item';
+                        recommendationDiv.innerHTML = `
+                            <span class="lemma-status-label">Recommendation:</span>
+                            <span class="lemma-status-value" style="color: #ffc107;">${testResult.recommendation}</span>
+                        `;
+                        detailsElement.appendChild(recommendationDiv);
+                    }
+                }
+                
+                // Log warning metric
+                this.options.onStepChange('post_verification_test_warning');
+            }
+            
+        } catch (error) {
+            console.error('Post-verification test error:', error);
+            
+            const statusElement = document.getElementById('system-check-status');
+            if (statusElement) {
+                statusElement.innerHTML = '❌ <span style="color: #dc3545;">System check failed</span>';
+            }
+            
+            // Log error metric but don't block user access
+            this.options.onStepChange('post_verification_test_error');
         }
     }
     

@@ -17,6 +17,33 @@ import os
 
 shield_api = Blueprint('shield_api', __name__)
 
+@shield_api.route('/api/shield/config', methods=['GET'])
+@rate_limit
+def shield_config():
+    """Get Shield configuration for the requested security level."""
+    try:
+        security_level = request.args.get('security_level', 'standard')
+        if security_level not in SECURITY_LEVELS:
+            security_level = 'standard'
+        
+        config = SECURITY_LEVELS[security_level]
+        
+        return jsonify({
+            'success': True,
+            'config': {
+                'security_level': security_level,
+                'settings': config,
+                'available_levels': list(SECURITY_LEVELS.keys())
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Shield config error: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to load configuration'
+        }), 500
+
 # Security Level Configurations
 SECURITY_LEVELS = {
     'basic': {
@@ -591,12 +618,13 @@ def start_verification():
         session['verification_started'] = time.time()
         session['requested_security_level'] = security_level
         
-        # Return verification URL
-        verification_url = f"/verify?session_id={verification_session_id}&redirect={return_url}&security_level={security_level}"
+        # Return onboarding URL for new users to complete verification
+        onboarding_url = f"/onboarding/start?return_url={return_url}&security_level={security_level}&session_id={verification_session_id}"
         
         return jsonify({
             'success': True,
-            'verification_url': verification_url,
+            'shield_action': 'start_verification',
+            'verification_url': onboarding_url,
             'session_id': verification_session_id,
             'security_level': security_level,
             'message': 'Verification process started'

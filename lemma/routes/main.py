@@ -77,44 +77,7 @@ def index():
     
     return render_template('index.html')
 
-@main_bp.route('/verify')
-def verify():
-    """Handle verification page - either from Shield or direct access."""
-    # Check for Shield parameters
-    session_id = request.args.get('session_id')
-    redirect_url = request.args.get('redirect')
-    security_level = request.args.get('security_level', 'standard')
-    user_id = request.args.get('user_id') or request.args.get('user')
-    
-    # If coming from Shield, validate session_id
-    if session_id:
-        stored_session_id = session.get('verification_session_id')
-        if session_id == stored_session_id:
-            # Valid Shield verification session
-            user_id = user_id or f"user_{secrets.token_hex(8)}"
-            session['verification_user_id'] = user_id
-            if redirect_url:
-                session['verification_redirect_url'] = redirect_url
-            session['requested_security_level'] = security_level
-            
-            # Render the verification template directly
-            return render_template('verify.html', 
-                                   user_id=user_id, 
-                                   redirect_url=redirect_url,
-                                   security_level=security_level,
-                                   from_shield=True)
-    
-    # Handle legacy/direct verification access
-    if not user_id:
-        user_id = f"user_{secrets.token_hex(8)}"
-    
-    # Store user ID and redirect URL in session for later use
-    session['verification_user_id'] = user_id
-    if redirect_url:
-        session['verification_redirect_url'] = redirect_url
-    
-    # Render the verification template
-    return render_template('verify.html', user_id=user_id, redirect_url=redirect_url)
+# Legacy verify route removed - verification now handled by Shield API protection on /join-network
 
 @main_bp.route('/start-verification/<user_id>', methods=['GET', 'POST'])
 def start_verification(user_id):
@@ -226,24 +189,17 @@ def verification_callback():
             session.pop('verification_return_url', None)  # Clear Shield API key
             session.pop('verification_redirect_url', None)  # Clear legacy key
             
-            if redirect_url:
-                # Redirect back to the original page with verification success
-                # Add query parameters to indicate verification completion
-                separator = '&' if '?' in redirect_url else '?'
-                return_url = f"{redirect_url}{separator}verified=true&user_id={user_id}&session_id={stripe_session_id}"
-                current_app.logger.info(f"Redirecting verified user {user_id} back to original page: {return_url}")
-                return redirect(return_url)
+            # Check for return URL from Shield API flow
+            return_url_param = request.args.get('return_url') or redirect_url
+            
+            if return_url_param and return_url_param != '/':
+                # Redirect back to the Shield-protected page
+                current_app.logger.info(f"Redirecting verified user {user_id} back to Shield-protected page: {return_url_param}")
+                return redirect(return_url_param)
             else:
-                # Redirect to home page with verification success parameters
-                # The frontend will handle credential retrieval and wallet storage via API
-                return_url = url_for('main.index', 
-                                   user_id=user_id, 
-                                   verification_success='true',
-                                   session_id=stripe_session_id,
-                                   _external=True)
-                
-                current_app.logger.info(f"Redirecting verified user {user_id} to home page for API-driven credential retrieval: {return_url}")
-                
+                # Default to join-network page (the main Shield-protected page)
+                return_url = url_for('main.join_network', _external=True)
+                current_app.logger.info(f"Redirecting verified user {user_id} to join-network page: {return_url}")
                 return redirect(return_url)
         else:
             # Handle verification failure
