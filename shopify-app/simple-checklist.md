@@ -110,7 +110,7 @@ app.post('/webhook/customer-created', (req, res) => {
 ### Week 2: Polish & Deploy  
 - [x] Basic merchant dashboard ✅ COMPLETE - 100% functional
 - [x] Simple documentation ✅ COMPLETE - Production deployment guide created
-- [x] Deploy to production ✅ READY - All endpoints tested and verified
+- [x] Deploy to production ✅ DEPLOYED - Live at https://lemma-enterprise-0f6ba17076c1.herokuapp.com/shopify/
 - [ ] Test with 1-2 real stores
 
 ### Week 3: Launch
@@ -132,6 +132,7 @@ app.post('/webhook/customer-created', (req, res) => {
 - [x] ✅ Verification widget functional - Widget loads and verifies successfully
 - [x] ✅ Basic merchant dashboard - Complete with real-time stats and controls
 - [x] ✅ Documentation complete - Production deployment guide ready
+- [x] ✅ Production deployment - Live and fully functional at Heroku
 - [ ] ✅ 2-3 beta merchants successful
 
 ## 📝 REMOVED REDUNDANCIES FROM ORIGINAL CHECKLIST
