@@ -375,13 +375,21 @@ class LemmaShieldWidget {
     
     async startVerificationSession() {
         try {
+            // Get CSRF token first
+            const csrfResponse = await fetch(`${this.options.apiBase}/api/generate-csrf`, {
+                credentials: 'same-origin'
+            });
+            const csrfData = await csrfResponse.json();
+            const csrfToken = csrfData.csrf_token;
+            
             // Start the verification session with Shield API
             const response = await fetch(`${this.options.apiBase}/api/shield/start-verification`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken
                 },
                 body: JSON.stringify({
                     return_url: window.location.href,
@@ -440,12 +448,20 @@ class LemmaShieldWidget {
     
     async checkVerificationStatus() {
         try {
+            // Get CSRF token first
+            const csrfResponse = await fetch(`${this.options.apiBase}/api/generate-csrf`, {
+                credentials: 'same-origin'
+            });
+            const csrfData = await csrfResponse.json();
+            const csrfToken = csrfData.csrf_token;
+            
             const response = await fetch(`${this.options.apiBase}/api/shield/verify-credentials`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken
                 },
                 body: JSON.stringify({
                     user_id: this.state.userId,
