@@ -198,9 +198,13 @@ def create_app(test_config=None):
     # Keep minimal admin routes for internal management
     from lemma.routes.admin import admin_bp
     app.register_blueprint(admin_bp)
+    
+    # Register Shopify app integration
+    from lemma.routes.shopify_app import shopify_bp
+    app.register_blueprint(shopify_bp)
 
     # Both Shield API v1 and legacy API available for backward compatibility
-    app.logger.info("Lemma Shield API v1.0 + Legacy API initialized - Market-ready with backward compatibility")
+    app.logger.info("Lemma Shield API v1.0 + Legacy API + Shopify App initialized - Market-ready with backward compatibility")
 
     # Clean up resources at the end of requests
     @app.teardown_appcontext
