@@ -327,6 +327,8 @@
 </div>
 
 <!-- Lemma Shield Widget - Real Integration Example -->
+<script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v={{ cache_bust }}"></script>
+<script src="{{ url_for('static', filename='js/lemma-wallet-init.js') }}?v={{ cache_bust }}"></script>
 <script src="{{ url_for('static', filename='js/lemma-shield-widget.js') }}?v={{ cache_bust }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
