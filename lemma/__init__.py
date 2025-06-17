@@ -109,7 +109,7 @@ def create_app(test_config=None):
         TRUSTED_ISSUERS=os.environ.get('LEMMA_TRUSTED_ISSUERS', '').split(',') if os.environ.get('LEMMA_TRUSTED_ISSUERS') else [],
         HARDWARE_SECURITY=os.environ.get('LEMMA_HARDWARE_SECURITY', 'false').lower() == 'true',
         # Stripe Identity verification
-        STRIPE_API_KEY=os.environ.get('STRIPE_API_KEY'),
+        STRIPE_SECRET_KEY=os.environ.get('STRIPE_SECRET_KEY') or os.environ.get('STRIPE_API_KEY'),
         STRIPE_PUBLISHABLE_KEY=os.environ.get('STRIPE_PUBLISHABLE_KEY'),
         # Enhanced security settings for OIDC4VP compliance - but relaxed for development
         SESSION_COOKIE_SECURE=not is_development,  # Only use secure cookies in production

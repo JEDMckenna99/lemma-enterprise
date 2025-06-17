@@ -342,6 +342,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Configuration options
         apiBase: window.location.origin,
         securityLevel: 'standard',
+        stripePublishableKey: '{{ config.STRIPE_PUBLISHABLE_KEY }}',
         
         // Event callbacks
         onVerified: function(data) {
