@@ -637,53 +637,6 @@ def start_verification():
             'error': 'Failed to start verification'
         }), 500
 
-@shield_api.route('/api/shield/config', methods=['GET'])
-@rate_limit
-def shield_config():
-    """
-    Get shield configuration for client-side initialization
-    """
-    try:
-        security_level = request.args.get('security_level', 'standard')
-        if security_level not in SECURITY_LEVELS:
-            security_level = 'standard'
-        
-        config = {
-            'endpoints': {
-                'status': '/api/shield/status',
-                'verify_credentials': '/api/shield/verify-credentials', 
-                'challenge': '/api/shield/challenge',
-                'start_verification': '/api/shield/start-verification',
-                'revoke_credential': '/api/shield/revoke-credential',
-                'force_reverification': '/api/shield/force-reverification',
-                'security_levels': '/api/shield/security-levels'
-            },
-            'settings': SECURITY_LEVELS[security_level],
-            'current_security_level': security_level,
-            'available_security_levels': list(SECURITY_LEVELS.keys()),
-            'features': {
-                'background_verification': True,
-                'revocation_checking': True,
-                'session_management': True,
-                'security_logging': True,
-                'configurable_security': True,
-                'credential_revocation': True,
-                'force_reverification': True
-            }
-        }
-        
-        return jsonify({
-            'success': True,
-            'config': config
-        })
-        
-    except Exception as e:
-        current_app.logger.error(f"shield config error: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Failed to get configuration'
-        }), 500
-
 
 
 # Helper functions
