@@ -104,14 +104,28 @@ def require_api_key(f: Callable) -> Callable:
     """Decorator to require API key for endpoints."""
     @wraps(f)
     def decorated(*args: Any, **kwargs: Any) -> Any:
-        # Skip API key check in testing environment if configured
-        testing_mode = current_app.config.get('TESTING', False)
-        skip_auth = current_app.config.get('SKIP_AUTH_IN_TESTS', False)
-        skip_api_key = current_app.config.get('SKIP_API_KEY_CHECK', False)
-        
-        if testing_mode and (skip_auth or skip_api_key):
-            logger.info("Skipping API key check in test environment")
-            return f(*args, **kwargs)
+        # SECURITY: Never skip API key validation in production
+        if current_app.config.get('ENV') == 'production':
+            # Force API key validation in production - no bypasses allowed
+            api_key = request.headers.get('X-API-Key')
+            expected_api_key = current_app.config.get('API_KEY')
+            
+            if not api_key:
+                logger.warning("Missing API key from IP: %s", request.remote_addr)
+                return jsonify({"error": "Missing API key", "message": "X-API-Key header is required"}), 401
+                
+            if api_key != expected_api_key:
+                logger.warning("Invalid API key attempt from IP: %s", request.remote_addr)
+                return jsonify({"error": "Invalid API key", "message": "The provided API key is not valid"}), 403
+        else:
+            # Skip API key check in testing environment if configured
+            testing_mode = current_app.config.get('TESTING', False)
+            skip_auth = current_app.config.get('SKIP_AUTH_IN_TESTS', False)
+            skip_api_key = current_app.config.get('SKIP_API_KEY_CHECK', False)
+            
+            if testing_mode and (skip_auth or skip_api_key):
+                logger.info("Skipping API key check in test environment")
+                return f(*args, **kwargs)
             
         api_key = request.headers.get('X-API-Key')
         expected_api_key = current_app.config.get('API_KEY')

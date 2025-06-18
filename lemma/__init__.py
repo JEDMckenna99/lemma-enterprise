@@ -44,7 +44,15 @@ def create_app(test_config=None):
     is_heroku = 'DYNO' in os.environ
     
     # Determine if we're in development mode
-    is_development = not is_heroku and (
+    # SECURITY: Production check - never allow debug mode in production
+    is_production = (
+        is_heroku or 
+        os.environ.get('FLASK_ENV') == 'production' or
+        os.environ.get('LEMMA_ENV') == 'production' or
+        os.environ.get('ENV') == 'production'
+    )
+    
+    is_development = not is_production and not is_heroku and (
         os.environ.get('FLASK_ENV') == 'development' or 
         os.environ.get('LEMMA_ENV') == 'development' or
         os.environ.get('FLASK_DEBUG') == '1' or
@@ -73,6 +81,15 @@ def create_app(test_config=None):
                 template_folder=template_dir,
                 static_folder=static_dir,
                 instance_relative_config=True)
+    
+    # SECURITY: Force production settings for security
+    if is_production:
+        app.debug = False
+        app.config['DEBUG'] = False
+        app.config['TESTING'] = False
+        logger.info("Production mode: Debug disabled")
+    else:
+        logger.info(f"Development mode: Debug allowed: {is_development}")
     
     # Initialize CORS
     CORS(app, resources={

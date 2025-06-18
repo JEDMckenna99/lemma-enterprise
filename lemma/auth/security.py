@@ -53,8 +53,15 @@ def authenticate_admin(username, password):
 def login_admin(username, password):
     """Authenticate and log in an admin user."""
     if authenticate_admin(username, password):
+        # SECURITY: Regenerate session ID to prevent session fixation
+        session.regenerate_id()
+        
         session['admin_logged_in'] = True
         session['admin_username'] = username
+        session['admin_login_time'] = datetime.now().isoformat()
+        session['admin_ip'] = request.remote_addr
+        session['session_token'] = secrets.token_hex(32)  # Additional session validation
+        
         # Log the admin login for security audit trail
         current_app.logger.info(f"Admin login: {username} from {request.remote_addr} at {datetime.now().isoformat()}")
         return True
@@ -62,17 +69,29 @@ def login_admin(username, password):
 
 def logout_admin():
     """Log out an admin user."""
+    # SECURITY: Clear all session data and regenerate session ID
+    admin_username = session.get('admin_username', 'unknown')
     session.clear()
+    session.regenerate_id()
+    
+    # Log the logout for security audit trail  
+    current_app.logger.info(f"Admin logout: {admin_username} from {request.remote_addr} at {datetime.now().isoformat()}")
 
 def admin_required(f):
     """Decorator to require admin authentication for a route."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Skip authentication checks in test environment if configured
-        is_testing = current_app.config.get('TESTING', False)
-        
-        if is_testing and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
-            return f(*args, **kwargs)
+        # SECURITY: Never skip authentication in production
+        if current_app.config.get('ENV') == 'production':
+            # Force authentication check in production - no bypasses allowed
+            if not session.get('admin_logged_in'):
+                return redirect(url_for('admin.login', next=request.url))
+        else:
+            # Skip authentication checks in test environment if configured
+            is_testing = current_app.config.get('TESTING', False)
+            
+            if is_testing and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
+                return f(*args, **kwargs)
             
         if not session.get('admin_logged_in'):
             return redirect(url_for('admin.login', next=request.url))
@@ -97,11 +116,22 @@ def api_key_required(f):
     """Decorator to require API key authentication for a route."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Skip authentication checks in test environment if configured
-        is_testing = current_app.config.get('TESTING', False)
-        
-        if is_testing and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
-            return f(*args, **kwargs)
+        # SECURITY: Never skip authentication in production
+        if current_app.config.get('ENV') == 'production':
+            # Force API key check in production - no bypasses allowed
+            api_key = request.headers.get('X-API-Key')
+            if not api_key:
+                return jsonify({"error": "API key required"}), 401
+            # Validate API key against configured key
+            expected_api_key = current_app.config.get('API_KEY')
+            if not expected_api_key or api_key != expected_api_key:
+                return jsonify({"error": "Invalid API key"}), 401
+        else:
+            # Skip authentication checks in test environment if configured
+            is_testing = current_app.config.get('TESTING', False)
+            
+            if is_testing and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
+                return f(*args, **kwargs)
         
         # Check for API key in headers
         api_key = request.headers.get('X-API-Key')

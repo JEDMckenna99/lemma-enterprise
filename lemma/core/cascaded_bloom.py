@@ -418,8 +418,13 @@ class OPRFClient:
             self.using_mock = False
             logger.info("Using pyristretto255 for OPRF operations")
         except ImportError:
-            logger.warning("pyristretto255 not available, using mock implementation")
-            self.using_mock = True
+            # SECURITY: Check if we're in production
+            if os.environ.get('ENV') == 'production' or os.environ.get('FLASK_ENV') == 'production':
+                logger.error("CRITICAL SECURITY: pyristretto255 not available in production!")
+                raise ImportError("Production OPRF requires pyristretto255 - install with: pip install pyristretto255")
+            else:
+                logger.warning("pyristretto255 not available, using mock implementation (DEVELOPMENT ONLY)")
+                self.using_mock = True
     
     def get_public_key(self) -> str:
         """

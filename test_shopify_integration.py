@@ -11,7 +11,7 @@ from datetime import datetime
 
 # Configuration
 BASE_URL = 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com'
-API_KEY = '63d3c76faad6b305b3630575524d7e1b829527526e29b5ea18757b42e4de771e'
+API_KEY = os.environ.get('LEMMA_API_KEY', 'test_key_for_development_only')
 
 def test_endpoint(name, url, method='GET', headers=None, expected_status=200):
     """Test an API endpoint and return results"""
