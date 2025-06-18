@@ -17,6 +17,12 @@
 
 class LemmaShieldWidget {
     constructor(options = {}) {
+        // Prevent multiple instances
+        if (LemmaShieldWidget.instance) {
+            console.warn('⚠️ LemmaShieldWidget already initialized. Returning existing instance.');
+            return LemmaShieldWidget.instance;
+        }
+        
         this.options = {
             // UI Elements
             protectedContent: options.protectedContent || '#protected-content',
@@ -47,6 +53,10 @@ class LemmaShieldWidget {
         };
         
         this.wallet = null;
+        
+        // Store instance
+        LemmaShieldWidget.instance = this;
+        
         this.init();
     }
     
@@ -1089,13 +1099,19 @@ class LemmaShieldWidget {
             </div>
         `;
         
-        // Automatically run end-to-end verification test
-        this.runPostVerificationTest();
+        // Run post-verification test and wait for result
+        const testResult = await this.runPostVerificationTest();
         
-        // Grant access after showing success message
-        setTimeout(() => {
-            this.grantAccess();
-        }, 3000); // Show success for 3 seconds, then grant access
+        // Only grant access if tests pass
+        if (testResult && testResult.success) {
+            console.log('✅ All verification tests passed - granting access');
+            setTimeout(() => {
+                this.grantAccess();
+            }, 2000); // Show success for 2 seconds, then grant access
+        } else {
+            console.warn('⚠️ Verification tests failed - keeping protection active');
+            this.showVerificationFailure(testResult);
+        }
     }
     
     /**
@@ -1104,7 +1120,7 @@ class LemmaShieldWidget {
     async runPostVerificationTest() {
         try {
             const statusElement = document.getElementById('system-check-status');
-            if (!statusElement) return;
+            if (!statusElement) return { success: false, error: 'No status element found' };
 
             // Update status to show testing
             statusElement.textContent = '🔄 Running system verification...';
@@ -1126,6 +1142,8 @@ class LemmaShieldWidget {
                 // Log success metric
                 this.options.onStepChange('post_verification_test_success');
                 
+                return { success: true, testResult };
+                
             } else {
                 statusElement.innerHTML = '⚠️ <span style="color: #ffc107;">Verification chain issue detected</span>';
                 console.warn('⚠️ Post-Shield verification found issues:', testResult.error);
@@ -1146,6 +1164,8 @@ class LemmaShieldWidget {
                 
                 // Log warning metric
                 this.options.onStepChange('post_verification_test_warning');
+                
+                return { success: false, error: testResult.error, testResult };
             }
             
         } catch (error) {
@@ -1156,11 +1176,84 @@ class LemmaShieldWidget {
                 statusElement.innerHTML = '❌ <span style="color: #dc3545;">System check failed</span>';
             }
             
-            // Log error metric but don't block user access
+            // Log error metric
             this.options.onStepChange('post_verification_test_error');
+            
+            return { success: false, error: error.message };
         }
     }
     
+    showVerificationFailure(testResult) {
+        console.log('❌ Showing verification failure - keeping protection active');
+        
+        const container = this.getShieldContainer();
+        if (!container) return;
+        
+        // Show failure message and keep protection active
+        container.innerHTML = `
+            <div class="lemma-shield-overlay">
+                <div class="lemma-shield-widget lemma-card error">
+                    <div class="lemma-card-header">
+                        <div class="error-icon">⚠️</div>
+                        <h2>Verification Issues Detected</h2>
+                        <p>Your identity was verified, but system checks found issues that need attention.</p>
+                    </div>
+                    <div class="lemma-card-body">
+                        <div class="lemma-error-details">
+                            <div class="lemma-status-item">
+                                <span class="lemma-status-label">Status:</span>
+                                <span class="lemma-status-value" style="color: #dc3545;">Protection Active</span>
+                            </div>
+                            <div class="lemma-status-item">
+                                <span class="lemma-status-label">Issue:</span>
+                                <span class="lemma-status-value">${testResult?.error || 'System verification failed'}</span>
+                            </div>
+                            ${testResult?.recommendation ? `
+                                <div class="lemma-status-item">
+                                    <span class="lemma-status-label">Recommendation:</span>
+                                    <span class="lemma-status-value" style="color: #ffc107;">${testResult.recommendation}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        <div class="lemma-card-actions">
+                            <button class="lemma-btn lemma-btn-primary" id="retry-verification-test">
+                                Retry Verification
+                            </button>
+                            <button class="lemma-btn lemma-btn-secondary" id="contact-support">
+                                Contact Support
+                            </button>
+                        </div>
+                    </div>
+                    <div class="lemma-card-footer">
+                        ${this.getBrandingFooter()}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add event listeners
+        document.getElementById('retry-verification-test')?.addEventListener('click', () => {
+            this.showSuccessAndGrantAccess(); // Retry the full verification
+        });
+        
+        document.getElementById('contact-support')?.addEventListener('click', () => {
+            window.open('mailto:support@lemma.network?subject=Verification Issues&body=I encountered verification issues. Test result: ' + JSON.stringify(testResult), '_blank');
+        });
+        
+        // Keep protection active - do NOT grant access
+        this.state.verified = false;
+        this.state.currentStep = 'verification_failed';
+        
+        // Ensure protected content remains hidden
+        const protectedEl = document.querySelector(this.options.protectedContent);
+        if (protectedEl) {
+            protectedEl.style.display = 'none';
+        }
+        
+        this.options.onStepChange('verification_failed');
+    }
+
     grantAccess() {
         console.log('✅ Granting access to protected content');
         
@@ -1244,9 +1337,17 @@ class LemmaShieldWidget {
         // Get or create the shield container
         let container = document.querySelector(this.options.widgetContainer);
         if (!container) {
+            // Remove any existing containers first
+            const existingContainers = document.querySelectorAll('[id*="lemma-shield"]');
+            existingContainers.forEach(el => el.remove());
+            
             container = document.createElement('div');
             container.id = this.options.widgetContainer.replace('#', '');
+            container.className = 'lemma-shield-container';
             document.body.appendChild(container);
+        } else {
+            // Clear existing content to prevent duplicates
+            container.innerHTML = '';
         }
         return container;
     }
@@ -1616,6 +1717,17 @@ class LemmaShieldWidget {
         `;
         
         document.head.appendChild(styles);
+    }
+    
+    // Static method to reset instance (for testing/debugging)
+    static reset() {
+        if (LemmaShieldWidget.instance) {
+            const container = document.querySelector(LemmaShieldWidget.instance.options.widgetContainer);
+            if (container) {
+                container.remove();
+            }
+            LemmaShieldWidget.instance = null;
+        }
     }
 }
 
