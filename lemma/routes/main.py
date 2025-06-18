@@ -195,7 +195,7 @@ def verification_callback():
             except Exception as credential_error:
                 current_app.logger.error(f"Failed to issue credential for user {user_id}: {credential_error}")
                 flash("Verification successful but credential issuance failed. Please contact support.", "error")
-                return redirect(url_for('main.verify', user_id=user_id))
+                return redirect(url_for('main.start_verification', user_id=user_id))
             
             # Store minimal session data for API to use
             session['stripe_verification_success'] = True
@@ -236,14 +236,14 @@ def verification_callback():
             current_app.logger.warning(f"Verification failed for session {stripe_session_id}: {error_message}")
             
             flash(f"Verification failed: {error_message}", "error")
-            return redirect(url_for('main.verify', user_id=user_id))
+            return redirect(url_for('main.start_verification', user_id=user_id))
             
     except Exception as e:
         # Handle exceptions
         current_app.logger.error(f"Error processing verification callback: {str(e)}")
         
         flash(f"Error processing verification: {str(e)}", "error")
-        return redirect(url_for('main.verify', user_id=user_id))
+        return redirect(url_for('main.start_verification', user_id=user_id))
 
 @main_bp.route('/api/verification/status/<session_id>')
 def api_verification_status(session_id):
