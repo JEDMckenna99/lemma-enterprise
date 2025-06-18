@@ -122,6 +122,16 @@ class LemmaShieldWidget {
                 this.showVerificationWidget();
                 break;
                 
+            case 'verify_did':
+                console.log('🆔 DID verification required - showing verification widget');
+                this.showVerificationWidget();
+                break;
+                
+            case 'check_revocation':
+                console.log('🔍 Revocation check required - showing verification widget');
+                this.showVerificationWidget();
+                break;
+                
             case 'require_reverification':
                 console.log('⚠️ Shield requires re-verification');
                 this.showVerificationWidget();
@@ -350,13 +360,14 @@ class LemmaShieldWidget {
                 
                 if (result && result.success && result.verified) {
                     console.log('✅ Verification status confirmed - credential issued');
-                    break;
-                } else if (result && result.error && !result.error.includes('incomplete')) {
-                    // If it's a real error (not just "incomplete"), break immediately
+                    // Success handled in checkVerificationStatus, no need to duplicate
+                    return; // Exit early to avoid showing success twice
+                } else if (result && result.error && !result.error.includes('incomplete') && !result.error.includes('processing')) {
+                    // If it's a real error (not just "incomplete" or "processing"), break immediately
                     console.error('❌ Verification failed with error:', result.error);
                     break;
                 } else {
-                    console.log(`⏳ Verification still processing... (${result ? result.error : 'no response'})`);
+                    console.log(`⏳ Verification still processing... (${result ? (result.error || result.message || 'no response') : 'no response'})`);
                 }
             }
             
@@ -394,9 +405,15 @@ class LemmaShieldWidget {
                 
                 this.showSuccessAndGrantAccess();
             } else {
-                const errorMessage = (result && result.error) ? result.error : 'Verification timed out - please try again';
-                console.error('❌ Verification not completed:', errorMessage);
-                this.options.onError(new Error(errorMessage));
+                // Check if it's just a timing issue vs real failure
+                const errorMessage = result && result.error;
+                if (errorMessage && (errorMessage.includes('incomplete') || errorMessage.includes('processing'))) {
+                    console.log('⏳ Verification still in progress after maximum attempts - may need manual refresh');
+                    this.showVerificationTimeoutMessage();
+                } else {
+                    console.error('❌ Verification failed:', errorMessage || 'Unknown error');
+                    this.options.onError(new Error(errorMessage || 'Verification failed - please try again'));
+                }
             }
             
         } catch (error) {
@@ -439,6 +456,57 @@ class LemmaShieldWidget {
                 </div>
             </div>
         `;
+    }
+    
+    showVerificationTimeoutMessage() {
+        const container = this.getShieldContainer();
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="lemma-shield-overlay">
+                <div class="lemma-shield-widget lemma-card">
+                    <div class="lemma-card-header">
+                        <h2>⏰ Verification In Progress</h2>
+                        <p>Your verification is still being processed</p>
+                    </div>
+                    <div class="lemma-card-body">
+                        <div class="verification-status">
+                            <div class="status-icon">🔄</div>
+                            <p><strong>Your Stripe Identity verification was successful!</strong></p>
+                            <p>The system is still processing your credential. This may take a few more moments.</p>
+                            
+                            <div class="action-buttons">
+                                <button class="lemma-btn primary" onclick="window.location.reload()">
+                                    🔄 Refresh Page
+                                </button>
+                                <button class="lemma-btn secondary" onclick="this.checkVerificationStatus()" id="retry-check">
+                                    🔍 Check Status Again
+                                </button>
+                            </div>
+                            
+                            <div class="help-text">
+                                <p class="small-text">
+                                    ✅ If you completed Stripe verification, your credential should be ready shortly.<br>
+                                    ⏰ Processing usually takes 30-60 seconds after verification.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="lemma-card-footer">
+                        ${this.getBrandingFooter()}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add event listener for retry button
+        const retryButton = container.querySelector('#retry-check');
+        if (retryButton) {
+            retryButton.addEventListener('click', () => {
+                this.showVerificationProcessingUI();
+                this.completeInlineVerification();
+            });
+        }
     }
     
     async checkVerificationStatus() {
@@ -772,13 +840,16 @@ class LemmaShieldWidget {
         const urlParams = new URLSearchParams(window.location.search);
         const returnUrl = sessionStorage.getItem('lemma_return_url');
         
-        // Check if we have URL parameters indicating return from verification
-        const hasReturnParams = urlParams.has('user_id') || urlParams.has('verified') || urlParams.has('verification_complete');
+        // Only proceed if we have clear indicators of successful verification return
+        const hasVerifiedParam = urlParams.get('verified') === 'true';
+        const hasVerificationComplete = urlParams.has('verification_complete');
+        const hasLemmaSession = sessionStorage.getItem('lemma_verification_state');
         
         // Check if current URL matches stored return URL
         const isReturnUrl = returnUrl && window.location.href.includes(returnUrl.split('?')[0]);
         
-        if (hasReturnParams || isReturnUrl) {
+        // Only proceed if we have strong indicators this is a verification return
+        if ((hasVerifiedParam || hasVerificationComplete) && (isReturnUrl || hasLemmaSession)) {
             console.log('🔄 User returned from Stripe verification, showing transition...');
             
             // Show return transition UI
@@ -793,10 +864,10 @@ class LemmaShieldWidget {
             // Clear the return URL to prevent repeated processing
             sessionStorage.removeItem('lemma_return_url');
             
-            // Check verification status after a short delay
+            // Wait longer for webhook processing before checking status
             setTimeout(() => {
                 this.checkPostVerificationStatus();
-            }, 2000);
+            }, 5000);
             
             return true;
         }
@@ -921,12 +992,20 @@ class LemmaShieldWidget {
                         await this.wallet.storeCredential(result.credential);
                     }
                     this.showSuccessAndGrantAccess();
-                } else if (result.status === 'processing' || result.message === 'Verification in progress') {
-                    // Still processing, try again in a few seconds
-                    setTimeout(() => this.checkVerificationStatus(), 3000);
+                    return result; // Return success to stop recursive calls
+                } else if (result.status === 'processing' || 
+                          result.message === 'Verification in progress' ||
+                          result.message === 'Inline verification not yet completed' ||
+                          result.error === 'Inline verification not yet completed') {
+                    // Still processing, don't show error - just wait
+                    console.log('⏳ Verification still processing, retrying...');
+                    // Don't set timeout here - let the caller handle retries
+                    return result; // Return processing status
                 } else {
-                    // Failed
+                    // Real failure
+                    console.error('❌ Verification failed:', result);
                     this.showError(null, result.message || 'Verification failed');
+                    return result;
                 }
             } else {
                 // Try to get credential directly if verification check failed
@@ -955,40 +1034,57 @@ class LemmaShieldWidget {
     async showSuccessAndGrantAccess() {
         this.hideError();
         
+        // Get the shield container
+        const container = this.getShieldContainer();
+        if (!container) {
+            console.warn('⚠️ No shield container found, granting access directly');
+            this.grantAccess();
+            return;
+        }
+        
         // Show success message with verification animation
-        this.ui.shieldContent.innerHTML = `
-            <div class="lemma-success">
-                <div class="lemma-success-icon">✅</div>
-                <h3>Verification Complete!</h3>
-                <p>You've been verified as a real human. Welcome to the Lemma Network!</p>
-                <div class="lemma-success-details">
-                    <div class="lemma-status-item">
-                        <span class="lemma-status-label">Status:</span>
-                        <span class="lemma-status-value">Verified Human</span>
+        container.innerHTML = `
+            <div class="lemma-shield-overlay">
+                <div class="lemma-shield-widget lemma-card">
+                    <div class="lemma-card-header">
+                        <h2>✅ Verification Complete!</h2>
+                        <p>You've been verified as a real human. Welcome to the Lemma Network!</p>
                     </div>
-                    <div class="lemma-status-item">
-                        <span class="lemma-status-label">Network:</span>
-                        <span class="lemma-status-value">Lemma Verified Network</span>
-                    </div>
-                    <div class="lemma-status-item">
-                        <span class="lemma-status-label">Access:</span>
-                        <span class="lemma-status-value">Full Platform Access</span>
-                    </div>
-                    <div id="lemma-verification-test-status" style="margin-top: 15px;">
-                        <div class="lemma-status-item">
-                            <span class="lemma-status-label">System Check:</span>
-                            <span class="lemma-status-value" id="system-check-status">🔄 Verifying...</span>
+                    <div class="lemma-card-body">
+                        <div class="lemma-success-details">
+                            <div class="lemma-status-item">
+                                <span class="lemma-status-label">Status:</span>
+                                <span class="lemma-status-value">Verified Human</span>
+                            </div>
+                            <div class="lemma-status-item">
+                                <span class="lemma-status-label">Network:</span>
+                                <span class="lemma-status-value">Lemma Verified Network</span>
+                            </div>
+                            <div class="lemma-status-item">
+                                <span class="lemma-status-label">Access:</span>
+                                <span class="lemma-status-value">Full Platform Access</span>
+                            </div>
+                            <div id="lemma-verification-test-status" style="margin-top: 15px;">
+                                <div class="lemma-status-item">
+                                    <span class="lemma-status-label">System Check:</span>
+                                    <span class="lemma-status-value" id="system-check-status">🔄 Verifying...</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="lemma-network-benefits">
+                            <h4>Your Lemma Benefits:</h4>
+                            <ul>
+                                <li>🚀 Instant access across all Lemma-integrated sites</li>
+                                <li>🔒 Privacy-first verification with minimal data collection</li>
+                                <li>⚡ Background verification - no more CAPTCHAs</li>
+                                <li>🌐 Portable identity that works everywhere</li>
+                            </ul>
                         </div>
                     </div>
-                </div>
-                <div class="lemma-network-benefits">
-                    <h4>Your Lemma Benefits:</h4>
-                    <ul>
-                        <li>🚀 Instant access across all Lemma-integrated sites</li>
-                        <li>🔒 Privacy-first verification with minimal data collection</li>
-                        <li>⚡ Background verification - no more CAPTCHAs</li>
-                        <li>🌐 Portable identity that works everywhere</li>
-                    </ul>
+                    <div class="lemma-card-footer">
+                        ${this.getBrandingFooter()}
+                    </div>
                 </div>
             </div>
         `;
