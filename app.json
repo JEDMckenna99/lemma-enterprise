@@ -1,14 +1,11 @@
 {
   "name": "Lemma Enterprise",
-  "description": "Human verification system using DID proofing and verifiable credentials",
+  "description": "Human verification system using DID proofing and verifiable credentials with integrated OPRF functionality",
   "repository": "https://github.com/yourusername/lemma-enterprise",
-  "keywords": ["python", "flask", "go", "oprf", "verifiable-credentials", "did"],
+  "keywords": ["python", "flask", "verifiable-credentials", "did", "oprf"],
   "buildpacks": [
     {
       "url": "heroku/python"
-    },
-    {
-      "url": "heroku/go"
     }
   ],
   "env": {
@@ -53,28 +50,12 @@
       "value": "web"
     },
     "OPRF_SERVICE_INTERNAL": {
-      "description": "Enable internal OPRF service (true for production)",
+      "description": "OPRF functionality integrated into main Flask app",
       "value": "true"
-    },
-    "OPRF_RATE_LIMIT": {
-      "description": "Rate limit for OPRF service (requests per minute)",
-      "value": "60"
-    },
-    "OPRF_ROTATION_DAYS": {
-      "description": "Days before OPRF key rotation",
-      "value": "30"
-    },
-    "OPRF_DEBUG": {
-      "description": "Enable debug mode for OPRF service",
-      "value": "false"
     }
   },
   "formation": {
     "web": {
-      "quantity": 1,
-      "size": "basic"
-    },
-    "oprf": {
       "quantity": 1,
       "size": "basic"
     }
