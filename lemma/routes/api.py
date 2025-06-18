@@ -2361,22 +2361,11 @@ def end_to_end_verification_test():
             # Generate challenge
             challenge = secrets.token_hex(32)
             
-            # Create presentation
-            presentation = {
-                "@context": ["https://www.w3.org/2018/credentials/v1"],
-                "type": ["VerifiablePresentation"],
-                "verifiableCredential": [credential],
-                "proof": {
-                    "type": "Ed25519Signature2020",
-                    "challenge": challenge,
-                    "created": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
-                    "verificationMethod": credential.get('issuer'),
-                    "domain": request.headers.get('Host', 'localhost')
-                }
-            }
+            # Create properly signed presentation using the credential service
+            presentation_start = time.time()
+            presentation = credential_service.create_presentation(credential, challenge)
             
             # Verify presentation
-            presentation_start = time.time()
             presentation_result = credential_service.verify_presentation(presentation, challenge)
             presentation_time = time.time() - presentation_start
             
