@@ -638,6 +638,7 @@ class LemmaShieldWidget {
                     'X-CSRFToken': csrfToken
                 },
                 body: JSON.stringify({
+                    check_inline_verification: true,
                     user_id: this.state.userId,
                     session_id: this.state.verificationSessionId
                 })
