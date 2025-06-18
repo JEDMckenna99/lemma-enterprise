@@ -371,8 +371,18 @@ def create_app(test_config=None):
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         
+        # Enhanced security headers
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Permissions-Policy'] = (
+            "camera=(), microphone=(), geolocation=(), "
+            "payment=(), usb=(), magnetometer=(), accelerometer=(), gyroscope=()"
+        )
+        
         if request.is_secure:
-            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
+        
+        # Remove server information
+        response.headers.pop('Server', None)
         
         return response
 
@@ -487,6 +497,135 @@ def create_app(test_config=None):
     def widget_test():
         """Widget security test page for CSP and injection testing."""
         return render_template('widget_test_security.html')
+
+    # RATE LIMITING & DOS PROTECTION
+    try:
+        from flask_limiter import Limiter
+        from flask_limiter.util import get_remote_address
+        
+        limiter = Limiter(
+            app,
+            key_func=get_remote_address,
+            default_limits=["1000 per hour", "100 per minute"],
+            storage_uri="memory://",
+            strategy="fixed-window"
+        )
+        
+        # Store limiter for use in routes
+        app.limiter = limiter
+        logger.info("Rate limiting enabled with Flask-Limiter")
+        
+    except ImportError:
+        logger.warning("Flask-Limiter not available - rate limiting disabled")
+        app.limiter = None
+
+    # ERROR HANDLING & INFORMATION DISCLOSURE PREVENTION
+    @app.errorhandler(400)
+    def handle_bad_request(e):
+        """Handle 400 errors without leaking sensitive information."""
+        if app.config.get('ENV') == 'production':
+            return jsonify({
+                'error': 'Bad Request',
+                'message': 'The request could not be processed.',
+                'request_id': getattr(g, 'request_id', 'unknown')
+            }), 400
+        else:
+            # Show detailed errors in development
+            return jsonify({
+                'error': 'Bad Request',
+                'message': str(e),
+                'request_id': getattr(g, 'request_id', 'unknown')
+            }), 400
+
+    @app.errorhandler(401)
+    def handle_unauthorized(e):
+        """Handle 401 errors without leaking sensitive information."""
+        return jsonify({
+            'error': 'Unauthorized',
+            'message': 'Authentication required.',
+            'request_id': getattr(g, 'request_id', 'unknown')
+        }), 401
+
+    @app.errorhandler(403)
+    def handle_forbidden(e):
+        """Handle 403 errors without leaking sensitive information."""
+        return jsonify({
+            'error': 'Forbidden',
+            'message': 'Access denied.',
+            'request_id': getattr(g, 'request_id', 'unknown')
+        }), 403
+
+    @app.errorhandler(404)
+    def handle_not_found(e):
+        """Handle 404 errors without leaking sensitive information."""
+        return jsonify({
+            'error': 'Not Found',
+            'message': 'The requested resource was not found.',
+            'request_id': getattr(g, 'request_id', 'unknown')
+        }), 404
+
+    @app.errorhandler(429)
+    def handle_rate_limit(e):
+        """Handle rate limit errors."""
+        return jsonify({
+            'error': 'Rate Limit Exceeded',
+            'message': 'Too many requests. Please try again later.',
+            'request_id': getattr(g, 'request_id', 'unknown')
+        }), 429
+
+    @app.errorhandler(500)
+    def handle_internal_error(e):
+        """Handle 500 errors without leaking sensitive information."""
+        # Log detailed error server-side only
+        logger.error(f"Internal server error: {str(e)}", extra={
+            'request_id': getattr(g, 'request_id', 'unknown'),
+            'user_agent': request.headers.get('User-Agent'),
+            'ip_address': request.remote_addr,
+            'endpoint': request.endpoint,
+            'method': request.method
+        })
+        
+        if app.config.get('ENV') == 'production':
+            return jsonify({
+                'error': 'Internal Server Error',
+                'message': 'An unexpected error occurred. Please try again later.',
+                'request_id': getattr(g, 'request_id', 'unknown')
+            }), 500
+        else:
+            # Show detailed errors in development
+            return jsonify({
+                'error': 'Internal Server Error',
+                'message': str(e),
+                'request_id': getattr(g, 'request_id', 'unknown')
+            }), 500
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(e):
+        """Handle unexpected errors without leaking sensitive information."""
+        # Log detailed error server-side only
+        logger.error(f"Unexpected error: {str(e)}", extra={
+            'request_id': getattr(g, 'request_id', 'unknown'),
+            'user_agent': request.headers.get('User-Agent'),
+            'ip_address': request.remote_addr,
+            'endpoint': request.endpoint,
+            'method': request.method,
+            'exception_type': type(e).__name__
+        })
+        
+        if app.config.get('ENV') == 'production':
+            return jsonify({
+                'error': 'Service Temporarily Unavailable',
+                'message': 'The service is temporarily unavailable. Please try again later.',
+                'request_id': getattr(g, 'request_id', 'unknown')
+            }), 503
+        else:
+            # Show detailed errors in development
+            return jsonify({
+                'error': 'Unexpected Error',
+                'message': str(e),
+                'exception_type': type(e).__name__,
+                'request_id': getattr(g, 'request_id', 'unknown')
+            }), 500
 
     return app
 

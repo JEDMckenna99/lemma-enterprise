@@ -30,6 +30,15 @@ from lemma.auth.csrf_config import csrf_protect, generate_csrf
 from lemma.utils.input_validation import InputValidator, ValidationError, validate_request_data
 from lemma.utils.stripe_service import check_verification_status, create_verification_session
 
+# Try to import Flask-Limiter for enhanced rate limiting
+try:
+    from flask import current_app
+    limiter = lambda: getattr(current_app, 'limiter', None)
+    LIMITER_AVAILABLE = True
+except ImportError:
+    limiter = lambda: None
+    LIMITER_AVAILABLE = False
+
 # Try to import enhanced crypto features
 try:
     from lemma.core.crypto_hardened import (
