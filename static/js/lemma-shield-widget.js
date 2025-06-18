@@ -208,17 +208,49 @@ class LemmaShieldWidget {
             // Show verification transition UI
             this.showVerificationTransitionUI(verificationData);
             
-            // Use redirect flow instead of inline for better UX and no CSS conflicts
-            if (verificationData.verification_url) {
-                console.log('🔄 Redirecting to Stripe Identity verification...');
+            // Handle both inline and redirect verification modes
+            if (verificationData.stripe_client_secret) {
+                console.log('🔄 Using Stripe Identity inline verification...');
+                
+                // Use the original inline approach but with better error handling
+                setTimeout(async () => {
+                    try {
+                        // Load Stripe Elements if not already loaded
+                        if (!window.Stripe) {
+                            await this.loadStripeElements();
+                        }
+                        
+                        const stripe = window.Stripe(this.options.stripePublishableKey || 'pk_test_51RJNLBDIouMeOMab56ZoLLf7qyXOfw2dWq8dDnhihzcc9hOHhw2xqyvzEUXbfZDsYyAnZNa5ADkycRpqUvDzMr3G00CgiM8efu');
+                        
+                        // Initialize Stripe Identity verification
+                        const { error } = await stripe.verifyIdentity(verificationData.stripe_client_secret);
+                        
+                        if (error) {
+                            console.error('❌ Stripe Identity verification failed:', error);
+                            this.options.onError(new Error(error.message));
+                        } else {
+                            console.log('✅ Stripe Identity verification completed');
+                            // Check verification status and complete flow
+                            await this.completeInlineVerification();
+                        }
+                    } catch (error) {
+                        console.error('❌ Stripe verification error:', error);
+                        this.options.onError(error);
+                    }
+                }, 1500);
+                
+            } else if (verificationData.verification_url) {
+                console.log('🔄 Redirecting to verification page...');
                 
                 // Set a small delay to show the transition UI
                 setTimeout(() => {
                     window.location.href = verificationData.verification_url;
                 }, 1500);
+                
             } else {
-                console.error('❌ No verification URL provided');
-                this.options.onError(new Error('No verification URL available'));
+                console.error('❌ No verification method provided');
+                console.log('Verification data received:', verificationData);
+                this.options.onError(new Error('No verification method available'));
             }
             
         } catch (error) {
