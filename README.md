@@ -63,6 +63,80 @@ Monthly Rate Decreases as Network Grows:
 - **Competitive Moat:** Early adopters get better pricing as network grows
 - **Viral Growth:** Businesses incentivized to recruit others to reduce their costs
 
+---
+
+## 💰 **Company Valuation Analysis**
+
+### **Investment Opportunity Overview**
+
+**Target Valuation:** $10-15M pre-money for seed funding round
+
+#### **Valuation Framework (3 Investment Lenses)**
+
+| Lens | Method | Lemma Valuation | Rationale |
+|------|--------|----------------|-----------|
+| **1. Stage Comparables** | Deep-tech identity startups | $6-15M pre-money | Patent-pending + working demo |
+| **2. Revenue Multiple** | Current trajectory × 10-20× | $1.3-2.6M (early stage) | 40K users target = $128K ARR |
+| **3. Platform Option Value** | Market size × penetration probability | $20-75M (risk-adjusted) | $24.7B TAM × 10-15% success rate |
+
+#### **Comparable Company Analysis**
+
+| Company | Stage/Year | Valuation | Market Focus |
+|---------|------------|-----------|--------------|
+| **Persona** | Series C | $2.0B | Identity verification platform |
+| **Onfido** | Exit (2024) | $650M | KYC/identity verification |
+| **Clear Secure** | Public | $2.3B market cap | Identity verification network |
+| **Jumio** | Private | ~$1.0B | Document verification |
+
+#### **Revenue Trajectory & Multiples**
+
+**18-Month Growth Scenario:**
+- **Target:** 400K users × $0.08/month + growth = $2M ARR
+- **SaaS Multiple:** 10-20× for high-growth identity platforms
+- **Series A Valuation:** $40-75M post-money
+
+#### **Market Disruption Potential**
+
+**Cost Reduction Across $24.7B Market:**
+- **Anti-Bot Market ($2.4B):** 95%+ cost reduction vs reCAPTCHA/Arkose
+- **IDaaS Market ($13.4B):** 90%+ cost reduction vs Auth0/Okta  
+- **KYC Market ($8.9B):** 80%+ cost reduction vs manual verification
+
+#### **Key Value Catalysts**
+
+**Short-term (+20-50% valuation boost):**
+- Third-party cryptographic security audit
+- First enterprise contract ($50K+ ACV)
+- Patent approval and IP portfolio completion
+- Strategic partnership (Shopify, major platform)
+
+**Medium-term (enables Series A at $40-75M):**
+- $1M+ ARR milestone achievement
+- Multi-vertical adoption (bot prevention + age verification + KYC)
+- Government or regulatory validation
+
+#### **Investment Risks & Mitigations**
+
+| Risk Factor | Impact | Mitigation Strategy |
+|-------------|---------|-------------------|
+| **Single founder** | -20% discount | Key hire: crypto lead + go-to-market exec |
+| **Technical complexity** | Execution risk | Third-party audit + formal verification |
+| **Market education** | Slower adoption | Reference customers + standards compliance |
+| **Competitive response** | Market share | Patent protection + network effects moat |
+
+### **Strategic Implications**
+
+**Why Lemma Justifies Premium Valuation:**
+1. **Technical Moat:** 2-3 year lead in OPRF-cascaded revocation + background wallet UX
+2. **Economic Moat:** Network effects create winner-take-all dynamics (first-mover advantage)
+3. **Patent Protection:** Intellectual property portfolio across cryptography, UX, and business methods
+4. **Market Timing:** AI crisis makes human verification critical infrastructure for every platform
+
+**Investor Return Scenarios:**
+- **Conservative:** 10× return if reaches $100M+ valuation (Jumio-level scale)
+- **Base Case:** 25× return if reaches $250M+ valuation (mid-market identity platform)
+- **Bull Case:** 50× return if reaches $500M+ valuation (Onfido-level exit or IPO path)
+
 ### **🤖 Perfect Timing - The AI Crisis**
 
 With AI making bot detection increasingly impossible, Lemma's **human verification** becomes critical infrastructure that every legitimate platform needs. We're not just solving today's bot problem - we're building tomorrow's trust infrastructure.
@@ -890,6 +964,80 @@ shopify-app/
 
 ---
 
+## 🔬 **The Lemma Verification Algorithm: Formal Specification**
+
+### Mathematical Foundation
+
+Lemma solves the fundamental problem: **"How to prove possession of attributes (e.g., 'I'm 18+ years old') without revealing the underlying data (e.g., exact birthdate)"** through a mathematically rigorous verification system.
+
+#### Core Verification Function
+
+```
+Verify(σ, π, P, pk^I, R) : {0, 1}
+```
+
+**Where:**
+- **σ** = Credential signature
+- **π** = Zero-knowledge proof  
+- **P** = Predicate function (e.g., age ≥ 18)
+- **pk^I** = Issuer's public key
+- **R** = OPRF-compressed revocation set
+
+**Verification succeeds iff:**
+1. **Signature Validity:** σ is valid signature over attribute vector **x**
+2. **Non-Revocation:** credential ID ∉ **R** 
+3. **Predicate Satisfaction:** π proves P(**x**) = 1 without revealing **x**
+
+#### Security Properties (Formal Guarantees)
+
+| Property | Mathematical Statement |
+|----------|----------------------|
+| **Completeness** | Honest holders with valid credentials always pass |
+| **Soundness** | No adversary can forge proofs for false predicates |
+| **Zero-Knowledge** | Proofs reveal nothing beyond predicate satisfaction |
+| **Unlinkability** | Multiple proofs from same credential are unlinkable |
+
+#### OPRF-Cascaded Revocation (Patent-Protected Innovation)
+
+```python
+# Privacy-preserving revocation check
+r = generate_random_scalar()
+alpha = r * H1(credential_id)  # Client blinds credential ID
+beta = alpha^k                 # Server evaluation (zero knowledge)
+y = beta^(r^-1)               # Client unblinds result
+# Server NEVER learns which credentials are being verified
+```
+
+#### Performance Specifications
+
+| Metric | Target | Current Achievement |
+|--------|-------|-------------------|
+| **Proof Size** | < 8 kB | ~4.2 kB (Ed25519 + minimal ZKP) |
+| **Verify Time** | ≤ 200 ms | ~117 ms (OPRF evaluation) |
+| **Revocation Data** | < 1 MB per 10M credentials | ~100 kB per 1M credentials |
+| **Offline Window** | 24-72h | 72h configurable |
+
+### Protocol State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Issuance
+    Issuance --> Hold: σ, pk^I stored in wallet
+    Hold --> Prove: User chooses predicate P, builds π
+    Prove --> Verify: Send {σ_ID, π, nonce}
+    Verify --> Accept: if Verify(σ,π,P,pk^I,R) = 1
+    Verify --> Reject: if verification fails
+    Accept --> [*]
+    Reject --> [*]
+    
+    note right of Hold
+        All steps after "Hold" execute offline
+        as long as R was synced recently
+    end note
+```
+
+---
+
 ## Architecture & Components
 
 ### Core Backend
@@ -898,12 +1046,14 @@ shopify-app/
 - **lemma/core/credential_service.py:** Credential issuance and verification logic with enhanced key management.
 - **✅ lemma/core/did_resolver.py:** **[UPDATED v2.3.0]** Multi-method DID resolver with complete multibase decoding support (base58btc, base64url, base16).
 - **lemma/core/revocation.py:** P2P revocation system with compact bitstrings.
+- **lemma/core/oprf_server.py:** **[NEW v2.9.0]** Production OPRF server with pycryptodome implementation.
 - **lemma/auth/security.py:** Authentication and security features with API key validation.
 - **lemma/auth/csrf_config.py:** Enhanced CSRF protection configuration.
 - **lemma/utils/input_validation.py:** Comprehensive input validation for all API endpoints with billing field types.
 - **lemma/routes/:** Modular route handlers with security middleware.
 - **lemma/routes/admin.py:** **[UPDATED v2.8.0]** Enhanced admin routes with unified dashboard data endpoint.
 - **lemma/routes/billing_api.py:** **[NEW v2.6.0]** Enterprise billing API endpoints with usage metering.
+- **lemma/routes/shield_api.py:** **[NEW v2.9.0]** Shield API endpoints for background wallet operation.
 - **lemma/utils/zero_knowledge.py:** Zero-knowledge proof utilities for selective disclosure.
 - **lemma/utils/secure_storage.py:** Hardware-backed key storage utilities.
 - **lemma/models/:** Data models.

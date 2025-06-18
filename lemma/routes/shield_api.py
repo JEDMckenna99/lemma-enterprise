@@ -250,6 +250,42 @@ def verify_credentials():
                 session['verification_time'] = current_time
                 session['user_id'] = user_id
                 
+                # CRITICAL FIX: Get the credential and include it in the response
+                credential_service = get_credential_service()
+                try:
+                    # Get the credential for this user
+                    user_credential = credential_service.get_user_credential(user_id)
+                    
+                    if user_credential:
+                        # Format credential for wallet storage
+                        wallet_credential = {
+                            "credential": user_credential,
+                            "wallet_metadata": {
+                                "added_at": user_credential.get('issuanceDate', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())),
+                                "holder_id": user_id,
+                                "status": "active",
+                                "display_name": "Lemma Human Verification",
+                                "fingerprint": user_credential.get('id', f"credential-{user_id}")
+                            }
+                        }
+                        
+                        # Include credential in response for immediate wallet storage
+                        return jsonify({
+                            'success': True,
+                            'verified': True,
+                            'shield_action': 'allow_access',
+                            'verification_status': 'verified',
+                            'credential': wallet_credential,  # Include credential for wallet storage
+                            'data': verification_result.get('claims', {}),
+                            'message': 'Inline verification completed successfully'
+                        })
+                    else:
+                        current_app.logger.warning(f"No credential found for verified user {user_id}")
+                        
+                except Exception as e:
+                    current_app.logger.error(f"Error retrieving credential for user {user_id}: {e}")
+                
+                # Fallback response without credential (should not happen if verification succeeded)
                 return jsonify({
                     'success': True,
                     'verified': True,

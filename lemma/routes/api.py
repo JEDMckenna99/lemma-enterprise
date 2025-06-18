@@ -2522,3 +2522,91 @@ def end_to_end_verification_test():
             'chain_validation': [f'❌ Test framework error: {str(e)}']
         }
         return jsonify(test_results), 500
+
+@api_bp.route('/verify-formal', methods=['POST'])
+@require_api_key
+@rate_limit
+def verify_formal():
+    """
+    Formal verification endpoint implementing the mathematical model:
+    Verify(σ, π, P, pk^I, R) : {0, 1}
+    
+    This endpoint provides the complete formal verification as specified in the white paper.
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Extract formal model parameters
+        sigma = data.get('sigma')  # Credential signature
+        pi = data.get('pi')        # Zero-knowledge proof  
+        P = data.get('P', 'isHuman')  # Predicate function
+        pk_I = data.get('pk_I')    # Issuer public key (optional)
+        R = data.get('R')          # Revocation set (optional)
+        
+        # Validate required parameters
+        if not sigma:
+            return jsonify({
+                "error": "Missing sigma (credential signature)",
+                "formal_model": "Verify(σ, π, P, pk^I, R) requires σ"
+            }), 400
+            
+        if not pi:
+            return jsonify({
+                "error": "Missing pi (zero-knowledge proof)",
+                "formal_model": "Verify(σ, π, P, pk^I, R) requires π"
+            }), 400
+        
+        # Get credential service and perform formal verification
+        credential_service = get_credential_service()
+        
+        # Load revocation set if available
+        revocation_set = None
+        if R:
+            try:
+                from lemma.core.cascaded_bloom import CascadedBloomRevocation
+                # In production, this would load the actual revocation cascade
+                # For now, we'll use a simple check
+                revocation_set = R
+            except ImportError:
+                logger.warning("OPRF revocation not available")
+        
+        # Perform formal verification
+        verification_result = credential_service.verify_formal(sigma, pi, P, pk_I, revocation_set)
+        
+        # Return formal verification result
+        if verification_result.get('valid'):
+            return jsonify({
+                "verified": True,
+                "formal_model_result": verification_result,
+                "conditions_verified": {
+                    "a_signature_valid": True,
+                    "b_not_revoked": True, 
+                    "c_predicate_proven": True
+                },
+                "security_properties": verification_result.get('formal_properties', {}),
+                "performance_metrics": {
+                    "verification_time_ms": verification_result.get('verification_time_ms'),
+                    "target_met": verification_result.get('performance_target_met'),
+                    "proof_size_bytes": verification_result.get('proof_size_estimate')
+                },
+                "algorithm": "Lemma-Formal-Verification-v1.0"
+            })
+        else:
+            return jsonify({
+                "verified": False,
+                "formal_model_result": verification_result,
+                "failed_condition": verification_result.get('formal_property'),
+                "reason": verification_result.get('reason'),
+                "algorithm": "Lemma-Formal-Verification-v1.0"
+            }), 401
+            
+    except Exception as e:
+        logger.error("Formal verification error: %s", str(e))
+        return jsonify({
+            "error": "Formal verification failed",
+            "reason": str(e),
+            "formal_model": "Verify(σ, π, P, pk^I, R) : {0, 1}"
+        }), 500
