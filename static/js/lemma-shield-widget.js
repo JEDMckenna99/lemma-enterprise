@@ -1105,8 +1105,10 @@ class LemmaShieldWidget {
         // Debug logging to understand the test result structure
         console.log('🔍 Post-verification test result:', testResult);
         
-        // Only grant access if tests pass
-        if (testResult && testResult.success === true) {
+        // Only grant access if tests pass (check both success and verified properties)
+        const isSuccessful = testResult && (testResult.success === true || testResult.verified === true);
+        
+        if (isSuccessful) {
             console.log('✅ All verification tests passed - granting access');
             setTimeout(() => {
                 this.grantAccess();
@@ -1116,7 +1118,10 @@ class LemmaShieldWidget {
             console.warn('⚠️ Test result details:', {
                 hasResult: !!testResult,
                 success: testResult?.success,
+                verified: testResult?.verified,
+                isSuccessful: isSuccessful,
                 error: testResult?.error,
+                message: testResult?.message,
                 fullResult: testResult
             });
             this.showVerificationFailure(testResult);
@@ -1146,9 +1151,12 @@ class LemmaShieldWidget {
             
             // Debug logging
             console.log('🔍 Raw verification flow result:', testResult);
-            console.log('🔍 Success check:', testResult && testResult.success);
+            console.log('🔍 Success check:', testResult && (testResult.success || testResult.verified));
             
-            if (testResult && testResult.success === true) {
+            // Check for success using either 'success' or 'verified' property
+            const isSuccessful = testResult && (testResult.success === true || testResult.verified === true);
+            
+            if (isSuccessful) {
                 statusElement.innerHTML = '✅ <span style="color: #28a745;">All systems operational</span>';
                 console.log('🎉 Shield verification chain fully operational');
                 
@@ -1158,7 +1166,8 @@ class LemmaShieldWidget {
                 return { success: true, testResult };
                 
             } else {
-                const errorMessage = testResult?.error || testResult?.message || 'Unknown verification error';
+                // Don't treat success messages as errors
+                const errorMessage = testResult?.error || (testResult?.message && !testResult?.verified ? testResult.message : 'Unknown verification error');
                 statusElement.innerHTML = '⚠️ <span style="color: #ffc107;">Verification chain issue detected</span>';
                 console.warn('⚠️ Post-Shield verification found issues:', errorMessage);
                 
