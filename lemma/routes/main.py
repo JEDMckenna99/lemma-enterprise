@@ -948,7 +948,9 @@ def join_network():
     
     # This page uses the same Lemma gate approach as the protected page
     # All verification is handled client-side using the LemmaReferenceIntegration
-    response = make_response(render_template('join_network.html', cache_bust=cache_bust))
+    response = make_response(render_template('join_network.html', 
+                                           cache_bust=cache_bust,
+                                           config=current_app.config))
     
     # Set cookie to enable the wallet if not already set
     if not request.cookies.get('lemma_wallet_enabled'):
@@ -975,7 +977,7 @@ def shield_protected():
     current_app.logger.info("Shield protected page accessed")
     
     # This page is protected by the real Shield API
-    response = make_response(render_template('shield_protected.html'))
+    response = make_response(render_template('shield_protected.html', config=current_app.config))
     
     # Set cookie to enable the wallet if not already set
     if not request.cookies.get('lemma_wallet_enabled'):
