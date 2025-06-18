@@ -1585,58 +1585,146 @@ def list_cascades():
 def get_oprf_pubkey():
     """
     Get the OPRF service's public key.
-    This is a mock endpoint for testing Flow 3 without a real OPRF service.
+    Production endpoint that provides real cryptographic public key information.
     """
-    # Return a mock public key response
-    return jsonify({
-        "publicKey": "mock_public_key_for_testing_in_production",
-        "epoch": datetime.now().strftime("%Y-%m-%d"),
-        "algorithm": "ristretto255",
-        "key_id": "mock_key_1"
-    }), 200
+    try:
+        from lemma.core.oprf_server import get_oprf_server
+        
+        oprf_server = get_oprf_server()
+        
+        # Get the requested key ID (optional)
+        key_id = request.args.get('key_id')
+        
+        public_key_info = oprf_server.get_public_key(key_id)
+        
+        return jsonify(public_key_info), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting OPRF public key: {e}")
+        return jsonify({
+            "error": f"Failed to get OPRF public key: {str(e)}"
+        }), 500
 
 @api_bp.route('/oprfeval', methods=['POST'])
 def evaluate_oprf():
     """
     Evaluate blinded inputs using the OPRF service.
-    This is a mock endpoint for testing Flow 3 without a real OPRF service.
+    Production endpoint that provides real cryptographic OPRF evaluation.
     """
-    # Parse the request
-    data = request.get_json()
-    
-    if not data or 'alpha' not in data:
-        return jsonify({"error": "Invalid request format"}), 400
-    
-    alpha_values = data['alpha']
-    
-    if not isinstance(alpha_values, list):
-        return jsonify({"error": "Alpha must be a list"}), 400
-    
-    if len(alpha_values) > 100:
-        return jsonify({"error": "Too many elements (max 100)"}), 400
-    
-    # Process each alpha value
-    beta_values = []
-    for alpha_str in alpha_values:
-        try:
-            # Decode base64 string to bytes
-            alpha_bytes = base64.b64decode(alpha_str)
+    try:
+        from lemma.core.oprf_server import get_oprf_server
+        
+        # Parse the request
+        data = request.get_json()
+        
+        if not data or 'alpha' not in data:
+            return jsonify({"error": "Invalid request format"}), 400
+        
+        alpha_values = data['alpha']
+        
+        if not isinstance(alpha_values, list):
+            return jsonify({"error": "Alpha must be a list"}), 400
+        
+        if len(alpha_values) > 100:
+            return jsonify({"error": "Too many elements (max 100)"}), 400
             
-            # Mock OPRF evaluation with a hash
-            beta_bytes = hashlib.sha256(alpha_bytes).digest()
-            
-            # Encode result to base64
-            beta_values.append(base64.b64encode(beta_bytes).decode('utf-8'))
-        except Exception as e:
-            return jsonify({"error": f"Error processing element: {str(e)}"}), 400
-    
-    # Return the results
-    return jsonify({
-        "beta": beta_values,
-        "epoch": datetime.now().strftime("%Y-%m-%d"),
-        "publicKey": "mock_public_key_for_testing_in_production",
-        "keyID": "mock_key_1"
-    }), 200
+        # Get the OPRF server
+        oprf_server = get_oprf_server()
+        
+        # Get the requested key ID (optional)
+        key_id = data.get('key_id')
+        
+        # Evaluate the OPRF function
+        result = oprf_server.evaluate(alpha_values, key_id)
+        
+        return jsonify(result), 200
+        
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Error evaluating OPRF: {e}")
+        return jsonify({
+            "error": f"OPRF evaluation failed: {str(e)}"
+        }), 500
+
+# ============================================================================
+# OPRF SERVER MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@api_bp.route('/oprf/status', methods=['GET'])
+@require_api_key
+@rate_limit
+def oprf_status():
+    """Get OPRF server status information."""
+    try:
+        from lemma.core.oprf_server import get_oprf_server
+        
+        oprf_server = get_oprf_server()
+        status = oprf_server.get_status()
+        
+        return jsonify({
+            'success': True,
+            'oprf': status,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting OPRF status: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error getting OPRF status: {str(e)}"
+        }), 500
+
+@api_bp.route('/oprf/keys', methods=['GET'])
+@require_api_key
+@admin_required
+@rate_limit
+def list_oprf_keys():
+    """List all OPRF keys."""
+    try:
+        from lemma.core.oprf_server import get_oprf_server
+        
+        oprf_server = get_oprf_server()
+        keys = oprf_server.list_keys()
+        
+        return jsonify({
+            'success': True,
+            'keys': keys,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing OPRF keys: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error listing OPRF keys: {str(e)}"
+        }), 500
+
+@api_bp.route('/oprf/rotate-key', methods=['POST'])
+@require_api_key
+@admin_required
+@rate_limit
+def rotate_oprf_key():
+    """Rotate OPRF key."""
+    try:
+        from lemma.core.oprf_server import get_oprf_server
+        
+        oprf_server = get_oprf_server()
+        new_key_id = oprf_server.rotate_key()
+        
+        return jsonify({
+            'success': True,
+            'message': 'OPRF key rotated successfully',
+            'new_key_id': new_key_id,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error rotating OPRF key: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"Error rotating OPRF key: {str(e)}"
+        }), 500
 
 # ============================================================================
 # AUTOMATION MANAGEMENT ENDPOINTS
