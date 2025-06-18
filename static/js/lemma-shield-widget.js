@@ -56,6 +56,9 @@ class LemmaShieldWidget {
         // Wait for wallet to be available
         await this.waitForWallet();
         
+        // Check if we're returning from Stripe verification
+        await this.checkForReturnFromVerification();
+        
         // Check initial status
         await this.checkStatus();
     }
@@ -192,36 +195,34 @@ class LemmaShieldWidget {
     
     async handleInlineVerification(verificationData) {
         try {
-            console.log('🛡️ Handling inline verification with Stripe Identity');
+            console.log('🛡️ Handling verification with Stripe Identity');
             
             // Store verification data
             this.state.userId = verificationData.user_id;
-            this.state.sessionId = verificationData.session_id;
+            this.state.verificationSessionId = verificationData.session_id;
             
-            // Load Stripe Elements if not already loaded
-            if (!window.Stripe) {
-                await this.loadStripeElements();
-            }
+            // Store current page URL for return after verification
+            const currentUrl = window.location.href;
+            sessionStorage.setItem('lemma_return_url', currentUrl);
             
-            const stripe = window.Stripe(this.options.stripePublishableKey || 'pk_test_...');
+            // Show verification transition UI
+            this.showVerificationTransitionUI(verificationData);
             
-            // Show inline verification UI
-            this.showInlineVerificationUI(verificationData);
-            
-            // Initialize Stripe Identity verification
-            const { error } = await stripe.verifyIdentity(verificationData.stripe_client_secret);
-            
-            if (error) {
-                console.error('❌ Stripe Identity verification failed:', error);
-                this.options.onError(new Error(error.message));
+            // Use redirect flow instead of inline for better UX and no CSS conflicts
+            if (verificationData.verification_url) {
+                console.log('🔄 Redirecting to Stripe Identity verification...');
+                
+                // Set a small delay to show the transition UI
+                setTimeout(() => {
+                    window.location.href = verificationData.verification_url;
+                }, 1500);
             } else {
-                console.log('✅ Stripe Identity verification completed');
-                // Check verification status and complete flow
-                await this.completeInlineVerification();
+                console.error('❌ No verification URL provided');
+                this.options.onError(new Error('No verification URL available'));
             }
             
         } catch (error) {
-            console.error('❌ Inline verification error:', error);
+            console.error('❌ Verification redirect error:', error);
             this.options.onError(error);
         }
     }
@@ -241,7 +242,7 @@ class LemmaShieldWidget {
         });
     }
     
-    showInlineVerificationUI(verificationData) {
+    showVerificationTransitionUI(verificationData) {
         const container = this.getShieldContainer();
         if (!container) return;
         
@@ -249,21 +250,48 @@ class LemmaShieldWidget {
             <div class="lemma-shield-overlay">
                 <div class="lemma-shield-widget lemma-card">
                     <div class="lemma-card-header">
-                        <h2>🛡️ Verify Your Identity</h2>
-                        <p>Complete identity verification to access protected content</p>
+                        <h2>🛡️ Redirecting to Identity Verification</h2>
+                        <p>You're being redirected to Stripe Identity for secure verification</p>
                     </div>
                     <div class="lemma-card-body">
-                        <div id="stripe-identity-verification-element">
-                            <!-- Stripe Identity element will be mounted here -->
-                        </div>
                         <div class="verification-progress">
                             <div class="lemma-spinner"></div>
-                            <p>Processing verification...</p>
+                            <p>Preparing secure verification...</p>
+                            <div class="verification-steps">
+                                <div class="step active">
+                                    <div class="step-icon">✓</div>
+                                    <div class="step-text">Initializing verification</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-icon">🔄</div>
+                                    <div class="step-text">Redirecting to Stripe</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-icon">📋</div>
+                                    <div class="step-text">Complete identity verification</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-icon">🏠</div>
+                                    <div class="step-text">Return to protected content</div>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+                    <div class="lemma-card-footer">
+                        <p class="small-text">🔒 Your data is processed securely by Stripe and not stored by Lemma</p>
                     </div>
                 </div>
             </div>
         `;
+        
+        // Animate the progress steps
+        setTimeout(() => {
+            const steps = container.querySelectorAll('.step');
+            if (steps[1]) {
+                steps[1].classList.add('active');
+                steps[1].querySelector('.step-icon').textContent = '✓';
+            }
+        }, 800);
     }
     
     async completeInlineVerification() {
@@ -645,22 +673,124 @@ class LemmaShieldWidget {
     }
     
     // Check if user is returning from Stripe verification
-    checkForReturnFromVerification() {
+    async checkForReturnFromVerification() {
         const urlParams = new URLSearchParams(window.location.search);
-        const verificationState = sessionStorage.getItem('lemma_verification_state');
+        const returnUrl = sessionStorage.getItem('lemma_return_url');
         
-        if (verificationState && (urlParams.get('verified') === 'true' || urlParams.get('return_url'))) {
-            console.log('🔄 User returned from Stripe verification, checking status...');
-            const state = JSON.parse(verificationState);
-            this.state.userId = state.userId;
-            this.state.verificationSessionId = state.sessionId;
+        // Check if we have URL parameters indicating return from verification
+        const hasReturnParams = urlParams.has('user_id') || urlParams.has('verified') || urlParams.has('verification_complete');
+        
+        // Check if current URL matches stored return URL
+        const isReturnUrl = returnUrl && window.location.href.includes(returnUrl.split('?')[0]);
+        
+        if (hasReturnParams || isReturnUrl) {
+            console.log('🔄 User returned from Stripe verification, showing transition...');
             
-            // Check verification status
-            this.checkVerificationStatus();
+            // Show return transition UI
+            this.showReturnTransitionUI();
+            
+            // Extract user ID from URL or session
+            const userId = urlParams.get('user_id') || this.state.userId;
+            if (userId) {
+                this.state.userId = userId;
+            }
+            
+            // Clear the return URL to prevent repeated processing
+            sessionStorage.removeItem('lemma_return_url');
+            
+            // Check verification status after a short delay
+            setTimeout(() => {
+                this.checkPostVerificationStatus();
+            }, 2000);
+            
             return true;
         }
         
         return false;
+    }
+    
+    showReturnTransitionUI() {
+        const container = this.getShieldContainer();
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="lemma-shield-overlay">
+                <div class="lemma-shield-widget lemma-card">
+                    <div class="lemma-card-header">
+                        <h2>🏠 Welcome Back!</h2>
+                        <p>Processing your verification results...</p>
+                    </div>
+                    <div class="lemma-card-body">
+                        <div class="verification-progress">
+                            <div class="lemma-spinner"></div>
+                            <p>Checking verification status...</p>
+                            <div class="verification-steps">
+                                <div class="step active">
+                                    <div class="step-icon">✓</div>
+                                    <div class="step-text">Verification completed</div>
+                                </div>
+                                <div class="step active">
+                                    <div class="step-icon">✓</div>
+                                    <div class="step-text">Returned to protected content</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-icon">🔄</div>
+                                    <div class="step-text">Processing results</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-icon">🛡️</div>
+                                    <div class="step-text">Granting access</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="lemma-card-footer">
+                        <p class="small-text">✅ Your identity has been verified successfully</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Animate the progress steps
+        setTimeout(() => {
+            const steps = container.querySelectorAll('.step');
+            if (steps[2]) {
+                steps[2].classList.add('active');
+                steps[2].querySelector('.step-icon').textContent = '✓';
+            }
+        }, 1000);
+    }
+    
+    async checkPostVerificationStatus() {
+        try {
+            console.log('🔍 Checking post-verification status...');
+            
+            // Check if verification was successful and get credential
+            const result = await this.checkVerificationStatus();
+            
+            if (result && result.success && result.verified) {
+                console.log('✅ Post-verification check successful');
+                
+                // Animate final step
+                const steps = document.querySelectorAll('.step');
+                if (steps[3]) {
+                    steps[3].classList.add('active');
+                    steps[3].querySelector('.step-icon').textContent = '✅';
+                }
+                
+                // Show success and grant access
+                setTimeout(() => {
+                    this.showSuccessAndGrantAccess();
+                }, 1000);
+            } else {
+                console.error('❌ Post-verification check failed:', result);
+                this.showError(null, 'Failed to complete verification process');
+            }
+            
+        } catch (error) {
+            console.error('❌ Post-verification status check failed:', error);
+            this.showError(null, 'Failed to process verification results');
+        }
     }
     
     async checkVerificationStatus() {
@@ -1045,21 +1175,50 @@ class LemmaShieldWidget {
             }
             
             .verification-steps {
-                display: flex;
-                justify-content: space-between;
                 margin: 1.5rem 0;
-                position: relative;
+                text-align: left;
             }
             
-            .verification-steps::before {
-                content: '';
-                position: absolute;
-                top: 16px;
-                left: 20px;
-                right: 20px;
-                height: 2px;
-                background: #E5E7EB;
-                z-index: 1;
+            .verification-steps .step {
+                display: flex;
+                align-items: center;
+                margin: 8px 0;
+                opacity: 0.5;
+                transition: all 0.3s ease;
+            }
+            
+            .verification-steps .step.active {
+                opacity: 1;
+            }
+            
+            .step-icon {
+                width: 24px;
+                height: 24px;
+                background: #f8f9fa;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 12px;
+                font-size: 12px;
+                border: 2px solid #e9ecef;
+                transition: all 0.3s ease;
+            }
+            
+            .step.active .step-icon {
+                background: #635bff;
+                color: white;
+                border-color: #635bff;
+            }
+            
+            .step-text {
+                font-size: 14px;
+                color: #6c757d;
+            }
+            
+            .step.active .step-text {
+                color: #212529;
+                font-weight: 500;
             }
             
             .step {
