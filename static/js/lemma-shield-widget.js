@@ -278,6 +278,36 @@ class LemmaShieldWidget {
             
             if (result.success && result.verified) {
                 console.log('✅ Inline verification completed successfully');
+                
+                // CRITICAL FIX: Retrieve and store the credential after successful verification
+                try {
+                    console.log('🔑 Retrieving credential for wallet storage...');
+                    const credentialResponse = await fetch(`${this.options.apiBase}/api/shield/get-credential`, {
+                        method: 'GET',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    
+                    if (credentialResponse.ok) {
+                        const credentialResult = await credentialResponse.json();
+                        if (credentialResult.success && credentialResult.credential && this.wallet) {
+                            console.log('💾 Storing credential in wallet...');
+                            await this.wallet.storeCredential(credentialResult.credential);
+                            console.log('✅ Credential stored successfully in wallet');
+                        } else {
+                            console.warn('⚠️ No credential available for wallet storage:', credentialResult.message);
+                        }
+                    } else {
+                        console.warn('⚠️ Failed to retrieve credential for wallet storage');
+                    }
+                } catch (credentialError) {
+                    console.error('❌ Failed to retrieve/store credential:', credentialError);
+                    // Don't fail the entire verification process for credential storage issues
+                }
+                
                 this.options.onVerified(result);
                 this.hideShield();
             } else {

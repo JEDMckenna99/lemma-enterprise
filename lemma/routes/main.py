@@ -170,18 +170,47 @@ def verification_callback():
         if verification_status.get("verified", False):
             current_app.logger.info(f"User {user_id} verified successfully through Stripe Identity")
             
+            # CRITICAL FIX: Issue the credential after successful verification
+            try:
+                new_credential = credential_service.issue_credential(user_id)
+                current_app.logger.info(f"Issued new credential for verified user {user_id}: {new_credential.get('id')}")
+                
+                # Format credential for wallet storage
+                wallet_credential = {
+                    "credential": new_credential,
+                    "wallet_metadata": {
+                        "added_at": new_credential.get('issuanceDate', datetime.now().isoformat()),
+                        "holder_id": user_id,
+                        "status": "active",
+                        "display_name": "Lemma Human Verification",
+                        "fingerprint": new_credential.get('id', f"credential-{user_id}")
+                    }
+                }
+                
+                # Store credential in session for wallet to pick up
+                session['store_credential'] = wallet_credential
+                session['verified_credential'] = new_credential
+                session['verified_credential_id'] = new_credential.get('id')
+                
+            except Exception as credential_error:
+                current_app.logger.error(f"Failed to issue credential for user {user_id}: {credential_error}")
+                flash("Verification successful but credential issuance failed. Please contact support.", "error")
+                return redirect(url_for('main.verify', user_id=user_id))
+            
             # Store minimal session data for API to use
             session['stripe_verification_success'] = True
             session['stripe_session_id'] = stripe_session_id
             session['verified_user_id'] = user_id
             session['verification_timestamp'] = datetime.now().isoformat()
+            session['verified_user'] = True
+            session['verified_human'] = True
             
             # Clear old session data
             session.pop('stripe_verification_session', None)
             session.pop(f'stripe_session_{user_id}', None)
             
             # Set success message
-            flash("Identity verified successfully! Your Lemma credential is being prepared.", "success")
+            flash("Identity verified successfully! Your Lemma credential has been issued and is ready for use.", "success")
             
             # Check if there's a redirect URL from the original request
             # Check both Shield API and legacy session keys

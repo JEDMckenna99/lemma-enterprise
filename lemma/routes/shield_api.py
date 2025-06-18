@@ -727,7 +727,63 @@ def start_verification():
             'error': 'Failed to start verification'
         }), 500
 
-
+@shield_api.route('/api/shield/get-credential', methods=['GET'])
+@rate_limit
+def get_stored_credential():
+    """
+    Get the credential that was stored in session after successful verification
+    Used by Shield Widget to retrieve credential for wallet storage
+    """
+    try:
+        # Check if there's a credential stored in session
+        stored_credential = session.get('store_credential')
+        if stored_credential:
+            # Clear the credential from session after retrieving
+            session.pop('store_credential', None)
+            
+            return jsonify({
+                'success': True,
+                'credential': stored_credential,
+                'message': 'Credential retrieved successfully'
+            })
+        else:
+            # No credential in session, check if user has an existing one
+            user_id = session.get('verified_user_id') or session.get('user_id')
+            if user_id:
+                credential_service = get_credential_service()
+                existing_credential = credential_service.get_user_credential(user_id)
+                
+                if existing_credential:
+                    # Format existing credential for wallet storage
+                    wallet_credential = {
+                        "credential": existing_credential,
+                        "wallet_metadata": {
+                            "added_at": existing_credential.get('issuanceDate', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())),
+                            "holder_id": user_id,
+                            "status": "active",
+                            "display_name": "Lemma Human Verification",
+                            "fingerprint": existing_credential.get('id', f"credential-{user_id}")
+                        }
+                    }
+                    
+                    return jsonify({
+                        'success': True,
+                        'credential': wallet_credential,
+                        'message': 'Existing credential retrieved successfully'
+                    })
+            
+            return jsonify({
+                'success': False,
+                'error': 'No credential available',
+                'message': 'No credential found in session or for user'
+            }), 404
+            
+    except Exception as e:
+        current_app.logger.error(f"Get stored credential error: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to retrieve credential'
+        }), 500
 
 # Helper functions
 
@@ -950,14 +1006,72 @@ def check_stripe_verification_completion(user_id, session_id):
             if stripe_session_id:
                 try:
                     # Try to import stripe
-                    import stripe as stripe_module
-                    stripe_module.api_key = current_app.config.get('STRIPE_SECRET_KEY')
+                    try:
+                        import stripe as stripe_module
+                        stripe_module.api_key = current_app.config.get('STRIPE_SECRET_KEY')
+                    except ImportError:
+                        stripe_module = None
                     
-                    if stripe_module.api_key:
+                    if stripe_module and stripe_module.api_key:
                         # Check Stripe session status
                         stripe_session = stripe_module.identity.VerificationSession.retrieve(stripe_session_id)
                         
                         if stripe_session.status == 'verified':
+                            # CRITICAL FIX: Issue credential when verification is confirmed
+                            credential_service = get_credential_service()
+                            try:
+                                # Check if credential already exists to avoid duplicates
+                                existing_credential = credential_service.get_user_credential(user_id)
+                                if not existing_credential:
+                                    # Issue new credential
+                                    new_credential = credential_service.issue_credential(user_id)
+                                    current_app.logger.info(f"Issued credential for Stripe-verified user {user_id}: {new_credential.get('id')}")
+                                    
+                                    # Format credential for wallet storage
+                                    wallet_credential = {
+                                        "credential": new_credential,
+                                        "wallet_metadata": {
+                                            "added_at": new_credential.get('issuanceDate', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())),
+                                            "holder_id": user_id,
+                                            "status": "active",
+                                            "display_name": "Lemma Human Verification",
+                                            "fingerprint": new_credential.get('id', f"credential-{user_id}")
+                                        }
+                                    }
+                                    
+                                    # Store credential in session for wallet to pick up
+                                    session['store_credential'] = wallet_credential
+                                    session['verified_credential'] = new_credential
+                                    session['verified_credential_id'] = new_credential.get('id')
+                                else:
+                                    current_app.logger.info(f"User {user_id} already has credential, using existing one")
+                                    # Format existing credential for wallet storage
+                                    wallet_credential = {
+                                        "credential": existing_credential,
+                                        "wallet_metadata": {
+                                            "added_at": existing_credential.get('issuanceDate', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())),
+                                            "holder_id": user_id,
+                                            "status": "active",
+                                            "display_name": "Lemma Human Verification",
+                                            "fingerprint": existing_credential.get('id', f"credential-{user_id}")
+                                        }
+                                    }
+                                    session['store_credential'] = wallet_credential
+                                    
+                            except Exception as credential_error:
+                                current_app.logger.error(f"Failed to issue credential for verified user {user_id}: {credential_error}")
+                                # Still return success for verification, but note the credential issue
+                                return {
+                                    'success': True,
+                                    'verified': True,
+                                    'claims': {
+                                        'isHuman': True,
+                                        'verification_method': 'stripe_identity',
+                                        'verified_at': time.time()
+                                    },
+                                    'warning': 'Verification successful but credential issuance failed'
+                                }
+                            
                             return {
                                 'success': True,
                                 'verified': True,
@@ -980,6 +1094,28 @@ def check_stripe_verification_completion(user_id, session_id):
                     else:
                         # No Stripe configured, check if session marked as complete
                         if session.get('stripe_verification_success') and session.get('verified_user_id') == user_id:
+                            # Also issue credential for session-based verification
+                            credential_service = get_credential_service()
+                            try:
+                                existing_credential = credential_service.get_user_credential(user_id)
+                                if not existing_credential:
+                                    new_credential = credential_service.issue_credential(user_id)
+                                    current_app.logger.info(f"Issued credential for session-verified user {user_id}: {new_credential.get('id')}")
+                                    
+                                    wallet_credential = {
+                                        "credential": new_credential,
+                                        "wallet_metadata": {
+                                            "added_at": new_credential.get('issuanceDate', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())),
+                                            "holder_id": user_id,
+                                            "status": "active",
+                                            "display_name": "Lemma Human Verification",
+                                            "fingerprint": new_credential.get('id', f"credential-{user_id}")
+                                        }
+                                    }
+                                    session['store_credential'] = wallet_credential
+                            except Exception as credential_error:
+                                current_app.logger.error(f"Failed to issue credential for session-verified user {user_id}: {credential_error}")
+                                
                             return {
                                 'success': True,
                                 'verified': True,
@@ -999,6 +1135,28 @@ def check_stripe_verification_completion(user_id, session_id):
                     current_app.logger.warning("Stripe not available for verification check")
                     # Fallback to session-based check
                     if session.get('stripe_verification_success') and session.get('verified_user_id') == user_id:
+                        # Also issue credential for session-based verification
+                        credential_service = get_credential_service()
+                        try:
+                            existing_credential = credential_service.get_user_credential(user_id)
+                            if not existing_credential:
+                                new_credential = credential_service.issue_credential(user_id)
+                                current_app.logger.info(f"Issued credential for fallback-verified user {user_id}: {new_credential.get('id')}")
+                                
+                                wallet_credential = {
+                                    "credential": new_credential,
+                                    "wallet_metadata": {
+                                        "added_at": new_credential.get('issuanceDate', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())),
+                                        "holder_id": user_id,
+                                        "status": "active",
+                                        "display_name": "Lemma Human Verification",
+                                        "fingerprint": new_credential.get('id', f"credential-{user_id}")
+                                    }
+                                }
+                                session['store_credential'] = wallet_credential
+                        except Exception as credential_error:
+                            current_app.logger.error(f"Failed to issue credential for fallback-verified user {user_id}: {credential_error}")
+                            
                         return {
                             'success': True,
                             'verified': True,
