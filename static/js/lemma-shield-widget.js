@@ -330,11 +330,35 @@ class LemmaShieldWidget {
         try {
             console.log('🛡️ Completing inline verification...');
             
-            // Wait a moment for Stripe to process
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Show loading state
+            this.showVerificationProcessingUI();
             
-            // Check if verification was successful and get credential
-            const result = await this.checkVerificationStatus();
+            // Wait for Stripe to process and retry verification status check
+            let attempts = 0;
+            const maxAttempts = 12; // Try for up to 60 seconds (12 * 5 seconds)
+            let result = null;
+            
+            while (attempts < maxAttempts) {
+                attempts++;
+                console.log(`🔄 Checking verification status (attempt ${attempts}/${maxAttempts})...`);
+                
+                // Wait before each attempt (progressive backoff)
+                const waitTime = Math.min(2000 + (attempts * 1000), 8000); // 2s, 3s, 4s... up to 8s
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                
+                result = await this.checkVerificationStatus();
+                
+                if (result && result.success && result.verified) {
+                    console.log('✅ Verification status confirmed - credential issued');
+                    break;
+                } else if (result && result.error && !result.error.includes('incomplete')) {
+                    // If it's a real error (not just "incomplete"), break immediately
+                    console.error('❌ Verification failed with error:', result.error);
+                    break;
+                } else {
+                    console.log(`⏳ Verification still processing... (${result ? result.error : 'no response'})`);
+                }
+            }
             
             if (result && result.success && result.verified) {
                 console.log('✅ Inline verification completed successfully');
@@ -368,10 +392,9 @@ class LemmaShieldWidget {
                     // Don't fail the entire verification process for credential storage issues
                 }
                 
-                this.options.onVerified(result);
-                this.hideShield();
+                this.showSuccessAndGrantAccess();
             } else {
-                const errorMessage = (result && result.error) ? result.error : 'Verification incomplete';
+                const errorMessage = (result && result.error) ? result.error : 'Verification timed out - please try again';
                 console.error('❌ Verification not completed:', errorMessage);
                 this.options.onError(new Error(errorMessage));
             }
@@ -380,6 +403,42 @@ class LemmaShieldWidget {
             console.error('❌ Failed to complete inline verification:', error);
             this.options.onError(error);
         }
+    }
+    
+    showVerificationProcessingUI() {
+        const container = this.getShieldContainer();
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="lemma-shield-overlay">
+                <div class="lemma-shield-widget lemma-card">
+                    <div class="lemma-card-header">
+                        <h2>🔄 Processing Verification</h2>
+                        <p>Please wait while we confirm your verification...</p>
+                    </div>
+                    <div class="lemma-card-body">
+                        <div class="verification-progress">
+                            <div class="lemma-spinner"></div>
+                            <p>This may take a few moments...</p>
+                            <div class="processing-steps">
+                                <div class="step-item active" id="step-1">
+                                    <span class="step-icon">✅</span>
+                                    <span class="step-text">Identity verification completed</span>
+                                </div>
+                                <div class="step-item processing" id="step-2">
+                                    <span class="step-icon">🔄</span>
+                                    <span class="step-text">Credential issuance in progress</span>
+                                </div>
+                                <div class="step-item pending" id="step-3">
+                                    <span class="step-icon">⏳</span>
+                                    <span class="step-text">Wallet storage pending</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
     
     async checkVerificationStatus() {
@@ -391,6 +450,14 @@ class LemmaShieldWidget {
             const csrfData = await csrfResponse.json();
             const csrfToken = csrfData.csrf_token;
             
+            const requestBody = {
+                user_id: this.state.userId,
+                session_id: this.state.verificationSessionId || this.state.sessionId,
+                check_inline_verification: true
+            };
+            
+            console.log('🔍 Sending verification status check request:', requestBody);
+            
             const response = await fetch(`${this.options.apiBase}/api/shield/verify-credentials`, {
                 method: 'POST',
                 credentials: 'same-origin',
@@ -399,11 +466,7 @@ class LemmaShieldWidget {
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRFToken': csrfToken
                 },
-                body: JSON.stringify({
-                    user_id: this.state.userId,
-                    session_id: this.state.verificationSessionId || this.state.sessionId,
-                    check_inline_verification: true
-                })
+                body: JSON.stringify(requestBody)
             });
             
             if (!response.ok) {
@@ -1033,6 +1096,18 @@ class LemmaShieldWidget {
         // Notify listeners
         this.options.onVerified();
         this.options.onStepChange('complete');
+    }
+    
+    hideError() {
+        // Clear any error states and hide error messages
+        const errorElements = document.querySelectorAll('.lemma-card.error, .lemma-error');
+        errorElements.forEach(el => el.remove());
+        
+        // Clear error styling from widget container
+        const widgetContainer = document.querySelector(this.options.widgetContainer);
+        if (widgetContainer) {
+            widgetContainer.classList.remove('error');
+        }
     }
     
     showError(container, message) {
