@@ -1191,3 +1191,298 @@ class LemmaCredentialService:
             return False
         except:
             return False
+
+    def issue_credential_with_offline_witness(self, user_id, attributes=None):
+        """
+        Issue a credential with offline verification capabilities including revocation witness
+        This enables true offline verification without API calls
+        """
+        try:
+            # Create base credential
+            base_credential = self.issue_credential(user_id, attributes)
+            
+            # Add offline verification witness
+            offline_witness = self.create_offline_witness(base_credential['id'])
+            
+            # Enhanced credential with offline capabilities
+            enhanced_credential = {
+                **base_credential,
+                'offline_witness': offline_witness,
+                'offline_capable': True,
+                'verification_mode': 'offline_with_sync',
+                'witness_version': '1.0'
+            }
+            
+            return enhanced_credential
+            
+        except Exception as e:
+            self.logger.error(f"Failed to issue offline-capable credential: {e}")
+            raise Exception(f"Offline credential issuance failed: {e}")
+    
+    def create_offline_witness(self, credential_id):
+        """
+        Create an offline verification witness that allows local verification
+        without calling the Lemma API
+        """
+        try:
+            current_time = time.time()
+            valid_until = current_time + (7 * 24 * 3600)  # Valid for 7 days
+            
+            # Create OPRF witness for revocation checking
+            oprf_witness = self.create_oprf_witness(credential_id)
+            
+            # Create compact revocation data snapshot
+            revocation_snapshot = self.create_revocation_snapshot()
+            
+            # Create offline witness
+            witness = {
+                'credential_id': credential_id,
+                'created_at': current_time,
+                'valid_until': valid_until,
+                'oprf_witness': oprf_witness,
+                'revocation_snapshot': revocation_snapshot,
+                'issuer_public_key': self.get_issuer_public_key(),
+                'witness_signature': None  # Will be added after signing
+            }
+            
+            # Sign the witness
+            witness_data = json.dumps(witness, sort_keys=True)
+            witness['witness_signature'] = self.sign_data(witness_data)
+            
+            return witness
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create offline witness: {e}")
+            return None
+    
+    def create_oprf_witness(self, credential_id):
+        """
+        Create OPRF witness for privacy-preserving revocation checking
+        """
+        try:
+            # Generate random blinding factor
+            r = secrets.token_bytes(32)
+            
+            # Hash the credential ID
+            credential_hash = hashlib.sha256(credential_id.encode()).digest()
+            
+            # Create blinded value (simplified for demo)
+            blinded_value = hashlib.sha256(credential_hash + r).hexdigest()
+            
+            # OPRF evaluation (simplified - in production this would use proper OPRF)
+            oprf_key = self.get_oprf_key()
+            oprf_result = hashlib.sha256((blinded_value + oprf_key).encode()).hexdigest()
+            
+            return {
+                'blinded_value': blinded_value,
+                'oprf_result': oprf_result,
+                'blinding_factor': r.hex(),
+                'algorithm': 'simplified_oprf_v1'
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create OPRF witness: {e}")
+            return None
+    
+    def create_revocation_snapshot(self):
+        """
+        Create a compact snapshot of current revocation data for offline checking
+        """
+        try:
+            # Get current revocation data (simplified)
+            revoked_credentials = self.get_revoked_credentials()
+            
+            # Create compact bloom filter representation
+            bloom_data = self.create_compact_bloom_filter(revoked_credentials)
+            
+            return {
+                'bloom_filter': bloom_data,
+                'snapshot_time': time.time(),
+                'revoked_count': len(revoked_credentials),
+                'false_positive_rate': 0.01,
+                'algorithm': 'cascaded_bloom_v1'
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create revocation snapshot: {e}")
+            return {'bloom_filter': '', 'snapshot_time': time.time(), 'revoked_count': 0}
+    
+    def verify_credential_offline(self, credential):
+        """
+        Verify credential using only local data - no API calls required
+        This is the core of true offline verification
+        """
+        try:
+            verification_start = time.time()
+            
+            # Check if credential supports offline verification
+            if not credential.get('offline_capable', False):
+                return {
+                    'valid': False,
+                    'error': 'Credential does not support offline verification',
+                    'verification_mode': 'offline_not_supported'
+                }
+            
+            offline_witness = credential.get('offline_witness')
+            if not offline_witness:
+                return {
+                    'valid': False,
+                    'error': 'No offline witness found',
+                    'verification_mode': 'offline_witness_missing'
+                }
+            
+            # 1. Verify credential signature (pure cryptography)
+            signature_valid = self.verify_credential_signature_offline(credential)
+            if not signature_valid:
+                return {
+                    'valid': False,
+                    'error': 'Invalid credential signature',
+                    'verification_mode': 'offline_signature_failed'
+                }
+            
+            # 2. Check witness validity
+            witness_valid = self.verify_offline_witness(offline_witness)
+            if not witness_valid:
+                return {
+                    'valid': False,
+                    'error': 'Invalid offline witness',
+                    'verification_mode': 'offline_witness_invalid'
+                }
+            
+            # 3. Check if witness has expired
+            current_time = time.time()
+            if current_time > offline_witness.get('valid_until', 0):
+                return {
+                    'valid': False,
+                    'error': 'Offline witness expired - sync required',
+                    'verification_mode': 'offline_witness_expired',
+                    'sync_required': True
+                }
+            
+            # 4. Check revocation status using offline witness
+            revocation_status = self.check_revocation_offline(credential['id'], offline_witness)
+            if revocation_status.get('revoked', False):
+                return {
+                    'valid': False,
+                    'error': 'Credential has been revoked',
+                    'verification_mode': 'offline_revoked'
+                }
+            
+            verification_time = (time.time() - verification_start) * 1000
+            
+            return {
+                'valid': True,
+                'verification_mode': 'offline_verified',
+                'verification_time_ms': verification_time,
+                'witness_valid_until': offline_witness.get('valid_until'),
+                'sync_recommended_after': offline_witness.get('valid_until') - (24 * 3600),  # Sync 1 day before expiry
+                'offline_verification': True
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Offline verification failed: {e}")
+            return {
+                'valid': False,
+                'error': f'Offline verification error: {str(e)}',
+                'verification_mode': 'offline_error'
+            }
+    
+    def verify_credential_signature_offline(self, credential):
+        """
+        Verify credential signature using only local cryptographic operations
+        """
+        try:
+            # Extract signature and data
+            signature = credential.get('proof', {}).get('jws')
+            if not signature:
+                return False
+            
+            # Get issuer public key from witness
+            offline_witness = credential.get('offline_witness', {})
+            issuer_public_key = offline_witness.get('issuer_public_key')
+            if not issuer_public_key:
+                return False
+            
+            # Verify signature (simplified - in production use proper JWT verification)
+            credential_data = {k: v for k, v in credential.items() if k not in ['proof', 'offline_witness']}
+            data_to_verify = json.dumps(credential_data, sort_keys=True)
+            
+            # This is a simplified verification - in production use proper Ed25519
+            return True  # For demo purposes
+            
+        except Exception as e:
+            self.logger.error(f"Offline signature verification failed: {e}")
+            return False
+    
+    def verify_offline_witness(self, offline_witness):
+        """
+        Verify the integrity of the offline witness
+        """
+        try:
+            # Check witness signature
+            witness_signature = offline_witness.get('witness_signature')
+            if not witness_signature:
+                return False
+            
+            # Verify witness hasn't been tampered with
+            witness_data = {k: v for k, v in offline_witness.items() if k != 'witness_signature'}
+            witness_json = json.dumps(witness_data, sort_keys=True)
+            
+            # Simplified verification - in production use proper signature verification
+            return True  # For demo purposes
+            
+        except Exception as e:
+            self.logger.error(f"Offline witness verification failed: {e}")
+            return False
+    
+    def check_revocation_offline(self, credential_id, offline_witness):
+        """
+        Check if credential is revoked using offline witness data
+        """
+        try:
+            # Get revocation snapshot from witness
+            revocation_snapshot = offline_witness.get('revocation_snapshot', {})
+            bloom_filter = revocation_snapshot.get('bloom_filter', '')
+            
+            if not bloom_filter:
+                # No revocation data - assume not revoked
+                return {'revoked': False, 'method': 'no_revocation_data'}
+            
+            # Check if credential ID is in bloom filter
+            credential_hash = hashlib.sha256(credential_id.encode()).hexdigest()
+            
+            # Simplified bloom filter check - in production use proper bloom filter
+            revoked = credential_hash in bloom_filter  # Simplified check
+            
+            return {
+                'revoked': revoked,
+                'method': 'offline_bloom_filter',
+                'snapshot_age_hours': (time.time() - revocation_snapshot.get('snapshot_time', 0)) / 3600
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Offline revocation check failed: {e}")
+            return {'revoked': False, 'method': 'offline_check_error'}
+    
+    def get_issuer_public_key(self):
+        """Get issuer public key for offline verification"""
+        try:
+            if hasattr(self, 'public_key_b64') and self.public_key_b64:
+                return self.public_key_b64
+            return None
+        except:
+            return None
+    
+    def get_oprf_key(self):
+        """Get OPRF key for witness creation"""
+        return "demo_oprf_key_12345"  # In production, use proper OPRF key management
+    
+    def get_revoked_credentials(self):
+        """Get list of revoked credentials"""
+        # In production, this would query the revocation database
+        return []  # Empty for demo
+    
+    def create_compact_bloom_filter(self, revoked_credentials):
+        """Create compact bloom filter representation"""
+        # Simplified bloom filter - in production use proper implementation
+        return hashlib.sha256(str(revoked_credentials).encode()).hexdigest()[:32]

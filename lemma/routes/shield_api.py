@@ -76,16 +76,26 @@ SECURITY_LEVELS = {
     }
 }
 
-@shield_api.route('/api/shield/status', methods=['GET'])
+@shield_api.route('/api/shield/status', methods=['GET', 'POST'])
 @rate_limit
 def shield_status():
     """
     Check the current shield status for the user with configurable security levels
     Returns what the shield should do: show shield, allow access, or needs verification
+    
+    GET: Check session-based status
+    POST: Verify credentials sent from wallet for offline verification
     """
     try:
         # Get security level from request or default to 'standard'
-        security_level = request.args.get('security_level', 'standard')
+        if request.method == 'GET':
+            security_level = request.args.get('security_level', 'standard')
+            credential_data = None
+        else:  # POST
+            data = request.get_json() or {}
+            security_level = data.get('security_level', 'standard')
+            credential_data = data.get('credential')
+        
         if security_level not in SECURITY_LEVELS:
             security_level = 'standard'
         
@@ -188,17 +198,76 @@ def shield_status():
                 }
             })
         
-        # No valid session verification found
-        return jsonify({
-            'success': True,
-            'shield_action': 'check_credentials',
-            'message': 'Need to check user credentials',
-            'data': {
-                'verified': False,
-                'session_expired': user_session_data['verification_time'] is not None,
-                'security_level': security_level
-            }
-        })
+        # No valid session verification found - BUT check if user has credentials in wallet
+        # This handles the case when user returns to page and session expired but credentials exist
+        
+        # Check if there's a credential available for verification
+        if credential_data:
+            # Get credential service instance
+            from lemma.core.credential_service import LemmaCredentialService
+            credential_service = LemmaCredentialService()
+            
+            # Check if credential supports offline verification
+            if credential_data.get('offline_capable', False):
+                # Use offline verification - no API calls needed!
+                verification_result = credential_service.verify_credential_offline(credential_data)
+            else:
+                # Fall back to online verification
+                verification_result = credential_service.verify_credential(credential_data)
+            
+            if verification_result.get('valid'):
+                # Store verification status in session
+                current_time = time.time()
+                session['verified_human'] = True
+                session['verification_time'] = current_time
+                session['user_id'] = extract_user_id_from_credential(credential_data)
+                session['credential_id'] = credential_data.get('id', f"credential-{session['user_id']}")
+                session['last_did_check'] = current_time
+                session['last_revocation_check'] = current_time
+                
+                # Include verification mode in response
+                verification_mode = verification_result.get('verification_mode', 'online')
+                offline_verified = verification_result.get('offline_verification', False)
+                
+                return jsonify({
+                    'success': True,
+                    'shield_action': 'allow_access',
+                    'message': f'User verified via {verification_mode}',
+                    'verification_mode': verification_mode,
+                    'offline_verification': offline_verified,
+                    'verification_time_ms': verification_result.get('verification_time_ms'),
+                    'witness_valid_until': verification_result.get('witness_valid_until'),
+                    'sync_required': verification_result.get('sync_required', False),
+                    'user_id': session.get('user_id'),
+                    'credential': credential_data if credential_data.get('offline_capable') else None
+                })
+            else:
+                # Verification failed
+                verification_mode = verification_result.get('verification_mode', 'unknown')
+                sync_required = verification_result.get('sync_required', False)
+                
+                return jsonify({
+                    'success': False,
+                    'shield_action': 'verify_did' if not sync_required else 'sync_required',
+                    'message': f'Verification failed: {verification_result.get("error", "Unknown error")}',
+                    'verification_mode': verification_mode,
+                    'sync_required': sync_required,
+                    'error': verification_result.get('error')
+                }), 400
+                
+        else:
+            # No credential provided in request, suggest checking wallet
+            return jsonify({
+                'success': True,
+                'shield_action': 'check_credentials',  # This will trigger wallet check
+                'message': 'Need to check user credentials or wallet',
+                'data': {
+                    'verified': False,
+                    'session_expired': user_session_data['verification_time'] is not None,
+                    'security_level': security_level,
+                    'check_wallet': True  # Signal to check wallet for existing credentials
+                }
+            })
         
     except Exception as e:
         current_app.logger.error(f"shield status check error: {e}")

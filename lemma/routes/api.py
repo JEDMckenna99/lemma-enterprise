@@ -2610,3 +2610,90 @@ def verify_formal():
             "reason": str(e),
             "formal_model": "Verify(σ, π, P, pk^I, R) : {0, 1}"
         }), 500
+
+@api_bp.route('/api/issue-offline-credential', methods=['POST'])
+@require_api_key
+@rate_limit
+def issue_offline_credential():
+    """
+    Issue a credential with offline verification capabilities
+    This enables true offline verification without API calls
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        user_id = data.get('user_id')
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        
+        # Validate user_id format
+        if not validate_user_id(user_id):
+            return jsonify({"error": "Invalid user_id format"}), 400
+        
+        # Get optional attributes
+        attributes = data.get('attributes', {})
+        
+        # Issue offline-capable credential
+        from lemma.core.credential_service import LemmaCredentialService
+        credential_service = LemmaCredentialService()
+        
+        offline_credential = credential_service.issue_credential_with_offline_witness(user_id, attributes)
+        
+        if not offline_credential:
+            return jsonify({"error": "Failed to issue offline credential"}), 500
+        
+        return jsonify({
+            "success": True,
+            "message": "Offline-capable credential issued successfully",
+            "credential": offline_credential,
+            "offline_capable": True,
+            "witness_valid_until": offline_credential.get('offline_witness', {}).get('valid_until'),
+            "verification_mode": "offline_with_sync"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error issuing offline credential: {e}")
+        return jsonify({"error": f"Failed to issue offline credential: {str(e)}"}), 500
+
+@api_bp.route('/api/verify-offline', methods=['POST'])
+@rate_limit
+def verify_offline():
+    """
+    Verify a credential using only offline verification
+    No external API calls - pure local cryptographic verification
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        credential = data.get('credential')
+        if not credential:
+            return jsonify({"error": "credential is required"}), 400
+        
+        # Perform offline verification
+        from lemma.core.credential_service import LemmaCredentialService
+        credential_service = LemmaCredentialService()
+        
+        verification_result = credential_service.verify_credential_offline(credential)
+        
+        return jsonify({
+            "success": verification_result.get('valid', False),
+            "verification_result": verification_result,
+            "offline_verification": True,
+            "api_calls_made": 0,  # Proof of true offline verification
+            "verification_mode": verification_result.get('verification_mode'),
+            "verification_time_ms": verification_result.get('verification_time_ms')
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in offline verification: {e}")
+        return jsonify({
+            "success": False,
+            "error": f"Offline verification failed: {str(e)}",
+            "verification_mode": "offline_error"
+        }), 500

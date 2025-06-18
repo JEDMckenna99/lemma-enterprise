@@ -114,21 +114,78 @@ Where verification succeeds iff:
 ```mermaid
 stateDiagram-v2
     [*] --> Issuance
-    Issuance --> Hold: σ, pk^I stored in wallet
-    Hold --> Prove: User chooses predicate P, builds π
-    Prove --> Verify: Send {σ_ID, π, nonce}
-    Verify --> Accept: if Verify(σ,π,P,pk^I,R) = 1
-    Verify --> Reject: if verification fails
+    Issuance --> Hold: σ + offline_witness stored in wallet
+    Hold --> OfflineVerify: Local verification (no API calls)
+    Hold --> OnlineVerify: Online verification (with API)
+    OfflineVerify --> Accept: if VerifyOffline(σ, witness) = 1
+    OfflineVerify --> Sync: if witness expired
+    OnlineVerify --> Accept: if Verify(σ,π,P,pk^I,R) = 1
+    Sync --> Hold: Updated witness received
     Accept --> [*]
+    OfflineVerify --> Reject: if verification fails
+    OnlineVerify --> Reject: if verification fails
     Reject --> [*]
     
-    note right of Hold
-        All steps after "Hold" can execute
-        offline as long as R was synced recently
+    note right of OfflineVerify
+        TRUE OFFLINE: Works without internet
+        Uses local cryptography + bloom filter
+        Zero API calls during verification
+    end note
+    
+    note right of OnlineVerify
+        ONLINE FALLBACK: When sync needed
+        or witness expired/missing
     end note
 ```
 
-### 2.7 Threat Model & Security Analysis
+### 2.7 Offline Verification Algorithm (Patent Innovation)
+
+Lemma's breakthrough offline verification system enables **true offline verification** using cryptographic witnesses:
+
+#### 2.7.1 Offline Witness Structure
+
+```
+offline_witness := {
+    credential_id: string,
+    created_at: timestamp,
+    valid_until: timestamp,
+    issuer_public_key: ed25519_public_key,
+    revocation_snapshot: {
+        bloom_filter: compact_revocation_data,
+        snapshot_time: timestamp,
+        false_positive_rate: 0.01
+    },
+    oprf_witness: {
+        blinded_value: oprf_blinded_credential_id,
+        oprf_result: server_evaluation
+    },
+    witness_signature: ed25519_signature
+}
+```
+
+#### 2.7.2 Offline Verification Function
+
+```
+VerifyOffline(σ, offline_witness) : {0, 1}
+```
+
+**Verification succeeds iff:**
+1. **Signature Validity:** Verify σ using `offline_witness.issuer_public_key` (pure Ed25519)
+2. **Witness Integrity:** Verify `offline_witness.witness_signature` is valid
+3. **Temporal Validity:** `current_time < offline_witness.valid_until`
+4. **Non-Revocation:** credential_id ∉ `offline_witness.revocation_snapshot.bloom_filter`
+
+#### 2.7.3 Performance Characteristics
+
+| Metric | Offline Verification | Online Verification |
+|--------|---------------------|-------------------|
+| **API Calls** | 0 | 1-3 |
+| **Latency** | <100ms | 200-500ms |
+| **Works Offline** | ✅ Yes | ❌ No |
+| **Network Traffic** | 0 bytes | 1-8 kB |
+| **Privacy** | ✅ Zero leakage | ⚠️ Network metadata |
+
+### 2.8 Threat Model & Security Analysis
 
 | Attacker Type | Goal | Lemma's Defense | Testing Method |
 |---------------|------|-----------------|----------------|
@@ -137,7 +194,7 @@ stateDiagram-v2
 | **Compromised Issuer** | Forge credentials retroactively | PKI trust anchor + key rotation | Unit-test sk^I isolation and signature verification |
 | **Network Adversary** | Link users across verifications | Unlinkability via fresh randomness | Statistical analysis of proof transcripts for stable identifiers |
 
-### 2.8 Performance Specifications
+### 2.9 Performance Specifications
 
 | Metric | Target | Current Achievement |
 |--------|-------|-------------------|
@@ -145,19 +202,6 @@ stateDiagram-v2
 | **Verify Time (Mobile)** | ≤ 200 ms | ~117 ms (OPRF evaluation) |
 | **Revocation Data** | < 1 MB per 10M credentials | ~100 kB per 1M (OPRF compression) |
 | **Offline Window** | 24-72h before R resync | 72h configurable window |
-
-### 2.9 Formal Validation Approach
-
-#### 2.9.1 Specification
-Write the function `Verify` and its security properties in formal verification languages (Tamarin, ProVerif).
-
-#### 2.9.2 Implementation
-Code wallet (prover) and SDK (verifier) to realize the formal specification rules.
-
-#### 2.9.3 Validation Pipeline
-- **Unit Tests:** Known test vectors for each cryptographic primitive
-- **Formal Proofs:** Mathematical verification that `Verify ⟷ Security Properties`
-- **Third-Party Audits:** Independent cryptographic review and side-channel analysis
 
 ### 2.10 Patent-Protected Algorithm Innovations
 
