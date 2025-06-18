@@ -863,6 +863,31 @@ class LemmaShieldWidget {
         return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
     
+    getShieldContainer() {
+        // Get or create the shield container
+        let container = document.querySelector(this.options.widgetContainer);
+        if (!container) {
+            container = document.createElement('div');
+            container.id = this.options.widgetContainer.replace('#', '');
+            document.body.appendChild(container);
+        }
+        return container;
+    }
+    
+    hideShield() {
+        // Hide the shield widget
+        const container = document.querySelector(this.options.widgetContainer);
+        if (container) {
+            container.remove();
+        }
+        
+        // Show protected content
+        const protectedEl = document.querySelector(this.options.protectedContent);
+        if (protectedEl) {
+            protectedEl.style.display = '';
+        }
+    }
+    
     getBrandingFooter() {
         return `
             <div class="lemma-branding">

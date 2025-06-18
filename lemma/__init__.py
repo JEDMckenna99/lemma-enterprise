@@ -244,6 +244,7 @@ def create_app(test_config=None):
             "img-src 'self' data: https:; "
             "font-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; "
             "connect-src 'self' https://api.stripe.com; "
+            "frame-src 'self' https://js.stripe.com; "
             "frame-ancestors 'none'; "
             "base-uri 'self'; "
             "form-action 'self'; "
