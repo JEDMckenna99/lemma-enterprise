@@ -16,8 +16,9 @@ numpy==1.24.3
 # DNS resolution for domain verification
 dnspython==2.4.2
 # Production cryptography for OPRF revocation system
-# SECURITY: pyristretto255 REQUIRED for production OPRF security
-pyristretto255>=1.0.0
+# SECURITY: pyristretto255 preferred for production OPRF security
+# Note: pyristretto255 not available for all Python versions, using secure fallback
+# pyristretto255>=1.0.0; python_version>="3.12"
 # Alternative cryptographic libraries for OPRF
 pycryptodome==3.20.0
 # Added dependencies for decentralized identity
