@@ -276,7 +276,7 @@ class LemmaShieldWidget {
             // Check if verification was successful and get credential
             const result = await this.checkVerificationStatus();
             
-            if (result.success && result.verified) {
+            if (result && result.success && result.verified) {
                 console.log('✅ Inline verification completed successfully');
                 
                 // CRITICAL FIX: Retrieve and store the credential after successful verification
@@ -311,8 +311,9 @@ class LemmaShieldWidget {
                 this.options.onVerified(result);
                 this.hideShield();
             } else {
-                console.error('❌ Verification not completed:', result.error);
-                this.options.onError(new Error(result.error || 'Verification incomplete'));
+                const errorMessage = (result && result.error) ? result.error : 'Verification incomplete';
+                console.error('❌ Verification not completed:', errorMessage);
+                this.options.onError(new Error(errorMessage));
             }
             
         } catch (error) {
@@ -323,25 +324,37 @@ class LemmaShieldWidget {
     
     async checkVerificationStatus() {
         try {
+            // Get CSRF token first
+            const csrfResponse = await fetch(`${this.options.apiBase}/api/generate-csrf`, {
+                credentials: 'same-origin'
+            });
+            const csrfData = await csrfResponse.json();
+            const csrfToken = csrfData.csrf_token;
+            
             const response = await fetch(`${this.options.apiBase}/api/shield/verify-credentials`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken
                 },
                 body: JSON.stringify({
                     user_id: this.state.userId,
-                    session_id: this.state.sessionId,
+                    session_id: this.state.verificationSessionId || this.state.sessionId,
                     check_inline_verification: true
                 })
             });
             
             if (!response.ok) {
-                throw new Error('Failed to check verification status');
+                const errorText = await response.text();
+                console.error('❌ API Response Error:', response.status, errorText);
+                throw new Error(`Failed to check verification status: ${response.status}`);
             }
             
-            return await response.json();
+            const result = await response.json();
+            console.log('✅ Verification status response:', result);
+            return result;
             
         } catch (error) {
             console.error('❌ Verification status check failed:', error);

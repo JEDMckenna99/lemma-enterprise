@@ -230,37 +230,45 @@ def verify_credentials():
             user_id = data.get('user_id')
             session_id = data.get('session_id')
             
-            if user_id and session_id:
-                # Check if verification was completed via Stripe callback
-                verification_result = check_stripe_verification_completion(user_id, session_id)
+            if not user_id:
+                return jsonify({
+                    'success': False,
+                    'error': 'User ID required for inline verification check'
+                }), 400
+            
+            # Check if verification was completed via Stripe callback
+            verification_result = check_stripe_verification_completion(user_id, session_id)
+            
+            if verification_result['success']:
+                # Store verification status in session
+                current_time = time.time()
+                session['lemma_verified'] = True
+                session['lemma_verification_time'] = current_time
+                session['lemma_user_id'] = user_id
+                session['verified_user'] = True
+                session['verified_human'] = True
+                session['verification_time'] = current_time
+                session['user_id'] = user_id
                 
-                if verification_result['success']:
-                    # Store verification status in session
-                    session['lemma_verified'] = True
-                    session['lemma_verification_time'] = time.time()
-                    session['lemma_user_id'] = user_id
-                    session['verified_user'] = True
-                    session['verified_human'] = True
-                    
-                    return jsonify({
-                        'success': True,
-                        'verified': True,
-                        'shield_action': 'allow_access',
-                        'verification_status': 'verified',
-                        'data': verification_result.get('claims', {}),
-                        'message': 'Inline verification completed successfully'
-                    })
-                else:
-                    return jsonify({
-                        'success': False,
-                        'verified': False,
-                        'shield_action': 'show_shield',
-                        'verification_status': 'pending',
-                        'error': verification_result.get('error', 'Verification incomplete'),
-                        'message': 'Inline verification not yet completed'
-                    })
+                return jsonify({
+                    'success': True,
+                    'verified': True,
+                    'shield_action': 'allow_access',
+                    'verification_status': 'verified',
+                    'data': verification_result.get('claims', {}),
+                    'message': 'Inline verification completed successfully'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'verified': False,
+                    'shield_action': 'show_shield',
+                    'verification_status': 'pending',
+                    'error': verification_result.get('error', 'Verification incomplete'),
+                    'message': 'Inline verification not yet completed'
+                })
         
-        # Validate input
+        # Validate input for credential verification (only if not doing inline check)
         try:
             credentials = InputValidator.validate_dict(data.get('credentials'), 'credentials')
             challenge = InputValidator.validate_string(data.get('challenge'), 'challenge', min_length=16, max_length=128)
