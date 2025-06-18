@@ -15,6 +15,8 @@ import socket
 import shutil
 import json
 from datetime import datetime
+import time
+import hashlib
 
 # Optional CSRF protection import
 try:
@@ -266,6 +268,77 @@ def create_app(test_config=None):
     def add_request_id():
         g.request_id = request.headers.get('X-Request-ID', secrets.token_hex(8))
     
+    # SESSION SECURITY: Implement session fixation and hijacking protection
+    @app.before_request
+    def secure_session():
+        """Implement comprehensive session security."""
+        from flask import session, request, g, redirect, url_for
+        import time
+        
+        # Skip session security for static files and health checks
+        if request.endpoint in ['static', 'health_check', 'ping', 'fast_test']:
+            return
+        
+        current_time = time.time()
+        
+        # 1. SESSION FIXATION PROTECTION
+        if 'user_id' in session or 'admin_logged_in' in session:
+            # Regenerate session ID periodically (every 30 minutes)
+            last_regenerated = session.get('last_regenerated', 0)
+            if current_time - last_regenerated > 1800:  # 30 minutes
+                # Store session data
+                session_data = dict(session)
+                # Clear and regenerate
+                session.clear()
+                session.regenerate_id()
+                # Restore data
+                session.update(session_data)
+                session['last_regenerated'] = current_time
+                logger.info("Session ID regenerated for security")
+        
+        # 2. SESSION HIJACKING PROTECTION
+        if 'user_id' in session or 'admin_logged_in' in session:
+            # Check IP address binding (with mobile consideration)
+            stored_ip = session.get('session_ip')
+            current_ip = request.remote_addr
+            
+            if stored_ip and stored_ip != current_ip:
+                # Allow IP changes for mobile users (check User-Agent)
+                user_agent = request.headers.get('User-Agent', '').lower()
+                is_mobile = any(mobile in user_agent for mobile in ['mobile', 'android', 'iphone', 'ipad'])
+                
+                if not is_mobile:
+                    logger.warning(f"Session IP mismatch: {stored_ip} -> {current_ip}")
+                    session.clear()
+                    return redirect(url_for('admin.login', reason='ip_changed'))
+                else:
+                    # Update IP for mobile users but log the change
+                    logger.info(f"Mobile user IP change: {stored_ip} -> {current_ip}")
+                    session['session_ip'] = current_ip
+            else:
+                # Store IP on first access
+                session['session_ip'] = current_ip
+            
+            # 3. USER-AGENT FINGERPRINTING
+            stored_ua_hash = session.get('ua_hash')
+            current_ua_hash = hashlib.sha256(request.headers.get('User-Agent', '').encode()).hexdigest()
+            
+            if stored_ua_hash and stored_ua_hash != current_ua_hash:
+                logger.warning("Session User-Agent mismatch - possible session hijacking")
+                session.clear()
+                return redirect(url_for('admin.login', reason='ua_changed'))
+            else:
+                session['ua_hash'] = current_ua_hash
+            
+            # 4. SESSION TIMEOUT
+            last_activity = session.get('last_activity', current_time)
+            if current_time - last_activity > 7200:  # 2 hours
+                logger.info("Session expired due to inactivity")
+                session.clear()
+                return redirect(url_for('admin.login', reason='expired'))
+            
+            session['last_activity'] = current_time
+
     # Force HTTPS in production for OIDC4VP compliance
     @app.before_request
     def force_https():

@@ -13,6 +13,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Add marshmallow import at the top
+try:
+    from marshmallow import Schema, fields, validate, ValidationError as MarshmallowValidationError
+    MARSHMALLOW_AVAILABLE = True
+except ImportError:
+    MARSHMALLOW_AVAILABLE = False
+    logger.warning("marshmallow not available - using basic validation only")
+
 class ValidationError(Exception):
     """Custom exception for validation errors."""
     def __init__(self, message: str, field: str = None):
@@ -270,10 +278,70 @@ class InputValidator:
         
         return data
 
+class CredentialSchema(Schema):
+    """Marshmallow schema for comprehensive credential validation."""
+    user_id = fields.Str(required=True, validate=validate.Length(min=1, max=100))
+    credential_type = fields.Str(validate=validate.OneOf(['human', 'age', 'location', 'identity']))
+    issuer_did = fields.Str(validate=validate.Length(min=10, max=200))
+    subject_did = fields.Str(validate=validate.Length(min=10, max=200))
+    issued_at = fields.DateTime()
+    expires_at = fields.DateTime()
+    credential_data = fields.Dict()
+    
+class PresentationSchema(Schema):
+    """Marshmallow schema for presentation validation."""
+    challenge = fields.Str(required=True, validate=validate.Length(min=16, max=128))
+    credentials = fields.List(fields.Dict(), validate=validate.Length(min=1, max=10))
+    domain = fields.Str(validate=validate.Length(max=100))
+    nonce = fields.Str(validate=validate.Length(max=64))
+
+class APIRequestSchema(Schema):
+    """Base schema for API requests with security validation."""
+    request_id = fields.Str(validate=validate.Length(max=64))
+    timestamp = fields.DateTime()
+    client_version = fields.Str(validate=validate.Length(max=50))
+
+class KYCVerificationSchema(Schema):
+    """Schema for KYC verification requests."""
+    user_id = fields.Str(required=True, validate=validate.Length(min=1, max=100))
+    verification_type = fields.Str(required=True, validate=validate.OneOf(['identity', 'age', 'address']))
+    document_type = fields.Str(validate=validate.OneOf(['passport', 'drivers_license', 'national_id']))
+    metadata = fields.Dict()
+
+def validate_with_schema(data: Dict[str, Any], schema_class: Schema) -> Dict[str, Any]:
+    """
+    Validate data using marshmallow schema with comprehensive error handling.
+    
+    Args:
+        data: Data to validate
+        schema_class: Marshmallow schema class to use
+        
+    Returns:
+        Validated and sanitized data
+        
+    Raises:
+        ValidationError: If validation fails
+    """
+    if not MARSHMALLOW_AVAILABLE:
+        logger.warning("Marshmallow not available - falling back to basic validation")
+        return data
+    
+    try:
+        schema = schema_class()
+        result = schema.load(data)
+        return result
+    except MarshmallowValidationError as e:
+        logger.warning(f"Schema validation failed: {e.messages}")
+        raise ValidationError(f"Input validation failed: {e.messages}")
+    except Exception as e:
+        logger.error(f"Unexpected validation error: {e}")
+        raise ValidationError("Input validation error")
+
 def validate_request_data(validator_func):
     """Decorator to validate request data using a validator function."""
     def decorator(f):
         def wrapper(*args, **kwargs):
+            from flask import request
             try:
                 # Get request data
                 if hasattr(request, 'json') and request.json:

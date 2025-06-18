@@ -271,12 +271,13 @@ def get_revocation_events():
         # Add some random recent events for testing
         recent_events = []
         for i in range(3):
-            event_time = datetime.now(timezone.utc) - timedelta(hours=random.randint(1, 72))
+            import secrets
+            event_time = datetime.now(timezone.utc) - timedelta(hours=secrets.randbelow(72) + 1)
             recent_events.append({
                 'credential_id': f"cred_sandbox_recent_{i+1}",
                 'user_id': f"test_user_recent_{i+1}",
                 'revoked_at': event_time.isoformat(),
-                'reason': random.choice(['Testing', 'Simulation', 'Development']),
+                'reason': secrets.choice(['Testing', 'Simulation', 'Development']),
                 'issuer': SANDBOX_KYC_ISSUER,
                 'event_type': 'sandbox_simulation'
             })
