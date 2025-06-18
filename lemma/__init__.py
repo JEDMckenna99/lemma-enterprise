@@ -178,30 +178,47 @@ def create_app(test_config=None):
         # Continue anyway - some components may work
     
     # Register blueprints - Maintain backward compatibility
-    from lemma.routes.shield_api import shield_api
-    from lemma.routes.api import api_bp
-    from lemma.routes.main import main_bp
-    from lemma.routes.onboarding import onboarding_bp
+    try:
+        from lemma.routes.shield_api import shield_api
+        app.register_blueprint(shield_api)
+        app.logger.info("Shield API blueprint registered successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to register Shield API blueprint: {e}")
     
-    # Register the main routes (homepage, etc.)
-    app.register_blueprint(main_bp)
+    try:
+        from lemma.routes.api import api_bp
+        app.register_blueprint(api_bp)
+        app.logger.info("Legacy API blueprint registered successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to register Legacy API blueprint: {e}")
     
-    # Register the onboarding routes for customer self-serve
-    app.register_blueprint(onboarding_bp, url_prefix='/onboarding')
+    try:
+        from lemma.routes.main import main_bp
+        app.register_blueprint(main_bp)
+        app.logger.info("Main blueprint registered successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to register Main blueprint: {e}")
     
-    # Register the clean Shield API v1 (new market-ready API)
-    app.register_blueprint(shield_api)
+    try:
+        from lemma.routes.onboarding import onboarding_bp
+        app.register_blueprint(onboarding_bp, url_prefix='/onboarding')
+        app.logger.info("Onboarding blueprint registered successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to register Onboarding blueprint: {e}")
     
-    # Maintain backward compatibility with original API
-    app.register_blueprint(api_bp)
+    try:
+        from lemma.routes.admin import admin_bp
+        app.register_blueprint(admin_bp)
+        app.logger.info("Admin blueprint registered successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to register Admin blueprint: {e}")
     
-    # Keep minimal admin routes for internal management
-    from lemma.routes.admin import admin_bp
-    app.register_blueprint(admin_bp)
-    
-    # Register Shopify app integration
-    from lemma.routes.shopify_app import shopify_bp
-    app.register_blueprint(shopify_bp)
+    try:
+        from lemma.routes.shopify_app import shopify_bp
+        app.register_blueprint(shopify_bp)
+        app.logger.info("Shopify blueprint registered successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to register Shopify blueprint: {e}")
 
     # Both Shield API v1 and legacy API available for backward compatibility
     app.logger.info("Lemma Shield API v1.0 + Legacy API + Shopify App initialized - Market-ready with backward compatibility")
