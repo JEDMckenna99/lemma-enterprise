@@ -1233,6 +1233,35 @@ The Lemma wallet is designed to be portable and work across websites, which is c
 
 ## Installation & Deployment
 
+### ⚠️ **TROUBLESHOOTING: If Site Shows 404 Errors**
+
+**Common Issue:** Sometimes after deployment, all routes return 404 errors while API health endpoints work. This indicates a blueprint registration failure.
+
+**Quick Fix Steps:**
+```bash
+# 1. Set OPRF service to external (common cause)
+heroku config:set OPRF_SERVICE_INTERNAL=false --app lemma-enterprise
+
+# 2. Force restart the dynos
+heroku restart --app lemma-enterprise
+
+# 3. Test if fixed
+curl https://lemma-enterprise-0f6ba17076c1.herokuapp.com/
+
+# 4. If still 404, check blueprint registration in logs
+heroku logs --app lemma-enterprise --num 50 | findstr "blueprint"
+
+# 5. If no blueprint logs found, force new deployment
+git commit --allow-empty -m "Fix blueprint registration"
+git push heroku main --force
+```
+
+**Root Cause:** The OPRF service tries to connect to localhost:8080 internally, but on Heroku dynos can't connect to each other via localhost. This causes initialization failures that prevent Flask blueprints from registering properly.
+
+**Prevention:** Always ensure `OPRF_SERVICE_INTERNAL=false` in production Heroku deployments.
+
+**What We Learned:** Previously, blueprint registration errors were being silently caught by try-catch blocks. Now the code will fail fast and show the actual error, making debugging much easier.
+
 ### Prerequisites
 - Python 3.9+
 - pip
