@@ -489,7 +489,7 @@ class OPRFClient:
     
     def __init__(self, server_url: str = None, cache_size: int = 1000):
         """
-        Initialize the OPRF client.
+        Initialize the OPRF client with certificate validation.
         
         Args:
             server_url: URL of the OPRF service (can be None to auto-detect)
@@ -515,15 +515,140 @@ class OPRFClient:
         self.cache_misses = 0
         self.offline_mode = False
         
+        # OPRF service authentication and certificate validation
+        self.api_key = os.environ.get('OPRF_API_KEY')
+        self.service_cert_fingerprint = os.environ.get('OPRF_CERT_FINGERPRINT')
+        self.verify_ssl = True
+        
         # Try initializing crypto and connecting to server
         try:
             self._initialize_crypto()
+            self._validate_server_security()
             # Test connection by getting public key
             self.get_public_key()
         except Exception as e:
             logger.warning(f"Failed to connect to OPRF service: {e}")
             logger.info("Using mock OPRF implementation (offline mode)")
             self.offline_mode = True
+    
+    def _validate_server_security(self):
+        """
+        Validate OPRF server security including HTTPS and certificate validation.
+        """
+        # In production, require HTTPS for external services
+        if os.environ.get('ENV') == 'production':
+            if not self.server_url.startswith('https://') and not self.server_url.startswith('http://localhost'):
+                raise ValueError("OPRF server must use HTTPS in production (unless localhost)")
+        
+        # Skip certificate validation for localhost in development
+        if 'localhost' in self.server_url or '127.0.0.1' in self.server_url:
+            if os.environ.get('ENV') != 'production':
+                logger.info("Skipping certificate validation for localhost in development")
+                return
+        
+        # For HTTPS services, validate certificates
+        if self.server_url.startswith('https://'):
+            self._validate_certificate()
+    
+    def _validate_certificate(self):
+        """
+        Validate OPRF server SSL/TLS certificate.
+        """
+        try:
+            import ssl
+            import socket
+            from urllib.parse import urlparse
+            
+            parsed_url = urlparse(self.server_url)
+            hostname = parsed_url.hostname
+            port = parsed_url.port or 443
+            
+            # Create SSL context with proper validation
+            context = ssl.create_default_context()
+            
+            # In production, require strict certificate validation
+            if os.environ.get('ENV') == 'production':
+                context.check_hostname = True
+                context.verify_mode = ssl.CERT_REQUIRED
+                
+                # If we have a certificate fingerprint, validate it
+                if self.service_cert_fingerprint:
+                    with socket.create_connection((hostname, port), timeout=10) as sock:
+                        with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                            cert_der = ssock.getpeercert(binary_form=True)
+                            cert_fingerprint = hashlib.sha256(cert_der).hexdigest()
+                            
+                            if cert_fingerprint != self.service_cert_fingerprint:
+                                raise ssl.SSLError(f"Certificate fingerprint mismatch. Expected: {self.service_cert_fingerprint}, Got: {cert_fingerprint}")
+                            
+                            logger.info("OPRF server certificate fingerprint validated")
+            else:
+                # In development, allow self-signed certificates but warn
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                logger.warning("SSL certificate validation relaxed for development")
+                
+        except ImportError:
+            logger.warning("SSL validation not available - proceeding without certificate validation")
+        except Exception as e:
+            logger.error(f"Certificate validation failed: {e}")
+            if os.environ.get('ENV') == 'production':
+                raise ConnectionError(f"OPRF server certificate validation failed: {e}")
+    
+    def _make_authenticated_request(self, endpoint: str, method: str = 'GET', data: dict = None) -> requests.Response:
+        """
+        Make authenticated request to OPRF server with proper security.
+        
+        Args:
+            endpoint: API endpoint to call
+            method: HTTP method (GET, POST, etc.)
+            data: Request data for POST requests
+            
+        Returns:
+            Response object
+        """
+        url = f"{self.server_url.rstrip('/')}/{endpoint.lstrip('/')}"
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Lemma-OPRF-Client/1.0'
+        }
+        
+        # Add API key authentication if available
+        if self.api_key:
+            headers['Authorization'] = f"Bearer {self.api_key}"
+        
+        # Configure SSL verification
+        verify_ssl = self.verify_ssl
+        if 'localhost' in self.server_url or '127.0.0.1' in self.server_url:
+            verify_ssl = False  # Allow localhost without SSL in development
+        
+        try:
+            if method.upper() == 'POST':
+                response = requests.post(url, json=data, headers=headers, 
+                                       verify=verify_ssl, timeout=30)
+            else:
+                response = requests.get(url, headers=headers, 
+                                      verify=verify_ssl, timeout=30)
+            
+            # Check for authentication errors
+            if response.status_code == 401:
+                raise ConnectionError("OPRF server authentication failed - check API key")
+            elif response.status_code == 403:
+                raise ConnectionError("OPRF server access forbidden - insufficient permissions")
+            
+            response.raise_for_status()
+            return response
+            
+        except requests.exceptions.SSLError as e:
+            logger.error(f"SSL/TLS error connecting to OPRF server: {e}")
+            if os.environ.get('ENV') == 'production':
+                raise ConnectionError(f"SSL/TLS validation failed for OPRF server: {e}")
+            else:
+                logger.warning("SSL error in development - check certificate configuration")
+                raise
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error connecting to OPRF server: {e}")
+            raise ConnectionError(f"Failed to connect to OPRF server: {e}")
     
     def _initialize_crypto(self):
         """Initialize cryptographic backend."""
@@ -554,14 +679,13 @@ class OPRFClient:
     
     def get_public_key(self) -> str:
         """
-        Get the OPRF service's public key.
+        Get the OPRF service's public key with authentication.
         
         Returns:
             str: Hex-encoded public key
         """
         try:
-            response = requests.get(f"{self.server_url}/pubkey")
-            response.raise_for_status()
+            response = self._make_authenticated_request("pubkey")
             data = response.json()
             self.public_key = data["publicKey"]
             return self.public_key
@@ -614,7 +738,7 @@ class OPRFClient:
         
     def evaluate(self, alpha: bytes) -> bytes:
         """
-        Send a blinded value to the OPRF service for evaluation.
+        Send a blinded value to the OPRF service for evaluation with authentication.
         
         Args:
             alpha: Blinded credential ID
@@ -626,12 +750,12 @@ class OPRFClient:
             # Encode alpha for transmission
             alpha_b64 = base64.b64encode(alpha).decode('utf-8')
             
-            # Send to OPRF service
-            response = requests.post(
-                f"{self.server_url}/oprfeval",
-                json={"alpha": [alpha_b64]}
+            # Send to OPRF service with authentication
+            response = self._make_authenticated_request(
+                "oprfeval", 
+                method="POST", 
+                data={"alpha": [alpha_b64]}
             )
-            response.raise_for_status()
             
             # Parse response
             data = response.json()

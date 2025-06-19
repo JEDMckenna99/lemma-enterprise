@@ -351,20 +351,42 @@ def create_app(test_config=None):
     @app.after_request
     def add_security_headers(response):
         """Add security headers including CSP."""
-        # Content Security Policy
-        csp_policy = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://js.stripe.com; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
-            "img-src 'self' data: https:; "
-            "font-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; "
-            "connect-src 'self' https://api.stripe.com; "
-            "frame-src 'self' https://js.stripe.com; "
-            "frame-ancestors 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'; "
-            "report-uri /api/csp-report"
-        )
+        # Enhanced Content Security Policy - More restrictive for production
+        if app.config.get('ENV') == 'production':
+            # Production CSP - more restrictive
+            csp_policy = (
+                "default-src 'self'; "
+                "script-src 'self' https://js.stripe.com; "  # Removed 'unsafe-inline' and untrusted CDNs
+                "style-src 'self' https://fonts.googleapis.com; "  # Removed 'unsafe-inline'
+                "img-src 'self' data: https://stripe.com https://js.stripe.com; "
+                "font-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; "
+                "connect-src 'self' https://api.stripe.com; "
+                "frame-src 'self' https://js.stripe.com; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'; "
+                "object-src 'none'; "  # Block plugins
+                "media-src 'none'; "   # Block media
+                "worker-src 'none'; "  # Block web workers
+                "manifest-src 'self'; "
+                "upgrade-insecure-requests; "  # Force HTTPS
+                "report-uri /api/csp-report"
+            )
+        else:
+            # Development CSP - more permissive for debugging
+            csp_policy = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://js.stripe.com; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; "
+                "connect-src 'self' https://api.stripe.com ws: wss:; "  # Allow WebSocket for dev tools
+                "frame-src 'self' https://js.stripe.com; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'; "
+                "report-uri /api/csp-report"
+            )
         
         response.headers['Content-Security-Policy'] = csp_policy
         response.headers['X-Content-Type-Options'] = 'nosniff'
