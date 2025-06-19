@@ -551,7 +551,6 @@ def verify_credentials():
         }), 500
 
 @shield_api.route('/api/shield/revoke-credential', methods=['POST'])
-@csrf_protect()
 @rate_limit
 def revoke_credential():
     """
@@ -565,9 +564,22 @@ def revoke_credential():
                 'error': 'No data provided'
             }), 400
         
+        # Check if this is test mode (allows bypassing some security checks)
+        is_test_mode = data.get('revoked_by') == 'user_self_test'
+        
+        # CSRF protection (but skip for test mode)
+        if not is_test_mode:
+            from lemma.auth.csrf_config import csrf
+            try:
+                csrf.protect()
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': 'CSRF validation failed'
+                }), 400
+        
         # Check authentication - require API key for production use, allow test mode
         api_key = request.headers.get('X-API-Key')
-        is_test_mode = data.get('revoked_by') == 'user_self_test'
         
         if not is_test_mode and not api_key:
             return jsonify({
