@@ -1,1 +1,1 @@
-web: gunicorn --worker-class gevent --workers 1 --worker-connections 1000 --timeout 30 --keep-alive 2 --max-requests 1000 --max-requests-jitter 50 --bind 0.0.0.0:$PORT wsgi_minimal:app
+web: gunicorn --worker-class gevent --workers 1 --worker-connections 1000 --timeout 30 --keep-alive 2 --max-requests 1000 --max-requests-jitter 50 --bind 0.0.0.0:$PORT wsgi:app
