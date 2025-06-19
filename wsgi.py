@@ -4,7 +4,7 @@ WSGI entry point for the Lemma Enterprise application.
 This is used by production servers like Gunicorn or uWSGI.
 """
 
-from lemma import create_app
+from app import create_app
 
 # Create the Flask application
 app = create_app()
