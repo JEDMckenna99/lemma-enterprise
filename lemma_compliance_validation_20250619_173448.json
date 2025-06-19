@@ -1,0 +1,579 @@
+{
+  "validation_timestamp": "2025-06-19T17:34:48.798072",
+  "total_duration_seconds": 295.4012825489044,
+  "overall_compliance_percentage": 50.87301587301587,
+  "is_production_ready": false,
+  "checklist_items_total": 8,
+  "checklist_items_passed": 3,
+  "checklist_items_failed": 5,
+  "checklist_results": {
+    "item_1": {
+      "name": "Credential issuance & wallet bootstrap",
+      "score": 80.0,
+      "duration_seconds": 4.102134943008423,
+      "status": "PASS",
+      "details": {
+        "tests": {
+          "endpoint_availability": {
+            "success": false,
+            "error": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: /api/issue-offline-credential (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x00000243354ED550>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+          },
+          "did_generation": {
+            "success": true,
+            "did_resolver_accessible": true
+          }
+        },
+        "endpoints_tested": [],
+        "compliance_items": {
+          "did_generation_works": true,
+          "protected_storage_available": true,
+          "issuer_key_embedded": true
+        }
+      },
+      "timestamp": 1750354197.4999166
+    },
+    "item_2": {
+      "name": "True-offline verification (happy path)",
+      "score": 100.0,
+      "duration_seconds": 0.0,
+      "status": "PASS",
+      "details": {
+        "tests": {
+          "offline_verification": {
+            "success": true,
+            "latency_ms": 0.0,
+            "details": {
+              "ed25519_signature_valid": true,
+              "witness_signature_valid": true,
+              "validity_window_ok": true,
+              "not_revoked": true
+            }
+          }
+        },
+        "performance_metrics": {
+          "offline_verification_latency_ms": 0.0,
+          "meets_latency_target": true
+        },
+        "compliance_items": {
+          "ed25519_signature_check": true,
+          "witness_integrity_check": true,
+          "validity_window_check": true,
+          "bloom_filter_check": true,
+          "zero_network_calls": true
+        }
+      },
+      "timestamp": 1750354197.5009189
+    },
+    "item_3": {
+      "name": "Automatic online fall-back",
+      "score": 0.0,
+      "duration_seconds": 0.0009975433349609375,
+      "status": "FAIL",
+      "details": {
+        "score": 100.0,
+        "duration_seconds": 0.0,
+        "status": "PASS",
+        "details": {
+          "tests": {
+            "online_fallback_endpoint": {
+              "success": true,
+              "error": "'LemmaComplianceValidator' object has no attribute 'headers'"
+            },
+            "fallback_triggers": {
+              "success": true,
+              "offline_failure_triggers": true,
+              "witness_expiry_triggers": true,
+              "witness_refresh_triggers": true,
+              "rate_limiting_works": true
+            },
+            "rate_limiting": {
+              "success": true,
+              "daily_limit_enforced": true,
+              "per_credential_tracking": true
+            }
+          },
+          "endpoints_tested": [],
+          "compliance_items": {
+            "fallback_triggers_working": true,
+            "rate_limiting_implemented": true,
+            "graceful_degradation": true
+          }
+        },
+        "timestamp": 1750354197.5019164
+      },
+      "timestamp": 1750354197.5019164
+    },
+    "item_4": {
+      "name": "Witness-refresh workflow",
+      "score": 71.42857142857143,
+      "duration_seconds": 2.0740625858306885,
+      "status": "FAIL",
+      "details": {
+        "tests": {
+          "witness_refresh_endpoint": {
+            "success": false,
+            "status_code": 403
+          },
+          "oprf_evaluation": {
+            "success": true,
+            "oprf_server_available": true,
+            "bloom_cascade_downloadable": true
+          }
+        },
+        "endpoints_tested": [
+          "/api/revocation/sync"
+        ],
+        "compliance_items": {
+          "witness_refresh_available": false,
+          "oprf_evaluation_works": true,
+          "bloom_cascade_current": true,
+          "witness_rebuild_successful": true,
+          "24h_trigger_threshold": true
+        }
+      },
+      "timestamp": 1750354199.576978
+    },
+    "item_5": {
+      "name": "Revocation service & cascade publishing",
+      "score": 0.0,
+      "duration_seconds": 4.1004958152771,
+      "status": "FAIL",
+      "details": {
+        "score": 100.0,
+        "duration_seconds": 4.1004958152771,
+        "status": "PASS",
+        "details": {
+          "tests": {
+            "cascade_publishing": {
+              "success": true,
+              "details": {
+                "success": true,
+                "false_positive_rate": 0.0005
+              }
+            },
+            "endpoint__api_revocation_data_didlemmadefault": {
+              "success": false,
+              "status_code": 403,
+              "response_size": 84
+            },
+            "endpoint__api_revocation_status": {
+              "success": false,
+              "status_code": 403,
+              "response_size": 84
+            },
+            "cdn_p2p_distribution": {
+              "success": true,
+              "cdn_configured": true,
+              "p2p_peers_available": true
+            }
+          },
+          "endpoints_tested": [
+            "/api/revocation/data/did:lemma:default",
+            "/api/revocation/status"
+          ],
+          "compliance_items": {
+            "cascade_publishing_works": true,
+            "false_positive_rate_compliant": true,
+            "oprf_pipeline_working": true,
+            "three_level_cascade": true,
+            "cdn_distribution": true,
+            "p2p_distribution": true
+          },
+          "cascade_metrics": {
+            "false_positive_rate": 0.0005,
+            "meets_threshold": true
+          }
+        },
+        "timestamp": 1750354203.6774738
+      },
+      "timestamp": 1750354203.6774738
+    },
+    "item_6": {
+      "name": "Security & key-management flows",
+      "score": 0.0,
+      "duration_seconds": 4.115640640258789,
+      "status": "FAIL",
+      "details": {
+        "score": 100.0,
+        "duration_seconds": 4.114640474319458,
+        "status": "PASS",
+        "details": {
+          "tests": {
+            "oprf_key_management": {
+              "success": false,
+              "status_code": 403,
+              "oprf_status": null
+            },
+            "device_binding": {
+              "success": true,
+              "device_key_encryption": true,
+              "replay_protection": true
+            },
+            "compliance_endpoints": {
+              "success": true,
+              "status_code": 200,
+              "compliance_data": {
+                "gdpr_compliant": true,
+                "iso27001_compliant": true,
+                "key_rotation_status": "current",
+                "last_audit": "2024-12-01",
+                "security_controls": "active",
+                "soc2_compliant": true
+              }
+            }
+          },
+          "endpoints_tested": [
+            "/api/oprf/status",
+            "/api/compliance/status"
+          ],
+          "compliance_items": {
+            "issuer_key_rotation": true,
+            "did_document_anchoring": true,
+            "device_binding_implemented": true,
+            "replay_protection_active": true,
+            "soc2_compliance": true,
+            "iso27001_compliance": true,
+            "gdpr_compliance": true
+          }
+        },
+        "timestamp": 1750354207.794111
+      },
+      "timestamp": 1750354207.794111
+    },
+    "item_7": {
+      "name": "Admin, billing & SRE observability",
+      "score": 100.0,
+      "duration_seconds": 6.199922800064087,
+      "status": "PASS",
+      "details": {
+        "tests": {
+          "endpoint__api_admin_status": {
+            "success": true,
+            "status_code": 200
+          },
+          "endpoint__api_billing_usage_monthly": {
+            "success": true,
+            "status_code": 200
+          },
+          "endpoint__api_sre_metrics_health": {
+            "success": true,
+            "status_code": 200
+          },
+          "metrics_collection": {
+            "success": true,
+            "mau_counters": true,
+            "revocation_lag_monitoring": true,
+            "p95_latency_tracking": true,
+            "bloom_size_monitoring": true
+          },
+          "billing_sre": {
+            "success": true,
+            "billing_webhooks": true,
+            "usage_tracking": true,
+            "sre_metrics_exposed": true
+          }
+        },
+        "endpoints_tested": [
+          "/api/admin/status",
+          "/api/billing/usage/monthly",
+          "/api/sre/metrics/health"
+        ],
+        "compliance_items": {
+          "admin_dashboard": true,
+          "billing_integration": true,
+          "sre_observability": true,
+          "metrics_collection": true
+        }
+      },
+      "timestamp": 1750354213.9940338
+    },
+    "item_8": {
+      "name": "Edge-case & hardening checks",
+      "score": 55.55555555555556,
+      "duration_seconds": 274.8030512332916,
+      "status": "FAIL",
+      "details": {
+        "tests": {
+          "comprehensive_hardening": {
+            "success": false,
+            "compliance_percentage": 70.0,
+            "tests_passed": 7,
+            "tests_failed": 3
+          }
+        },
+        "hardening_results": {
+          "session_id": "test_session_1750354193",
+          "total_duration_seconds": 274.800749540329,
+          "tests_run": 10,
+          "tests_passed": 7,
+          "tests_failed": 3,
+          "compliance_percentage": 70.0,
+          "is_production_ready": false,
+          "detailed_results": {
+            "false_positive_handling": {
+              "test_name": "false_positive_handling",
+              "success": true,
+              "duration_ms": 3.004789352416992,
+              "error_message": null,
+              "metrics": {
+                "false_positive_rate": 0.0,
+                "threshold": 0.0008,
+                "false_positives": 0,
+                "total_tests": 1000,
+                "online_fallbacks": 0,
+                "fallback_success_rate": 1.0,
+                "fp_compliant": true,
+                "fallback_compliant": true
+              },
+              "timestamp": 1750354213.9980261
+            },
+            "collision_ratio_monitoring": {
+              "test_name": "collision_ratio_monitoring",
+              "success": false,
+              "duration_ms": 2080.4011821746826,
+              "error_message": null,
+              "metrics": {
+                "collision_ratio": 0.0,
+                "threshold": 0.05,
+                "collisions_found": 0,
+                "test_size": 10000,
+                "monitoring_active": false,
+                "compliance": true
+              },
+              "timestamp": 1750354216.079427
+            },
+            "cdn_loss_simulation": {
+              "test_name": "cdn_loss_simulation",
+              "success": false,
+              "duration_ms": 2063.9572143554688,
+              "error_message": null,
+              "metrics": {
+                "cdn_endpoints_tested": 0,
+                "available_cdns": 0,
+                "working_fallbacks": 0,
+                "local_fallback_works": false,
+                "cdn_results": []
+              },
+              "timestamp": 1750354218.1443825
+            },
+            "burst_performance": {
+              "test_name": "burst_performance",
+              "success": false,
+              "duration_ms": 228422.03545570374,
+              "error_message": "7100 (of 10000) futures unfinished",
+              "metrics": {},
+              "timestamp": 1750354446.567415
+            },
+            "device_offline_scenarios": {
+              "test_name": "device_offline_scenarios",
+              "success": true,
+              "duration_ms": 0.0,
+              "error_message": null,
+              "metrics": {
+                "scenarios_tested": 4,
+                "scenarios_passed": 4,
+                "pass_rate": 1.0,
+                "scenario_results": {
+                  "offline_verification": {
+                    "success": true,
+                    "offline_verification_works": true
+                  },
+                  "witness_expiry_offline": {
+                    "success": true,
+                    "expiry_handled": true
+                  },
+                  "offline_recovery": {
+                    "success": true,
+                    "recovery_successful": true
+                  },
+                  "graceful_degradation": {
+                    "success": true,
+                    "degradation_graceful": true
+                  }
+                }
+              },
+              "timestamp": 1750354446.568415
+            },
+            "witness_expiry_edge_cases": {
+              "test_name": "witness_expiry_edge_cases",
+              "success": true,
+              "duration_ms": 0.0,
+              "error_message": null,
+              "metrics": {
+                "edge_cases_tested": 4,
+                "edge_cases_passed": 4,
+                "edge_case_results": {
+                  "exact_expiry": {
+                    "success": true,
+                    "timing_handled": true
+                  },
+                  "refresh_failure": {
+                    "success": true,
+                    "failure_handled": true
+                  },
+                  "concurrent_refresh": {
+                    "success": true,
+                    "concurrency_handled": true
+                  },
+                  "clock_skew": {
+                    "success": true,
+                    "skew_handled": true
+                  }
+                }
+              },
+              "timestamp": 1750354446.568415
+            },
+            "threat_model_validation": {
+              "test_name": "threat_model_validation",
+              "success": true,
+              "duration_ms": 0.0,
+              "error_message": null,
+              "metrics": {
+                "threat_tests": 5,
+                "threats_mitigated": 5,
+                "mitigation_rate": 1.0,
+                "threat_results": {
+                  "replay_protection": {
+                    "success": true,
+                    "replay_protected": true
+                  },
+                  "forgery_protection": {
+                    "success": true,
+                    "forgery_protected": true
+                  },
+                  "timing_resistance": {
+                    "success": true,
+                    "timing_resistant": true
+                  },
+                  "sidechannel_resistance": {
+                    "success": true,
+                    "sidechannel_resistant": true
+                  },
+                  "mitm_protection": {
+                    "success": true,
+                    "mitm_protected": true
+                  }
+                }
+              },
+              "timestamp": 1750354446.568415
+            },
+            "recovery_mechanisms": {
+              "test_name": "recovery_mechanisms",
+              "success": true,
+              "duration_ms": 0.0,
+              "error_message": null,
+              "metrics": {
+                "recovery_scenarios": 4,
+                "successful_recoveries": 4,
+                "recovery_rate": 1.0,
+                "recovery_results": {
+                  "service_restart": {
+                    "success": true,
+                    "restart_recovery": true
+                  },
+                  "database_recovery": {
+                    "success": true,
+                    "db_recovery": true
+                  },
+                  "network_partition": {
+                    "success": true,
+                    "partition_recovery": true
+                  },
+                  "memory_exhaustion": {
+                    "success": true,
+                    "memory_recovery": true
+                  }
+                }
+              },
+              "timestamp": 1750354446.5694149
+            },
+            "concurrent_access_patterns": {
+              "test_name": "concurrent_access_patterns",
+              "success": true,
+              "duration_ms": 41203.24945449829,
+              "error_message": null,
+              "metrics": {
+                "concurrent_workers": 50,
+                "requests_per_worker": 20,
+                "total_requests": 1000,
+                "successful_requests": 1000,
+                "success_rate": 1.0
+              },
+              "timestamp": 1750354487.7726643
+            },
+            "memory_stress_testing": {
+              "test_name": "memory_stress_testing",
+              "success": true,
+              "duration_ms": 1023.106575012207,
+              "error_message": null,
+              "metrics": {
+                "baseline_memory_mb": 76.44921875,
+                "peak_memory_mb": 91.37109375,
+                "final_memory_mb": 76.25,
+                "memory_leak_mb": -0.19921875,
+                "acceptable_leak": true
+              },
+              "timestamp": 1750354488.795771
+            }
+          },
+          "timestamp": 1750354488.795771
+        },
+        "compliance_items": {
+          "false_positive_handling": true,
+          "collision_monitoring": false,
+          "cdn_loss_recovery": false,
+          "burst_testing": false,
+          "offline_scenarios": true,
+          "witness_expiry_handling": true,
+          "threat_model_validation": true,
+          "recovery_mechanisms": true
+        }
+      },
+      "timestamp": 1750354488.7980726
+    }
+  },
+  "production_readiness_summary": {
+    "production_ready": false,
+    "compliance_level": "BASIC_FUNCTIONALITY",
+    "critical_issues": [
+      {
+        "item": "Automatic online fall-back",
+        "score": 0.0,
+        "status": "FAIL"
+      },
+      {
+        "item": "Witness-refresh workflow",
+        "score": 71.42857142857143,
+        "status": "FAIL"
+      },
+      {
+        "item": "Revocation service & cascade publishing",
+        "score": 0.0,
+        "status": "FAIL"
+      },
+      {
+        "item": "Security & key-management flows",
+        "score": 0.0,
+        "status": "FAIL"
+      },
+      {
+        "item": "Edge-case & hardening checks",
+        "score": 55.55555555555556,
+        "status": "FAIL"
+      }
+    ],
+    "recommendations": [
+      "Complete implementation of failing checklist items",
+      "Run comprehensive edge-case testing",
+      "Validate false-positive rate \u22640.0008%",
+      "Ensure CDN/P2P distribution is configured",
+      "Implement monitoring and alerting systems"
+    ],
+    "next_steps": [
+      "Address critical failing items",
+      "Re-run compliance validation",
+      "Target: 49.1% improvement needed",
+      "Focus on security and performance items"
+    ]
+  }
+}
