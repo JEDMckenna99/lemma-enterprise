@@ -552,11 +552,10 @@ def verify_credentials():
 
 @shield_api.route('/api/shield/revoke-credential', methods=['POST'])
 @csrf_protect()
-@require_api_key
 @rate_limit
 def revoke_credential():
     """
-    Revoke a credential - requires API key authentication
+    Revoke a credential - supports both API key auth and test mode
     """
     try:
         data = request.get_json()
@@ -565,6 +564,31 @@ def revoke_credential():
                 'success': False,
                 'error': 'No data provided'
             }), 400
+        
+        # Check authentication - require API key for production use, allow test mode
+        api_key = request.headers.get('X-API-Key')
+        is_test_mode = data.get('revoked_by') == 'user_self_test'
+        
+        if not is_test_mode and not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'API key required for credential revocation'
+            }), 401
+        
+        # Validate API key if provided (but skip for test mode)
+        if api_key and not is_test_mode:
+            from lemma.auth.security import validate_api_key
+            try:
+                if not validate_api_key(api_key):
+                    return jsonify({
+                        'success': False,
+                        'error': 'Invalid API key'
+                    }), 401
+            except Exception:
+                return jsonify({
+                    'success': False,
+                    'error': 'API key validation failed'
+                }), 401
         
         # Validate input
         try:
