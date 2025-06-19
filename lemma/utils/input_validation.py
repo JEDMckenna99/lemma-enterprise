@@ -278,37 +278,49 @@ class InputValidator:
         
         return data
 
-class CredentialSchema(Schema):
-    """Marshmallow schema for comprehensive credential validation."""
-    user_id = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    credential_type = fields.Str(validate=validate.OneOf(['human', 'age', 'location', 'identity']))
-    issuer_did = fields.Str(validate=validate.Length(min=10, max=200))
-    subject_did = fields.Str(validate=validate.Length(min=10, max=200))
-    issued_at = fields.DateTime()
-    expires_at = fields.DateTime()
-    credential_data = fields.Dict()
-    
-class PresentationSchema(Schema):
-    """Marshmallow schema for presentation validation."""
-    challenge = fields.Str(required=True, validate=validate.Length(min=16, max=128))
-    credentials = fields.List(fields.Dict(), validate=validate.Length(min=1, max=10))
-    domain = fields.Str(validate=validate.Length(max=100))
-    nonce = fields.Str(validate=validate.Length(max=64))
+# Only define schema classes if marshmallow is available
+if MARSHMALLOW_AVAILABLE:
+    class CredentialSchema(Schema):
+        """Marshmallow schema for comprehensive credential validation."""
+        user_id = fields.Str(required=True, validate=validate.Length(min=1, max=100))
+        credential_type = fields.Str(validate=validate.OneOf(['human', 'age', 'location', 'identity']))
+        issuer_did = fields.Str(validate=validate.Length(min=10, max=200))
+        subject_did = fields.Str(validate=validate.Length(min=10, max=200))
+        issued_at = fields.DateTime()
+        expires_at = fields.DateTime()
+        credential_data = fields.Dict()
+        
+    class PresentationSchema(Schema):
+        """Marshmallow schema for presentation validation."""
+        challenge = fields.Str(required=True, validate=validate.Length(min=16, max=128))
+        credentials = fields.List(fields.Dict(), validate=validate.Length(min=1, max=10))
+        domain = fields.Str(validate=validate.Length(max=100))
+        nonce = fields.Str(validate=validate.Length(max=64))
 
-class APIRequestSchema(Schema):
-    """Base schema for API requests with security validation."""
-    request_id = fields.Str(validate=validate.Length(max=64))
-    timestamp = fields.DateTime()
-    client_version = fields.Str(validate=validate.Length(max=50))
+    class APIRequestSchema(Schema):
+        """Base schema for API requests with security validation."""
+        request_id = fields.Str(validate=validate.Length(max=64))
+        timestamp = fields.DateTime()
+        client_version = fields.Str(validate=validate.Length(max=50))
 
-class KYCVerificationSchema(Schema):
-    """Schema for KYC verification requests."""
-    user_id = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    verification_type = fields.Str(required=True, validate=validate.OneOf(['identity', 'age', 'address']))
-    document_type = fields.Str(validate=validate.OneOf(['passport', 'drivers_license', 'national_id']))
-    metadata = fields.Dict()
+    class KYCVerificationSchema(Schema):
+        """Schema for KYC verification requests."""
+        user_id = fields.Str(required=True, validate=validate.Length(min=1, max=100))
+        verification_type = fields.Str(required=True, validate=validate.OneOf(['identity', 'age', 'address']))
+        document_type = fields.Str(validate=validate.OneOf(['passport', 'drivers_license', 'national_id']))
+        metadata = fields.Dict()
+else:
+    # Fallback classes when marshmallow is not available
+    class CredentialSchema:
+        pass
+    class PresentationSchema:
+        pass  
+    class APIRequestSchema:
+        pass
+    class KYCVerificationSchema:
+        pass
 
-def validate_with_schema(data: Dict[str, Any], schema_class: Schema) -> Dict[str, Any]:
+def validate_with_schema(data: Dict[str, Any], schema_class) -> Dict[str, Any]:
     """
     Validate data using marshmallow schema with comprehensive error handling.
     

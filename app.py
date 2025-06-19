@@ -60,11 +60,8 @@ def create_app():
     else:
         logger.info("OPRF cascade manager disabled or not available")
     
-    # Define routes - removed redirect to allow main app to handle homepage
-    # @app.route('/')  # Commented out to let the main Flask app handle the homepage
-    # def index():
-    #     """Redirect to the main Lemma application."""
-    #     return redirect('/lemma/')
+    # Define routes - ensure main app handles homepage properly
+    # Root route is handled by the main Lemma app through its blueprints
     
     @app.route('/cascade/<epoch>')
     def cascade_direct(epoch):
