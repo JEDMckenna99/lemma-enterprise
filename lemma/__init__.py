@@ -526,12 +526,12 @@ def create_app(test_config=None):
         from flask_limiter.util import get_remote_address
         
         limiter = Limiter(
-            app,
             key_func=get_remote_address,
             default_limits=["1000 per hour", "100 per minute"],
             storage_uri="memory://",
             strategy="fixed-window"
         )
+        limiter.init_app(app)
         
         # Store limiter for use in routes
         app.limiter = limiter
