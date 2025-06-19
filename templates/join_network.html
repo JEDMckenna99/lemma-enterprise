@@ -440,9 +440,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const verificationStatus = document.getElementById('verificationStatus');
     const actionStatus = document.getElementById('actionStatus');
     
-    // Revoke credential
+    // Revoke credential and automatically trigger re-verification
     revokeBtn.addEventListener('click', async function() {
-        if (!confirm('This will revoke your current Lemma credential for testing purposes. You will need to re-verify. Continue?')) {
+        if (!confirm('This will revoke your current Lemma credential for testing purposes. The system will automatically attempt re-verification. Continue?')) {
             return;
         }
         
@@ -450,10 +450,21 @@ document.addEventListener('DOMContentLoaded', function() {
         revokeBtn.innerHTML = '<span class="loading-spinner mr-2"></span>Revoking...';
         
         try {
-            // Get current credential ID from session/storage
+            // Step 1: Get current credential ID from wallet
             const credentialId = sessionStorage.getItem('lemma_credential_id') || 'test-credential-' + Date.now();
             
-            const response = await fetch('/api/shield/revoke-credential', {
+            // Step 2: Revoke the credential
+            actionStatus.innerHTML = `
+                <div class="status-indicator status-pending">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Step 1/4: Revoking credential...
+                </div>
+            `;
+            actionStatus.style.display = 'block';
+            
+            const revokeResponse = await fetch('/api/shield/revoke-credential', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -466,34 +477,100 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             });
             
-            const result = await response.json();
+            const revokeResult = await revokeResponse.json();
             
-            if (result.success) {
-                // Update UI to show revoked state
-                verificationStatus.innerHTML = `
+            if (!revokeResult.success) {
+                throw new Error(revokeResult.error || 'Revocation failed');
+            }
+            
+            // Step 3: Verify revocation status with offline API
+            actionStatus.innerHTML = `
+                <div class="status-indicator status-pending">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Step 2/4: Checking revocation status...
+                </div>
+            `;
+            
+            const verifyResponse = await fetch('/api/verify-offline', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    credential_id: credentialId
+                })
+            });
+            
+            const verifyResult = await verifyResponse.json();
+            
+            // Step 4: Notify Lemma API of revocation
+            actionStatus.innerHTML = `
+                <div class="status-indicator status-pending">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Step 3/4: Notifying Lemma API...
+                </div>
+            `;
+            
+            // Notify central Lemma API
+            try {
+                await fetch('https://api.lemma.network/v1/revocations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + (sessionStorage.getItem('lemma_api_token') || 'demo-token')
+                    },
+                    body: JSON.stringify({
+                        credential_id: credentialId,
+                        revocation_reason: 'user_test',
+                        timestamp: new Date().toISOString(),
+                        source: 'lemma-enterprise-demo'
+                    })
+                });
+            } catch (notifyError) {
+                console.warn('Failed to notify Lemma API:', notifyError);
+                // Continue with flow even if notification fails
+            }
+            
+            // Update UI to show revoked state
+            verificationStatus.innerHTML = `
+                <div class="status-indicator status-error">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                    Credential Revoked
+                </div>
+            `;
+            
+            // Step 5: Automatically trigger Lemma Shield for re-verification
+            actionStatus.innerHTML = `
+                <div class="status-indicator status-pending">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Step 4/4: Automatically triggering re-verification...
+                </div>
+            `;
+            
+            // Wait 2 seconds then auto-trigger Shield
+            setTimeout(() => {
+                actionStatus.innerHTML = `
                     <div class="status-indicator status-error">
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                         </svg>
-                        Credential Revoked
+                        Credential revoked! Re-verification required to continue.
                     </div>
                 `;
                 
-                actionStatus.innerHTML = `
-                    <div class="status-indicator status-pending">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        Revocation successful. Use Shield to re-verify.
-                    </div>
-                `;
-                actionStatus.style.display = 'block';
+                // Auto-trigger Lemma Shield for re-verification
+                triggerLemmaShieldReVerification();
                 
-                revokeBtn.style.display = 'none';
-                verifyBtn.style.display = 'inline-flex';
-            } else {
-                throw new Error(result.error || 'Revocation failed');
-            }
+            }, 2000);
+            
         } catch (error) {
             actionStatus.innerHTML = `
                 <div class="status-indicator status-error">
@@ -515,12 +592,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Re-verify with Shield
-    verifyBtn.addEventListener('click', function() {
+    // Function to trigger Lemma Shield re-verification
+    function triggerLemmaShieldReVerification() {
         // Initialize Lemma Shield for re-verification
         if (typeof LemmaShield !== 'undefined') {
             const shield = new LemmaShield({
                 apiKey: 'demo-key',
+                mode: 'reverification', // Indicate this is a re-verification after revocation
                 onVerified: function(proof) {
                     // Update UI to show verified state
                     verificationStatus.innerHTML = `
@@ -541,8 +619,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     `;
                     
+                    // Reset buttons for next test
                     verifyBtn.style.display = 'none';
                     revokeBtn.style.display = 'inline-flex';
+                    
+                    // Store new credential ID
+                    sessionStorage.setItem('lemma_credential_id', proof.credential_id || 'new-credential-' + Date.now());
                 },
                 onError: function(error) {
                     actionStatus.innerHTML = `
@@ -550,8 +632,41 @@ document.addEventListener('DOMContentLoaded', function() {
                             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                             </svg>
-                            Verification failed: ${error.message}
+                            Re-verification failed: ${error.message}. You are now locked out.
                         </div>
+                    `;
+                    
+                    // User is now locked out - this is the intended security behavior
+                    revokeBtn.style.display = 'none';
+                    verifyBtn.style.display = 'none';
+                    
+                    // Show manual verification option
+                    setTimeout(() => {
+                        actionStatus.innerHTML += `
+                            <br><br>
+                            <button onclick="window.location.reload()" class="btn btn-primary">
+                                Start Over (Clear Session)
+                            </button>
+                        `;
+                    }, 3000);
+                },
+                onCancel: function() {
+                    actionStatus.innerHTML = `
+                        <div class="status-indicator status-error">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                            Re-verification cancelled. You are locked out until you complete verification.
+                        </div>
+                    `;
+                    
+                    // Show retry option
+                    verifyBtn.style.display = 'inline-flex';
+                    verifyBtn.innerHTML = `
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="mr-2">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Retry Verification
                     `;
                 }
             });
@@ -559,8 +674,30 @@ document.addEventListener('DOMContentLoaded', function() {
             shield.show();
         } else {
             // Fallback if Shield widget not available
-            alert('Lemma Shield widget not available. Please refresh the page and try again.');
+            actionStatus.innerHTML = `
+                <div class="status-indicator status-error">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                    Lemma Shield widget not available. You are locked out.
+                </div>
+            `;
+            
+            // Show manual reload option
+            setTimeout(() => {
+                actionStatus.innerHTML += `
+                    <br><br>
+                    <button onclick="window.location.reload()" class="btn btn-primary">
+                        Reload Page and Try Again
+                    </button>
+                `;
+            }, 2000);
         }
+    }
+
+    // Manual re-verify button (fallback)
+    verifyBtn.addEventListener('click', function() {
+        triggerLemmaShieldReVerification();
     });
     
     // Check if user already has a saved signature
