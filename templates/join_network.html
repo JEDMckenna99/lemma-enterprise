@@ -509,12 +509,13 @@ document.addEventListener('DOMContentLoaded', function() {
             let verifyResult = await verifyResponse.json();
             
             // Fallback: Check in-memory revocation if server didn't detect it
-            if (verifyResult.success) {
+            if (verifyResult.verified && !verifyResult.revoked) {
                 const revokedList = JSON.parse(sessionStorage.getItem('lemma_revoked_credentials') || '[]');
                 if (revokedList.includes(credentialId)) {
                     console.log('[LEMMA-FLOW] In-memory revocation check detected revoked credential');
                     verifyResult = {
-                        success: false,
+                        success: true,
+                        verified: false,
                         reason: 'credential_revoked',
                         network_calls: 0,
                         revoked: true
@@ -523,7 +524,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Step 4: Show verification result and immediately trigger security response
-            if (verifyResult.success) {
+            if (verifyResult.verified && !verifyResult.revoked) {
                 actionStatus.innerHTML = `
                     <div class="status-indicator status-error">
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">

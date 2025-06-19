@@ -2798,8 +2798,8 @@ def verify_offline():
         if is_revoked:
             # Credential is revoked - return failure immediately
             return jsonify({
-                "success": False,
-                "verified": False,
+                "success": True,  # API call succeeded
+                "verified": False,  # But verification failed due to revocation
                 "revoked": True,
                 "reason": revocation_reason,
                 "method": "offline_revocation_check",
