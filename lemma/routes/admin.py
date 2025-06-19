@@ -98,7 +98,11 @@ def logout():
 @admin_bp.route('/')
 @admin_required
 def dashboard():
-    """Main admin dashboard"""
+    """Main admin dashboard with strict authentication"""
+    # Additional check - ensure admin is actually logged in
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin.login', next=request.url))
+    
     return render_template('admin_dashboard.html')
 
 @admin_bp.route('/api/dashboard/data')

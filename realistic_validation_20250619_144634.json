@@ -1,0 +1,15 @@
+{
+  "validation_timestamp": "2025-06-19T18:46:34.062631",
+  "total_duration_seconds": 4.312268972396851,
+  "success_rate_percentage": 0.0,
+  "is_production_ready": false,
+  "failure_reason": "Server not running or accessible",
+  "realistic_assessment": {
+    "status": "SYSTEM_UNAVAILABLE",
+    "confidence_level": "NONE",
+    "recommendations": [
+      "Start the server before validation",
+      "Ensure system is properly configured"
+    ]
+  }
+}

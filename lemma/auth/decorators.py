@@ -10,18 +10,14 @@ def admin_required(f):
     """Decorator to require admin authentication for a route."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # SECURITY: Never skip authentication in production
-        if current_app.config.get('ENV') == 'production':
-            # Force authentication check in production - no bypasses allowed
-            if not session.get('admin_logged_in'):
-                return redirect(url_for('admin.login', next=request.url))
-        else:
-            # Skip authentication checks in test environment if configured
-            is_testing = current_app.config.get('TESTING', False)
-            
-            if is_testing and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
-                return f(*args, **kwargs)
-            
+        # Check if we're in testing mode
+        is_testing = current_app.config.get('TESTING', False)
+        
+        # Skip authentication checks in test environment if configured
+        if is_testing and current_app.config.get('SKIP_AUTH_IN_TESTS', False):
+            return f(*args, **kwargs)
+        
+        # Check if admin is logged in
         if not session.get('admin_logged_in'):
             return redirect(url_for('admin.login', next=request.url))
         
