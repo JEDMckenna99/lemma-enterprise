@@ -649,6 +649,158 @@ def create_app(test_config=None):
                 'request_id': getattr(g, 'request_id', 'unknown')
             }), 500
 
+    # PRODUCTION CONFIGURATION HARDENING
+    def validate_production_environment():
+        """Validate production environment configuration and security settings."""
+        if app.config.get('ENV') != 'production':
+            return  # Skip validation for non-production environments
+        
+        logger.info("Validating production environment configuration...")
+        
+        # Critical environment variables that must be set in production
+        required_env_vars = {
+            'LEMMA_API_KEY': 'API authentication key',
+            'SECRET_KEY': 'Flask secret key for session security',
+            'DATABASE_URL': 'Database connection string',
+        }
+        
+        optional_secure_env_vars = {
+            'OPRF_API_KEY': 'OPRF service authentication',
+            'OPRF_CERT_FINGERPRINT': 'OPRF service certificate fingerprint',
+            'STRIPE_SECRET_KEY': 'Stripe payment processing',
+            'STRIPE_WEBHOOK_SECRET': 'Stripe webhook validation'
+        }
+        
+        missing_vars = []
+        weak_vars = []
+        
+        # Validate required environment variables
+        for var_name, description in required_env_vars.items():
+            value = os.environ.get(var_name)
+            if not value:
+                missing_vars.append(f"{var_name} ({description})")
+            elif len(value) < 32:  # Minimum entropy requirement
+                weak_vars.append(f"{var_name} (too short - minimum 32 characters)")
+        
+        # Validate optional but recommended variables
+        for var_name, description in optional_secure_env_vars.items():
+            value = os.environ.get(var_name)
+            if value and len(value) < 16:
+                weak_vars.append(f"{var_name} (too short for security)")
+        
+        # Check for insecure default values
+        insecure_defaults = {
+            'SECRET_KEY': ['dev', 'development', 'secret', 'change-me'],
+            'LEMMA_API_KEY': ['dev_api_key', 'test_key', 'changeme']
+        }
+        
+        for var_name, insecure_values in insecure_defaults.items():
+            value = os.environ.get(var_name, '').lower()
+            if any(insecure in value for insecure in insecure_values):
+                weak_vars.append(f"{var_name} (using insecure default value)")
+        
+        # Report validation results
+        if missing_vars:
+            error_msg = f"PRODUCTION SECURITY ERROR: Missing required environment variables: {', '.join(missing_vars)}"
+            logger.error(error_msg)
+            raise EnvironmentError(error_msg)
+        
+        if weak_vars:
+            warning_msg = f"PRODUCTION SECURITY WARNING: Weak environment variables detected: {', '.join(weak_vars)}"
+            logger.warning(warning_msg)
+        
+        # Validate debug mode is completely disabled
+        if app.debug or app.config.get('DEBUG'):
+            error_msg = "PRODUCTION SECURITY ERROR: Debug mode must be disabled in production"
+            logger.error(error_msg)
+            raise EnvironmentError(error_msg)
+        
+        # Validate secure session configuration
+        if not app.config.get('SESSION_COOKIE_SECURE'):
+            logger.warning("PRODUCTION WARNING: SESSION_COOKIE_SECURE should be True in production")
+        
+        if not app.config.get('SESSION_COOKIE_HTTPONLY'):
+            logger.warning("PRODUCTION WARNING: SESSION_COOKIE_HTTPONLY should be True")
+        
+        logger.info("Production environment validation completed successfully")
+    
+    # Run production validation
+    try:
+        validate_production_environment()
+    except Exception as e:
+        logger.error(f"Production validation failed: {e}")
+        if app.config.get('ENV') == 'production':
+            raise  # Fail fast in production
+
+    # SECRETS MANAGEMENT ENHANCEMENT
+    def get_secure_config(key: str, default=None, min_length: int = 0):
+        """Securely retrieve configuration values with validation."""
+        value = os.environ.get(key, default)
+        
+        if value and min_length > 0 and len(value) < min_length:
+            logger.warning(f"Configuration value for {key} is shorter than recommended ({min_length} chars)")
+        
+        # Log configuration access (without revealing values)
+        if app.config.get('ENV') == 'production':
+            logger.info(f"Configuration accessed: {key} ({'SET' if value else 'NOT_SET'})")
+        
+        return value
+    
+    # Store secure config function in app for use by other modules
+    app.get_secure_config = get_secure_config
+
+    # NETWORK SECURITY IMPROVEMENTS
+    @app.before_request
+    def enforce_network_security():
+        """Enforce network-level security policies."""
+        # Skip for health checks and static files
+        if request.endpoint in ['static', 'health_check', 'ping']:
+            return
+        
+        # Enforce HTTPS in production
+        if app.config.get('ENV') == 'production':
+            if not request.is_secure and 'localhost' not in request.host:
+                # Redirect HTTP to HTTPS
+                url = request.url.replace('http://', 'https://', 1)
+                return redirect(url, code=301)
+        
+        # Add security context to request
+        g.security_context = {
+            'is_secure': request.is_secure,
+            'user_agent': request.headers.get('User-Agent', ''),
+            'ip_address': request.remote_addr,
+            'timestamp': time.time()
+        }
+    
+    # CERTIFICATE PINNING FOR OPRF SERVICE
+    def setup_certificate_pinning():
+        """Set up certificate pinning for external services."""
+        try:
+            # Certificate pinning configuration
+            cert_pins = {
+                'oprf_service': {
+                    'url_pattern': 'oprf',
+                    'fingerprint': os.environ.get('OPRF_CERT_FINGERPRINT'),
+                    'backup_fingerprint': os.environ.get('OPRF_BACKUP_CERT_FINGERPRINT')
+                },
+                'stripe_api': {
+                    'url_pattern': 'api.stripe.com',
+                    'fingerprint': os.environ.get('STRIPE_CERT_FINGERPRINT'),
+                    'backup_fingerprint': None  # Stripe manages their own certificates
+                }
+            }
+            
+            # Store certificate pins in app config
+            app.config['CERTIFICATE_PINS'] = cert_pins
+            
+            if app.config.get('ENV') == 'production':
+                logger.info("Certificate pinning configured for production")
+            
+        except Exception as e:
+            logger.warning(f"Certificate pinning setup failed: {e}")
+    
+    setup_certificate_pinning()
+
     return app
 
 def _init_components(app):

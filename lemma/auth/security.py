@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from flask import current_app, session, redirect, url_for, request, abort, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
+from typing import List, Set
 
 def hash_password(password):
     """Hash a password for secure storage using Werkzeug's implementation."""
@@ -163,3 +164,214 @@ def validate_csrf_token(token):
     if not token or token != session.get('_csrf_token'):
         abort(403)
     return True
+
+# ROLE-BASED ACCESS CONTROL (RBAC) SYSTEM
+class Permission:
+    """Define system permissions for RBAC."""
+    VERIFY = 'verify'           # Verify credentials
+    ISSUE = 'issue'             # Issue new credentials
+    REVOKE = 'revoke'           # Revoke credentials
+    ADMIN = 'admin'             # Administrative access
+    BILLING = 'billing'         # Billing and payment access
+    READONLY = 'readonly'       # Read-only access
+    AUDIT = 'audit'             # Audit log access
+    CONFIG = 'config'           # Configuration management
+    OPRF = 'oprf'              # OPRF service access
+    SHIELD = 'shield'           # Shield widget access
+
+class Role:
+    """Define system roles with associated permissions."""
+    
+    # Role definitions with their permissions
+    ROLES = {
+        'super_admin': {
+            'permissions': [Permission.VERIFY, Permission.ISSUE, Permission.REVOKE, 
+                          Permission.ADMIN, Permission.BILLING, Permission.AUDIT, 
+                          Permission.CONFIG, Permission.OPRF, Permission.SHIELD],
+            'description': 'Full system access'
+        },
+        'admin': {
+            'permissions': [Permission.VERIFY, Permission.ISSUE, Permission.REVOKE, 
+                          Permission.ADMIN, Permission.AUDIT, Permission.SHIELD],
+            'description': 'Administrative access without billing'
+        },
+        'issuer': {
+            'permissions': [Permission.VERIFY, Permission.ISSUE, Permission.SHIELD],
+            'description': 'Can issue and verify credentials'
+        },
+        'verifier': {
+            'permissions': [Permission.VERIFY, Permission.SHIELD],
+            'description': 'Can only verify credentials'
+        },
+        'billing_admin': {
+            'permissions': [Permission.BILLING, Permission.READONLY, Permission.AUDIT],
+            'description': 'Billing and financial access'
+        },
+        'auditor': {
+            'permissions': [Permission.READONLY, Permission.AUDIT],
+            'description': 'Read-only access for auditing'
+        },
+        'api_client': {
+            'permissions': [Permission.VERIFY, Permission.OPRF],
+            'description': 'API client access for verification'
+        }
+    }
+    
+    @classmethod
+    def get_permissions(cls, role_name: str) -> List[str]:
+        """Get permissions for a role."""
+        role = cls.ROLES.get(role_name, {})
+        return role.get('permissions', [])
+
+    @classmethod
+    def validate_role(cls, role_name: str) -> bool:
+        """Validate if a role exists."""
+        return role_name in cls.ROLES
+
+    @classmethod
+    def get_role_description(cls, role_name: str) -> str:
+        """Get role description."""
+        role = cls.ROLES.get(role_name, {})
+        return role.get('description', 'Unknown role')
+
+class UserPermissions:
+    """Manage user permissions and roles."""
+    
+    def __init__(self, user_id: str, roles: List[str] = None, api_key_scopes: List[str] = None):
+        self.user_id = user_id
+        self.roles = roles or []
+        self.api_key_scopes = api_key_scopes or []
+        self._permissions_cache = None
+    
+    @property
+    def permissions(self) -> Set[str]:
+        """Get all permissions for this user."""
+        if self._permissions_cache is None:
+            perms = set()
+            
+            # Add permissions from roles
+            for role in self.roles:
+                perms.update(Role.get_permissions(role))
+            
+            # Add permissions from API key scopes
+            perms.update(self.api_key_scopes)
+            
+            self._permissions_cache = perms
+       
+        return self._permissions_cache
+    
+    def has_permission(self, permission: str) -> bool:
+        """Check if user has a specific permission."""
+        return permission in self.permissions
+    
+    def has_any_permission(self, permissions: List[str]) -> bool:
+        """Check if user has any of the specified permissions."""
+        return bool(set(permissions) & self.permissions)
+    
+    def has_all_permissions(self, permissions: List[str]) -> bool:
+        """Check if user has all of the specified permissions."""
+        return set(permissions).issubset(self.permissions)
+    
+    def add_role(self, role: str):
+        """Add a role to the user."""
+        if Role.validate_role(role) and role not in self.roles:
+            self.roles.append(role)
+            self._permissions_cache = None  # Clear cache
+    
+    def remove_role(self, role: str):
+        """Remove a role from the user."""
+        if role in self.roles:
+            self.roles.remove(role)
+            self._permissions_cache = None  # Clear cache
+
+def get_current_user_permissions() -> UserPermissions:
+    """Get permissions for the current user."""
+    from flask import session, request, current_app
+    
+    # Check if user is logged in via session
+    if session.get('admin_logged_in'):
+        user_id = session.get('admin_user_id', 'admin')
+        roles = session.get('admin_roles', ['admin'])
+        return UserPermissions(user_id=user_id, roles=roles)
+    
+    # Check API key authentication
+    api_key = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not api_key:
+        api_key = request.headers.get('X-API-Key')
+    
+    if api_key:
+        # Get API key scopes from the API key manager
+        try:
+            from lemma.auth.api_key_manager import APIKeyManager
+            api_manager = APIKeyManager()
+            key_info = api_manager.validate_key(api_key)
+            
+            if key_info and key_info.get('valid'):
+                scopes = key_info.get('scopes', [])
+                return UserPermissions(
+                    user_id=f"api_key_{key_info.get('key_id', 'unknown')}",
+                    api_key_scopes=scopes
+                )
+        except Exception as e:
+            logger.warning(f"Failed to validate API key for permissions: {e}")
+    
+    # Return empty permissions for unauthenticated users
+    return UserPermissions(user_id='anonymous')
+
+def require_permission(permission: str):
+    """Decorator to require a specific permission."""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            user_perms = get_current_user_permissions()
+            
+            if not user_perms.has_permission(permission):
+                logger.warning(f"Permission denied: User {user_perms.user_id} lacks permission '{permission}'")
+                return jsonify({
+                    'error': 'Insufficient permissions',
+                    'required_permission': permission,
+                    'user_permissions': list(user_perms.permissions)
+                }), 403
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def require_any_permission(*permissions):
+    """Decorator to require any of the specified permissions."""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            user_perms = get_current_user_permissions()
+            
+            if not user_perms.has_any_permission(list(permissions)):
+                logger.warning(f"Permission denied: User {user_perms.user_id} lacks any of permissions {permissions}")
+                return jsonify({
+                    'error': 'Insufficient permissions',
+                    'required_permissions': list(permissions),
+                    'user_permissions': list(user_perms.permissions)
+                }), 403
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def require_all_permissions(*permissions):
+    """Decorator to require all of the specified permissions."""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            user_perms = get_current_user_permissions()
+            
+            if not user_perms.has_all_permissions(list(permissions)):
+                missing_perms = set(permissions) - user_perms.permissions
+                logger.warning(f"Permission denied: User {user_perms.user_id} missing permissions {missing_perms}")
+                return jsonify({
+                    'error': 'Insufficient permissions',
+                    'missing_permissions': list(missing_perms),
+                    'user_permissions': list(user_perms.permissions)
+                }), 403
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator

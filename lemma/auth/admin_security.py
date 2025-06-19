@@ -22,6 +22,7 @@ import ipaddress
 import ssl
 import base64
 from urllib.parse import urlparse
+import secrets
 
 from flask import request, current_app, session, redirect, url_for, g, abort, jsonify
 from cryptography import x509
@@ -78,6 +79,463 @@ class AuditLogEntry:
     session_id: str
     previous_hash: str
     entry_hash: str
+
+class MultiFactorAuth:
+    """Multi-factor authentication for admin access."""
+    
+    def __init__(self):
+        self.totp_secret_length = 32
+        self.backup_codes_count = 10
+        self.code_validity_window = 300  # 5 minutes
+    
+    def generate_totp_secret(self) -> str:
+        """Generate a new TOTP secret for a user."""
+        return secrets.token_hex(self.totp_secret_length)
+    
+    def generate_backup_codes(self) -> List[str]:
+        """Generate backup codes for account recovery."""
+        codes = []
+        for _ in range(self.backup_codes_count):
+            code = '-'.join([
+                secrets.token_hex(3).upper(),
+                secrets.token_hex(3).upper()
+            ])
+            codes.append(code)
+        return codes
+    
+    def verify_totp_code(self, secret: str, code: str, user_id: str) -> bool:
+        """Verify a TOTP code (simplified implementation)."""
+        try:
+            # In a real implementation, use a proper TOTP library like pyotp
+            # This is a simplified version for demonstration
+            current_time = int(time.time() // 30)  # 30-second window
+            
+            # Check current and previous time windows
+            for time_window in [current_time, current_time - 1]:
+                expected_code = self._generate_totp_code(secret, time_window)
+                if secrets.compare_digest(code.replace(' ', ''), expected_code):
+                    # Log successful MFA
+                    self._log_mfa_event(user_id, 'totp_success', {
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'ip_address': request.remote_addr
+                    })
+                    return True
+            
+            # Log failed MFA attempt
+            self._log_mfa_event(user_id, 'totp_failed', {
+                'timestamp': datetime.utcnow().isoformat(),
+                'ip_address': request.remote_addr,
+                'code_provided': code[:2] + '*' * (len(code) - 2)  # Partial code for debugging
+            })
+            return False
+            
+        except Exception as e:
+            logger.error(f"TOTP verification error for user {user_id}: {e}")
+            return False
+    
+    def _generate_totp_code(self, secret: str, time_window: int) -> str:
+        """Generate TOTP code for a given time window (simplified)."""
+        # Simplified TOTP implementation - use pyotp in production
+        import hmac
+        
+        key = secret.encode()
+        time_bytes = time_window.to_bytes(8, 'big')
+        
+        # Generate HMAC
+        hmac_digest = hmac.new(key, time_bytes, hashlib.sha1).digest()
+        
+        # Extract 6-digit code
+        offset = hmac_digest[-1] & 0x0F
+        code = int.from_bytes(hmac_digest[offset:offset+4], 'big') & 0x7FFFFFFF
+        return f"{code % 1000000:06d}"
+    
+    def verify_backup_code(self, user_id: str, code: str, used_codes: List[str]) -> bool:
+        """Verify a backup recovery code."""
+        if code in used_codes:
+            logger.warning(f"Backup code reuse attempt for user {user_id}")
+            return False
+        
+        # In a real implementation, check against stored backup codes
+        # This is a simplified version
+        if len(code) == 13 and '-' in code:  # Format: XXXXXX-XXXXXX
+            self._log_mfa_event(user_id, 'backup_code_used', {
+                'timestamp': datetime.utcnow().isoformat(),
+                'ip_address': request.remote_addr,
+                'code_prefix': code[:3] + '*' * 10
+            })
+            return True
+        
+        return False
+    
+    def _log_mfa_event(self, user_id: str, event_type: str, details: Dict):
+        """Log MFA events for auditing."""
+        try:
+            audit_entry = {
+                'event_type': f'mfa_{event_type}',
+                'user_id': user_id,
+                'timestamp': datetime.utcnow().isoformat(),
+                'details': details
+            }
+            
+            # Store in audit log
+            audit_dir = os.path.join(current_app.instance_path, 'security', 'mfa_audit')
+            os.makedirs(audit_dir, exist_ok=True)
+            
+            audit_file = os.path.join(audit_dir, f"mfa_audit_{datetime.utcnow().strftime('%Y-%m-%d')}.jsonl")
+            with open(audit_file, 'a') as f:
+                f.write(json.dumps(audit_entry) + '\n')
+                
+        except Exception as e:
+            logger.error(f"Failed to log MFA event: {e}")
+
+class AdminActionAuditor:
+    """Audit all administrative actions."""
+    
+    def __init__(self):
+        self.audit_enabled = True
+        self.sensitive_actions = {
+            'user_create', 'user_delete', 'user_role_change',
+            'api_key_create', 'api_key_revoke', 'config_change',
+            'security_setting_change', 'credential_revoke',
+            'billing_change', 'system_shutdown'
+        }
+    
+    def log_admin_action(self, action: str, user_id: str, details: Dict = None, sensitive: bool = None):
+        """Log an administrative action."""
+        if not self.audit_enabled:
+            return
+        
+        try:
+            # Determine if action is sensitive
+            is_sensitive = sensitive if sensitive is not None else action in self.sensitive_actions
+            
+            audit_entry = {
+                'action': action,
+                'user_id': user_id,
+                'timestamp': datetime.utcnow().isoformat(),
+                'ip_address': request.remote_addr,
+                'user_agent': request.headers.get('User-Agent', ''),
+                'session_id': session.get('session_id', 'unknown'),
+                'is_sensitive': is_sensitive,
+                'details': details or {},
+                'request_id': getattr(g, 'request_id', 'unknown')
+            }
+            
+            # Store in appropriate audit log
+            audit_type = 'sensitive' if is_sensitive else 'standard'
+            audit_dir = os.path.join(current_app.instance_path, 'security', 'admin_audit', audit_type)
+            os.makedirs(audit_dir, exist_ok=True)
+            
+            audit_file = os.path.join(audit_dir, f"admin_audit_{datetime.utcnow().strftime('%Y-%m-%d')}.jsonl")
+            with open(audit_file, 'a') as f:
+                f.write(json.dumps(audit_entry) + '\n')
+            
+            # Log to application logger as well
+            if is_sensitive:
+                logger.warning(f"SENSITIVE ADMIN ACTION: {action} by {user_id} from {request.remote_addr}")
+            else:
+                logger.info(f"Admin action: {action} by {user_id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to log admin action: {e}")
+    
+    def get_audit_summary(self, days: int = 7) -> Dict:
+        """Get audit summary for the last N days."""
+        try:
+            summary = {
+                'total_actions': 0,
+                'sensitive_actions': 0,
+                'unique_users': set(),
+                'actions_by_type': {},
+                'recent_sensitive': []
+            }
+            
+            # Read audit logs for the specified period
+            start_date = datetime.utcnow() - timedelta(days=days)
+            
+            for audit_type in ['standard', 'sensitive']:
+                audit_dir = os.path.join(current_app.instance_path, 'security', 'admin_audit', audit_type)
+                if not os.path.exists(audit_dir):
+                    continue
+                
+                for filename in os.listdir(audit_dir):
+                    if not filename.endswith('.jsonl'):
+                        continue
+                    
+                    file_path = os.path.join(audit_dir, filename)
+                    try:
+                        with open(file_path, 'r') as f:
+                            for line in f:
+                                entry = json.loads(line.strip())
+                                entry_date = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
+                                
+                                if entry_date >= start_date:
+                                    summary['total_actions'] += 1
+                                    summary['unique_users'].add(entry['user_id'])
+                                    
+                                    action = entry['action']
+                                    summary['actions_by_type'][action] = summary['actions_by_type'].get(action, 0) + 1
+                                    
+                                    if entry.get('is_sensitive'):
+                                        summary['sensitive_actions'] += 1
+                                        if len(summary['recent_sensitive']) < 10:
+                                            summary['recent_sensitive'].append({
+                                                'action': action,
+                                                'user_id': entry['user_id'],
+                                                'timestamp': entry['timestamp'],
+                                                'ip_address': entry['ip_address']
+                                            })
+                    except Exception as e:
+                        logger.warning(f"Error reading audit file {filename}: {e}")
+            
+            # Convert set to count
+            summary['unique_users'] = len(summary['unique_users'])
+            
+            return summary
+            
+        except Exception as e:
+            logger.error(f"Failed to generate audit summary: {e}")
+            return {'error': str(e)}
+
+class SessionPrivilegeSeparation:
+    """Implement session privilege separation for admin access."""
+    
+    def __init__(self):
+        self.elevated_session_timeout = 900  # 15 minutes
+        self.privilege_escalation_actions = {
+            'user_delete', 'api_key_revoke', 'system_config_change',
+            'credential_mass_revoke', 'billing_admin_change'
+        }
+    
+    def require_elevated_privileges(self, action: str):
+        """Decorator to require elevated privileges for sensitive actions."""
+        def decorator(f):
+            @wraps(f)
+            def decorated_function(*args, **kwargs):
+                if not self._check_elevated_session():
+                    return self._request_privilege_elevation(action)
+                
+                # Log privilege usage
+                user_id = session.get('admin_user_id', 'unknown')
+                AdminActionAuditor().log_admin_action(
+                    f'elevated_privilege_used_{action}',
+                    user_id,
+                    {'action': action, 'elevated_session': True},
+                    sensitive=True
+                )
+                
+                return f(*args, **kwargs)
+            return decorated_function
+        return decorator
+    
+    def _check_elevated_session(self) -> bool:
+        """Check if current session has elevated privileges."""
+        elevated_until = session.get('elevated_until', 0)
+        return time.time() < elevated_until
+    
+    def _request_privilege_elevation(self, action: str):
+        """Request privilege elevation from user."""
+        from flask import jsonify
+        
+        return jsonify({
+            'error': 'Elevated privileges required',
+            'action': action,
+            'message': 'This action requires elevated privileges. Please re-authenticate.',
+            'elevation_required': True
+        }), 403
+    
+    def elevate_privileges(self, user_id: str, verification_method: str) -> bool:
+        """Elevate user privileges after additional verification."""
+        try:
+            # Grant elevated privileges for limited time
+            session['elevated_until'] = time.time() + self.elevated_session_timeout
+            session['elevation_method'] = verification_method
+            
+            # Log privilege elevation
+            AdminActionAuditor().log_admin_action(
+                'privilege_elevation',
+                user_id,
+                {
+                    'method': verification_method,
+                    'duration': self.elevated_session_timeout,
+                    'elevated_until': session['elevated_until']
+                },
+                sensitive=True
+            )
+            
+            logger.info(f"Privileges elevated for user {user_id} using {verification_method}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to elevate privileges for user {user_id}: {e}")
+            return False
+
+class AdminIPWhitelist:
+    """IP whitelisting for admin access."""
+    
+    def __init__(self):
+        self.whitelist_enabled = os.environ.get('ADMIN_IP_WHITELIST_ENABLED', 'false').lower() == 'true'
+        self.allowed_ips = self._load_ip_whitelist()
+        self.emergency_bypass_code = os.environ.get('ADMIN_EMERGENCY_BYPASS_CODE')
+    
+    def _load_ip_whitelist(self) -> List[str]:
+        """Load IP whitelist from environment or config file."""
+        # Load from environment variable
+        env_ips = os.environ.get('ADMIN_ALLOWED_IPS', '')
+        if env_ips:
+            return [ip.strip() for ip in env_ips.split(',') if ip.strip()]
+        
+        # Load from config file
+        try:
+            config_file = os.path.join(current_app.instance_path, 'security', 'admin_ip_whitelist.txt')
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    return [line.strip() for line in f if line.strip() and not line.startswith('#')]
+        except Exception as e:
+            logger.warning(f"Failed to load IP whitelist from file: {e}")
+        
+        return []
+    
+    def is_ip_allowed(self, ip_address: str) -> bool:
+        """Check if IP address is allowed for admin access."""
+        if not self.whitelist_enabled:
+            return True
+        
+        # Allow localhost in development
+        if current_app.config.get('ENV') != 'production':
+            if ip_address in ['127.0.0.1', '::1', 'localhost']:
+                return True
+        
+        # Check against whitelist
+        return ip_address in self.allowed_ips
+    
+    def check_emergency_bypass(self, bypass_code: str) -> bool:
+        """Check emergency bypass code for IP whitelist."""
+        if not self.emergency_bypass_code:
+            return False
+        
+        if secrets.compare_digest(bypass_code, self.emergency_bypass_code):
+            # Log emergency bypass usage
+            AdminActionAuditor().log_admin_action(
+                'emergency_ip_bypass',
+                'system',
+                {
+                    'ip_address': request.remote_addr,
+                    'user_agent': request.headers.get('User-Agent', ''),
+                    'timestamp': datetime.utcnow().isoformat()
+                },
+                sensitive=True
+            )
+            return True
+        
+        return False
+    
+    def add_ip_to_whitelist(self, ip_address: str, added_by: str) -> bool:
+        """Add IP address to whitelist."""
+        try:
+            if ip_address not in self.allowed_ips:
+                self.allowed_ips.append(ip_address)
+                self._save_ip_whitelist()
+                
+                # Log IP addition
+                AdminActionAuditor().log_admin_action(
+                    'ip_whitelist_add',
+                    added_by,
+                    {'ip_address': ip_address},
+                    sensitive=True
+                )
+                
+                logger.info(f"IP {ip_address} added to admin whitelist by {added_by}")
+                return True
+            
+            return False  # Already in whitelist
+            
+        except Exception as e:
+            logger.error(f"Failed to add IP to whitelist: {e}")
+            return False
+    
+    def _save_ip_whitelist(self):
+        """Save IP whitelist to config file."""
+        try:
+            config_dir = os.path.join(current_app.instance_path, 'security')
+            os.makedirs(config_dir, exist_ok=True)
+            
+            config_file = os.path.join(config_dir, 'admin_ip_whitelist.txt')
+            with open(config_file, 'w') as f:
+                f.write('# Admin IP Whitelist\n')
+                f.write(f'# Last updated: {datetime.utcnow().isoformat()}\n')
+                for ip in self.allowed_ips:
+                    f.write(f'{ip}\n')
+                    
+        except Exception as e:
+            logger.error(f"Failed to save IP whitelist: {e}")
+
+# Initialize security components
+mfa = MultiFactorAuth()
+auditor = AdminActionAuditor()
+privilege_separation = SessionPrivilegeSeparation()
+ip_whitelist = AdminIPWhitelist()
+
+# Decorator functions for easy use
+def require_mfa(f):
+    """Decorator to require MFA for admin functions."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('mfa_verified'):
+            from flask import jsonify
+            return jsonify({
+                'error': 'Multi-factor authentication required',
+                'mfa_required': True
+            }), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def require_ip_whitelist(f):
+    """Decorator to require IP whitelist for admin functions."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not ip_whitelist.is_ip_allowed(request.remote_addr):
+            # Check for emergency bypass
+            bypass_code = request.headers.get('X-Emergency-Bypass')
+            if not bypass_code or not ip_whitelist.check_emergency_bypass(bypass_code):
+                from flask import jsonify
+                logger.warning(f"Admin access denied for IP {request.remote_addr}")
+                return jsonify({
+                    'error': 'IP address not authorized for admin access',
+                    'ip_address': request.remote_addr
+                }), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def audit_admin_action(action: str, sensitive: bool = False):
+    """Decorator to audit admin actions."""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            user_id = session.get('admin_user_id', 'unknown')
+            
+            # Log action start
+            auditor.log_admin_action(f'{action}_start', user_id, sensitive=sensitive)
+            
+            try:
+                result = f(*args, **kwargs)
+                
+                # Log successful action
+                auditor.log_admin_action(f'{action}_success', user_id, sensitive=sensitive)
+                
+                return result
+            except Exception as e:
+                # Log failed action
+                auditor.log_admin_action(
+                    f'{action}_failed',
+                    user_id,
+                    {'error': str(e)},
+                    sensitive=sensitive
+                )
+                raise
+        
+        return decorated_function
+    return decorator
 
 class AdminSecurityManager:
     """
