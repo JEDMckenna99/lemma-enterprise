@@ -660,7 +660,7 @@ def create_app(test_config=None):
         # Critical environment variables that must be set in production
         required_env_vars = {
             'LEMMA_API_KEY': 'API authentication key',
-            'SECRET_KEY': 'Flask secret key for session security',
+            'LEMMA_SECRET_KEY': 'Flask secret key for session security',
             'DATABASE_URL': 'Database connection string',
         }
         
@@ -690,7 +690,7 @@ def create_app(test_config=None):
         
         # Check for insecure default values
         insecure_defaults = {
-            'SECRET_KEY': ['dev', 'development', 'secret', 'change-me'],
+            'LEMMA_SECRET_KEY': ['dev', 'development', 'secret', 'change-me'],
             'LEMMA_API_KEY': ['dev_api_key', 'test_key', 'changeme']
         }
         
