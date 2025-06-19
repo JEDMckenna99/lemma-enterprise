@@ -360,7 +360,7 @@ def create_app(test_config=None):
                 "style-src 'self' https://fonts.googleapis.com; "  # Removed 'unsafe-inline'
                 "img-src 'self' data: https://stripe.com https://js.stripe.com; "
                 "font-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; "
-                "connect-src 'self' https://api.stripe.com; "
+                "connect-src 'self' https://api.stripe.com https://api.lemma.network; "
                 "frame-src 'self' https://js.stripe.com; "
                 "frame-ancestors 'none'; "
                 "base-uri 'self'; "
@@ -380,7 +380,7 @@ def create_app(test_config=None):
                 "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
                 "img-src 'self' data: https:; "
                 "font-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; "
-                "connect-src 'self' https://api.stripe.com ws: wss:; "  # Allow WebSocket for dev tools
+                "connect-src 'self' https://api.stripe.com https://api.lemma.network ws: wss:; "  # Allow WebSocket for dev tools
                 "frame-src 'self' https://js.stripe.com; "
                 "frame-ancestors 'none'; "
                 "base-uri 'self'; "
