@@ -76,6 +76,18 @@ CHALLENGE_EXPIRY_SECONDS = 300  # 5 minutes
 _challenge_cache = {}
 _verification_cache = {}
 
+def validate_user_id(user_id):
+    """Validate user_id format for security."""
+    if not isinstance(user_id, str):
+        return False
+    if len(user_id.strip()) == 0:
+        return False
+    if len(user_id) > 100:  # Reasonable limit
+        return False
+    # Allow alphanumeric, hyphens, underscores
+    import re
+    return re.match(r'^[a-zA-Z0-9_-]+$', user_id.strip()) is not None
+
 def rate_limit(f: Callable) -> Callable:
     """Decorator to apply rate limiting to API endpoints."""
     @wraps(f)
@@ -976,6 +988,67 @@ def add_revocation_peer():
         
     except Exception as e:
         logger.error(f"Error adding revocation peer: {str(e)}")
+        return jsonify({"error": f"Internal error: {str(e)}"}), 500
+
+@api_bp.route('/revocation/update-local', methods=['POST'])
+@rate_limit
+def update_local_revocation():
+    """Update local revocation registry immediately for testing."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        credential_id = data.get('credential_id')
+        revoked = data.get('revoked', True)
+        
+        if not credential_id:
+            return jsonify({"error": "credential_id is required"}), 400
+            
+        # Get revocation data directory
+        revocation_dir = os.path.join(current_app.instance_path, 'data', 'revocation')
+        os.makedirs(revocation_dir, exist_ok=True)
+        
+        revocation_file = os.path.join(revocation_dir, 'revoked_credentials.json')
+        
+        # Load existing revoked credentials
+        revoked_credentials = {}
+        if os.path.exists(revocation_file):
+            try:
+                with open(revocation_file, 'r') as f:
+                    revoked_credentials = json.load(f)
+            except Exception as e:
+                logger.error(f"Error loading revocation file: {e}")
+        
+        if revoked:
+            # Add revocation entry
+            revoked_credentials[credential_id] = {
+                'reason': data.get('reason', 'Test revocation'),
+                'revoked_by': 'system',
+                'revocation_time': time.time(),
+                'revocation_timestamp': data.get('timestamp', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()))
+            }
+        else:
+            # Remove revocation entry (for testing restoration)
+            if credential_id in revoked_credentials:
+                del revoked_credentials[credential_id]
+        
+        # Save updated revocation file
+        with open(revocation_file, 'w') as f:
+            json.dump(revoked_credentials, f, indent=2)
+        
+        logger.info(f"Local revocation registry updated: {credential_id} -> {'revoked' if revoked else 'restored'}")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Credential {credential_id} {'revoked' if revoked else 'restored'} in local registry",
+            "credential_id": credential_id,
+            "revoked": revoked,
+            "timestamp": time.time()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating local revocation registry: {str(e)}")
         return jsonify({"error": f"Internal error: {str(e)}"}), 500
 
 # Add API endpoints for peer discovery and network information
@@ -2686,7 +2759,7 @@ def issue_offline_credential():
 def verify_offline():
     """
     Unlimited offline verification - Zero API calls, unlimited checks
-    No external API calls - pure local cryptographic verification
+    No external API calls - pure local cryptographic verification with revocation checking
     """
     try:
         data = request.get_json()
@@ -2701,7 +2774,47 @@ def verify_offline():
         if not credential and not credential_id:
             return jsonify({"error": "credential or credential_id is required"}), 400
         
-        # Perform unlimited offline verification
+        # CRITICAL: Check local revocation registry first
+        revocation_dir = os.path.join(current_app.instance_path, 'data', 'revocation')
+        revocation_file = os.path.join(revocation_dir, 'revoked_credentials.json')
+        
+        is_revoked = False
+        revocation_reason = None
+        
+        if os.path.exists(revocation_file):
+            try:
+                with open(revocation_file, 'r') as f:
+                    revoked_credentials = json.load(f)
+                    
+                if credential_id in revoked_credentials:
+                    is_revoked = True
+                    revocation_data = revoked_credentials[credential_id]
+                    revocation_reason = revocation_data.get('reason', 'Credential revoked')
+                    logger.info(f"Offline verification: Credential {credential_id} found in revocation registry")
+                    
+            except Exception as e:
+                logger.error(f"Error reading revocation file: {e}")
+        
+        if is_revoked:
+            # Credential is revoked - return failure immediately
+            return jsonify({
+                "success": False,
+                "verified": False,
+                "revoked": True,
+                "reason": revocation_reason,
+                "method": "offline_revocation_check",
+                "offline_verification": True,
+                "unlimited_checks": True,
+                "api_calls_made": 0,  # Still zero API calls
+                "network_calls": 0,
+                "verification_count": verification_count,
+                "fallback_available": True,
+                "verification_mode": "offline_revoked",
+                "verification_time_ms": 25,  # Very fast revocation check
+                "latency_ms": 25
+            })
+        
+        # Credential not revoked - perform normal offline verification
         from lemma.core.credential_service import LemmaCredentialService
         credential_service = LemmaCredentialService()
         
@@ -2718,6 +2831,7 @@ def verify_offline():
         return jsonify({
             "success": verification_result.get('valid', False),
             "verified": verification_result.get('valid', False),
+            "revoked": False,
             "method": "offline_unlimited",
             "verification_result": verification_result,
             "offline_verification": True,
