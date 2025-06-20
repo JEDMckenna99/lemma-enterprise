@@ -52,15 +52,15 @@ if os.getenv('REDISCLOUD_URL'):
             port=url.port,
             password=url.password,
             decode_responses=True,
-            socket_timeout=5,
-            socket_connect_timeout=5,
+            socket_timeout=2,
+            socket_connect_timeout=2,
             retry_on_timeout=True
         )
-        # Test connection
+        # Test connection with short timeout to avoid startup delays
         redis_client.ping()
         print("✅ Redis Cloud connected successfully")
     except Exception as e:
-        print(f"⚠️  Redis connection failed: {e}")
+        print(f"⚠️  Redis connection failed: {e} - continuing with in-memory fallback")
         redis_client = None
 else:
     print("ℹ️  Redis not configured, using in-memory caching")
