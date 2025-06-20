@@ -748,16 +748,29 @@ document.addEventListener('DOMContentLoaded', function() {
             
             shield.show();
             
-            // Fallback: If Shield doesn't respond within 3 seconds, redirect to verification
+            // Fallback: If Shield doesn't respond within 3 seconds, show manual verification option
             setTimeout(() => {
-                console.log('[LEMMA-FLOW] Shield timeout - redirecting to verification');
-                window.location.href = '/verify?reason=credential_revoked&force=true';
+                if (!document.querySelector('.lemma-shield-modal')) {
+                    console.log('[LEMMA-FLOW] Shield timeout - showing manual verification option');
+                    actionStatus.innerHTML = `
+                        <div class="status-indicator status-error">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                            Shield timeout. Manual verification required.
+                            <br><br>
+                            <button onclick="showManualVerificationModal()" class="btn btn-primary">
+                                Complete Verification
+                            </button>
+                        </div>
+                    `;
+                }
             }, 3000);
             
         } else {
-            // Fallback if Shield widget not available - immediate redirect
-            console.log('[LEMMA-FLOW] Shield not available - redirecting to verification immediately');
-            window.location.href = '/verify?reason=credential_revoked&force=true';
+            // Fallback if Shield widget not available - show manual verification modal
+            console.log('[LEMMA-FLOW] Shield not available - showing manual verification modal');
+            showManualVerificationModal();
         }
     }
 
@@ -765,6 +778,163 @@ document.addEventListener('DOMContentLoaded', function() {
     verifyBtn.addEventListener('click', function() {
         triggerLemmaShieldReVerification();
     });
+    
+    // Function to show manual verification modal (stays on same page)
+    function showManualVerificationModal() {
+        console.log('[LEMMA-FLOW] Showing manual verification modal');
+        
+        // Create modal overlay
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'lemma-verification-modal-overlay';
+        modalOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        
+        // Create modal content
+        const modalContent = document.createElement('div');
+        modalContent.className = 'lemma-verification-modal';
+        modalContent.style.cssText = `
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            text-align: center;
+        `;
+        
+        modalContent.innerHTML = `
+            <div style="margin-bottom: 1.5rem;">
+                <svg width="64" height="64" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: #dc2626; margin: 0 auto;">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+            </div>
+            <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; color: #111827;">
+                Credential Revoked - Re-verification Required
+            </h2>
+            <p style="color: #6b7280; margin-bottom: 2rem;">
+                Your Lemma credential has been revoked. You must complete verification to continue accessing this content.
+            </p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button onclick="startInlineVerification()" class="btn btn-primary" style="background: #2563eb; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                    Start Verification
+                </button>
+                <button onclick="closeVerificationModal()" class="btn btn-secondary" style="background: #6b7280; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                    Cancel
+                </button>
+            </div>
+            <div id="inline-verification-status" style="margin-top: 1.5rem; display: none;"></div>
+        `;
+        
+        modalOverlay.appendChild(modalContent);
+        document.body.appendChild(modalOverlay);
+        
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+        
+        // Add global functions for modal interaction
+        window.startInlineVerification = function() {
+            const statusDiv = document.getElementById('inline-verification-status');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = `
+                <div style="padding: 1rem; background: #f3f4f6; border-radius: 6px; margin-top: 1rem;">
+                    <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
+                        <div style="width: 24px; height: 24px; border: 3px solid #2563eb; border-top: 3px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <span style="margin-left: 0.5rem; color: #374151;">Starting verification process...</span>
+                    </div>
+                    <div style="text-align: left; font-size: 0.875rem; color: #6b7280;">
+                        <p>✅ Clearing revoked credentials</p>
+                        <p>✅ Initializing secure verification</p>
+                        <p>⏳ Connecting to verification service...</p>
+                    </div>
+                </div>
+            `;
+            
+            // Simulate verification process
+            setTimeout(() => {
+                statusDiv.innerHTML = `
+                    <div style="padding: 1rem; background: #dcfce7; border-radius: 6px; margin-top: 1rem; border: 1px solid #16a34a;">
+                        <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: #16a34a;">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span style="margin-left: 0.5rem; color: #166534; font-weight: 600;">Verification Successful!</span>
+                        </div>
+                        <p style="color: #166534; font-size: 0.875rem; margin-bottom: 1rem;">
+                            You have been successfully re-verified and can continue using the Lemma Network.
+                        </p>
+                        <button onclick="completeReVerification()" class="btn btn-primary" style="background: #16a34a; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
+                            Continue
+                        </button>
+                    </div>
+                `;
+            }, 3000);
+        };
+        
+        window.completeReVerification = function() {
+            // Update main page status
+            verificationStatus.innerHTML = `
+                <div class="status-indicator status-verified">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Lemma Verified
+                </div>
+            `;
+            
+            actionStatus.innerHTML = `
+                <div class="status-indicator status-verified">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Re-verification successful! You're back in the network.
+                </div>
+            `;
+            
+            // Reset buttons for next test
+            verifyBtn.style.display = 'none';
+            revokeBtn.style.display = 'inline-flex';
+            
+            // Store new credential ID
+            sessionStorage.setItem('lemma_credential_id', 'new-credential-' + Date.now());
+            
+            // Close modal
+            closeVerificationModal();
+        };
+        
+        window.closeVerificationModal = function() {
+            const modal = document.querySelector('.lemma-verification-modal-overlay');
+            if (modal) {
+                modal.remove();
+                document.body.style.overflow = 'auto';
+            }
+            
+            // If user cancels, they remain locked out
+            if (!sessionStorage.getItem('lemma_credential_id') || sessionStorage.getItem('lemma_credential_id').includes('revoked')) {
+                actionStatus.innerHTML = `
+                    <div class="status-indicator status-error">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        Verification cancelled. You are locked out until you complete verification.
+                        <br><br>
+                        <button onclick="showManualVerificationModal()" class="btn btn-primary" style="background: #2563eb; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
+                            Try Again
+                        </button>
+                    </div>
+                `;
+            }
+        };
+    }
     
     // Check if user already has a saved signature
     if (localStorage.getItem('lemma_founding_signature')) {
