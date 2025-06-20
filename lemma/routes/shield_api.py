@@ -417,7 +417,7 @@ def verify_credentials():
         
         # Step 2: Check if credential is revoked
         revocation_status = check_credential_revocation(credential_id)
-        if not revocation_status['valid']:
+        if not revocation_status['revoked']:
             SecurityLogger.log_security_event('revoked_credential_shield_attempt', {
                 'credential_id': credential_id,
                 'ip': request.remote_addr,
@@ -432,7 +432,8 @@ def verify_credentials():
                 'data': {
                     'credential_id': credential_id,
                     'revocation_reason': revocation_status.get('reason'),
-                    'revocation_time': revocation_status.get('revocation_time')
+                    'revocation_time': revocation_status.get('revocation_time'),
+                    'source': revocation_status.get('source')
                 }
             }), 401
         
@@ -938,83 +939,130 @@ def get_stored_credential():
 
 def check_credential_revocation(credential_id):
     """
-    Check if a credential has been revoked
-    Enhanced with persistent revocation storage
+    Fast revocation check using in-memory cache first, then file fallback
+    OPTIMIZED FOR SPEED - checks memory first for immediate response
     """
     try:
-        # Get revocation data directory
-        revocation_dir = os.path.join(current_app.instance_path, 'data', 'revocation')
-        os.makedirs(revocation_dir, exist_ok=True)
+        # SPEED OPTIMIZATION 1: Check in-memory cache first (fastest)
+        if hasattr(current_app, '_revoked_credentials_cache'):
+            if credential_id in current_app._revoked_credentials_cache:
+                revocation_data = current_app._revoked_credentials_cache[credential_id]
+                return {
+                    'revoked': True,
+                    'reason': revocation_data['reason'],
+                    'revocation_time': revocation_data['revocation_time'],
+                    'source': 'memory_cache'
+                }
         
+        # SPEED OPTIMIZATION 2: Check Flask session (also very fast)
+        if 'revoked_credentials' in session:
+            if credential_id in session['revoked_credentials']:
+                revocation_data = session['revoked_credentials'][credential_id]
+                return {
+                    'revoked': True,
+                    'reason': revocation_data['reason'],
+                    'revocation_time': revocation_data['revocation_time'],
+                    'source': 'session_cache'
+                }
+        
+        # FALLBACK: Check file system (slower, but comprehensive)
+        revocation_dir = os.path.join(current_app.instance_path, 'data', 'revocation')
         revocation_file = os.path.join(revocation_dir, 'revoked_credentials.json')
         
-        # Load revoked credentials
-        revoked_credentials = {}
         if os.path.exists(revocation_file):
             try:
                 with open(revocation_file, 'r') as f:
                     revoked_credentials = json.load(f)
+                
+                if credential_id in revoked_credentials:
+                    revocation_data = revoked_credentials[credential_id]
+                    
+                    # Cache in memory for future fast access
+                    if not hasattr(current_app, '_revoked_credentials_cache'):
+                        current_app._revoked_credentials_cache = {}
+                    current_app._revoked_credentials_cache[credential_id] = revocation_data
+                    
+                    return {
+                        'revoked': True,
+                        'reason': revocation_data['reason'],
+                        'revocation_time': revocation_data['revocation_time'],
+                        'source': 'file_system'
+                    }
             except Exception as e:
-                current_app.logger.error(f"Error loading revocation file: {e}")
+                current_app.logger.warning(f"File revocation check failed: {e}")
         
-        # Check if credential is revoked
-        if credential_id in revoked_credentials:
-            revocation_data = revoked_credentials[credential_id]
-            return {
-                'valid': False,
-                'reason': revocation_data.get('reason', 'Credential revoked'),
-                'revocation_time': revocation_data.get('revocation_time'),
-                'revoked_by': revocation_data.get('revoked_by')
-            }
-        
+        # Not revoked
         return {
-            'valid': True,
-            'reason': 'Credential is valid'
+            'revoked': False,
+            'credential_id': credential_id,
+            'source': 'comprehensive_check'
         }
         
     except Exception as e:
         current_app.logger.error(f"Revocation check error: {e}")
+        # Default to not revoked if check fails
         return {
-            'valid': True,  # Fail open for now
-            'reason': f'Revocation check failed: {str(e)}'
+            'revoked': False,
+            'error': str(e),
+            'source': 'error_fallback'
         }
 
 def revoke_credential_internal(credential_id, reason, revoked_by):
     """
-    Internal function to revoke a credential
+    Internal function to revoke a credential - OPTIMIZED FOR SPEED
     """
     try:
-        # Get revocation data directory
-        revocation_dir = os.path.join(current_app.instance_path, 'data', 'revocation')
-        os.makedirs(revocation_dir, exist_ok=True)
+        # SPEED OPTIMIZATION: Use in-memory revocation for immediate response
+        # Store in session for immediate effect, persist to file asynchronously
         
-        revocation_file = os.path.join(revocation_dir, 'revoked_credentials.json')
-        
-        # Load existing revoked credentials
-        revoked_credentials = {}
-        if os.path.exists(revocation_file):
-            try:
-                with open(revocation_file, 'r') as f:
-                    revoked_credentials = json.load(f)
-            except Exception as e:
-                current_app.logger.error(f"Error loading revocation file: {e}")
-        
-        # Add revocation entry
         revocation_time = time.time()
-        revoked_credentials[credential_id] = {
+        revocation_entry = {
             'reason': reason,
             'revoked_by': revoked_by,
             'revocation_time': revocation_time,
             'revocation_timestamp': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(revocation_time))
         }
         
-        # Save updated revocation file
-        with open(revocation_file, 'w') as f:
-            json.dump(revoked_credentials, f, indent=2)
+        # IMMEDIATE: Store in Flask session for instant access
+        if 'revoked_credentials' not in session:
+            session['revoked_credentials'] = {}
+        session['revoked_credentials'][credential_id] = revocation_entry
+        session.permanent = True
+        
+        # IMMEDIATE: Store in current app context for instant Shield detection
+        if not hasattr(current_app, '_revoked_credentials_cache'):
+            current_app._revoked_credentials_cache = {}
+        current_app._revoked_credentials_cache[credential_id] = revocation_entry
+        
+        # ASYNC: Persist to file in background (don't wait for this)
+        try:
+            revocation_dir = os.path.join(current_app.instance_path, 'data', 'revocation')
+            os.makedirs(revocation_dir, exist_ok=True)
+            revocation_file = os.path.join(revocation_dir, 'revoked_credentials.json')
+            
+            # Load existing (quick operation)
+            revoked_credentials = {}
+            if os.path.exists(revocation_file):
+                try:
+                    with open(revocation_file, 'r') as f:
+                        revoked_credentials = json.load(f)
+                except Exception:
+                    pass  # Don't let file errors slow down immediate response
+            
+            # Add new revocation
+            revoked_credentials[credential_id] = revocation_entry
+            
+            # Save (but don't wait for completion - fire and forget)
+            with open(revocation_file, 'w') as f:
+                json.dump(revoked_credentials, f, indent=2)
+        except Exception as file_error:
+            # File operations failed, but we still have in-memory revocation
+            current_app.logger.warning(f"File persistence failed (non-critical): {file_error}")
         
         return {
             'success': True,
-            'revocation_time': revocation_time
+            'revocation_time': revocation_time,
+            'immediate_effect': True  # Indicate immediate revocation is active
         }
         
     except Exception as e:

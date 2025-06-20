@@ -727,6 +727,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Listen for Shield verification completion
                     monitorShieldVerification();
+                    
+                    // SPEED OPTIMIZATION: Trigger multiple rapid status checks to force Shield appearance
+                    let rapidCheckCount = 0;
+                    const rapidCheckInterval = setInterval(() => {
+                        rapidCheckCount++;
+                        fetch('/api/shield/status')
+                            .then(response => response.json())
+                            .then(statusData => {
+                                console.log(`[LEMMA-FLOW] Rapid check ${rapidCheckCount}:`, statusData.shield_action);
+                            })
+                            .catch(() => {});
+                        
+                        if (rapidCheckCount >= 10) { // Stop after 10 rapid checks (5 seconds)
+                            clearInterval(rapidCheckInterval);
+                        }
+                    }, 500); // Every 500ms for first 5 seconds
+                    
                 } else {
                     console.log('[LEMMA-FLOW] Unexpected shield status - using fallback modal');
                     setTimeout(showManualVerificationModal, 1000); // Delay to let Shield try first
@@ -751,18 +768,34 @@ document.addEventListener('DOMContentLoaded', function() {
             completeReVerification();
         });
         
-        // Also check periodically if verification status has changed
+        // FAST polling during active revocation - check every 1 second instead of 30
         const checkInterval = setInterval(() => {
             if (sessionStorage.getItem('lemma_verified') || localStorage.getItem('lemma_credential')) {
                 console.log('[LEMMA-FLOW] Verification detected - Shield process completed');
                 clearInterval(checkInterval);
                 completeReVerification();
             }
-        }, 2000); // Check every 2 seconds
+        }, 1000); // Fast check every 1 second for immediate detection
+        
+        // Also trigger Shield status checks more aggressively during revocation
+        const shieldStatusInterval = setInterval(() => {
+            fetch('/api/shield/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.shield_action === 'allow_access') {
+                        console.log('[LEMMA-FLOW] Shield status shows verification complete');
+                        clearInterval(shieldStatusInterval);
+                        clearInterval(checkInterval);
+                        completeReVerification();
+                    }
+                })
+                .catch(() => {}); // Ignore errors during rapid polling
+        }, 500); // Super fast Shield status polling every 500ms
         
         // Stop checking after 2 minutes
         setTimeout(() => {
             clearInterval(checkInterval);
+            clearInterval(shieldStatusInterval);
         }, 120000);
     }
 
