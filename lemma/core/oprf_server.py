@@ -308,26 +308,40 @@ class OPRFServer:
                 # Decode blinded element
                 alpha_bytes = base64.b64decode(alpha_b64)
                 
-                # Evaluate OPRF function
-                if self.using_mock:
-                    # Basic implementation using HMAC
-                    import hmac
-                    beta_bytes = hmac.new(private_key, alpha_bytes, hashlib.sha256).digest()
-                else:
-                    if hasattr(self, 'oprf'):
-                        # Use production OPRF library
-                        beta_bytes = self.oprf.evaluate(private_key, alpha_bytes)
-                    elif hasattr(self, 'pyristretto255'):
-                        # Use pyristretto255
-                        alpha_element = self.Element.from_bytes(alpha_bytes)
-                        private_scalar = self.Scalar.from_bytes(private_key)
-                        beta_element = private_scalar * alpha_element
-                        beta_bytes = bytes(beta_element)
+                # Evaluate OPRF function using real cryptographic operations
+                try:
+                    # Try to use OPRF cascade manager for consistent evaluation
+                    from lemma.core.oprf_cascade import get_oprf_cascade_manager
+                    
+                    oprf_manager = get_oprf_cascade_manager(private_key)
+                    beta_bytes = oprf_manager.evaluate_oprf(alpha_bytes)
+                    
+                    logger.debug(f"Used OPRF cascade manager for evaluation")
+                    
+                except ImportError:
+                    # Fallback to direct implementation
+                    if self.using_mock:
+                        # Basic implementation using HMAC - for development only
+                        import hmac
+                        beta_bytes = hmac.new(private_key, alpha_bytes, hashlib.sha256).digest()
+                        logger.warning("Using mock HMAC OPRF evaluation - not suitable for production")
                     else:
-                        # Use secure pycryptodome implementation
-                        hmac_obj = self.Crypto_HMAC.new(private_key, digestmod=self.Crypto_SHA256)
-                        hmac_obj.update(alpha_bytes)
-                        beta_bytes = hmac_obj.digest()
+                        if hasattr(self, 'oprf'):
+                            # Use production OPRF library
+                            beta_bytes = self.oprf.evaluate(private_key, alpha_bytes)
+                        elif hasattr(self, 'pyristretto255'):
+                            # Use pyristretto255
+                            alpha_element = self.Element.from_bytes(alpha_bytes)
+                            private_scalar = self.Scalar.from_bytes(private_key)
+                            beta_element = private_scalar * alpha_element
+                            beta_bytes = bytes(beta_element)
+                        else:
+                            # Use secure pycryptodome implementation
+                            from Crypto.Hash import HMAC, SHA256
+                            hmac_obj = HMAC.new(private_key, digestmod=SHA256)
+                            hmac_obj.update(alpha_bytes)
+                            beta_bytes = hmac_obj.digest()
+                            logger.info("Using pycryptodome HMAC for OPRF evaluation")
                 
                 # Encode result
                 beta_b64 = base64.b64encode(beta_bytes).decode('utf-8')

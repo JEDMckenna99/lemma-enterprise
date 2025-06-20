@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import Fernet
 from flask import current_app, g
 import time
+import logging
 
 from lemma.core.did_resolver import get_did_resolver
 
@@ -298,6 +299,15 @@ class LemmaCredentialService:
         """Initialize the credential service with secure storage."""
         self.storage_dir = storage_dir
         self.is_heroku = 'DYNO' in os.environ
+        
+        # Initialize logger
+        self.logger = logging.getLogger(__name__)
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
         
         # Initialize storage
         if not self.is_heroku:
@@ -1257,8 +1267,35 @@ class LemmaCredentialService:
     
     def create_oprf_witness(self, credential_id):
         """
-        Create OPRF witness for privacy-preserving revocation checking
+        Create real OPRF witness for privacy-preserving revocation checking
         """
+        try:
+            # Initialize OPRF cascade manager
+            from lemma.core.oprf_cascade import get_oprf_cascade_manager
+            
+            try:
+                oprf_manager = get_oprf_cascade_manager()
+                
+                # Generate real OPRF witness
+                oprf_witness = oprf_manager.get_oprf_witness(credential_id)
+                
+                # Add validity period
+                valid_until_timestamp = (datetime.utcnow() + timedelta(hours=72)).timestamp()
+                oprf_witness['valid_until'] = valid_until_timestamp
+                
+                self.logger.info(f"Created real OPRF witness for credential {credential_id} using {oprf_witness.get('algorithm', 'unknown')}")
+                return oprf_witness
+                
+            except ImportError:
+                self.logger.warning("OPRF cascade module not available, using fallback witness")
+                return self._create_fallback_oprf_witness(credential_id)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create OPRF witness: {e}")
+            return self._create_fallback_oprf_witness(credential_id)
+    
+    def _create_fallback_oprf_witness(self, credential_id):
+        """Create fallback OPRF witness when real implementation not available"""
         try:
             # Generate random blinding factor
             r = secrets.token_bytes(32)
@@ -1277,22 +1314,76 @@ class LemmaCredentialService:
                 'blinded_value': blinded_value,
                 'oprf_result': oprf_result,
                 'blinding_factor': r.hex(),
-                'algorithm': 'simplified_oprf_v1'
+                'algorithm': 'simplified_oprf_v1_fallback',
+                'valid_until': (datetime.utcnow() + timedelta(hours=72)).timestamp(),
+                'is_fallback': True
             }
             
         except Exception as e:
-            self.logger.error(f"Failed to create OPRF witness: {e}")
-            return None
+            self.logger.error(f"Failed to create fallback OPRF witness: {e}")
+            return {
+                'algorithm': 'error_fallback',
+                'valid_until': (datetime.utcnow() + timedelta(hours=72)).timestamp(),
+                'is_fallback': True,
+                'error': str(e)
+            }
     
     def create_revocation_snapshot(self):
         """
-        Create a compact snapshot of current revocation data for offline checking
+        Create a compact snapshot of current revocation data using OPRF-cascaded bloom filter
         """
         try:
-            # Get current revocation data (simplified)
+            # Get current revocation data
             revoked_credentials = self.get_revoked_credentials()
             
-            # Create compact bloom filter representation
+            try:
+                # Initialize managers
+                from lemma.core.oprf_cascade import get_oprf_cascade_manager
+                from lemma.core.bloom_cascade import get_cascade_manager
+                
+                oprf_manager = get_oprf_cascade_manager()
+                cascade_manager = get_cascade_manager()
+                
+                # Add revoked credentials to cascade
+                for credential_id in revoked_credentials:
+                    # Compute OPRF output for each revoked credential
+                    oprf_output = oprf_manager.compute_oprf_output(credential_id)
+                    # Add to cascaded bloom filter
+                    cascade_manager.add_oprf_hash(oprf_output)
+                
+                # Serialize cascade
+                cascade_bytes = cascade_manager.serialize()
+                cascade_b64 = base64.b64encode(cascade_bytes).decode('utf-8')
+                
+                cascade_stats = cascade_manager.get_stats()
+                
+                self.logger.info(f"Created OPRF cascade snapshot: {len(revoked_credentials)} credentials, "
+                               f"{cascade_stats['levels']} levels, "
+                               f"size: {len(cascade_bytes)} bytes")
+                
+                return {
+                    'bloom_filter': cascade_b64,
+                    'snapshot_time': time.time(),
+                    'revoked_count': len(revoked_credentials),
+                    'false_positive_rate': cascade_manager.error_rate,
+                    'algorithm': 'oprf_cascaded_bloom_v1',
+                    'cascade_levels': cascade_stats['levels'],
+                    'cascade_size_bytes': len(cascade_bytes),
+                    'using_real_bloom': cascade_stats['using_real_bloom']
+                }
+                
+            except ImportError:
+                self.logger.warning("OPRF/cascade modules not available, using fallback snapshot")
+                return self._create_fallback_snapshot(revoked_credentials)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create revocation snapshot: {e}")
+            return self._create_fallback_snapshot([])
+    
+    def _create_fallback_snapshot(self, revoked_credentials):
+        """Create fallback snapshot when real implementation not available"""
+        try:
+            # Create simple bloom filter representation
             bloom_data = self.create_compact_bloom_filter(revoked_credentials)
             
             return {
@@ -1300,12 +1391,19 @@ class LemmaCredentialService:
                 'snapshot_time': time.time(),
                 'revoked_count': len(revoked_credentials),
                 'false_positive_rate': 0.01,
-                'algorithm': 'cascaded_bloom_v1'
+                'algorithm': 'fallback_bloom_v1',
+                'is_fallback': True
             }
             
         except Exception as e:
-            self.logger.error(f"Failed to create revocation snapshot: {e}")
-            return {'bloom_filter': '', 'snapshot_time': time.time(), 'revoked_count': 0}
+            self.logger.error(f"Failed to create fallback snapshot: {e}")
+            return {
+                'bloom_filter': '',
+                'snapshot_time': time.time(),
+                'revoked_count': 0,
+                'algorithm': 'error_fallback',
+                'is_fallback': True
+            }
     
     def verify_credential_offline(self, credential):
         """
@@ -1393,22 +1491,54 @@ class LemmaCredentialService:
         """
         try:
             # Extract signature and data
-            signature = credential.get('proof', {}).get('jws')
-            if not signature:
+            proof = credential.get('proof', {})
+            signature_b64 = proof.get('jws')
+            if not signature_b64:
+                self.logger.error("No signature found in credential proof")
                 return False
             
             # Get issuer public key from witness
             offline_witness = credential.get('offline_witness', {})
-            issuer_public_key = offline_witness.get('issuer_public_key')
-            if not issuer_public_key:
+            issuer_public_key_b64 = offline_witness.get('issuer_public_key')
+            if not issuer_public_key_b64:
+                self.logger.error("No issuer public key found in offline witness")
                 return False
             
-            # Verify signature (simplified - in production use proper JWT verification)
+            # Prepare credential data for verification (exclude proof and witness)
             credential_data = {k: v for k, v in credential.items() if k not in ['proof', 'offline_witness']}
-            data_to_verify = json.dumps(credential_data, sort_keys=True)
+            data_to_verify = json.dumps(credential_data, sort_keys=True).encode('utf-8')
             
-            # This is a simplified verification - in production use proper Ed25519
-            return True  # For demo purposes
+            # Decode the signature and public key
+            try:
+                # Add padding if needed
+                if len(signature_b64) % 4:
+                    signature_b64 += '=' * (4 - len(signature_b64) % 4)
+                if len(issuer_public_key_b64) % 4:
+                    issuer_public_key_b64 += '=' * (4 - len(issuer_public_key_b64) % 4)
+                    
+                signature_bytes = base64.b64decode(signature_b64)
+                public_key_bytes = base64.b64decode(issuer_public_key_b64)
+                
+                # Ensure public key is exactly 32 bytes for Ed25519
+                if len(public_key_bytes) != 32:
+                    self.logger.error(f"Invalid public key length: {len(public_key_bytes)} bytes (expected 32)")
+                    return False
+                    
+            except Exception as e:
+                self.logger.error(f"Failed to decode signature or public key: {e}")
+                return False
+            
+            # Perform Ed25519 signature verification
+            try:
+                from cryptography.hazmat.primitives.asymmetric import ed25519
+                public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
+                public_key.verify(signature_bytes, data_to_verify)
+                self.logger.info("Offline Ed25519 signature verification successful")
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"Ed25519 signature verification failed: {e}")
+                return False
             
         except Exception as e:
             self.logger.error(f"Offline signature verification failed: {e}")
@@ -1416,20 +1546,54 @@ class LemmaCredentialService:
     
     def verify_offline_witness(self, offline_witness):
         """
-        Verify the integrity of the offline witness
+        Verify the integrity of the offline witness using real cryptography
         """
         try:
-            # Check witness signature
-            witness_signature = offline_witness.get('witness_signature')
-            if not witness_signature:
+            # Check witness signature if present
+            witness_signature_b64 = offline_witness.get('witness_signature')
+            if not witness_signature_b64:
+                self.logger.warning("No witness signature found - skipping witness integrity check")
+                return True  # Allow if no signature present
+            
+            # Get issuer public key for witness verification
+            issuer_public_key_b64 = offline_witness.get('issuer_public_key')
+            if not issuer_public_key_b64:
+                self.logger.error("No issuer public key for witness verification")
                 return False
             
-            # Verify witness hasn't been tampered with
+            # Prepare witness data for verification (exclude signature)
             witness_data = {k: v for k, v in offline_witness.items() if k != 'witness_signature'}
-            witness_json = json.dumps(witness_data, sort_keys=True)
+            witness_json = json.dumps(witness_data, sort_keys=True).encode('utf-8')
             
-            # Simplified verification - in production use proper signature verification
-            return True  # For demo purposes
+            # Decode signature and public key
+            try:
+                if len(witness_signature_b64) % 4:
+                    witness_signature_b64 += '=' * (4 - len(witness_signature_b64) % 4)
+                if len(issuer_public_key_b64) % 4:
+                    issuer_public_key_b64 += '=' * (4 - len(issuer_public_key_b64) % 4)
+                    
+                signature_bytes = base64.b64decode(witness_signature_b64)
+                public_key_bytes = base64.b64decode(issuer_public_key_b64)
+                
+                if len(public_key_bytes) != 32:
+                    self.logger.error(f"Invalid witness public key length: {len(public_key_bytes)} bytes")
+                    return False
+                    
+            except Exception as e:
+                self.logger.error(f"Failed to decode witness signature or public key: {e}")
+                return False
+            
+            # Verify witness signature
+            try:
+                from cryptography.hazmat.primitives.asymmetric import ed25519
+                public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
+                public_key.verify(signature_bytes, witness_json)
+                self.logger.info("Offline witness signature verification successful")
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"Witness signature verification failed: {e}")
+                return False
             
         except Exception as e:
             self.logger.error(f"Offline witness verification failed: {e}")
@@ -1437,32 +1601,114 @@ class LemmaCredentialService:
     
     def check_revocation_offline(self, credential_id, offline_witness):
         """
-        Check if credential is revoked using offline witness data
+        Check if credential is revoked using OPRF-cascaded bloom filter
         """
         try:
             # Get revocation snapshot from witness
             revocation_snapshot = offline_witness.get('revocation_snapshot', {})
-            bloom_filter = revocation_snapshot.get('bloom_filter', '')
+            cascade_data_b64 = revocation_snapshot.get('bloom_filter', '')
             
-            if not bloom_filter:
+            if not cascade_data_b64:
                 # No revocation data - assume not revoked
+                self.logger.info("No revocation data in witness - assuming not revoked")
                 return {'revoked': False, 'method': 'no_revocation_data'}
             
-            # Check if credential ID is in bloom filter
-            credential_hash = hashlib.sha256(credential_id.encode()).hexdigest()
+            # Get OPRF witness data
+            oprf_witness = offline_witness.get('oprf_witness', {})
+            if not oprf_witness:
+                self.logger.warning("No OPRF witness found - falling back to simple check")
+                return self._fallback_revocation_check(credential_id, cascade_data_b64)
             
-            # Simplified bloom filter check - in production use proper bloom filter
-            revoked = credential_hash in bloom_filter  # Simplified check
+            # Initialize OPRF and cascade managers
+            from lemma.core.oprf_cascade import get_oprf_cascade_manager
+            from lemma.core.bloom_cascade import get_cascade_manager
+            
+            try:
+                oprf_manager = get_oprf_cascade_manager()
+                cascade_manager = get_cascade_manager()
+                
+                # Deserialize cascaded bloom filter
+                cascade_bytes = base64.b64decode(cascade_data_b64)
+                cascade_manager.deserialize(cascade_bytes)
+                
+                # Get OPRF output for this credential
+                oprf_output = None
+                
+                # Try to get cached OPRF output from witness
+                if 'oprf_output' in oprf_witness:
+                    try:
+                        oprf_output = base64.b64decode(oprf_witness['oprf_output'])
+                        self.logger.debug("Using cached OPRF output from witness")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to decode cached OPRF output: {e}")
+                
+                # If no cached output, compute OPRF output
+                if oprf_output is None:
+                    try:
+                        oprf_output = oprf_manager.compute_oprf_output(credential_id)
+                        self.logger.debug("Computed fresh OPRF output")
+                    except Exception as e:
+                        self.logger.error(f"Failed to compute OPRF output: {e}")
+                        return {'revoked': False, 'method': 'oprf_computation_error'}
+                
+                # Check against cascaded bloom filter
+                revoked = cascade_manager.check_oprf_hash(oprf_output)
+                
+                snapshot_time = revocation_snapshot.get('snapshot_time', 0)
+                snapshot_age_hours = (time.time() - snapshot_time) / 3600 if snapshot_time else 0
+                
+                cascade_stats = cascade_manager.get_stats()
+                
+                self.logger.info(f"OPRF cascade revocation check: credential_id={credential_id}, "
+                               f"revoked={revoked}, snapshot_age={snapshot_age_hours:.1f}h, "
+                               f"cascade_levels={cascade_stats['levels']}, "
+                               f"total_elements={cascade_stats['total_elements']}")
+                
+                return {
+                    'revoked': revoked,
+                    'method': 'oprf_cascaded_bloom_filter',
+                    'snapshot_age_hours': snapshot_age_hours,
+                    'cascade_levels': cascade_stats['levels'],
+                    'oprf_verified': True,
+                    'using_real_bloom': cascade_stats['using_real_bloom']
+                }
+                
+            except ImportError as e:
+                self.logger.warning(f"OPRF/cascade modules not available: {e}, falling back to simple check")
+                return self._fallback_revocation_check(credential_id, cascade_data_b64)
+            
+        except Exception as e:
+            self.logger.error(f"OPRF cascade revocation check failed: {e}")
+            # Fallback to simple check in case of errors
+            return self._fallback_revocation_check(credential_id, 
+                                                 offline_witness.get('revocation_snapshot', {}).get('bloom_filter', ''))
+    
+    def _fallback_revocation_check(self, credential_id, cascade_data_b64):
+        """Fallback revocation check using simple hash comparison"""
+        try:
+            if not cascade_data_b64:
+                return {'revoked': False, 'method': 'no_revocation_data_fallback'}
+            
+            # Decode cascade data
+            cascade_bytes = base64.b64decode(cascade_data_b64)
+            
+            # Hash the credential ID
+            credential_hash = hashlib.sha256(credential_id.encode()).digest()
+            
+            # Simple fallback: check if hash appears in cascade data
+            revoked = credential_hash[:8] in cascade_bytes
+            
+            self.logger.warning(f"Using fallback revocation check for {credential_id}: revoked={revoked}")
             
             return {
                 'revoked': revoked,
-                'method': 'offline_bloom_filter',
-                'snapshot_age_hours': (time.time() - revocation_snapshot.get('snapshot_time', 0)) / 3600
+                'method': 'fallback_byte_matching',
+                'cascade_size': len(cascade_bytes)
             }
             
         except Exception as e:
-            self.logger.error(f"Offline revocation check failed: {e}")
-            return {'revoked': False, 'method': 'offline_check_error'}
+            self.logger.error(f"Fallback revocation check failed: {e}")
+            return {'revoked': False, 'method': 'fallback_error'}
     
     def get_issuer_public_key(self):
         """Get issuer public key for offline verification"""

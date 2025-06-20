@@ -23,6 +23,12 @@ dnspython==2.4.2
 # pyristretto255>=1.0.0; python_version>="3.12"
 # Alternative cryptographic libraries for OPRF
 pycryptodome==3.20.0
+# Real OPRF-Cascaded Bloom Filter Dependencies
+pybloom-live==4.0.0
+bitarray==2.8.3
+mmh3==4.0.1
+# OPRF implementation (fallback to pycryptodome if ristretto255 unavailable)
+# pyristretto255==0.1.6
 # Added dependencies for decentralized identity
 pynacl==1.5.0
 base58==2.1.1

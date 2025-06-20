@@ -1022,4 +1022,11 @@ def shield_protected():
     
     return response
 
+@main_bp.route('/offline-demo')
+def offline_demo():
+    """
+    Demo page showing how to integrate offline verification
+    """
+    return render_template('offline_demo.html')
+
 
