@@ -35,6 +35,8 @@ try:
 except ImportError:
     MINIFY_AVAILABLE = False
 
+
+
 # Create logger
 logger = logging.getLogger(__name__)
 
@@ -146,7 +148,8 @@ def create_app(test_config=None):
             'X-Content-Type-Options': 'nosniff',
             'X-Frame-Options': 'SAMEORIGIN',
             'X-XSS-Protection': '1; mode=block',
-        }
+        },
+        MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16MB max file size
     )
     
     # Override with test config if provided
@@ -813,6 +816,8 @@ def create_app(test_config=None):
             logger.warning(f"Certificate pinning setup failed: {e}")
     
     setup_certificate_pinning()
+
+
 
     return app
 
