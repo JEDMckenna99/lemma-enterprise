@@ -2916,7 +2916,7 @@ def verify_with_fallback():
 
 @api_bp.route('/issue-offline-credential', methods=['POST'])
 @require_api_key
-def issue_offline_credential():
+def issue_offline_credential_legacy():
     """
     Issue a credential with offline verification capabilities
     Includes cryptographic witness for offline verification
