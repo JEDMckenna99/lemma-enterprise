@@ -545,26 +545,48 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
             }
             
-            // Notify central Lemma API (graceful degradation)
+            // Step 4: Notify Lemma Enterprise API to update DID and revocation registry
             try {
-                await fetch('https://api.lemma.network/v1/revocations', {
+                const revocationResponse = await fetch('/api/shield/revoke-credential', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + (sessionStorage.getItem('lemma_api_token') || 'demo-token')
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 'demo'
                     },
                     body: JSON.stringify({
                         credential_id: credentialId,
-                        revocation_reason: 'user_test',
+                        reason: 'User-initiated test revocation - demonstrating automated revocation flow',
+                        revoked_by: 'user_self_test',
                         timestamp: new Date().toISOString(),
-                        source: 'lemma-enterprise-demo'
+                        revocation_type: 'immediate'
                     })
                 });
-                console.log('[LEMMA-FLOW] Successfully notified central Lemma API');
+                
+                const revocationResult = await revocationResponse.json();
+                if (revocationResult.success) {
+                    console.log('[LEMMA-FLOW] Successfully notified Lemma API - DID and registry updated');
+                    actionStatus.innerHTML = `
+                        <div class="status-indicator status-success">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Step 4/5: Lemma API updated - DID and revocation registry synchronized
+                        </div>
+                    `;
+                } else {
+                    console.log('[LEMMA-FLOW] API notification failed, continuing with local revocation');
+                }
             } catch (notifyError) {
-                // Central API unavailable - continue with local revocation process
-                console.log('[LEMMA-FLOW] Central API unavailable - revocation continues locally:', notifyError.message);
-                // This is normal - we proceed with local revocation registry update
+                // API unavailable - continue with local revocation process
+                console.log('[LEMMA-FLOW] Lemma API unavailable - revocation continues locally:', notifyError.message);
+                actionStatus.innerHTML = `
+                    <div class="status-indicator status-warning">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        Step 4/5: Lemma API offline - proceeding with local revocation
+                    </div>
+                `;
             }
             
             // CRITICAL: Update local revocation registry immediately
@@ -601,18 +623,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
             
-            // Step 5: IMMEDIATELY trigger Lemma Shield - no delays
+            // Step 5: Clear credentials and let Shield autonomously detect revocation
             actionStatus.innerHTML = `
-                <div class="status-indicator status-error">
+                <div class="status-indicator status-warning">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                     </svg>
-                    SECURITY LOCKOUT: Re-verification required immediately!
+                    Step 5/5: Clearing credentials - Shield will autonomously detect and require re-verification
                 </div>
             `;
             
-            // IMMEDIATE security response - trigger Shield now
-            console.log('[LEMMA-FLOW] SECURITY EVENT: Credential revoked - triggering immediate Shield re-verification');
+            // Clear credentials and let Shield autonomously detect the revocation
+            console.log('[LEMMA-FLOW] SECURITY EVENT: Credential revoked - clearing credentials for autonomous Shield detection');
             triggerLemmaShieldReVerification();
             
         } catch (error) {
@@ -647,11 +669,16 @@ document.addEventListener('DOMContentLoaded', function() {
         sessionStorage.removeItem('lemma_session');
         sessionStorage.removeItem('lemma_verified');
         
+        // Clear IndexedDB credentials if wallet is available
+        if (window.lemmaWallet && window.lemmaWallet.clearAllCredentials) {
+            window.lemmaWallet.clearAllCredentials();
+        }
+        
         // Clear cookies
         document.cookie = 'lemma_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
         document.cookie = 'lemma_verified=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
         
-        // Emit security events to trigger Shield
+        // Emit security events to trigger Shield system
         window.dispatchEvent(new CustomEvent('lemma-security-lockout', {
             detail: { 
                 reason: 'credential_revoked',
@@ -669,9 +696,74 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }));
         
-        // ALWAYS use manual verification modal - no redirects
-        console.log('[LEMMA-FLOW] Starting manual verification modal - no redirects allowed');
-        showManualVerificationModal();
+        // Let Shield autonomously detect the revocation and appear automatically
+        console.log('[LEMMA-FLOW] Credentials cleared - Shield will autonomously detect and appear');
+        
+        // The Shield API /api/shield/status will now return shield_action: 'require_verification' 
+        // when it detects no valid credentials, causing Shield to appear automatically
+        
+        // Force a Shield status check to speed up the autonomous detection
+        if (window.fetch) {
+            fetch('/api/shield/status', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then(response => response.json())
+            .then(data => {
+                console.log('[LEMMA-FLOW] Shield status check result:', data);
+                if (data.shield_action === 'require_verification' || data.shield_action === 'check_credentials') {
+                    console.log('[LEMMA-FLOW] Shield will appear autonomously due to:', data.shield_action);
+                    
+                    // Update UI to show Shield is taking over
+                    actionStatus.innerHTML = `
+                        <div class="status-indicator status-success">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            ✅ Complete! Shield detected revocation and will appear for re-verification
+                        </div>
+                    `;
+                    
+                    // Listen for Shield verification completion
+                    monitorShieldVerification();
+                } else {
+                    console.log('[LEMMA-FLOW] Unexpected shield status - using fallback modal');
+                    setTimeout(showManualVerificationModal, 1000); // Delay to let Shield try first
+                }
+            }).catch(error => {
+                console.log('[LEMMA-FLOW] Shield status check failed - using fallback modal');
+                setTimeout(showManualVerificationModal, 1000); // Delay to let Shield try first
+            });
+        } else {
+            // Fallback for older browsers
+            setTimeout(showManualVerificationModal, 2000); // Give Shield time to autonomously detect
+        }
+    }
+
+    // Monitor for Shield verification completion
+    function monitorShieldVerification() {
+        console.log('[LEMMA-FLOW] Monitoring for Shield verification completion');
+        
+        // Listen for verification success events
+        window.addEventListener('lemma-verification-complete', function(event) {
+            console.log('[LEMMA-FLOW] Shield verification completed:', event.detail);
+            completeReVerification();
+        });
+        
+        // Also check periodically if verification status has changed
+        const checkInterval = setInterval(() => {
+            if (sessionStorage.getItem('lemma_verified') || localStorage.getItem('lemma_credential')) {
+                console.log('[LEMMA-FLOW] Verification detected - Shield process completed');
+                clearInterval(checkInterval);
+                completeReVerification();
+            }
+        }, 2000); // Check every 2 seconds
+        
+        // Stop checking after 2 minutes
+        setTimeout(() => {
+            clearInterval(checkInterval);
+        }, 120000);
     }
 
     // Manual re-verify button (fallback)
