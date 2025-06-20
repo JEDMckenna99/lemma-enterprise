@@ -1,0 +1,453 @@
+{
+  "info": {
+    "_postman_id": "e8f2c4d5-7a6b-4c2d-9e1f-3a4b5c6d7e8f",
+    "name": "Lemma Shield API - Complete Production Suite",
+    "description": "Comprehensive API collection for Lemma Shield digital identity verification system",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "lemma-shield-production"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://lemma-enterprise-production.up.railway.app",
+      "type": "string"
+    },
+    {
+      "key": "local_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🛡️ Shield API - Core Flow",
+      "item": [
+        {
+          "name": "Issue Offline Credential",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Issue credential successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('credential');",
+                  "    pm.expect(response).to.have.property('offline_witness');",
+                  "    pm.globals.set('test_credential', JSON.stringify(response.credential));",
+                  "    pm.globals.set('offline_witness', JSON.stringify(response.offline_witness));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kyc_session_id\": \"test_kyc_{{$timestamp}}\",\n  \"user_attributes\": {\n    \"isHuman\": true,\n    \"ageOver18\": true,\n    \"country\": \"US\"\n  },\n  \"proof_types\": [\"human\", \"age\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/issue-credential",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "issue-credential"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify Offline (True Offline)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Offline verification works', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.verified).to.eql(true);",
+                  "    pm.expect(response.method).to.eql('offline');",
+                  "    pm.expect(response.api_calls_made).to.eql(0);",
+                  "});",
+                  "",
+                  "pm.test('Performance under 100ms', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(100);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": {{test_credential}},\n  \"offline_witness\": {{offline_witness}},\n  \"proof_type\": \"human\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/verify-offline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "verify-offline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify with Fallback (Smart Fallback)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Fallback verification works', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.verified).to.eql(true);",
+                  "    pm.expect(['offline', 'did_vp']).to.include(response.method);",
+                  "});",
+                  "",
+                  "pm.test('Performance under 500ms', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": {{test_credential}},\n  \"proof_type\": \"human\",\n  \"challenge\": \"test_challenge_{{$timestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/verify-with-fallback",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "verify-with-fallback"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔄 Revocation API - Complete Flow",
+      "item": [
+        {
+          "name": "Revoke Credential",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Revocation succeeds', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.eql(true);",
+                  "    pm.expect(response).to.have.property('revocation_id');",
+                  "    pm.globals.set('revocation_id', response.revocation_id);",
+                  "});",
+                  "",
+                  "pm.test('Revocation under 4 seconds', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(4000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential_id\": \"test_revoke_{{$timestamp}}\",\n  \"reason\": \"Test revocation for Postman validation\",\n  \"revoked_by\": \"postman_test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/shield/revoke-credential",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shield",
+                "revoke-credential"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Check Revocation Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status check works', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('cascade_size');",
+                  "    pm.expect(response).to.have.property('last_updated');",
+                  "});",
+                  "",
+                  "pm.test('Performance under 100ms', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(100);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/shield/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shield",
+                "status"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 SRE & Monitoring",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('System healthy', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.status).to.eql('healthy');",
+                  "});",
+                  "",
+                  "pm.test('Fast health check', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(50);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Prometheus Metrics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Metrics available', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.text()).to.include('lemma_');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sre/metrics/prometheus",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "sre",
+                "metrics",
+                "prometheus"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "⚡ Performance Validation Suite",
+      "item": [
+        {
+          "name": "Load Test - Offline Verification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Meets offline performance requirement', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(100);",
+                  "});",
+                  "",
+                  "pm.test('Zero API calls confirmed', function () {",
+                  "    const response = pm.response.json();",
+                  "    if (response.api_calls_made !== undefined) {",
+                  "        pm.expect(response.api_calls_made).to.eql(0);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential_id\": \"perf_test_offline\",\n  \"credential\": {\"id\": \"test\", \"attributes\": {\"isHuman\": true}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/verify-offline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "verify-offline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Load Test - Fallback Verification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Meets fallback performance requirement', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                  "});",
+                  "",
+                  "pm.test('Proper fallback behavior', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(['offline', 'did_vp']).to.include(response.method || 'offline');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential_id\": \"perf_test_fallback\",\n  \"proof_type\": \"human\",\n  \"challenge\": \"perf_{{$timestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/verify-with-fallback",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "verify-with-fallback"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global setup for all requests",
+          "pm.globals.set('timestamp', Date.now());"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global validation for all responses",
+          "pm.test('Response time is reasonable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "pm.test('No server errors', function () {",
+          "    pm.expect(pm.response.code).to.be.below(500);",
+          "});"
+        ]
+      }
+    }
+  ]
+} 

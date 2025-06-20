@@ -440,41 +440,164 @@ document.addEventListener('DOMContentLoaded', function() {
     const verificationStatus = document.getElementById('verificationStatus');
     const actionStatus = document.getElementById('actionStatus');
     
-    // OPTIMIZED revoke credential - targets <1 second total time
+    // ENHANCED REVOCATION FLOW - Complete network workflow
+    // Target: Full revocation → OPRF cascade update → Network notification → Shield reappearance
+
+    // Enhanced revoke credential button - triggers complete network workflow
     revokeBtn.addEventListener('click', async function() {
-        if (!confirm('This will revoke your current Lemma credential for testing purposes using the OPTIMIZED flow (target: <1 second). Continue?')) {
+        if (!confirm('This will revoke your current Lemma credential for testing purposes using the ENHANCED network workflow. This will:\n\n• Clear all local credentials\n• Update OPRF cascade\n• Send network notifications\n• Force Shield reappearance\n\nContinue?')) {
             return;
         }
         
         revokeBtn.disabled = true;
-        revokeBtn.innerHTML = '<span class="loading-spinner mr-2"></span>OPTIMIZED: Revoking...';
+        revokeBtn.innerHTML = '<span class="loading-spinner mr-2"></span>ENHANCED: Finding credential...';
         
         try {
-            // Get current credential ID from wallet
-            const credentialId = sessionStorage.getItem('lemma_credential_id') || 'test-credential-' + Date.now();
+            // STEP 0: ENHANCED CREDENTIAL DETECTION (multi-source search)
+            console.log('[LEMMA-FLOW] Step 0: Enhanced credential ID detection');
+            let credentialId = null;
+            let foundCredential = null;
             
-            // Use the optimized revocation flow
+            // Method 1: Check sessionStorage first
+            const sessionCredId = sessionStorage.getItem('lemma_credential_id');
+            if (sessionCredId) {
+                credentialId = sessionCredId;
+                console.log('[LEMMA-FLOW] Found credential ID in sessionStorage:', credentialId);
+            }
+            
+            // Method 2: Check localStorage for credential
+            if (!credentialId) {
+                const localCredId = localStorage.getItem('lemma_credential_id');
+                if (localCredId) {
+                    credentialId = localCredId;
+                    console.log('[LEMMA-FLOW] Found credential ID in localStorage:', credentialId);
+                }
+            }
+            
+            // Method 3: Check for stored credentials in localStorage
+            if (!credentialId) {
+                const credentialKeys = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+                if (credentialKeys.length > 0) {
+                    try {
+                        const credentialData = JSON.parse(localStorage.getItem(credentialKeys[0]));
+                        if (credentialData.credential && credentialData.credential.id) {
+                            credentialId = credentialData.credential.id;
+                            foundCredential = credentialData;
+                            console.log('[LEMMA-FLOW] Found credential ID from stored credential:', credentialId);
+                        }
+                    } catch (e) {
+                        console.log('[LEMMA-FLOW] Error parsing stored credential:', e);
+                    }
+                }
+            }
+            
+            // Method 4: Check lemmaWallet if available
+            if (!credentialId && window.lemmaWallet) {
+                try {
+                    const walletCredentials = await window.lemmaWallet.getAllCredentials();
+                    if (walletCredentials && walletCredentials.length > 0) {
+                        const walletCred = walletCredentials[0];
+                        if (walletCred.credential && walletCred.credential.id) {
+                            credentialId = walletCred.credential.id;
+                            foundCredential = walletCred;
+                            console.log('[LEMMA-FLOW] Found credential ID from wallet:', credentialId);
+                        }
+                    }
+                } catch (e) {
+                    console.log('[LEMMA-FLOW] Error accessing wallet credentials:', e);
+                }
+            }
+            
+            // Method 5: Check verification flow IndexedDB
+            if (!credentialId && window.lemmaVerificationFlow) {
+                try {
+                    const dbCredentials = await window.lemmaVerificationFlow.getAllCredentialsFromIndexedDB();
+                    if (dbCredentials && dbCredentials.length > 0) {
+                        const dbCred = dbCredentials[0];
+                        if (dbCred.credential && dbCred.credential.id) {
+                            credentialId = dbCred.credential.id;
+                            foundCredential = dbCred;
+                            console.log('[LEMMA-FLOW] Found credential ID from IndexedDB:', credentialId);
+                        }
+                    }
+                } catch (e) {
+                    console.log('[LEMMA-FLOW] Error accessing IndexedDB credentials:', e);
+                }
+            }
+            
+            // Method 6: Check session credential element (legacy support)
+            if (!credentialId) {
+                const sessionCredentialElement = document.getElementById('sessionCredential');
+                if (sessionCredentialElement && sessionCredentialElement.value) {
+                    try {
+                        const sessionCred = JSON.parse(sessionCredentialElement.value);
+                        if (sessionCred.id) {
+                            credentialId = sessionCred.id;
+                            foundCredential = { credential: sessionCred };
+                            console.log('[LEMMA-FLOW] Found credential ID from session element:', credentialId);
+                        }
+                    } catch (e) {
+                        console.log('[LEMMA-FLOW] Error parsing session credential element:', e);
+                    }
+                }
+            }
+            
+            // COMPREHENSIVE DEBUG OUTPUT
+            console.log('[LEMMA-FLOW] COMPREHENSIVE CREDENTIAL DEBUG:');
+            console.log('- sessionStorage credential_id:', sessionStorage.getItem('lemma_credential_id'));
+            console.log('- localStorage credential_id:', localStorage.getItem('lemma_credential_id'));
+            console.log('- localStorage credential keys:', Object.keys(localStorage).filter(k => k.includes('lemma')));
+            console.log('- wallet available:', !!window.lemmaWallet);
+            console.log('- verification flow available:', !!window.lemmaVerificationFlow);
+            console.log('- session element present:', !!document.getElementById('sessionCredential'));
+            console.log('- FINAL credential ID:', credentialId);
+            console.log('- FINAL found credential:', foundCredential);
+            
+            // Generate fallback ID if none found
+            if (!credentialId) {
+                credentialId = `test-credential-fallback-${Date.now()}`;
+                console.log('[LEMMA-FLOW] No credential found, using fallback ID:', credentialId);
+                
+                // Show additional info to user
+                actionStatus.innerHTML = `
+                    <div class="status-indicator status-warning">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        No existing credential found - testing with fallback ID
+                    </div>
+                    <div style="font-size: 12px; margin-top: 8px; color: #666;">
+                        This will test the revocation system even without an existing credential.
+                    </div>
+                `;
+                actionStatus.style.display = 'block';
+            }
+            
+            revokeBtn.innerHTML = '<span class="loading-spinner mr-2"></span>ENHANCED: Revoking...';
+            
+            // Use the enhanced revocation flow
             actionStatus.innerHTML = `
                 <div class="status-indicator status-pending">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    OPTIMIZED: Starting sub-1-second revocation flow...
+                    ENHANCED: Starting complete network revocation workflow...
+                    <br><small>Credential ID: ${credentialId}</small>
                 </div>
             `;
             actionStatus.style.display = 'block';
             
-            // Call the optimized revocation flow (targets <1 second total time)
+            // Call the enhanced revocation flow (complete network workflow)
             const result = await performOptimizedRevocation(credentialId);
             
             if (!result.success) {
-                throw new Error(result.error || 'Optimized revocation failed');
+                throw new Error(result.error || 'Enhanced revocation failed');
             }
             
-            console.log(`[LEMMA-FLOW] OPTIMIZED REVOCATION COMPLETE: ${result.totalTime.toFixed(0)}ms total`);
+            console.log(`[LEMMA-FLOW] ENHANCED REVOCATION COMPLETE: ${result.totalTime.toFixed(0)}ms total`);
             
-            // The optimized function handles everything - just show success
-            // actionStatus is already updated by performOptimizedRevocation() with timing details
+            // The enhanced function handles everything - just show success
+            // actionStatus is already updated by performOptimizedRevocation() with detailed timing
             
         } catch (error) {
             actionStatus.innerHTML = `
@@ -496,308 +619,271 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
     });
-    
-    // Function to trigger Lemma Shield re-verification
-    function triggerLemmaShieldReVerification() {
-        console.log('[LEMMA-FLOW] SECURITY LOCKOUT: Clearing all credentials and forcing immediate re-verification');
+
+    async function performOptimizedRevocation(credentialId) {
+        console.log('[LEMMA-FLOW] Starting ENHANCED revocation flow (complete network workflow)');
+        const startTime = performance.now();
         
-        // COMPLETE credential cleanup - remove everything
-        localStorage.removeItem('lemma_credentials');
-        localStorage.removeItem('lemma_credential');
-        localStorage.removeItem('lemma_user_id');
-        sessionStorage.removeItem('lemma_session');
-        sessionStorage.removeItem('lemma_verified');
-        
-        // Clear IndexedDB credentials if wallet is available
-        if (window.lemmaWallet && window.lemmaWallet.clearAllCredentials) {
-            window.lemmaWallet.clearAllCredentials();
-        }
-        
-        // Clear cookies
-        document.cookie = 'lemma_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        document.cookie = 'lemma_verified=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        
-        // Emit security events to trigger Shield system
-        window.dispatchEvent(new CustomEvent('lemma-security-lockout', {
-            detail: { 
-                reason: 'credential_revoked',
-                force: true,
-                immediate: true,
-                security_event: true
+        try {
+            // STEP 1: ENHANCED credential clearing (comprehensive storage cleanup)
+            console.log('[LEMMA-FLOW] Step 1: Enhanced local credential clearing (all storage types)');
+            
+            // Clear sessionStorage (all variations)
+            const sessionKeys = ['lemma_session', 'lemma_verified', 'lemma_credential_id', 'lemma_user_id', 'lemma_credential'];
+            sessionKeys.forEach(key => {
+                if (sessionStorage.getItem(key)) {
+                    console.log(`[LEMMA-FLOW] Clearing sessionStorage: ${key}`);
+                    sessionStorage.removeItem(key);
+                }
+            });
+            
+            // Clear localStorage (comprehensive cleanup)
+            const localStorageKeys = Object.keys(localStorage).filter(key => 
+                key.includes('lemma') || key.includes('credential') || key.includes('verification')
+            );
+            console.log(`[LEMMA-FLOW] Found ${localStorageKeys.length} storage keys to clear:`, localStorageKeys);
+            
+            localStorageKeys.forEach(key => {
+                console.log(`[LEMMA-FLOW] Clearing localStorage: ${key}`);
+                localStorage.removeItem(key);
+            });
+            
+            // Clear IndexedDB credentials via lemmaWallet
+            if (window.lemmaWallet) {
+                try {
+                    console.log('[LEMMA-FLOW] Attempting to clear wallet credentials...');
+                    const walletCredentials = await window.lemmaWallet.getAllCredentials();
+                    console.log(`[LEMMA-FLOW] Found ${walletCredentials.length} wallet credentials to clear`);
+                    
+                    for (const walletCred of walletCredentials) {
+                        try {
+                            if (walletCred.credential && walletCred.credential.id) {
+                                console.log(`[LEMMA-FLOW] Deleting wallet credential: ${walletCred.credential.id}`);
+                                await window.lemmaWallet.deleteCredential(walletCred.credential.id);
+                            }
+                        } catch (e) {
+                            console.log(`[LEMMA-FLOW] Error deleting wallet credential:`, e);
+                        }
+                    }
+                } catch (e) {
+                    console.log('[LEMMA-FLOW] Error accessing wallet for cleanup:', e);
+                }
             }
-        }));
-        
-        window.dispatchEvent(new CustomEvent('lemma-force-verification', {
-            detail: { 
-                reason: 'credential_revoked',
-                force: true,
-                immediate: true
+            
+            // Clear IndexedDB credentials via verification flow
+            if (window.lemmaVerificationFlow) {
+                try {
+                    console.log('[LEMMA-FLOW] Attempting to clear verification flow credentials...');
+                    const dbCredentials = await window.lemmaVerificationFlow.getAllCredentialsFromIndexedDB();
+                    console.log(`[LEMMA-FLOW] Found ${dbCredentials.length} IndexedDB credentials to clear`);
+                    
+                    for (const dbCred of dbCredentials) {
+                        try {
+                            if (dbCred.credential && dbCred.credential.id) {
+                                console.log(`[LEMMA-FLOW] Attempting to delete IndexedDB credential: ${dbCred.credential.id}`);
+                                // Try to use the verification flow's delete method if available
+                                if (window.lemmaVerificationFlow.deleteCredential) {
+                                    await window.lemmaVerificationFlow.deleteCredential(dbCred.credential.id);
+                                }
+                            }
+                        } catch (e) {
+                            console.log(`[LEMMA-FLOW] Error deleting IndexedDB credential:`, e);
+                        }
+                    }
+                } catch (e) {
+                    console.log('[LEMMA-FLOW] Error accessing IndexedDB for cleanup:', e);
+                }
             }
-        }));
-        
-        // Let Shield autonomously detect the revocation and appear automatically
-        console.log('[LEMMA-FLOW] Credentials cleared - Shield will autonomously detect and appear');
-        
-        // The Shield API /api/shield/status will now return shield_action: 'require_verification' 
-        // when it detects no valid credentials, causing Shield to appear automatically
-        
-        // Force a Shield status check to speed up the autonomous detection
-        if (window.fetch) {
-            fetch('/api/shield/status', {
-                method: 'GET',
+            
+            // Clear session credential element
+            const sessionCredentialElement = document.getElementById('sessionCredential');
+            if (sessionCredentialElement) {
+                console.log('[LEMMA-FLOW] Clearing session credential element');
+                sessionCredentialElement.value = '';
+            }
+            
+            // Clear cookies (comprehensive)
+            const cookiesToClear = ['lemma_session', 'lemma_verified', 'lemma_credential', 'lemma_user_id'];
+            cookiesToClear.forEach(cookieName => {
+                document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+                document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
+            });
+            
+            const step1Time = performance.now() - startTime;
+            console.log(`[LEMMA-FLOW] Step 1 completed in ${step1Time.toFixed(2)}ms - cleared all local storage`);
+            
+            // STEP 2: Call ENHANCED revoke API (complete workflow)
+            console.log('[LEMMA-FLOW] Step 2: Calling enhanced revoke API (network workflow)');
+            const revokeStartTime = performance.now();
+            
+            const revokeResponse = await fetch('/api/shield/revoke-credential', {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                }
-            }).then(response => response.json())
-            .then(data => {
-                console.log('[LEMMA-FLOW] Shield status check result:', data);
-                if (data.shield_action === 'require_verification' || data.shield_action === 'check_credentials') {
-                    console.log('[LEMMA-FLOW] Shield will appear autonomously due to:', data.shield_action);
-                    
-                    // Update UI to show Shield is taking over
-                    actionStatus.innerHTML = `
-                        <div class="status-indicator status-success">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            ✅ Complete! Shield detected revocation and will appear for re-verification
-                        </div>
-                    `;
-                    
-                    // Listen for Shield verification completion
-                    monitorShieldVerification();
-                    
-                    // SPEED OPTIMIZATION: Trigger multiple rapid status checks to force Shield appearance
-                    let rapidCheckCount = 0;
-                    const rapidCheckInterval = setInterval(() => {
-                        rapidCheckCount++;
-                        fetch('/api/shield/status')
-                            .then(response => response.json())
-                            .then(statusData => {
-                                console.log(`[LEMMA-FLOW] Rapid check ${rapidCheckCount}:`, statusData.shield_action);
-                            })
-                            .catch(() => {});
-                        
-                        if (rapidCheckCount >= 10) { // Stop after 10 rapid checks (5 seconds)
-                            clearInterval(rapidCheckInterval);
-                        }
-                    }, 500); // Every 500ms for first 5 seconds
-                    
-                } else {
-                    console.log('[LEMMA-FLOW] Unexpected shield status - using fallback modal');
-                    setTimeout(showManualVerificationModal, 1000); // Delay to let Shield try first
-                }
-            }).catch(error => {
-                console.log('[LEMMA-FLOW] Shield status check failed - using fallback modal');
-                setTimeout(showManualVerificationModal, 1000); // Delay to let Shield try first
-            });
-        } else {
-            // Fallback for older browsers
-            setTimeout(showManualVerificationModal, 2000); // Give Shield time to autonomously detect
-        }
-    }
-
-    // Monitor for Shield verification completion
-    function monitorShieldVerification() {
-        console.log('[LEMMA-FLOW] Monitoring for Shield verification completion');
-        
-        // Listen for verification success events
-        window.addEventListener('lemma-verification-complete', function(event) {
-            console.log('[LEMMA-FLOW] Shield verification completed:', event.detail);
-            completeReVerification();
-        });
-        
-        // FAST polling during active revocation - check every 1 second instead of 30
-        const checkInterval = setInterval(() => {
-            if (sessionStorage.getItem('lemma_verified') || localStorage.getItem('lemma_credential')) {
-                console.log('[LEMMA-FLOW] Verification detected - Shield process completed');
-                clearInterval(checkInterval);
-                completeReVerification();
-            }
-        }, 1000); // Fast check every 1 second for immediate detection
-        
-        // Also trigger Shield status checks more aggressively during revocation
-        const shieldStatusInterval = setInterval(() => {
-            fetch('/api/shield/status')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.shield_action === 'allow_access') {
-                        console.log('[LEMMA-FLOW] Shield status shows verification complete');
-                        clearInterval(shieldStatusInterval);
-                        clearInterval(checkInterval);
-                        completeReVerification();
-                    }
+                },
+                body: JSON.stringify({
+                    credential_id: credentialId,
+                    reason: 'User-initiated test revocation - complete network workflow',
+                    revoked_by: 'user_self_test',
+                    comprehensive_cleanup: true
                 })
-                .catch(() => {}); // Ignore errors during rapid polling
-        }, 500); // Super fast Shield status polling every 500ms
-        
-        // Stop checking after 2 minutes
-        setTimeout(() => {
-            clearInterval(checkInterval);
-            clearInterval(shieldStatusInterval);
-        }, 120000);
-    }
-
-    // Manual re-verify button (fallback)
-    verifyBtn.addEventListener('click', function() {
-        triggerLemmaShieldReVerification();
-    });
-    
-    // Function to show manual verification modal (stays on same page)
-    function showManualVerificationModal() {
-        console.log('[LEMMA-FLOW] Showing manual verification modal');
-        
-        // Create modal overlay
-        const modalOverlay = document.createElement('div');
-        modalOverlay.className = 'lemma-verification-modal-overlay';
-        modalOverlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 10000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
-        
-        // Create modal content
-        const modalContent = document.createElement('div');
-        modalContent.className = 'lemma-verification-modal';
-        modalContent.style.cssText = `
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            max-width: 500px;
-            width: 90%;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            text-align: center;
-        `;
-        
-        modalContent.innerHTML = `
-            <div style="margin-bottom: 1.5rem;">
-                <svg width="64" height="64" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: #dc2626; margin: 0 auto;">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                </svg>
-            </div>
-            <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; color: #111827;">
-                Credential Revoked - Re-verification Required
-            </h2>
-            <p style="color: #6b7280; margin-bottom: 2rem;">
-                Your Lemma credential has been revoked. You must complete verification to continue accessing this content.
-            </p>
-            <div style="display: flex; gap: 1rem; justify-content: center;">
-                <button onclick="startInlineVerification()" class="btn btn-primary" style="background: #2563eb; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
-                    Start Verification
-                </button>
-                <button onclick="closeVerificationModal()" class="btn btn-secondary" style="background: #6b7280; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
-                    Cancel
-                </button>
-            </div>
-            <div id="inline-verification-status" style="margin-top: 1.5rem; display: none;"></div>
-        `;
-        
-        modalOverlay.appendChild(modalContent);
-        document.body.appendChild(modalOverlay);
-        
-        // Prevent body scroll
-        document.body.style.overflow = 'hidden';
-        
-        // Add global functions for modal interaction
-        window.startInlineVerification = function() {
-            const statusDiv = document.getElementById('inline-verification-status');
-            statusDiv.style.display = 'block';
-            statusDiv.innerHTML = `
-                <div style="padding: 1rem; background: #f3f4f6; border-radius: 6px; margin-top: 1rem;">
-                    <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
-                        <div style="width: 24px; height: 24px; border: 3px solid #2563eb; border-top: 3px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                        <span style="margin-left: 0.5rem; color: #374151;">Starting verification process...</span>
-                    </div>
-                    <div style="text-align: left; font-size: 0.875rem; color: #6b7280;">
-                        <p>✅ Clearing revoked credentials</p>
-                        <p>✅ Initializing secure verification</p>
-                        <p>⏳ Connecting to verification service...</p>
-                    </div>
-                </div>
-            `;
+            });
             
-            // Simulate verification process
+            const revokeData = await revokeResponse.json();
+            const step2Time = performance.now() - revokeStartTime;
+            console.log(`[LEMMA-FLOW] Step 2 completed in ${step2Time.toFixed(2)}ms`);
+            console.log('[LEMMA-FLOW] Enhanced revoke API response:', revokeData);
+            
+            if (!revokeData.success) {
+                throw new Error(`Revocation API failed: ${revokeData.error}`);
+            }
+            
+            // STEP 3: ENHANCED Shield status check (comprehensive detection)
+            console.log('[LEMMA-FLOW] Step 3: Enhanced Shield status check with revocation detection');
+            const statusStartTime = performance.now();
+            
+            const statusResponse = await fetch('/api/shield/status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    credentials: [{ id: credentialId }],
+                    check_revocation: true,
+                    comprehensive_check: true,
+                    force_check: true
+                })
+            });
+            
+            const statusData = await statusResponse.json();
+            const step3Time = performance.now() - statusStartTime;
+            console.log(`[LEMMA-FLOW] Step 3 completed in ${step3Time.toFixed(2)}ms`);
+            console.log('[LEMMA-FLOW] Enhanced Shield status response:', statusData);
+            
+            // STEP 4: FORCE Shield reappearance (multiple methods)
+            console.log('[LEMMA-FLOW] Step 4: Forcing Shield reappearance with multiple triggers');
+            const step4StartTime = performance.now();
+            
+            // Emit comprehensive security events
+            window.dispatchEvent(new CustomEvent('lemma-security-lockout', {
+                detail: { 
+                    reason: 'credential_revoked',
+                    credential_id: credentialId,
+                    force: true,
+                    immediate: true,
+                    security_event: true,
+                    revocation_confirmed: true,
+                    network_notified: revokeData.network_notification === 'sent'
+                }
+            }));
+            
+            window.dispatchEvent(new CustomEvent('lemma-force-verification', {
+                detail: { 
+                    reason: 'credential_revoked',
+                    credential_id: credentialId,
+                    force: true,
+                    immediate: true,
+                    revocation_data: statusData
+                }
+            }));
+            
+            // Force Shield to show regardless of status
+            if (window.LemmaShield) {
+                if (window.LemmaShield.show) {
+                    window.LemmaShield.show({
+                        force: true,
+                        reason: 'credential_revoked',
+                        title: 'Credential Revoked - Re-verification Required',
+                        message: 'Your verification has been revoked. Please verify again to continue.',
+                        revocation_data: statusData
+                    });
+                } else if (window.LemmaShield.forceShow) {
+                    window.LemmaShield.forceShow();
+                }
+            }
+            
+            // Trigger lemma-shield-api reappearance if available
+            if (window.lemmaShieldAPI && window.lemmaShieldAPI.handleCredentialRevoked) {
+                window.lemmaShieldAPI.handleCredentialRevoked({
+                    credential_id: credentialId,
+                    revocation_reason: revokeData.reason || 'Test revocation',
+                    network_status: 'revoked'
+                });
+            }
+            
+            // Fallback: Force page reload to trigger Shield
             setTimeout(() => {
-                statusDiv.innerHTML = `
-                    <div style="padding: 1rem; background: #dcfce7; border-radius: 6px; margin-top: 1rem; border: 1px solid #16a34a;">
-                        <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
-                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: #16a34a;">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                            <span style="margin-left: 0.5rem; color: #166534; font-weight: 600;">Verification Successful!</span>
-                        </div>
-                        <p style="color: #166534; font-size: 0.875rem; margin-bottom: 1rem;">
-                            You have been successfully re-verified and can continue using the Lemma Network.
-                        </p>
-                        <button onclick="completeReVerification()" class="btn btn-primary" style="background: #16a34a; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
-                            Continue
-                        </button>
-                    </div>
-                `;
-            }, 3000);
-        };
-        
-        window.completeReVerification = function() {
-            // Update main page status
-            verificationStatus.innerHTML = `
-                <div class="status-indicator status-verified">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Lemma Verified
-                </div>
-            `;
+                if (!document.querySelector('.lemma-shield') && !document.querySelector('[data-lemma-shield]')) {
+                    console.log('[LEMMA-FLOW] Shield not detected, forcing page reload');
+                    window.location.reload();
+                }
+            }, 1000);
+            
+            const step4Time = performance.now() - step4StartTime;
+            const totalTime = performance.now() - startTime;
+            
+            console.log(`[LEMMA-FLOW] Step 4 completed in ${step4Time.toFixed(2)}ms`);
+            console.log(`[LEMMA-FLOW] TOTAL ENHANCED FLOW TIME: ${totalTime.toFixed(2)}ms`);
+            
+            // STEP 5: Update UI with comprehensive success status
+            const actionsCompleted = revokeData.actions_completed || [];
+            const networkNotification = revokeData.network_notification || 'unknown';
             
             actionStatus.innerHTML = `
-                <div class="status-indicator status-verified">
+                <div class="status-indicator status-success">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                     </svg>
-                    Re-verification successful! You're back in the network.
+                    ENHANCED: Complete revocation workflow completed in ${totalTime.toFixed(0)}ms!
+                </div>
+                <div style="font-size: 12px; margin-top: 8px; color: #666;">
+                    <strong>Actions Completed:</strong><br>
+                    ${actionsCompleted.map(action => `✅ ${action.replace(/_/g, ' ')}`).join('<br>')}
+                    <br><br>
+                    <strong>Network Status:</strong> ${networkNotification}<br>
+                    <strong>Revocation Detection:</strong> ${statusData.detection_layers?.join(', ') || 'Enhanced layers'}<br>
+                    <strong>Shield Status:</strong> ${statusData.shield_action === 'require_verification' ? '✅ Will reappear' : '❌ Status unclear'}<br>
+                    <strong>Performance:</strong> ${(revokeData.response_time_ms || 0).toFixed(1)}ms API + ${statusData.response_time_ms.toFixed(1)}ms status
                 </div>
             `;
             
-            // Reset buttons for next test
-            verifyBtn.style.display = 'none';
-            revokeBtn.style.display = 'inline-flex';
+            return {
+                success: true,
+                totalTime: totalTime,
+                breakdown: {
+                    step1_clear_local: step1Time,
+                    step2_revoke_api: step2Time,
+                    step3_status_check: step3Time,
+                    step4_force_shield: step4Time
+                },
+                revocation_data: revokeData,
+                status_data: statusData,
+                network_notification: networkNotification,
+                actions_completed: actionsCompleted
+            };
             
-            // Store new credential ID
-            sessionStorage.setItem('lemma_credential_id', 'new-credential-' + Date.now());
+        } catch (error) {
+            const totalTime = performance.now() - startTime;
+            console.error('[LEMMA-FLOW] Enhanced revocation failed:', error);
             
-            // Close modal
-            closeVerificationModal();
-        };
-        
-        window.closeVerificationModal = function() {
-            const modal = document.querySelector('.lemma-verification-modal-overlay');
-            if (modal) {
-                modal.remove();
-                document.body.style.overflow = 'auto';
-            }
+            actionStatus.innerHTML = `
+                <div class="status-indicator status-error">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                    Enhanced revocation failed: ${error.message}
+                </div>
+                <div style="font-size: 12px; margin-top: 8px; color: #666;">
+                    Time: ${totalTime.toFixed(0)}ms | Error during network workflow
+                </div>
+            `;
             
-            // If user cancels, they remain locked out
-            if (!sessionStorage.getItem('lemma_credential_id') || sessionStorage.getItem('lemma_credential_id').includes('revoked')) {
-                actionStatus.innerHTML = `
-                    <div class="status-indicator status-error">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                        </svg>
-                        Verification cancelled. You are locked out until you complete verification.
-                        <br><br>
-                        <button onclick="showManualVerificationModal()" class="btn btn-primary" style="background: #2563eb; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
-                            Try Again
-                        </button>
-                    </div>
-                `;
-            }
-        };
+            return {
+                success: false,
+                error: error.message,
+                totalTime: totalTime
+            };
+        }
     }
     
     // Check if user already has a saved signature
@@ -815,145 +901,5 @@ document.addEventListener('DOMContentLoaded', function() {
         img.src = savedSignature;
     }
 });
-
-// OPTIMIZED REVOCATION FLOW - NO WEBSOCKETS, NO POLLING
-// Target: <1 second total time using immediate checks
-
-async function performOptimizedRevocation(credentialId) {
-    console.log('[LEMMA-FLOW] Starting optimized revocation flow (target: <1s)');
-    const startTime = performance.now();
-    
-    try {
-        // STEP 1: Clear credentials locally (0ms)
-        console.log('[LEMMA-FLOW] Step 1: Clearing local credentials');
-        localStorage.removeItem('lemma_credentials');
-        localStorage.removeItem('lemma_credential');
-        localStorage.removeItem('lemma_user_id');
-        sessionStorage.removeItem('lemma_session');
-        sessionStorage.removeItem('lemma_verified');
-        
-        // Clear cookies
-        document.cookie = 'lemma_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        document.cookie = 'lemma_verified=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        
-        const step1Time = performance.now() - startTime;
-        console.log(`[LEMMA-FLOW] Step 1 completed in ${step1Time.toFixed(2)}ms`);
-        
-        // STEP 2: Call optimized revoke API (target: <20ms)
-        console.log('[LEMMA-FLOW] Step 2: Calling optimized revoke API');
-        const revokeStartTime = performance.now();
-        
-        const revokeResponse = await fetch('/api/shield/revoke-credential', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                credential_id: credentialId,
-                reason: 'User-initiated test revocation - optimized flow',
-                revoked_by: 'user_self_test'
-            })
-        });
-        
-        const revokeData = await revokeResponse.json();
-        const step2Time = performance.now() - revokeStartTime;
-        console.log(`[LEMMA-FLOW] Step 2 completed in ${step2Time.toFixed(2)}ms`);
-        console.log('[LEMMA-FLOW] Revoke API response:', revokeData);
-        
-        // STEP 3: Immediate Shield status check (target: <10ms) 
-        console.log('[LEMMA-FLOW] Step 3: Immediate Shield status check');
-        const statusStartTime = performance.now();
-        
-        const statusResponse = await fetch('/api/shield/status', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const statusData = await statusResponse.json();
-        const step3Time = performance.now() - statusStartTime;
-        console.log(`[LEMMA-FLOW] Step 3 completed in ${step3Time.toFixed(2)}ms`);
-        console.log('[LEMMA-FLOW] Shield status response:', statusData);
-        
-        // STEP 4: Immediate Shield trigger (0ms)
-        console.log('[LEMMA-FLOW] Step 4: Triggering Shield immediately');
-        const step4StartTime = performance.now();
-        
-        if (statusData.shield_action === 'require_verification') {
-            console.log('[LEMMA-FLOW] Shield will appear - credentials successfully revoked');
-            
-            // Force immediate Shield appearance
-            if (window.LemmaShield && window.LemmaShield.show) {
-                window.LemmaShield.show({
-                    force: true,
-                    reason: 'credential_revoked'
-                });
-            } else {
-                // Fallback: trigger page reload to activate Shield
-                setTimeout(() => {
-                    window.location.reload();
-                }, 100);
-            }
-        } else {
-            console.log('[LEMMA-FLOW] Unexpected status - forcing Shield check');
-            // Force Shield to check status again
-            if (window.LemmaShield && window.LemmaShield.checkStatus) {
-                window.LemmaShield.checkStatus();
-            }
-        }
-        
-        const step4Time = performance.now() - step4StartTime;
-        const totalTime = performance.now() - startTime;
-        
-        console.log(`[LEMMA-FLOW] Step 4 completed in ${step4Time.toFixed(2)}ms`);
-        console.log(`[LEMMA-FLOW] TOTAL OPTIMIZED FLOW TIME: ${totalTime.toFixed(2)}ms`);
-        
-        // Update UI with success and timing
-        actionStatus.innerHTML = `
-            <div class="status-indicator status-success">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                OPTIMIZED: Revocation completed in ${totalTime.toFixed(0)}ms!
-            </div>
-            <div style="font-size: 12px; margin-top: 8px; color: #666;">
-                API Response: ${(revokeData.response_time_ms || 0).toFixed(1)}ms | 
-                Status Check: ${statusData.response_time_ms.toFixed(1)}ms | 
-                Target: <1000ms ✅
-            </div>
-        `;
-        
-        return {
-            success: true,
-            totalTime: totalTime,
-            breakdown: {
-                step1_clear_local: step1Time,
-                step2_revoke_api: step2Time,
-                step3_status_check: step3Time,
-                step4_trigger_shield: step4Time
-            }
-        };
-        
-    } catch (error) {
-        const totalTime = performance.now() - startTime;
-        console.error('[LEMMA-FLOW] Optimized revocation failed:', error);
-        
-        actionStatus.innerHTML = `
-            <div class="status-indicator status-error">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                </svg>
-                Revocation failed: ${error.message}
-            </div>
-        `;
-        
-        return {
-            success: false,
-            error: error.message,
-            totalTime: totalTime
-        };
-    }
-}
 </script>
 {% endblock %} 

@@ -47,5 +47,6 @@ psutil==5.9.6
 schedule==1.2.0
 reportlab==4.2.2
 flask-minify==0.50
+redis==5.0.1
 
 

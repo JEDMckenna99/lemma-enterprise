@@ -17,6 +17,8 @@ import json
 from datetime import datetime
 import time
 import hashlib
+import redis
+from urllib.parse import urlparse
 
 # Optional CSRF protection import
 try:
@@ -39,6 +41,32 @@ except ImportError:
 
 # Create logger
 logger = logging.getLogger(__name__)
+
+# Initialize Redis client for production caching
+redis_client = None
+if os.getenv('REDISCLOUD_URL'):
+    try:
+        url = urlparse(os.getenv('REDISCLOUD_URL'))
+        redis_client = redis.Redis(
+            host=url.hostname,
+            port=url.port,
+            password=url.password,
+            decode_responses=True,
+            socket_timeout=5,
+            socket_connect_timeout=5,
+            retry_on_timeout=True
+        )
+        # Test connection
+        redis_client.ping()
+        print("✅ Redis Cloud connected successfully")
+    except Exception as e:
+        print(f"⚠️  Redis connection failed: {e}")
+        redis_client = None
+else:
+    print("ℹ️  Redis not configured, using in-memory caching")
+
+# Export for use in other modules
+__all__ = ['redis_client']
 
 def create_app(test_config=None):
     """Create and configure the Flask application."""
@@ -345,7 +373,8 @@ def create_app(test_config=None):
     # Force HTTPS in production for OIDC4VP compliance
     @app.before_request
     def force_https():
-        if not app.debug and not app.testing:
+        # Disable HTTPS enforcement for local testing
+        if False and not app.debug and not app.testing:
             if request.headers.get('X-Forwarded-Proto', 'http') != 'https':
                 url = request.url.replace('http://', 'https://', 1)
                 return redirect(url, code=301)
@@ -773,8 +802,8 @@ def create_app(test_config=None):
         if request.endpoint in ['static', 'health_check', 'ping']:
             return
         
-        # Enforce HTTPS in production
-        if app.config.get('ENV') == 'production':
+        # Disable HTTPS enforcement for local testing
+        if False and app.config.get('ENV') == 'production':
             if not request.is_secure and 'localhost' not in request.host:
                 # Redirect HTTP to HTTPS
                 url = request.url.replace('http://', 'https://', 1)

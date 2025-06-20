@@ -7,8 +7,8 @@ import time
 import logging
 from functools import wraps
 from typing import Dict, Any, Optional, Tuple, Callable
-from flask import Blueprint, request, jsonify, current_app, session, url_for, render_template, abort
-from datetime import datetime
+from flask import Blueprint, request, jsonify, current_app, session, url_for, render_template, abort, redirect, flash, make_response
+from datetime import datetime, timedelta
 import os
 import json
 import hashlib
@@ -68,9 +68,57 @@ logger = logging.getLogger(__name__)
 # Rate limiting implementation
 request_history: Dict[str, list] = {}
 
-# Simple in-memory challenge store for demo; replace with Redis/DB in production
-challenge_store = {}
-CHALLENGE_EXPIRY_SECONDS = 300  # 5 minutes
+# Enhanced challenge store with Redis caching
+class ChallengeStore:
+    def __init__(self):
+        self.redis = redis_client
+        self.memory_store = {}  # Fallback for when Redis unavailable
+        
+    def store_challenge(self, challenge_id, challenge_data, ttl=300):
+        """Store challenge with TTL (default 5 minutes)"""
+        try:
+            if self.redis:
+                # Use Redis for production performance
+                self.redis.setex(
+                    f"challenge:{challenge_id}", 
+                    ttl, 
+                    json.dumps(challenge_data)
+                )
+                return True
+            else:
+                # Fallback to memory
+                self.memory_store[challenge_id] = {
+                    'data': challenge_data,
+                    'expires': time.time() + ttl
+                }
+                return True
+        except Exception as e:
+            logger.error(f"Failed to store challenge: {e}")
+            return False
+            
+    def get_challenge(self, challenge_id):
+        """Get and remove challenge (single use)"""
+        try:
+            if self.redis:
+                # Get from Redis
+                data = self.redis.get(f"challenge:{challenge_id}")
+                if data:
+                    self.redis.delete(f"challenge:{challenge_id}")  # Single use
+                    return json.loads(data)
+                return None
+            else:
+                # Fallback to memory
+                if challenge_id in self.memory_store:
+                    stored = self.memory_store.pop(challenge_id)
+                    if stored['expires'] > time.time():
+                        return stored['data']
+                return None
+        except Exception as e:
+            logger.error(f"Failed to get challenge: {e}")
+            return None
+
+# Initialize high-performance challenge store
+challenge_store = ChallengeStore()
 
 # Add global caches for performance
 _challenge_cache = {}
@@ -182,7 +230,7 @@ def fast_test() -> Tuple[str, int, Dict[str, str]]:
 @require_api_key
 @rate_limit
 def issue_credential():
-    """Issue a credential via API (requires API key)."""
+    """Issue a credential with offline verification capabilities by default."""
     try:
         data = request.get_json()
         if not data or 'user_id' not in data:
@@ -194,22 +242,48 @@ def issue_credential():
         if not isinstance(user_id, str) or len(user_id.strip()) == 0:
             return jsonify({"error": "Invalid user ID format"}), 400
         
+        # Get optional attributes and offline preference
+        attributes = data.get('attributes', {})
+        include_offline = data.get('include_offline', True)  # Default to True for offline capabilities
+        
         # Issue the credential
         credential_service = get_credential_service()
         if not credential_service:
             logger.error("Credential service not available")
             return jsonify({"error": "Credential service not available"}), 503
+        
+        if include_offline:
+            # Issue credential with offline verification capabilities (new default)
+            try:
+                credential = credential_service.issue_credential_with_offline_witness(user_id.strip(), attributes)
+                logger.info("Offline-capable credential issued for user: %s", user_id)
+                
+                return jsonify({
+                    "success": True,
+                    "message": "Credential issued successfully with offline verification",
+                    "credential": credential,
+                    "offline_capable": True,
+                    "witness_valid_until": credential.get('offline_witness', {}).get('valid_until'),
+                    "verification_modes": ["offline", "online_fallback"]
+                })
+            except Exception as e:
+                logger.warning("Failed to issue offline credential, falling back to standard: %s", str(e))
+                # Fall back to standard credential if offline fails
+                include_offline = False
+        
+        if not include_offline:
+            # Issue standard credential (fallback or explicitly requested)
+            credential = credential_service.issue_credential(user_id.strip())
+            logger.info("Standard credential issued for user: %s", user_id)
             
-        credential = credential_service.issue_credential(user_id.strip())
-        
-        # Log successful issuance
-        logger.info("Credential issued for user: %s", user_id)
-        
-        return jsonify({
-            "success": True,
-            "message": "Credential issued successfully",
-            "credential": credential
-        })
+            return jsonify({
+                "success": True,
+                "message": "Credential issued successfully",
+                "credential": credential,
+                "offline_capable": False,
+                "verification_modes": ["online_only"]
+            })
+            
     except ValueError as e:
         logger.error("Invalid data for credential issuance: %s", str(e))
         return jsonify({"error": f"Invalid data: {str(e)}"}), 400
