@@ -29,6 +29,7 @@ from lemma.auth.security import admin_required
 from lemma.auth.csrf_config import csrf_protect, generate_csrf
 from lemma.utils.input_validation import InputValidator, ValidationError, validate_request_data
 from lemma.utils.stripe_service import check_verification_status, create_verification_session
+from lemma import redis_client
 
 # Try to import Flask-Limiter for enhanced rate limiting
 try:
