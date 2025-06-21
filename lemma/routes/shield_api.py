@@ -637,9 +637,12 @@ def revoke_credential():
             current_app.logger.warning(f"[REVOCATION] Network notification failed: {e}")
         
         # STEP 7: Background file persistence (fire-and-forget)
+        # Capture the app instance for use in background thread
+        app_instance = current_app._get_current_object()
+        
         def persist_revocation_complete():
             # Create application context for background thread
-            with current_app.app_context():
+            with app_instance.app_context():
                 try:
                     revocation_file = os.path.join('instance', 'revoked_credentials.json')
                     os.makedirs(os.path.dirname(revocation_file), exist_ok=True)
@@ -654,9 +657,9 @@ def revoke_credential():
                     with open(revocation_file, 'w') as f:
                         json.dump(revocations, f, indent=2)
                     
-                    current_app.logger.info(f"[REVOCATION] Persisted revocation for {credential_id}")
+                    app_instance.logger.info(f"[REVOCATION] Persisted revocation for {credential_id}")
                 except Exception as e:
-                    current_app.logger.error(f"[REVOCATION] Persistence failed: {e}")
+                    app_instance.logger.error(f"[REVOCATION] Persistence failed: {e}")
         
         # Execute in background thread (non-blocking)
         import threading
@@ -1129,9 +1132,12 @@ def revoke_credential_internal(credential_id, reason, revoked_by):
         current_app.logger.info(f"[INSTANT] Credential {credential_id} revoked in memory cache")
         
         # BACKGROUND: Persist to file asynchronously (non-blocking)
+        # Capture the app instance for use in background thread
+        app_instance = current_app._get_current_object()
+        
         def persist_revocation():
             # Create application context for background thread
-            with current_app.app_context():
+            with app_instance.app_context():
                 try:
                     revocation_file = os.path.join('instance', 'revoked_credentials.json')
                     os.makedirs(os.path.dirname(revocation_file), exist_ok=True)
@@ -1146,9 +1152,9 @@ def revoke_credential_internal(credential_id, reason, revoked_by):
                     with open(revocation_file, 'w') as f:
                         json.dump(revocations, f, indent=2)
                     
-                    current_app.logger.info(f"[BACKGROUND] Revocation persisted to file for credential {credential_id}")
+                    app_instance.logger.info(f"[BACKGROUND] Revocation persisted to file for credential {credential_id}")
                 except Exception as e:
-                    current_app.logger.error(f"[BACKGROUND] Failed to persist revocation: {e}")
+                    app_instance.logger.error(f"[BACKGROUND] Failed to persist revocation: {e}")
         
         # Execute persistence in background thread (non-blocking)
         import threading
