@@ -14,11 +14,11 @@ import hashlib
 import secrets
 import json
 import os
-from lemma.storage import StorageManager
-from lemma.credential_service import CredentialService
-from lemma.did_resolver import DIDResolver
-from lemma.oprf_cascade import OPRFCascadeManager
-from lemma.security import SecurityManager
+from lemma.utils.secure_storage import SecureStorage
+from lemma.core.credential_service import LemmaCredentialService
+from lemma.core.did_resolver import DIDResolver
+from lemma.core.oprf_cascade import OPRFCascadeManager
+
 from lemma import redis_client
 import logging
 from datetime import datetime, timedelta
