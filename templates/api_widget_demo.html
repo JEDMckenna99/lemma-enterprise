@@ -98,8 +98,10 @@
                 <div>
                     <h3 class="font-medium text-gray-900 mb-2">JavaScript Integration</h3>
                     <pre class="text-sm text-gray-800 bg-gray-100 p-3 rounded overflow-x-auto"><code>// Check if user is verified
-if (window.lemmaWallet) {
-  const credential = await window.lemmaWallet.getFirstCredential();
+        // Background wallet check
+        console.log('🔍 BACKGROUND: Checking background wallet for demo...');
+        if (window.lemmaWallet) {
+            const credential = await window.lemmaWallet.getFirstCredential();
   if (credential) {
     // User is verified, show protected content
     showProtectedContent();

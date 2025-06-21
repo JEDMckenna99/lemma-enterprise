@@ -577,260 +577,54 @@ class LemmaWallet {
 }
 
 /**
- * Lemma Wallet UI - Minimal UI for the wallet
- * Provides a non-intrusive UI for managing credentials
+ * Lemma Wallet UI - REMOVED: Background wallet only, no visual components
+ * All wallet operations happen in background during flow 1 (store) and flow 2 (offline->online check)
  */
 class LemmaWalletUI {
     /**
-     * Initialize the wallet UI
+     * Initialize the wallet UI - NO-OP (visual wallet removed)
      * @param {LemmaWallet} wallet - The wallet instance
      */
     constructor(wallet) {
         this.wallet = wallet;
-        this.initializedUI = false;
+        this.initializedUI = true; // Always consider "initialized" since no UI
+        console.log('🚫 WALLET UI: Visual wallet components removed - operating in background only');
     }
     
     /**
-     * Initialize the wallet UI
+     * Initialize the wallet UI - NO-OP (background only)
      */
     async init() {
-        if (this.initializedUI) return;
-        
-        // Create the wallet UI container
-        this.createWalletIcon();
-        this.initializedUI = true;
+        // NO-OP: Visual wallet removed, operating in background only
+        console.log('🚫 WALLET UI: init() called but visual components disabled - background wallet active');
+        return;
     }
     
     /**
-     * Create a minimal wallet icon in the corner of the screen
+     * Create wallet icon - REMOVED (background only)
      */
     createWalletIcon() {
-        // Create the wallet icon
-        const icon = document.createElement('div');
-        icon.className = 'lemma-wallet-icon';
-        icon.innerHTML = `
-            <div class="lemma-wallet-icon-inner">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-                    <path fill="currentColor" d="M21,18v1c0,1.1-0.9,2-2,2H5c-1.1,0-2-0.9-2-2V5c0-1.1,0.9-2,2-2h14c1.1,0,2,0.9,2,2v1h-9c-1.1,0-2,0.9-2,2v8c0,1.1,0.9,2,2,2H21z M12,16h10V8H12V16z M16,13.5c-0.8,0-1.5-0.7-1.5-1.5s0.7-1.5,1.5-1.5s1.5,0.7,1.5,1.5S16.8,13.5,16,13.5z"/>
-                </svg>
-            </div>
-        `;
-        
-        // Add styles for the wallet icon
-        const style = document.createElement('style');
-        style.textContent = `
-            .lemma-wallet-icon {
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                width: 48px;
-                height: 48px;
-                border-radius: 50%;
-                background-color: #6B3FA0;
-                color: white;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-                cursor: pointer;
-                z-index: 9999;
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                opacity: 0.8;
-            }
-            
-            .lemma-wallet-icon:hover {
-                transform: scale(1.1);
-                opacity: 1;
-            }
-            
-            .lemma-wallet-icon-inner {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            
-            .lemma-wallet-panel {
-                position: fixed;
-                bottom: 80px;
-                right: 20px;
-                width: 320px;
-                max-height: 480px;
-                background-color: white;
-                border-radius: 12px;
-                box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-                z-index: 9998;
-                overflow: hidden;
-                display: none;
-                flex-direction: column;
-            }
-            
-            .lemma-wallet-panel-header {
-                padding: 16px;
-                background-color: #6B3FA0;
-                color: white;
-                font-weight: bold;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-            
-            .lemma-wallet-panel-close {
-                cursor: pointer;
-                font-size: 20px;
-            }
-            
-            .lemma-wallet-panel-content {
-                padding: 16px;
-                overflow-y: auto;
-                flex: 1;
-            }
-            
-            .lemma-wallet-credential {
-                border: 1px solid #eee;
-                border-radius: 8px;
-                margin-bottom: 12px;
-                padding: 12px;
-                cursor: pointer;
-                transition: all 0.2s ease;
-            }
-            
-            .lemma-wallet-credential:hover {
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            }
-            
-            .lemma-wallet-credential-title {
-                font-weight: bold;
-                margin-bottom: 4px;
-            }
-            
-            .lemma-wallet-credential-issuer {
-                font-size: 0.9em;
-                color: #666;
-                margin-bottom: 4px;
-            }
-            
-            .lemma-wallet-credential-date {
-                font-size: 0.8em;
-                color: #999;
-            }
-            
-            .lemma-wallet-actions {
-                padding: 12px 16px;
-                border-top: 1px solid #eee;
-                display: flex;
-                justify-content: flex-end;
-                gap: 8px;
-            }
-            
-            .lemma-wallet-button {
-                padding: 8px 12px;
-                border-radius: 4px;
-                border: none;
-                font-size: 14px;
-                cursor: pointer;
-                background-color: #f0f0f0;
-                color: #333;
-            }
-            
-            .lemma-wallet-button.primary {
-                background-color: #6B3FA0;
-                color: white;
-            }
-            
-            @media (max-width: 480px) {
-                .lemma-wallet-panel {
-                    width: calc(100% - 40px);
-                    max-height: 70vh;
-                }
-            }
-        `;
-        
-        document.head.appendChild(style);
-        document.body.appendChild(icon);
-        
-        // Create the wallet panel
-        const panel = document.createElement('div');
-        panel.className = 'lemma-wallet-panel';
-        panel.innerHTML = `
-            <div class="lemma-wallet-panel-header">
-                <div>Lemma Wallet</div>
-                <div class="lemma-wallet-panel-close">&times;</div>
-            </div>
-            <div class="lemma-wallet-panel-content">
-                <div class="lemma-wallet-credential-list"></div>
-            </div>
-            <div class="lemma-wallet-actions">
-                <button class="lemma-wallet-button" id="lemma-wallet-export">Export</button>
-                <button class="lemma-wallet-button" id="lemma-wallet-import">Import</button>
-            </div>
-        `;
-        
-        document.body.appendChild(panel);
-        
-        // Add event listeners
-        icon.addEventListener('click', () => this.togglePanel());
-        panel.querySelector('.lemma-wallet-panel-close').addEventListener('click', () => this.togglePanel());
-        panel.querySelector('#lemma-wallet-export').addEventListener('click', () => this.exportCredentials());
-        panel.querySelector('#lemma-wallet-import').addEventListener('click', () => this.importCredentials());
+        // NO-OP: Visual wallet icon removed - wallet operates in background only
+        console.log('🚫 WALLET UI: createWalletIcon() disabled - no visual components');
+        return;
     }
     
     /**
-     * Toggle the wallet panel visibility
+     * Toggle wallet panel - REMOVED (background only)
      */
     async togglePanel() {
-        const panel = document.querySelector('.lemma-wallet-panel');
-        
-        if (panel.style.display === 'flex') {
-            panel.style.display = 'none';
-        } else {
-            panel.style.display = 'flex';
-            await this.refreshCredentialList();
-        }
+        // NO-OP: Visual wallet panel removed - wallet operates in background only
+        console.log('🚫 WALLET UI: togglePanel() disabled - no visual components');
+        return;
     }
     
     /**
-     * Refresh the credential list in the panel
+     * Refresh credential list - REMOVED (background only)
      */
     async refreshCredentialList() {
-        const listElement = document.querySelector('.lemma-wallet-credential-list');
-        listElement.innerHTML = '';
-        
-        try {
-            const credentials = await this.wallet.getAllCredentials();
-            
-            if (credentials.length === 0) {
-                listElement.innerHTML = '<p>No credentials found in your wallet.</p>';
-                return;
-            }
-            
-            for (const walletCred of credentials) {
-                const credential = walletCred.credential;
-                const metadata = walletCred.wallet_metadata;
-                
-                const credElement = document.createElement('div');
-                credElement.className = 'lemma-wallet-credential';
-                credElement.dataset.id = credential.id;
-                
-                credElement.innerHTML = `
-                    <div class="lemma-wallet-credential-title">
-                        ${metadata.display_name || 'Credential'}
-                    </div>
-                    <div class="lemma-wallet-credential-issuer">
-                        ${credential.issuer || 'Unknown Issuer'}
-                    </div>
-                    <div class="lemma-wallet-credential-date">
-                        Issued: ${new Date(credential.issuanceDate).toLocaleDateString()}
-                    </div>
-                `;
-                
-                credElement.addEventListener('click', () => this.showCredentialDetails(credential.id));
-                
-                listElement.appendChild(credElement);
-            }
-        } catch (error) {
-            console.error('Failed to refresh credential list:', error);
-            listElement.innerHTML = '<p>Error loading credentials. Please try again.</p>';
-        }
+        // NO-OP: Visual credential list removed - wallet operates in background only
+        console.log('🚫 WALLET UI: refreshCredentialList() disabled - background wallet active');
+        return;
     }
     
     /**
@@ -838,236 +632,27 @@ class LemmaWalletUI {
      * @param {string} id - The ID of the credential to show
      */
     async showCredentialDetails(id) {
-        try {
-            const walletCred = await this.wallet.getCredential(id);
-            if (!walletCred) {
-                alert('Credential not found');
-                return;
-            }
-            
-            const credential = walletCred.credential;
-            const metadata = walletCred.wallet_metadata;
-            
-            // Create a modal for credential details
-            const modal = document.createElement('div');
-            modal.className = 'lemma-wallet-modal';
-            modal.innerHTML = `
-                <div class="lemma-wallet-modal-content">
-                    <div class="lemma-wallet-modal-header">
-                        <div>${metadata.display_name || 'Credential Details'}</div>
-                        <div class="lemma-wallet-modal-close">&times;</div>
-                    </div>
-                    <div class="lemma-wallet-modal-body">
-                        <div class="lemma-wallet-detail-item">
-                            <div class="lemma-wallet-detail-label">ID</div>
-                            <div class="lemma-wallet-detail-value">${credential.id}</div>
-                        </div>
-                        <div class="lemma-wallet-detail-item">
-                            <div class="lemma-wallet-detail-label">Issuer</div>
-                            <div class="lemma-wallet-detail-value">${credential.issuer}</div>
-                        </div>
-                        <div class="lemma-wallet-detail-item">
-                            <div class="lemma-wallet-detail-label">Issued Date</div>
-                            <div class="lemma-wallet-detail-value">${new Date(credential.issuanceDate).toLocaleString()}</div>
-                        </div>
-                        <div class="lemma-wallet-detail-item">
-                            <div class="lemma-wallet-detail-label">Expiry Date</div>
-                            <div class="lemma-wallet-detail-value">${credential.expirationDate ? new Date(credential.expirationDate).toLocaleString() : 'Never'}</div>
-                        </div>
-                        <div class="lemma-wallet-detail-item">
-                            <div class="lemma-wallet-detail-label">Subject ID</div>
-                            <div class="lemma-wallet-detail-value">${credential.credentialSubject?.id || 'Unknown'}</div>
-                        </div>
-                        <div class="lemma-wallet-detail-item">
-                            <div class="lemma-wallet-detail-label">Type</div>
-                            <div class="lemma-wallet-detail-value">${Array.isArray(credential.type) ? credential.type.join(', ') : credential.type}</div>
-                        </div>
-                    </div>
-                    <div class="lemma-wallet-modal-actions">
-                        <button class="lemma-wallet-button" id="lemma-wallet-delete">Delete</button>
-                        <button class="lemma-wallet-button primary" id="lemma-wallet-close-detail">Close</button>
-                    </div>
-                </div>
-            `;
-            
-            // Add modal styles
-            const style = document.createElement('style');
-            style.textContent = `
-                .lemma-wallet-modal {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background-color: rgba(0, 0, 0, 0.5);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 10000;
-                }
-                
-                .lemma-wallet-modal-content {
-                    width: 90%;
-                    max-width: 480px;
-                    background-color: white;
-                    border-radius: 12px;
-                    overflow: hidden;
-                    display: flex;
-                    flex-direction: column;
-                }
-                
-                .lemma-wallet-modal-header {
-                    padding: 16px;
-                    background-color: #6B3FA0;
-                    color: white;
-                    font-weight: bold;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                
-                .lemma-wallet-modal-close {
-                    cursor: pointer;
-                    font-size: 20px;
-                }
-                
-                .lemma-wallet-modal-body {
-                    padding: 16px;
-                    max-height: 60vh;
-                    overflow-y: auto;
-                }
-                
-                .lemma-wallet-detail-item {
-                    margin-bottom: 12px;
-                }
-                
-                .lemma-wallet-detail-label {
-                    font-weight: bold;
-                    margin-bottom: 4px;
-                    color: #666;
-                }
-                
-                .lemma-wallet-detail-value {
-                    word-break: break-all;
-                }
-                
-                .lemma-wallet-modal-actions {
-                    padding: 12px 16px;
-                    border-top: 1px solid #eee;
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 8px;
-                }
-            `;
-            
-            document.head.appendChild(style);
-            document.body.appendChild(modal);
-            
-            // Add event listeners
-            modal.querySelector('.lemma-wallet-modal-close').addEventListener('click', () => modal.remove());
-            modal.querySelector('#lemma-wallet-close-detail').addEventListener('click', () => modal.remove());
-            modal.querySelector('#lemma-wallet-delete').addEventListener('click', async () => {
-                if (confirm('Are you sure you want to delete this credential?')) {
-                    await this.wallet.deleteCredential(id);
-                    modal.remove();
-                    this.refreshCredentialList();
-                }
-            });
-        } catch (error) {
-            console.error('Failed to show credential details:', error);
-            alert('Error showing credential details');
-        }
+        // NO-OP: Visual credential details removed - wallet operates in background only
+        console.log('🚫 WALLET UI: showCredentialDetails() disabled - background wallet only');
+        return;
     }
     
     /**
-     * Export credentials to a file
+     * Export credentials - REMOVED (background only)
      */
     async exportCredentials() {
-        try {
-            // For simplicity, we'll export all credentials regardless of holder
-            const credentials = await this.wallet.getAllCredentials();
-            
-            if (credentials.length === 0) {
-                alert('No credentials to export');
-                return;
-            }
-            
-            const bundle = {
-                format: 'lemma-wallet-export',
-                version: '1.0',
-                created_at: new Date().toISOString(),
-                credentials: credentials,
-                metadata: {
-                    credential_count: credentials.length,
-                    export_date: new Date().toISOString()
-                }
-            };
-            
-            // Convert to JSON and create download link
-            const jsonStr = JSON.stringify(bundle, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `lemma-credentials-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            
-            // Clean up
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 0);
-        } catch (error) {
-            console.error('Failed to export credentials:', error);
-            alert('Error exporting credentials');
-        }
+        // NO-OP: Visual export functionality removed - wallet operates in background only
+        console.log('🚫 WALLET UI: exportCredentials() disabled - background wallet only');
+        return;
     }
     
     /**
-     * Import credentials from a file
+     * Import credentials - REMOVED (background only)
      */
     async importCredentials() {
-        // Create a file input
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'application/json';
-        
-        input.addEventListener('change', async (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            try {
-                const reader = new FileReader();
-                
-                reader.onload = async (e) => {
-                    try {
-                        const bundle = JSON.parse(e.target.result);
-                        
-                        if (bundle.format !== 'lemma-wallet-export') {
-                            alert('Invalid credential export format');
-                            return;
-                        }
-                        
-                        const credentials = await this.wallet.importCredentials(bundle);
-                        
-                        alert(`Successfully imported ${credentials.length} credential(s)`);
-                        this.refreshCredentialList();
-                    } catch (error) {
-                        console.error('Failed to parse import file:', error);
-                        alert('Error parsing import file: ' + error.message);
-                    }
-                };
-                
-                reader.readAsText(file);
-            } catch (error) {
-                console.error('Failed to import credentials:', error);
-                alert('Error importing credentials');
-            }
-        });
-        
-        input.click();
+        // NO-OP: Visual import functionality removed - wallet operates in background only
+        console.log('🚫 WALLET UI: importCredentials() disabled - background wallet only');
+        return;
     }
 }
 

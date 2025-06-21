@@ -225,6 +225,63 @@ class RevocationRegistry:
         
         return result
     
+    def revoke_credential_with_oprf(self, issuer_id: str, credential_id: str, oprf_output: str, cascade_data: dict) -> dict:
+        """
+        Revoke a credential with OPRF data for enhanced privacy-preserving revocation.
+        
+        Args:
+            issuer_id: The DID of the issuer
+            credential_id: The ID of the credential to revoke
+            oprf_output: Base64-encoded OPRF evaluation output
+            cascade_data: Cascaded bloom filter data
+            
+        Returns:
+            dict: Result of the revocation operation with OPRF metadata
+        """
+        # Standard revocation first
+        standard_result = self.revoke_credential(issuer_id, credential_id)
+        
+        # Store OPRF-specific data for enhanced revocation checking
+        oprf_registry_file = os.path.join(self.storage_dir, f"oprf_revocations_{issuer_id.replace(':', '_')}.json")
+        
+        try:
+            # Load existing OPRF revocation data
+            oprf_revocations = {}
+            if os.path.exists(oprf_registry_file):
+                with open(oprf_registry_file, 'r') as f:
+                    oprf_revocations = json.load(f)
+            
+            # Add new OPRF revocation entry
+            oprf_revocations[credential_id] = {
+                'oprf_output': oprf_output,
+                'cascade_data': cascade_data,
+                'revocation_time': time.time(),
+                'issuer_id': issuer_id
+            }
+            
+            # Save OPRF revocation data
+            with open(oprf_registry_file, 'w') as f:
+                json.dump(oprf_revocations, f, indent=2)
+            
+            logger.info(f"Stored OPRF revocation data for credential {credential_id}")
+            
+            return {
+                'success': True,
+                'standard_revocation': standard_result,
+                'oprf_data_stored': True,
+                'oprf_output_length': len(oprf_output),
+                'cascade_levels': cascade_data.get('cascade_levels', 0)
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to store OPRF revocation data: {e}")
+            return {
+                'success': False,
+                'standard_revocation': standard_result,
+                'oprf_data_stored': False,
+                'error': str(e)
+            }
+    
     def is_revoked(self, issuer_id: str, credential_id: str) -> bool:
         """
         Check if a credential is revoked.

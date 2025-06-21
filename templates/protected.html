@@ -398,20 +398,24 @@ function viewCredentialEnhanced() {
 }
 
 function loadFromWallet() {
+    console.log('🔍 BACKGROUND: Loading from background wallet...');
     const contentEl = document.getElementById('credentialContent');
     
     if (window.lemmaWallet) {
         window.lemmaWallet.getFirstCredential().then(credential => {
             if (credential) {
+                console.log('🔍 BACKGROUND: Credential found in wallet');
                 displayCredentialDetails(credential);
             } else {
+                console.log('🔍 BACKGROUND: No credential in wallet, showing session');
                 displaySessionCredential();
             }
         }).catch(error => {
-            console.error('Failed to load from wallet:', error);
+            console.error('🔍 BACKGROUND: Wallet access failed:', error);
             displaySessionCredential();
         });
     } else {
+        console.log('🔍 BACKGROUND: No wallet available, showing session');
         displaySessionCredential();
     }
 }
@@ -469,7 +473,7 @@ function displayCredentialDetails(credential) {
                         <svg class="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        Wallet: Active
+                        Background Wallet: Active
                     </div>
                 </div>
             </div>
@@ -505,9 +509,11 @@ async function clearCredentialEnhanced() {
     } else {
         // Fallback to basic confirmation
         if (confirm('Are you sure you want to clear your verification credential? You will need to verify again to access protected content.')) {
-            // Basic clear functionality
+            // Background wallet clear functionality
+            console.log('🗑️ BACKGROUND: Clearing background wallet...');
             if (window.lemmaWallet) {
                 window.lemmaWallet.clearCredentials();
+                console.log('🗑️ BACKGROUND: Wallet cleared');
             }
             
             fetch('/api/logout', { method: 'POST' })
