@@ -69,8 +69,12 @@ class LemmaShieldWidget {
         // Check if we're returning from Stripe verification
         await this.checkForReturnFromVerification();
         
-        // Check initial status
-        await this.checkStatus();
+        // Check initial status and act on the result
+        const statusResult = await this.checkStatus();
+        await this.handleStatusResult(statusResult);
+        
+        // Start periodic revocation checking
+        this.startRevocationMonitoring();
     }
     
     async waitForWallet() {
@@ -143,7 +147,11 @@ class LemmaShieldWidget {
             const requestData = existingCredential ? {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ credential: existingCredential })
+                body: JSON.stringify({ 
+                    credentials: [{ id: existingCredential.id }],
+                    check_revocation: true,
+                    comprehensive_check: true
+                })
             } : { method: 'GET' };
             
             const response = await fetch('/api/shield/status', requestData);
@@ -159,6 +167,142 @@ class LemmaShieldWidget {
                 shield_action: 'verify_did',
                 error: error.message
             };
+        }
+    }
+    
+    async handleStatusResult(statusResult) {
+        /*
+         * Handle the result from checkStatus and determine what action to take
+         */
+        try {
+            console.log('🛡️ Processing shield status result:', statusResult);
+            
+            if (!statusResult) {
+                console.warn('⚠️ No status result - showing shield as fallback');
+                await this.showVerificationWidget();
+                return;
+            }
+            
+            const { shield_action, verification_mode, offline_verification } = statusResult;
+            
+            switch (shield_action) {
+                case 'allow_access':
+                    console.log('✅ Access allowed - hiding shield');
+                    this.grantAccess();
+                    break;
+                    
+                case 'require_verification':
+                    console.log('🛡️ Verification required - showing shield');
+                    await this.showVerificationWidget();
+                    break;
+                    
+                case 'verify_did':
+                case 'check_credentials':
+                case 'check_revocation':
+                default:
+                    console.log(`🔍 Shield action: ${shield_action} - showing verification widget`);
+                    await this.showVerificationWidget();
+                    break;
+            }
+            
+            // Handle specific verification modes
+            if (verification_mode === 'offline_verified' && offline_verification) {
+                console.log('🚀 Offline verification successful - access granted');
+                this.grantAccess();
+            } else if (verification_mode === 'offline_failed') {
+                console.log('❌ Offline verification failed - showing shield');
+                await this.showVerificationWidget();
+            }
+            
+        } catch (error) {
+            console.error('❌ Error handling status result:', error);
+            // Fallback to showing shield on error
+            await this.showVerificationWidget();
+        }
+    }
+    
+    startRevocationMonitoring() {
+        /*
+         * Start periodic checking for credential revocation
+         * This ensures the shield reappears when credentials are revoked
+         */
+        console.log('🔄 Starting revocation monitoring...');
+        
+        // Check every 10 seconds for revocation
+        this.revocationCheckInterval = setInterval(async () => {
+            try {
+                console.log('🔍 Periodic revocation check...');
+                const statusResult = await this.checkStatus();
+                
+                // If status changed to require verification, show shield
+                if (statusResult && statusResult.shield_action === 'require_verification') {
+                    console.log('⚠️ Revocation detected - showing shield');
+                    await this.showVerificationWidget();
+                    
+                    // Clear the interval since we're now in verification mode
+                    if (this.revocationCheckInterval) {
+                        clearInterval(this.revocationCheckInterval);
+                        this.revocationCheckInterval = null;
+                    }
+                }
+                
+            } catch (error) {
+                console.error('❌ Revocation check error:', error);
+            }
+        }, 10000); // Check every 10 seconds
+        
+        // Also listen for custom revocation events
+        window.addEventListener('lemma-credential-revoked', async (event) => {
+            console.log('🚨 Revocation event received:', event.detail);
+            this.handleCredentialRevoked(event.detail);
+            await this.showVerificationWidget();
+        });
+        
+        window.addEventListener('lemma-force-verification', async (event) => {
+            console.log('🚨 Force verification event received:', event.detail);
+            await this.showVerificationWidget();
+        });
+        
+        window.addEventListener('lemma-security-lockout', async (event) => {
+            console.log('🚨 Security lockout event received:', event.detail);
+            this.handleCredentialRevoked(event.detail);
+            await this.showVerificationWidget();
+        });
+    }
+    
+    handleCredentialRevoked(eventDetail) {
+        /*
+         * Handle credential revocation by updating local revocation list
+         * This ensures offline verification will detect revoked credentials
+         */
+        try {
+            const credentialId = eventDetail.credential_id || eventDetail.credentialId;
+            if (!credentialId) {
+                console.warn('⚠️ No credential ID in revocation event');
+                return;
+            }
+            
+            console.log(`🚨 Adding credential to local revocation list: ${credentialId}`);
+            
+            // Get existing revoked credentials
+            const revokedCredentials = JSON.parse(localStorage.getItem('lemma_revoked_credentials') || '[]');
+            
+            // Add the revoked credential if not already present
+            if (!revokedCredentials.includes(credentialId)) {
+                revokedCredentials.push(credentialId);
+                localStorage.setItem('lemma_revoked_credentials', JSON.stringify(revokedCredentials));
+                console.log(`✅ Updated local revocation list. Now contains ${revokedCredentials.length} revoked credentials`);
+            }
+            
+            // Also remove the credential from wallet if available
+            if (this.wallet && this.wallet.removeCredential) {
+                this.wallet.removeCredential(credentialId).catch(error => {
+                    console.warn('⚠️ Failed to remove credential from wallet:', error);
+                });
+            }
+            
+        } catch (error) {
+            console.error('❌ Error handling credential revocation:', error);
         }
     }
     
@@ -262,30 +406,45 @@ class LemmaShieldWidget {
     async checkRevocationOffline(credentialId, offlineWitness) {
         /*
          * Check if credential is revoked using offline witness data
+         * For demo purposes, this will detect revocation by checking against
+         * a simple revocation list stored in localStorage
          */
         try {
+            // Check if credential is in the revoked list (demo implementation)
+            const revokedCredentials = JSON.parse(localStorage.getItem('lemma_revoked_credentials') || '[]');
+            const isRevoked = revokedCredentials.includes(credentialId);
+            
+            if (isRevoked) {
+                console.log(`🚨 Offline revocation check: CREDENTIAL REVOKED - ${credentialId}`);
+                return {
+                    revoked: true,
+                    method: 'offline_revocation_list',
+                    revocation_reason: 'Detected in offline revocation list'
+                };
+            }
+            
+            // Also check the bloom filter if available
             const revocationSnapshot = offlineWitness.revocation_snapshot;
-            if (!revocationSnapshot) {
-                // No revocation data - assume not revoked
-                return { revoked: false, method: 'no_revocation_data' };
+            if (revocationSnapshot && revocationSnapshot.bloom_filter) {
+                // Simplified bloom filter check - in production use proper bloom filter
+                const credentialHash = await this.hashCredentialId(credentialId);
+                const bloomRevoked = revocationSnapshot.bloom_filter.includes(credentialHash.substring(0, 8));
+                
+                if (bloomRevoked) {
+                    console.log(`🚨 Offline revocation check: BLOOM FILTER REVOKED - ${credentialId}`);
+                    return {
+                        revoked: true,
+                        method: 'offline_bloom_filter',
+                        snapshot_age_hours: (Date.now() / 1000 - revocationSnapshot.snapshot_time) / 3600
+                    };
+                }
             }
             
-            const bloomFilter = revocationSnapshot.bloom_filter;
-            if (!bloomFilter) {
-                return { revoked: false, method: 'no_bloom_filter' };
-            }
-            
-            // Simplified bloom filter check - in production use proper bloom filter
-            // Hash the credential ID and check against bloom filter
-            const credentialHash = await this.hashCredentialId(credentialId);
-            const revoked = bloomFilter.includes(credentialHash.substring(0, 8));  // Simplified check
-            
-            console.log(`🔍 Offline revocation check: ${revoked ? 'REVOKED' : 'VALID'}`);
-            
-            return {
-                revoked: revoked,
-                method: 'offline_bloom_filter',
-                snapshot_age_hours: (Date.now() / 1000 - revocationSnapshot.snapshot_time) / 3600
+            console.log(`✅ Offline revocation check: CREDENTIAL VALID - ${credentialId}`);
+            return { 
+                revoked: false, 
+                method: 'offline_comprehensive_check',
+                checked_sources: ['revocation_list', 'bloom_filter']
             };
             
         } catch (error) {
