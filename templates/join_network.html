@@ -440,185 +440,206 @@ document.addEventListener('DOMContentLoaded', function() {
     const verificationStatus = document.getElementById('verificationStatus');
     const actionStatus = document.getElementById('actionStatus');
     
+    // DEBUG: Check if elements are found
+    console.log('🔍 DEBUG: Button elements found:');
+    console.log('- revokeBtn:', !!revokeBtn, revokeBtn);
+    console.log('- verifyBtn:', !!verifyBtn, verifyBtn);
+    console.log('- verificationStatus:', !!verificationStatus, verificationStatus);
+    console.log('- actionStatus:', !!actionStatus, actionStatus);
+    
+    // Add immediate test click handler for debugging
+    if (revokeBtn) {
+        console.log('✅ Adding click handler to revoke button');
+        revokeBtn.addEventListener('click', function(e) {
+            console.log('🚨 REVOKE BUTTON CLICKED!', e);
+            actionStatus.innerHTML = '<div style="color: red; font-weight: bold;">BUTTON CLICK DETECTED!</div>';
+            actionStatus.style.display = 'block';
+        });
+    } else {
+        console.error('❌ Revoke button not found!');
+    }
+    
     // ENHANCED REVOCATION FLOW - Complete network workflow
     // Target: Full revocation → OPRF cascade update → Network notification → Shield reappearance
 
     // Enhanced revoke credential button - triggers complete network workflow
-    revokeBtn.addEventListener('click', async function() {
-        if (!confirm('This will revoke your current Lemma credential for testing purposes using the ENHANCED network workflow. This will:\n\n• Clear all local credentials\n• Update OPRF cascade\n• Send network notifications\n• Force Shield reappearance\n\nContinue?')) {
-            return;
-        }
-        
-        revokeBtn.disabled = true;
-        revokeBtn.innerHTML = '<span class="loading-spinner mr-2"></span>ENHANCED: Finding credential...';
-        
-        try {
-            // STEP 0: ENHANCED CREDENTIAL DETECTION (multi-source search)
-            console.log('[LEMMA-FLOW] Step 0: Enhanced credential ID detection');
-            let credentialId = null;
-            let foundCredential = null;
-            
-            // Method 1: Check sessionStorage first
-            const sessionCredId = sessionStorage.getItem('lemma_credential_id');
-            if (sessionCredId) {
-                credentialId = sessionCredId;
-                console.log('[LEMMA-FLOW] Found credential ID in sessionStorage:', credentialId);
+    if (revokeBtn) {
+        revokeBtn.addEventListener('click', async function() {
+            if (!confirm('This will revoke your current Lemma credential for testing purposes using the ENHANCED network workflow. This will:\n\n• Clear all local credentials\n• Update OPRF cascade\n• Send network notifications\n• Force Shield reappearance\n\nContinue?')) {
+                return;
             }
             
-            // Method 2: Check localStorage for credential
-            if (!credentialId) {
-                const localCredId = localStorage.getItem('lemma_credential_id');
-                if (localCredId) {
-                    credentialId = localCredId;
-                    console.log('[LEMMA-FLOW] Found credential ID in localStorage:', credentialId);
-                }
-            }
+            revokeBtn.disabled = true;
+            revokeBtn.innerHTML = '<span class="loading-spinner mr-2"></span>ENHANCED: Finding credential...';
             
-            // Method 3: Check for stored credentials in localStorage
-            if (!credentialId) {
-                const credentialKeys = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
-                if (credentialKeys.length > 0) {
-                    try {
-                        const credentialData = JSON.parse(localStorage.getItem(credentialKeys[0]));
-                        if (credentialData.credential && credentialData.credential.id) {
-                            credentialId = credentialData.credential.id;
-                            foundCredential = credentialData;
-                            console.log('[LEMMA-FLOW] Found credential ID from stored credential:', credentialId);
-                        }
-                    } catch (e) {
-                        console.log('[LEMMA-FLOW] Error parsing stored credential:', e);
-                    }
-                }
-            }
-            
-            // Method 4: Check lemmaWallet if available
-            if (!credentialId && window.lemmaWallet) {
-                try {
-                    const walletCredentials = await window.lemmaWallet.getAllCredentials();
-                    if (walletCredentials && walletCredentials.length > 0) {
-                        const walletCred = walletCredentials[0];
-                        if (walletCred.credential && walletCred.credential.id) {
-                            credentialId = walletCred.credential.id;
-                            foundCredential = walletCred;
-                            console.log('[LEMMA-FLOW] Found credential ID from wallet:', credentialId);
-                        }
-                    }
-                } catch (e) {
-                    console.log('[LEMMA-FLOW] Error accessing wallet credentials:', e);
-                }
-            }
-            
-            // Method 5: Check verification flow IndexedDB
-            if (!credentialId && window.lemmaVerificationFlow) {
-                try {
-                    const dbCredentials = await window.lemmaVerificationFlow.getAllCredentialsFromIndexedDB();
-                    if (dbCredentials && dbCredentials.length > 0) {
-                        const dbCred = dbCredentials[0];
-                        if (dbCred.credential && dbCred.credential.id) {
-                            credentialId = dbCred.credential.id;
-                            foundCredential = dbCred;
-                            console.log('[LEMMA-FLOW] Found credential ID from IndexedDB:', credentialId);
-                        }
-                    }
-                } catch (e) {
-                    console.log('[LEMMA-FLOW] Error accessing IndexedDB credentials:', e);
-                }
-            }
-            
-            // Method 6: Check session credential element (legacy support)
-            if (!credentialId) {
-                const sessionCredentialElement = document.getElementById('sessionCredential');
-                if (sessionCredentialElement && sessionCredentialElement.value) {
-                    try {
-                        const sessionCred = JSON.parse(sessionCredentialElement.value);
-                        if (sessionCred.id) {
-                            credentialId = sessionCred.id;
-                            foundCredential = { credential: sessionCred };
-                            console.log('[LEMMA-FLOW] Found credential ID from session element:', credentialId);
-                        }
-                    } catch (e) {
-                        console.log('[LEMMA-FLOW] Error parsing session credential element:', e);
-                    }
-                }
-            }
-            
-            // COMPREHENSIVE DEBUG OUTPUT
-            console.log('[LEMMA-FLOW] COMPREHENSIVE CREDENTIAL DEBUG:');
-            console.log('- sessionStorage credential_id:', sessionStorage.getItem('lemma_credential_id'));
-            console.log('- localStorage credential_id:', localStorage.getItem('lemma_credential_id'));
-            console.log('- localStorage credential keys:', Object.keys(localStorage).filter(k => k.includes('lemma')));
-            console.log('- wallet available:', !!window.lemmaWallet);
-            console.log('- verification flow available:', !!window.lemmaVerificationFlow);
-            console.log('- session element present:', !!document.getElementById('sessionCredential'));
-            console.log('- FINAL credential ID:', credentialId);
-            console.log('- FINAL found credential:', foundCredential);
-            
-            // Generate fallback ID if none found
-            if (!credentialId) {
-                credentialId = `test-credential-fallback-${Date.now()}`;
-                console.log('[LEMMA-FLOW] No credential found, using fallback ID:', credentialId);
+            try {
+                // STEP 0: ENHANCED CREDENTIAL DETECTION (multi-source search)
+                console.log('[LEMMA-FLOW] Step 0: Enhanced credential ID detection');
+                let credentialId = null;
+                let foundCredential = null;
                 
-                // Show additional info to user
+                // Method 1: Check sessionStorage first
+                const sessionCredId = sessionStorage.getItem('lemma_credential_id');
+                if (sessionCredId) {
+                    credentialId = sessionCredId;
+                    console.log('[LEMMA-FLOW] Found credential ID in sessionStorage:', credentialId);
+                }
+                
+                // Method 2: Check localStorage for credential
+                if (!credentialId) {
+                    const localCredId = localStorage.getItem('lemma_credential_id');
+                    if (localCredId) {
+                        credentialId = localCredId;
+                        console.log('[LEMMA-FLOW] Found credential ID in localStorage:', credentialId);
+                    }
+                }
+                
+                // Method 3: Check for stored credentials in localStorage
+                if (!credentialId) {
+                    const credentialKeys = Object.keys(localStorage).filter(key => key.startsWith('lemma_credential_'));
+                    if (credentialKeys.length > 0) {
+                        try {
+                            const credentialData = JSON.parse(localStorage.getItem(credentialKeys[0]));
+                            if (credentialData.credential && credentialData.credential.id) {
+                                credentialId = credentialData.credential.id;
+                                foundCredential = credentialData;
+                                console.log('[LEMMA-FLOW] Found credential ID from stored credential:', credentialId);
+                            }
+                        } catch (e) {
+                            console.log('[LEMMA-FLOW] Error parsing stored credential:', e);
+                        }
+                    }
+                }
+                
+                // Method 4: Check lemmaWallet if available
+                if (!credentialId && window.lemmaWallet) {
+                    try {
+                        const walletCredentials = await window.lemmaWallet.getAllCredentials();
+                        if (walletCredentials && walletCredentials.length > 0) {
+                            const walletCred = walletCredentials[0];
+                            if (walletCred.credential && walletCred.credential.id) {
+                                credentialId = walletCred.credential.id;
+                                foundCredential = walletCred;
+                                console.log('[LEMMA-FLOW] Found credential ID from wallet:', credentialId);
+                            }
+                        }
+                    } catch (e) {
+                        console.log('[LEMMA-FLOW] Error accessing wallet credentials:', e);
+                    }
+                }
+                
+                // Method 5: Check verification flow IndexedDB
+                if (!credentialId && window.lemmaVerificationFlow) {
+                    try {
+                        const dbCredentials = await window.lemmaVerificationFlow.getAllCredentialsFromIndexedDB();
+                        if (dbCredentials && dbCredentials.length > 0) {
+                            const dbCred = dbCredentials[0];
+                            if (dbCred.credential && dbCred.credential.id) {
+                                credentialId = dbCred.credential.id;
+                                foundCredential = dbCred;
+                                console.log('[LEMMA-FLOW] Found credential ID from IndexedDB:', credentialId);
+                            }
+                        }
+                    } catch (e) {
+                        console.log('[LEMMA-FLOW] Error accessing IndexedDB credentials:', e);
+                    }
+                }
+                
+                // Method 6: Check session credential element (legacy support)
+                if (!credentialId) {
+                    const sessionCredentialElement = document.getElementById('sessionCredential');
+                    if (sessionCredentialElement && sessionCredentialElement.value) {
+                        try {
+                            const sessionCred = JSON.parse(sessionCredentialElement.value);
+                            if (sessionCred.id) {
+                                credentialId = sessionCred.id;
+                                foundCredential = { credential: sessionCred };
+                                console.log('[LEMMA-FLOW] Found credential ID from session element:', credentialId);
+                            }
+                        } catch (e) {
+                            console.log('[LEMMA-FLOW] Error parsing session credential element:', e);
+                        }
+                    }
+                }
+                
+                // COMPREHENSIVE DEBUG OUTPUT
+                console.log('[LEMMA-FLOW] COMPREHENSIVE CREDENTIAL DEBUG:');
+                console.log('- sessionStorage credential_id:', sessionStorage.getItem('lemma_credential_id'));
+                console.log('- localStorage credential_id:', localStorage.getItem('lemma_credential_id'));
+                console.log('- localStorage credential keys:', Object.keys(localStorage).filter(k => k.includes('lemma')));
+                console.log('- wallet available:', !!window.lemmaWallet);
+                console.log('- verification flow available:', !!window.lemmaVerificationFlow);
+                console.log('- session element present:', !!document.getElementById('sessionCredential'));
+                console.log('- FINAL credential ID:', credentialId);
+                console.log('- FINAL found credential:', foundCredential);
+                
+                // Generate fallback ID if none found
+                if (!credentialId) {
+                    credentialId = `test-credential-fallback-${Date.now()}`;
+                    console.log('[LEMMA-FLOW] No credential found, using fallback ID:', credentialId);
+                    
+                    // Show additional info to user
+                    actionStatus.innerHTML = `
+                        <div class="status-indicator status-warning">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                            No existing credential found - testing with fallback ID
+                        </div>
+                        <div style="font-size: 12px; margin-top: 8px; color: #666;">
+                            This will test the revocation system even without an existing credential.
+                        </div>
+                    `;
+                    actionStatus.style.display = 'block';
+                }
+                
+                revokeBtn.innerHTML = '<span class="loading-spinner mr-2"></span>ENHANCED: Revoking...';
+                
+                // Use the enhanced revocation flow
                 actionStatus.innerHTML = `
-                    <div class="status-indicator status-warning">
+                    <div class="status-indicator status-pending">
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        No existing credential found - testing with fallback ID
-                    </div>
-                    <div style="font-size: 12px; margin-top: 8px; color: #666;">
-                        This will test the revocation system even without an existing credential.
+                        ENHANCED: Starting complete network revocation workflow...
+                        <br><small>Credential ID: ${credentialId}</small>
                     </div>
                 `;
                 actionStatus.style.display = 'block';
-            }
-            
-            revokeBtn.innerHTML = '<span class="loading-spinner mr-2"></span>ENHANCED: Revoking...';
-            
-            // Use the enhanced revocation flow
-            actionStatus.innerHTML = `
-                <div class="status-indicator status-pending">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    ENHANCED: Starting complete network revocation workflow...
-                    <br><small>Credential ID: ${credentialId}</small>
-                </div>
-            `;
-            actionStatus.style.display = 'block';
-            
-            // Call the enhanced revocation flow (complete network workflow)
-            const result = await performOptimizedRevocation(credentialId);
-            
-            if (!result.success) {
-                throw new Error(result.error || 'Enhanced revocation failed');
-            }
-            
-            console.log(`[LEMMA-FLOW] ENHANCED REVOCATION COMPLETE: ${result.totalTime.toFixed(0)}ms total`);
-            
-            // The enhanced function handles everything - just show success
-            // actionStatus is already updated by performOptimizedRevocation() with detailed timing
-            
-        } catch (error) {
-            actionStatus.innerHTML = `
-                <div class="status-indicator status-error">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                
+                // Call the enhanced revocation flow (complete network workflow)
+                const result = await performOptimizedRevocation(credentialId);
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Enhanced revocation failed');
+                }
+                
+                console.log(`[LEMMA-FLOW] ENHANCED REVOCATION COMPLETE: ${result.totalTime.toFixed(0)}ms total`);
+                
+                // The enhanced function handles everything - just show success
+                // actionStatus is already updated by performOptimizedRevocation() with detailed timing
+                
+            } catch (error) {
+                actionStatus.innerHTML = `
+                    <div class="status-indicator status-error">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        Error: ${error.message}
+                    </div>
+                `;
+                actionStatus.style.display = 'block';
+            } finally {
+                revokeBtn.disabled = false;
+                revokeBtn.innerHTML = `
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="mr-2">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                     </svg>
-                    Error: ${error.message}
-                </div>
-            `;
-            actionStatus.style.display = 'block';
-        } finally {
-            revokeBtn.disabled = false;
-            revokeBtn.innerHTML = `
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="mr-2">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                </svg>
-                Test Revocation
-            `;
-        }
-    });
+                    Test Revocation
+                `;
+            }
+        });
+    }
 
     async function performOptimizedRevocation(credentialId) {
         console.log('[LEMMA-FLOW] Starting ENHANCED revocation flow (complete network workflow)');
