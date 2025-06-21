@@ -297,7 +297,7 @@
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="mr-2">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                 </svg>
-                Test Revocation
+                Revoke
             </button>
             <button id="verifyCredential" class="btn btn-verify" style="display: none;">
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="mr-2">
@@ -305,6 +305,19 @@
                 </svg>
                 Re-verify with Shield
             </button>
+        </div>
+        
+        <div class="revocation-explanation mb-4 p-4 bg-gray-50 rounded-lg border-l-4 border-orange-400">
+            <h4 class="font-semibold text-gray-900 mb-2">What happens when you click "Revoke":</h4>
+            <ul class="text-sm text-gray-700 space-y-1">
+                <li>• <strong>Clears your Lemma credential</strong> from this device</li>
+                <li>• <strong>Removes all verification data</strong> from browser storage</li>
+                <li>• <strong>Triggers network revocation</strong> so other sites detect the change</li>
+                <li>• <strong>Forces shield reappearance</strong> on protected pages for re-verification</li>
+            </ul>
+            <p class="text-xs text-gray-600 mt-2">
+                <em>This simulates what happens when credentials are revoked for security reasons.</em>
+            </p>
         </div>
         
         <div id="actionStatus" class="mt-4" style="display: none;">
@@ -618,6 +631,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // The enhanced function handles everything - just show success
                 // actionStatus is already updated by performOptimizedRevocation() with detailed timing
+                
+                // CRITICAL: Dispatch revocation event for shield widgets
+                const revocationEvent = new CustomEvent('lemma-credential-revoked', {
+                    detail: {
+                        credential_id: result.credential_id || 'revoked-credential',
+                        reason: 'User initiated revocation',
+                        timestamp: new Date().toISOString(),
+                        source: 'join-network-page'
+                    }
+                });
+                window.dispatchEvent(revocationEvent);
+                console.log('[LEMMA-FLOW] Dispatched revocation event:', revocationEvent.detail);
+                
+                // CRITICAL: Redirect to protected page to force shield reappearance
+                setTimeout(() => {
+                    console.log('[LEMMA-FLOW] Redirecting to protected page to trigger shield...');
+                    actionStatus.innerHTML = `
+                        <div class="status-indicator status-success">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Revocation complete! Redirecting to protected page...
+                        </div>
+                    `;
+                    
+                    // Redirect to shield demo page to force shield reappearance
+                    window.location.href = '/shield-demo?revoked=true&force_shield=true';
+                }, 2000);
                 
             } catch (error) {
                 actionStatus.innerHTML = `

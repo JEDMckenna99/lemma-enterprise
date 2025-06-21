@@ -240,10 +240,88 @@
     <!-- Load Lemma Components -->
     <script src="/static/js/lemma-wallet.js"></script>
     <script src="/static/js/lemma-wallet-init.js"></script>
-    <script src="/static/js/shield.js"></script>
+    <script src="/static/js/lemma-shield-widget.js"></script>
     <script src="/static/js/lemma-wallet-sre.js"></script>
     
     <script>
+        // Check URL parameters for revocation flags
+        const urlParams = new URLSearchParams(window.location.search);
+        const isRevoked = urlParams.get('revoked') === 'true';
+        const forceShield = urlParams.get('force_shield') === 'true';
+        
+        console.log('Shield Demo: URL params check:', { isRevoked, forceShield });
+        
+        // If coming from revocation, force shield to appear
+        if (isRevoked || forceShield) {
+            console.log('🚨 REVOCATION DETECTED - Forcing shield to appear');
+            
+            // Clear any existing credentials to ensure shield appears
+            const keysToRemove = Object.keys(localStorage).filter(key => 
+                key.includes('lemma') || key.includes('credential') || key.includes('verification')
+            );
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            
+            // Clear session storage
+            const sessionKeysToRemove = Object.keys(sessionStorage).filter(key => 
+                key.includes('lemma') || key.includes('credential') || key.includes('verification')
+            );
+            sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+            
+            // Force shield initialization
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('🛡️ Initializing shield widget after revocation...');
+                
+                // Initialize the shield widget
+                if (window.LemmaShieldWidget) {
+                    const shield = new LemmaShieldWidget({
+                        containerId: 'lemma-shield',
+                        onVerified: (proof) => {
+                            console.log('✅ Re-verification successful:', proof);
+                            document.getElementById('public-content').style.display = 'none';
+                            document.getElementById('protected-content').style.display = 'block';
+                            updateStatus('✅ Re-verification successful! Access restored.');
+                        },
+                        onError: (error) => {
+                            console.log('❌ Re-verification failed:', error);
+                            updateStatus('❌ Re-verification failed: ' + error.message);
+                        }
+                    });
+                    
+                    // Force the shield to appear
+                    shield.init().then(() => {
+                        console.log('🛡️ Shield widget initialized');
+                        // Force verification check
+                        shield.showVerificationWidget();
+                    });
+                } else {
+                    console.error('❌ LemmaShieldWidget not available');
+                }
+            });
+        } else {
+            // Normal initialization for non-revoked access
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('🛡️ Normal shield initialization...');
+                
+                if (window.LemmaShieldWidget) {
+                    const shield = new LemmaShieldWidget({
+                        containerId: 'lemma-shield',
+                        onVerified: (proof) => {
+                            console.log('✅ Verification successful:', proof);
+                            document.getElementById('public-content').style.display = 'none';
+                            document.getElementById('protected-content').style.display = 'block';
+                            updateStatus('✅ Verification successful! Access granted.');
+                        },
+                        onError: (error) => {
+                            console.log('❌ Verification failed:', error);
+                            updateStatus('❌ Verification failed: ' + error.message);
+                        }
+                    });
+                    
+                    shield.init();
+                }
+            });
+        }
+        
         // Demo functions
         function clearCredentials() {
             // Clear localStorage and sessionStorage
@@ -327,19 +405,6 @@
         
         // Initialize demo
         console.log('Lemma Shield Demo loaded');
-        
-        // Log shield events
-        if (window.lemmaShield) {
-            window.lemmaShield.options.onVerified = () => {
-                console.log('Demo: User verified!');
-                updateStatus('✅ Verification successful! Access granted.');
-            };
-            
-            window.lemmaShield.options.onError = (error) => {
-                console.log('Demo: Verification error:', error);
-                updateStatus('❌ Verification failed: ' + error.message);
-            };
-        }
     </script>
 </body>
 </html> 
