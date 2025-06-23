@@ -472,10 +472,34 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add clean click handler for revocation
     if (revokeBtn) {
         console.log('✅ Adding revoke button click handler');
+        console.log('🔍 Button details:');
+        console.log('- ID:', revokeBtn.id);
+        console.log('- Class:', revokeBtn.className);
+        console.log('- Disabled:', revokeBtn.disabled);
+        console.log('- Style display:', revokeBtn.style.display);
+        console.log('- Text content:', revokeBtn.textContent);
+        console.log('- Parent element:', revokeBtn.parentElement);
+        
+        // Add a simple test click handler first
+        revokeBtn.addEventListener('mousedown', function() {
+            console.log('🖱️ MOUSE DOWN detected on revoke button');
+        });
+        
+        revokeBtn.addEventListener('mouseup', function() {
+            console.log('🖱️ MOUSE UP detected on revoke button');
+        });
         
         revokeBtn.addEventListener('click', async function(e) {
+            // IMMEDIATE DEBUG - this should show up in console right away
+            console.log('🚨🚨🚨 CLICK DETECTED ON REVOKE BUTTON! 🚨🚨🚨');
+            console.log('Event object:', e);
+            console.log('Button element:', e.target);
+            
             e.preventDefault();
             e.stopPropagation();
+            
+            // Show immediate visual feedback
+            alert('🚨 REVOKE BUTTON CLICKED!\n\nThis confirms the click handler is working!');
             
             console.log('🚨 REVOKE BUTTON CLICKED!');
             
