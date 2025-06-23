@@ -66,21 +66,73 @@ class LemmaShieldWidget {
         // Wait for wallet to be available
         await this.waitForWallet();
         
+        // Initialize orchestrator integration
+        this.initializeOrchestrator();
+        
         // Check if we're returning from Stripe verification
         await this.checkForReturnFromVerification();
         
-        // Check initial status and act on the result
-        const statusResult = await this.checkStatus();
-        await this.handleStatusResult(statusResult);
+        // Check initial status and act on the result - but let orchestrator handle the flow
+        if (!window.lemmaFlowOrchestrator) {
+            const statusResult = await this.checkStatus();
+            await this.handleStatusResult(statusResult);
+        }
         
         // Start periodic revocation checking
         this.startRevocationMonitoring();
+    }
+
+    initializeOrchestrator() {
+        // Register this widget with the orchestrator
+        if (window.lemmaFlowOrchestrator) {
+            console.log('🔗 Registering shield widget with orchestrator');
+            window.lemmaFlowOrchestrator.shieldWidget = this;
+        } else {
+            // Wait for orchestrator and register when available
+            const checkOrchestrator = () => {
+                if (window.lemmaFlowOrchestrator) {
+                    console.log('🔗 Registering shield widget with orchestrator (delayed)');
+                    window.lemmaFlowOrchestrator.shieldWidget = this;
+                } else {
+                    setTimeout(checkOrchestrator, 100);
+                }
+            };
+            checkOrchestrator();
+        }
+
+        // Listen for orchestrator events
+        window.addEventListener('lemma-orchestrator-shield-show', () => {
+            this.showVerificationWidget();
+        });
+
+        window.addEventListener('lemma-orchestrator-shield-hide', () => {
+            this.hideShield();
+        });
+
+        window.addEventListener('lemma-orchestrator-credential-valid', () => {
+            this.grantAccess();
+        });
     }
     
     async waitForWallet() {
         return new Promise((resolve) => {
             const checkWallet = () => {
-                if (window.LemmaWallet) {
+                // Use the background wallet if available
+                if (window.lemmaBackgroundWallet) {
+                    console.log('🎯 Using existing background wallet');
+                    this.wallet = window.lemmaBackgroundWallet;
+                    resolve();
+                } else if (window.LemmaBackgroundWallet) {
+                    console.log('🎯 Creating new background wallet instance');
+                    this.wallet = new window.LemmaBackgroundWallet();
+                    window.lemmaBackgroundWallet = this.wallet;
+                    resolve();
+                } else if (window.lemmaWallet) {
+                    console.log('🎯 Using existing lemmaWallet instance');
+                    this.wallet = window.lemmaWallet;
+                    resolve();
+                } else if (window.LemmaWallet) {
+                    console.log('⚠️ Using legacy LemmaWallet - consider upgrading to background wallet');
                     this.wallet = new window.LemmaWallet();
                     resolve();
                 } else {
@@ -1541,6 +1593,18 @@ class LemmaShieldWidget {
         url.searchParams.delete('return_url');
         url.searchParams.delete('user_id');
         window.history.replaceState({}, document.title, url.toString());
+        
+        // Emit verification completion event for orchestrator
+        const completionEvent = new CustomEvent('lemma-verification-complete', {
+            detail: {
+                verified: true,
+                userId: this.state.userId,
+                verificationSessionId: this.state.verificationSessionId,
+                timestamp: new Date().toISOString(),
+                source: 'shield-widget'
+            }
+        });
+        window.dispatchEvent(completionEvent);
         
         // Notify listeners
         this.options.onVerified();

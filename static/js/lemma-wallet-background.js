@@ -154,6 +154,59 @@ class LemmaBackgroundWallet {
     }
     
     /**
+     * Remove credential (for shield widget compatibility)
+     */
+    async removeCredential(credentialId) {
+        await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.credentialStore], 'readwrite');
+            const store = transaction.objectStore(this.credentialStore);
+            
+            const request = store.delete(credentialId);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+    
+    /**
+     * Get all credentials (alias for getCredentials for compatibility)
+     */
+    async getAllCredentials() {
+        return await this.getCredentials();
+    }
+    
+    /**
+     * Get first credential (for compatibility)
+     */
+    async getFirstCredential() {
+        const credentials = await this.getCredentials();
+        return credentials && credentials.length > 0 ? credentials[0] : null;
+    }
+    
+    /**
+     * Check verification status (compatibility method)
+     */
+    async checkVerification(userId) {
+        const hasCredentials = await this.hasValidCredentials();
+        return {
+            verified: hasCredentials,
+            reason: hasCredentials ? 'credentials_found' : 'no_credentials'
+        };
+    }
+    
+    /**
+     * Start verification (compatibility method - redirect to verification flow)
+     */
+    async startVerification(userId, options = {}) {
+        // For background wallet, we just return instructions to show the shield
+        return {
+            action: 'show_shield',
+            message: 'Please complete verification through the shield interface'
+        };
+    }
+    
+    /**
      * Check if user has valid credentials
      */
     async hasValidCredentials() {
@@ -223,6 +276,16 @@ class BackgroundVerificationManager {
 // Initialize background wallet automatically
 window.lemmaBackgroundWallet = new LemmaBackgroundWallet();
 window.lemmaBackgroundVerifier = new BackgroundVerificationManager();
+
+// For compatibility with existing code expecting lemmaWallet
+if (!window.lemmaWallet) {
+    window.lemmaWallet = window.lemmaBackgroundWallet;
+    console.log('🎯 Background wallet set as primary lemmaWallet instance');
+}
+
+// Prevent old wallet initialization by marking as already initialized
+window.lemmaWalletInitialized = true;
+document.cookie = "lemma_wallet_enabled=false; max-age=31536000; path=/; samesite=Lax";
 
 // Auto-verify on page load
 document.addEventListener('DOMContentLoaded', () => {

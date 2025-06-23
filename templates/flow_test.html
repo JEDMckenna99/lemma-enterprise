@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma Three Flows Test</title>
+    <style>
+        body {
+            font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        .section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+        .button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 0.5rem 0.5rem 0.5rem 0;
+            font-size: 14px;
+        }
+        .button:hover {
+            background: #1d4ed8;
+        }
+        .button.secondary {
+            background: #64748b;
+        }
+        .button.danger {
+            background: #ef4444;
+        }
+        .status {
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 6px;
+            border-left: 4px solid;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        .status.info {
+            background: #eff6ff;
+            border-color: #2563eb;
+            color: #1e40af;
+        }
+        .status.success {
+            background: #f0fdf4;
+            border-color: #10b981;
+            color: #065f46;
+        }
+        .status.error {
+            background: #fef2f2;
+            border-color: #ef4444;
+            color: #991b1b;
+        }
+        .status.warning {
+            background: #fffbeb;
+            border-color: #f59e0b;
+            color: #92400e;
+        }
+        #protected-content {
+            background: #10b981;
+            color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            margin: 2rem 0;
+        }
+        .flow-diagram {
+            display: flex;
+            justify-content: space-between;
+            margin: 2rem 0;
+            gap: 1rem;
+        }
+        .flow-step {
+            flex: 1;
+            text-align: center;
+            padding: 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
+        }
+        .flow-step.active {
+            border-color: #2563eb;
+            background: #eff6ff;
+        }
+        .flow-arrow {
+            align-self: center;
+            font-size: 1.5rem;
+            color: #64748b;
+        }
+        .debug-panel {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .debug-panel h4 {
+            margin: 0 0 1rem 0;
+            color: #334155;
+        }
+        .credential-info {
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Lemma Three Flows Test</h1>
+    <p>This page demonstrates the three main Lemma bot shield flows working together with the flow orchestrator.</p>
+
+    <!-- Flow Diagram -->
+    <div class="flow-diagram">
+        <div class="flow-step" id="flow-check">
+            <h4>1. CHECK</h4>
+            <p>Detect & verify credentials</p>
+            <small>Offline → Online → Fallback</small>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" id="flow-shield">
+            <h4>2. BOT SHIELD</h4>
+            <p>Protect until verified</p>
+            <small>Wall until verified</small>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" id="flow-revocation">
+            <h4>3. REVOCATION</h4>
+            <p>Handle bad credentials</p>
+            <small>OPRF → Clear → Shield</small>
+        </div>
+    </div>
+
+    <!-- Protected Content -->
+    <div id="protected-content">
+        🎉 SUCCESS! You have verified access to this protected content.
+        <br><small>This content is only visible when you have a valid Lemma credential.</small>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="section">
+        <h3>🎮 Flow Control Panel</h3>
+        <p>Use these controls to test the three flows:</p>
+        
+        <button class="button" onclick="testCheckFlow()">🔍 Test CHECK Flow</button>
+        <button class="button" onclick="testShieldFlow()">🛡️ Test BOT SHIELD Flow</button>
+        <button class="button danger" onclick="testRevocationFlow()">🚫 Test REVOCATION Flow</button>
+        
+        <br><br>
+        
+        <button class="button secondary" onclick="clearCredentials()">🧹 Clear All Credentials</button>
+        <button class="button secondary" onclick="forceRecheck()">🔄 Force Recheck</button>
+        <button class="button secondary" onclick="showDebugInfo()">🔍 Show Debug Info</button>
+    </div>
+
+    <!-- Status Display -->
+    <div id="status-display"></div>
+
+    <!-- Debug Panel -->
+    <div class="debug-panel" id="debug-panel" style="display: none;">
+        <h4>🔍 Debug Information</h4>
+        <div id="debug-content"></div>
+    </div>
+
+    <!-- Orchestrator Status -->
+    <div class="section">
+        <h3>📊 Orchestrator Status</h3>
+        <div id="orchestrator-status" class="credential-info">
+            Waiting for orchestrator to initialize...
+        </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="section">
+        <h3>📝 Event Log</h3>
+        <div id="event-log" class="credential-info" style="height: 200px; overflow-y: scroll;">
+            Initializing event log...
+        </div>
+    </div>
+
+    <!-- Include Scripts -->
+    <script src="/static/js/lemma-wallet-background.js"></script>
+    <script src="/static/js/lemma-verification-flow.js"></script>
+    <script src="/static/js/lemma-shield-flow-orchestrator.js"></script>
+    <script src="/static/js/lemma-shield-widget.js"></script>
+
+    <script>
+        // Global variables
+        let eventLog = [];
+        let orchestrator = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', async function() {
+            addToEventLog('Page loaded, waiting for components...');
+            
+            // Wait for orchestrator
+            await waitForOrchestrator();
+            updateOrchestratorStatus();
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            addToEventLog('✅ Page initialization complete');
+        });
+
+        async function waitForOrchestrator() {
+            return new Promise((resolve) => {
+                const check = () => {
+                    if (window.lemmaFlowOrchestrator) {
+                        orchestrator = window.lemmaFlowOrchestrator;
+                        addToEventLog('✅ Orchestrator found and connected');
+                        resolve();
+                    } else {
+                        setTimeout(check, 100);
+                    }
+                };
+                check();
+            });
+        }
+
+        function setupEventListeners() {
+            // Listen for orchestrator events
+            window.addEventListener('lemma-credential-revoked', (event) => {
+                addToEventLog(`🚨 Credential revoked: ${event.detail.credential_id}`, 'error');
+                updateFlowStep('revocation');
+            });
+
+            window.addEventListener('lemma-verification-complete', (event) => {
+                addToEventLog(`✅ Verification complete: ${event.detail.userId}`, 'success');
+                updateFlowStep('check');
+            });
+
+            window.addEventListener('lemma-shield-required', (event) => {
+                addToEventLog(`🛡️ Shield required: ${event.detail.reason}`, 'warning');
+                updateFlowStep('shield');
+            });
+
+            window.addEventListener('lemma-flow-ready', (event) => {
+                addToEventLog('🚀 Flow ready event received', 'info');
+            });
+
+            // Listen for orchestrator state changes
+            if (orchestrator) {
+                // Set up periodic status updates
+                setInterval(updateOrchestratorStatus, 2000);
+            }
+        }
+
+        // Flow test functions
+        async function testCheckFlow() {
+            addToEventLog('🔍 Testing CHECK flow...', 'info');
+            updateFlowStep('check');
+            
+            if (orchestrator) {
+                try {
+                    await orchestrator.forceRecheck();
+                    addToEventLog('✅ CHECK flow test completed', 'success');
+                } catch (error) {
+                    addToEventLog(`❌ CHECK flow test failed: ${error.message}`, 'error');
+                }
+            } else {
+                addToEventLog('❌ No orchestrator available', 'error');
+            }
+        }
+
+        async function testShieldFlow() {
+            addToEventLog('🛡️ Testing BOT SHIELD flow...', 'info');
+            updateFlowStep('shield');
+            
+            if (orchestrator) {
+                try {
+                    await orchestrator.forceShield();
+                    addToEventLog('✅ BOT SHIELD flow test completed', 'success');
+                } catch (error) {
+                    addToEventLog(`❌ BOT SHIELD flow test failed: ${error.message}`, 'error');
+                }
+            } else {
+                addToEventLog('❌ No orchestrator available', 'error');
+            }
+        }
+
+        async function testRevocationFlow() {
+            addToEventLog('🚫 Testing REVOCATION flow...', 'warning');
+            updateFlowStep('revocation');
+            
+            // First, get a credential to revoke
+            if (window.lemmaWallet) {
+                try {
+                    const credentials = await window.lemmaWallet.getCredentials();
+                    if (credentials && credentials.length > 0) {
+                        const credentialId = credentials[0].id;
+                        addToEventLog(`🎯 Found credential to revoke: ${credentialId}`);
+                        
+                        // Trigger revocation event
+                        const event = new CustomEvent('lemma-credential-revoked', {
+                            detail: {
+                                credential_id: credentialId,
+                                reason: 'Test revocation from flow test page',
+                                timestamp: new Date().toISOString(),
+                                source: 'flow-test-page'
+                            }
+                        });
+                        window.dispatchEvent(event);
+                        
+                        addToEventLog('✅ REVOCATION flow test event dispatched', 'success');
+                    } else {
+                        addToEventLog('⚠️ No credentials found to revoke - creating test event anyway', 'warning');
+                        
+                        // Create a test revocation event
+                        const event = new CustomEvent('lemma-credential-revoked', {
+                            detail: {
+                                credential_id: 'test-credential-' + Date.now(),
+                                reason: 'Test revocation - no real credential',
+                                timestamp: new Date().toISOString(),
+                                source: 'flow-test-page'
+                            }
+                        });
+                        window.dispatchEvent(event);
+                    }
+                } catch (error) {
+                    addToEventLog(`❌ REVOCATION flow test failed: ${error.message}`, 'error');
+                }
+            } else {
+                addToEventLog('❌ No wallet available for revocation test', 'error');
+            }
+        }
+
+        async function clearCredentials() {
+            addToEventLog('🧹 Clearing all credentials...', 'info');
+            
+            try {
+                // Clear localStorage
+                localStorage.removeItem('lemma_revoked_credentials');
+                localStorage.removeItem('lemma_credentials');
+                
+                // Clear wallet if available
+                if (window.lemmaWallet && window.lemmaWallet.clearAll) {
+                    await window.lemmaWallet.clearAll();
+                }
+                
+                addToEventLog('✅ All credentials cleared', 'success');
+                
+                // Trigger recheck
+                if (orchestrator) {
+                    await orchestrator.forceRecheck();
+                }
+            } catch (error) {
+                addToEventLog(`❌ Failed to clear credentials: ${error.message}`, 'error');
+            }
+        }
+
+        async function forceRecheck() {
+            addToEventLog('🔄 Forcing orchestrator recheck...', 'info');
+            
+            if (orchestrator) {
+                try {
+                    await orchestrator.forceRecheck();
+                    addToEventLog('✅ Recheck completed', 'success');
+                } catch (error) {
+                    addToEventLog(`❌ Recheck failed: ${error.message}`, 'error');
+                }
+            } else {
+                addToEventLog('❌ No orchestrator available', 'error');
+            }
+        }
+
+        function showDebugInfo() {
+            const debugPanel = document.getElementById('debug-panel');
+            const debugContent = document.getElementById('debug-content');
+            
+            if (debugPanel.style.display === 'none') {
+                debugPanel.style.display = 'block';
+                
+                let info = '';
+                
+                // Orchestrator state
+                if (orchestrator) {
+                    const state = orchestrator.getState();
+                    info += `<div class="credential-info">
+                        <strong>Orchestrator State:</strong><br>
+                        Current Flow: ${state.currentFlow}<br>
+                        Credential Status: ${state.credentialStatus}<br>
+                        Last Check: ${new Date(state.lastCheck).toLocaleTimeString()}<br>
+                        Update In Progress: ${state.updateInProgress}<br>
+                        Credential List Version: ${state.credentialListVersion}
+                    </div>`;
+                }
+                
+                // Wallet info
+                info += `<div class="credential-info">
+                    <strong>Available Components:</strong><br>
+                    Orchestrator: ${window.lemmaFlowOrchestrator ? '✅' : '❌'}<br>
+                    Wallet: ${window.lemmaWallet ? '✅' : '❌'}<br>
+                    Shield Widget: ${window.LemmaShieldWidget ? '✅' : '❌'}<br>
+                    Verification Flow: ${window.lemmaVerificationFlow ? '✅' : '❌'}
+                </div>`;
+                
+                // Local storage info
+                const revokedCreds = localStorage.getItem('lemma_revoked_credentials');
+                info += `<div class="credential-info">
+                    <strong>Local Storage:</strong><br>
+                    Revoked Credentials: ${revokedCreds ? JSON.parse(revokedCreds).length : 0} entries<br>
+                    Data: ${revokedCreds || 'none'}
+                </div>`;
+                
+                debugContent.innerHTML = info;
+            } else {
+                debugPanel.style.display = 'none';
+            }
+        }
+
+        function updateOrchestratorStatus() {
+            const statusEl = document.getElementById('orchestrator-status');
+            
+            if (orchestrator) {
+                const state = orchestrator.getState();
+                statusEl.innerHTML = `
+Current Flow: ${state.currentFlow}
+Credential Status: ${state.credentialStatus}
+Last Check: ${state.lastCheck ? new Date(state.lastCheck).toLocaleTimeString() : 'Never'}
+Update In Progress: ${state.updateInProgress}
+Version: ${state.credentialListVersion}
+                `.trim();
+            } else {
+                statusEl.innerHTML = 'Orchestrator not available';
+            }
+        }
+
+        function updateFlowStep(activeStep) {
+            // Clear all active states
+            document.querySelectorAll('.flow-step').forEach(step => {
+                step.classList.remove('active');
+            });
+            
+            // Set active step
+            const stepMap = {
+                'check': 'flow-check',
+                'shield': 'flow-shield', 
+                'revocation': 'flow-revocation'
+            };
+            
+            if (stepMap[activeStep]) {
+                document.getElementById(stepMap[activeStep]).classList.add('active');
+            }
+        }
+
+        function addToEventLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = {
+                timestamp,
+                message,
+                type
+            };
+            
+            eventLog.push(logEntry);
+            
+            // Keep only last 50 entries
+            if (eventLog.length > 50) {
+                eventLog = eventLog.slice(-50);
+            }
+            
+            // Update display
+            const logEl = document.getElementById('event-log');
+            const logLines = eventLog.map(entry => 
+                `[${entry.timestamp}] ${entry.message}`
+            ).join('\n');
+            
+            logEl.textContent = logLines;
+            logEl.scrollTop = logEl.scrollHeight;
+            
+            // Also show in status display
+            showStatus(message, type);
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status-display');
+            statusEl.innerHTML = `<div class="status ${type}">${message}</div>`;
+            
+            // Auto-clear status after 5 seconds
+            setTimeout(() => {
+                statusEl.innerHTML = '';
+            }, 5000);
+        }
+    </script>
+</body>
+</html> 

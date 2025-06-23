@@ -3154,3 +3154,155 @@ def sign_witness(witness_data, credential_service):
     except Exception as e:
         current_app.logger.error(f"Error signing witness: {e}")
         return None
+
+@api_bp.route('/api/network/sync', methods=['POST'])
+@rate_limit
+def network_sync():
+    """
+    Network synchronization endpoint for credential list updates
+    Provides updated revocation lists and credential status to integrated sites
+    """
+    try:
+        data = request.get_json() or {}
+        
+        # Get client's current version
+        client_version = data.get('version', 0)
+        force_update = data.get('force', False)
+        
+        # Load current revocation data
+        revocation_file = os.path.join('instance', 'revoked_credentials.json')
+        revoked_credentials = []
+        server_version = int(time.time())  # Use timestamp as version
+        
+        if os.path.exists(revocation_file):
+            try:
+                with open(revocation_file, 'r') as f:
+                    revocation_data = json.load(f)
+                    revoked_credentials = list(revocation_data.keys())
+                    # Use file modification time as version
+                    server_version = int(os.path.getmtime(revocation_file))
+            except Exception as e:
+                logger.warning(f"Failed to load revocation data: {e}")
+        
+        # Also get in-memory revocations
+        memory_revocations = getattr(current_app, '_memory_revocations', {})
+        for cred_id in memory_revocations:
+            if cred_id not in revoked_credentials:
+                revoked_credentials.append(cred_id)
+        
+        # Check if update is needed
+        needs_update = force_update or server_version > client_version
+        
+        response_data = {
+            'success': True,
+            'version': server_version,
+            'needs_update': needs_update,
+            'revoked_count': len(revoked_credentials),
+            'timestamp': time.time()
+        }
+        
+        # Include revocation list if update needed
+        if needs_update:
+            response_data['revoked_credentials'] = revoked_credentials
+            response_data['update_reason'] = 'version_mismatch' if server_version > client_version else 'force_update'
+        
+        # Include network statistics
+        response_data['network_stats'] = {
+            'total_revocations': len(revoked_credentials),
+            'memory_revocations': len(memory_revocations),
+            'file_revocations': len(revoked_credentials) - len(memory_revocations),
+            'sync_time': time.time()
+        }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        logger.error(f"Network sync error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'version': 0,
+            'needs_update': False
+        }), 500
+
+@api_bp.route('/api/credential/status-batch', methods=['POST'])
+@rate_limit  
+def credential_status_batch():
+    """
+    Batch credential status checking for efficient network updates
+    """
+    try:
+        data = request.get_json()
+        
+        if not data or 'credential_ids' not in data:
+            return jsonify({'error': 'credential_ids required'}), 400
+        
+        credential_ids = data['credential_ids']
+        if not isinstance(credential_ids, list):
+            return jsonify({'error': 'credential_ids must be a list'}), 400
+        
+        # Load revocation data
+        revocation_file = os.path.join('instance', 'revoked_credentials.json')
+        revoked_set = set()
+        
+        if os.path.exists(revocation_file):
+            try:
+                with open(revocation_file, 'r') as f:
+                    revocation_data = json.load(f)
+                    revoked_set = set(revocation_data.keys())
+            except Exception as e:
+                logger.warning(f"Failed to load revocation data: {e}")
+        
+        # Also check in-memory revocations
+        memory_revocations = getattr(current_app, '_memory_revocations', {})
+        revoked_set.update(memory_revocations.keys())
+        
+        # Check status for each credential
+        credential_statuses = {}
+        for cred_id in credential_ids:
+            is_revoked = cred_id in revoked_set
+            
+            credential_statuses[cred_id] = {
+                'credential_id': cred_id,
+                'revoked': is_revoked,
+                'status': 'revoked' if is_revoked else 'valid',
+                'checked_at': time.time()
+            }
+            
+            # Include revocation details if revoked
+            if is_revoked:
+                if cred_id in memory_revocations:
+                    credential_statuses[cred_id]['revocation_source'] = 'memory'
+                    credential_statuses[cred_id]['revocation_data'] = memory_revocations[cred_id]
+                elif os.path.exists(revocation_file):
+                    try:
+                        with open(revocation_file, 'r') as f:
+                            revocation_data = json.load(f)
+                            if cred_id in revocation_data:
+                                credential_statuses[cred_id]['revocation_source'] = 'persistent'
+                                credential_statuses[cred_id]['revocation_data'] = revocation_data[cred_id]
+                    except:
+                        pass
+        
+        # Summary statistics
+        total_checked = len(credential_ids)
+        total_revoked = sum(1 for status in credential_statuses.values() if status['revoked'])
+        total_valid = total_checked - total_revoked
+        
+        return jsonify({
+            'success': True,
+            'credential_statuses': credential_statuses,
+            'summary': {
+                'total_checked': total_checked,
+                'total_revoked': total_revoked,
+                'total_valid': total_valid,
+                'check_time': time.time()
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Batch status check error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

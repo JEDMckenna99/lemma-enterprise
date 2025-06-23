@@ -1029,4 +1029,9 @@ def offline_demo():
     """
     return render_template('offline_demo.html')
 
+@main_bp.route('/flow-test')
+def flow_test():
+    """Test page for demonstrating the three main Lemma flows"""
+    return render_template('flow_test.html')
+
 
