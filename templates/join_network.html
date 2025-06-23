@@ -462,172 +462,94 @@ document.addEventListener('DOMContentLoaded', function() {
     const verificationStatus = document.getElementById('verificationStatus');
     const actionStatus = document.getElementById('actionStatus');
     
-    // ENHANCED DEBUG: Check if elements are found
-    console.log('🔍 ENHANCED DEBUG: Button elements found:');
+    // Check if elements are found
+    console.log('🔍 Button elements found:');
     console.log('- revokeBtn:', !!revokeBtn, revokeBtn);
     console.log('- verifyBtn:', !!verifyBtn, verifyBtn);
     console.log('- verificationStatus:', !!verificationStatus, verificationStatus);
     console.log('- actionStatus:', !!actionStatus, actionStatus);
     
-    // ENHANCED DEBUG: Check element IDs in DOM  
-    console.log('🔍 ALL elements with IDs on page:');
-    const allElementsWithIds = document.querySelectorAll('[id]');
-    allElementsWithIds.forEach(el => console.log(`  - ID: ${el.id}, TAG: ${el.tagName}`));
-    
-    // Add immediate test click handler for debugging
+    // Add clean click handler for revocation
     if (revokeBtn) {
-        console.log('✅ Adding ENHANCED click handler to revoke button');
-        
-        // Add visual feedback that click handler is working
-        revokeBtn.style.border = '2px solid green';
-        revokeBtn.title = 'ENHANCED: Click handler attached';
+        console.log('✅ Adding revoke button click handler');
         
         revokeBtn.addEventListener('click', async function(e) {
-            console.log('🚨 ENHANCED: REVOKE BUTTON CLICKED!', e);
-            console.log('🚨 Event target:', e.target);
-            console.log('🚨 Event type:', e.type);
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('🚨 REVOKE BUTTON CLICKED!');
             
             // Show immediate feedback
-            actionStatus.innerHTML = '<div style="color: blue; font-weight: bold; font-size: 16px; border: 2px solid blue; padding: 10px;">🚀 ENHANCED: Starting revocation workflow...</div>';
+            actionStatus.innerHTML = '<div style="color: blue; font-weight: bold; padding: 10px; border: 2px solid blue; border-radius: 5px;">🚀 Starting revocation test...</div>';
             actionStatus.style.display = 'block';
             
-            // Start the enhanced revocation workflow
-            if (!confirm('🚨 REVOCATION FLOW TEST\n\nThis will simulate credential revocation and test the complete flow:\n\n✅ Clear all stored credentials\n✅ Update network revocation status\n✅ Send revocation notifications\n✅ Force Shield reappearance for re-verification\n\nThis is a SAFE TEST - you can re-verify immediately afterward.\n\nContinue with revocation test?')) {
-                actionStatus.innerHTML = '<div style="color: gray; font-weight: bold; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">❌ Revocation test cancelled by user</div>';
+            // Simplified confirmation dialog
+            const confirmed = confirm('🚨 REVOCATION FLOW TEST\n\nThis will test the complete revocation flow:\n\n• Clear stored credentials\n• Update network status\n• Force Shield reappearance\n\nThis is a safe test. Continue?');
+            
+            if (!confirmed) {
+                actionStatus.innerHTML = '<div style="color: gray; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">❌ Test cancelled</div>';
                 return;
             }
             
+            // Disable button and show loading
             revokeBtn.disabled = true;
-            revokeBtn.innerHTML = '<span class="loading-spinner mr-2"></span>ENHANCED: Finding credential...';
+            revokeBtn.innerHTML = '<span class="loading-spinner mr-2"></span>Processing...';
             
             try {
-                // STEP 0: ENHANCED CREDENTIAL DETECTION (multi-source search)
-                console.log('[LEMMA-FLOW] Step 0: Enhanced credential ID detection');
-                let credentialId = null;
-                let foundCredential = null;
+                // Find credential ID
+                console.log('[LEMMA-FLOW] Finding credential to revoke');
+                let credentialId = sessionStorage.getItem('lemma_credential_id') || 
+                                  localStorage.getItem('lemma_credential_id') || 
+                                  `test-revocation-${Date.now()}`;
                 
-                // Method 1: Check sessionStorage first
-                const sessionCredId = sessionStorage.getItem('lemma_credential_id');
-                if (sessionCredId) {
-                    credentialId = sessionCredId;
-                    console.log('[LEMMA-FLOW] Found credential ID in sessionStorage:', credentialId);
-                }
+                console.log('[LEMMA-FLOW] Using credential ID:', credentialId);
                 
-                // Method 2: Check localStorage for credential
-                if (!credentialId) {
-                    const localCredId = localStorage.getItem('lemma_credential_id');
-                    if (localCredId) {
-                        credentialId = localCredId;
-                        console.log('[LEMMA-FLOW] Found credential ID in localStorage:', credentialId);
-                    }
-                }
-                
-                // Generate fallback ID if none found
-                if (!credentialId) {
-                    credentialId = `test-credential-fallback-${Date.now()}`;
-                    console.log('[LEMMA-FLOW] No credential found, using fallback ID:', credentialId);
-                }
-                
-                revokeBtn.innerHTML = '<span class="loading-spinner mr-2"></span>ENHANCED: Revoking...';
-                
-                // Use the enhanced revocation flow
+                // Update status
                 actionStatus.innerHTML = `
-                    <div class="status-indicator status-pending">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        ENHANCED: Starting complete network revocation workflow...
-                        <br><small>Credential ID: ${credentialId}</small>
+                    <div style="color: orange; padding: 10px; border: 1px solid orange; border-radius: 5px;">
+                        ⏳ Processing revocation for credential: ${credentialId.substring(0, 20)}...
                     </div>
                 `;
                 
-                // Call the enhanced revocation flow (complete network workflow)
+                // Call the revocation function
                 const result = await performOptimizedRevocation(credentialId);
                 
                 if (!result.success) {
-                    throw new Error(result.error || 'Enhanced revocation failed');
+                    throw new Error(result.error || 'Revocation failed');
                 }
                 
-                console.log(`[LEMMA-FLOW] ENHANCED REVOCATION COMPLETE: ${result.totalTime.toFixed(0)}ms total`);
+                console.log('[LEMMA-FLOW] Revocation completed successfully');
                 
-                // CRITICAL: Dispatch revocation event for shield widgets
-                const revocationEvent = new CustomEvent('lemma-credential-revoked', {
-                    detail: {
-                        credential_id: result.credential_id || 'revoked-credential',
-                        reason: 'User initiated revocation',
-                        timestamp: new Date().toISOString(),
-                        source: 'join-network-page'
-                    }
-                });
-                window.dispatchEvent(revocationEvent);
-                console.log('[LEMMA-FLOW] Dispatched revocation event:', revocationEvent.detail);
+                // Show success and redirect
+                actionStatus.innerHTML = `
+                    <div style="color: green; padding: 10px; border: 1px solid green; border-radius: 5px;">
+                        ✅ Revocation test completed! Redirecting to test page...
+                    </div>
+                `;
                 
-                // CRITICAL: Redirect to protected page to force shield reappearance
+                // Redirect after short delay
                 setTimeout(() => {
-                    console.log('[LEMMA-FLOW] Redirecting to protected page to trigger shield...');
-                    actionStatus.innerHTML = `
-                        <div class="status-indicator status-success">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                            ✅ Revocation complete! Redirecting to test shield reappearance...
-                        </div>
-                    `;
-                    
-                    // Redirect to shield demo page to force shield reappearance
                     window.location.href = '/flow-test?revoked=true&test=revocation&source=join-network';
-                }, 2000);
+                }, 1500);
                 
             } catch (error) {
+                console.error('[LEMMA-FLOW] Revocation error:', error);
                 actionStatus.innerHTML = `
-                    <div class="status-indicator status-error">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                        </svg>
-                        Error: ${error.message}
+                    <div style="color: red; padding: 10px; border: 1px solid red; border-radius: 5px;">
+                        ❌ Error: ${error.message}
                     </div>
                 `;
             } finally {
                 revokeBtn.disabled = false;
-                revokeBtn.innerHTML = `
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="mr-2">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                    </svg>
-                    Test Revocation
-                `;
+                revokeBtn.innerHTML = '🚨 Test Revocation Flow';
             }
         });
-        
-        // Also add mousedown event for extra debugging
-        revokeBtn.addEventListener('mousedown', function(e) {
-            console.log('🖱️ ENHANCED: Mouse down on revoke button');
-        });
-        
-        // Also add mouseup event
-        revokeBtn.addEventListener('mouseup', function(e) {
-            console.log('🖱️ ENHANCED: Mouse up on revoke button');  
-        });
-        
     } else {
-        console.error('❌ ENHANCED: Revoke button not found!');
-        console.log('❌ Searching for button by class or other attributes...');
-        const buttonsByClass = document.querySelectorAll('.btn-revoke');
-        console.log('❌ Buttons with .btn-revoke class:', buttonsByClass);
-        
-        const buttonsByText = Array.from(document.querySelectorAll('button')).filter(btn => 
-            btn.textContent.toLowerCase().includes('revoke')
-        );
-        console.log('❌ Buttons containing "revoke" text:', buttonsByText);
+        console.error('❌ Revoke button not found!');
     }
-    
-    // ENHANCED REVOCATION FLOW - Complete network workflow
-    // Target: Full revocation → OPRF cascade update → Network notification → Shield reappearance
-
-    // The enhanced revoke handler is already attached above
-    console.log('🔄 ENHANCED: Duplicate handler block removed - using unified handler above');
 
     async function performOptimizedRevocation(credentialId) {
-        console.log('[LEMMA-FLOW] Starting ENHANCED revocation flow (complete network workflow)');
+        console.log('[LEMMA-FLOW] Starting revocation flow for:', credentialId);
         const startTime = performance.now();
         
         try {
