@@ -293,11 +293,11 @@
         </p>
         
         <div class="flex gap-4 justify-center">
-            <button id="revokeCredential" class="btn btn-revoke">
+            <button id="revokeCredential" class="btn btn-revoke" style="font-weight: bold; padding: 12px 24px;">
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="mr-2">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                 </svg>
-                Revoke
+                🚨 Test Revocation Flow
             </button>
             <button id="verifyCredential" class="btn btn-verify" style="display: none;">
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="mr-2">
@@ -307,16 +307,17 @@
             </button>
         </div>
         
-        <div class="revocation-explanation mb-4 p-4 bg-gray-50 rounded-lg border-l-4 border-orange-400">
-            <h4 class="font-semibold text-gray-900 mb-2">What happens when you click "Revoke":</h4>
+        <div class="revocation-explanation mb-4 p-4 bg-orange-50 rounded-lg border-l-4 border-orange-400">
+            <h4 class="font-semibold text-gray-900 mb-2">🚨 Test the Complete Revocation Flow:</h4>
             <ul class="text-sm text-gray-700 space-y-1">
-                <li>• <strong>Clears your Lemma credential</strong> from this device</li>
-                <li>• <strong>Removes all verification data</strong> from browser storage</li>
-                <li>• <strong>Triggers network revocation</strong> so other sites detect the change</li>
-                <li>• <strong>Forces shield reappearance</strong> on protected pages for re-verification</li>
+                <li>✅ <strong>Clear all stored credentials</strong> from this device</li>
+                <li>✅ <strong>Update network revocation status</strong> via OPRF cascade</li>
+                <li>✅ <strong>Send revocation notifications</strong> to the Lemma network</li>
+                <li>✅ <strong>Force Shield reappearance</strong> on protected pages</li>
+                <li>✅ <strong>Test automatic re-verification</strong> workflow</li>
             </ul>
-            <p class="text-xs text-gray-600 mt-2">
-                <em>This simulates what happens when credentials are revoked for security reasons.</em>
+            <p class="text-xs text-gray-600 mt-2 bg-blue-50 p-2 rounded border-l-2 border-blue-300">
+                <strong>Safe Test:</strong> This simulates credential revocation for testing. You can immediately re-verify afterward to restore access.
             </p>
         </div>
         
@@ -491,8 +492,8 @@ document.addEventListener('DOMContentLoaded', function() {
             actionStatus.style.display = 'block';
             
             // Start the enhanced revocation workflow
-            if (!confirm('This will revoke your current Lemma credential for testing purposes using the ENHANCED network workflow. This will:\n\n• Clear all local credentials\n• Update OPRF cascade\n• Send network notifications\n• Force Shield reappearance\n\nContinue?')) {
-                actionStatus.innerHTML = '<div style="color: gray; font-weight: bold;">Revocation cancelled by user</div>';
+            if (!confirm('🚨 REVOCATION FLOW TEST\n\nThis will simulate credential revocation and test the complete flow:\n\n✅ Clear all stored credentials\n✅ Update network revocation status\n✅ Send revocation notifications\n✅ Force Shield reappearance for re-verification\n\nThis is a SAFE TEST - you can re-verify immediately afterward.\n\nContinue with revocation test?')) {
+                actionStatus.innerHTML = '<div style="color: gray; font-weight: bold; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">❌ Revocation test cancelled by user</div>';
                 return;
             }
             
@@ -569,12 +570,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                             </svg>
-                            Revocation complete! Redirecting to protected page...
+                            ✅ Revocation complete! Redirecting to test shield reappearance...
                         </div>
                     `;
                     
                     // Redirect to shield demo page to force shield reappearance
-                    window.location.href = '/shield-demo?revoked=true&force_shield=true';
+                    window.location.href = '/flow-test?revoked=true&test=revocation&source=join-network';
                 }, 2000);
                 
             } catch (error) {
