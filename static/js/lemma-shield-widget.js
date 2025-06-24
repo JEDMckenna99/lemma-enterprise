@@ -2207,49 +2207,107 @@ class LemmaShieldWidget {
     }
 }
 
-// Ensure forceShow methods are available (emergency fix for any class definition issues)
-if (typeof LemmaShieldWidget !== 'undefined') {
-    // Add instance method to prototype if it doesn't exist
-    if (!LemmaShieldWidget.prototype.forceShow) {
-        LemmaShieldWidget.prototype.forceShow = function(options = {}) {
-            console.log('🚨 Force showing shield with options (prototype):', options);
-            
-            // Set revocation trigger if this is a revocation scenario
-            if (options.reason === 'credential_revoked') {
-                sessionStorage.setItem('lemma_revocation_triggered', 'true');
-            }
-            
-            // Force show the widget
+// AGGRESSIVE FIX: Force methods to be available immediately and repeatedly
+(function() {
+    console.log('🔧 AGGRESSIVE FORCE SHOW FIX EXECUTING');
+    
+    // Define the forceShow function that we'll use everywhere
+    const forceShowFunction = function(options = {}) {
+        console.log('🚨 Force showing shield with options (AGGRESSIVE):', options);
+        
+        // Set revocation trigger if this is a revocation scenario
+        if (options.reason === 'credential_revoked') {
+            sessionStorage.setItem('lemma_revocation_triggered', 'true');
+        }
+        
+        // Try multiple ways to show the widget
+        if (this && typeof this.showVerificationWidget === 'function') {
             this.showVerificationWidget();
+        } else if (window.LemmaShieldWidget && window.LemmaShieldWidget.instance && typeof window.LemmaShieldWidget.instance.showVerificationWidget === 'function') {
+            window.LemmaShieldWidget.instance.showVerificationWidget();
+        } else if (window.lemmaShieldWidget && typeof window.lemmaShieldWidget.showVerificationWidget === 'function') {
+            window.lemmaShieldWidget.showVerificationWidget();
+        } else {
+            console.log('🔄 Creating emergency widget instance...');
+            try {
+                const instance = new LemmaShieldWidget({
+                    widgetContainer: '#lemma-shield-container',
+                    apiEndpoint: '/api/shield',
+                    debug: true
+                });
+                window.lemmaShieldWidget = instance;
+                instance.showVerificationWidget();
+            } catch (e) {
+                console.error('Failed to create emergency instance:', e);
+            }
+        }
+        
+        return this || window.LemmaShieldWidget?.instance || window.lemmaShieldWidget;
+    };
+    
+    // Static method for class
+    const staticForceShow = function(options = {}) {
+        console.log('🚨 Static forceShow called (AGGRESSIVE):', options);
+        if (LemmaShieldWidget.instance) {
+            return forceShowFunction.call(LemmaShieldWidget.instance, options);
+        } else {
+            return forceShowFunction.call(null, options);
+        }
+    };
+    
+    // Apply fixes immediately and repeatedly
+    const applyFixes = () => {
+        // Fix 1: Ensure class has static method
+        if (typeof LemmaShieldWidget !== 'undefined') {
+            LemmaShieldWidget.forceShow = staticForceShow;
             
-            return this;
-        };
+            // Fix 2: Ensure prototype has method
+            LemmaShieldWidget.prototype.forceShow = forceShowFunction;
+            
+            // Fix 3: Ensure instance has method if it exists
+            if (LemmaShieldWidget.instance) {
+                LemmaShieldWidget.instance.forceShow = forceShowFunction.bind(LemmaShieldWidget.instance);
+            }
+        }
+        
+        // Fix 4: Ensure global instance has method
+        if (window.lemmaShieldWidget) {
+            window.lemmaShieldWidget.forceShow = forceShowFunction.bind(window.lemmaShieldWidget);
+        }
+        
+        // Fix 5: Ensure convenience object exists with methods
+        window.lemmaShield = window.lemmaShield || {};
+        window.lemmaShield.forceShow = forceShowFunction;
+        window.lemmaShield.show = forceShowFunction;
+        window.lemmaShield.getInstance = () => window.lemmaShieldWidget || window.LemmaShieldWidget?.instance;
+        
+        console.log('✅ AGGRESSIVE FIX APPLIED');
+    };
+    
+    // Apply fixes immediately
+    applyFixes();
+    
+    // Apply fixes after DOM loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyFixes);
     }
     
-    // Add static method if it doesn't exist
-    if (!LemmaShieldWidget.forceShow) {
-        LemmaShieldWidget.forceShow = function(options = {}) {
-            if (LemmaShieldWidget.instance) {
-                return LemmaShieldWidget.instance.forceShow(options);
-            } else {
-                console.warn('⚠️ No LemmaShieldWidget instance available for forceShow (static)');
-                // Try to create one if it doesn't exist
-                try {
-                    const instance = new LemmaShieldWidget({
-                        widgetContainer: '#lemma-shield-container',
-                        apiEndpoint: '/api/shield',
-                        debug: true
-                    });
-                    window.lemmaShieldWidget = instance;
-                    return instance.forceShow(options);
-                } catch (e) {
-                    console.error('Failed to create emergency instance:', e);
-                    return null;
-                }
-            }
-        };
-    }
-}
+    // Apply fixes after window loads
+    window.addEventListener('load', applyFixes);
+    
+    // Apply fixes every 500ms for the first 5 seconds (aggressive)
+    let fixCount = 0;
+    const fixInterval = setInterval(() => {
+        applyFixes();
+        fixCount++;
+        if (fixCount >= 10) { // Stop after 5 seconds
+            clearInterval(fixInterval);
+            console.log('🏁 AGGRESSIVE FIX COMPLETE');
+        }
+    }, 500);
+    
+    console.log('🔧 AGGRESSIVE FORCE SHOW FIX INSTALLED');
+})();
 
 // Auto-initialize if window is loaded
 if (document.readyState === 'loading') {
