@@ -2190,7 +2190,19 @@ class LemmaShieldWidget {
             return LemmaShieldWidget.instance.forceShow(options);
         } else {
             console.warn('⚠️ No LemmaShieldWidget instance available for forceShow');
-            return null;
+            // Try to create one if it doesn't exist
+            try {
+                const instance = new LemmaShieldWidget({
+                    widgetContainer: '#lemma-shield-container',
+                    apiEndpoint: '/api/shield',
+                    debug: true
+                });
+                window.lemmaShieldWidget = instance;
+                return instance.forceShow(options);
+            } catch (e) {
+                console.error('Failed to create emergency instance:', e);
+                return null;
+            }
         }
     }
 }
@@ -2199,7 +2211,55 @@ class LemmaShieldWidget {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         window.LemmaShieldWidget = LemmaShieldWidget;
+        // Create a default instance for immediate use
+        if (!LemmaShieldWidget.instance) {
+            window.lemmaShieldWidget = new LemmaShieldWidget({
+                widgetContainer: '#lemma-shield-container',
+                apiEndpoint: '/api/shield',
+                debug: true
+            });
+        }
+        
+        // Add global convenience methods
+        window.lemmaShield = {
+            forceShow: (options = {}) => {
+                if (window.lemmaShieldWidget) {
+                    return window.lemmaShieldWidget.forceShow(options);
+                } else if (window.LemmaShieldWidget) {
+                    return window.LemmaShieldWidget.forceShow(options);
+                } else {
+                    console.error('No Lemma Shield available');
+                    return null;
+                }
+            },
+            show: (options = {}) => window.lemmaShield.forceShow(options),
+            getInstance: () => window.lemmaShieldWidget || window.LemmaShieldWidget?.instance
+        };
     });
 } else {
     window.LemmaShieldWidget = LemmaShieldWidget;
+    // Create a default instance for immediate use
+    if (!LemmaShieldWidget.instance) {
+        window.lemmaShieldWidget = new LemmaShieldWidget({
+            widgetContainer: '#lemma-shield-container',
+            apiEndpoint: '/api/shield',
+            debug: true
+        });
+    }
+    
+    // Add global convenience methods
+    window.lemmaShield = {
+        forceShow: (options = {}) => {
+            if (window.lemmaShieldWidget) {
+                return window.lemmaShieldWidget.forceShow(options);
+            } else if (window.LemmaShieldWidget) {
+                return window.LemmaShieldWidget.forceShow(options);
+            } else {
+                console.error('No Lemma Shield available');
+                return null;
+            }
+        },
+        show: (options = {}) => window.lemmaShield.forceShow(options),
+        getInstance: () => window.lemmaShieldWidget || window.LemmaShieldWidget?.instance
+    };
 } 
