@@ -212,6 +212,9 @@
 {% endblock %}
 
 {% block content %}
+<!-- Shield Container - CRITICAL: Must be present for shield to display -->
+<div id="lemma-shield-container" style="display: none;"></div>
+
 <div class="welcome-container">
     <!-- Welcome Banner Card -->
     <div class="welcome-banner">
@@ -292,19 +295,25 @@
             Your Lemma credential is active and working across the network. You can test the revocation and re-verification process below.
         </p>
         
-        <div class="flex gap-4 justify-center">
+        <div class="feature-card">
+            <h4 class="font-semibold text-gray-900 mb-2">🚨 Credential Revocation System:</h4>
+            <p class="text-gray-600 mb-4">
+                Lemma provides enterprise-grade credential revocation capabilities. When a credential is revoked, 
+                all sites using Lemma will immediately detect the revocation and require re-verification.
+            </p>
+            <p class="text-sm text-yellow-700 bg-yellow-50 p-3 rounded-lg mb-4">
+                <strong>Real Revocation:</strong> This will actually revoke your current credential across the entire Lemma network. 
+                You will need to re-verify afterward to regain access to protected content.
+            </p>
+            
             <button id="revokeCredential" class="btn btn-revoke" style="font-weight: bold; padding: 12px 24px;">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="mr-2">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: inline-block; margin-right: 8px;">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                 </svg>
-                🚨 Test Revocation Flow
+                🚨 Revoke My Credential
             </button>
-            <button id="verifyCredential" class="btn btn-verify" style="display: none;">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="mr-2">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                Re-verify with Shield
-            </button>
+            
+            <div id="revocationStatus" class="mt-4" style="display: none;"></div>
         </div>
         
         <div class="revocation-explanation mb-4 p-4 bg-orange-50 rounded-lg border-l-4 border-orange-400">
@@ -328,12 +337,99 @@
 </div>
 
 <!-- Lemma Shield Widget - Will be triggered for re-verification -->
+<script src="{{ url_for('static', filename='js/lemma-wallet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lemma-wallet-background.js') }}"></script>
 <script src="{{ url_for('static', filename='js/lemma-shield-flow-orchestrator.js') }}"></script>
 <script src="{{ url_for('static', filename='js/lemma-shield-widget.js') }}"></script>
 
 <script>
 console.log('🚀 JOIN NETWORK PAGE: JavaScript loading started');
 console.log('🚀 JOIN NETWORK PAGE: DOM ready state:', document.readyState);
+
+// CRITICAL FIX: Initialize the shield properly
+function initializeLemmaShield() {
+    console.log('🛡️ Initializing Lemma Shield on join-network page...');
+    
+    // Step 1: Initialize wallet first (required by orchestrator)
+    if (typeof window.LemmaWallet !== 'undefined') {
+        try {
+            console.log('💰 Initializing wallet...');
+            window.lemmaWallet = new window.LemmaWallet();
+            console.log('✅ Wallet initialized');
+        } catch (error) {
+            console.error('❌ Failed to initialize wallet:', error);
+        }
+    }
+    
+    if (typeof window.LemmaBackgroundWallet !== 'undefined') {
+        try {
+            console.log('💰 Initializing background wallet...');
+            window.lemmaBackgroundWallet = new window.LemmaBackgroundWallet();
+            console.log('✅ Background wallet initialized');
+        } catch (error) {
+            console.error('❌ Failed to initialize background wallet:', error);
+        }
+    }
+    
+    // Step 2: Check if LemmaShieldWidget class is available
+    if (typeof window.LemmaShieldWidget !== 'undefined') {
+        try {
+            console.log('✅ LemmaShieldWidget class found, creating instance...');
+            
+            // Create global shield widget instance
+            window.lemmaShieldWidget = new window.LemmaShieldWidget({
+                widgetContainer: '#lemma-shield-container',
+                protectedContent: '.protected-content'
+            });
+            
+            // Initialize the widget
+            window.lemmaShieldWidget.init().then(() => {
+                console.log('✅ Shield widget initialized successfully');
+                
+                // Create aliases for backward compatibility
+                window.LemmaShield = {
+                    show: (options) => window.lemmaShieldWidget.showVerificationWidget(options),
+                    forceShow: () => window.lemmaShieldWidget.showVerificationWidget(),
+                    hide: () => window.lemmaShieldWidget.hideShield()
+                };
+                
+                console.log('✅ Shield aliases created');
+                
+                // CRITICAL: Initialize the flow orchestrator
+                if (typeof window.LemmaShieldFlowOrchestrator !== 'undefined') {
+                    try {
+                        window.lemmaFlowOrchestrator = new window.LemmaShieldFlowOrchestrator({
+                            debug: true,
+                            apiBase: '',
+                            updateInterval: 10000 // Check every 10 seconds
+                        });
+                        console.log('✅ Flow orchestrator initialized');
+                    } catch (error) {
+                        console.error('❌ Failed to initialize flow orchestrator:', error);
+                    }
+                } else {
+                    console.warn('❌ LemmaShieldFlowOrchestrator class not found');
+                }
+                
+            }).catch(error => {
+                console.error('❌ Failed to initialize shield widget:', error);
+            });
+            
+        } catch (error) {
+            console.error('❌ Error creating shield widget:', error);
+        }
+    } else {
+        console.warn('❌ LemmaShieldWidget class not found, retrying in 100ms...');
+        setTimeout(initializeLemmaShield, 100);
+    }
+}
+
+// Initialize when scripts are loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeLemmaShield);
+} else {
+    initializeLemmaShield();
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 JOIN NETWORK PAGE: DOMContentLoaded fired');
@@ -508,7 +604,7 @@ document.addEventListener('DOMContentLoaded', function() {
             actionStatus.style.display = 'block';
             
             // Simplified confirmation dialog
-            const confirmed = confirm('🚨 REVOCATION FLOW TEST\n\nThis will test the complete revocation flow:\n\n• Clear stored credentials\n• Update network status\n• Force Shield reappearance\n\nThis is a safe test. Continue?');
+            const confirmed = confirm('🚨 CREDENTIAL REVOCATION\n\nThis will revoke your current credential:\n\n• Clear stored credentials\n• Update network revocation status\n• Force Shield reappearance on all sites\n• Require re-verification to access protected content\n\nThis is real revocation. Continue?');
             
             if (!confirmed) {
                 actionStatus.innerHTML = '<div style="color: gray; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">❌ Test cancelled</div>';
@@ -565,7 +661,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
             } finally {
                 revokeBtn.disabled = false;
-                revokeBtn.innerHTML = '🚨 Test Revocation Flow';
+                revokeBtn.innerHTML = '🚨 Revoke My Credential';
             }
         });
     } else {
@@ -675,8 +771,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     credential_id: credentialId,
-                    reason: 'User-initiated test revocation - complete network workflow',
-                    revoked_by: 'user_self_test',
+                    reason: 'User-initiated revocation from join-network page',
+                                          revoked_by: 'user_self_revoke',
                     comprehensive_cleanup: true
                 })
             });
@@ -725,7 +821,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     immediate: true,
                     security_event: true,
                     revocation_confirmed: true,
-                    network_notified: revokeData.network_notification === 'sent'
+                    network_notified: revokeData.network_propagation?.success === true
                 }
             }));
             
@@ -739,63 +835,132 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }));
             
-            // Force Shield to show regardless of status
+            // ENHANCED: Try multiple Shield triggering methods
+            let shieldTriggered = false;
+            
+            // Method 1: LemmShield widget
             if (window.LemmaShield) {
-                if (window.LemmaShield.show) {
-                    window.LemmaShield.show({
-                        force: true,
-                        reason: 'credential_revoked',
-                        title: 'Credential Revoked - Re-verification Required',
-                        message: 'Your verification has been revoked. Please verify again to continue.',
-                        revocation_data: statusData
-                    });
-                } else if (window.LemmaShield.forceShow) {
-                    window.LemmaShield.forceShow();
+                try {
+                    if (window.LemmaShield.show) {
+                        window.LemmaShield.show({
+                            force: true,
+                            reason: 'credential_revoked',
+                            title: 'Credential Revoked - Re-verification Required',
+                            message: 'Your verification has been revoked. Please verify again to continue.',
+                            revocation_data: statusData
+                        });
+                        shieldTriggered = true;
+                        console.log('[LEMMA-FLOW] LemmaShield.show() triggered');
+                    } else if (window.LemmaShield.forceShow) {
+                        window.LemmaShield.forceShow();
+                        shieldTriggered = true;
+                        console.log('[LEMMA-FLOW] LemmaShield.forceShow() triggered');
+                    }
+                } catch (e) {
+                    console.warn('[LEMMA-FLOW] LemmaShield trigger failed:', e);
                 }
             }
             
-            // Trigger lemma-shield-api reappearance if available
-            if (window.lemmaShieldAPI && window.lemmaShieldAPI.handleCredentialRevoked) {
-                window.lemmaShieldAPI.handleCredentialRevoked({
-                    credential_id: credentialId,
-                    revocation_reason: revokeData.reason || 'Test revocation',
-                    network_status: 'revoked'
+            // Method 2: Shield Widget
+            if (window.lemmaShieldWidget && !shieldTriggered) {
+                try {
+                    window.lemmaShieldWidget.showVerificationWidget();
+                    shieldTriggered = true;
+                    console.log('[LEMMA-FLOW] lemmaShieldWidget triggered');
+                } catch (e) {
+                    console.warn('[LEMMA-FLOW] lemmaShieldWidget trigger failed:', e);
+                }
+            }
+            
+            // Method 3: Shield API
+            if (window.lemmaShieldAPI && !shieldTriggered) {
+                try {
+                    if (window.lemmaShieldAPI.handleCredentialRevoked) {
+                        window.lemmaShieldAPI.handleCredentialRevoked({
+                            credential_id: credentialId,
+                            revocation_reason: revokeData.reason || 'Test revocation',
+                            network_status: 'revoked'
+                        });
+                        shieldTriggered = true;
+                        console.log('[LEMMA-FLOW] lemmaShieldAPI.handleCredentialRevoked() triggered');
+                    }
+                } catch (e) {
+                    console.warn('[LEMMA-FLOW] lemmaShieldAPI trigger failed:', e);
+                }
+            }
+            
+            // Method 4: Check for any existing shield containers and force show
+            const existingShields = document.querySelectorAll('.lemma-shield, [data-lemma-shield], .shield-container');
+            if (existingShields.length > 0 && !shieldTriggered) {
+                existingShields.forEach(shield => {
+                    shield.style.display = 'block';
+                    shield.classList.remove('hidden');
                 });
+                shieldTriggered = true;
+                console.log('[LEMMA-FLOW] Existing shield containers forced visible');
             }
             
-            // Fallback: Force page reload to trigger Shield
-            setTimeout(() => {
-                if (!document.querySelector('.lemma-shield') && !document.querySelector('[data-lemma-shield]')) {
-                    console.log('[LEMMA-FLOW] Shield not detected, forcing page reload');
-                    window.location.reload();
+            // Method 5: Initialize new shield if none exist
+            if (!shieldTriggered) {
+                console.log('[LEMMA-FLOW] No shield found, initializing new one...');
+                try {
+                    // Try to reinitialize shield
+                    if (typeof initializeLemmaShield === 'function') {
+                        initializeLemmaShield({ force: true, reason: 'credential_revoked' });
+                        shieldTriggered = true;
+                    } else if (window.LemmaShieldWidget) {
+                        const newShield = new window.LemmaShieldWidget({
+                            force: true,
+                            reason: 'credential_revoked'
+                        });
+                        await newShield.init();
+                        shieldTriggered = true;
+                    }
+                } catch (e) {
+                    console.warn('[LEMMA-FLOW] Shield initialization failed:', e);
                 }
-            }, 1000);
+            }
+            
+            // ENHANCED Fallback: Force page reload with special parameter
+            setTimeout(() => {
+                if (!shieldTriggered && !document.querySelector('.lemma-shield:not([style*="display: none"]), [data-lemma-shield]:not([style*="display: none"])')) {
+                    console.log('[LEMMA-FLOW] Shield not detected after revocation, forcing page reload with revocation flag');
+                    
+                    // Add revocation flag to URL to trigger shield on reload
+                    const url = new URL(window.location);
+                    url.searchParams.set('force_verification', 'credential_revoked');
+                    url.searchParams.set('revoked_credential', credentialId);
+                    window.location.href = url.toString();
+                }
+            }, 1500); // Increased timeout to 1.5 seconds
             
             const step4Time = performance.now() - step4StartTime;
             const totalTime = performance.now() - startTime;
             
             console.log(`[LEMMA-FLOW] Step 4 completed in ${step4Time.toFixed(2)}ms`);
+            console.log(`[LEMMA-FLOW] Shield triggered: ${shieldTriggered}`);
             console.log(`[LEMMA-FLOW] TOTAL ENHANCED FLOW TIME: ${totalTime.toFixed(2)}ms`);
             
             // STEP 5: Update UI with comprehensive success status
-            const actionsCompleted = revokeData.actions_completed || [];
-            const networkNotification = revokeData.network_notification || 'unknown';
+            const actionsCompleted = revokeData.flow_steps_completed || revokeData.actions_completed || [];
+            const networkNotification = revokeData.network_propagation?.success ? 'sent' : 'failed';
             
             actionStatus.innerHTML = `
                 <div class="status-indicator status-success">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                     </svg>
-                    ENHANCED: Complete revocation workflow completed in ${totalTime.toFixed(0)}ms!
+                    ✅ CREDENTIAL REVOKED: Complete revocation workflow completed in ${totalTime.toFixed(0)}ms
                 </div>
                 <div style="font-size: 12px; margin-top: 8px; color: #666;">
                     <strong>Actions Completed:</strong><br>
                     ${actionsCompleted.map(action => `✅ ${action.replace(/_/g, ' ')}`).join('<br>')}
                     <br><br>
                     <strong>Network Status:</strong> ${networkNotification}<br>
-                    <strong>Revocation Detection:</strong> ${statusData.detection_layers?.join(', ') || 'Enhanced layers'}<br>
+                    <strong>Revocation Detection:</strong> ${statusData.detection_layers?.join(', ') || statusData.detection_method || 'Enhanced layers'}<br>
                     <strong>Shield Status:</strong> ${statusData.shield_action === 'require_verification' ? '✅ Will reappear' : '❌ Status unclear'}<br>
-                    <strong>Performance:</strong> ${(revokeData.response_time_ms || 0).toFixed(1)}ms API + ${statusData.response_time_ms.toFixed(1)}ms status
+                    <strong>Shield Triggered:</strong> ${shieldTriggered ? '✅ Successfully triggered' : '❌ Failed to trigger'}<br>
+                    <strong>Performance:</strong> ${(revokeData.response_time_ms || 0).toFixed(1)}ms API + ${(statusData.response_time_ms || 0).toFixed(1)}ms status
                 </div>
             `;
             
@@ -823,10 +988,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                     </svg>
-                    Enhanced revocation failed: ${error.message}
+                    ❌ REVOCATION FAILED: ${error.message}
                 </div>
                 <div style="font-size: 12px; margin-top: 8px; color: #666;">
-                    Time: ${totalTime.toFixed(0)}ms | Error during network workflow
+                    Time: ${totalTime.toFixed(0)}ms | Error during revocation workflow
                 </div>
             `;
             
@@ -836,6 +1001,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 totalTime: totalTime
             };
         }
+    }
+    
+    // ENHANCED: Check for revocation URL parameters on page load
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('force_verification') === 'credential_revoked') {
+        console.log('[LEMMA-FLOW] Page loaded with revocation flag - forcing shield appearance');
+        const revokedCredentialId = urlParams.get('revoked_credential');
+        
+        // Clear the URL parameters to avoid repeated triggering
+        const cleanUrl = new URL(window.location);
+        cleanUrl.searchParams.delete('force_verification');
+        cleanUrl.searchParams.delete('revoked_credential');
+        window.history.replaceState({}, document.title, cleanUrl.toString());
+        
+        // Force shield appearance immediately
+        setTimeout(() => {
+            if (window.LemmaShield) {
+                window.LemmaShield.show?.({
+                    force: true,
+                    reason: 'credential_revoked_on_load',
+                    title: 'Re-verification Required',
+                    message: 'Your credential has been revoked. Please verify again to continue.'
+                });
+            } else if (window.lemmaShieldWidget) {
+                window.lemmaShieldWidget.showVerificationWidget();
+            } else {
+                // Try to initialize shield
+                console.log('[LEMMA-FLOW] Initializing shield for revocation...');
+                if (typeof initializeLemmaShield === 'function') {
+                    initializeLemmaShield({ force: true, reason: 'credential_revoked_on_load' });
+                }
+            }
+        }, 500); // Small delay to ensure DOM is ready
     }
     
     // Check if user already has a saved signature
