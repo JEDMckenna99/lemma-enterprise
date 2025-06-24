@@ -331,22 +331,26 @@
         </div>
         
         <!-- DEBUGGING: Manual Shield Testing -->
-        <div class="debug-section mb-4 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-400">
-            <h4 class="font-semibold text-gray-900 mb-2">🔧 Debug Shield Initialization:</h4>
-            <div class="flex gap-2 mb-2">
-                <button id="testShieldInit" class="btn btn-primary" style="font-size: 12px; padding: 6px 12px;">
+        <div class="debug-buttons mb-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg">
+            <h4 class="font-semibold text-gray-900 mb-3">🔧 Debug Shield Initialization:</h4>
+            <div class="space-y-2">
+                <button id="testShieldInit" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
                     🛡️ Test Shield Init
                 </button>
-                <button id="forceShieldShow" class="btn btn-primary" style="font-size: 12px; padding: 6px 12px;">
+                <button id="forceShieldShow" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
                     🚨 Force Shield Show
                 </button>
-                <button id="checkShieldVars" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;">
+                <button id="checkShieldVars" class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600">
                     🔍 Check Variables
                 </button>
+                <button id="directShieldTest" class="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600">
+                    ⚡ Direct Shield Test
+                </button>
+                <button id="initAndShow" class="px-3 py-1 bg-orange-500 text-white rounded text-sm hover:bg-orange-600">
+                    🎯 Init + Show
+                </button>
             </div>
-            <div id="debugOutput" class="text-xs text-gray-600 bg-white p-2 rounded border font-mono" style="display: none;">
-                Debug output will appear here...
-            </div>
+            <div id="debugOutput" class="mt-3 p-3 bg-gray-100 rounded text-sm font-mono text-gray-800 hidden"></div>
         </div>
         
         <div id="actionStatus" class="mt-4" style="display: none;">
@@ -657,6 +661,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const testShieldInitBtn = document.getElementById('testShieldInit');
     const forceShieldShowBtn = document.getElementById('forceShieldShow');
     const checkShieldVarsBtn = document.getElementById('checkShieldVars');
+    const directShieldTestBtn = document.getElementById('directShieldTest');
+    const initAndShowBtn = document.getElementById('initAndShow');
     const debugOutput = document.getElementById('debugOutput');
     
     function showDebugOutput(message) {
@@ -724,7 +730,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (window.lemmaShieldWidget && !shieldShown) {
                 try {
                     if (window.lemmaShieldWidget.forceShow) {
-                        window.lemmaShieldWidget.forceShow({ force: true, reason: 'debug_force' });
+                        window.lemmaShieldWidget.forceShow({
+                            force: true,
+                            reason: 'credential_revoked'
+                        });
                         shieldShown = true;
                         messages.push('✅ lemmaShieldWidget.forceShow() succeeded');
                     } else {
@@ -755,7 +764,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 { name: 'LemmaShieldWidget.instance', value: window.LemmaShieldWidget?.instance ? 'exists' : 'null', exists: !!window.LemmaShieldWidget?.instance },
                 { name: 'initializeLemmaShield', value: typeof initializeLemmaShield, exists: typeof initializeLemmaShield === 'function' },
                 { name: 'lemmaShieldInitialized', value: lemmaShieldInitialized, exists: lemmaShieldInitialized },
-                { name: 'Shield container', value: document.querySelector('#lemma-shield-container') ? 'exists' : 'not found', exists: !!document.querySelector('#lemma-shield-container') }
+                { name: 'Shield container', value: document.querySelector('#lemma-shield-container') ? 'exists' : 'not found', exists: !!document.querySelector('#lemma-shield-container') },
+                { name: 'LemmaShieldWidget.forceShow', value: typeof window.LemmaShieldWidget?.forceShow, exists: typeof window.LemmaShieldWidget?.forceShow === 'function' },
+                { name: 'lemmaShield.forceShow', value: typeof window.lemmaShield?.forceShow, exists: typeof window.lemmaShield?.forceShow === 'function' },
+                { name: 'lemmaShieldWidget.forceShow', value: typeof window.lemmaShieldWidget?.forceShow, exists: typeof window.lemmaShieldWidget?.forceShow === 'function' }
             ];
             
             const output = checks.map(check => 
@@ -763,6 +775,90 @@ document.addEventListener('DOMContentLoaded', function() {
             ).join('<br>');
             
             showDebugOutput('🔍 Shield Variable Check:<br><br>' + output);
+        });
+    }
+    
+    if (directShieldTestBtn) {
+        directShieldTestBtn.addEventListener('click', function() {
+            showDebugOutput('🔄 Direct Shield Test Starting...');
+            
+            try {
+                // Method 1: Direct class instantiation
+                if (typeof LemmaShieldWidget !== 'undefined') {
+                    const directShield = new LemmaShieldWidget({
+                        widgetContainer: '#lemma-shield-container',
+                        apiEndpoint: '/api/shield',
+                        debug: true
+                    });
+                    
+                    if (directShield.forceShow) {
+                        directShield.forceShow({ reason: 'direct_test' });
+                        showDebugOutput('✅ Direct instantiation + forceShow succeeded');
+                        return;
+                    }
+                }
+                
+                // Method 2: Try to create shield container manually
+                let container = document.querySelector('#lemma-shield-container');
+                if (!container) {
+                    container = document.createElement('div');
+                    container.id = 'lemma-shield-container';
+                    container.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 999999; display: flex; justify-content: center; align-items: center;';
+                    document.body.appendChild(container);
+                }
+                
+                container.innerHTML = `
+                    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 400px; text-align: center;">
+                        <h3>🛡️ Shield Test Successful!</h3>
+                        <p>Direct shield container created and displayed</p>
+                        <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 10px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+                    </div>
+                `;
+                
+                showDebugOutput('✅ Direct container creation succeeded');
+                
+            } catch (error) {
+                showDebugOutput(`❌ Direct shield test failed: ${error.message}`);
+            }
+        });
+    }
+    
+    if (initAndShowBtn) {
+        initAndShowBtn.addEventListener('click', function() {
+            showDebugOutput('🎯 Init + Show Test Starting...');
+            
+            try {
+                // Force re-initialization
+                if (typeof initializeLemmaShield === 'function') {
+                    initializeLemmaShield({ force: true });
+                    
+                    // Wait a moment then try to show
+                    setTimeout(() => {
+                        const methods = [
+                            () => window.LemmaShieldWidget?.forceShow({ reason: 'init_and_show' }),
+                            () => window.lemmaShield?.forceShow({ reason: 'init_and_show' }),
+                            () => window.lemmaShieldWidget?.forceShow({ reason: 'init_and_show' }),
+                            () => window.LemmaShieldWidget?.instance?.forceShow({ reason: 'init_and_show' })
+                        ];
+                        
+                        for (let i = 0; i < methods.length; i++) {
+                            try {
+                                methods[i]();
+                                showDebugOutput(`✅ Init + Show succeeded with method ${i + 1}`);
+                                return;
+                            } catch (e) {
+                                console.log(`Method ${i + 1} failed:`, e);
+                            }
+                        }
+                        
+                        showDebugOutput('❌ All Init + Show methods failed');
+                    }, 500);
+                } else {
+                    showDebugOutput('❌ initializeLemmaShield function not found');
+                }
+            } catch (error) {
+                showDebugOutput(`❌ Init + Show failed: ${error.message}`);
+            }
         });
     }
     
