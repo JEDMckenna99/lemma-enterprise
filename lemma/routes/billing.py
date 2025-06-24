@@ -289,7 +289,7 @@ def create_payment_intent():
         payment_intent = stripe_manager.create_payment_intent(
             stripe_customer_id,
             total_amount,
-            f"Lemma Network Verification - {user_count} user(s)",
+            f"Lemmanomics Verification - {user_count} user(s)",
             {
                 'lemma_customer_id': session['customer_id'],
                 'user_count': str(user_count),

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class LemmaStripeManager:
     """
-    Manages all Stripe operations for Lemma Network billing.
+    Manages all Stripe operations for Lemmanomics billing.
     Implements network-effect pricing with dynamic subscription management.
     """
     
@@ -40,7 +40,7 @@ class LemmaStripeManager:
     
     def create_stripe_customer(self, customer_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
-        Create a new Stripe customer for Lemma Network billing.
+        Create a new Stripe customer for Lemmanomics billing.
         
         Args:
             customer_data: Customer information from onboarding
@@ -56,7 +56,7 @@ class LemmaStripeManager:
             stripe_customer = stripe.Customer.create(
                 email=customer_data.get('email'),
                 name=customer_data.get('company') or customer_data.get('email'),
-                description=f"Lemma Network Customer - {customer_data.get('domain')}",
+                description=f"Lemmanomics Customer - {customer_data.get('domain')}",
                 metadata={
                     'lemma_customer_id': customer_data.get('customer_id'),
                     'domain': customer_data.get('domain'),
@@ -107,7 +107,7 @@ class LemmaStripeManager:
                 customer=customer_id,
                 items=[{'price': price['id']}],
                 billing_cycle_anchor=None,  # Start immediately
-                description=f"Lemma Network Verification Service - ${current_rate}/user/month",
+                description=f"Lemmanomics Verification Service - ${current_rate}/user/month",
                 metadata={
                     'lemma_service': 'network_verification',
                     'network_rate': str(current_rate),

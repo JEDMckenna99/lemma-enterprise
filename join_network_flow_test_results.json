@@ -1,19 +1,19 @@
 {
   "step1_page_load": {
-    "success": false,
-    "status_code": 404,
-    "load_time_ms": 384.04,
-    "content_length": 124,
-    "has_shield_widget_script": false,
-    "has_shield_container": false,
-    "has_debug_buttons": false,
-    "shield_initialization_code": false
+    "success": true,
+    "status_code": 200,
+    "load_time_ms": 486.34,
+    "content_length": 119723,
+    "has_shield_widget_script": true,
+    "has_shield_container": true,
+    "has_debug_buttons": true,
+    "shield_initialization_code": true
   },
   "step2_shield_scripts": {
     "/static/js/lemma-shield-widget.js": {
       "success": true,
       "status_code": 200,
-      "load_time_ms": 96.68,
+      "load_time_ms": 38.03,
       "size_bytes": 99791,
       "has_shield_widget_class": true,
       "has_force_show": true,
@@ -22,13 +22,13 @@
     "/static/js/lemma-wallet-background.js": {
       "success": true,
       "status_code": 200,
-      "load_time_ms": 31.01,
+      "load_time_ms": 33.0,
       "size_bytes": 9135
     },
     "/static/js/lemma-shield-flow-orchestrator.js": {
       "success": true,
       "status_code": 200,
-      "load_time_ms": 33.0,
+      "load_time_ms": 32.06,
       "size_bytes": 20162,
       "has_shield_widget_class": true,
       "has_show_verification": true
@@ -38,7 +38,7 @@
     "/api/health": {
       "success": true,
       "status_code": 200,
-      "response_time_ms": 34.01,
+      "response_time_ms": 32.94,
       "response_data": {
         "status": "ok",
         "service": "lemma-human-verification",
@@ -48,7 +48,7 @@
     "/api/shield/status": {
       "success": true,
       "status_code": 200,
-      "response_time_ms": 29.14,
+      "response_time_ms": 31.28,
       "response_data": {
         "credentials_checked": 0,
         "details": "All checked credentials are valid",
@@ -71,10 +71,10 @@
     "/api/generate-challenge": {
       "success": true,
       "status_code": 200,
-      "response_time_ms": 30.46,
+      "response_time_ms": 28.51,
       "response_data": {
-        "challenge": "9xNs_DuDdNWBeqpc3KkxU-ZS40d2YhKF6efWESJsRu0",
-        "expires_at": 1750799370,
+        "challenge": "U2LPckc9fd0iz9qG6xv8sxzaE3Ll2NKFWGoyhJTr7H4",
+        "expires_at": 1750799572,
         "expiry_seconds": 300,
         "success": true
       }
@@ -84,7 +84,7 @@
     "Basic status": {
       "success": true,
       "status_code": 200,
-      "response_time_ms": 34.71,
+      "response_time_ms": 31.2,
       "data": {
         "credentials_checked": 0,
         "details": "All checked credentials are valid",
@@ -97,7 +97,7 @@
         ],
         "network_status": "access_granted",
         "reason": "valid_credentials_confirmed",
-        "response_time_ms": 0.06,
+        "response_time_ms": 0.04,
         "revoked_count": 0,
         "shield_action": "allow_access",
         "valid_count": 0,
@@ -107,7 +107,7 @@
     "Force check": {
       "success": true,
       "status_code": 200,
-      "response_time_ms": 30.96,
+      "response_time_ms": 30.74,
       "data": {
         "credentials_checked": 0,
         "details": "All checked credentials are valid",
@@ -130,7 +130,7 @@
     "Detailed status": {
       "success": true,
       "status_code": 200,
-      "response_time_ms": 33.1,
+      "response_time_ms": 30.61,
       "data": {
         "credentials_checked": 0,
         "details": "All checked credentials are valid",
@@ -143,7 +143,7 @@
         ],
         "network_status": "access_granted",
         "reason": "valid_credentials_confirmed",
-        "response_time_ms": 0.05,
+        "response_time_ms": 0.04,
         "revoked_count": 0,
         "shield_action": "allow_access",
         "valid_count": 0,
@@ -154,7 +154,7 @@
   "step5_revocation_test": {
     "revoke_success": true,
     "revoke_status_code": 200,
-    "revoke_response_time_ms": 40.68,
+    "revoke_response_time_ms": 38.84,
     "revoke_data": {
       "credential_id": "test_credential_12345",
       "flow_steps_completed": [
@@ -178,8 +178,8 @@
       "next_action": "shield_will_reappear_automatically",
       "oprf_data_available": false,
       "registry_update": null,
-      "response_time_ms": 8.76,
-      "revocation_time": 1750799070.2644796,
+      "response_time_ms": 4.67,
+      "revocation_time": 1750799272.2274542,
       "shield_trigger": {
         "shield_will_reappear": true,
         "success": true,
@@ -189,23 +189,18 @@
     },
     "post_revoke_status": {
       "credentials_checked": 0,
-      "details": "All checked credentials are valid",
-      "detection_layers": [
-        "shield_triggers",
-        "memory_cache",
-        "session_cache",
-        "persistent_file",
-        "oprf_cascade"
-      ],
-      "network_status": "access_granted",
-      "reason": "valid_credentials_confirmed",
-      "response_time_ms": 0.06,
-      "revoked_count": 0,
-      "shield_action": "allow_access",
-      "valid_count": 0,
-      "valid_credentials": []
+      "details": "Recent credential revocations require new verification",
+      "detection_method": "recent_revocation_check",
+      "force_appearance": true,
+      "reason": "recent_revocations_detected",
+      "requires_verification": true,
+      "response_time_ms": 0.14,
+      "revocation_detected": true,
+      "revoked_count": 1,
+      "shield_action": "require_verification",
+      "trigger_count": 1
     },
-    "shield_should_appear": false
+    "shield_should_appear": true
   },
   "errors": [],
   "warnings": []
