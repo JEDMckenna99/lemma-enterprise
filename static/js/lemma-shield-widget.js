@@ -2207,6 +2207,50 @@ class LemmaShieldWidget {
     }
 }
 
+// Ensure forceShow methods are available (emergency fix for any class definition issues)
+if (typeof LemmaShieldWidget !== 'undefined') {
+    // Add instance method to prototype if it doesn't exist
+    if (!LemmaShieldWidget.prototype.forceShow) {
+        LemmaShieldWidget.prototype.forceShow = function(options = {}) {
+            console.log('🚨 Force showing shield with options (prototype):', options);
+            
+            // Set revocation trigger if this is a revocation scenario
+            if (options.reason === 'credential_revoked') {
+                sessionStorage.setItem('lemma_revocation_triggered', 'true');
+            }
+            
+            // Force show the widget
+            this.showVerificationWidget();
+            
+            return this;
+        };
+    }
+    
+    // Add static method if it doesn't exist
+    if (!LemmaShieldWidget.forceShow) {
+        LemmaShieldWidget.forceShow = function(options = {}) {
+            if (LemmaShieldWidget.instance) {
+                return LemmaShieldWidget.instance.forceShow(options);
+            } else {
+                console.warn('⚠️ No LemmaShieldWidget instance available for forceShow (static)');
+                // Try to create one if it doesn't exist
+                try {
+                    const instance = new LemmaShieldWidget({
+                        widgetContainer: '#lemma-shield-container',
+                        apiEndpoint: '/api/shield',
+                        debug: true
+                    });
+                    window.lemmaShieldWidget = instance;
+                    return instance.forceShow(options);
+                } catch (e) {
+                    console.error('Failed to create emergency instance:', e);
+                    return null;
+                }
+            }
+        };
+    }
+}
+
 // Auto-initialize if window is loaded
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
