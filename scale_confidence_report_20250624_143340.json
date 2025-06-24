@@ -1,0 +1,141 @@
+{
+  "test_timestamp": "2025-06-24T14:33:39.400272",
+  "test_configuration": {
+    "optimized_error_rate": 0.01,
+    "cascade_levels": 3,
+    "test_scales": [
+      1000,
+      10000,
+      50000,
+      100000
+    ]
+  },
+  "tests_performed": {
+    "optimized_configuration": {
+      "1000": {
+        "revoked_count": 300,
+        "revocation_time": 0.003006458282470703,
+        "accuracy": 1.0,
+        "false_positive_rate": 0.0,
+        "false_negative_rate": 0.0,
+        "avg_verification_time": 0.005389910477858324
+      },
+      "10000": {
+        "revoked_count": 3000,
+        "revocation_time": 0.03153848648071289,
+        "accuracy": 1.0,
+        "false_positive_rate": 0.0,
+        "false_negative_rate": 0.0,
+        "avg_verification_time": 0.004999518394470215
+      },
+      "50000": {
+        "revoked_count": 15000,
+        "revocation_time": 0.16675806045532227,
+        "accuracy": 1.0,
+        "false_positive_rate": 0.0,
+        "false_negative_rate": 0.0,
+        "avg_verification_time": 0.004420161247253418
+      },
+      "100000": {
+        "revoked_count": 30000,
+        "revocation_time": 0.3443288803100586,
+        "accuracy": 1.0,
+        "false_positive_rate": 0.0,
+        "false_negative_rate": 0.0,
+        "avg_verification_time": 0.0049974918365478516
+      }
+    },
+    "production_optimizer": {
+      "test_start": "2025-06-24T14:33:40.004174",
+      "phases": {
+        "phase1_light": {
+          "target_scale": 1000,
+          "revoked_count": 300,
+          "phase_duration": 0.013351917266845703,
+          "accuracy_results": {
+            "test_count": 1000,
+            "accuracy": 1.0,
+            "avg_verification_time_ms": 0.006343364715576172,
+            "min_verification_time_ms": 0.0,
+            "max_verification_time_ms": 1.3399124145507812
+          },
+          "final_metrics": {
+            "timestamp": 1750790020.017526,
+            "false_positive_rate": 0.0,
+            "verification_latency": 0,
+            "accuracy_rate": 1.0,
+            "cascade_saturation": 0,
+            "total_revocations": 0
+          }
+        },
+        "phase2_medium": {
+          "target_scale": 10000,
+          "revoked_count": 3000,
+          "phase_duration": 0.06304311752319336,
+          "accuracy_results": {
+            "test_count": 1000,
+            "accuracy": 1.0,
+            "avg_verification_time_ms": 0.00399327278137207,
+            "min_verification_time_ms": 0.0,
+            "max_verification_time_ms": 0.9999275207519531
+          },
+          "final_metrics": {
+            "timestamp": 1750790020.08157,
+            "false_positive_rate": 0.0,
+            "verification_latency": 0,
+            "accuracy_rate": 1.0,
+            "cascade_saturation": 0,
+            "total_revocations": 0
+          }
+        },
+        "phase3_heavy": {
+          "target_scale": 50000,
+          "revoked_count": 15000,
+          "phase_duration": 0.29634761810302734,
+          "accuracy_results": {
+            "test_count": 1000,
+            "accuracy": 1.0,
+            "avg_verification_time_ms": 0.005998849868774414,
+            "min_verification_time_ms": 0.0,
+            "max_verification_time_ms": 1.0001659393310547
+          },
+          "final_metrics": {
+            "timestamp": 1750790020.3789175,
+            "false_positive_rate": 0.0,
+            "verification_latency": 0,
+            "accuracy_rate": 1.0,
+            "cascade_saturation": 0,
+            "total_revocations": 0
+          }
+        }
+      },
+      "final_confidence_summary": {
+        "status": "operational",
+        "current_metrics": {
+          "timestamp": 1750790020.3789175,
+          "false_positive_rate": 0.0,
+          "verification_latency": 0,
+          "accuracy_rate": 1.0,
+          "cascade_saturation": 0,
+          "total_revocations": 0
+        },
+        "trends": {
+          "false_positive_rate": "declining",
+          "verification_latency": "declining",
+          "accuracy_rate": "declining"
+        },
+        "confidence_level": "EXCELLENT",
+        "recommendations": [
+          "System operating within optimal parameters"
+        ]
+      }
+    }
+  },
+  "confidence_assessment": {
+    "configuration_score": 100.0,
+    "optimizer_score": 100,
+    "overall_score": 100.0,
+    "assessment": "PRODUCTION_READY",
+    "ready_for_scale": true
+  }
+}

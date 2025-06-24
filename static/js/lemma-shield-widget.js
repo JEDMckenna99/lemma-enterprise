@@ -346,12 +346,25 @@ class LemmaShieldWidget {
                 console.log(`✅ Updated local revocation list. Now contains ${revokedCredentials.length} revoked credentials`);
             }
             
-            // Also remove the credential from wallet if available
+            // ENHANCED: Also clear from wallet and trigger immediate re-verification
             if (this.wallet && this.wallet.removeCredential) {
                 this.wallet.removeCredential(credentialId).catch(error => {
                     console.warn('⚠️ Failed to remove credential from wallet:', error);
                 });
             }
+            
+            // Clear local storage items related to this credential
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.includes(credentialId) || key.includes('lemma_credential') || key.includes('lemma_verified'))) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            
+            // Force immediate verification
+            this.showVerificationWidget();
             
         } catch (error) {
             console.error('❌ Error handling credential revocation:', error);
@@ -927,26 +940,46 @@ class LemmaShieldWidget {
         }
     }
 
-    showVerificationWidget() {
-        console.log('🛡️ Showing verification widget');
-        
-        // Hide protected content
-        const protectedEl = document.querySelector(this.options.protectedContent);
-        if (protectedEl) {
-            protectedEl.style.display = 'none';
+    async showVerificationWidget() {
+        /*
+         * Enhanced showVerificationWidget that handles revocation scenarios
+         */
+        try {
+            console.log('🛡️ Showing verification widget...');
+            
+            // ENHANCED: Check if we're in a revocation scenario
+            const isRevocationTriggered = document.querySelector('[data-revocation-triggered="true"]') || 
+                                         window.location.search.includes('force_verification=credential_revoked');
+            
+            if (isRevocationTriggered) {
+                console.log('🚨 Revocation-triggered verification detected');
+                
+                // Show with special revocation messaging
+                const container = this.getShieldContainer();
+                if (container) {
+                    container.innerHTML = `
+                        <div class="lemma-shield-revocation-notice">
+                            <div class="lemma-shield-icon">🚨</div>
+                            <h3>Credential Revoked - Re-verification Required</h3>
+                            <p>Your verification credential has been revoked for security reasons. Please complete verification again to continue.</p>
+                            <button class="lemma-btn lemma-btn-primary" onclick="this.startVerification()">
+                                Start Re-verification
+                            </button>
+                        </div>
+                    `;
+                    container.style.display = 'block';
+                    container.setAttribute('data-revocation-triggered', 'true');
+                }
+            }
+            
+            // Continue with normal verification widget display
+            await this.startShieldVerification();
+            
+        } catch (error) {
+            console.error('❌ Error showing verification widget:', error);
+            // Fallback: force page reload
+            window.location.reload();
         }
-        
-        // Create widget container if it doesn't exist
-        let widgetEl = document.querySelector(this.options.widgetContainer);
-        if (!widgetEl) {
-            widgetEl = document.createElement('div');
-            widgetEl.id = this.options.widgetContainer.replace('#', '');
-            document.body.appendChild(widgetEl);
-        }
-        
-        // Show initial verification button
-        this.showInitialStep(widgetEl);
-        this.state.currentStep = 'initial';
     }
     
     showInitialStep(container) {

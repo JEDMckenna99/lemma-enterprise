@@ -205,11 +205,7 @@ def create_app():
                 "error": str(e)
             }), 500
     
-    # Shield Demo Route
-    @app.route('/shield-demo')
-    def shield_demo():
-        """Shield demo page."""
-        return render_template('shield_demo.html')
+    # Removed shield demo - now using real protection on join-network page
 
     # Add route to serve OpenAPI Shield specification
     @app.route('/openapi/shield.yaml')

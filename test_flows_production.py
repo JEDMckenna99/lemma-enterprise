@@ -115,16 +115,19 @@ def test_production_flows():
         "include_offline": True
     }
     
+    credential_id = None
+    credential_object = None
     status, data = test_endpoint("/api/issue-credential", "POST", credential_data)
     if status in [200, 201]:
         try:
             result = json.loads(data)
-            credential_id = result.get("credential", {}).get("id")
-            if credential_id:
+            credential_object = result.get("credential")
+            if credential_object:
+                credential_id = credential_object.get("id")
                 print(f"✅ Credential creation PASSED - ID: {credential_id}")
                 flow_results["credential_creation"] = True
             else:
-                print("⚠️  Credential creation PARTIAL - No ID returned")
+                print("⚠️  Credential creation PARTIAL - No credential returned")
         except Exception as e:
             print(f"⚠️  Credential creation PARTIAL - Parse error: {e}")
     else:
@@ -134,9 +137,9 @@ def test_production_flows():
     print("\n✅ TESTING CREDENTIAL VERIFICATION")
     print("-" * 30)
     
-    if credential_id:
+    if credential_object:
         verify_data = {
-            "credential_id": credential_id,
+            "credential": credential_object,
             "challenge": f"production_challenge_{int(time.time())}"
         }
         
@@ -153,7 +156,7 @@ def test_production_flows():
         else:
             print(f"❌ Credential verification FAILED - Status: {status}")
     else:
-        print("❌ Credential verification SKIPPED - No credential ID")
+        print("❌ Credential verification SKIPPED - No credential object")
     
     # Test 5: Shield Status Check
     print("\n🔍 TESTING SHIELD STATUS CHECK")

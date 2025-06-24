@@ -336,95 +336,140 @@
     </div>
 </div>
 
-<!-- Lemma Shield Widget - Will be triggered for re-verification -->
-<script src="{{ url_for('static', filename='js/lemma-wallet.js') }}"></script>
-<script src="{{ url_for('static', filename='js/lemma-wallet-background.js') }}"></script>
-<script src="{{ url_for('static', filename='js/lemma-shield-flow-orchestrator.js') }}"></script>
+<!-- REAL CUSTOMER INTEGRATION: Lemma Shield SDK -->
+<!-- This is exactly how a customer site would integrate Lemma protection -->
+
+<!-- Step 1: Load the Lemma Shield SDK -->
 <script src="{{ url_for('static', filename='js/lemma-shield-widget.js') }}"></script>
+
+<!-- Step 2: Customer site initialization (real production pattern) -->
+<script>
+// CUSTOMER SITE CONFIGURATION
+// This is how real customer sites initialize Lemma protection
+window.LemmaConfig = {
+    apiKey: '{{ lemma_api_key }}',  // Customer's API key
+    apiBase: '{{ lemma_api_base }}', // Lemma service endpoint
+    mode: '{{ protection_mode }}',   // production, staging, or development
+    
+    // Customer site preferences
+    autoProtect: true,               // Automatically protect page on load
+    challengeType: 'verification',   // or 'captcha', 'biometric'
+    fallbackEnabled: true,           // Enable fallback verification methods
+    offlineCapable: true,            // Enable offline verification
+    
+    // UI customization (customer branding)
+    branding: {
+        companyName: 'Lemma Network',
+        primaryColor: '#2563eb',
+        borderRadius: '8px',
+        position: 'center' // or 'bottom-right', 'top-center', etc.
+    },
+    
+    // Security settings
+    maxRetries: 3,
+    timeoutMs: 30000,
+    requireHTTPS: true,
+    
+    // Event callbacks (customer's business logic)
+    onVerified: function(result) {
+        console.log('✅ User verified successfully:', result);
+        // Customer's logic when user is verified
+        window.userVerified = true;
+        document.dispatchEvent(new CustomEvent('lemma-user-verified', { detail: result }));
+    },
+    
+    onError: function(error) {
+        console.error('❌ Verification error:', error);
+        // Customer's error handling
+        document.dispatchEvent(new CustomEvent('lemma-verification-error', { detail: error }));
+    },
+    
+    onRevoked: function(details) {
+        console.log('🚨 Credential revoked:', details);
+        // Customer's revocation handling
+        window.userVerified = false;
+        document.dispatchEvent(new CustomEvent('lemma-credential-revoked', { detail: details }));
+    }
+};
+
+console.log('🛡️ LEMMA SHIELD: Real customer integration initialized');
+console.log('📊 Config:', window.LemmaConfig);
+</script>
 
 <script>
 console.log('🚀 JOIN NETWORK PAGE: JavaScript loading started');
 console.log('🚀 JOIN NETWORK PAGE: DOM ready state:', document.readyState);
 
-// CRITICAL FIX: Initialize the shield properly
+// CUSTOMER SDK INTEGRATION - STANDARD PATTERN
+// This is the exact code a customer would use to protect their site
+
 function initializeLemmaShield() {
-    console.log('🛡️ Initializing Lemma Shield on join-network page...');
+    console.log('🛡️ Initializing REAL Lemma Shield Protection...');
     
-    // Step 1: Initialize wallet first (required by orchestrator)
-    if (typeof window.LemmaWallet !== 'undefined') {
+    // Standard customer initialization pattern
+    if (typeof window.LemmaShieldWidget !== 'undefined' && window.LemmaConfig) {
         try {
-            console.log('💰 Initializing wallet...');
-            window.lemmaWallet = new window.LemmaWallet();
-            console.log('✅ Wallet initialized');
-        } catch (error) {
-            console.error('❌ Failed to initialize wallet:', error);
-        }
-    }
-    
-    if (typeof window.LemmaBackgroundWallet !== 'undefined') {
-        try {
-            console.log('💰 Initializing background wallet...');
-            window.lemmaBackgroundWallet = new window.LemmaBackgroundWallet();
-            console.log('✅ Background wallet initialized');
-        } catch (error) {
-            console.error('❌ Failed to initialize background wallet:', error);
-        }
-    }
-    
-    // Step 2: Check if LemmaShieldWidget class is available
-    if (typeof window.LemmaShieldWidget !== 'undefined') {
-        try {
-            console.log('✅ LemmaShieldWidget class found, creating instance...');
+            console.log('✅ Lemma Shield SDK loaded, initializing with customer config...');
             
-            // Create global shield widget instance
-            window.lemmaShieldWidget = new window.LemmaShieldWidget({
+            // Create shield instance with customer configuration
+            window.lemmaShield = new window.LemmaShieldWidget({
+                // Core configuration from LemmaConfig
+                apiKey: window.LemmaConfig.apiKey,
+                apiBase: window.LemmaConfig.apiBase,
+                mode: window.LemmaConfig.mode,
+                
+                // Widget settings
                 widgetContainer: '#lemma-shield-container',
-                protectedContent: '.protected-content'
+                autoProtect: window.LemmaConfig.autoProtect,
+                challengeType: window.LemmaConfig.challengeType,
+                fallbackEnabled: window.LemmaConfig.fallbackEnabled,
+                offlineCapable: window.LemmaConfig.offlineCapable,
+                
+                // UI customization
+                branding: window.LemmaConfig.branding,
+                
+                // Security settings
+                maxRetries: window.LemmaConfig.maxRetries,
+                timeoutMs: window.LemmaConfig.timeoutMs,
+                requireHTTPS: window.LemmaConfig.requireHTTPS,
+                
+                // Event handlers
+                onVerified: window.LemmaConfig.onVerified,
+                onError: window.LemmaConfig.onError,
+                onRevoked: window.LemmaConfig.onRevoked
             });
             
-            // Initialize the widget
-            window.lemmaShieldWidget.init().then(() => {
-                console.log('✅ Shield widget initialized successfully');
+            // Initialize the shield protection
+            window.lemmaShield.init().then(() => {
+                console.log('✅ Lemma Shield protection ACTIVE');
+                console.log('🔒 Site is now protected by real Lemma Shield');
                 
-                // Create aliases for backward compatibility
-                window.LemmaShield = {
-                    show: (options) => window.lemmaShieldWidget.showVerificationWidget(options),
-                    forceShow: () => window.lemmaShieldWidget.showVerificationWidget(),
-                    hide: () => window.lemmaShieldWidget.hideShield()
-                };
-                
-                console.log('✅ Shield aliases created');
-                
-                // CRITICAL: Initialize the flow orchestrator
-                if (typeof window.LemmaShieldFlowOrchestrator !== 'undefined') {
-                    try {
-                        window.lemmaFlowOrchestrator = new window.LemmaShieldFlowOrchestrator({
-                            debug: true,
-                            apiBase: '',
-                            updateInterval: 10000 // Check every 10 seconds
-                        });
-                        console.log('✅ Flow orchestrator initialized');
-                    } catch (error) {
-                        console.error('❌ Failed to initialize flow orchestrator:', error);
-                    }
-                } else {
-                    console.warn('❌ LemmaShieldFlowOrchestrator class not found');
+                // Start automatic protection if enabled
+                if (window.LemmaConfig.autoProtect) {
+                    console.log('🔄 Starting automatic credential verification...');
+                    window.lemmaShield.startProtection();
                 }
                 
             }).catch(error => {
-                console.error('❌ Failed to initialize shield widget:', error);
+                console.error('❌ Failed to initialize Lemma Shield:', error);
+                if (window.LemmaConfig.onError) {
+                    window.LemmaConfig.onError(error);
+                }
             });
             
         } catch (error) {
-            console.error('❌ Error creating shield widget:', error);
+            console.error('❌ Error initializing Lemma Shield:', error);
+            if (window.LemmaConfig.onError) {
+                window.LemmaConfig.onError(error);
+            }
         }
     } else {
-        console.warn('❌ LemmaShieldWidget class not found, retrying in 100ms...');
+        console.warn('⏳ Waiting for Lemma Shield SDK to load...');
         setTimeout(initializeLemmaShield, 100);
     }
 }
 
-// Initialize when scripts are loaded
+// Customer site protection starts here
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeLemmaShield);
 } else {

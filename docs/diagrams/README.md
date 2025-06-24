@@ -1,88 +1,76 @@
-# Lemma Enterprise - Diagrams Collection
+# Lemma Diagrams
 
-This folder contains comprehensive visual documentation of the Lemma Enterprise platform architecture, user flows, and system structure.
+This folder contains technical diagrams and visual documentation for the Lemma Enterprise Digital Verification Platform.
 
-## 📊 Available Diagrams
+## Available Diagrams
+
+### 🔄 [Bot Shield Circuit](./bot-shield-circuit.md)
+**The complete Lemma verification flow diagram**
+- Shows the three core flows: Check, Shield, and Revocation
+- Illustrates user visible vs background operations
+- Documents the continuous protection loop across websites
+- Demonstrates offline-first architecture with smart fallbacks
+
+### 🌐 [API Endpoints](./api-endpoints.md)
+**Complete API architecture documentation**
+- All Shield API endpoints and their relationships
+- Request/response flow diagrams
+- Integration patterns and examples
 
 ### 🏗️ [Site Structure](./site-structure.md)
-**Main page layout and navigation flow**
-- Complete page hierarchy
-- Navigation relationships
-- Template file mapping
-- User interface organization
+**Website and application architecture**
+- Component relationships and data flow
+- Integration points and dependencies
+- Deployment architecture diagrams
 
-### 🔌 [API Endpoints](./api-endpoints.md)
-**Complete API structure and organization**
-- All 35+ API endpoints
-- Functional groupings (Core, SRE, Billing, Compliance, Sandbox)
-- Authentication requirements
-- Endpoint relationships
+## Diagram Usage
 
-### 👥 [User Journeys](./user-journeys.md)
-**Different user paths through the application**
-- Business customer onboarding (7 steps)
-- End user verification flow (3 steps)
-- Admin management workflow (4 steps)
-- Developer integration journey (3 steps)
-- Billing and error handling flows
+### In Documentation
+All diagrams are referenced throughout the Lemma documentation:
+- **README.md** - Overview and quick start
+- **LEMMA_WHITEPAPER.md** - Technical deep dive
+- **Integration guides** - Implementation details
 
-### 🏛️ [System Architecture](./system-architecture.md)
-**Technical architecture and component relationships**
-- 7-layer architecture (Frontend → Client Components)
-- Component interactions and data flow
-- External service integrations
-- Technology stack overview
+### In Presentations
+These diagrams are designed for:
+- Technical presentations to developers
+- Business presentations to stakeholders
+- Security audits and compliance reviews
+- Investor presentations and demos
 
-## 🎯 How to Use These Diagrams
+### For Development
+Developers can use these diagrams to:
+- Understand system architecture before integration
+- Debug flow issues and edge cases
+- Design new features and extensions
+- Optimize performance and user experience
 
-### For **Business Stakeholders**
-- **Start with:** [User Journeys](./user-journeys.md) to understand customer experience
-- **Then review:** [Site Structure](./site-structure.md) for complete feature overview
+## Diagram Standards
 
-### For **Developers**
-- **Start with:** [API Endpoints](./api-endpoints.md) for integration planning
-- **Then review:** [System Architecture](./system-architecture.md) for technical implementation
+### Visual Style
+- **Mermaid format** for version control and collaboration
+- **Color coding** for different system layers
+- **Clear labeling** of all flow conditions and outcomes
+- **Responsive design** for mobile and desktop viewing
 
-### For **Product Managers**
-- **Start with:** [Site Structure](./site-structure.md) for feature mapping
-- **Then review:** [User Journeys](./user-journeys.md) for experience optimization
+### Content Standards
+- **User-centric perspective** showing what users see vs background operations
+- **Performance metrics** included where relevant
+- **Security considerations** highlighted throughout
+- **Business value** clearly articulated
 
-### For **System Administrators**
-- **Start with:** [System Architecture](./system-architecture.md) for infrastructure understanding
-- **Then review:** [API Endpoints](./api-endpoints.md) for monitoring and maintenance
+### Update Process
+1. **Source diagrams** are maintained in this folder
+2. **Referenced copies** are embedded in relevant documentation
+3. **Version control** tracks all changes for audit purposes
+4. **Regular reviews** ensure accuracy with implementation
 
-## 📋 Diagram Features
+## Contributing
 
-All diagrams include:
-- **Color-coded categories** for easy visual organization
-- **Detailed annotations** explaining each component
-- **Mermaid format** for easy editing and version control
-- **Comprehensive documentation** with context and usage notes
+When updating diagrams:
+1. **Edit source files** in this folder first
+2. **Update references** in documentation that embeds the diagram
+3. **Test rendering** in multiple contexts (GitHub, documentation sites)
+4. **Validate accuracy** against current implementation
 
-## 🔄 Keeping Diagrams Updated
-
-When making changes to the platform:
-
-1. **Page Changes** → Update [Site Structure](./site-structure.md)
-2. **API Changes** → Update [API Endpoints](./api-endpoints.md)
-3. **User Flow Changes** → Update [User Journeys](./user-journeys.md)
-4. **Architecture Changes** → Update [System Architecture](./system-architecture.md)
-
-## 🛠️ Editing Diagrams
-
-These diagrams use [Mermaid](https://mermaid.js.org/) syntax and can be:
-- **Viewed** in GitHub, GitLab, or any Mermaid-compatible viewer
-- **Edited** in any text editor
-- **Rendered** in documentation systems like GitBook, Notion, or Confluence
-- **Exported** as images using Mermaid CLI or online tools
-
-## 📊 Platform Overview
-
-The diagrams collectively show:
-- **40+ pages/templates** across different user types
-- **35+ API endpoints** for comprehensive functionality
-- **6 distinct user journeys** (customers, end users, developers, admins, billing, errors)
-- **7-layer architecture** from frontend to external services
-- **Enterprise-grade features** (billing, compliance, monitoring, legal)
-
-This visual documentation supports Lemma's mission to become the **internet's trust infrastructure** by providing clear understanding of the platform's comprehensive capabilities and professional architecture. 
+For questions about diagrams or requests for new visualizations, please see the main project documentation or contact the development team. 

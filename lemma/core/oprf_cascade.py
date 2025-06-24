@@ -71,16 +71,26 @@ class OPRFCascadeManager:
                 pass
                 
             # Fallback to secure HMAC-based implementation
-            from Crypto.Hash import HMAC, SHA256
-            from Crypto.Random import get_random_bytes
-            from Crypto.Protocol.KDF import PBKDF2
-            
-            self.Crypto_HMAC = HMAC
-            self.Crypto_SHA256 = SHA256
-            self.Crypto_get_random_bytes = get_random_bytes
-            self.Crypto_PBKDF2 = PBKDF2
-            self.using_mock = False
-            logger.info("Using pycryptodome for secure OPRF operations")
+            try:
+                from Crypto.Hash import HMAC, SHA256
+                from Crypto.Random import get_random_bytes
+                from Crypto.Protocol.KDF import PBKDF2
+                
+                self.Crypto_HMAC = HMAC
+                self.Crypto_SHA256 = SHA256
+                self.Crypto_get_random_bytes = get_random_bytes
+                self.Crypto_PBKDF2 = PBKDF2
+                self.using_mock = False
+                logger.info("Using pycryptodome for secure OPRF operations")
+            except ImportError:
+                # Final fallback to standard library
+                import hmac
+                import hashlib
+                
+                self.hmac = hmac
+                self.hashlib = hashlib
+                self.using_mock = False
+                logger.info("Using standard library HMAC for OPRF operations")
             
         except Exception as e:
             logger.warning(f"Could not initialize advanced cryptography, using secure fallback: {e}")
@@ -105,13 +115,17 @@ class OPRFCascadeManager:
             return digest  # Simplified for now
         else:
             # Secure fallback: Use PBKDF2 to derive deterministic output
-            return self.Crypto_PBKDF2(
-                data, 
-                b'lemma_oprf_hash_to_group',
-                32,
-                count=1000,
-                hmac_hash_module=self.Crypto_SHA256
-            )
+            if hasattr(self, 'Crypto_PBKDF2'):
+                return self.Crypto_PBKDF2(
+                    data, 
+                    b'lemma_oprf_hash_to_group',
+                    32,
+                    count=1000,
+                    hmac_hash_module=self.Crypto_SHA256
+                )
+            else:
+                # Use standard library for hash-to-group
+                return hashlib.pbkdf2_hmac('sha256', data, b'lemma_oprf_hash_to_group', 1000)
     
     def blind_credential_id(self, credential_id: str) -> Tuple[bytes, bytes]:
         """
@@ -137,9 +151,12 @@ class OPRFCascadeManager:
             return bytes(blinded), blind_factor
         else:
             # Secure fallback: Use HMAC for blinding simulation
-            hmac_obj = self.Crypto_HMAC.new(blind_factor, digestmod=self.Crypto_SHA256)
-            hmac_obj.update(h1)
-            blinded = hmac_obj.digest()
+            if hasattr(self, 'Crypto_HMAC'):
+                hmac_obj = self.Crypto_HMAC.new(blind_factor, digestmod=self.Crypto_SHA256)
+                hmac_obj.update(h1)
+                blinded = hmac_obj.digest()
+            else:
+                blinded = self.hmac.new(blind_factor, h1, self.hashlib.sha256).digest()
             return blinded, blind_factor
     
     def evaluate_oprf(self, blinded_element: bytes) -> bytes:
@@ -160,9 +177,12 @@ class OPRFCascadeManager:
             return bytes(beta)
         else:
             # Secure fallback: HMAC-based evaluation
-            hmac_obj = self.Crypto_HMAC.new(self.secret_key, digestmod=self.Crypto_SHA256)
-            hmac_obj.update(blinded_element)
-            return hmac_obj.digest()
+            if hasattr(self, 'Crypto_HMAC'):
+                hmac_obj = self.Crypto_HMAC.new(self.secret_key, digestmod=self.Crypto_SHA256)
+                hmac_obj.update(blinded_element)
+                return hmac_obj.digest()
+            else:
+                return self.hmac.new(self.secret_key, blinded_element, self.hashlib.sha256).digest()
     
     def unblind_result(self, server_response: bytes, blind_factor: bytes) -> bytes:
         """
@@ -184,9 +204,12 @@ class OPRFCascadeManager:
             return bytes(result)
         else:
             # Secure fallback: HMAC-based unblinding
-            hmac_obj = self.Crypto_HMAC.new(blind_factor, digestmod=self.Crypto_SHA256)
-            hmac_obj.update(server_response)
-            return hmac_obj.digest()
+            if hasattr(self, 'Crypto_HMAC'):
+                hmac_obj = self.Crypto_HMAC.new(blind_factor, digestmod=self.Crypto_SHA256)
+                hmac_obj.update(server_response)
+                return hmac_obj.digest()
+            else:
+                return self.hmac.new(blind_factor, server_response, self.hashlib.sha256).digest()
     
     def compute_oprf_output(self, credential_id: str) -> bytes:
         """

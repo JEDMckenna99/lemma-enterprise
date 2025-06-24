@@ -7,35 +7,39 @@ import http.client
 import json
 import time
 import sys
+import requests
+import os
+
+# Configuration
+BASE_URL = "https://lemma-enterprise-0f6ba17076c1.herokuapp.com"
+# Use the actual API key from Heroku configuration
+API_KEY = "e663a17fe6a8b1501c768ad88c9ceb072d2ef6eecaa51d84b38a89edfe07d5db"
+
+# Test headers
+HEADERS = {
+    "X-API-Key": API_KEY,
+    "Content-Type": "application/json"
+}
 
 def test_api_endpoint(path, method="GET", data=None, headers=None):
-    """Test an API endpoint using direct HTTP connection"""
+    """Test an API endpoint using requests"""
     try:
-        # Connect to localhost:5000
-        conn = http.client.HTTPConnection("localhost", 5000, timeout=10)
+        # Use production URL with the API key from Heroku
+        url = f"{BASE_URL}{path}"
         
-        # Prepare headers
-        request_headers = {
-            "Content-Type": "application/json",
-            "X-API-Key": "test-api-key-123"
-        }
+        # Prepare headers with the Heroku API key
+        request_headers = HEADERS.copy()
         if headers:
             request_headers.update(headers)
         
-        # Prepare body
-        body = None
-        if data:
-            body = json.dumps(data)
-        
         # Make request
-        conn.request(method, path, body, request_headers)
-        response = conn.getresponse()
+        if method.upper() == "POST":
+            response = requests.post(url, json=data, headers=request_headers, timeout=30)
+        else:
+            response = requests.get(url, headers=request_headers, timeout=30)
         
-        # Read response
-        response_data = response.read().decode('utf-8')
-        status = response.status
-        
-        conn.close()
+        status = response.status_code
+        response_data = response.text
         
         print(f"[{time.strftime('%H:%M:%S')}] {method} {path} -> {status}")
         

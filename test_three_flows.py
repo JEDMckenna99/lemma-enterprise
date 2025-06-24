@@ -17,16 +17,18 @@ import time
 import sys
 import os
 from urllib.parse import urljoin
+import secrets
+from datetime import datetime
 
-# Configuration
-BASE_URL = "http://localhost:5000"
-API_KEY = "test-api-key-123"  # Test API key
+# Production Configuration - Updated to match Heroku
+BASE_URL = "https://lemma-enterprise-0f6ba17076c1.herokuapp.com"
+API_KEY = "e663a17fe6a8b1501c768ad88c9ceb072d2ef6eecaa51d84b38a89edfe07d5db"  # From Heroku config
 TEST_USER_ID = f"test_user_{int(time.time())}"
 
-# Headers for API requests
+# Test API connection
 HEADERS = {
-    "Content-Type": "application/json",
-    "X-API-Key": API_KEY
+    "X-API-Key": API_KEY,
+    "Content-Type": "application/json"
 }
 
 def log_test(message):
