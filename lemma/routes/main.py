@@ -967,6 +967,7 @@ paths:
         return jsonify({'error': f'Error serving OpenAPI specification: {str(e)}'}), 500
 
 @main_bp.route('/join-network')
+@main_bp.route('/join_network')  # Add underscore version for compatibility
 def join_network():
     """Join the Lemma Verification Network - REAL LEMMA SHIELD PROTECTION.
     

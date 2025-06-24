@@ -126,6 +126,30 @@ def shield_status():
         if lemma_credential_id:
             credential_ids_to_check.append(lemma_credential_id)
         
+        # CRITICAL FIX: If no credentials provided, check for any recent revocations that should trigger shield
+        if not credential_ids_to_check:
+            # Check if there are any recent shield triggers that should force verification
+            shield_triggers = getattr(current_app, '_shield_triggers', {})
+            revocation_cache = getattr(current_app, '_revoked_credentials_cache', {})
+            
+            if shield_triggers or revocation_cache:
+                # Recent revocations found - require verification
+                current_app.logger.info("[SHIELD-STATUS] No credentials provided but recent revocations detected")
+                response_time = (time.time() - start_time) * 1000
+                return jsonify({
+                    'shield_action': 'require_verification',
+                    'reason': 'recent_revocations_detected',
+                    'details': 'Recent credential revocations require new verification',
+                    'requires_verification': True,
+                    'force_appearance': True,
+                    'revocation_detected': True,
+                    'response_time_ms': round(response_time, 2),
+                    'detection_method': 'recent_revocation_check',
+                    'credentials_checked': 0,
+                    'revoked_count': len(revocation_cache),
+                    'trigger_count': len(shield_triggers)
+                }), 200
+        
         # STEP 2: CHECK SHIELD TRIGGERS (Priority check for forced reappearance)
         shield_triggers = getattr(current_app, '_shield_triggers', {})
         for credential_id in credential_ids_to_check:
