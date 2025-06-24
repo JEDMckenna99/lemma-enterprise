@@ -688,14 +688,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show success and redirect
                 actionStatus.innerHTML = `
                     <div style="color: green; padding: 10px; border: 1px solid green; border-radius: 5px;">
-                        ✅ Revocation test completed! Redirecting to test page...
+                        ✅ Credential revoked successfully! Shield will reappear for re-verification...
                     </div>
                 `;
                 
-                // Redirect after short delay
+                // No redirect - shield should reappear on same page
+                console.log('[LEMMA-FLOW] Revocation completed - shield will reappear automatically');
+                
+                // CRITICAL: Force immediate shield recheck to trigger protection
                 setTimeout(() => {
-                    window.location.href = '/flow-test?revoked=true&test=revocation&source=join-network';
-                }, 1500);
+                    console.log('[LEMMA-FLOW] Triggering immediate shield recheck...');
+                    if (window.lemmaShield && window.lemmaShield.startProtection) {
+                        window.lemmaShield.startProtection();
+                    }
+                    
+                    // Also trigger page protection check
+                    window.dispatchEvent(new CustomEvent('lemma-recheck-protection', {
+                        detail: { reason: 'post_revocation', force: true }
+                    }));
+                }, 100);
                 
             } catch (error) {
                 console.error('[LEMMA-FLOW] Revocation error:', error);
