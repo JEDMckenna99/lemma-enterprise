@@ -349,6 +349,9 @@
                 <button id="initAndShow" class="px-3 py-1 bg-orange-500 text-white rounded text-sm hover:bg-orange-600">
                     🎯 Init + Show
                 </button>
+                <button id="comprehensiveTest" class="px-3 py-1 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600">
+                    🧪 Comprehensive Test
+                </button>
             </div>
             <div id="debugOutput" class="mt-3 p-3 bg-gray-100 rounded text-sm font-mono text-gray-800 hidden"></div>
         </div>
@@ -663,6 +666,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const checkShieldVarsBtn = document.getElementById('checkShieldVars');
     const directShieldTestBtn = document.getElementById('directShieldTest');
     const initAndShowBtn = document.getElementById('initAndShow');
+    const comprehensiveTestBtn = document.getElementById('comprehensiveTest');
     const debugOutput = document.getElementById('debugOutput');
     
     function showDebugOutput(message) {
@@ -858,6 +862,97 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } catch (error) {
                 showDebugOutput(`❌ Init + Show failed: ${error.message}`);
+            }
+        });
+    }
+    
+    if (comprehensiveTestBtn) {
+        comprehensiveTestBtn.addEventListener('click', function() {
+            showDebugOutput('🎯 Comprehensive Test Starting...');
+            
+                         try {
+                 let results = [];
+                 
+                 // Test 1: Check all global variables
+                 results.push('=== GLOBAL VARIABLES ===');
+                 results.push(`LemmaShieldWidget: ${typeof window.LemmaShieldWidget}`);
+                 results.push(`lemmaShield: ${typeof window.lemmaShield}`);
+                 results.push(`lemmaShieldWidget: ${typeof window.lemmaShieldWidget}`);
+                 results.push(`LemmaShieldWidget.instance: ${window.LemmaShieldWidget?.instance ? 'exists' : 'null'}`);
+                 
+                 // Test 2: Check static methods on class
+                 results.push('\\n=== STATIC METHODS ON CLASS ===');
+                 if (window.LemmaShieldWidget) {
+                     const staticMethods = Object.getOwnPropertyNames(window.LemmaShieldWidget);
+                     results.push(`Static methods: ${staticMethods.join(', ')}`);
+                     results.push(`forceShow static: ${typeof window.LemmaShieldWidget.forceShow}`);
+                     results.push(`reset static: ${typeof window.LemmaShieldWidget.reset}`);
+                 }
+                 
+                 // Test 3: Check instance methods
+                 results.push('\\n=== INSTANCE METHODS ===');
+                 if (window.lemmaShieldWidget) {
+                     results.push(`Instance exists: true`);
+                     results.push(`forceShow instance: ${typeof window.lemmaShieldWidget.forceShow}`);
+                     results.push(`showVerificationWidget: ${typeof window.lemmaShieldWidget.showVerificationWidget}`);
+                 } else if (window.LemmaShieldWidget?.instance) {
+                     results.push(`Using LemmaShieldWidget.instance`);
+                     results.push(`forceShow instance: ${typeof window.LemmaShieldWidget.instance.forceShow}`);
+                 } else {
+                     results.push(`No instance available`);
+                 }
+                 
+                 // Test 4: Check convenience methods
+                 results.push('\\n=== CONVENIENCE METHODS ===');
+                 if (window.lemmaShield) {
+                     results.push(`lemmaShield.forceShow: ${typeof window.lemmaShield.forceShow}`);
+                     results.push(`lemmaShield.show: ${typeof window.lemmaShield.show}`);
+                     results.push(`lemmaShield.getInstance: ${typeof window.lemmaShield.getInstance}`);
+                 }
+                 
+                 // Test 5: Try to call methods
+                 results.push('\\n=== METHOD EXECUTION TESTS ===');
+                 
+                 // Test static method
+                 if (typeof window.LemmaShieldWidget?.forceShow === 'function') {
+                     try {
+                         window.LemmaShieldWidget.forceShow({ test: true });
+                         results.push(`✅ LemmaShieldWidget.forceShow() - SUCCESS`);
+                     } catch (e) {
+                         results.push(`❌ LemmaShieldWidget.forceShow() - ERROR: ${e.message}`);
+                     }
+                 } else {
+                     results.push(`❌ LemmaShieldWidget.forceShow() - NOT A FUNCTION`);
+                 }
+                 
+                 // Test instance method
+                 if (window.lemmaShieldWidget && typeof window.lemmaShieldWidget.forceShow === 'function') {
+                     try {
+                         window.lemmaShieldWidget.forceShow({ test: true });
+                         results.push(`✅ lemmaShieldWidget.forceShow() - SUCCESS`);
+                     } catch (e) {
+                         results.push(`❌ lemmaShieldWidget.forceShow() - ERROR: ${e.message}`);
+                     }
+                 } else {
+                     results.push(`❌ lemmaShieldWidget.forceShow() - NOT AVAILABLE`);
+                 }
+                 
+                 // Test convenience method
+                 if (window.lemmaShield && typeof window.lemmaShield.forceShow === 'function') {
+                     try {
+                         window.lemmaShield.forceShow({ test: true });
+                         results.push(`✅ lemmaShield.forceShow() - SUCCESS`);
+                     } catch (e) {
+                         results.push(`❌ lemmaShield.forceShow() - ERROR: ${e.message}`);
+                     }
+                 } else {
+                     results.push(`❌ lemmaShield.forceShow() - NOT AVAILABLE`);
+                 }
+                 
+                 showDebugOutput(results.join('<br>'));
+                 
+             } catch (error) {
+                showDebugOutput(`❌ Comprehensive test failed: ${error.message}`);
             }
         });
     }
