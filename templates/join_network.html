@@ -330,6 +330,25 @@
             </p>
         </div>
         
+        <!-- DEBUGGING: Manual Shield Testing -->
+        <div class="debug-section mb-4 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+            <h4 class="font-semibold text-gray-900 mb-2">🔧 Debug Shield Initialization:</h4>
+            <div class="flex gap-2 mb-2">
+                <button id="testShieldInit" class="btn btn-primary" style="font-size: 12px; padding: 6px 12px;">
+                    🛡️ Test Shield Init
+                </button>
+                <button id="forceShieldShow" class="btn btn-primary" style="font-size: 12px; padding: 6px 12px;">
+                    🚨 Force Shield Show
+                </button>
+                <button id="checkShieldVars" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;">
+                    🔍 Check Variables
+                </button>
+            </div>
+            <div id="debugOutput" class="text-xs text-gray-600 bg-white p-2 rounded border font-mono" style="display: none;">
+                Debug output will appear here...
+            </div>
+        </div>
+        
         <div id="actionStatus" class="mt-4" style="display: none;">
             <!-- Status messages will appear here -->
         </div>
@@ -403,8 +422,23 @@ console.log('🚀 JOIN NETWORK PAGE: DOM ready state:', document.readyState);
 // CUSTOMER SDK INTEGRATION - STANDARD PATTERN
 // This is the exact code a customer would use to protect their site
 
-function initializeLemmaShield() {
+let lemmaShieldInitialized = false;
+
+function initializeLemmaShield(options = {}) {
+    // Prevent multiple initializations
+    if (lemmaShieldInitialized) {
+        console.log('🛡️ Lemma Shield already initialized');
+        if (options.force) {
+            console.log('🔄 Force option provided - showing shield');
+            if (window.lemmaShield) {
+                window.lemmaShield.showVerificationWidget();
+            }
+        }
+        return;
+    }
+    
     console.log('🛡️ Initializing REAL Lemma Shield Protection...');
+    console.log('🔧 Options:', options);
     
     // Standard customer initialization pattern
     if (typeof window.LemmaShieldWidget !== 'undefined' && window.LemmaConfig) {
@@ -420,7 +454,7 @@ function initializeLemmaShield() {
                 
                 // Widget settings
                 widgetContainer: '#lemma-shield-container',
-                autoProtect: window.LemmaConfig.autoProtect,
+                autoProtect: true, // Always auto-protect for the join network page
                 challengeType: window.LemmaConfig.challengeType,
                 fallbackEnabled: window.LemmaConfig.fallbackEnabled,
                 offlineCapable: window.LemmaConfig.offlineCapable,
@@ -434,24 +468,45 @@ function initializeLemmaShield() {
                 requireHTTPS: window.LemmaConfig.requireHTTPS,
                 
                 // Event handlers
-                onVerified: window.LemmaConfig.onVerified,
-                onError: window.LemmaConfig.onError,
-                onRevoked: window.LemmaConfig.onRevoked
+                onVerified: function(result) {
+                    console.log('✅ Shield verification successful:', result);
+                    if (window.LemmaConfig.onVerified) {
+                        window.LemmaConfig.onVerified(result);
+                    }
+                },
+                onError: function(error) {
+                    console.error('❌ Shield verification error:', error);
+                    if (window.LemmaConfig.onError) {
+                        window.LemmaConfig.onError(error);
+                    }
+                },
+                onRevoked: function(details) {
+                    console.log('🚨 Shield credential revoked:', details);
+                    if (window.LemmaConfig.onRevoked) {
+                        window.LemmaConfig.onRevoked(details);
+                    }
+                }
             });
+            
+            // Mark as initialized before calling init()
+            lemmaShieldInitialized = true;
             
             // Initialize the shield protection
             window.lemmaShield.init().then(() => {
                 console.log('✅ Lemma Shield protection ACTIVE');
                 console.log('🔒 Site is now protected by real Lemma Shield');
                 
-                // Start automatic protection if enabled
-                if (window.LemmaConfig.autoProtect) {
-                    console.log('🔄 Starting automatic credential verification...');
-                    window.lemmaShield.startProtection();
+                // If this is a forced initialization (e.g., after revocation), show shield immediately
+                if (options.force || options.reason === 'credential_revoked') {
+                    console.log('🚨 Forced shield display:', options.reason);
+                    setTimeout(() => {
+                        window.lemmaShield.showVerificationWidget();
+                    }, 100);
                 }
                 
             }).catch(error => {
                 console.error('❌ Failed to initialize Lemma Shield:', error);
+                lemmaShieldInitialized = false; // Reset on error
                 if (window.LemmaConfig.onError) {
                     window.LemmaConfig.onError(error);
                 }
@@ -459,13 +514,14 @@ function initializeLemmaShield() {
             
         } catch (error) {
             console.error('❌ Error initializing Lemma Shield:', error);
+            lemmaShieldInitialized = false; // Reset on error
             if (window.LemmaConfig.onError) {
                 window.LemmaConfig.onError(error);
             }
         }
     } else {
         console.warn('⏳ Waiting for Lemma Shield SDK to load...');
-        setTimeout(initializeLemmaShield, 100);
+        setTimeout(() => initializeLemmaShield(options), 100);
     }
 }
 
@@ -596,6 +652,119 @@ document.addEventListener('DOMContentLoaded', function() {
             // });
         }
     });
+    
+    // Debug Button Handlers
+    const testShieldInitBtn = document.getElementById('testShieldInit');
+    const forceShieldShowBtn = document.getElementById('forceShieldShow');
+    const checkShieldVarsBtn = document.getElementById('checkShieldVars');
+    const debugOutput = document.getElementById('debugOutput');
+    
+    function showDebugOutput(message) {
+        debugOutput.style.display = 'block';
+        debugOutput.innerHTML = message;
+        console.log('[DEBUG]', message);
+    }
+    
+    if (testShieldInitBtn) {
+        testShieldInitBtn.addEventListener('click', function() {
+            console.log('[DEBUG] Testing shield initialization...');
+            showDebugOutput('🔄 Testing shield initialization...');
+            
+            try {
+                // Test basic initialization
+                if (typeof initializeLemmaShield === 'function') {
+                    initializeLemmaShield({ force: true, reason: 'debug_test' });
+                    showDebugOutput('✅ initializeLemmaShield() called successfully');
+                } else {
+                    showDebugOutput('❌ initializeLemmaShield function not found');
+                }
+            } catch (error) {
+                showDebugOutput('❌ Shield init error: ' + error.message);
+            }
+        });
+    }
+    
+    if (forceShieldShowBtn) {
+        forceShieldShowBtn.addEventListener('click', function() {
+            console.log('[DEBUG] Force showing shield...');
+            showDebugOutput('🚨 Force showing shield...');
+            
+            let shieldShown = false;
+            let messages = [];
+            
+            // Try multiple methods
+            if (window.LemmaShieldWidget) {
+                try {
+                    const result = window.LemmaShieldWidget.forceShow({ force: true, reason: 'debug_force' });
+                    if (result) {
+                        shieldShown = true;
+                        messages.push('✅ LemmaShieldWidget.forceShow() succeeded');
+                    } else {
+                        messages.push('❌ LemmaShieldWidget.forceShow() returned null');
+                    }
+                } catch (e) {
+                    messages.push('❌ LemmaShieldWidget.forceShow() failed: ' + e.message);
+                }
+            } else {
+                messages.push('❌ LemmaShieldWidget class not found');
+            }
+            
+            if (window.lemmaShield && !shieldShown) {
+                try {
+                    window.lemmaShield.forceShow({ force: true, reason: 'debug_force' });
+                    shieldShown = true;
+                    messages.push('✅ lemmaShield.forceShow() succeeded');
+                } catch (e) {
+                    messages.push('❌ lemmaShield.forceShow() failed: ' + e.message);
+                }
+            } else if (!window.lemmaShield) {
+                messages.push('❌ lemmaShield instance not found');
+            }
+            
+            if (window.lemmaShieldWidget && !shieldShown) {
+                try {
+                    if (window.lemmaShieldWidget.forceShow) {
+                        window.lemmaShieldWidget.forceShow({ force: true, reason: 'debug_force' });
+                        shieldShown = true;
+                        messages.push('✅ lemmaShieldWidget.forceShow() succeeded');
+                    } else {
+                        window.lemmaShieldWidget.showVerificationWidget();
+                        shieldShown = true;
+                        messages.push('✅ lemmaShieldWidget.showVerificationWidget() succeeded');
+                    }
+                } catch (e) {
+                    messages.push('❌ lemmaShieldWidget failed: ' + e.message);
+                }
+            } else if (!window.lemmaShieldWidget) {
+                messages.push('❌ lemmaShieldWidget not found');
+            }
+            
+            const result = shieldShown ? '✅ Shield shown successfully!' : '❌ Failed to show shield';
+            showDebugOutput(result + '<br><br>' + messages.join('<br>'));
+        });
+    }
+    
+    if (checkShieldVarsBtn) {
+        checkShieldVarsBtn.addEventListener('click', function() {
+            console.log('[DEBUG] Checking shield variables...');
+            
+            const checks = [
+                { name: 'LemmaShieldWidget', value: typeof window.LemmaShieldWidget, exists: !!window.LemmaShieldWidget },
+                { name: 'lemmaShield', value: typeof window.lemmaShield, exists: !!window.lemmaShield },
+                { name: 'lemmaShieldWidget', value: typeof window.lemmaShieldWidget, exists: !!window.lemmaShieldWidget },
+                { name: 'LemmaShieldWidget.instance', value: window.LemmaShieldWidget?.instance ? 'exists' : 'null', exists: !!window.LemmaShieldWidget?.instance },
+                { name: 'initializeLemmaShield', value: typeof initializeLemmaShield, exists: typeof initializeLemmaShield === 'function' },
+                { name: 'lemmaShieldInitialized', value: lemmaShieldInitialized, exists: lemmaShieldInitialized },
+                { name: 'Shield container', value: document.querySelector('#lemma-shield-container') ? 'exists' : 'not found', exists: !!document.querySelector('#lemma-shield-container') }
+            ];
+            
+            const output = checks.map(check => 
+                `${check.exists ? '✅' : '❌'} ${check.name}: ${check.value}`
+            ).join('<br>');
+            
+            showDebugOutput('🔍 Shield Variable Check:<br><br>' + output);
+        });
+    }
     
     // Verification Actions
     const revokeBtn = document.getElementById('revokeCredential');
@@ -729,6 +898,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const startTime = performance.now();
         
         try {
+            // CRITICAL: Set revocation flag for shield to detect special UI
+            sessionStorage.setItem('lemma_revocation_triggered', 'true');
+            console.log('[LEMMA-FLOW] Step 0: Revocation flag set for shield detection');
             // STEP 1: ENHANCED credential clearing (comprehensive storage cleanup)
             console.log('[LEMMA-FLOW] Step 1: Enhanced local credential clearing (all storage types)');
             
@@ -894,41 +1066,57 @@ document.addEventListener('DOMContentLoaded', function() {
             // ENHANCED: Try multiple Shield triggering methods
             let shieldTriggered = false;
             
-            // Method 1: LemmShield widget
-            if (window.LemmaShield) {
+            // Method 1: LemmaShieldWidget.forceShow (Class method)
+            if (window.LemmaShieldWidget && !shieldTriggered) {
                 try {
-                    if (window.LemmaShield.show) {
-                        window.LemmaShield.show({
-                            force: true,
-                            reason: 'credential_revoked',
-                            title: 'Credential Revoked - Re-verification Required',
-                            message: 'Your verification has been revoked. Please verify again to continue.',
-                            revocation_data: statusData
-                        });
+                    const result = window.LemmaShieldWidget.forceShow({
+                        force: true,
+                        reason: 'credential_revoked'
+                    });
+                    if (result) {
                         shieldTriggered = true;
-                        console.log('[LEMMA-FLOW] LemmaShield.show() triggered');
-                    } else if (window.LemmaShield.forceShow) {
-                        window.LemmaShield.forceShow();
-                        shieldTriggered = true;
-                        console.log('[LEMMA-FLOW] LemmaShield.forceShow() triggered');
+                        console.log('[LEMMA-FLOW] LemmaShieldWidget.forceShow() triggered successfully');
                     }
                 } catch (e) {
-                    console.warn('[LEMMA-FLOW] LemmaShield trigger failed:', e);
+                    console.warn('[LEMMA-FLOW] LemmaShieldWidget.forceShow() failed:', e);
                 }
             }
             
-            // Method 2: Shield Widget
+            // Method 2: Instance-based shield widget
+            if (window.lemmaShield && !shieldTriggered) {
+                try {
+                    window.lemmaShield.forceShow({
+                        force: true,
+                        reason: 'credential_revoked'
+                    });
+                    shieldTriggered = true;
+                    console.log('[LEMMA-FLOW] lemmaShield.forceShow() triggered');
+                } catch (e) {
+                    console.warn('[LEMMA-FLOW] lemmaShield.forceShow() failed:', e);
+                }
+            }
+            
+            // Method 3: Legacy shield widget (different variable name)
             if (window.lemmaShieldWidget && !shieldTriggered) {
                 try {
-                    window.lemmaShieldWidget.showVerificationWidget();
-                    shieldTriggered = true;
-                    console.log('[LEMMA-FLOW] lemmaShieldWidget triggered');
+                    if (window.lemmaShieldWidget.forceShow) {
+                        window.lemmaShieldWidget.forceShow({
+                            force: true,
+                            reason: 'credential_revoked'
+                        });
+                        shieldTriggered = true;
+                        console.log('[LEMMA-FLOW] lemmaShieldWidget.forceShow() triggered');
+                    } else {
+                        window.lemmaShieldWidget.showVerificationWidget();
+                        shieldTriggered = true;
+                        console.log('[LEMMA-FLOW] lemmaShieldWidget.showVerificationWidget() triggered');
+                    }
                 } catch (e) {
                     console.warn('[LEMMA-FLOW] lemmaShieldWidget trigger failed:', e);
                 }
             }
             
-            // Method 3: Shield API
+            // Method 4: Shield API
             if (window.lemmaShieldAPI && !shieldTriggered) {
                 try {
                     if (window.lemmaShieldAPI.handleCredentialRevoked) {
@@ -945,7 +1133,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
-            // Method 4: Check for any existing shield containers and force show
+            // Method 5: Check for any existing shield containers and force show
             const existingShields = document.querySelectorAll('.lemma-shield, [data-lemma-shield], .shield-container');
             if (existingShields.length > 0 && !shieldTriggered) {
                 existingShields.forEach(shield => {
@@ -956,7 +1144,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('[LEMMA-FLOW] Existing shield containers forced visible');
             }
             
-            // Method 5: Initialize new shield if none exist
+            // Method 6: Initialize new shield if none exist
             if (!shieldTriggered) {
                 console.log('[LEMMA-FLOW] No shield found, initializing new one...');
                 try {

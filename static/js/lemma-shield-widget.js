@@ -947,38 +947,87 @@ class LemmaShieldWidget {
         try {
             console.log('🛡️ Showing verification widget...');
             
-            // ENHANCED: Check if we're in a revocation scenario
-            const isRevocationTriggered = document.querySelector('[data-revocation-triggered="true"]') || 
-                                         window.location.search.includes('force_verification=credential_revoked');
-            
-            if (isRevocationTriggered) {
-                console.log('🚨 Revocation-triggered verification detected');
-                
-                // Show with special revocation messaging
-                const container = this.getShieldContainer();
-                if (container) {
-                    container.innerHTML = `
-                        <div class="lemma-shield-revocation-notice">
-                            <div class="lemma-shield-icon">🚨</div>
-                            <h3>Credential Revoked - Re-verification Required</h3>
-                            <p>Your verification credential has been revoked for security reasons. Please complete verification again to continue.</p>
-                            <button class="lemma-btn lemma-btn-primary" onclick="this.startVerification()">
-                                Start Re-verification
-                            </button>
-                        </div>
-                    `;
-                    container.style.display = 'block';
-                    container.setAttribute('data-revocation-triggered', 'true');
-                }
+            // Get the shield container
+            const container = this.getShieldContainer();
+            if (!container) {
+                console.error('❌ Shield container not found');
+                return;
             }
             
-            // Continue with normal verification widget display
-            await this.startShieldVerification();
+            // CRITICAL FIX: Always show the container immediately
+            container.style.display = 'block';
+            container.style.visibility = 'visible';
+            container.style.opacity = '1';
+            
+            // ENHANCED: Check if we're in a revocation scenario
+            const isRevocationTriggered = document.querySelector('[data-revocation-triggered="true"]') || 
+                                         window.location.search.includes('force_verification=credential_revoked') ||
+                                         sessionStorage.getItem('lemma_revocation_triggered') === 'true';
+            
+            if (isRevocationTriggered) {
+                console.log('🚨 Revocation-triggered verification detected - showing special UI');
+                
+                // Show with special revocation messaging
+                container.innerHTML = `
+                    <div class="lemma-shield-overlay">
+                        <div class="lemma-shield-widget">
+                            <div class="lemma-shield-header">
+                                <div class="lemma-shield-icon">🚨</div>
+                                <h2>Credential Revoked - Re-verification Required</h2>
+                                <p>Your verification credential has been revoked for security reasons.</p>
+                            </div>
+                            <div class="lemma-shield-body">
+                                <p>Please complete verification again to continue accessing protected content.</p>
+                                <button class="lemma-verify-btn" id="start-revoke-verification">
+                                    🛡️ Start Re-verification
+                                </button>
+                            </div>
+                            ${this.options.showBranding ? this.getBrandingFooter() : ''}
+                        </div>
+                    </div>
+                `;
+                
+                // Add styles
+                this.addStyles();
+                
+                // Add event listener for the button
+                document.getElementById('start-revoke-verification').addEventListener('click', () => {
+                    sessionStorage.removeItem('lemma_revocation_triggered');
+                    this.showInitialStep(container);
+                });
+                
+                container.setAttribute('data-revocation-triggered', 'true');
+                console.log('✅ Revocation UI displayed');
+                return; // Don't continue to normal flow
+            }
+            
+            // Normal verification widget display
+            this.showInitialStep(container);
             
         } catch (error) {
             console.error('❌ Error showing verification widget:', error);
-            // Fallback: force page reload
-            window.location.reload();
+            // Fallback: show basic shield
+            const container = this.getShieldContainer();
+            if (container) {
+                container.style.display = 'block';
+                container.innerHTML = `
+                    <div class="lemma-shield-overlay">
+                        <div class="lemma-shield-widget">
+                            <div class="lemma-shield-header">
+                                <div class="lemma-shield-icon">🛡️</div>
+                                <h2>Verification Required</h2>
+                                <p>Please verify to continue</p>
+                            </div>
+                            <div class="lemma-shield-body">
+                                <button class="lemma-verify-btn" onclick="window.location.reload()">
+                                    🔄 Try Again
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                this.addStyles();
+            }
         }
     }
     
@@ -1692,20 +1741,53 @@ class LemmaShieldWidget {
     
     getShieldContainer() {
         // Get or create the shield container
-        let container = document.querySelector(this.options.widgetContainer);
+        const selector = this.options.widgetContainer;
+        console.log('🔍 Looking for shield container with selector:', selector);
+        
+        let container = document.querySelector(selector);
+        console.log('🔍 Found existing container:', !!container);
+        
         if (!container) {
+            console.log('🔧 Creating new shield container...');
+            
             // Remove any existing containers first
             const existingContainers = document.querySelectorAll('[id*="lemma-shield"]');
-            existingContainers.forEach(el => el.remove());
+            existingContainers.forEach(el => {
+                console.log('🗑️ Removing existing container:', el.id);
+                el.remove();
+            });
             
             container = document.createElement('div');
-            container.id = this.options.widgetContainer.replace('#', '');
+            const containerId = selector.startsWith('#') ? selector.substring(1) : selector;
+            container.id = containerId;
             container.className = 'lemma-shield-container';
+            
+            // Always make sure container is visible
+            container.style.position = 'fixed';
+            container.style.top = '0';
+            container.style.left = '0';
+            container.style.width = '100%';
+            container.style.height = '100%';
+            container.style.zIndex = '10000';
+            container.style.display = 'block';
+            
             document.body.appendChild(container);
+            console.log('✅ Created new shield container with ID:', container.id);
         } else {
+            console.log('🧹 Clearing existing container content');
             // Clear existing content to prevent duplicates
             container.innerHTML = '';
+            
+            // Ensure container is properly positioned and visible
+            container.style.position = 'fixed';
+            container.style.top = '0';
+            container.style.left = '0';
+            container.style.width = '100%';
+            container.style.height = '100%';
+            container.style.zIndex = '10000';
+            container.style.display = 'block';
         }
+        
         return container;
     }
     
@@ -2076,6 +2158,21 @@ class LemmaShieldWidget {
         document.head.appendChild(styles);
     }
     
+    // Force show the shield - used for testing and revocation scenarios
+    forceShow(options = {}) {
+        console.log('🚨 Force showing shield with options:', options);
+        
+        // Set revocation trigger if this is a revocation scenario
+        if (options.reason === 'credential_revoked') {
+            sessionStorage.setItem('lemma_revocation_triggered', 'true');
+        }
+        
+        // Force show the widget
+        this.showVerificationWidget();
+        
+        return this;
+    }
+    
     // Static method to reset instance (for testing/debugging)
     static reset() {
         if (LemmaShieldWidget.instance) {
@@ -2084,6 +2181,16 @@ class LemmaShieldWidget {
                 container.remove();
             }
             LemmaShieldWidget.instance = null;
+        }
+    }
+    
+    // Static method to force show shield
+    static forceShow(options = {}) {
+        if (LemmaShieldWidget.instance) {
+            return LemmaShieldWidget.instance.forceShow(options);
+        } else {
+            console.warn('⚠️ No LemmaShieldWidget instance available for forceShow');
+            return null;
         }
     }
 }
