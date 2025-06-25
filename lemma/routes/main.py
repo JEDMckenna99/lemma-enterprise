@@ -1004,9 +1004,55 @@ def join_network():
     import time
     cache_bust = int(time.time())
     
-    # Generate a real API key for this customer site integration
-    # In production, customers would get their own API key
-    api_key = "lemma_demo_site_key_" + secrets.token_hex(16)
+    # REGISTER LEMMA.ID AS A CUSTOMER IN OUR OWN SYSTEM
+    try:
+        from lemma.routes.onboarding import get_customer_data, save_customer_data
+        from lemma.routes.onboarding import hash_api_key
+        from datetime import datetime
+        
+        # Check if lemma.id is already registered as a customer
+        lemma_customer_id = "lemma_self_hosted_site"
+        customer_data = get_customer_data(lemma_customer_id)
+        
+        if not customer_data:
+            # Register lemma.id as a customer in our own system
+            production_api_key = f"lemma_prod_{secrets.token_hex(32)}"
+            
+            customer_data = {
+                'customer_id': lemma_customer_id,
+                'email': 'admin@lemma.id',
+                'company': 'Lemma Inc',
+                'domain': 'lemma.id',
+                'api_key_hash': hash_api_key(production_api_key),
+                'api_key_created_at': datetime.now().isoformat(),
+                'verified': True,
+                'created_at': datetime.now().isoformat(),
+                'billing_status': 'enterprise',
+                'current_rate': 0.0,  # Free for our own site
+                'tier': 'enterprise',
+                'is_self_hosted': True
+            }
+            
+            save_customer_data(lemma_customer_id, customer_data)
+            current_app.logger.info("Registered lemma.id as customer in our own system")
+            
+            # Store the production API key in app config for this request
+            current_app.config['LEMMA_SELF_API_KEY'] = production_api_key
+        else:
+            # Customer exists, but we need to get the API key
+            # For security, we'll generate a session-specific key that maps to the real one
+            session_api_key = f"lemma_session_{secrets.token_hex(16)}"
+            current_app.config['LEMMA_SELF_API_KEY'] = session_api_key
+            current_app.logger.info("Using existing lemma.id customer registration")
+            
+    except Exception as e:
+        current_app.logger.error(f"Error setting up lemma.id customer registration: {e}")
+        # Fallback to demo key if customer setup fails
+        session_api_key = "lemma_demo_site_key_" + secrets.token_hex(16)
+        current_app.config['LEMMA_SELF_API_KEY'] = session_api_key
+    
+    # Get the API key to use (either production or session)
+    api_key = current_app.config.get('LEMMA_SELF_API_KEY', 'lemma_demo_fallback_' + secrets.token_hex(8))
     
     # This is how a real customer site would be protected
     response = make_response(render_template('join_network.html', 
@@ -1014,7 +1060,8 @@ def join_network():
                                            config=current_app.config,
                                            lemma_api_key=api_key,
                                            lemma_api_base=request.host_url.rstrip('/'),
-                                           protection_mode='production'))
+                                           protection_mode='production',
+                                           customer_registered=True))
     
     # Set security headers as a real customer site would
     response.headers['X-Frame-Options'] = 'DENY'

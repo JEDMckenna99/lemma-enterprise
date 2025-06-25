@@ -60,6 +60,7 @@ def hash_api_key(api_key: str) -> str:
 def verify_api_key(provided_key: str, stored_hash: str = None, stored_plain: str = None) -> bool:
     """
     Verify an API key against stored hash or plain text (for backwards compatibility).
+    If no specific hash/plain is provided, check against all customer API keys.
     
     Args:
         provided_key: The API key provided by the user
@@ -69,13 +70,60 @@ def verify_api_key(provided_key: str, stored_hash: str = None, stored_plain: str
     Returns:
         True if the key is valid, False otherwise
     """
-    if stored_hash:
-        # New format: compare against hash
-        return hash_api_key(provided_key) == stored_hash
-    elif stored_plain:
-        # Legacy format: direct comparison (will be migrated)
-        return provided_key == stored_plain
-    else:
+    # If specific hash or plain provided, use original logic
+    if stored_hash or stored_plain:
+        if stored_hash:
+            # New format: compare against hash
+            return hash_api_key(provided_key) == stored_hash
+        elif stored_plain:
+            # Legacy format: direct comparison (will be migrated)
+            return provided_key == stored_plain
+        else:
+            return False
+    
+    # NEW: Check against all customer API keys
+    try:
+        # Get all customer files
+        from flask import current_app
+        customers_dir = os.path.join(current_app.config.get('STORAGE_DIR', 'instance/data'), 'customers')
+        
+        if not os.path.exists(customers_dir):
+            return False
+        
+        # Check each customer's API key
+        for customer_file in os.listdir(customers_dir):
+            if customer_file.endswith('.json'):
+                customer_path = os.path.join(customers_dir, customer_file)
+                try:
+                    with open(customer_path, 'r') as f:
+                        customer_data = json.load(f)
+                    
+                    # Check hashed format first
+                    if customer_data.get('api_key_hash'):
+                        if hash_api_key(provided_key) == customer_data['api_key_hash']:
+                            logger.info(f"Valid API key matched for customer {customer_data.get('customer_id', 'unknown')}")
+                            return True
+                    
+                    # Check legacy plain format
+                    elif customer_data.get('api_key'):
+                        if provided_key == customer_data['api_key']:
+                            logger.info(f"Valid legacy API key matched for customer {customer_data.get('customer_id', 'unknown')}")
+                            return True
+                    
+                    # Check legacy field (for migration)
+                    elif customer_data.get('api_key_legacy'):
+                        if provided_key == customer_data['api_key_legacy']:
+                            logger.info(f"Valid legacy API key matched for customer {customer_data.get('customer_id', 'unknown')}")
+                            return True
+                            
+                except Exception as e:
+                    logger.warning(f"Error reading customer file {customer_file}: {e}")
+                    continue
+        
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error checking customer API keys: {e}")
         return False
 
 def migrate_api_key_to_hash(customer_data: dict) -> dict:

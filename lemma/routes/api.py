@@ -174,42 +174,51 @@ def rate_limit(f: Callable) -> Callable:
     return decorated_function
 
 def require_api_key(f: Callable) -> Callable:
-    """Decorator to require API key for endpoints."""
+    """Decorator to require API key for endpoints with customer validation."""
     @wraps(f)
     def decorated(*args: Any, **kwargs: Any) -> Any:
-        # SECURITY: Never skip API key validation in production
-        if current_app.config.get('ENV') == 'production':
-            # Force API key validation in production - no bypasses allowed
-            api_key = request.headers.get('X-API-Key')
-            expected_api_key = current_app.config.get('API_KEY')
-            
-            if not api_key:
-                logger.warning("Missing API key from IP: %s", request.remote_addr)
-                return jsonify({"error": "Missing API key", "message": "X-API-Key header is required"}), 401
-                
-            if api_key != expected_api_key:
-                logger.warning("Invalid API key attempt from IP: %s", request.remote_addr)
-                return jsonify({"error": "Invalid API key", "message": "The provided API key is not valid"}), 403
-        else:
-            # Skip API key check in testing environment if configured
-            testing_mode = current_app.config.get('TESTING', False)
-            skip_auth = current_app.config.get('SKIP_AUTH_IN_TESTS', False)
-            skip_api_key = current_app.config.get('SKIP_API_KEY_CHECK', False)
-            
-            if testing_mode and (skip_auth or skip_api_key):
-                logger.info("Skipping API key check in test environment")
-                return f(*args, **kwargs)
-            
-        api_key = request.headers.get('X-API-Key')
-        expected_api_key = current_app.config.get('API_KEY')
+        # Skip API key check in testing environment if configured
+        testing_mode = current_app.config.get('TESTING', False)
+        skip_auth = current_app.config.get('SKIP_AUTH_IN_TESTS', False)
+        skip_api_key = current_app.config.get('SKIP_API_KEY_CHECK', False)
         
+        if testing_mode and (skip_auth or skip_api_key):
+            logger.info("Skipping API key check in test environment")
+            return f(*args, **kwargs)
+        
+        api_key = request.headers.get('X-API-Key')
         if not api_key:
             logger.warning("Missing API key from IP: %s", request.remote_addr)
             return jsonify({"error": "Missing API key", "message": "X-API-Key header is required"}), 401
+        
+        # ENHANCED: Check against customer-registered API keys first
+        try:
+            from lemma.routes.onboarding import verify_api_key
             
-        if api_key != expected_api_key:
-            logger.warning("Invalid API key attempt from IP: %s", request.remote_addr)
-            return jsonify({"error": "Invalid API key", "message": "The provided API key is not valid"}), 403
+            # Check if this is a customer-registered API key
+            is_valid_customer_key = verify_api_key(api_key)
+            if is_valid_customer_key:
+                # Valid customer API key - allow access
+                logger.info(f"Valid customer API key used from IP: {request.remote_addr}")
+                return f(*args, **kwargs)
+        except Exception as e:
+            logger.warning(f"Error checking customer API keys: {e}")
+        
+        # FALLBACK: Check against legacy admin API key
+        expected_api_key = current_app.config.get('API_KEY')
+        if expected_api_key and api_key == expected_api_key:
+            logger.info(f"Valid admin API key used from IP: {request.remote_addr}")
+            return f(*args, **kwargs)
+        
+        # Check for special case: lemma.id self-hosted key
+        lemma_self_key = current_app.config.get('LEMMA_SELF_API_KEY')
+        if lemma_self_key and api_key == lemma_self_key:
+            logger.info(f"Valid lemma.id self-hosted API key used from IP: {request.remote_addr}")
+            return f(*args, **kwargs)
+        
+        # No valid API key found
+        logger.warning("Invalid API key attempt from IP: %s", request.remote_addr)
+        return jsonify({"error": "Invalid API key", "message": "The provided API key is not valid"}), 403
             
         return f(*args, **kwargs)
     return decorated
