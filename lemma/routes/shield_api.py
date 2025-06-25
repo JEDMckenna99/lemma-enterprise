@@ -1705,4 +1705,71 @@ def get_cached_revocation_status(credential_id):
         return None
     except Exception as e:
         logger.error(f"Redis cache error: {e}")
-        return None 
+        return None
+
+@shield_api.route('/verification-status', methods=['GET'])
+@csrf_protect()
+@rate_limit
+def verification_status():
+    """Check the status of the current verification process."""
+    try:
+        # Check if user has completed verification
+        verified_user_id = session.get('verified_user_id')
+        verified_credential = session.get('verified_credential')
+        store_credential = session.get('store_credential')
+        verification_timestamp = session.get('verification_timestamp')
+        
+        if verified_user_id and verified_credential:
+            # User is verified and credential is ready
+            return jsonify({
+                'success': True,
+                'verified': True,
+                'status': 'completed',
+                'user_id': verified_user_id,
+                'credential': store_credential,  # Include formatted credential for wallet storage
+                'verified_at': verification_timestamp,
+                'message': 'Verification completed successfully'
+            })
+        
+        # Check for Stripe verification in progress
+        stripe_session_id = session.get('stripe_session_id') or session.get('stripe_verification_session')
+        if stripe_session_id:
+            # Check Stripe verification status
+            verification_result = check_stripe_verification_completion(None, stripe_session_id)
+            
+            if verification_result and verification_result.get('verified'):
+                return jsonify({
+                    'success': True,
+                    'verified': True,
+                    'status': 'completed',
+                    'user_id': verification_result.get('user_id'),
+                    'credential': session.get('store_credential'),
+                    'message': 'Stripe verification completed'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'verified': False,
+                    'status': 'processing',
+                    'message': 'Verification still in progress',
+                    'error': 'processing'
+                })
+        
+        # No verification in progress
+        return jsonify({
+            'success': False,
+            'verified': False,
+            'status': 'not_started',
+            'message': 'No verification process detected',
+            'error': 'incomplete'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error checking verification status: {e}")
+        return jsonify({
+            'success': False,
+            'verified': False,
+            'status': 'error',
+            'message': 'Error checking verification status',
+            'error': str(e)
+        }), 500 
