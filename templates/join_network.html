@@ -360,6 +360,25 @@
             <!-- Status messages will appear here -->
         </div>
     </div>
+
+    <!-- DEBUGGING: Add manual Shield trigger -->
+    <div class="verification-section" style="margin-bottom: var(--space-8);">
+        <h3>🛡️ Shield Debug Panel</h3>
+        <p>If the Shield doesn't appear automatically, use these controls:</p>
+        <div style="display: flex; gap: var(--space-4); justify-content: center; margin-top: var(--space-4);">
+            <button id="forceShowShield" class="btn btn-verify">🛡️ Force Show Shield</button>
+            <button id="debugShield" class="btn btn-secondary">🔍 Debug Shield</button>
+            <button id="checkShieldStatus" class="btn btn-secondary">📊 Check Status</button>
+        </div>
+        <div id="shieldDebugOutput" style="margin-top: var(--space-4); padding: var(--space-4); background: var(--gray-50); border-radius: var(--radius-lg); font-family: monospace; font-size: 12px; display: none;">
+            <!-- Debug output will appear here -->
+        </div>
+    </div>
+
+    <!-- Shield Container (should become visible when Shield is active) -->
+    <div id="lemma-shield-container" style="margin: var(--space-8) 0; border: 2px dashed var(--gray-300); border-radius: var(--radius-lg); padding: var(--space-4); text-align: center; background: var(--gray-50);">
+        <p style="color: var(--gray-500); margin: 0;">🛡️ Shield will appear here when active</p>
+    </div>
 </div>
 
 <!-- REAL CUSTOMER INTEGRATION: Lemma Shield SDK -->
@@ -1484,6 +1503,144 @@ document.addEventListener('DOMContentLoaded', function() {
             hasSignature = true;
         };
         img.src = savedSignature;
+    }
+
+    // SHIELD DEBUG CONTROLS
+    const forceShowBtn = document.getElementById('forceShowShield');
+    const debugBtn = document.getElementById('debugShield');
+    const checkStatusBtn = document.getElementById('checkShieldStatus');
+    const shieldDebugOutput = document.getElementById('shieldDebugOutput');
+
+    if (forceShowBtn) {
+        forceShowBtn.addEventListener('click', function() {
+            console.log('🛡️ FORCE SHOWING SHIELD...');
+            shieldDebugOutput.style.display = 'block';
+            shieldDebugOutput.innerHTML = '<strong>🛡️ Force Show Shield Results:</strong><br>';
+            
+            let attempts = [];
+            
+            // Method 1: Direct container show
+            const container = document.getElementById('lemma-shield-container');
+            if (container) {
+                container.style.display = 'block';
+                container.style.opacity = '1';
+                container.innerHTML = '<div style="padding: 20px; border: 2px solid #10b981; background: #f0fdf4; border-radius: 8px; text-align: center;"><h3>🛡️ SHIELD FORCE ACTIVATED</h3><p>This is where the Shield widget would appear</p></div>';
+                attempts.push('✅ Container made visible');
+            } else {
+                attempts.push('❌ Container not found');
+            }
+            
+            // Method 2: Try lemmaShield instance
+            if (window.lemmaShield) {
+                try {
+                    if (window.lemmaShield.showVerificationWidget) {
+                        window.lemmaShield.showVerificationWidget();
+                        attempts.push('✅ lemmaShield.showVerificationWidget() called');
+                    }
+                    if (window.lemmaShield.forceShow) {
+                        window.lemmaShield.forceShow({ force: true, reason: 'manual_debug' });
+                        attempts.push('✅ lemmaShield.forceShow() called');
+                    }
+                } catch (e) {
+                    attempts.push(`❌ lemmaShield error: ${e.message}`);
+                }
+            } else {
+                attempts.push('❌ lemmaShield instance not found');
+            }
+            
+            // Method 3: Try LemmaShieldWidget static methods
+            if (window.LemmaShieldWidget) {
+                try {
+                    if (window.LemmaShieldWidget.forceShow) {
+                        window.LemmaShieldWidget.forceShow({ force: true, reason: 'manual_debug' });
+                        attempts.push('✅ LemmaShieldWidget.forceShow() called');
+                    } else {
+                        attempts.push('❌ LemmaShieldWidget.forceShow() not found');
+                    }
+                } catch (e) {
+                    attempts.push(`❌ LemmaShieldWidget error: ${e.message}`);
+                }
+            } else {
+                attempts.push('❌ LemmaShieldWidget class not found');
+            }
+            
+            shieldDebugOutput.innerHTML += attempts.join('<br>');
+        });
+    }
+
+    if (debugBtn) {
+        debugBtn.addEventListener('click', function() {
+            console.log('🔍 DEBUGGING SHIELD STATE...');
+            shieldDebugOutput.style.display = 'block';
+            shieldDebugOutput.innerHTML = '<strong>🔍 Shield Debug Information:</strong><br>';
+            
+            const debug = [];
+            debug.push(`LemmaShieldWidget: ${typeof window.LemmaShieldWidget}`);
+            debug.push(`lemmaShield: ${typeof window.lemmaShield}`);
+            debug.push(`LemmaConfig: ${typeof window.LemmaConfig}`);
+            debug.push(`Shield container: ${document.getElementById('lemma-shield-container') ? 'exists' : 'missing'}`);
+            debug.push(`SDK script loaded: ${document.querySelector('script[src*="lemma-shield-widget"]') ? 'yes' : 'no'}`);
+            
+            if (window.LemmaConfig) {
+                debug.push(`API Key: ${window.LemmaConfig.apiKey ? window.LemmaConfig.apiKey.substring(0, 20) + '...' : 'missing'}`);
+                debug.push(`API Base: ${window.LemmaConfig.apiBase || 'missing'}`);
+                debug.push(`Mode: ${window.LemmaConfig.mode || 'missing'}`);
+            }
+            
+            shieldDebugOutput.innerHTML += debug.join('<br>');
+        });
+    }
+
+    if (checkStatusBtn) {
+        checkStatusBtn.addEventListener('click', async function() {
+            console.log('📊 CHECKING SHIELD STATUS...');
+            shieldDebugOutput.style.display = 'block';
+            shieldDebugOutput.innerHTML = '<strong>📊 Shield Status Check:</strong><br>Checking API endpoints...<br>';
+            
+            try {
+                // Test API endpoints
+                const tests = [];
+                
+                // Test health endpoint
+                try {
+                    const health = await fetch('/api/health');
+                    const healthData = await health.json();
+                    tests.push(`✅ Health: ${health.status} - ${healthData.status}`);
+                } catch (e) {
+                    tests.push(`❌ Health: ${e.message}`);
+                }
+                
+                // Test shield health
+                try {
+                    const shieldHealth = await fetch('/api/shield/health');
+                    const shieldData = await shieldHealth.json();
+                    tests.push(`✅ Shield Health: ${shieldHealth.status} - ${shieldData.status}`);
+                } catch (e) {
+                    tests.push(`❌ Shield Health: ${e.message}`);
+                }
+                
+                // Test with API key if available
+                if (window.LemmaConfig && window.LemmaConfig.apiKey) {
+                    try {
+                        const shieldStatus = await fetch('/api/shield/status', {
+                            method: 'GET',
+                            headers: {
+                                'X-API-Key': window.LemmaConfig.apiKey
+                            }
+                        });
+                        const statusData = await shieldStatus.json();
+                        tests.push(`✅ Shield Status: ${shieldStatus.status} - ${statusData.shield_action}`);
+                    } catch (e) {
+                        tests.push(`❌ Shield Status: ${e.message}`);
+                    }
+                }
+                
+                                 shieldDebugOutput.innerHTML += tests.join('<br>');
+                 
+             } catch (error) {
+                 shieldDebugOutput.innerHTML += `❌ Status check failed: ${error.message}`;
+             }
+        });
     }
 });
 </script>
