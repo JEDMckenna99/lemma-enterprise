@@ -319,10 +319,9 @@ def create_app(test_config=None):
             if current_time - last_regenerated > 1800:  # 30 minutes
                 # Store session data
                 session_data = dict(session)
-                # Clear and regenerate
+                # Clear and regenerate (Flask doesn't have regenerate_id, just clear and restore)
                 session.clear()
-                session.regenerate_id()
-                # Restore data
+                # Restore data with new timestamp
                 session.update(session_data)
                 session['last_regenerated'] = current_time
                 logger.info("Session ID regenerated for security")

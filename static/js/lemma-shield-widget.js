@@ -841,11 +841,153 @@ try {
                                         <span class="step-text">Wallet storage pending</span>
                                     </div>
                                 </div>
+                                <div id="verification-error" class="verification-error" style="display: none;">
+                                    <div class="error-content">
+                                        <span class="error-icon">❌</span>
+                                        <span class="error-text">Verification failed. Please try again.</span>
+                                    </div>
+                                    <button class="retry-btn" onclick="window.location.reload()">Retry</button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             `;
+            
+            // Start monitoring verification progress
+            this.monitorVerificationProgress();
+        }
+
+        async monitorVerificationProgress() {
+            const maxAttempts = 30; // 30 seconds max
+            let attempts = 0;
+            
+            const checkProgress = async () => {
+                attempts++;
+                console.log(`🔍 Checking verification progress (attempt ${attempts}/${maxAttempts})`);
+                
+                try {
+                    // Check verification status
+                    const response = await fetch('/api/shield/verification-status', {
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        console.log('📊 Verification status:', result);
+                        
+                        if (result.success && result.verified) {
+                            // Move to step 3 - wallet storage
+                            this.updateProgressStep(3, 'active', '🔄', 'Storing credential in wallet...');
+                            
+                            // Try to retrieve and store credential
+                            try {
+                                await this.handleCredentialStorage(result);
+                                
+                                // Complete - all steps done
+                                this.updateProgressStep(3, 'active', '✅', 'Wallet storage complete');
+                                
+                                // Hide processing UI and show success
+                                setTimeout(() => {
+                                    this.showVerificationSuccess(result);
+                                }, 1000);
+                                
+                                return true; // Success, stop monitoring
+                                
+                            } catch (storageError) {
+                                console.error('❌ Credential storage failed:', storageError);
+                                this.showVerificationError('Failed to store credential in wallet. Please refresh and try again.');
+                                return true; // Stop monitoring on error
+                            }
+                            
+                        } else if (result.error && !result.error.includes('processing') && !result.error.includes('incomplete')) {
+                            console.error('❌ Verification failed:', result.error);
+                            this.showVerificationError(result.error);
+                            return true; // Stop monitoring on error
+                        } else {
+                            // Still processing, continue monitoring
+                            console.log('⏳ Verification still processing...');
+                            
+                            // Update step 2 status to show progress
+                            this.updateProgressStep(2, 'processing', '🔄', 'Credential issuance in progress...');
+                        }
+                    } else {
+                        console.warn('⚠️ Verification status check failed:', response.status);
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Error checking verification progress:', error);
+                }
+                
+                // Continue monitoring if not complete and not at max attempts
+                if (attempts < maxAttempts) {
+                    setTimeout(checkProgress, 1000); // Check every second
+                } else {
+                    console.error('❌ Verification monitoring timed out');
+                    this.showVerificationError('Verification is taking longer than expected. Please refresh and try again.');
+                }
+            };
+            
+            // Start checking after a brief delay
+            setTimeout(checkProgress, 1000);
+        }
+
+        updateProgressStep(stepNumber, status, icon, text) {
+            const stepEl = document.getElementById(`step-${stepNumber}`);
+            if (stepEl) {
+                stepEl.className = `step-item ${status}`;
+                stepEl.querySelector('.step-icon').textContent = icon;
+                stepEl.querySelector('.step-text').textContent = text;
+            }
+        }
+
+        showVerificationError(errorMessage) {
+            const errorEl = document.getElementById('verification-error');
+            if (errorEl) {
+                errorEl.style.display = 'block';
+                errorEl.querySelector('.error-text').textContent = errorMessage;
+            }
+            
+            // Update step 2 to show error
+            this.updateProgressStep(2, 'error', '❌', 'Credential issuance failed');
+        }
+
+        async handleCredentialStorage(verificationResult) {
+            console.log('💾 Handling credential storage...');
+            
+            // Try to get credential from verification result or fetch it
+            let credential = verificationResult.credential;
+            
+            if (!credential) {
+                console.log('🔍 Fetching credential from API...');
+                const credentialResponse = await fetch('/api/shield/get-credential', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                
+                if (credentialResponse.ok) {
+                    const credentialResult = await credentialResponse.json();
+                    if (credentialResult.success && credentialResult.credential) {
+                        credential = credentialResult.credential;
+                    }
+                }
+            }
+            
+            if (credential && this.wallet) {
+                console.log('✅ Storing credential in wallet...');
+                await this.wallet.storeCredential(credential);
+                console.log('✅ Credential stored successfully');
+            } else {
+                throw new Error('No credential available for storage or wallet not initialized');
+            }
         }
         
         showVerificationTimeoutMessage() {
