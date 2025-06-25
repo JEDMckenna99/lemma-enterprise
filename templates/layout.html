@@ -783,6 +783,13 @@
             margin-top: var(--space-2);
         }
 
+        /* Products dropdown - align left instead of right */
+        #productsMenu {
+            right: auto;
+            left: 0;
+            min-width: 320px;
+        }
+
         .stripe-nav__dropdown:hover .stripe-nav__dropdown-menu {
             opacity: 1;
             visibility: visible;
@@ -867,8 +874,67 @@
             
             <!-- Stripe Navigation Links -->
             <div class="stripe-nav__links stripe-hide-mobile">
-                <a href="/products" class="stripe-nav__link">Products</a>
-                <a href="/solutions" class="stripe-nav__link">Solutions</a>
+                <!-- Products Dropdown -->
+                <div class="stripe-nav__dropdown">
+                    <a href="#" class="stripe-nav__link dropdown-toggle" id="productsDropdown">
+                        Products
+                        <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6,9 12,15 18,9"></polyline>
+                        </svg>
+                    </a>
+                    <div class="stripe-nav__dropdown-menu" id="productsMenu">
+                        <div class="dropdown-section">
+                            <div class="dropdown-label">Verification Products</div>
+                            <a href="/products/human-verification" class="dropdown-item">
+                                <span class="dropdown-icon">🤖</span>
+                                Human Verification
+                            </a>
+                            <a href="/products/identity-verification" class="dropdown-item">
+                                <span class="dropdown-icon">👤</span>
+                                Identity Verification
+                            </a>
+                            <a href="/products/age-verification" class="dropdown-item">
+                                <span class="dropdown-icon">🔢</span>
+                                Age Verification
+                            </a>
+                            <a href="/products/professional-verification" class="dropdown-item">
+                                <span class="dropdown-icon">🏢</span>
+                                Professional Verification
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <div class="dropdown-label">Solutions by Industry</div>
+                            <a href="/solutions/ecommerce" class="dropdown-item">
+                                <span class="dropdown-icon">🛒</span>
+                                E-commerce & Marketplaces
+                            </a>
+                            <a href="/solutions/financial" class="dropdown-item">
+                                <span class="dropdown-icon">🏦</span>
+                                Financial Services
+                            </a>
+                            <a href="/solutions/gaming" class="dropdown-item">
+                                <span class="dropdown-icon">🎮</span>
+                                Gaming & Entertainment
+                            </a>
+                            <a href="/solutions/social" class="dropdown-item">
+                                <span class="dropdown-icon">💬</span>
+                                Social Media & Content
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <div class="dropdown-label">Platform Features</div>
+                            <a href="/features/offline-verification" class="dropdown-item">
+                                <span class="dropdown-icon">⚡</span>
+                                Offline Verification
+                            </a>
+                            <a href="/features/privacy-protection" class="dropdown-item">
+                                <span class="dropdown-icon">🔐</span>
+                                Privacy Protection
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
                 <a href="/api-docs" class="stripe-nav__link">Developers</a>
                 <a href="/pricing" class="stripe-nav__link">Pricing</a>
                 
@@ -946,10 +1012,17 @@
         <div class="mobile-menu stripe-nav--mobile" id="mobile-menu" role="navigation" aria-label="Mobile navigation">
             <div class="stripe-container stripe-section--sm">
                 <div class="stripe-grid gap-4" role="menu">
-                    <a href="/products" class="stripe-btn stripe-btn--outline" role="menuitem">Products</a>
-                    <a href="/solutions" class="stripe-btn stripe-btn--outline" role="menuitem">Solutions</a>
-                    <a href="/api-docs" class="stripe-btn stripe-btn--outline" role="menuitem">Developers</a>
-                    <a href="/pricing" class="stripe-btn stripe-btn--outline" role="menuitem">Pricing</a>
+                    <!-- Products & Solutions Section -->
+                    <div class="mobile-section-label">Products & Solutions</div>
+                    <a href="/products/human-verification" class="stripe-btn stripe-btn--outline" role="menuitem">🤖 Human Verification</a>
+                    <a href="/products/identity-verification" class="stripe-btn stripe-btn--outline" role="menuitem">👤 Identity Verification</a>
+                    <a href="/products/age-verification" class="stripe-btn stripe-btn--outline" role="menuitem">🔢 Age Verification</a>
+                    <a href="/solutions/ecommerce" class="stripe-btn stripe-btn--outline" role="menuitem">🛒 E-commerce Solutions</a>
+                    <a href="/solutions/financial" class="stripe-btn stripe-btn--outline" role="menuitem">🏦 Financial Services</a>
+                    
+                    <div class="mobile-section-label">Platform</div>
+                    <a href="/api-docs" class="stripe-btn stripe-btn--outline" role="menuitem">👨‍💻 Developers</a>
+                    <a href="/pricing" class="stripe-btn stripe-btn--outline" role="menuitem">💰 Pricing</a>
                     
                     <hr style="border: none; height: 1px; background: var(--cardBorderColor); margin: var(--space-4) 0;" role="separator">
                     
