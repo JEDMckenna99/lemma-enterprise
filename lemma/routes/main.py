@@ -67,7 +67,7 @@ def inject_csrf_token():
 
 @main_bp.route('/')
 def index():
-    """Render the main page."""
+    """Render the modern React-powered main page."""
     from lemma.auth.csrf_config import generate_csrf
     session['csrf_token'] = generate_csrf()
     
@@ -75,7 +75,7 @@ def index():
     # This ensures the main page is clean as an entry point
     session.pop('_flashes', None)
     
-    return render_template('index.html')
+    return render_template('index_modern.html')
 
 # Legacy verify route removed - verification now handled by Shield API protection on /join-network
 
@@ -871,6 +871,21 @@ def pricing():
 def status():
     """Render the system status page."""
     return render_template('status.html')
+
+@main_bp.route('/react-demo')
+def react_demo():
+    """React components demonstration page."""
+    return render_template('react_demo.html')
+
+@main_bp.route('/modern')
+def modern_homepage():
+    """Redirect to modern homepage (now the main page)."""
+    return redirect(url_for('main.index'))
+
+@main_bp.route('/dashboard')
+def dashboard():
+    """Render the modern React-powered dashboard."""
+    return render_template('modern_dashboard.html')
 
 @main_bp.route('/contact')
 def contact():
