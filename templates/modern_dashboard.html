@@ -1,0 +1,371 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard - Lemma{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    
+    <!-- React 18 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Existing React Components -->
+    <script src="{{ url_for('static', filename='js/react-components.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/lemma-saas-components.js') }}" defer></script>
+    
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 3fr 1fr;
+            gap: 1.5rem;
+            min-height: 100vh;
+        }
+        
+        .sidebar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 2rem;
+            color: white;
+        }
+        
+        .main-content {
+            padding: 2rem;
+            background: #f8fafc;
+        }
+        
+        .widget-sidebar {
+            padding: 2rem;
+            background: white;
+            border-left: 1px solid #e2e8f0;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-online { background: #10b981; }
+        .status-warning { background: #f59e0b; }
+        .status-error { background: #ef4444; }
+        
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar, .widget-sidebar {
+                position: relative;
+                min-height: auto;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid">
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold mb-2">🛡️ Lemma</h2>
+            <p class="text-blue-200">Digital Verification Platform</p>
+        </div>
+        
+        <nav class="space-y-4">
+            <a href="/dashboard" class="flex items-center p-3 rounded-lg bg-white bg-opacity-20 text-white">
+                <span class="mr-3">📊</span>
+                Dashboard
+            </a>
+            <a href="/verification" class="flex items-center p-3 rounded-lg hover:bg-white hover:bg-opacity-10 text-white transition-colors">
+                <span class="mr-3">⚡</span>
+                Verification
+            </a>
+            <a href="/analytics" class="flex items-center p-3 rounded-lg hover:bg-white hover:bg-opacity-10 text-white transition-colors">
+                <span class="mr-3">📈</span>
+                Analytics
+            </a>
+            <a href="/settings" class="flex items-center p-3 rounded-lg hover:bg-white hover:bg-opacity-10 text-white transition-colors">
+                <span class="mr-3">⚙️</span>
+                Settings
+            </a>
+            <a href="/billing" class="flex items-center p-3 rounded-lg hover:bg-white hover:bg-opacity-10 text-white transition-colors">
+                <span class="mr-3">💳</span>
+                Billing
+            </a>
+        </nav>
+        
+        <div class="mt-8 p-4 bg-white bg-opacity-10 rounded-lg">
+            <h3 class="font-semibold mb-2">Quick Stats</h3>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span>Verifications Today</span>
+                    <span class="font-bold">1,247</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Success Rate</span>
+                    <span class="font-bold text-green-300">99.8%</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Avg Response</span>
+                    <span class="font-bold text-blue-300">8.3ms</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Dashboard Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+                <p class="text-gray-600">Real-time verification metrics and system health</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="status-indicator status-online"></span>
+                <span class="text-sm text-gray-600">All Systems Operational</span>
+                <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    Run Test
+                </button>
+            </div>
+        </div>
+        
+        <!-- Metrics Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="metric-card">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-sm font-medium text-gray-600">Total Verifications</h3>
+                    <span class="text-2xl">⚡</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-900 mb-2">2,847,392</div>
+                <div class="flex items-center text-sm">
+                    <span class="text-green-600 font-medium">↗ +12.3%</span>
+                    <span class="text-gray-500 ml-2">vs last month</span>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-sm font-medium text-gray-600">Success Rate</h3>
+                    <span class="text-2xl">🎯</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-900 mb-2">99.8%</div>
+                <div class="flex items-center text-sm">
+                    <span class="text-green-600 font-medium">↗ +0.2%</span>
+                    <span class="text-gray-500 ml-2">vs last month</span>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-sm font-medium text-gray-600">Avg Response Time</h3>
+                    <span class="text-2xl">⏱️</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-900 mb-2">8.3ms</div>
+                <div class="flex items-center text-sm">
+                    <span class="text-green-600 font-medium">↘ -15%</span>
+                    <span class="text-gray-500 ml-2">vs last month</span>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-sm font-medium text-gray-600">Cost Savings</h3>
+                    <span class="text-2xl">💰</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-900 mb-2">$18,472</div>
+                <div class="flex items-center text-sm">
+                    <span class="text-green-600 font-medium">99.8% reduction</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- React Components Section -->
+        <div class="space-y-8">
+            <!-- Real-time Metrics -->
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <h2 class="text-xl font-semibold mb-4">Real-Time Verification Metrics</h2>
+                <div id="dashboard-metrics" data-lemma-component="DashboardMetrics">
+                    <div class="animate-pulse">
+                        <div class="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+                        <div class="h-32 bg-gray-200 rounded"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Interactive Demo -->
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <h2 class="text-xl font-semibold mb-4">Interactive OPRF Demo</h2>
+                <div id="interactive-demo" data-lemma-saas-component="InteractiveDemo">
+                    <div class="animate-pulse">
+                        <div class="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+                        <div class="h-48 bg-gray-200 rounded"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Performance Chart -->
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <h2 class="text-xl font-semibold mb-4">Performance Trend</h2>
+                <canvas id="performanceChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Widget Sidebar -->
+    <div class="widget-sidebar">
+        <h3 class="text-lg font-semibold mb-6">System Status</h3>
+        
+        <!-- Service Status -->
+        <div class="space-y-4 mb-8">
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">OPRF Service</span>
+                <span class="status-indicator status-online"></span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">Cascade Filters</span>
+                <span class="status-indicator status-online"></span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">Redis Cache</span>
+                <span class="status-indicator status-online"></span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">CDN Edge</span>
+                <span class="status-indicator status-online"></span>
+            </div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <div>
+            <h4 class="font-medium mb-4">Recent Activity</h4>
+            <div class="space-y-3 text-sm">
+                <div class="flex items-start space-x-3">
+                    <div class="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                    <div>
+                        <p class="text-gray-900">Verification completed</p>
+                        <p class="text-gray-500">2 minutes ago</p>
+                    </div>
+                </div>
+                <div class="flex items-start space-x-3">
+                    <div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                    <div>
+                        <p class="text-gray-900">Cascade updated</p>
+                        <p class="text-gray-500">5 minutes ago</p>
+                    </div>
+                </div>
+                <div class="flex items-start space-x-3">
+                    <div class="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
+                    <div>
+                        <p class="text-gray-900">New API key generated</p>
+                        <p class="text-gray-500">12 minutes ago</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="mt-8">
+            <h4 class="font-medium mb-4">Quick Actions</h4>
+            <div class="space-y-2">
+                <button class="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-sm">
+                    🔄 Refresh Cascade
+                </button>
+                <button class="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-sm">
+                    📊 Generate Report
+                </button>
+                <button class="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-sm">
+                    🔧 Run Diagnostics
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize Chart.js
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['6h ago', '5h ago', '4h ago', '3h ago', '2h ago', '1h ago', 'Now'],
+            datasets: [{
+                label: 'Response Time (ms)',
+                data: [12.3, 8.7, 9.2, 7.8, 8.1, 8.3, 8.3],
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.4
+            }, {
+                label: 'Success Rate (%)',
+                data: [99.2, 99.5, 99.8, 99.6, 99.7, 99.8, 99.8],
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            }
+        }
+    });
+    
+    // Real-time updates
+    setInterval(() => {
+        const newTime = Math.random() * 5 + 6; // 6-11ms
+        const newRate = Math.random() * 0.5 + 99.5; // 99.5-100%
+        
+        chart.data.datasets[0].data.shift();
+        chart.data.datasets[0].data.push(newTime);
+        chart.data.datasets[1].data.shift();
+        chart.data.datasets[1].data.push(newRate);
+        
+        chart.update('none');
+    }, 5000);
+    
+    console.log('✅ Modern Dashboard Initialized');
+});
+</script>
+{% endblock %} 

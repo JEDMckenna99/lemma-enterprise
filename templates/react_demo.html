@@ -1,0 +1,172 @@
+{% extends "layout.html" %}
+
+{% block title %}React Components Demo - Lemma{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- React 18 from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Your new React components -->
+    <script src="{{ url_for('static', filename='js/react-components.js') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+<div class="stripe-container py-8">
+    <div class="max-w-7xl mx-auto">
+        
+        <!-- Page Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                🚀 Modern React Components
+            </h1>
+            <p class="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
+                Experience Lemma's revolutionary OPRF technology through modern, interactive React components 
+                seamlessly integrated with your existing Flask application.
+            </p>
+        </div>
+
+        <!-- Dashboard Metrics Section -->
+        <section class="mb-12">
+            <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6">
+                📊 Real-Time Verification Metrics
+            </h2>
+            <div id="dashboard-metrics" data-lemma-component="DashboardMetrics">
+                <!-- React component will mount here -->
+                <div class="flex justify-center py-8">
+                    <div class="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Offline Verification Demo -->
+        <section class="mb-12">
+            <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6">
+                ⚡ Interactive OPRF Verification Demo
+            </h2>
+            <div id="offline-demo" data-lemma-component="OfflineVerificationDemo">
+                <!-- React component will mount here -->
+                <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-8 text-center">
+                    <p class="text-gray-600 dark:text-gray-400">Loading verification demo...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Individual Metric Cards -->
+        <section class="mb-12">
+            <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6">
+                📈 Individual Performance Metrics
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <!-- These will be populated by React components -->
+                <div id="metric-response-time" 
+                     data-lemma-component="MetricCard" 
+                     data-lemma-props='{"title": "Response Time", "value": "8.3ms", "icon": "clock", "subtitle": "30x faster than traditional", "highlight": true}'>
+                    <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-6 h-32"></div>
+                </div>
+                
+                <div id="metric-cost-savings" 
+                     data-lemma-component="MetricCard" 
+                     data-lemma-props='{"title": "Cost Savings", "value": "$18,472", "change": {"value": 15.2, "type": "increase"}, "icon": "dollar", "subtitle": "99.8% reduction"}'>
+                    <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-6 h-32"></div>
+                </div>
+                
+                <div id="metric-network-calls" 
+                     data-lemma-component="MetricCard" 
+                     data-lemma-props='{"title": "Network Calls", "value": "0", "icon": "zap", "subtitle": "Zero API calls", "highlight": true}'>
+                    <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-6 h-32"></div>
+                </div>
+                
+            </div>
+        </section>
+
+        <!-- Integration Instructions -->
+        <section class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-8">
+            <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
+                🛠️ How to Integrate These Components
+            </h2>
+            <div class="prose dark:prose-invert max-w-none">
+                <p class="text-gray-700 dark:text-gray-300 mb-4">
+                    These React components work seamlessly with your existing Flask templates. Here's how to use them:
+                </p>
+                
+                <div class="bg-white dark:bg-gray-800 rounded-md p-4 mb-4">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Option 1: Data Attributes (Automatic)</h3>
+                    <pre class="text-sm text-gray-600 dark:text-gray-400 overflow-x-auto"><code>&lt;div data-lemma-component="DashboardMetrics"&gt;&lt;/div&gt;
+&lt;div data-lemma-component="MetricCard" 
+     data-lemma-props='{"title": "Verifications", "value": 847392}'&gt;&lt;/div&gt;</code></pre>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 rounded-md p-4 mb-4">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Option 2: JavaScript API</h3>
+                    <pre class="text-sm text-gray-600 dark:text-gray-400 overflow-x-auto"><code>// Mount specific components
+LemmaComponents.mount('OfflineVerificationDemo', 'demo-container');
+
+// Mount with props
+LemmaComponents.mount('MetricCard', 'metric-1', {
+  title: 'Response Time',
+  value: '8.3ms',
+  icon: 'clock'
+});</code></pre>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 rounded-md p-4">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Required Dependencies</h3>
+                    <pre class="text-sm text-gray-600 dark:text-gray-400 overflow-x-auto"><code>&lt;script src="https://unpkg.com/react@18/umd/react.production.min.js"&gt;&lt;/script&gt;
+&lt;script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"&gt;&lt;/script&gt;
+&lt;script src="{{ url_for('static', filename='js/react-components.js') }}"&gt;&lt;/script&gt;</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Back to Dashboard -->
+        <div class="text-center mt-12">
+            <a href="/onboarding/dashboard" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors">
+                ← Back to Dashboard
+            </a>
+        </div>
+        
+    </div>
+</div>
+
+<style>
+/* Additional styles for the demo */
+.prose pre {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+.prose code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-weight: normal;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .prose {
+        color: #e5e7eb;
+    }
+}
+</style>
+
+<script>
+// Demo-specific JavaScript
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🎯 React Components Demo Page Loaded');
+    
+    // Optional: Add some demo-specific behavior
+    setTimeout(() => {
+        console.log('📊 All React components should be mounted now');
+    }, 1000);
+});
+</script>
+
+{% endblock %} 

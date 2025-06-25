@@ -67,7 +67,7 @@ def inject_csrf_token():
 
 @main_bp.route('/')
 def index():
-    """Render the modern React-powered main page."""
+    """Render the working main page."""
     from lemma.auth.csrf_config import generate_csrf
     session['csrf_token'] = generate_csrf()
     
@@ -75,7 +75,7 @@ def index():
     # This ensures the main page is clean as an entry point
     session.pop('_flashes', None)
     
-    return render_template('index_modern.html')
+    return render_template('index.html')
 
 # Legacy verify route removed - verification now handled by Shield API protection on /join-network
 

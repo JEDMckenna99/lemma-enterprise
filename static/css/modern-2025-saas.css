@@ -1,0 +1,481 @@
+/**
+ * Modern 2025 SaaS Enhancements
+ * Complements React components with cutting-edge design patterns
+ */
+
+/* CSS Custom Properties for 2025 Design System */
+:root {
+    /* Enhanced Color Palette */
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --success-gradient: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    --warning-gradient: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+    --error-gradient: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+    
+    /* Glass Morphism */
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.2);
+    --glass-blur: blur(20px);
+    
+    /* Enhanced Shadows */
+    --shadow-glow: 0 0 30px rgba(102, 126, 234, 0.3);
+    --shadow-intense: 0 20px 60px rgba(0, 0, 0, 0.15);
+    --shadow-card-hover: 0 10px 40px rgba(0, 0, 0, 0.12);
+    
+    /* Animations */
+    --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --ease-smooth: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --duration-fast: 150ms;
+    --duration-normal: 300ms;
+    --duration-slow: 500ms;
+    
+    /* Modern Typography */
+    --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-code: 'JetBrains Mono', 'SF Mono', Monaco, Consolas, monospace;
+    --letter-spacing-tight: -0.025em;
+    --letter-spacing-wide: 0.05em;
+}
+
+/* Enhanced Base Styles */
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: var(--font-display);
+    line-height: 1.6;
+    text-rendering: optimizeLegibility;
+}
+
+/* Modern Button System */
+.btn-modern {
+    position: relative;
+    overflow: hidden;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 24px;
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: var(--letter-spacing-tight);
+    transition: all var(--duration-normal) var(--ease-smooth);
+    cursor: pointer;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-modern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left var(--duration-slow) var(--ease-smooth);
+}
+
+.btn-modern:hover::before {
+    left: 100%;
+}
+
+.btn-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+}
+
+.btn-modern:active {
+    transform: translateY(0);
+}
+
+/* Button Variants */
+.btn-modern.btn-ghost {
+    background: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: var(--glass-blur);
+}
+
+.btn-modern.btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-modern.btn-success {
+    background: var(--success-gradient);
+}
+
+.btn-modern.btn-warning {
+    background: var(--warning-gradient);
+}
+
+.btn-modern.btn-error {
+    background: var(--error-gradient);
+}
+
+/* Glass Morphism Components */
+.glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 24px;
+    transition: all var(--duration-normal) var(--ease-smooth);
+}
+
+.glass-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-intense);
+}
+
+/* Modern Card System */
+.card-modern {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all var(--duration-normal) var(--ease-smooth);
+    position: relative;
+    overflow: hidden;
+}
+
+.card-modern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--primary-gradient);
+    transform: scaleX(0);
+    transition: transform var(--duration-normal) var(--ease-smooth);
+}
+
+.card-modern:hover::before {
+    transform: scaleX(1);
+}
+
+.card-modern:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-card-hover);
+    border-color: rgba(102, 126, 234, 0.2);
+}
+
+/* Status Indicators */
+.status-modern {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.status-modern::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.status-online {
+    background: rgba(72, 187, 120, 0.1);
+    color: #38a169;
+}
+
+.status-online::before {
+    background: #48bb78;
+}
+
+.status-warning {
+    background: rgba(237, 137, 54, 0.1);
+    color: #dd6b20;
+}
+
+.status-warning::before {
+    background: #ed8936;
+}
+
+.status-error {
+    background: rgba(245, 101, 101, 0.1);
+    color: #e53e3e;
+}
+
+.status-error::before {
+    background: #f56565;
+}
+
+/* Modern Typography */
+.heading-modern {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: var(--letter-spacing-tight);
+    line-height: 1.2;
+}
+
+.heading-gradient {
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.text-mono {
+    font-family: var(--font-code);
+    font-size: 14px;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* Loading States */
+.skeleton-modern {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.spinner-modern {
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(102, 126, 234, 0.2);
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Metric Display */
+.metric-modern {
+    text-align: center;
+    padding: 20px;
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.2;
+}
+
+.metric-label {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: var(--letter-spacing-wide);
+    margin-top: 8px;
+}
+
+.metric-change {
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.metric-change.positive {
+    color: #48bb78;
+}
+
+.metric-change.negative {
+    color: #f56565;
+}
+
+/* Interactive Elements */
+.interactive-hover {
+    transition: all var(--duration-normal) var(--ease-smooth);
+    cursor: pointer;
+}
+
+.interactive-hover:hover {
+    transform: scale(1.02);
+}
+
+/* Code Blocks */
+.code-modern {
+    background: #1a202c;
+    color: #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    font-family: var(--font-code);
+    font-size: 14px;
+    line-height: 1.6;
+    overflow-x: auto;
+    position: relative;
+}
+
+.code-modern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+    border-radius: 12px 12px 0 0;
+}
+
+.code-modern::after {
+    content: '⚡ Terminal';
+    position: absolute;
+    top: 12px;
+    left: 20px;
+    font-size: 12px;
+    color: #a0aec0;
+}
+
+.code-content {
+    margin-top: 40px;
+}
+
+/* Floating Action Button */
+.fab-modern {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--primary-gradient);
+    color: white;
+    border: none;
+    box-shadow: var(--shadow-intense);
+    cursor: pointer;
+    transition: all var(--duration-normal) var(--ease-bounce);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    z-index: 1000;
+}
+
+.fab-modern:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-glow);
+}
+
+/* Responsive Grid */
+.grid-modern {
+    display: grid;
+    gap: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.grid-modern.dense {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+}
+
+/* Navigation Enhancement */
+.nav-modern {
+    backdrop-filter: var(--glass-blur);
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all var(--duration-normal) var(--ease-smooth);
+}
+
+.nav-modern.scrolled {
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Accessibility Enhancements */
+.focus-visible {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --glass-bg: rgba(0, 0, 0, 0.3);
+        --glass-border: rgba(255, 255, 255, 0.1);
+    }
+    
+    .card-modern {
+        background: #1a202c;
+        color: #e2e8f0;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .text-mono {
+        background: rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+    }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Performance Optimizations */
+.will-change-transform {
+    will-change: transform;
+}
+
+.will-change-auto {
+    will-change: auto;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+    .card-modern {
+        padding: 16px;
+        border-radius: 12px;
+    }
+    
+    .btn-modern {
+        padding: 10px 20px;
+        font-size: 14px;
+    }
+    
+    .grid-modern {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .fab-modern {
+        width: 48px;
+        height: 48px;
+        bottom: 16px;
+        right: 16px;
+    }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .btn-modern {
+        border: 2px solid currentColor;
+    }
+    
+    .card-modern {
+        border: 2px solid currentColor;
+    }
+} 
