@@ -14,8 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;425;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;600&display=swap" rel="stylesheet">
     
-    <!-- Stripe Exact Design System -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-exact-layout.css') }}">
+    <!-- Other Design System Files -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modern-saas-enhancements.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/form-enhancements-2025.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/card-components-2025.css') }}">
@@ -747,6 +746,9 @@
             transition: all 0.2s ease;
         }
     </style>
+    
+    <!-- Stripe Exact Design System - Loaded AFTER inline styles for priority -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-exact-layout.css') }}">
     
     {% block head %}{% endblock %}
 </head>

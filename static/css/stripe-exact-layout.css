@@ -237,15 +237,66 @@ html {
     column-gap: 20px;
 }
 
-/* Apply Stripe styling to body */
-body.stripe-layout {
-    font-family: var(--fontFamily);
-    font-weight: var(--fontWeightNormal);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    color: var(--textColor);
-    background: var(--backgroundColor);
-    margin: 0;
+/* Apply Stripe styling to body - High Specificity */
+body.MktRoot.MktBody.stripe-layout {
+    font-family: var(--fontFamily) !important;
+    font-weight: var(--fontWeightNormal) !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    color: var(--textColor) !important;
+    background: var(--backgroundColor) !important;
+    margin: 0 !important;
+    min-height: 100vh !important;
+}
+
+/* TEST: Ensure Stripe styles are loading with a visible change */
+body.MktRoot.MktBody.stripe-layout .stripe-nav {
+    background: #f6f9fc !important;
+    border-bottom: 1px solid #e7ecf1 !important;
+}
+
+/* Force Stripe navigation styling */
+.stripe-logo {
+    font-family: var(--fontFamily) !important;
+    font-size: 24px !important;
+    font-weight: var(--fontWeightBold) !important;
+    color: var(--navColor) !important;
+    text-decoration: none !important;
+}
+
+/* Force Stripe button styling */
+.stripe-btn {
+    font: var(--ctaFont) !important;
+    background-color: #635bff !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 12px 24px !important;
+    cursor: pointer !important;
+    text-decoration: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.stripe-btn--outline {
+    background-color: transparent !important;
+    color: #635bff !important;
+    border: 1px solid #e7ecf1 !important;
+}
+
+/* Force navigation links styling */
+.stripe-nav__link {
+    color: var(--navColor) !important;
+    text-decoration: none !important;
+    font-weight: var(--fontWeightNormal) !important;
+    font-size: 15px !important;
+    line-height: 1.6 !important;
+}
+
+/* Override the inline styles with higher specificity */
+body.MktRoot.MktBody.stripe-layout * {
+    box-sizing: border-box;
 }
 
 /* Container and Layout */
