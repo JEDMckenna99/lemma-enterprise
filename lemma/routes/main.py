@@ -1023,6 +1023,7 @@ def join_network():
                 'email': 'admin@lemma.id',
                 'company': 'Lemma Inc',
                 'domain': 'lemma.id',
+                'api_key': production_api_key,  # Store plain key for immediate use
                 'api_key_hash': hash_api_key(production_api_key),
                 'api_key_created_at': datetime.now().isoformat(),
                 'verified': True,
@@ -1036,23 +1037,40 @@ def join_network():
             save_customer_data(lemma_customer_id, customer_data)
             current_app.logger.info("Registered lemma.id as customer in our own system")
             
-            # Store the production API key in app config for this request
-            current_app.config['LEMMA_SELF_API_KEY'] = production_api_key
+            # Use the production API key
+            api_key = production_api_key
         else:
-            # Customer exists, but we need to get the API key
-            # For security, we'll generate a session-specific key that maps to the real one
-            session_api_key = f"lemma_session_{secrets.token_hex(16)}"
-            current_app.config['LEMMA_SELF_API_KEY'] = session_api_key
-            current_app.logger.info("Using existing lemma.id customer registration")
+            # Customer exists, get the actual API key
+            if customer_data.get('api_key'):
+                # Use the stored plain key
+                api_key = customer_data['api_key']
+                current_app.logger.info("Using stored API key for lemma.id customer")
+            elif customer_data.get('api_key_hash'):
+                # We have a hash but no plain key, generate a new one and update
+                new_api_key = f"lemma_prod_{secrets.token_hex(32)}"
+                customer_data['api_key'] = new_api_key
+                customer_data['api_key_hash'] = hash_api_key(new_api_key)
+                customer_data['api_key_regenerated_at'] = datetime.now().isoformat()
+                save_customer_data(lemma_customer_id, customer_data)
+                api_key = new_api_key
+                current_app.logger.info("Regenerated API key for lemma.id customer")
+            else:
+                # No key at all, create one
+                new_api_key = f"lemma_prod_{secrets.token_hex(32)}"
+                customer_data['api_key'] = new_api_key
+                customer_data['api_key_hash'] = hash_api_key(new_api_key)
+                customer_data['api_key_created_at'] = datetime.now().isoformat()
+                save_customer_data(lemma_customer_id, customer_data)
+                api_key = new_api_key
+                current_app.logger.info("Created new API key for existing lemma.id customer")
             
     except Exception as e:
         current_app.logger.error(f"Error setting up lemma.id customer registration: {e}")
         # Fallback to demo key if customer setup fails
-        session_api_key = "lemma_demo_site_key_" + secrets.token_hex(16)
-        current_app.config['LEMMA_SELF_API_KEY'] = session_api_key
+        api_key = "lemma_demo_site_key_" + secrets.token_hex(16)
     
-    # Get the API key to use (either production or session)
-    api_key = current_app.config.get('LEMMA_SELF_API_KEY', 'lemma_demo_fallback_' + secrets.token_hex(8))
+    # Store the API key in config for this request (for debugging)
+    current_app.config['LEMMA_SELF_API_KEY'] = api_key
     
     # This is how a real customer site would be protected
     response = make_response(render_template('join_network.html', 
