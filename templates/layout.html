@@ -745,6 +745,106 @@
         .accordion-content {
             transition: all 0.2s ease;
         }
+
+        /* Customer Account Dropdown Styles */
+        .stripe-nav__dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-toggle {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .dropdown-arrow {
+            transition: transform 0.2s ease;
+        }
+
+        .stripe-nav__dropdown:hover .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .stripe-nav__dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.2s ease;
+            z-index: 50;
+            min-width: 280px;
+            margin-top: var(--space-2);
+        }
+
+        .stripe-nav__dropdown:hover .stripe-nav__dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-section {
+            padding: var(--space-3);
+        }
+
+        .dropdown-section:not(:last-child) {
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .dropdown-label {
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--space-2);
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            border-radius: var(--radius-sm);
+            color: var(--gray-700);
+            text-decoration: none;
+            transition: all 0.15s ease;
+            font-size: var(--font-size-sm);
+        }
+
+        .dropdown-item:hover {
+            background: var(--gray-50);
+            color: var(--primary-600);
+        }
+
+        .dropdown-icon {
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        /* Mobile Section Labels */
+        .mobile-section-label {
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: var(--space-2) 0;
+            padding: 0 var(--space-3);
+        }
+
+        /* Hide dropdown on mobile */
+        @media (max-width: 768px) {
+            .stripe-nav__dropdown {
+                display: none;
+            }
+        }
     </style>
     
     <!-- Stripe Exact Design System - Loaded AFTER inline styles for priority -->
@@ -770,14 +870,66 @@
                 <a href="/products" class="stripe-nav__link">Products</a>
                 <a href="/solutions" class="stripe-nav__link">Solutions</a>
                 <a href="/api-docs" class="stripe-nav__link">Developers</a>
-                <a href="/resources" class="stripe-nav__link">Resources</a>
                 <a href="/pricing" class="stripe-nav__link">Pricing</a>
+                
+                <!-- Customer Account Dropdown -->
+                <div class="stripe-nav__dropdown">
+                    <a href="#" class="stripe-nav__link dropdown-toggle" id="accountDropdown">
+                        Account
+                        <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6,9 12,15 18,9"></polyline>
+                        </svg>
+                    </a>
+                    <div class="stripe-nav__dropdown-menu" id="accountMenu">
+                        <div class="dropdown-section">
+                            <div class="dropdown-label">Customer Portal</div>
+                            <a href="/onboarding/dashboard" class="dropdown-item">
+                                <span class="dropdown-icon">📊</span>
+                                Dashboard
+                            </a>
+                            <a href="/onboarding/api-keys" class="dropdown-item">
+                                <span class="dropdown-icon">🔑</span>
+                                API Keys
+                            </a>
+                            <a href="/onboarding/usage" class="dropdown-item">
+                                <span class="dropdown-icon">📈</span>
+                                Usage Analytics
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <div class="dropdown-label">Billing & Payments</div>
+                            <a href="/billing/status" class="dropdown-item">
+                                <span class="dropdown-icon">💳</span>
+                                Billing Overview
+                            </a>
+                            <a href="/billing/payment-methods" class="dropdown-item">
+                                <span class="dropdown-icon">💰</span>
+                                Payment Methods
+                            </a>
+                            <a href="/billing/invoices" class="dropdown-item">
+                                <span class="dropdown-icon">📄</span>
+                                Invoices
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <div class="dropdown-label">Account Settings</div>
+                            <a href="/onboarding/verify" class="dropdown-item">
+                                <span class="dropdown-icon">✅</span>
+                                Domain Verification
+                            </a>
+                            <a href="/onboarding/integration" class="dropdown-item">
+                                <span class="dropdown-icon">🔧</span>
+                                Integration Guide
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Stripe Actions -->
             <div class="stripe-nav__links">
-                <a href="/onboarding" class="stripe-btn stripe-btn--outline">Sign In</a>
-
+                <a href="/onboarding/register" class="stripe-btn stripe-btn--outline">Get Started</a>
+                <a href="/onboarding/dashboard" class="stripe-btn">Sign In</a>
             </div>
 
             <!-- Mobile Menu Button -->
@@ -797,11 +949,25 @@
                     <a href="/products" class="stripe-btn stripe-btn--outline" role="menuitem">Products</a>
                     <a href="/solutions" class="stripe-btn stripe-btn--outline" role="menuitem">Solutions</a>
                     <a href="/api-docs" class="stripe-btn stripe-btn--outline" role="menuitem">Developers</a>
-                    <a href="/resources" class="stripe-btn stripe-btn--outline" role="menuitem">Resources</a>
                     <a href="/pricing" class="stripe-btn stripe-btn--outline" role="menuitem">Pricing</a>
+                    
                     <hr style="border: none; height: 1px; background: var(--cardBorderColor); margin: var(--space-4) 0;" role="separator">
-                    <a href="/onboarding" class="stripe-btn stripe-btn--outline" role="menuitem">Sign In</a>
-                    <a href="{{ url_for('onboarding.start') }}" class="stripe-btn" role="menuitem">Get Started</a>
+                    
+                    <!-- Customer Account Section -->
+                    <div class="mobile-section-label">Customer Portal</div>
+                    <a href="/onboarding/dashboard" class="stripe-btn stripe-btn--outline" role="menuitem">📊 Dashboard</a>
+                    <a href="/onboarding/api-keys" class="stripe-btn stripe-btn--outline" role="menuitem">🔑 API Keys</a>
+                    <a href="/onboarding/usage" class="stripe-btn stripe-btn--outline" role="menuitem">📈 Usage Analytics</a>
+                    
+                    <div class="mobile-section-label">Billing & Payments</div>
+                    <a href="/billing/status" class="stripe-btn stripe-btn--outline" role="menuitem">💳 Billing Overview</a>
+                    <a href="/billing/payment-methods" class="stripe-btn stripe-btn--outline" role="menuitem">💰 Payment Methods</a>
+                    <a href="/billing/invoices" class="stripe-btn stripe-btn--outline" role="menuitem">📄 Invoices</a>
+                    
+                    <hr style="border: none; height: 1px; background: var(--cardBorderColor); margin: var(--space-4) 0;" role="separator">
+                    
+                    <a href="/onboarding/register" class="stripe-btn stripe-btn--outline" role="menuitem">Get Started</a>
+                    <a href="/onboarding/dashboard" class="stripe-btn" role="menuitem">Sign In</a>
                 </div>
             </div>
         </div>

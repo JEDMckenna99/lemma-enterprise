@@ -1004,41 +1004,20 @@ def join_network():
     import time
     cache_bust = int(time.time())
     
-    # REGISTER LEMMA.ID AS A CUSTOMER IN OUR OWN SYSTEM
+    # USE PROPERLY REGISTERED LEMMA.ID CUSTOMER
     try:
         from lemma.routes.onboarding import get_customer_data, save_customer_data
         from lemma.routes.onboarding import hash_api_key
         from datetime import datetime
         
-        # Check if lemma.id is already registered as a customer
-        lemma_customer_id = "lemma_self_hosted_site"
+        # Use the properly registered customer ID from our registration script
+        lemma_customer_id = "c17940d1-568b-462f-a107-dccf82b4f2a5"
         customer_data = get_customer_data(lemma_customer_id)
         
         if not customer_data:
-            # Register lemma.id as a customer in our own system
-            production_api_key = f"lemma_prod_{secrets.token_hex(32)}"
-            
-            customer_data = {
-                'customer_id': lemma_customer_id,
-                'email': 'admin@lemma.id',
-                'company': 'Lemma Inc',
-                'domain': 'lemma.id',
-                'api_key': production_api_key,  # Store plain key for immediate use
-                'api_key_hash': hash_api_key(production_api_key),
-                'api_key_created_at': datetime.now().isoformat(),
-                'verified': True,
-                'created_at': datetime.now().isoformat(),
-                'billing_status': 'enterprise',
-                'current_rate': 0.0,  # Free for our own site
-                'tier': 'enterprise',
-                'is_self_hosted': True
-            }
-            
-            save_customer_data(lemma_customer_id, customer_data)
-            current_app.logger.info("Registered lemma.id as customer in our own system")
-            
-            # Use the production API key
-            api_key = production_api_key
+            # Customer should already exist from registration script, use the registered API key
+            current_app.logger.info(f"Customer {lemma_customer_id} not found locally, using registered API key")
+            api_key = "lemma_82e39e7c79f09ff38f3480cf33324e6ee2a40ae2db03ef0c"
         else:
             # Customer exists, get the actual API key
             if customer_data.get('api_key'):
