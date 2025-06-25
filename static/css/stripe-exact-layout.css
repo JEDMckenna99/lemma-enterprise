@@ -1,0 +1,532 @@
+/* Stripe Exact Layout System - 2025 */
+/* This file replicates Stripe's exact design system and layout patterns */
+
+.MktRoot {
+    --fontFamily: "sohne-var", "Helvetica Neue", "Arial", sans-serif;
+    --fontWeightLight: 200;
+    --fontWeightNormal: 300;
+    --fontWeightSemibold: 425;
+    --fontWeightBold: 500;
+    --systemFontFamily: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --codeFontFamily: "SourceCodePro";
+    --sourceCodeFont: 500 14px / 1.714285714 var(--codeFontFamily);
+    --ctaFont: var(--fontWeightSemibold) 15px / 1.6 var(--fontFamily);
+    --inputFont: var(--fontWeightNormal) 15px / 1.6 var(--fontFamily);
+    
+    /* Card Shadows - Stripe's exact shadow system */
+    --cardShadowSmall: 0 6px 12px -2px rgba(50, 50, 93, 0.25), 0 3px 7px -3px rgba(0, 0, 0, 0.3);
+    --cardShadowMedium: 0 13px 27px -5px rgba(50, 50, 93, 0.25), 0 8px 16px -8px rgba(0, 0, 0, 0.3);
+    --cardShadowLarge: 0 30px 60px -12px rgba(50, 50, 93, 0.25), 0 18px 36px -18px rgba(0, 0, 0, 0.3);
+    --cardShadowLargeInset: inset 0 30px 60px -12px rgba(50, 50, 93, 0.25), inset 0 18px 36px -18px rgba(0, 0, 0, 0.3);
+    --cardShadowXLarge: 0 50px 100px -20px rgba(50, 50, 93, 0.25), 0 30px 60px -30px rgba(0, 0, 0, 0.3);
+    --cardShadowXSMallMargin: 2px;
+    --cardShadowSmallMargin: 8px;
+    --cardShadowMediumMargin: 16px;
+    --cardShadowLargeMargin: 32px;
+    --cardShadowXLargeMargin: 48px;
+    --cardBorderRadius: 8px;
+    --filterShadowMedium: 0px 3px 11.5px -3.5px rgba(50, 50, 93, 0.25), 0px 3.8px 7.5px -3.7px rgba(0, 0, 0, 0.1);
+    
+    /* Layout Variables */
+    --scrollbarOffset: 10px;
+    --angleNormal: -6deg;
+    --angleStrong: -12deg;
+    --angleNormalSin: 0.106;
+    --angleStrongSin: 0.212;
+    --modalZIndex: 999999;
+    --fixedNavHeight: 60px;
+    --fixedNavSpacing: 48px;
+    --fixedNavScrollMargin: calc(var(--fixedNavHeight) + var(--fixedNavSpacing));
+    --hoverTransition: 150ms cubic-bezier(0.215,0.61,0.355,1);
+    --focusBoxShadow: 0 0 0 2px #4d90fe, inset 0 0 0 2px hsla(0, 0%, 100%, 0.9);
+    
+    color-scheme: only light;
+}
+
+.MktRoot *, .MktRoot :after, .MktRoot :before {
+    box-sizing: border-box;
+}
+
+/* Viewport and Layout Variables - Stripe's exact system */
+html {
+    --gutterWidth: 16px;
+    --scrollbarWidth: 0px;
+    --windowWidth: calc(100vw - var(--scrollbarWidth));
+    --layoutWidth: calc(var(--windowWidth) - var(--gutterWidth) * 2);
+    --layoutWidthMax: 1080px;
+    --viewportWidthSmall: 375;
+    --viewportWidthMedium: 600;
+    --viewportWidthLarge: 1112;
+    --viewportScale: calc(var(--windowWidth) / var(--viewportWidthLarge));
+    --paddingTop: 160px;
+    --paddingBottom: 160px;
+    --columnPaddingNone: 0;
+    --columnPaddingSmall: 8px;
+    --columnPaddingNormal: 16px;
+    --columnPaddingMedium: 16px;
+    --columnPaddingLarge: 16px;
+    --columnPaddingXLarge: 16px;
+    --rowGapNormal: 8px;
+    --rowGapMedium: 24px;
+    --rowGapLarge: 32px;
+    --rowGapXLarge: 64px;
+    --rowGapXXLarge: 88px;
+    --rowGap: var(--rowGapNormal);
+    --columnCountMax: 1;
+    --columnWidth: calc(var(--layoutWidth) / var(--columnCountMax));
+    --columnMaxWidth: calc(var(--layoutWidthMax) * 0.25);
+    --copyMaxWidth: calc(var(--columnMaxWidth) * 3);
+}
+
+@media (min-width: 600px) {
+    html {
+        --columnPaddingMedium: 32px;
+        --columnPaddingLarge: 64px;
+        --columnPaddingXLarge: 64px;
+        --columnCountMax: 2;
+    }
+}
+
+@media (min-width: 900px) {
+    html {
+        --columnPaddingXLarge: 112px;
+        --columnCountMax: 4;
+    }
+}
+
+/* Stripe Themes */
+.theme--Light {
+    --backgroundColor: #f6f9fc;
+    --linkColor: var(--accentColor);
+    --linkHoverColor: #0a2540;
+    --buttonColor: var(--accentColor);
+    --buttonHoverColor: #0a2540;
+    --buttonDisabledColor: #cfd7df;
+    --buttonDisabledOpacity: 0.7;
+    --knockoutColor: #fff;
+    --knockoutDisabledColor: #8898aa;
+    --guideSolidColor: rgba(66, 71, 112, 0.06);
+    --guideDashedColor: rgba(66, 71, 112, 0.09);
+    --titleColor: #0a2540;
+    --textColor: #425466;
+    --formFieldDescriptionTextColor: #3f4b66;
+    --inputBackground: #f6f9fc;
+    --checkboxInputBackground: #e7ecf1;
+    --inputPlaceholderColor: #727f96;
+    --inputTextColor: #0a2540;
+    --inputErrorAccentColor: #ff5996;
+    --annotationColor: #8c9eb1;
+    --maskFadeColor: rgba(0, 0, 0, 0.4);
+    --navColor: #0a2540;
+    --navHoverColor: #0a2540;
+    --navHoverOpacity: 0.6;
+    --footerColor: #0a2540;
+    --cardBorderColor: #cbd6e0;
+    --cardBorderColorSoft: #e7ecf1;
+    --cardBackground: #fff;
+    --subcardBackground: #f6f9fc;
+    --gridSubcardBackground: #fff;
+    --tableIconColor: #8c9eb1;
+    --stripeAccentWhite: #fff;
+    --stripeAccentLight: #e3e7ec;
+    --stripeAccentDark: #0a2540;
+    --bulletColor: #cfd7df;
+    --footnoteTextColor: #4d5b78;
+    --disclaimerTextColor: #707f98;
+    --inlineCodeTextColor: #2c3a57;
+    --inlineCodeBackground: #dce6ee;
+    --socialLogoColor: #c4ccd8;
+    --socialLogoHoverColor: #0a2540;
+}
+
+.theme--Transparent {
+    --backgroundColor: none;
+    --linkColor: #fff;
+    --linkHoverColor: var(--linkColor);
+    --linkHoverOpacity: 0.6;
+    --buttonColor: hsla(0, 0%, 100%, 0.2);
+    --buttonHoverColor: hsla(0, 0%, 100%, 0.4);
+    --accentColor: #fff;
+    --knockoutColor: #fff;
+    --textColor: #fff;
+    --guideSolidColor: rgba(66, 71, 112, 0.06);
+    --guideDashedColor: rgba(66, 71, 112, 0.09);
+    --titleColor: #fff;
+    --maskFadeColor: rgba(0, 0, 0, 0.4);
+    --navColor: #fff;
+    --navHoverColor: #fff;
+    --navHoverOpacity: 0.6;
+    --stripeColor: #fff;
+}
+
+.flavor--Chroma {
+    --blendBackground: #80e9ff;
+    --blendIntersection: #0048e5;
+    --blendForeground: #7a73ff;
+    --gradientColorZero: #a960ee;
+    --gradientColorOne: #ff333d;
+    --gradientColorTwo: #90e0ff;
+    --gradientColorThree: #ffcb57;
+    --gradientColorZeroTransparent: rgba(169, 96, 238, 0);
+    --gradientColorOneTransparent: rgba(255, 51, 61, 0);
+    --gradientColorTwoTransparent: rgba(144, 224, 255, 0);
+    --gradientColorThreeTransparent: rgba(255, 203, 87, 0);
+    --shadeOneColor: #02bcf5;
+    --shadeTwoColor: #0073e6;
+    --shadeThreeColor: #003ab9;
+    --shadeFourColor: #635bff;
+    --shadeFiveColor: #002c59;
+    --shadeSixColor: #09cbcb;
+}
+
+.flavor--Chroma.accent--Blurple, .flavor--Chroma .accent--Blurple {
+    --accentColor: #635bff;
+    --guideBackground: #5d69e3;
+    --guideDarkColor: #4d5ae0;
+    --guideLightColor: #6772e5;
+    --guideLighterColor: #7a84e9;
+    --guideLightestColor: #8d95ec;
+}
+
+/* Body Styles */
+.MktBody {
+    margin: 0;
+    font-family: var(--fontFamily);
+    font-weight: var(--fontWeightNormal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: var(--textColor);
+    background: var(--backgroundColor);
+}
+
+/* Site Header Styles - Exact Stripe Implementation */
+.SiteHeader {
+    --siteMenuTransition: 250ms;
+    --siteMenuArrowSpacing: 13px;
+    --siteMenuArrowOffset: 0;
+    --userLogoColor: var(--navColor);
+    --tabletOverlayDisplay: none;
+    position: relative;
+    z-index: 100;
+    background-color: var(--backgroundColor);
+}
+
+@media (min-width: 900px) {
+    .SiteHeader {
+        --mobileNavDisplay: none;
+        --tabletOverlayDisplay: none;
+    }
+}
+
+.SiteHeader__navContainer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 68px;
+    padding: 32px var(--columnPaddingNormal) 12px;
+}
+
+@media (min-width: 900px) {
+    .HubPage .SiteHeader__navContainer, .SiteHeader__navContainer {
+        padding: 12px var(--columnPaddingNormal);
+    }
+}
+
+.SiteHeader--hasContactSales .SiteHeader__navContainer {
+    -moz-column-gap: 20px;
+    column-gap: 20px;
+}
+
+/* Apply Stripe styling to body */
+body.stripe-layout {
+    font-family: var(--fontFamily);
+    font-weight: var(--fontWeightNormal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: var(--textColor);
+    background: var(--backgroundColor);
+    margin: 0;
+}
+
+/* Container and Layout */
+.stripe-container {
+    max-width: var(--layoutWidthMax);
+    margin: 0 auto;
+    padding: 0 var(--columnPaddingNormal);
+}
+
+/* Navigation Styles */
+.stripe-nav {
+    background-color: var(--backgroundColor);
+    position: relative;
+    z-index: 100;
+}
+
+.stripe-nav__container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 68px;
+    padding: 32px var(--columnPaddingNormal) 12px;
+}
+
+@media (min-width: 900px) {
+    .stripe-nav__container {
+        padding: 12px var(--columnPaddingNormal);
+    }
+}
+
+/* Logo */
+.stripe-logo {
+    font-size: 24px;
+    font-weight: var(--fontWeightBold);
+    color: var(--navColor);
+    text-decoration: none;
+    transition: var(--hoverTransition);
+}
+
+.stripe-logo:hover {
+    opacity: var(--navHoverOpacity);
+}
+
+/* Navigation Links */
+.stripe-nav__links {
+    display: flex;
+    gap: 32px;
+    align-items: center;
+}
+
+.stripe-nav__link {
+    color: var(--navColor);
+    text-decoration: none;
+    font-weight: var(--fontWeightNormal);
+    font-size: 15px;
+    line-height: 1.6;
+    transition: var(--hoverTransition);
+}
+
+.stripe-nav__link:hover {
+    color: var(--navHoverColor);
+    opacity: var(--navHoverOpacity);
+}
+
+/* Buttons */
+.stripe-btn {
+    font: var(--ctaFont);
+    background-color: var(--buttonColor);
+    color: var(--knockoutColor);
+    border: none;
+    border-radius: var(--cardBorderRadius);
+    padding: 12px 24px;
+    cursor: pointer;
+    transition: var(--hoverTransition);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stripe-btn:hover {
+    background-color: var(--buttonHoverColor);
+}
+
+.stripe-btn--outline {
+    background-color: transparent;
+    color: var(--buttonColor);
+    border: 1px solid var(--cardBorderColor);
+}
+
+.stripe-btn--outline:hover {
+    background-color: var(--buttonColor);
+    color: var(--knockoutColor);
+}
+
+/* Cards */
+.stripe-card {
+    background: var(--cardBackground);
+    border-radius: var(--cardBorderRadius);
+    padding: 32px;
+    box-shadow: var(--cardShadowSmall);
+    border: 1px solid var(--cardBorderColorSoft);
+    transition: var(--hoverTransition);
+}
+
+.stripe-card:hover {
+    box-shadow: var(--cardShadowMedium);
+}
+
+.stripe-card--large {
+    box-shadow: var(--cardShadowLarge);
+}
+
+/* Typography */
+.stripe-heading {
+    color: var(--titleColor);
+    font-weight: var(--fontWeightBold);
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+}
+
+.stripe-heading--xl {
+    font-size: 48px;
+    line-height: 1.1;
+}
+
+.stripe-heading--lg {
+    font-size: 36px;
+    line-height: 1.1;
+}
+
+.stripe-heading--md {
+    font-size: 24px;
+    line-height: 1.3;
+}
+
+.stripe-text {
+    color: var(--textColor);
+    line-height: 1.6;
+    font-size: 16px;
+}
+
+.stripe-text--lg {
+    font-size: 18px;
+    line-height: 1.7;
+}
+
+.stripe-text--sm {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Forms */
+.stripe-form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.stripe-input {
+    font: var(--inputFont);
+    background: var(--inputBackground);
+    border: 1px solid var(--cardBorderColor);
+    border-radius: var(--cardBorderRadius);
+    padding: 12px 16px;
+    color: var(--inputTextColor);
+    transition: var(--hoverTransition);
+}
+
+.stripe-input:focus {
+    outline: none;
+    box-shadow: var(--focusBoxShadow);
+    border-color: var(--accentColor);
+}
+
+.stripe-input::placeholder {
+    color: var(--inputPlaceholderColor);
+}
+
+/* Grid System */
+.stripe-grid {
+    display: grid;
+    gap: var(--rowGapLarge);
+}
+
+.stripe-grid--2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.stripe-grid--3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.stripe-grid--4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 768px) {
+    .stripe-grid--2,
+    .stripe-grid--3,
+    .stripe-grid--4 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Sections */
+.stripe-section {
+    padding: var(--paddingTop) 0 var(--paddingBottom);
+}
+
+.stripe-section--sm {
+    padding: 80px 0;
+}
+
+.stripe-section--lg {
+    padding: 200px 0;
+}
+
+/* Utilities */
+.stripe-text-center {
+    text-align: center;
+}
+
+.stripe-mb-sm { margin-bottom: 16px; }
+.stripe-mb-md { margin-bottom: 24px; }
+.stripe-mb-lg { margin-bottom: 32px; }
+.stripe-mb-xl { margin-bottom: 48px; }
+
+.stripe-mt-sm { margin-top: 16px; }
+.stripe-mt-md { margin-top: 24px; }
+.stripe-mt-lg { margin-top: 32px; }
+.stripe-mt-xl { margin-top: 48px; }
+
+/* Mobile Navigation */
+@media (max-width: 899px) {
+    .stripe-nav__links {
+        display: none;
+    }
+    
+    .stripe-nav--mobile {
+        display: block;
+    }
+}
+
+@media (min-width: 900px) {
+    .stripe-nav--mobile {
+        display: none;
+    }
+}
+
+/* Animation and Transitions */
+.stripe-fade-in {
+    animation: stripeeFadeIn 0.6s ease-out;
+}
+
+@keyframes stripeFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Focus and Accessibility */
+.stripe-focus:focus {
+    outline: none;
+    box-shadow: var(--focusBoxShadow);
+}
+
+/* Responsive Utilities */
+@media (max-width: 599px) {
+    .stripe-hide-mobile { display: none !important; }
+}
+
+@media (min-width: 600px) and (max-width: 899px) {
+    .stripe-hide-tablet { display: none !important; }
+}
+
+@media (min-width: 900px) {
+    .stripe-hide-desktop { display: none !important; }
+} 

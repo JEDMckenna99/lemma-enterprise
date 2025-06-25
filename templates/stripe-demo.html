@@ -1,0 +1,196 @@
+{% extends "layout.html" %}
+
+{% block title %}Stripe Design System Demo - Lemma{% endblock %}
+
+{% block content %}
+<!-- Hero Section with Stripe Styling -->
+<section class="stripe-section stripe-text-center" style="background: linear-gradient(135deg, var(--gradientColorZero), var(--gradientColorOne));">
+    <div class="stripe-container">
+        <h1 class="stripe-heading stripe-heading--xl" style="color: white; margin-bottom: var(--space-6);">
+            Payments infrastructure for the internet
+        </h1>
+        <p class="stripe-text stripe-text--lg" style="color: rgba(255,255,255,0.8); margin-bottom: var(--space-8); max-width: 600px; margin-left: auto; margin-right: auto;">
+            Millions of businesses of all sizes—from startups to large enterprises—use Stripe's software and APIs to accept payments, send payouts, and manage their businesses online.
+        </p>
+        <div class="stripe-nav__links" style="gap: 16px;">
+            <a href="#" class="stripe-btn" style="background: white; color: var(--titleColor);">Start now</a>
+            <a href="#" class="stripe-btn stripe-btn--outline" style="border-color: rgba(255,255,255,0.3); color: white;">Get in touch</a>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="stripe-section">
+    <div class="stripe-container">
+        <div class="stripe-text-center stripe-mb-xl">
+            <h2 class="stripe-heading stripe-heading--lg stripe-mb-md">Built for developers</h2>
+            <p class="stripe-text stripe-text--lg">Stripe is designed to get you up and running as fast as possible.</p>
+        </div>
+        
+        <div class="stripe-grid stripe-grid--3">
+            <div class="stripe-card">
+                <div class="stripe-mb-md">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accentColor)" stroke-width="2">
+                        <polyline points="16,18 22,12 16,6"></polyline>
+                        <polyline points="8,6 2,12 8,18"></polyline>
+                    </svg>
+                </div>
+                <h3 class="stripe-heading stripe-heading--md stripe-mb-sm">Developer-friendly</h3>
+                <p class="stripe-text">Full-featured APIs and libraries make integration easy.</p>
+            </div>
+            
+            <div class="stripe-card">
+                <div class="stripe-mb-md">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accentColor)" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="m7,11 0,-5a5,5 0 0,1 10,0l0,5"></path>
+                    </svg>
+                </div>
+                <h3 class="stripe-heading stripe-heading--md stripe-mb-sm">Secure by default</h3>
+                <p class="stripe-text">Industry-leading security and compliance built in.</p>
+            </div>
+            
+            <div class="stripe-card">
+                <div class="stripe-mb-md">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accentColor)" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polygon points="10,8 16,12 10,16 10,8"></polygon>
+                    </svg>
+                </div>
+                <h3 class="stripe-heading stripe-heading--md stripe-mb-sm">Fast integration</h3>
+                <p class="stripe-text">Get up and running in minutes with our quick start guides.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Code Example Section -->
+<section class="stripe-section" style="background: var(--subcardBackground);">
+    <div class="stripe-container">
+        <div class="stripe-grid stripe-grid--2" style="align-items: center;">
+            <div>
+                <h2 class="stripe-heading stripe-heading--lg stripe-mb-md">Start with code</h2>
+                <p class="stripe-text stripe-text--lg stripe-mb-lg">
+                    Integrate Stripe in minutes with our libraries and clear documentation.
+                </p>
+                <a href="#" class="stripe-btn">View documentation</a>
+            </div>
+            
+            <div class="stripe-card" style="background: var(--titleColor); color: white; padding: 24px;">
+                <pre style="margin: 0; font-family: var(--codeFontFamily); font-size: 14px; line-height: 1.5; overflow-x: auto;"><code>curl https://api.stripe.com/v1/payment_intents \
+  -u sk_test_...: \
+  -d amount=2000 \
+  -d currency=usd \
+  -d automatic_payment_methods[enabled]=true</code></pre>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Stats Section -->
+<section class="stripe-section">
+    <div class="stripe-container">
+        <div class="stripe-text-center stripe-mb-xl">
+            <h2 class="stripe-heading stripe-heading--lg">Trusted by millions</h2>
+        </div>
+        
+        <div class="stripe-grid stripe-grid--4 stripe-text-center">
+            <div>
+                <div class="stripe-heading stripe-heading--xl" style="color: var(--accentColor);">135+</div>
+                <p class="stripe-text">Countries supported</p>
+            </div>
+            <div>
+                <div class="stripe-heading stripe-heading--xl" style="color: var(--accentColor);">99.99%</div>
+                <p class="stripe-text">Uptime</p>
+            </div>
+            <div>
+                <div class="stripe-heading stripe-heading--xl" style="color: var(--accentColor);">$1T+</div>
+                <p class="stripe-text">Volume processed</p>
+            </div>
+            <div>
+                <div class="stripe-heading stripe-heading--xl" style="color: var(--accentColor);">50M+</div>
+                <p class="stripe-text">API requests daily</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Form Example -->
+<section class="stripe-section" style="background: var(--subcardBackground);">
+    <div class="stripe-container">
+        <div class="stripe-text-center stripe-mb-xl">
+            <h2 class="stripe-heading stripe-heading--lg">Get started today</h2>
+            <p class="stripe-text stripe-text--lg">Join millions of businesses worldwide.</p>
+        </div>
+        
+        <div style="max-width: 480px; margin: 0 auto;">
+            <form class="stripe-form">
+                <div>
+                    <label for="email" class="stripe-text" style="display: block; margin-bottom: 8px; font-weight: var(--fontWeightSemibold);">Email address</label>
+                    <input type="email" id="email" class="stripe-input" placeholder="Enter your email" required>
+                </div>
+                
+                <div>
+                    <label for="company" class="stripe-text" style="display: block; margin-bottom: 8px; font-weight: var(--fontWeightSemibold);">Company name</label>
+                    <input type="text" id="company" class="stripe-input" placeholder="Your company">
+                </div>
+                
+                <button type="submit" class="stripe-btn" style="width: 100%;">
+                    Create account
+                </button>
+                
+                <p class="stripe-text stripe-text--sm stripe-text-center" style="color: var(--annotationColor); margin-top: 16px;">
+                    By creating an account, you agree to our 
+                    <a href="#" style="color: var(--accentColor);">Terms of Service</a> and 
+                    <a href="#" style="color: var(--accentColor);">Privacy Policy</a>.
+                </p>
+            </form>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="stripe-section stripe-text-center" style="background: var(--titleColor); color: white;">
+    <div class="stripe-container">
+        <h2 class="stripe-heading stripe-heading--lg stripe-mb-md" style="color: white;">
+            Ready to get started?
+        </h2>
+        <p class="stripe-text stripe-text--lg stripe-mb-lg" style="color: rgba(255,255,255,0.8);">
+            Explore our documentation or contact our sales team.
+        </p>
+        <div class="stripe-nav__links" style="gap: 16px; justify-content: center;">
+            <a href="#" class="stripe-btn" style="background: white; color: var(--titleColor);">Get started</a>
+            <a href="#" class="stripe-btn stripe-btn--outline" style="border-color: rgba(255,255,255,0.3); color: white;">Contact sales</a>
+        </div>
+    </div>
+</section>
+
+<style>
+/* Additional styling for the demo */
+.stripe-container {
+    max-width: var(--layoutWidthMax);
+    margin: 0 auto;
+    padding: 0 var(--columnPaddingNormal);
+}
+
+.stripe-nav__links {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .stripe-heading--xl {
+        font-size: 36px !important;
+    }
+    
+    .stripe-heading--lg {
+        font-size: 28px !important;
+    }
+    
+    .stripe-section {
+        padding: 80px 0 !important;
+    }
+}
+</style>
+{% endblock %} 

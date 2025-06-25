@@ -10,10 +10,12 @@
     <link rel="icon" href="/static/img/favicon.ico" type="image/x-icon">
     <link rel="icon" href="/static/img/icon.png" type="image/png">
     
-    <!-- 2025 SaaS Design System - Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Stripe's Exact Font System -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;425;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;600&display=swap" rel="stylesheet">
     
-    <!-- Modern SaaS Enhancements -->
+    <!-- Stripe Exact Design System -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-exact-layout.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modern-saas-enhancements.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/form-enhancements-2025.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/card-components-2025.css') }}">
@@ -748,17 +750,18 @@
     
     {% block head %}{% endblock %}
 </head>
-<body>
+<body class="MktRoot MktBody theme--Light flavor--Chroma accent--Blurple stripe-layout">
     <!-- Skip link for accessibility -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
     
     <!-- Live region for screen reader announcements -->
     <div aria-live="polite" aria-atomic="true" class="sr-only" id="live-region"></div>
     
-    <!-- Modern SaaS Navigation -->
-    <nav class="navbar">
-        <div class="navbar-container">
-            <a href="/" class="navbar-brand">
+    <!-- Stripe Navigation Header -->
+    <header class="SiteHeader stripe-nav">
+        <nav class="SiteHeader__navContainer stripe-nav__container stripe-container">
+            <!-- Stripe Logo -->
+            <a href="/" class="stripe-logo">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                     <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
@@ -767,62 +770,47 @@
                 lemma
             </a>
 
-            <!-- Desktop Navigation -->
-            <ul class="navbar-nav">
-                <li><a href="/">Home</a></li>
-                <li><a href="/docs">How It Works</a></li>
-                <li><a href="/pricing">Pricing</a></li>
-                <li><a href="/api-docs">Developers</a></li>
-                <li><a href="/status">Status</a></li>
-            </ul>
+            <!-- Stripe Navigation Links -->
+            <div class="stripe-nav__links stripe-hide-mobile">
+                <a href="/" class="stripe-nav__link">Home</a>
+                <a href="/docs" class="stripe-nav__link">How It Works</a>
+                <a href="/pricing" class="stripe-nav__link">Pricing</a>
+                <a href="/api-docs" class="stripe-nav__link">Developers</a>
+                <a href="/status" class="stripe-nav__link">Status</a>
+            </div>
 
-            <!-- Actions -->
-            <div class="navbar-actions">
-                <a href="/onboarding" class="btn btn-ghost">Sign In</a>
-                <a href="{{ url_for('onboarding.start') }}" class="btn btn-primary">Start Free</a>
+            <!-- Stripe Actions -->
+            <div class="stripe-nav__links">
+                <a href="/onboarding" class="stripe-btn stripe-btn--outline">Sign In</a>
+                <a href="{{ url_for('onboarding.start') }}" class="stripe-btn">Start Free</a>
             </div>
 
             <!-- Mobile Menu Button -->
-            <button class="mobile-menu-button" data-mobile-menu aria-expanded="false" aria-label="Toggle navigation menu">
+            <button class="mobile-menu-button stripe-nav--mobile" data-mobile-menu aria-expanded="false" aria-label="Toggle navigation menu">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <line x1="3" y1="6" x2="21" y2="6"></line>
                     <line x1="3" y1="12" x2="21" y2="12"></line>
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
-            
-            <!-- Dark Mode Toggle -->
-            <button class="dark-mode-toggle" id="dark-mode-toggle" aria-label="Toggle dark mode">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <circle cx="12" cy="12" r="5"></circle>
-                    <line x1="12" y1="1" x2="12" y2="3"></line>
-                    <line x1="12" y1="21" x2="12" y2="23"></line>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                    <line x1="1" y1="12" x2="3" y2="12"></line>
-                    <line x1="21" y1="12" x2="23" y2="12"></line>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                </svg>
-            </button>
-        </div>
+        </nav>
 
-        <!-- Mobile Menu -->
-        <div class="mobile-menu navbar-nav" id="mobile-menu" role="navigation" aria-label="Mobile navigation">
-            <div class="container py-4">
-                <div class="grid gap-4" role="menu">
-                    <a href="/" class="btn btn-ghost" role="menuitem">Home</a>
-                    <a href="/docs" class="btn btn-ghost" role="menuitem">Documentation</a>
-                    <a href="/pricing" class="btn btn-ghost" role="menuitem">Pricing</a>
-                    <a href="/api-docs" class="btn btn-ghost" role="menuitem">API</a>
-                    <a href="/status" class="btn btn-ghost" role="menuitem">Status</a>
-                    <hr style="border: none; height: 1px; background: var(--gray-200); margin: var(--space-4) 0;" role="separator">
-                    <a href="/onboarding" class="btn btn-outline" role="menuitem">Sign In</a>
-                    <a href="{{ url_for('onboarding.start') }}" class="btn btn-primary" role="menuitem">Get Started</a>
+        <!-- Stripe Mobile Menu -->
+        <div class="mobile-menu stripe-nav--mobile" id="mobile-menu" role="navigation" aria-label="Mobile navigation">
+            <div class="stripe-container stripe-section--sm">
+                <div class="stripe-grid gap-4" role="menu">
+                    <a href="/" class="stripe-btn stripe-btn--outline" role="menuitem">Home</a>
+                    <a href="/docs" class="stripe-btn stripe-btn--outline" role="menuitem">Documentation</a>
+                    <a href="/pricing" class="stripe-btn stripe-btn--outline" role="menuitem">Pricing</a>
+                    <a href="/api-docs" class="stripe-btn stripe-btn--outline" role="menuitem">API</a>
+                    <a href="/status" class="stripe-btn stripe-btn--outline" role="menuitem">Status</a>
+                    <hr style="border: none; height: 1px; background: var(--cardBorderColor); margin: var(--space-4) 0;" role="separator">
+                    <a href="/onboarding" class="stripe-btn stripe-btn--outline" role="menuitem">Sign In</a>
+                    <a href="{{ url_for('onboarding.start') }}" class="stripe-btn" role="menuitem">Get Started</a>
                 </div>
             </div>
         </div>
-    </nav>
+    </header>
 
     <!-- Main Content -->
     <main id="main-content" tabindex="-1">

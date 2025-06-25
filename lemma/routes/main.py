@@ -877,6 +877,11 @@ def contact():
     """Contact page"""
     return render_template('contact.html')
 
+@main_bp.route('/stripe-demo')  
+def stripe_demo():
+    """Stripe Design System Demo - Showcases exact Stripe layout patterns"""
+    return render_template('stripe-demo.html')
+
 @main_bp.route('/about')
 def about():
     """About page"""
