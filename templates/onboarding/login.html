@@ -1,0 +1,241 @@
+{% extends "layout.html" %}
+
+{% block title %}Sign In - Lemma Customer Portal{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="lemma-container">
+    <div class="register-page">
+        <!-- Header Section -->
+        <div class="register-header">
+            <div class="register-logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="register-icon">
+                    <path d="M12 15l3-3-3-3"/>
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16,17 21,12 16,7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                <span class="register-brand">Lemma</span>
+            </div>
+            <h1 class="register-title">Welcome back</h1>
+            <p class="register-subtitle">
+                Sign in to your customer dashboard to manage your API keys and view usage analytics.
+            </p>
+        </div>
+
+        <!-- Registration Card -->
+        <div class="register-card">
+            <form id="loginForm" class="register-form">
+                {{ csrf_token() }}
+                
+                <!-- Email Field -->
+                <div class="form-group">
+                    <label for="email" class="form-label">
+                        Email address
+                    </label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        required 
+                        class="form-input"
+                        placeholder="your@email.com"
+                        autocomplete="email"
+                    >
+                    <p class="form-help">
+                        The email address you used when you first registered
+                    </p>
+                </div>
+
+                <!-- API Key Field -->
+                <div class="form-group">
+                    <label for="api_key" class="form-label">
+                        API Key
+                    </label>
+                    <input 
+                        type="password" 
+                        id="api_key" 
+                        name="api_key" 
+                        required 
+                        class="form-input"
+                        placeholder="lemma_xxxxxxxxxxxxxxxxxxxxxxxx"
+                        autocomplete="current-password"
+                    >
+                    <p class="form-help">
+                        Your API key that was provided during registration
+                    </p>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="submitBtn" class="btn btn-primary btn-full">
+                    <span class="btn-text">Sign in</span>
+                    <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </button>
+            </form>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state hidden">
+                <div class="loading-spinner"></div>
+                <span>Signing you in...</span>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="alert alert-error hidden">
+                <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                <span id="errorText">Error message will appear here</span>
+            </div>
+        </div>
+
+        <!-- Help Section -->
+        <div class="register-help">
+            <h3 class="help-title">Need help signing in?</h3>
+            <div class="help-content">
+                <div class="help-item">
+                    <div class="help-icon">❓</div>
+                    <div class="help-text">
+                        <strong>Don't have an account?</strong>
+                        <p><a href="{{ url_for('onboarding.register') }}" class="help-link">Create a new account</a> to get started with Lemma verification.</p>
+                    </div>
+                </div>
+                <div class="help-item">
+                    <div class="help-icon">🔑</div>
+                    <div class="help-text">
+                        <strong>Forgot your API key?</strong>
+                        <p>Your API key was provided when you first registered. Check your email or registration confirmation.</p>
+                    </div>
+                </div>
+                <div class="help-item">
+                    <div class="help-icon">📧</div>
+                    <div class="help-text">
+                        <strong>Need support?</strong>
+                        <p><a href="/contact" class="help-link">Contact our support team</a> for help with your account.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="register-footer">
+            <p class="footer-text">
+                New to Lemma? 
+                <a href="{{ url_for('onboarding.register') }}" class="footer-link">Create account</a>
+            </p>
+            <div class="footer-security">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span>Your data stays private and secure</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Form submission handling
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = {
+        email: formData.get('email'),
+        api_key: formData.get('api_key'),
+        csrf_token: formData.get('csrf_token')
+    };
+    
+    // Show loading state
+    document.getElementById('submitBtn').style.display = 'none';
+    document.getElementById('loadingState').classList.remove('hidden');
+    document.getElementById('errorMessage').classList.add('hidden');
+    
+    try {
+        const response = await fetch('{{ url_for("onboarding.login") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': data.csrf_token
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Success animation then redirect
+            document.getElementById('loadingState').innerHTML = `
+                <svg class="loading-success" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2">
+                    <path d="M9 12l2 2 4-4"/>
+                    <circle cx="12" cy="12" r="9"/>
+                </svg>
+                <span style="color: var(--color-primary);">Sign in successful!</span>
+            `;
+            
+            setTimeout(() => {
+                window.location.href = result.next_step;
+            }, 1000);
+        } else {
+            // Show error
+            document.getElementById('errorText').textContent = result.error;
+            document.getElementById('errorMessage').classList.remove('hidden');
+            
+            // Reset form state
+            document.getElementById('submitBtn').style.display = 'flex';
+            document.getElementById('loadingState').classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        document.getElementById('errorText').textContent = 'Network error. Please try again.';
+        document.getElementById('errorMessage').classList.remove('hidden');
+        
+        // Reset form state
+        document.getElementById('submitBtn').style.display = 'flex';
+        document.getElementById('loadingState').classList.add('hidden');
+    }
+});
+
+// API key input formatting and toggle visibility
+document.getElementById('api_key').addEventListener('input', function(e) {
+    // Basic formatting - ensure lemma_ prefix for user convenience
+    let value = e.target.value;
+    if (value && !value.startsWith('lemma_') && value.length > 5) {
+        // Don't auto-add prefix if user is typing it
+        if (!'lemma_'.startsWith(value)) {
+            e.target.value = 'lemma_' + value;
+        }
+    }
+});
+
+// Enhanced form validation
+function validateForm() {
+    const email = document.getElementById('email').value;
+    const apiKey = document.getElementById('api_key').value;
+    const submitBtn = document.getElementById('submitBtn');
+    
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    const apiKeyValid = apiKey.length > 10; // Basic length check
+    
+    if (emailValid && apiKeyValid) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('btn-disabled');
+    } else {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('btn-disabled');
+    }
+}
+
+// Add validation listeners
+document.getElementById('email').addEventListener('input', validateForm);
+document.getElementById('api_key').addEventListener('input', validateForm);
+
+// Initial validation
+validateForm();
+</script>
+{% endblock %} 

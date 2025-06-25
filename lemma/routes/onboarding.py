@@ -374,6 +374,86 @@ def register():
         'next_step': '/onboarding/verify'
     })
 
+@onboarding_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login for existing customers."""
+    if request.method == 'GET':
+        return render_template('onboarding/login.html')
+    
+    # Handle POST request
+    data = request.get_json() if request.is_json else request.form
+    
+    email = data.get('email', '').strip().lower()
+    api_key = data.get('api_key', '').strip()
+    
+    # Basic validation
+    if not email or '@' not in email:
+        return jsonify({'success': False, 'error': 'Valid email is required'}), 400
+    
+    if not api_key:
+        return jsonify({'success': False, 'error': 'API key is required'}), 400
+    
+    # Find customer by email
+    try:
+        customers_dir = os.path.join(current_app.config.get('STORAGE_DIR', 'instance/data'), 'customers')
+        
+        if not os.path.exists(customers_dir):
+            return jsonify({'success': False, 'error': 'Invalid email or API key'}), 401
+        
+        # Look for customer with matching email
+        found_customer = None
+        for customer_file in os.listdir(customers_dir):
+            if customer_file.endswith('.json'):
+                customer_path = os.path.join(customers_dir, customer_file)
+                try:
+                    with open(customer_path, 'r') as f:
+                        customer_data = json.load(f)
+                    
+                    if customer_data.get('email', '').lower() == email:
+                        found_customer = customer_data
+                        break
+                        
+                except Exception as e:
+                    logger.warning(f"Error reading customer file {customer_file}: {e}")
+                    continue
+        
+        if not found_customer:
+            return jsonify({'success': False, 'error': 'Invalid email or API key'}), 401
+        
+        # Verify API key
+        api_key_info = get_customer_api_key_info(found_customer, api_key)
+        
+        if not api_key_info.get('valid'):
+            return jsonify({'success': False, 'error': 'Invalid email or API key'}), 401
+        
+        # Set session
+        session['customer_id'] = found_customer['customer_id']
+        
+        # Update last login
+        found_customer['last_login'] = datetime.now().isoformat()
+        save_customer_data(found_customer['customer_id'], found_customer)
+        
+        logger.info(f"Customer login successful: {email} ({found_customer['customer_id']})")
+        
+        # Determine next step
+        if not found_customer.get('verified'):
+            next_step = '/onboarding/verify'
+        else:
+            next_step = '/onboarding/dashboard'
+        
+        return jsonify({
+            'success': True,
+            'message': 'Login successful',
+            'next_step': next_step,
+            'customer_id': found_customer['customer_id'],
+            'domain': found_customer.get('domain'),
+            'verified': found_customer.get('verified', False)
+        })
+        
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        return jsonify({'success': False, 'error': 'Login failed. Please try again.'}), 500
+
 @onboarding_bp.route('/verify')
 @customer_required
 def verify():
