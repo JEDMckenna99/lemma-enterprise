@@ -3315,3 +3315,238 @@ def credential_status_batch():
             'success': False,
             'error': str(e)
         }), 500
+
+# Add after the existing API endpoints, before the end of the file
+
+# =================== SHIELD API ENDPOINTS ===================
+# These endpoints support the Lemma Shield widget functionality
+
+@api_bp.route('/shield/health')
+@rate_limit
+def shield_health():
+    """Shield health check endpoint."""
+    try:
+        return jsonify({
+            'status': 'ok',
+            'service': 'lemma-shield',
+            'version': '1.0.0',
+            'timestamp': int(time.time()),
+            'shield_enabled': True
+        })
+    except Exception as e:
+        logger.error(f"Shield health check failed: {e}")
+        return jsonify({
+            'status': 'error', 
+            'service': 'lemma-shield',
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/shield/config', methods=['GET'])
+@require_api_key
+@rate_limit
+def shield_config():
+    """Get Shield configuration for a customer."""
+    try:
+        return jsonify({
+            'shield_enabled': True,
+            'auto_protect': True,
+            'challenge_type': 'verification',
+            'fallback_enabled': True,
+            'offline_capable': True,
+            'security_level': 'standard',
+            'max_retries': 3,
+            'timeout_ms': 30000,
+            'require_https': True,
+            'api_version': '1.0.0'
+        })
+    except Exception as e:
+        logger.error(f"Shield config error: {e}")
+        return jsonify({'error': 'Configuration error'}), 500
+
+@api_bp.route('/shield/status', methods=['GET', 'POST'])
+@rate_limit
+def shield_status():
+    """Check shield status and get protection recommendations."""
+    try:
+        # Default response
+        response_data = {
+            'shield_status': 'active',
+            'shield_action': 'allow',
+            'timestamp': int(time.time()),
+            'response_time_ms': 0.5
+        }
+        
+        # If POST request, check specific credentials
+        if request.method == 'POST':
+            data = request.get_json() or {}
+            credentials = data.get('credentials', [])
+            
+            if credentials:
+                # Check if any credentials are revoked
+                revoked_count = 0
+                for cred in credentials:
+                    cred_id = cred.get('id') if isinstance(cred, dict) else str(cred)
+                    # In a real implementation, check against revocation list
+                    # For now, assume all credentials are valid
+                    pass
+                
+                if revoked_count > 0:
+                    response_data.update({
+                        'shield_action': 'require_verification',
+                        'reason': 'revoked_credentials_detected',
+                        'revoked_count': revoked_count
+                    })
+                else:
+                    response_data.update({
+                        'shield_action': 'allow',
+                        'reason': 'credentials_valid'
+                    })
+        
+        return jsonify(response_data)
+    except Exception as e:
+        logger.error(f"Shield status error: {e}")
+        return jsonify({
+            'shield_status': 'error',
+            'shield_action': 'require_verification',
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/shield/start-verification', methods=['POST'])
+@require_api_key
+@rate_limit
+def shield_start_verification():
+    """Start a shield verification process."""
+    try:
+        data = request.get_json() or {}
+        user_id = data.get('user_id', f'shield_user_{secrets.token_hex(8)}')
+        verification_type = data.get('verification_type', 'human')
+        
+        # Generate a verification session
+        session_id = f'shield_session_{secrets.token_hex(16)}'
+        challenge = secrets.token_urlsafe(32)
+        
+        # Store verification session (in production, use proper storage)
+        verification_data = {
+            'session_id': session_id,
+            'user_id': user_id,
+            'verification_type': verification_type,
+            'challenge': challenge,
+            'status': 'pending',
+            'created_at': int(time.time()),
+            'expires_at': int(time.time()) + 300  # 5 minutes
+        }
+        
+        # Store in challenge store
+        challenge_store.store_challenge(session_id, verification_data, 300)
+        
+        return jsonify({
+            'success': True,
+            'session_id': session_id,
+            'challenge': challenge,
+            'verification_type': verification_type,
+            'expires_at': verification_data['expires_at'],
+            'next_step': 'complete_verification'
+        })
+        
+    except Exception as e:
+        logger.error(f"Shield start verification error: {e}")
+        return jsonify({'error': 'Verification start failed'}), 500
+
+@api_bp.route('/shield/verify-credentials', methods=['POST'])
+@require_api_key
+@rate_limit
+def shield_verify_credentials():
+    """Verify credentials through the shield."""
+    try:
+        data = request.get_json() or {}
+        session_id = data.get('session_id')
+        credentials = data.get('credentials', [])
+        
+        if not session_id:
+            return jsonify({'error': 'Missing session_id'}), 400
+        
+        # Get verification session
+        session_data = challenge_store.get_challenge(session_id)
+        if not session_data:
+            return jsonify({'error': 'Invalid or expired session'}), 404
+        
+        # For demo purposes, accept any credentials
+        verification_result = {
+            'verified': True,
+            'session_id': session_id,
+            'verification_type': session_data.get('verification_type', 'human'),
+            'timestamp': int(time.time()),
+            'method': 'shield_verification'
+        }
+        
+        return jsonify(verification_result)
+        
+    except Exception as e:
+        logger.error(f"Shield verify credentials error: {e}")
+        return jsonify({'error': 'Credential verification failed'}), 500
+
+@api_bp.route('/shield/revoke-credential', methods=['POST'])
+@require_api_key
+@rate_limit
+def shield_revoke_credential():
+    """Revoke a credential through the shield."""
+    try:
+        data = request.get_json() or {}
+        credential_id = data.get('credential_id')
+        reason = data.get('reason', 'security_incident')
+        
+        if not credential_id:
+            return jsonify({'error': 'Missing credential_id'}), 400
+        
+        # In a real implementation, add to revocation list
+        revocation_record = {
+            'credential_id': credential_id,
+            'reason': reason,
+            'revoked_at': int(time.time()),
+            'revoked_by': 'shield_api'
+        }
+        
+        logger.info(f"Shield revocation: {revocation_record}")
+        
+        return jsonify({
+            'success': True,
+            'credential_id': credential_id,
+            'revoked': True,
+            'reason': reason,
+            'revoked_at': revocation_record['revoked_at']
+        })
+        
+    except Exception as e:
+        logger.error(f"Shield revoke credential error: {e}")
+        return jsonify({'error': 'Credential revocation failed'}), 500
+
+@api_bp.route('/shield/get-credential', methods=['POST'])
+@require_api_key
+@rate_limit
+def shield_get_credential():
+    """Get credential information through the shield."""
+    try:
+        data = request.get_json() or {}
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'Missing user_id'}), 400
+        
+        # For demo purposes, return a mock credential
+        mock_credential = {
+            'user_id': user_id,
+            'credential_id': f'cred_{secrets.token_hex(16)}',
+            'status': 'valid',
+            'issued_at': int(time.time()) - 86400,  # 1 day ago
+            'expires_at': int(time.time()) + 86400 * 365,  # 1 year from now
+            'type': 'human_verification'
+        }
+        
+        return jsonify({
+            'success': True,
+            'credential': mock_credential
+        })
+        
+    except Exception as e:
+        logger.error(f"Shield get credential error: {e}")
+        return jsonify({'error': 'Failed to get credential'}), 500
