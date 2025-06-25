@@ -445,7 +445,7 @@ Perfect Scale Performance Metrics - ACHIEVED
 
 ## 📄 **LICENSE & PATENTS**
 
-**Lemma Digital Verification Platform** - Copyright 2025 Lemmanomics Inc.
+**Lemma Digital Verification Platform** - Copyright 2025 Lemma Inc.
 
 **Patent-Protected Technology:**
 - Privacy-Preserving Digital Verification System (Patent Pending)

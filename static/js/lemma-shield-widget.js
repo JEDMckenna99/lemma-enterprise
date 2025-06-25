@@ -1435,7 +1435,7 @@ try {
                     <div class="lemma-shield-widget lemma-card">
                         <div class="lemma-card-header">
                             <h2>✅ Verification Complete!</h2>
-                            <p>You've been verified as a real human. Welcome to Lemmanomics!</p>
+                            <p>You've been verified as a real human. Welcome to Lemma!</p>
                         </div>
                         <div class="lemma-card-body">
                             <div class="lemma-success-details">

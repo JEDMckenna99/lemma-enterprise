@@ -15,7 +15,7 @@
     "human-verification",
     "bot-protection"
   ],
-  "author": "Lemmanomics",
+  "author": "Lemma",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
