@@ -49,6 +49,14 @@ def create_app():
     # Create the Lemma app
     app = lemma_create_app()
     
+    # Register API v2 routes for React integration
+    try:
+        from lemma.api import register_api_routes
+        register_api_routes(app)
+        logger.info("API v2 routes registered successfully")
+    except ImportError as e:
+        logger.warning(f"Could not register API v2 routes: {e}")
+    
     # Set up OPRF service integration
     if os.environ.get('OPRF_SERVICE_INTERNAL'):
         logger.info(f"OPRF service configured: {os.environ.get('OPRF_SERVICE_INTERNAL')}")
