@@ -1069,4 +1069,9 @@ def flow_test():
     """Test page for demonstrating the three main Lemma flows"""
     return render_template('flow_test.html')
 
+@main_bp.route('/react-components-test')
+def react_components_test():
+    """Test page for React components."""
+    return render_template('react_demo.html')
+
 

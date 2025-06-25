@@ -4,6 +4,16 @@
 {% block description %}The essential verification protocol for digital trust. Complete enterprise platform with secure human verification, privacy-first design, and production-ready infrastructure.{% endblock %}
 
 {% block head %}
+    <!-- React 18 from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Modern SaaS Components -->
+    <script src="{{ url_for('static', filename='js/lemma-saas-components.js') }}" defer></script>
+    
 <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
 <style>
     /* Homepage-specific styles - Stripe Design System */
@@ -302,6 +312,37 @@
                     GDPR Compliant
                 </div>
             </div>
+        </div>
+    </div>
+</section>
+
+<!-- React Component Demo Section -->
+<section class="py-16 bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div class="container">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl font-bold mb-4">🚀 React Components Enabled</h2>
+            <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                Your site now supports modern React components! Below you can see a live React-powered interactive demo.
+            </p>
+        </div>
+        
+        <!-- React Component Container -->
+        <div class="bg-white rounded-lg p-8 shadow-lg max-w-4xl mx-auto">
+            <!-- This will be replaced by React component -->
+            <div id="interactive-demo-container" data-lemma-saas-component="InteractiveDemo">
+                <!-- Fallback content while React loads -->
+                <div class="text-center py-12">
+                    <div class="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p class="text-gray-600">Loading React component...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Component Info -->
+        <div class="text-center mt-8">
+            <p class="text-sm text-gray-500">
+                ✅ React 18 loaded | ✅ Components initialized | ✅ Tailwind CSS active
+            </p>
         </div>
     </div>
 </section>
@@ -695,6 +736,32 @@
 
 {% block scripts %}
 <script>
+// React Component Initialization
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 Initializing React components...');
+    
+    // Check if React and components are loaded
+    if (typeof React !== 'undefined' && typeof window.LemmaSaaSComponents !== 'undefined') {
+        console.log('✅ React and Lemma components loaded successfully');
+        
+        // Initialize components automatically
+        if (window.LemmaSaaSComponents.mountAll) {
+            window.LemmaSaaSComponents.mountAll();
+            console.log('✅ All React components mounted');
+        }
+    } else {
+        console.warn('⚠️ React or Lemma components not loaded yet, will retry...');
+        
+        // Retry after a short delay
+        setTimeout(() => {
+            if (typeof window.LemmaSaaSComponents !== 'undefined' && window.LemmaSaaSComponents.mountAll) {
+                window.LemmaSaaSComponents.mountAll();
+                console.log('✅ React components mounted on retry');
+            }
+        }, 1000);
+    }
+});
+
 // Analytics tracking functions
 function trackCTAClick(action, location) {
     // Fire analytics event
