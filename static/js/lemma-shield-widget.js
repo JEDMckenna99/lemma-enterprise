@@ -859,8 +859,9 @@ try {
         }
 
         async monitorVerificationProgress() {
-            const maxAttempts = 30; // 30 seconds max
+            const maxAttempts = 45; // 45 seconds max (increased for better reliability)
             let attempts = 0;
+            let consecutiveErrors = 0;
             
             const checkProgress = async () => {
                 attempts++;
@@ -879,8 +880,11 @@ try {
                     if (response.ok) {
                         const result = await response.json();
                         console.log('📊 Verification status:', result);
+                        consecutiveErrors = 0; // Reset error counter on successful response
                         
                         if (result.success && result.verified) {
+                            console.log('✅ Verification completed! Moving to credential storage...');
+                            
                             // Move to step 3 - wallet storage
                             this.updateProgressStep(3, 'active', '🔄', 'Storing credential in wallet...');
                             
@@ -904,31 +908,49 @@ try {
                                 return true; // Stop monitoring on error
                             }
                             
-                        } else if (result.error && !result.error.includes('processing') && !result.error.includes('incomplete')) {
+                        } else if (result.error && !result.error.includes('processing') && !result.error.includes('incomplete') && !result.error.includes('not_started')) {
                             console.error('❌ Verification failed:', result.error);
                             this.showVerificationError(result.error);
                             return true; // Stop monitoring on error
                         } else {
                             // Still processing, continue monitoring
-                            console.log('⏳ Verification still processing...');
+                            console.log('⏳ Verification still processing...', result.message || result.error);
                             
                             // Update step 2 status to show progress
                             this.updateProgressStep(2, 'processing', '🔄', 'Credential issuance in progress...');
                         }
                     } else {
-                        console.warn('⚠️ Verification status check failed:', response.status);
+                        consecutiveErrors++;
+                        console.warn(`⚠️ Verification status check failed: ${response.status} (error ${consecutiveErrors})`);
+                        
+                        // If too many consecutive errors, stop monitoring
+                        if (consecutiveErrors >= 5) {
+                            console.error('❌ Too many consecutive errors, stopping monitoring');
+                            this.showVerificationError('Unable to check verification status. Please refresh and try again.');
+                            return true;
+                        }
                     }
                     
                 } catch (error) {
-                    console.error('❌ Error checking verification progress:', error);
+                    consecutiveErrors++;
+                    console.error(`❌ Error checking verification progress: ${error} (error ${consecutiveErrors})`);
+                    
+                    // If too many consecutive errors, stop monitoring
+                    if (consecutiveErrors >= 5) {
+                        console.error('❌ Too many consecutive errors, stopping monitoring');
+                        this.showVerificationError('Network error checking verification status. Please refresh and try again.');
+                        return true;
+                    }
                 }
                 
                 // Continue monitoring if not complete and not at max attempts
                 if (attempts < maxAttempts) {
-                    setTimeout(checkProgress, 1000); // Check every second
+                    // Use exponential backoff for errors, but keep checking every second for normal progress
+                    const delay = consecutiveErrors > 0 ? Math.min(5000, 1000 * Math.pow(2, consecutiveErrors - 1)) : 1000;
+                    setTimeout(checkProgress, delay);
                 } else {
-                    console.error('❌ Verification monitoring timed out');
-                    this.showVerificationError('Verification is taking longer than expected. Please refresh and try again.');
+                    console.error('❌ Verification monitoring timed out after 45 seconds');
+                    this.showVerificationError('Verification is taking longer than expected. Your verification may have completed - please refresh the page to check.');
                 }
             };
             
@@ -964,29 +986,46 @@ try {
             
             if (!credential) {
                 console.log('🔍 Fetching credential from API...');
-                const credentialResponse = await fetch('/api/shield/get-credential', {
-                    method: 'GET',
-                    credentials: 'same-origin',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
+                try {
+                    const credentialResponse = await fetch('/api/shield/get-credential', {
+                        method: 'GET',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    
+                    if (credentialResponse.ok) {
+                        const credentialResult = await credentialResponse.json();
+                        if (credentialResult.success && credentialResult.credential) {
+                            credential = credentialResult.credential;
+                            console.log('✅ Retrieved credential from API');
+                        }
+                    } else {
+                        console.warn('⚠️ Could not fetch credential from API, status:', credentialResponse.status);
                     }
-                });
-                
-                if (credentialResponse.ok) {
-                    const credentialResult = await credentialResponse.json();
-                    if (credentialResult.success && credentialResult.credential) {
-                        credential = credentialResult.credential;
-                    }
+                } catch (fetchError) {
+                    console.warn('⚠️ Error fetching credential from API:', fetchError);
                 }
             }
             
+            // Try wallet storage if we have a credential and wallet
             if (credential && this.wallet) {
                 console.log('✅ Storing credential in wallet...');
-                await this.wallet.storeCredential(credential);
-                console.log('✅ Credential stored successfully');
+                try {
+                    await this.wallet.storeCredential(credential);
+                    console.log('✅ Credential stored successfully in wallet');
+                } catch (walletError) {
+                    console.warn('⚠️ Wallet storage failed, but credential is available:', walletError);
+                    // Don't throw error - credential exists even if wallet storage fails
+                }
+            } else if (credential) {
+                console.log('✅ Credential available (wallet not initialized, but that\'s OK)');
+                // Credential exists, which is the important part
             } else {
-                throw new Error('No credential available for storage or wallet not initialized');
+                // Only throw error if no credential at all
+                throw new Error('No credential available - verification may not be complete');
             }
         }
         

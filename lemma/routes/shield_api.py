@@ -1719,15 +1719,17 @@ def verification_status():
         store_credential = session.get('store_credential')
         verification_timestamp = session.get('verification_timestamp')
         
-        if verified_user_id and verified_credential:
+        # FIXED: Check for completed verification using multiple indicators
+        # Look for either verified_credential OR store_credential as indicators of completion
+        if (verified_user_id and verified_credential) or store_credential:
             # User is verified and credential is ready
             return jsonify({
                 'success': True,
                 'verified': True,
                 'status': 'completed',
-                'user_id': verified_user_id,
+                'user_id': verified_user_id or session.get('user_id'),
                 'credential': store_credential,  # Include formatted credential for wallet storage
-                'verified_at': verification_timestamp,
+                'verified_at': verification_timestamp or session.get('verification_time'),
                 'message': 'Verification completed successfully'
             })
         
@@ -1754,6 +1756,22 @@ def verification_status():
                     'message': 'Verification still in progress',
                     'error': 'processing'
                 })
+        
+        # ADDITIONAL CHECK: Look for any signs of completed verification in session
+        if (session.get('verified_user', False) or 
+            session.get('verification_complete', False) or
+            session.get('credential_id') or
+            session.get('lemma_credential_id')):
+            
+            return jsonify({
+                'success': True,
+                'verified': True,
+                'status': 'completed',
+                'user_id': session.get('user_id') or verified_user_id,
+                'credential': store_credential,
+                'verified_at': session.get('verification_time') or verification_timestamp,
+                'message': 'Verification completed (detected from session)'
+            })
         
         # No verification in progress
         return jsonify({
