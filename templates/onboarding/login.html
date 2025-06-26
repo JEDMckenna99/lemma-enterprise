@@ -1,146 +1,595 @@
 {% extends "layout.html" %}
 
-{% block title %}Sign In - Lemma Customer Portal{% endblock %}
+{% block title %}Sign In - Lemma Enterprise{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/modern-2025-saas.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/form-enhancements-2025.css') }}">
+<style>
+/* Login Page - Modern SaaS Design */
+.login-hero {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.login-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="80" cy="40" r="1" fill="rgba(255,255,255,0.08)"/><circle cx="40" cy="80" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+    opacity: 0.3;
+}
+
+.login-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--space-6);
+    position: relative;
+    z-index: 1;
+}
+
+.login-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-16);
+    align-items: center;
+}
+
+.login-left {
+    color: white;
+    padding-right: var(--space-8);
+}
+
+.login-headline {
+    font-size: 3.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: var(--space-6);
+    background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.8) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.login-subtitle {
+    font-size: 1.25rem;
+    line-height: 1.6;
+    margin-bottom: var(--space-8);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.feature-grid {
+    display: grid;
+    gap: var(--space-4);
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.feature-icon {
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.login-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: var(--space-10);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.login-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.card-header {
+    text-align: center;
+    margin-bottom: var(--space-8);
+}
+
+.card-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: var(--space-2);
+    letter-spacing: -0.025em;
+}
+
+.card-subtitle {
+    color: var(--gray-600);
+    font-size: 1.125rem;
+    line-height: 1.6;
+}
+
+.modern-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+
+.form-group-modern {
+    position: relative;
+}
+
+.form-label-modern {
+    display: block;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin-bottom: var(--space-2);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.form-input-modern {
+    width: 100%;
+    padding: var(--space-4) var(--space-4);
+    border: 2px solid var(--gray-200);
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: white;
+    font-weight: 500;
+}
+
+.form-input-modern:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    transform: translateY(-1px);
+}
+
+.form-input-modern::placeholder {
+    color: var(--gray-400);
+    font-weight: 400;
+}
+
+.form-help-modern {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    margin-top: var(--space-1);
+}
+
+.btn-submit-modern {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: var(--space-4) var(--space-6);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+    min-height: 56px;
+}
+
+.btn-submit-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+}
+
+.btn-submit-modern:active {
+    transform: translateY(0);
+}
+
+.loading-state-modern {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    justify-content: center;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.loading-spinner-modern {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--gray-300);
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.error-message-modern {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    padding: var(--space-4);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.success-state-modern {
+    color: #059669;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.help-section {
+    margin-top: var(--space-8);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--gray-200);
+}
+
+.help-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin-bottom: var(--space-4);
+    text-align: center;
+}
+
+.help-items {
+    display: grid;
+    gap: var(--space-4);
+}
+
+.help-item {
+    background: var(--gray-50);
+    padding: var(--space-4);
+    border-radius: 12px;
+    border: 1px solid var(--gray-100);
+}
+
+.help-item-title {
+    font-weight: 600;
+    color: var(--gray-800);
+    margin-bottom: var(--space-1);
+    font-size: 0.875rem;
+}
+
+.help-item-text {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    line-height: 1.5;
+}
+
+.help-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.help-link:hover {
+    color: #5a52d5;
+    text-decoration: underline;
+}
+
+.footer-link-modern {
+    text-align: center;
+    margin-top: var(--space-6);
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.footer-link-modern a {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.footer-link-modern a:hover {
+    color: #5a52d5;
+}
+
+.stats-preview {
+    margin-top: var(--space-8);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: var(--space-6);
+    backdrop-filter: blur(10px);
+}
+
+.stats-title {
+    color: white;
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: var(--space-4);
+    text-align: center;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: var(--space-1);
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .login-content {
+        grid-template-columns: 1fr;
+        gap: var(--space-8);
+        text-align: center;
+    }
+    
+    .login-left {
+        padding-right: 0;
+        order: 2;
+    }
+    
+    .login-card {
+        order: 1;
+    }
+    
+    .login-headline {
+        font-size: 2.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .login-hero {
+        padding: var(--space-6) 0;
+        min-height: auto;
+    }
+    
+    .login-card {
+        padding: var(--space-6);
+        border-radius: 16px;
+        margin: var(--space-4);
+    }
+    
+    .login-headline {
+        font-size: 2rem;
+    }
+    
+    .stats-preview {
+        display: none;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-3);
+    }
+}
+
+.hidden { display: none; }
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="lemma-container">
-    <div class="register-page">
-        <!-- Header Section -->
-        <div class="register-header">
-            <div class="register-logo">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="register-icon">
-                    <path d="M12 15l3-3-3-3"/>
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                    <polyline points="16,17 21,12 16,7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-                <span class="register-brand">Lemma</span>
-            </div>
-            <h1 class="register-title">Welcome back</h1>
-            <p class="register-subtitle">
-                Sign in to your customer dashboard to manage your API keys and view usage analytics.
-            </p>
-        </div>
-
-        <!-- Registration Card -->
-        <div class="register-card">
-            <form id="loginForm" class="register-form">
-                {{ csrf_token() }}
+<div class="login-hero">
+    <div class="login-container">
+        <div class="login-content">
+            <!-- Left Side - Marketing Content -->
+            <div class="login-left">
+                <h1 class="login-headline">
+                    Welcome back
+                </h1>
+                <p class="login-subtitle">
+                    Access your enterprise verification dashboard to manage API keys, view analytics, and monitor your protection status.
+                </p>
                 
-                <!-- Email Field -->
-                <div class="form-group">
-                    <label for="email" class="form-label">
-                        Email address
-                    </label>
-                    <input 
-                        type="email" 
-                        id="email" 
-                        name="email" 
-                        required 
-                        class="form-input"
-                        placeholder="your@email.com"
-                        autocomplete="email"
-                    >
-                    <p class="form-help">
-                        The email address you used when you first registered
-                    </p>
+                <div class="feature-grid">
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 12l2 2 4-4"/>
+                            </svg>
+                        </div>
+                        <span>Real-time verification analytics</span>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                        </div>
+                        <span>Secure API key management</span>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                            </svg>
+                        </div>
+                        <span>Production-ready infrastructure</span>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="8.5" cy="7" r="4"/>
+                                <path d="M20 8v6M23 11h-6"/>
+                            </svg>
+                        </div>
+                        <span>24/7 enterprise support</span>
+                    </div>
                 </div>
 
-                <!-- API Key Field -->
-                <div class="form-group">
-                    <label for="api_key" class="form-label">
-                        API Key
-                    </label>
-                    <input 
-                        type="password" 
-                        id="api_key" 
-                        name="api_key" 
-                        required 
-                        class="form-input"
-                        placeholder="lemma_xxxxxxxxxxxxxxxxxxxxxxxx"
-                        autocomplete="current-password"
-                    >
-                    <p class="form-help">
-                        Your API key that was provided during registration
-                    </p>
+                <div class="stats-preview">
+                    <h3 class="stats-title">Platform Performance</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-number">99.99%</div>
+                            <div class="stat-label">Uptime SLA</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">&lt;150ms</div>
+                            <div class="stat-label">Response Time</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">100%</div>
+                            <div class="stat-label">Accuracy Rate</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">0ms</div>
+                            <div class="stat-label">Offline Latency</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side - Login Form -->
+            <div class="login-card fade-in">
+                <div class="card-header">
+                    <h2 class="card-title">Sign in to your account</h2>
+                    <p class="card-subtitle">Enter your credentials to access your dashboard</p>
                 </div>
 
-                <!-- Submit Button -->
-                <button type="submit" id="submitBtn" class="btn btn-primary btn-full">
-                    <span class="btn-text">Sign in</span>
-                    <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                <form id="loginForm" class="modern-form">
+                    {{ csrf_token() }}
+                    
+                    <div class="form-group-modern">
+                        <label for="email" class="form-label-modern">Email Address</label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            required 
+                            class="form-input-modern"
+                            placeholder="your@email.com"
+                            autocomplete="email"
+                        >
+                        <div class="form-help-modern">The email address you used during registration</div>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label for="api_key" class="form-label-modern">API Key</label>
+                        <input 
+                            type="password" 
+                            id="api_key" 
+                            name="api_key" 
+                            required 
+                            class="form-input-modern"
+                            placeholder="lemma_xxxxxxxxxxxxxxxxxxxxxxxx"
+                            autocomplete="current-password"
+                        >
+                        <div class="form-help-modern">Your secure API key from registration confirmation</div>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="btn-submit-modern">
+                        <span class="btn-text">Sign In</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </form>
+
+                <!-- Loading State -->
+                <div id="loadingState" class="loading-state-modern hidden">
+                    <div class="loading-spinner-modern"></div>
+                    <span>Signing you in...</span>
+                </div>
+
+                <!-- Error Message -->
+                <div id="errorMessage" class="error-message-modern hidden">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
                     </svg>
-                </button>
-            </form>
+                    <span id="errorText">Error message will appear here</span>
+                </div>
 
-            <!-- Loading State -->
-            <div id="loadingState" class="loading-state hidden">
-                <div class="loading-spinner"></div>
-                <span>Signing you in...</span>
-            </div>
-
-            <!-- Error Message -->
-            <div id="errorMessage" class="alert alert-error hidden">
-                <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="15" y1="9" x2="9" y2="15"/>
-                    <line x1="9" y1="9" x2="15" y2="15"/>
-                </svg>
-                <span id="errorText">Error message will appear here</span>
-            </div>
-        </div>
-
-        <!-- Help Section -->
-        <div class="register-help">
-            <h3 class="help-title">Need help signing in?</h3>
-            <div class="help-content">
-                <div class="help-item">
-                    <div class="help-icon">❓</div>
-                    <div class="help-text">
-                        <strong>Don't have an account?</strong>
-                        <p><a href="{{ url_for('onboarding.register') }}" class="help-link">Create a new account</a> to get started with Lemma verification.</p>
+                <!-- Help Section -->
+                <div class="help-section">
+                    <h3 class="help-title">Need help signing in?</h3>
+                    <div class="help-items">
+                        <div class="help-item">
+                            <div class="help-item-title">Don't have an account?</div>
+                            <div class="help-item-text">
+                                <a href="{{ url_for('onboarding.register') }}" class="help-link">Create a new account</a> to get started with Lemma verification.
+                            </div>
+                        </div>
+                        <div class="help-item">
+                            <div class="help-item-title">Forgot your API key?</div>
+                            <div class="help-item-text">
+                                Your API key was provided during registration. Check your email confirmation or contact support.
+                            </div>
+                        </div>
+                        <div class="help-item">
+                            <div class="help-item-title">Need enterprise support?</div>
+                            <div class="help-item-text">
+                                <a href="/contact" class="help-link">Contact our enterprise team</a> for dedicated account assistance.
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="help-item">
-                    <div class="help-icon">🔑</div>
-                    <div class="help-text">
-                        <strong>Forgot your API key?</strong>
-                        <p>Your API key was provided when you first registered. Check your email or registration confirmation.</p>
-                    </div>
-                </div>
-                <div class="help-item">
-                    <div class="help-icon">📧</div>
-                    <div class="help-text">
-                        <strong>Need support?</strong>
-                        <p><a href="/contact" class="help-link">Contact our support team</a> for help with your account.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Footer -->
-        <div class="register-footer">
-            <p class="footer-text">
-                New to Lemma? 
-                <a href="{{ url_for('onboarding.register') }}" class="footer-link">Create account</a>
-            </p>
-            <div class="footer-security">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <span>Your data stays private and secure</span>
+                <!-- Footer -->
+                <div class="footer-link-modern">
+                    New to Lemma? 
+                    <a href="{{ url_for('onboarding.register') }}">Create account</a>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-// Form submission handling
+// Enhanced form submission with modern UX
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -151,7 +600,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
         csrf_token: formData.get('csrf_token')
     };
     
-    // Show loading state
+    // Show loading state with smooth transition
     document.getElementById('submitBtn').style.display = 'none';
     document.getElementById('loadingState').classList.remove('hidden');
     document.getElementById('errorMessage').classList.add('hidden');
@@ -169,20 +618,25 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
         const result = await response.json();
         
         if (result.success) {
-            // Success animation then redirect
+            // Success animation with modern styling
             document.getElementById('loadingState').innerHTML = `
-                <svg class="loading-success" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2">
-                    <path d="M9 12l2 2 4-4"/>
-                    <circle cx="12" cy="12" r="9"/>
-                </svg>
-                <span style="color: var(--color-primary);">Sign in successful!</span>
+                <div class="success-state-modern">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 12l2 2 4-4"/>
+                        <circle cx="12" cy="12" r="9"/>
+                    </svg>
+                    <span>Sign in successful!</span>
+                </div>
             `;
+            
+            // Add success pulse animation
+            document.getElementById('loadingState').style.color = '#059669';
             
             setTimeout(() => {
                 window.location.href = result.next_step;
-            }, 1000);
+            }, 1500);
         } else {
-            // Show error
+            // Show error with better UX
             document.getElementById('errorText').textContent = result.error;
             document.getElementById('errorMessage').classList.remove('hidden');
             
@@ -201,33 +655,23 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     }
 });
 
-// API key input formatting and toggle visibility
-document.getElementById('api_key').addEventListener('input', function(e) {
-    // Basic formatting - ensure lemma_ prefix for user convenience
-    let value = e.target.value;
-    if (value && !value.startsWith('lemma_') && value.length > 5) {
-        // Don't auto-add prefix if user is typing it
-        if (!'lemma_'.startsWith(value)) {
-            e.target.value = 'lemma_' + value;
-        }
-    }
-});
-
-// Enhanced form validation
+// Enhanced form validation with real-time feedback
 function validateForm() {
     const email = document.getElementById('email').value;
     const apiKey = document.getElementById('api_key').value;
     const submitBtn = document.getElementById('submitBtn');
     
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    const apiKeyValid = apiKey.length > 10; // Basic length check
+    const apiKeyValid = apiKey.length > 10 && apiKey.startsWith('lemma_');
     
     if (emailValid && apiKeyValid) {
         submitBtn.disabled = false;
-        submitBtn.classList.remove('btn-disabled');
+        submitBtn.style.opacity = '1';
+        submitBtn.style.transform = 'translateY(0)';
     } else {
         submitBtn.disabled = true;
-        submitBtn.classList.add('btn-disabled');
+        submitBtn.style.opacity = '0.6';
+        submitBtn.style.transform = 'translateY(1px)';
     }
 }
 
@@ -237,5 +681,46 @@ document.getElementById('api_key').addEventListener('input', validateForm);
 
 // Initial validation
 validateForm();
+
+// API key input formatting with visual feedback
+document.getElementById('api_key').addEventListener('input', function(e) {
+    const value = e.target.value;
+    
+    // Add visual feedback for valid API keys
+    if (value.startsWith('lemma_') && value.length > 20) {
+        e.target.style.borderColor = '#059669';
+        e.target.style.boxShadow = '0 0 0 4px rgba(5, 150, 105, 0.1)';
+    } else {
+        e.target.style.borderColor = '';
+        e.target.style.boxShadow = '';
+    }
+});
+
+// Add focus animations
+document.querySelectorAll('.form-input-modern').forEach(input => {
+    input.addEventListener('focus', function() {
+        this.parentElement.style.transform = 'translateY(-2px)';
+    });
+    
+    input.addEventListener('blur', function() {
+        this.parentElement.style.transform = 'translateY(0)';
+    });
+});
+
+// Page load animation
+document.addEventListener('DOMContentLoaded', function() {
+    const card = document.querySelector('.login-card');
+    const leftContent = document.querySelector('.login-left');
+    
+    setTimeout(() => {
+        card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
+    }, 200);
+    
+    setTimeout(() => {
+        leftContent.style.opacity = '1';
+        leftContent.style.transform = 'translateX(0)';
+    }, 400);
+});
 </script>
 {% endblock %} 
