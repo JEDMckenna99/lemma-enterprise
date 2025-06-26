@@ -634,6 +634,16 @@ def create_app():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route('/sw.js')
+    def service_worker():
+        """Serve the service worker file to prevent 404 errors."""
+        try:
+            from flask import send_from_directory
+            return send_from_directory('static', 'sw.js', mimetype='application/javascript')
+        except Exception as e:
+            logger.error(f"Error serving service worker: {e}")
+            return "Service worker not found", 404
+
     return app
 
 def create_production_ready_app():
