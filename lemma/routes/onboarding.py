@@ -14,6 +14,7 @@ from flask import Blueprint, render_template, request, jsonify, session, flash, 
 from functools import wraps
 import secrets
 import math
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Optional DNS resolver import
 try:
@@ -30,7 +31,7 @@ except ImportError:
     BILLING_AVAILABLE = False
     get_stripe_manager = lambda: None
 
-onboarding_bp = Blueprint('onboarding', __name__)
+onboarding_bp = Blueprint('onboarding', __name__, url_prefix='/onboarding')
 logger = logging.getLogger(__name__)
 
 # Pricing configuration
@@ -40,6 +41,9 @@ PRICING = {
     'base_rate_per_user_per_month': 0.10,  # $0.10 starting rate
     'minimum_rate_floor': 0.045,  # $0.045 minimum rate (55% discount)
     'network_decay_rate': 0.0003217,  # Calculated so price is halfway between original and floor at 1000 sites
+    'enterprise_discount_threshold': 1000,
+    'enterprise_discount_rate': 0.45,
+    'network_discount_max': 0.55
 }
 
 # API Key Security Functions
@@ -56,6 +60,14 @@ def hash_api_key(api_key: str) -> str:
     # Use SHA-256 with a salt for hashing
     salt = "lemma_api_key_salt_2024"  # In production, use environment variable
     return hashlib.sha256(f"{salt}{api_key}".encode()).hexdigest()
+
+def hash_password(password: str) -> str:
+    """Hash a password using Werkzeug's secure method."""
+    return generate_password_hash(password)
+
+def verify_password(password: str, password_hash: str) -> bool:
+    """Verify a password against its hash."""
+    return check_password_hash(password_hash, password)
 
 def verify_api_key(provided_key: str, stored_hash: str = None, stored_plain: str = None) -> bool:
     """
@@ -323,6 +335,8 @@ def register():
     email = data.get('email', '').strip().lower()
     company = data.get('company', '').strip()
     domain = data.get('domain', '').strip().lower()
+    password = data.get('password', '').strip()
+    confirm_password = data.get('confirm_password', '').strip()
     
     # Basic validation
     if not email or '@' not in email:
@@ -330,6 +344,15 @@ def register():
     
     if not domain or '.' not in domain:
         return jsonify({'success': False, 'error': 'Valid domain is required'}), 400
+    
+    if not password:
+        return jsonify({'success': False, 'error': 'Password is required'}), 400
+    
+    if len(password) < 8:
+        return jsonify({'success': False, 'error': 'Password must be at least 8 characters'}), 400
+    
+    if password != confirm_password:
+        return jsonify({'success': False, 'error': 'Passwords do not match'}), 400
     
     # Remove protocol if provided
     domain = domain.replace('https://', '').replace('http://', '').replace('www.', '')
@@ -339,12 +362,13 @@ def register():
     verification_token = secrets.token_hex(16)
     api_key = f"lemma_{secrets.token_hex(24)}"
     
-    # Create customer record with secure API key storage
+    # Create customer record with secure password and API key storage
     customer_data = {
         'customer_id': customer_id,
         'email': email,
         'company': company,
         'domain': domain,
+        'password_hash': hash_password(password),  # Store hashed password
         'verification_token': verification_token,
         'api_key_hash': hash_api_key(api_key),  # Store hashed API key
         'api_key_created_at': datetime.now().isoformat(),
@@ -384,14 +408,14 @@ def login():
     data = request.get_json() if request.is_json else request.form
     
     email = data.get('email', '').strip().lower()
-    api_key = data.get('api_key', '').strip()
+    password = data.get('password', '').strip()
     
     # Basic validation
     if not email or '@' not in email:
         return jsonify({'success': False, 'error': 'Valid email is required'}), 400
     
-    if not api_key:
-        return jsonify({'success': False, 'error': 'API key is required'}), 400
+    if not password:
+        return jsonify({'success': False, 'error': 'Password is required'}), 400
     
     # Find customer by email
     try:
@@ -418,13 +442,14 @@ def login():
                     continue
         
         if not found_customer:
-            return jsonify({'success': False, 'error': 'Invalid email or API key'}), 401
+            return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
         
-        # Verify API key
-        api_key_info = get_customer_api_key_info(found_customer, api_key)
+        # Verify password
+        if not found_customer.get('password_hash'):
+            return jsonify({'success': False, 'error': 'Account not configured for password login. Please contact support.'}), 401
         
-        if not api_key_info.get('valid'):
-            return jsonify({'success': False, 'error': 'Invalid email or API key'}), 401
+        if not verify_password(password, found_customer['password_hash']):
+            return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
         
         # Set session
         session['customer_id'] = found_customer['customer_id']

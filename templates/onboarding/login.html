@@ -516,17 +516,17 @@
                     </div>
 
                     <div class="form-group-modern">
-                        <label for="api_key" class="form-label-modern">API Key</label>
+                        <label for="password" class="form-label-modern">Password</label>
                         <input 
                             type="password" 
-                            id="api_key" 
-                            name="api_key" 
+                            id="password" 
+                            name="password" 
                             required 
                             class="form-input-modern"
-                            placeholder="lemma_xxxxxxxxxxxxxxxxxxxxxxxx"
+                            placeholder="Enter your password"
                             autocomplete="current-password"
                         >
-                        <div class="form-help-modern">Your secure API key from registration confirmation</div>
+                        <div class="form-help-modern">The password you created during registration</div>
                     </div>
 
                     <button type="submit" id="submitBtn" class="btn-submit-modern">
@@ -596,7 +596,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     const formData = new FormData(this);
     const data = {
         email: formData.get('email'),
-        api_key: formData.get('api_key'),
+        password: formData.get('password'),
         csrf_token: formData.get('csrf_token')
     };
     
@@ -658,13 +658,13 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 // Enhanced form validation with real-time feedback
 function validateForm() {
     const email = document.getElementById('email').value;
-    const apiKey = document.getElementById('api_key').value;
+    const password = document.getElementById('password').value;
     const submitBtn = document.getElementById('submitBtn');
     
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    const apiKeyValid = apiKey.length > 10 && apiKey.startsWith('lemma_');
+    const passwordValid = password.length >= 8;
     
-    if (emailValid && apiKeyValid) {
+    if (emailValid && passwordValid) {
         submitBtn.disabled = false;
         submitBtn.style.opacity = '1';
         submitBtn.style.transform = 'translateY(0)';
@@ -677,17 +677,17 @@ function validateForm() {
 
 // Add validation listeners
 document.getElementById('email').addEventListener('input', validateForm);
-document.getElementById('api_key').addEventListener('input', validateForm);
+document.getElementById('password').addEventListener('input', validateForm);
 
 // Initial validation
 validateForm();
 
-// API key input formatting with visual feedback
-document.getElementById('api_key').addEventListener('input', function(e) {
+// Password input formatting with visual feedback
+document.getElementById('password').addEventListener('input', function(e) {
     const value = e.target.value;
     
-    // Add visual feedback for valid API keys
-    if (value.startsWith('lemma_') && value.length > 20) {
+    // Add visual feedback for valid passwords
+    if (value.length >= 8) {
         e.target.style.borderColor = '#059669';
         e.target.style.boxShadow = '0 0 0 4px rgba(5, 150, 105, 0.1)';
     } else {

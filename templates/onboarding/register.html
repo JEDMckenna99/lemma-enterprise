@@ -526,6 +526,36 @@
                         <div class="form-help-modern">Don't include https:// or www.</div>
                     </div>
 
+                    <div class="form-group-modern">
+                        <label for="password" class="form-label-modern">Password</label>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            required 
+                            class="form-input-modern"
+                            placeholder="Create a secure password"
+                            autocomplete="new-password"
+                            minlength="8"
+                        >
+                        <div class="form-help-modern">Minimum 8 characters required</div>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label for="confirm_password" class="form-label-modern">Confirm Password</label>
+                        <input 
+                            type="password" 
+                            id="confirm_password" 
+                            name="confirm_password" 
+                            required 
+                            class="form-input-modern"
+                            placeholder="Confirm your password"
+                            autocomplete="new-password"
+                            minlength="8"
+                        >
+                        <div class="form-help-modern">Must match the password above</div>
+                    </div>
+
                     <button type="submit" id="submitBtn" class="btn-submit-modern">
                         <span class="btn-text">Create Account</span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -580,6 +610,8 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         email: formData.get('email'),
         company: formData.get('company'),
         domain: formData.get('domain'),
+        password: formData.get('password'),
+        confirm_password: formData.get('confirm_password'),
         csrf_token: formData.get('csrf_token')
     };
     
@@ -664,12 +696,16 @@ document.getElementById('domain').addEventListener('input', function(e) {
 function validateForm() {
     const email = document.getElementById('email').value;
     const domain = document.getElementById('domain').value;
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirm_password').value;
     const submitBtn = document.getElementById('submitBtn');
     
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     const domainValid = /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.([a-zA-Z]{2,}|[a-zA-Z]{2,}\.[a-zA-Z]{2,})$/.test(domain);
+    const passwordValid = password.length >= 8;
+    const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
     
-    if (emailValid && domainValid) {
+    if (emailValid && domainValid && passwordValid && passwordsMatch) {
         submitBtn.disabled = false;
         submitBtn.style.opacity = '1';
         submitBtn.style.transform = 'translateY(0)';
@@ -683,6 +719,8 @@ function validateForm() {
 // Add validation listeners
 document.getElementById('email').addEventListener('input', validateForm);
 document.getElementById('domain').addEventListener('input', validateForm);
+document.getElementById('password').addEventListener('input', validateForm);
+document.getElementById('confirm_password').addEventListener('input', validateForm);
 
 // Initial validation
 validateForm();
