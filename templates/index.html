@@ -1,315 +1,438 @@
 {% extends "layout.html" %}
 
-{% block title %}lemma - Human Verification Infrastructure{% endblock %}
-{% block description %}The essential verification protocol for digital trust. Complete enterprise platform with secure human verification, privacy-first design, and production-ready infrastructure.{% endblock %}
+{% block title %}Lemma - Revolutionary Digital Verification Platform{% endblock %}
+{% block description %}The world's first enterprise-grade cryptographic verification system serving the $47.3B+ Digital Verification Market with zero-knowledge proofs and perfect privacy.{% endblock %}
 
 {% block head %}
-    <!-- React 18 from CDN -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Tailwind CSS for modern styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Modern SaaS Components -->
-    <script src="{{ url_for('static', filename='js/lemma-saas-components.js') }}" defer></script>
-    
+<!-- React 18 from CDN -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+<!-- Tailwind CSS for modern styling -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Modern SaaS Components -->
+<script src="{{ url_for('static', filename='js/lemma-saas-components.js') }}" defer></script>
+
 <link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/modern-2025-saas.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/form-enhancements-2025.css') }}">
+
 <style>
-    /* Homepage-specific styles - Stripe Design System */
-    .hero-gradient {
-        background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
-    }
-    
-    .hero-bg-pattern {
-        background-image: 
-            radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 2px, transparent 2px),
-            radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.1) 2px, transparent 2px);
-        background-size: 60px 60px;
-        padding: var(--space-20) 0;
-        border-radius: var(--radius-2xl);
-    }
-    
-    .feature-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: var(--radius-lg);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        margin-bottom: var(--space-4);
-    }
-    
-    .feature-card {
-        padding: var(--space-8);
-        border-radius: var(--radius-lg);
-        background: var(--white);
-        box-shadow: var(--shadow-card);
-        border: 1px solid var(--gray-200);
-        transition: all var(--duration-base) var(--ease-swift-out);
-        height: 100%;
-    }
-    
-    .feature-card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg);
-        border-color: var(--gray-300);
-    }
-    
-    .platform-section {
-        padding: var(--space-12);
-        border-radius: var(--radius-lg);
-        background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);
-        border: 1px solid var(--gray-200);
-        margin: var(--space-8) 0;
-    }
-    
-    .platform-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: var(--space-6);
-        margin: var(--space-8) 0;
-    }
-    
-    .page-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: var(--space-3);
-        margin: var(--space-4) 0;
-    }
-    
-    .page-item {
-        padding: var(--space-3);
-        background: var(--white);
-        border-radius: var(--radius-sm);
-        border: 1px solid var(--gray-200);
-        font-size: var(--font-size-sm);
-        color: var(--gray-700);
-        transition: all var(--duration-fast) var(--ease-swift-out);
-    }
-    
-    .page-item:hover {
-        background: var(--primary-50);
-        border-color: var(--primary-200);
-        color: var(--primary-700);
-    }
-    
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: var(--space-8);
-        margin: var(--space-12) 0;
-    }
-    
-    .stat-item {
-        text-align: center;
-    }
-    
-    .stat-number {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: var(--primary-500);
-        display: block;
-    }
-    
-    .stat-label {
-        font-size: var(--font-size-sm);
-        color: var(--gray-500);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    
-    .features-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: var(--space-6);
-        margin: var(--space-12) 0;
-    }
-    
-    .cta-section {
-        background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);
-        border-radius: var(--radius-xl);
-        padding: var(--space-16);
-        text-align: center;
-        margin: var(--space-20) 0;
-        border: 1px solid var(--gray-200);
-    }
-    
-    .btn-lg {
-        height: 48px;
-        padding: 0 var(--space-8);
-        font-size: var(--font-size-base);
-        font-weight: 600;
-    }
-    
-    .btn-ghost {
-        background: transparent;
-        color: var(--gray-700);
-        border: 1px solid var(--gray-300);
-    }
-    
-    .btn-ghost:hover {
-        background: var(--gray-50);
-        color: var(--gray-800);
-    }
-    
-    .code-preview {
-        background: var(--gray-900);
-        color: var(--gray-100);
-        padding: var(--space-6);
-        border-radius: var(--radius-lg);
-        font-family: var(--font-mono);
-        font-size: var(--font-size-sm);
-        line-height: 1.6;
-        overflow-x: auto;
-        margin: var(--space-6) 0;
-        position: relative;
-    }
-    
-    .highlight {
-        background: linear-gradient(120deg, rgba(99, 91, 255, 0.1) 0%, rgba(99, 91, 255, 0.05) 100%);
-        padding: var(--space-1) var(--space-2);
-        border-radius: var(--radius-sm);
-        font-weight: 600;
-    }
+/* Modern SaaS Design - Dark Theme with Glassmorphism */
+:root {
+    --primary-dark: #1a1a2e;
+    --primary-darker: #16213e;
+    --primary-darkest: #0f0f23;
+    --accent-blue: #4f46e5;
+    --accent-cyan: #06b6d4;
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.2);
+}
 
-    /* Hero button styling with Stripe colors */
-    .btn-hero-primary {
-        background: var(--white);
-        color: var(--primary-500);
-        border: 1px solid var(--white);
-        font-weight: 600;
-    }
+/* Hero Section - Dark Gradient */
+.hero-dark {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-darker) 50%, var(--primary-darkest) 100%);
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+}
 
-    .btn-hero-primary:hover {
-        background: var(--gray-50);
-        color: var(--primary-600);
-        transform: translateY(-1px);
-        box-shadow: var(--shadow-active);
-    }
+.hero-dark::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        radial-gradient(circle at 20% 50%, rgba(79, 70, 229, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(6, 182, 212, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 40% 80%, rgba(139, 92, 246, 0.2) 0%, transparent 50%);
+    animation: gradientShift 8s ease-in-out infinite;
+}
 
-    .btn-hero-ghost {
-        background: transparent;
-        color: var(--white);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-    }
+@keyframes gradientShift {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
 
-    .btn-hero-ghost:hover {
-        background: rgba(255, 255, 255, 0.1);
-        border-color: rgba(255, 255, 255, 0.5);
-        color: var(--white);
+/* Animated Grid Pattern */
+.hero-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: gridFloat 20s linear infinite;
+}
+
+@keyframes gridFloat {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(50px, 50px); }
+}
+
+/* Floating Elements */
+.floating-orb {
+    position: absolute;
+    border-radius: 50%;
+    background: linear-gradient(45deg, rgba(79, 70, 229, 0.4), rgba(6, 182, 212, 0.4));
+    filter: blur(40px);
+    animation: float 6s ease-in-out infinite;
+}
+
+.floating-orb:nth-child(1) {
+    width: 200px;
+    height: 200px;
+    top: 10%;
+    left: 10%;
+    animation-delay: 0s;
+}
+
+.floating-orb:nth-child(2) {
+    width: 150px;
+    height: 150px;
+    top: 60%;
+    right: 10%;
+    animation-delay: 2s;
+}
+
+.floating-orb:nth-child(3) {
+    width: 100px;
+    height: 100px;
+    bottom: 20%;
+    left: 50%;
+    animation-delay: 4s;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+}
+
+/* Glassmorphic Cards */
+.glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 2rem;
+    transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* Feature Grid */
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2rem;
+    margin: 3rem 0;
+}
+
+/* Dark Section Styling */
+.section-dark {
+    background: linear-gradient(180deg, var(--primary-darkest) 0%, var(--primary-darker) 100%);
+    color: white;
+    position: relative;
+}
+
+.section-dark::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.05) 2px, transparent 2px),
+        radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.05) 2px, transparent 2px);
+    background-size: 60px 60px;
+}
+
+/* Glowing Button */
+.btn-glow {
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    border: none;
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+}
+
+.btn-glow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(79, 70, 229, 0.6);
+    background: linear-gradient(135deg, #5b52e8, #08c5db);
+}
+
+.btn-glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-glass:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+}
+
+/* Stats Animation */
+.stat-number {
+    font-size: 3rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #4f46e5, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Feature Icons */
+.feature-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(6, 182, 212, 0.2));
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.feature-icon:hover {
+    transform: scale(1.1);
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.4), rgba(6, 182, 212, 0.4));
+}
+
+/* Pricing Cards */
+.pricing-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 2.5rem;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.pricing-card.featured {
+    border: 2px solid var(--accent-blue);
+    background: rgba(79, 70, 229, 0.1);
+    transform: scale(1.05);
+}
+
+.pricing-card.featured::before {
+    content: 'Most Popular';
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    color: white;
+    padding: 0.5rem 1.5rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+/* Platform Overview */
+.platform-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.platform-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-3px);
+}
+
+/* Trust Indicators */
+.trust-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-radius: 25px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+}
+
+.trust-indicator:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .feature-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
     }
     
-    @media (max-width: 767px) {
-        .features-grid, .platform-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .stats-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: var(--space-4);
-        }
-        
-        .cta-section, .platform-section {
-            padding: var(--space-8);
-        }
-
-        .hero-title {
-            font-size: 2.25rem !important;
-        }
-
-        .hero-subtitle {
-            font-size: var(--font-size-lg) !important;
-        }
-        
-        .page-list {
-            grid-template-columns: 1fr;
-        }
+    .hero-dark {
+        min-height: 80vh;
     }
-
-    @media (max-width: 768px) {
-        .hero-bg-pattern {
-            padding: var(--space-12) 0;
-        }
-        
-        .grid-cols-3 {
-            grid-template-columns: 1fr;
-        }
-        
-        .grid-cols-4 {
-            grid-template-columns: repeat(2, 1fr);
-        }
+    
+    .floating-orb {
+        display: none;
     }
-
-    @media (max-width: 480px) {
-        .grid-cols-4 {
-            grid-template-columns: 1fr;
-        }
+    
+    .glass-card {
+        padding: 1.5rem;
     }
+    
+    .pricing-card.featured {
+        transform: none;
+        margin-top: 2rem;
+    }
+}
+
+/* Loading Animation */
+.loading-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: .5;
+    }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Navigation -->
-
-
-<!-- Hero Section -->
-<section class="hero-gradient py-20">
-    <div class="container text-center">
-        <div class="hero-bg-pattern">
-            <h1 class="text-6xl font-bold mb-6 text-white hero-title">
-                Stop Bots, Welcome Real Users
+<!-- Hero Section - Dark Theme -->
+<section class="hero-dark flex items-center justify-center">
+    <!-- Floating Orbs -->
+    <div class="floating-orb"></div>
+    <div class="floating-orb"></div>
+    <div class="floating-orb"></div>
+    
+    <!-- Animated Grid -->
+    <div class="hero-grid"></div>
+    
+    <div class="container relative z-10 text-center text-white">
+        <div class="max-w-4xl mx-auto">
+            <!-- Main Headlines -->
+            <h1 class="text-6xl md:text-7xl font-bold mb-6 leading-tight">
+                Revolutionary
+                <span class="block bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                    Digital Verification
+                </span>
             </h1>
-            <p class="text-xl text-white opacity-90 max-w-3xl mx-auto mb-8 hero-subtitle">
-                Finally, a simple way to verify real humans without the hassle. Keep your platform safe while giving users the smooth experience they deserve.
+            
+            <p class="text-xl md:text-2xl mb-8 opacity-90 leading-relaxed max-w-3xl mx-auto">
+                The world's first enterprise-grade cryptographic verification system serving the 
+                <span class="font-semibold text-cyan-400">$47.3B+ Digital Verification Market</span> 
+                with zero-knowledge proofs and perfect privacy.
             </p>
             
+            <!-- Key Benefits -->
+            <div class="flex flex-wrap justify-center gap-4 mb-12">
+                <div class="trust-indicator">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    100% Accuracy Achieved
+                </div>
+                <div class="trust-indicator">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    Sub-10ms Performance
+                </div>
+                <div class="trust-indicator">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    Zero-Knowledge Privacy
+                </div>
+                <div class="trust-indicator">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                    </svg>
+                    Production Ready
+                </div>
+            </div>
+            
             <!-- Primary CTAs -->
-            <div class="flex gap-4 justify-center mb-12">
-                <a href="{{ url_for('onboarding.start') }}" class="btn btn-lg btn-hero-primary" onclick="trackCTAClick('get_started_free', 'hero')">
+            <div class="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+                <a href="{{ url_for('onboarding.start') }}" class="btn-glow" onclick="trackCTAClick('get_started_free', 'hero')">
                     Start Protecting Your Site
+                    <svg class="inline-block ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
                 </a>
-                <a href="/docs#quick-start" class="btn btn-lg btn-hero-ghost" onclick="trackCTAClick('view_documentation', 'hero')">
+                <a href="/docs#quick-start" class="btn-glass" onclick="trackCTAClick('view_documentation', 'hero')">
                     See How It Works
                 </a>
             </div>
             
-            <!-- Secondary Actions - Tertiary Ghost Buttons -->
-            <div class="flex justify-center gap-6 mb-8">
-                <a href="/join-network" target="_blank" class="btn btn-sm" style="background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); font-size: var(--font-size-xs); padding: var(--space-2) var(--space-3);" onclick="trackCTAClick('try_demo', 'hero')">
-                    Try Demo
+            <!-- Secondary Actions -->
+            <div class="flex flex-wrap justify-center gap-4 mb-12">
+                <a href="/join-network" class="btn-glass text-sm px-4 py-2" onclick="trackCTAClick('try_demo', 'hero')">
+                    🚀 Try Demo
                 </a>
-                <a href="/join-network" class="btn btn-sm" style="background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); font-size: var(--font-size-xs); padding: var(--space-2) var(--space-3);" onclick="trackCTAClick('join_network', 'hero')">
-                    Join Network
+                <a href="/join-network" class="btn-glass text-sm px-4 py-2" onclick="trackCTAClick('join_network', 'hero')">
+                    🌐 Join Network
                 </a>
-                <a href="/api-docs" class="btn btn-sm" style="background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); font-size: var(--font-size-xs); padding: var(--space-2) var(--space-3);" onclick="trackCTAClick('explore_api', 'hero')">
-                    Explore API
+                <a href="/api-docs" class="btn-glass text-sm px-4 py-2" onclick="trackCTAClick('explore_api', 'hero')">
+                    📋 Explore API
                 </a>
-                <a href="/join-network" class="btn btn-sm" style="background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); font-size: var(--font-size-xs); padding: var(--space-2) var(--space-3);" onclick="trackCTAClick('see_live_protection', 'hero')">
-                    See Shield Demo
+                <a href="/join-network" class="btn-glass text-sm px-4 py-2" onclick="trackCTAClick('see_live_protection', 'hero')">
+                    🛡️ Shield Demo
                 </a>
             </div>
             
-            <!-- Trust Indicators -->
-            <div class="flex justify-center gap-8 text-white opacity-75 text-sm">
-                <div class="flex items-center gap-2">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                    </svg>
-                    SOC 2 Type II Ready
+            <!-- Performance Stats -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="stat-number">100%</div>
+                    <div class="text-sm opacity-75">Accuracy Rate</div>
                 </div>
-                <div class="flex items-center gap-2">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 1l1.27 3.88h4.08l-3.3 2.4 1.27 3.88L12 8.76l-3.32 2.4 1.27-3.88-3.3-2.4h4.08L12 1z"/>
-                    </svg>
-                    W3C Standards
+                <div class="text-center">
+                    <div class="stat-number">&lt;10ms</div>
+                    <div class="text-sm opacity-75">Response Time</div>
                 </div>
-                <div class="flex items-center gap-2">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M21 8c0-3.3-2.7-6-6-6s-6 2.7-6 6c0 1.5.6 2.9 1.5 4L15 21l4.5-9c.9-1.1 1.5-2.5 1.5-4z"/>
-                    </svg>
-                    GDPR Compliant
+                <div class="text-center">
+                    <div class="stat-number">99.99%</div>
+                    <div class="text-sm opacity-75">Uptime SLA</div>
+                </div>
+                <div class="text-center">
+                    <div class="stat-number">$47.3B+</div>
+                    <div class="text-sm opacity-75">Market Size</div>
                 </div>
             </div>
         </div>
@@ -317,30 +440,30 @@
 </section>
 
 <!-- React Component Demo Section -->
-<section class="py-16 bg-gradient-to-br from-blue-50 to-indigo-100">
-    <div class="container">
+<section class="section-dark py-20">
+    <div class="container relative z-10">
         <div class="text-center mb-12">
-            <h2 class="text-3xl font-bold mb-4">🚀 React Components Enabled</h2>
-            <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+            <h2 class="text-4xl font-bold mb-4 text-white">🚀 React Components Enabled</h2>
+            <p class="text-xl text-gray-300 max-w-2xl mx-auto">
                 Your site now supports modern React components! Below you can see a live React-powered interactive demo.
             </p>
         </div>
         
         <!-- React Component Container -->
-        <div class="bg-white rounded-lg p-8 shadow-lg max-w-4xl mx-auto">
+        <div class="glass-card max-w-4xl mx-auto">
             <!-- This will be replaced by React component -->
             <div id="interactive-demo-container" data-lemma-saas-component="InteractiveDemo">
                 <!-- Fallback content while React loads -->
                 <div class="text-center py-12">
-                    <div class="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                    <p class="text-gray-600">Loading React component...</p>
+                    <div class="loading-pulse w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p class="text-gray-300">Loading React component...</p>
                 </div>
             </div>
         </div>
         
         <!-- Component Info -->
         <div class="text-center mt-8">
-            <p class="text-sm text-gray-500">
+            <p class="text-sm text-gray-400">
                 ✅ React 18 loaded | ✅ Components initialized | ✅ Tailwind CSS active
             </p>
         </div>
@@ -348,126 +471,98 @@
 </section>
 
 <!-- Platform Overview -->
-<section class="py-20 bg-muted">
-    <div class="container">
+<section class="section-dark py-20">
+    <div class="container relative z-10">
         <div class="text-center mb-16">
-            <h2 class="text-4xl font-bold mb-4">Everything You Need, Ready to Go</h2>
-            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+            <h2 class="text-5xl font-bold mb-6 text-white">Everything You Need, Ready to Go</h2>
+            <p class="text-xl text-gray-300 max-w-3xl mx-auto">
                 We've built the complete platform so you don't have to. Get up and running in minutes with our self-service onboarding, simple APIs, and bulletproof security.
             </p>
         </div>
         
-        <!-- Platform Stats -->
-        <div class="grid grid-cols-4 gap-8 mb-16">
-            <div class="text-center">
-                <div class="text-4xl font-bold text-primary-600 mb-2">25+</div>
-                <div class="text-gray-600">Production Pages</div>
-            </div>
-            <div class="text-center">
-                <div class="text-4xl font-bold text-primary-600 mb-2">100%</div>
-                <div class="text-gray-600">SRE Ready</div>
-            </div>
-            <div class="text-center">
-                <div class="text-4xl font-bold text-primary-600 mb-2">15+</div>
-                <div class="text-gray-600">API Endpoints</div>
-            </div>
-            <div class="text-center">    
-                <div class="text-4xl font-bold text-primary-600 mb-2">99.9%</div>
-                <div class="text-gray-600">Uptime SLA</div>
-            </div>
-        </div>
-        
-        <!-- Site Structure Categories -->
-        <div class="grid grid-cols-2 gap-8">
-            <!-- Customer Pages -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="text-xl font-semibold flex items-center gap-2">
-                        <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
-                        Customer Experience
-                    </h3>
+        <!-- Platform Categories -->
+        <div class="feature-grid">
+            <!-- Customer Experience -->
+            <div class="glass-card">
+                <div class="feature-icon">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-blue-400">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
                 </div>
-                <div class="card-body">
-                    <p class="text-gray-600 mb-4">Your customers get a smooth, self-service experience from start to finish</p>
-                    <div class="grid grid-cols-2 gap-2 text-sm">
-                        <div class="p-2 bg-gray-50 rounded text-center">Landing Page</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Registration</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Verification</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Dashboard</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">API Keys</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Usage Analytics</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Integration Guide</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Billing Portal</div>
-                    </div>
+                <h3 class="text-xl font-semibold mb-3 text-white">Customer Experience</h3>
+                <p class="text-gray-300 mb-6">Your customers get a smooth, self-service experience from start to finish</p>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="platform-card text-center text-white">Landing Page</div>
+                    <div class="platform-card text-center text-white">Registration</div>
+                    <div class="platform-card text-center text-white">Verification</div>
+                    <div class="platform-card text-center text-white">Dashboard</div>
+                    <div class="platform-card text-center text-white">API Keys</div>
+                    <div class="platform-card text-center text-white">Usage Analytics</div>
+                    <div class="platform-card text-center text-white">Integration Guide</div>
+                    <div class="platform-card text-center text-white">Billing Portal</div>
                 </div>
             </div>
             
-            <!-- Developer Pages -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="text-xl font-semibold flex items-center gap-2">
-                        <div class="w-3 h-3 bg-purple-500 rounded-full"></div>
-                        Developer Experience
-                    </h3>
+            <!-- Developer Experience -->
+            <div class="glass-card">
+                <div class="feature-icon">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-purple-400">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                    </svg>
                 </div>
-                <div class="card-body">
-                    <p class="text-gray-600 mb-4">Everything developers need to integrate quickly and confidently</p>
-                    <div class="grid grid-cols-2 gap-2 text-sm">
-                        <div class="p-2 bg-gray-50 rounded text-center">API Documentation</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">OpenAPI Spec</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Code Samples</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Sandbox</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Widget Test</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Demo Pages</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Integration Guide</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Status Page</div>
-                    </div>
+                <h3 class="text-xl font-semibold mb-3 text-white">Developer Experience</h3>
+                <p class="text-gray-300 mb-6">Everything developers need to integrate quickly and confidently</p>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="platform-card text-center text-white">API Documentation</div>
+                    <div class="platform-card text-center text-white">OpenAPI Spec</div>
+                    <div class="platform-card text-center text-white">Code Samples</div>
+                    <div class="platform-card text-center text-white">Sandbox</div>
+                    <div class="platform-card text-center text-white">Widget Test</div>
+                    <div class="platform-card text-center text-white">Demo Pages</div>
+                    <div class="platform-card text-center text-white">Integration Guide</div>
+                    <div class="platform-card text-center text-white">Status Page</div>
                 </div>
             </div>
             
-            <!-- Admin Pages -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="text-xl font-semibold flex items-center gap-2">
-                        <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
-                        Admin & Management
-                    </h3>
+            <!-- Admin & Management -->
+            <div class="glass-card">
+                <div class="feature-icon">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-orange-400">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
                 </div>
-                <div class="card-body">
-                    <p class="text-gray-600 mb-4">Complete administrative control and system management</p>
-                    <div class="grid grid-cols-2 gap-2 text-sm">
-                        <div class="p-2 bg-gray-50 rounded text-center">Admin Login</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Admin Dashboard</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">User Management</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Credential Issuing</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">System Settings</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Audit Logs</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Billing Admin</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">SRE Dashboard</div>
-                    </div>
+                <h3 class="text-xl font-semibold mb-3 text-white">Admin & Management</h3>
+                <p class="text-gray-300 mb-6">Complete administrative control and system management</p>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="platform-card text-center text-white">Admin Login</div>
+                    <div class="platform-card text-center text-white">Admin Dashboard</div>
+                    <div class="platform-card text-center text-white">User Management</div>
+                    <div class="platform-card text-center text-white">Credential Issuing</div>
+                    <div class="platform-card text-center text-white">System Settings</div>
+                    <div class="platform-card text-center text-white">Audit Logs</div>
+                    <div class="platform-card text-center text-white">Billing Admin</div>
+                    <div class="platform-card text-center text-white">SRE Dashboard</div>
                 </div>
             </div>
             
-            <!-- Demo Pages -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="text-xl font-semibold flex items-center gap-2">
-                        <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-                        Demo & Testing
-                    </h3>
+            <!-- Demo & Testing -->
+            <div class="glass-card">
+                <div class="feature-icon">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 4h10a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V10a2 2 0 012-2zm3 4h4"/>
+                    </svg>
                 </div>
-                <div class="card-body">
-                    <p class="text-gray-600 mb-4">Interactive demonstrations and testing environments</p>
-                    <div class="grid grid-cols-2 gap-2 text-sm">
-                        <div class="p-2 bg-gray-50 rounded text-center">Agent Network Demo</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Gate Demo</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Widget Test</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Crypto Demo</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Protected Content</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Playground</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">API Widget Demo</div>
-                        <div class="p-2 bg-gray-50 rounded text-center">Scenario Demo</div>
-                    </div>
+                <h3 class="text-xl font-semibold mb-3 text-white">Demo & Testing</h3>
+                <p class="text-gray-300 mb-6">Interactive demonstrations and testing environments</p>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="platform-card text-center text-white">Agent Network Demo</div>
+                    <div class="platform-card text-center text-white">Gate Demo</div>
+                    <div class="platform-card text-center text-white">Widget Test</div>
+                    <div class="platform-card text-center text-white">Crypto Demo</div>
+                    <div class="platform-card text-center text-white">Protected Content</div>
+                    <div class="platform-card text-center text-white">Playground</div>
+                    <div class="platform-card text-center text-white">API Widget Demo</div>
+                    <div class="platform-card text-center text-white">Scenario Demo</div>
                 </div>
             </div>
         </div>
@@ -475,382 +570,228 @@
 </section>
 
 <!-- Key Features -->
-<section class="py-20">
-    <div class="container">
+<section class="section-dark py-20">
+    <div class="container relative z-10">
         <div class="text-center mb-16">
-            <h2 class="text-4xl font-bold mb-4">Why Choose Lemma?</h2>
-            <p class="text-xl text-gray-600">Built for enterprise scale with privacy-first design</p>
+            <h2 class="text-5xl font-bold mb-6 text-white">Why Choose Lemma?</h2>
+            <p class="text-xl text-gray-300">Built for enterprise scale with privacy-first design</p>
         </div>
         
-        <div class="grid grid-cols-3 gap-8">
-            <div class="text-center">
-                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+        <div class="feature-grid">
+            <div class="glass-card text-center">
+                <div class="feature-icon mx-auto">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-blue-400">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                     </svg>
                 </div>
-                <h3 class="text-xl font-semibold mb-2">Privacy-First Verification</h3>
-                <p class="text-gray-600">Only verifies humanity - no personal data collection. GDPR compliant with zero-knowledge proofs.</p>
+                <h3 class="text-xl font-semibold mb-3 text-white">Privacy-First Verification</h3>
+                <p class="text-gray-300">Only verifies humanity - no personal data collection. GDPR compliant with zero-knowledge proofs.</p>
             </div>
             
-            <div class="text-center">
-                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+            <div class="glass-card text-center">
+                <div class="feature-icon mx-auto">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-cyan-400">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                     </svg>
                 </div>
-                <h3 class="text-xl font-semibold mb-2">Lightning Fast Integration</h3>
-                <p class="text-gray-600">10-minute setup with comprehensive APIs, SDKs, and copy-paste code examples.</p>
+                <h3 class="text-xl font-semibold mb-3 text-white">Lightning Fast Integration</h3>
+                <p class="text-gray-300">10-minute setup with comprehensive APIs, SDKs, and copy-paste code examples.</p>
             </div>
             
-            <div class="text-center">
-                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+            <div class="glass-card text-center">
+                <div class="feature-icon mx-auto">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-purple-400">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
                     </svg>
                 </div>
-                <h3 class="text-xl font-semibold mb-2">Network Effects</h3>
-                <p class="text-gray-600">One verification works across all network sites. Costs decrease as more businesses join.</p>
+                <h3 class="text-xl font-semibold mb-3 text-white">Network Effects</h3>
+                <p class="text-gray-300">One verification works across all network sites. Costs decrease as more businesses join.</p>
             </div>
             
-            <div class="text-center">
-                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+            <div class="glass-card text-center">
+                <div class="feature-icon mx-auto">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                     </svg>
                 </div>
-                <h3 class="text-xl font-semibold mb-2">Enterprise SRE</h3>
-                <p class="text-gray-600">83% SRE ready with real-time monitoring, alerting, and performance optimization.</p>
+                <h3 class="text-xl font-semibold mb-3 text-white">Enterprise SRE</h3>
+                <p class="text-gray-300">83% SRE ready with real-time monitoring, alerting, and performance optimization.</p>
             </div>
             
-            <div class="text-center">
-                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+            <div class="glass-card text-center">
+                <div class="feature-icon mx-auto">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-orange-400">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                     </svg>
                 </div>
-                <h3 class="text-xl font-semibold mb-2">Security & Compliance</h3>
-                <p class="text-gray-600">SOC 2 Type II ready with comprehensive audit framework and compliance dashboard.</p>
+                <h3 class="text-xl font-semibold mb-3 text-white">Security & Compliance</h3>
+                <p class="text-gray-300">SOC 2 Type II ready with comprehensive audit framework and compliance dashboard.</p>
             </div>
             
-            <div class="text-center">
-                <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary-600">
+            <div class="glass-card text-center">
+                <div class="feature-icon mx-auto">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-pink-400">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9-9a9 9 0 00-9 9m0 0a9 9 0 019-9"/>
                     </svg>
                 </div>
-                <h3 class="text-xl font-semibold mb-2">W3C Standards</h3>
-                <p class="text-gray-600">Built on W3C Verifiable Credentials and DID standards for universal compatibility.</p>
+                <h3 class="text-xl font-semibold mb-3 text-white">W3C Standards</h3>
+                <p class="text-gray-300">Built on W3C Verifiable Credentials and DID standards for universal compatibility.</p>
             </div>
         </div>
     </div>
 </section>
 
 <!-- Pricing Section -->
-<section class="py-20 bg-muted">
-    <div class="container">
+<section class="section-dark py-20">
+    <div class="container relative z-10">
         <div class="text-center mb-16">
-            <h2 class="text-4xl font-bold mb-4">Network-Effect Pricing</h2>
-            <p class="text-xl text-gray-600">Revolutionary pricing that gets better as the network grows</p>
+            <h2 class="text-5xl font-bold mb-6 text-white">Network-Effect Pricing</h2>
+            <p class="text-xl text-gray-300">Revolutionary pricing that gets better as the network grows</p>
         </div>
         
-        <div class="grid grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             <!-- Free Tier -->
-            <div class="card">
-                <div class="card-header text-center">
-                    <h3 class="text-xl font-semibold">Free</h3>
-                    <div class="text-3xl font-bold mt-2">$0</div>
-                    <div class="text-gray-600">Up to 1,000 verifications/month</div>
+            <div class="pricing-card">
+                <div class="text-center mb-8">
+                    <h3 class="text-xl font-semibold text-white">Free</h3>
+                    <div class="text-4xl font-bold mt-4 mb-2 text-white">$0</div>
+                    <div class="text-gray-400">Up to 1,000 verifications/month</div>
                 </div>
-                <div class="card-body">
-                    <ul class="space-y-3">
-                        <li class="flex items-center gap-2">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            Basic human verification
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            API access
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            Community support
-                        </li>
-                    </ul>
-                    <a href="{{ url_for('onboarding.start') }}" class="btn btn-outline w-full mt-6">Get Started</a>
-                </div>
+                <ul class="space-y-4 mb-8">
+                    <li class="flex items-center gap-3 text-gray-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Basic human verification
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        API access
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Community support
+                    </li>
+                </ul>
+                <a href="{{ url_for('onboarding.start') }}" class="btn-glass w-full text-center block">Get Started</a>
             </div>
             
             <!-- Standard Tier -->
-            <div class="card border-primary-500 border-2 relative">
-                <div class="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <span class="bg-primary-500 text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
+            <div class="pricing-card featured">
+                <div class="text-center mb-8">
+                    <h3 class="text-xl font-semibold text-white">Standard</h3>
+                    <div class="text-4xl font-bold mt-4 mb-2 text-white">$0.10</div>
+                    <div class="text-gray-400">per user per month + $2.00 onboarding</div>
                 </div>
-                <div class="card-header text-center">
-                    <h3 class="text-xl font-semibold">Standard</h3>
-                    <div class="text-3xl font-bold mt-2">$0.10</div>
-                    <div class="text-gray-600">per user per month + $2.00 onboarding</div>
-                </div>
-                <div class="card-body">
-                    <ul class="space-y-3">
-                        <li class="flex items-center gap-2">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            Everything in Free
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            Network effects pricing
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            Advanced analytics
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            Email support
-                        </li>
-                    </ul>
-                    <a href="/onboarding/register" class="btn btn-primary w-full mt-6">Start Standard</a>
-                </div>
+                <ul class="space-y-4 mb-8">
+                    <li class="flex items-center gap-3 text-gray-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Everything in Free
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Unlimited verifications
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Priority support
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Advanced analytics
+                    </li>
+                </ul>
+                <a href="{{ url_for('onboarding.start') }}" class="btn-glow w-full text-center block">Start Trial</a>
             </div>
             
             <!-- Enterprise Tier -->
-            <div class="card">
-                <div class="card-header text-center">
-                    <h3 class="text-xl font-semibold">Enterprise</h3>
-                    <div class="text-3xl font-bold mt-2">$0.08</div>
-                    <div class="text-gray-600">per user per month + custom onboarding</div>
+            <div class="pricing-card">
+                <div class="text-center mb-8">
+                    <h3 class="text-xl font-semibold text-white">Enterprise</h3>
+                    <div class="text-4xl font-bold mt-4 mb-2 text-white">Custom</div>
+                    <div class="text-gray-400">Volume discounts available</div>
                 </div>
-                <div class="card-body">
-                    <ul class="space-y-3">
-                        <li class="flex items-center gap-2">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            Everything in Standard
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            SOC 2 compliance
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            Custom integrations
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            24/7 priority support
-                        </li>
-                    </ul>
-                    <a href="/contact" class="btn btn-outline w-full mt-6">Contact Sales</a>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Network Effect Explanation -->
-        <div class="text-center mt-12">
-            <div class="bg-primary-50 rounded-xl p-6 max-w-2xl mx-auto">
-                <h4 class="font-semibold mb-2">How Network Effects Work</h4>
-                <p class="text-gray-600 text-sm">
-                    As more businesses join the network, your monthly rate automatically decreases. 
-                    At 1,000+ businesses, everyone pays just $0.045/user/month (55% discount).
-                </p>
+                <ul class="space-y-4 mb-8">
+                    <li class="flex items-center gap-3 text-gray-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Everything in Standard
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Dedicated support
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Custom integrations
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        SLA guarantees
+                    </li>
+                </ul>
+                <a href="mailto:enterprise@lemma.network" class="btn-glass w-full text-center block">Contact Sales</a>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Quick Start -->
-<section class="py-20">
-    <div class="container">
-        <div class="text-center mb-16">
-            <h2 class="text-4xl font-bold mb-4">Get Started in Minutes</h2>
-            <p class="text-xl text-gray-600">Three simple steps to human verification</p>
-        </div>
-        
-        <div class="grid grid-cols-3 gap-8">
-            <div class="text-center">
-                <div class="w-12 h-12 bg-primary-500 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">1</div>
-                <h3 class="text-xl font-semibold mb-2">Register & Verify</h3>
-                <p class="text-gray-600">Sign up for free and verify your domain in seconds</p>
-            </div>
-            
-            <div class="text-center">
-                <div class="w-12 h-12 bg-primary-500 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">2</div>
-                <h3 class="text-xl font-semibold mb-2">Get Your API Key</h3>
-                <p class="text-gray-600">Receive your secure API key and integration code</p>
-            </div>
-            
-            <div class="text-center">
-                <div class="w-12 h-12 bg-primary-500 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">3</div>
-                <h3 class="text-xl font-semibold mb-2">Start Verifying</h3>
-                <p class="text-gray-600">Add one line of code and start blocking bots</p>
+<!-- Call to Action -->
+<section class="section-dark py-20">
+    <div class="container relative z-10">
+        <div class="glass-card text-center max-w-4xl mx-auto">
+            <h2 class="text-4xl font-bold mb-6 text-white">Ready to Transform Your Platform?</h2>
+            <p class="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+                Join the digital verification revolution. Get started with Lemma today and experience the future of secure, privacy-first verification.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="{{ url_for('onboarding.start') }}" class="btn-glow">
+                    Start Your Free Trial
+                    <svg class="inline-block ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                </a>
+                <a href="/docs" class="btn-glass">
+                    View Documentation
+                </a>
             </div>
         </div>
     </div>
 </section>
 
-<!-- CTA Section -->
-<section class="py-20 bg-gradient-to-r from-primary-600 to-primary-700">
-    <div class="container text-center">
-        <h2 class="text-4xl font-bold text-white mb-4">Ready to Build Trust?</h2>
-        <p class="text-xl text-white opacity-90 mb-8 max-w-2xl mx-auto">
-            Join thousands of developers building the verified internet with Lemma's human verification infrastructure.
-        </p>
-        
-        <div class="flex gap-4 justify-center">
-            <a href="/onboarding/register" class="btn btn-lg bg-white text-primary-600 hover:bg-gray-50">
-                Start Free Trial
-            </a>
-                            <a href="/join-network" class="btn btn-lg bg-transparent text-white border-white hover:bg-white hover:bg-opacity-10">
-                View Demo
-            </a>
-        </div>
-        
-        <div class="mt-8 text-white opacity-75 text-sm">
-            <p>No credit card required • 1,000 free verifications • Setup in 10 minutes</p>
-        </div>
-    </div>
-</section>
-{% endblock %}
-
-{% block scripts %}
 <script>
-// React Component Initialization
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Initializing React components...');
-    
-    // Check if React and components are loaded
-    if (typeof React !== 'undefined' && typeof window.LemmaSaaSComponents !== 'undefined') {
-        console.log('✅ React and Lemma components loaded successfully');
-        
-        // Initialize components automatically
-        if (window.LemmaSaaSComponents.mountAll) {
-            window.LemmaSaaSComponents.mountAll();
-            console.log('✅ All React components mounted');
-        }
-    } else {
-        console.warn('⚠️ React or Lemma components not loaded yet, will retry...');
-        
-        // Retry after a short delay
-        setTimeout(() => {
-            if (typeof window.LemmaSaaSComponents !== 'undefined' && window.LemmaSaaSComponents.mountAll) {
-                window.LemmaSaaSComponents.mountAll();
-                console.log('✅ React components mounted on retry');
-            }
-        }, 1000);
-    }
-});
-
-// Analytics tracking functions
+// Track CTA clicks for analytics
 function trackCTAClick(action, location) {
-    // Fire analytics event
-    if (typeof gtag !== 'undefined') {
-        gtag('event', 'cta_click', {
-            'event_category': 'conversion',
-            'event_label': `${location}_${action}`,
-            'cta_action': action,
-            'cta_location': location,
-            'page': 'homepage'
-        });
-    }
-    
-    // Console log for debugging
     console.log(`CTA Click: ${action} from ${location}`);
+    // Add your analytics tracking here
 }
 
-// Page view tracking
-document.addEventListener('DOMContentLoaded', function() {
-    // Track page view
-    if (typeof gtag !== 'undefined') {
-        gtag('event', 'page_view', {
-            'page_title': 'Homepage',
-            'page_location': window.location.href,
-            'event_category': 'engagement'
+// Add smooth scrolling for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        document.querySelector(this.getAttribute('href')).scrollIntoView({
+            behavior: 'smooth'
         });
-    }
-    
-    // Track scroll depth
-    let maxScroll = 0;
-    let scrollEvents = [25, 50, 75, 90];
-    
-    window.addEventListener('scroll', function() {
-        const scrollPercent = Math.round((window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100);
-        
-        if (scrollPercent > maxScroll) {
-            maxScroll = scrollPercent;
-            
-            // Fire scroll depth events
-            scrollEvents.forEach(threshold => {
-                if (scrollPercent >= threshold && maxScroll < threshold + 1) {
-                    if (typeof gtag !== 'undefined') {
-                        gtag('event', 'scroll_depth', {
-                            'event_category': 'engagement',
-                            'event_label': `${threshold}%`,
-                            'scroll_depth': threshold,
-                            'page': 'homepage'
-                        });
-                    }
-                }
-            });
-        }
-    });
-    
-    // Track feature card interactions
-    const featureCards = document.querySelectorAll('.feature-card, .platform-card');
-    featureCards.forEach((card, index) => {
-        card.addEventListener('click', function() {
-            if (typeof gtag !== 'undefined') {
-                gtag('event', 'feature_card_click', {
-                    'event_category': 'engagement',
-                    'event_label': this.textContent.trim().substring(0, 50),
-                    'card_index': index,
-                    'page': 'homepage'
-                });
-            }
-        });
-    });
-    
-    // Track section views with intersection observer
-    const sections = document.querySelectorAll('section[id], .platform-section, .cta-section');
-    const sectionObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const sectionName = entry.target.id || entry.target.className.split(' ')[0] || 'unnamed_section';
-                
-                if (typeof gtag !== 'undefined') {
-                    gtag('event', 'section_view', {
-                        'event_category': 'engagement',
-                        'event_label': sectionName,
-                        'page': 'homepage'
-                    });
-                }
-            }
-        });
-    }, { threshold: 0.5 });
-    
-    sections.forEach(section => {
-        sectionObserver.observe(section);
     });
 });
 </script>
