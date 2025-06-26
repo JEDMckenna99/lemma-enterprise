@@ -1,856 +1,522 @@
 {% extends "layout.html" %}
 
 {% block title %}Lemma - Revolutionary Digital Verification Platform{% endblock %}
-{% block description %}The world's first enterprise-grade cryptographic verification system serving the $47.3B+ Digital Verification Market with zero-knowledge proofs and perfect privacy.{% endblock %}
+{% block description %}The world's first enterprise-grade cryptographic verification system with zero-knowledge proofs and perfect privacy.{% endblock %}
 
 {% block head %}
-<!-- React 18 from CDN -->
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-
 <!-- Tailwind CSS for modern styling -->
 <script src="https://cdn.tailwindcss.com"></script>
 
-<!-- Modern SaaS Components -->
-<script src="{{ url_for('static', filename='js/lemma-saas-components.js') }}" defer></script>
-
-<link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/modern-2025-saas.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/form-enhancements-2025.css') }}">
-
 <style>
-/* Modern SaaS Design - Dark Theme with Glassmorphism */
+/* Modern SaaS Design System */
 :root {
-    --primary-dark: #1a1a2e;
-    --primary-darker: #16213e;
-    --primary-darkest: #0f0f23;
-    --accent-blue: #4f46e5;
-    --accent-cyan: #06b6d4;
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --dark-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
     --glass-bg: rgba(255, 255, 255, 0.1);
     --glass-border: rgba(255, 255, 255, 0.2);
 }
 
-/* Hero Section - Dark Gradient */
-.hero-dark {
-    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-darker) 50%, var(--primary-darkest) 100%);
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.6;
+    color: #333;
+}
+
+/* Hero Section */
+.hero-section {
+    background: var(--dark-gradient);
     min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     position: relative;
     overflow: hidden;
 }
 
-.hero-dark::before {
+.hero-section::before {
     content: '';
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background-image: 
-        radial-gradient(circle at 20% 50%, rgba(79, 70, 229, 0.3) 0%, transparent 50%),
-        radial-gradient(circle at 80% 20%, rgba(6, 182, 212, 0.3) 0%, transparent 50%),
-        radial-gradient(circle at 40% 80%, rgba(139, 92, 246, 0.2) 0%, transparent 50%);
-    animation: gradientShift 8s ease-in-out infinite;
+    background: radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%);
+    pointer-events: none;
 }
 
-@keyframes gradientShift {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.8; }
-}
-
-/* Animated Grid Pattern */
-.hero-grid {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: 
-        linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
-    background-size: 50px 50px;
-    animation: gridFloat 20s linear infinite;
-}
-
-@keyframes gridFloat {
-    0% { transform: translate(0, 0); }
-    100% { transform: translate(50px, 50px); }
-}
-
-/* Floating Elements */
-.floating-orb {
-    position: absolute;
-    border-radius: 50%;
-    background: linear-gradient(45deg, rgba(79, 70, 229, 0.4), rgba(6, 182, 212, 0.4));
-    filter: blur(40px);
-    animation: float 6s ease-in-out infinite;
-}
-
-.floating-orb:nth-child(1) {
-    width: 200px;
-    height: 200px;
-    top: 10%;
-    left: 10%;
-    animation-delay: 0s;
-}
-
-.floating-orb:nth-child(2) {
-    width: 150px;
-    height: 150px;
-    top: 60%;
-    right: 10%;
-    animation-delay: 2s;
-}
-
-.floating-orb:nth-child(3) {
-    width: 100px;
-    height: 100px;
-    bottom: 20%;
-    left: 50%;
-    animation-delay: 4s;
-}
-
-@keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
-}
-
-/* Glassmorphic Cards */
-.glass-card {
-    background: rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 20px;
-    padding: 2.5rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-.glass-card:hover {
-    background: rgba(255, 255, 255, 0.18);
-    border-color: rgba(255, 255, 255, 0.4);
-    transform: translateY(-5px);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-}
-
-/* Feature Grid */
-.feature-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 2.5rem;
-    margin: 4rem 0;
-    max-width: 1400px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-/* Dark Section Styling */
-.section-dark {
-    background: linear-gradient(180deg, var(--primary-darkest) 0%, var(--primary-darker) 100%);
+.hero-content {
+    text-align: center;
     color: white;
+    z-index: 10;
     position: relative;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 2rem;
 }
 
-.section-dark::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: 
-        radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.05) 2px, transparent 2px),
-        radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.05) 2px, transparent 2px);
-    background-size: 60px 60px;
-}
-
-/* Glowing Button */
-.btn-glow {
-    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
-    border: none;
-    color: white;
-    padding: 1rem 2rem;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 1.1rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
-}
-
-.btn-glow:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(79, 70, 229, 0.6);
-    background: linear-gradient(135deg, #5b52e8, #08c5db);
-}
-
-.btn-glass {
-    background: var(--glass-bg);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--glass-border);
-    color: white;
-    padding: 1rem 2rem;
-    border-radius: 12px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
-
-.btn-glass:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.4);
-    transform: translateY(-2px);
-}
-
-/* Stats Animation */
-.stat-number {
-    font-size: 3rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #4f46e5, #06b6d4);
+.hero-title {
+    font-size: 4rem;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, #ffffff 0%, #a0a9ff 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
 }
 
-/* Feature Icons */
+.hero-subtitle {
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+.hero-stats {
+    display: flex;
+    justify-content: center;
+    gap: 3rem;
+    margin: 3rem 0;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #60d9f7;
+    display: block;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin-top: 0.5rem;
+}
+
+/* Buttons */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    text-decoration: none;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin: 2rem 0;
+    flex-wrap: wrap;
+}
+
+/* Features Section */
+.features-section {
+    padding: 6rem 0;
+    background: #fafbfc;
+}
+
+.section-title {
+    text-align: center;
+    font-size: 3rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 1rem;
+}
+
+.section-subtitle {
+    text-align: center;
+    font-size: 1.2rem;
+    color: #6b7280;
+    margin-bottom: 4rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.feature-card {
+    background: white;
+    padding: 2.5rem 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    border: 1px solid #e5e7eb;
+}
+
+.feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
 .feature-icon {
     width: 60px;
     height: 60px;
-    border-radius: 16px;
-    background: linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(6, 182, 212, 0.2));
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: 1.5rem;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.feature-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #1a1a2e;
     margin-bottom: 1rem;
-    transition: all 0.3s ease;
 }
 
-.feature-icon:hover {
-    transform: scale(1.1);
-    background: linear-gradient(135deg, rgba(79, 70, 229, 0.4), rgba(6, 182, 212, 0.4));
+.feature-description {
+    color: #6b7280;
+    line-height: 1.6;
 }
 
-/* Pricing Cards */
+/* Pricing Section */
+.pricing-section {
+    padding: 6rem 0;
+    background: var(--dark-gradient);
+    color: white;
+}
+
+.pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
 .pricing-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(15px);
-    border: 1px solid var(--glass-border);
-    border-radius: 24px;
-    padding: 2.5rem;
-    position: relative;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    text-align: center;
     transition: all 0.3s ease;
 }
 
 .pricing-card.featured {
-    border: 2px solid var(--accent-blue);
-    background: rgba(79, 70, 229, 0.1);
+    background: rgba(255, 255, 255, 0.15);
+    border-color: #667eea;
     transform: scale(1.05);
 }
 
-.pricing-card.featured::before {
-    content: 'Most Popular';
-    position: absolute;
-    top: -12px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
-    color: white;
-    padding: 0.5rem 1.5rem;
-    border-radius: 20px;
-    font-size: 0.875rem;
-    font-weight: 600;
-}
-
-/* Platform Overview */
-.platform-card {
+.pricing-card:hover {
+    transform: translateY(-4px);
     background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 12px;
-    padding: 1rem 1.5rem;
-    transition: all 0.3s ease;
-    color: #ffffff;
-    font-weight: 500;
-    min-height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
-.platform-card:hover {
-    background: rgba(255, 255, 255, 0.25);
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.5);
+.pricing-card.featured:hover {
+    transform: scale(1.05) translateY(-4px);
 }
 
-/* Trust Indicators */
-.trust-indicator {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 25px;
-    color: #ffffff;
-    font-size: 0.875rem;
+.plan-name {
+    font-size: 1.2rem;
     font-weight: 600;
-    transition: all 0.3s ease;
+    margin-bottom: 1rem;
 }
 
-.trust-indicator:hover {
-    background: rgba(255, 255, 255, 0.25);
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.5);
+.plan-price {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #60d9f7;
+    margin-bottom: 0.5rem;
 }
 
-/* Responsive Design & Accessibility */
+.plan-period {
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 2rem;
+}
+
+.plan-features {
+    list-style: none;
+    margin-bottom: 2rem;
+}
+
+.plan-features li {
+    padding: 0.5rem 0;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.plan-features li::before {
+    content: "✓";
+    color: #60d9f7;
+    font-weight: bold;
+    margin-right: 0.5rem;
+}
+
+/* Container */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+/* Responsive */
 @media (max-width: 768px) {
-    .feature-grid {
-        grid-template-columns: 1fr;
+    .hero-title {
+        font-size: 2.5rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.2rem;
+    }
+    
+    .hero-stats {
         gap: 2rem;
     }
     
-    .hero-dark {
-        min-height: 80vh;
-        padding: 2rem 0;
+    .stat-number {
+        font-size: 2rem;
     }
     
-    .floating-orb {
-        display: none;
+    .cta-buttons {
+        flex-direction: column;
+        align-items: center;
     }
     
-    .glass-card {
-        padding: 2rem 1.5rem;
-        margin-bottom: 1.5rem;
+    .section-title {
+        font-size: 2.2rem;
+    }
+    
+    .features-grid {
+        grid-template-columns: 1fr;
     }
     
     .pricing-card.featured {
         transform: none;
-        margin-top: 2rem;
-    }
-    
-    .trust-indicator {
-        padding: 0.5rem 1rem;
-        font-size: 0.8rem;
-    }
-    
-    .platform-card {
-        padding: 0.75rem 1rem;
-        font-size: 0.875rem;
-        min-height: 40px;
-    }
-    
-    .hero-content h1 {
-        font-size: 3rem;
-        line-height: 1.1;
-    }
-    
-    .hero-content p {
-        font-size: 1.1rem;
-        line-height: 1.6;
-        margin-bottom: 2rem;
     }
 }
 
 /* Focus states for accessibility */
-.btn-glass:focus,
-.btn-glow:focus,
-.platform-card:focus,
-.trust-indicator:focus {
+.btn-primary:focus,
+.btn-secondary:focus {
     outline: 2px solid #60d9f7;
     outline-offset: 2px;
-    box-shadow: 0 0 0 4px rgba(96, 217, 247, 0.2);
-}
-
-/* Improved text spacing and readability */
-.glass-card p {
-    line-height: 1.7;
-    margin-bottom: 1.5rem;
-}
-
-.glass-card h3 {
-    line-height: 1.3;
-    margin-bottom: 1rem;
-}
-
-/* Loading Animation */
-.loading-pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: .5;
-    }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Hero Section - Dark Theme -->
-<section class="hero-dark flex items-center justify-center">
-    <!-- Floating Orbs -->
-    <div class="floating-orb"></div>
-    <div class="floating-orb"></div>
-    <div class="floating-orb"></div>
-    
-    <!-- Animated Grid -->
-    <div class="hero-grid"></div>
-    
-    <div class="container relative z-10 text-center text-white">
-        <div class="max-w-4xl mx-auto">
-            <!-- Main Headlines -->
-            <h1 class="text-6xl md:text-7xl font-bold mb-6 leading-tight">
-                Revolutionary
-                <span class="block bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                    Digital Verification
-                </span>
-            </h1>
-            
-                         <p class="text-xl md:text-2xl mb-8 leading-relaxed max-w-3xl mx-auto" style="color: rgba(255, 255, 255, 0.95); text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">
-                 The world's first enterprise-grade cryptographic verification system serving the 
-                 <span class="font-semibold" style="color: #60d9f7; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);">$47.3B+ Digital Verification Market</span> 
-                 with zero-knowledge proofs and perfect privacy.
-             </p>
-            
-            <!-- Key Benefits -->
-            <div class="flex flex-wrap justify-center gap-4 mb-12">
-                <div class="trust-indicator">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                    </svg>
-                    100% Accuracy Achieved
-                </div>
-                <div class="trust-indicator">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                    Sub-10ms Performance
-                </div>
-                <div class="trust-indicator">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                    </svg>
-                    Zero-Knowledge Privacy
-                </div>
-                <div class="trust-indicator">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
-                    </svg>
-                    Production Ready
-                </div>
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="hero-content">
+        <h1 class="hero-title">
+            Revolutionary Digital Verification
+        </h1>
+        
+        <p class="hero-subtitle">
+            Enterprise-grade cryptographic verification with zero-knowledge proofs. 
+            Protect your platform from bots while preserving user privacy.
+        </p>
+        
+        <div class="hero-stats">
+            <div class="stat-item">
+                <span class="stat-number">100%</span>
+                <span class="stat-label">Accuracy</span>
             </div>
-            
-            <!-- Primary CTAs -->
-            <div class="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-                <a href="{{ url_for('onboarding.start') }}" class="btn-glow" onclick="trackCTAClick('get_started_free', 'hero')">
-                    Start Protecting Your Site
-                    <svg class="inline-block ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                    </svg>
-                </a>
-                <a href="/docs#quick-start" class="btn-glass" onclick="trackCTAClick('view_documentation', 'hero')">
-                    See How It Works
-                </a>
+            <div class="stat-item">
+                <span class="stat-number">&lt;10ms</span>
+                <span class="stat-label">Response Time</span>
             </div>
-            
-            <!-- Secondary Actions -->
-            <div class="flex flex-wrap justify-center gap-4 mb-12">
-                <a href="/join-network" class="btn-glass text-sm px-4 py-2" onclick="trackCTAClick('try_demo', 'hero')">
-                    🚀 Try Demo
-                </a>
-                <a href="/join-network" class="btn-glass text-sm px-4 py-2" onclick="trackCTAClick('join_network', 'hero')">
-                    🌐 Join Network
-                </a>
-                <a href="/api-docs" class="btn-glass text-sm px-4 py-2" onclick="trackCTAClick('explore_api', 'hero')">
-                    📋 Explore API
-                </a>
-                <a href="/join-network" class="btn-glass text-sm px-4 py-2" onclick="trackCTAClick('see_live_protection', 'hero')">
-                    🛡️ Shield Demo
-                </a>
+            <div class="stat-item">
+                <span class="stat-number">99.99%</span>
+                <span class="stat-label">Uptime</span>
             </div>
-            
-                         <!-- Performance Stats -->
-             <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mt-16">
-                 <div class="text-center">
-                     <div class="stat-number">100%</div>
-                     <div class="text-sm font-medium" style="color: rgba(255, 255, 255, 0.9);">Accuracy Rate</div>
-                 </div>
-                 <div class="text-center">
-                     <div class="stat-number">&lt;10ms</div>
-                     <div class="text-sm font-medium" style="color: rgba(255, 255, 255, 0.9);">Response Time</div>
-                 </div>
-                 <div class="text-center">
-                     <div class="stat-number">99.99%</div>
-                     <div class="text-sm font-medium" style="color: rgba(255, 255, 255, 0.9);">Uptime SLA</div>
-                 </div>
-                 <div class="text-center">
-                     <div class="stat-number">$47.3B+</div>
-                     <div class="text-sm font-medium" style="color: rgba(255, 255, 255, 0.9);">Market Size</div>
-                 </div>
-             </div>
+        </div>
+        
+        <div class="cta-buttons">
+            <a href="{{ url_for('onboarding.start') }}" class="btn-primary">
+                Start Free Trial
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                </svg>
+            </a>
+            <a href="/docs" class="btn-secondary">
+                View Documentation
+            </a>
         </div>
     </div>
 </section>
 
-<!-- React Component Demo Section -->
-<section class="section-dark py-20">
-    <div class="container relative z-10">
-                 <div class="text-center mb-12">
-             <h2 class="text-4xl font-bold mb-6" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">🚀 React Components Enabled</h2>
-             <p class="text-xl max-w-2xl mx-auto leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">
-                 Your site now supports modern React components! Below you can see a live React-powered interactive demo.
-             </p>
-         </div>
+<!-- Features Section -->
+<section class="features-section">
+    <div class="container">
+        <h2 class="section-title">Why Choose Lemma?</h2>
+        <p class="section-subtitle">
+            Built for enterprise scale with privacy-first design and lightning-fast performance.
+        </p>
         
-        <!-- React Component Container -->
-        <div class="glass-card max-w-4xl mx-auto">
-            <!-- This will be replaced by React component -->
-            <div id="interactive-demo-container" data-lemma-saas-component="InteractiveDemo">
-                <!-- Fallback content while React loads -->
-                <div class="text-center py-12">
-                    <div class="loading-pulse w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full mx-auto mb-4"></div>
-                    <p class="text-gray-300">Loading React component...</p>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Component Info -->
-        <div class="text-center mt-8">
-            <p class="text-sm text-gray-400">
-                ✅ React 18 loaded | ✅ Components initialized | ✅ Tailwind CSS active
-            </p>
-        </div>
-    </div>
-</section>
-
-<!-- Platform Overview -->
-<section class="section-dark py-20">
-    <div class="container relative z-10">
-                 <div class="text-center mb-20">
-             <h2 class="text-5xl font-bold mb-6" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Everything You Need, Ready to Go</h2>
-             <p class="text-xl max-w-3xl mx-auto leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">
-                 We've built the complete platform so you don't have to. Get up and running in minutes with our self-service onboarding, simple APIs, and bulletproof security.
-             </p>
-         </div>
-        
-        <!-- Platform Categories -->
-        <div class="feature-grid">
-            <!-- Customer Experience -->
-            <div class="glass-card">
-                <div class="feature-icon">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-blue-400">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-3" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Customer Experience</h3>
-                <p class="mb-6 leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">Your customers get a smooth, self-service experience from start to finish</p>
-                <div class="grid grid-cols-2 gap-3 text-sm">
-                    <div class="platform-card text-center text-white">Landing Page</div>
-                    <div class="platform-card text-center text-white">Registration</div>
-                    <div class="platform-card text-center text-white">Verification</div>
-                    <div class="platform-card text-center text-white">Dashboard</div>
-                    <div class="platform-card text-center text-white">API Keys</div>
-                    <div class="platform-card text-center text-white">Usage Analytics</div>
-                    <div class="platform-card text-center text-white">Integration Guide</div>
-                    <div class="platform-card text-center text-white">Billing Portal</div>
-                </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🛡️</div>
+                <h3 class="feature-title">Privacy-First Verification</h3>
+                <p class="feature-description">
+                    Zero personal data collection. GDPR compliant with cryptographic zero-knowledge proofs.
+                </p>
             </div>
             
-            <!-- Developer Experience -->
-            <div class="glass-card">
-                <div class="feature-icon">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-purple-400">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-3" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Developer Experience</h3>
-                <p class="mb-6 leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">Everything developers need to integrate quickly and confidently</p>
-                <div class="grid grid-cols-2 gap-3 text-sm">
-                    <div class="platform-card text-center text-white">API Documentation</div>
-                    <div class="platform-card text-center text-white">OpenAPI Spec</div>
-                    <div class="platform-card text-center text-white">Code Samples</div>
-                    <div class="platform-card text-center text-white">Sandbox</div>
-                    <div class="platform-card text-center text-white">Widget Test</div>
-                    <div class="platform-card text-center text-white">Demo Pages</div>
-                    <div class="platform-card text-center text-white">Integration Guide</div>
-                    <div class="platform-card text-center text-white">Status Page</div>
-                </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3 class="feature-title">Lightning Fast</h3>
+                <p class="feature-description">
+                    Sub-10ms verification globally. 10x faster than traditional systems with offline capability.
+                </p>
             </div>
             
-            <!-- Admin & Management -->
-            <div class="glass-card">
-                <div class="feature-icon">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-orange-400">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-3" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Admin & Management</h3>
-                <p class="mb-6 leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">Complete administrative control and system management</p>
-                <div class="grid grid-cols-2 gap-3 text-sm">
-                    <div class="platform-card text-center text-white">Admin Login</div>
-                    <div class="platform-card text-center text-white">Admin Dashboard</div>
-                    <div class="platform-card text-center text-white">User Management</div>
-                    <div class="platform-card text-center text-white">Credential Issuing</div>
-                    <div class="platform-card text-center text-white">System Settings</div>
-                    <div class="platform-card text-center text-white">Audit Logs</div>
-                    <div class="platform-card text-center text-white">Billing Admin</div>
-                    <div class="platform-card text-center text-white">SRE Dashboard</div>
-                </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔧</div>
+                <h3 class="feature-title">Easy Integration</h3>
+                <p class="feature-description">
+                    10-minute setup with comprehensive APIs, SDKs, and copy-paste code examples.
+                </p>
             </div>
             
-            <!-- Demo & Testing -->
-            <div class="glass-card">
-                <div class="feature-icon">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 4h10a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V10a2 2 0 012-2zm3 4h4"/>
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-3" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Demo & Testing</h3>
-                <p class="mb-6 leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">Interactive demonstrations and testing environments</p>
-                <div class="grid grid-cols-2 gap-3 text-sm">
-                    <div class="platform-card text-center text-white">Agent Network Demo</div>
-                    <div class="platform-card text-center text-white">Gate Demo</div>
-                    <div class="platform-card text-center text-white">Widget Test</div>
-                    <div class="platform-card text-center text-white">Crypto Demo</div>
-                    <div class="platform-card text-center text-white">Protected Content</div>
-                    <div class="platform-card text-center text-white">Playground</div>
-                    <div class="platform-card text-center text-white">API Widget Demo</div>
-                    <div class="platform-card text-center text-white">Scenario Demo</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Key Features -->
-<section class="section-dark py-20">
-    <div class="container relative z-10">
-        <div class="text-center mb-16">
-            <h2 class="text-5xl font-bold mb-6" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Why Choose Lemma?</h2>
-            <p class="text-xl leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">Built for enterprise scale with privacy-first design</p>
-        </div>
-        
-        <div class="feature-grid">
-            <div class="glass-card text-center">
-                <div class="feature-icon mx-auto">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-blue-400">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-3" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Privacy-First Verification</h3>
-                <p class="leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">Only verifies humanity - no personal data collection. GDPR compliant with zero-knowledge proofs.</p>
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3 class="feature-title">Global Scale</h3>
+                <p class="feature-description">
+                    99.99% uptime SLA with 200+ CDN edge locations and enterprise infrastructure.
+                </p>
             </div>
             
-            <div class="glass-card text-center">
-                <div class="feature-icon mx-auto">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-cyan-400">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-3" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Lightning Fast Integration</h3>
-                <p class="leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">10-minute setup with comprehensive APIs, SDKs, and copy-paste code examples.</p>
+            <div class="feature-card">
+                <div class="feature-icon">💰</div>
+                <h3 class="feature-title">Cost Effective</h3>
+                <p class="feature-description">
+                    Network pricing that decreases as more businesses join. Unlimited offline verifications.
+                </p>
             </div>
             
-            <div class="glass-card text-center">
-                <div class="feature-icon mx-auto">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-purple-400">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-3" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Network Effects</h3>
-                <p class="leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">One verification works across all network sites. Costs decrease as more businesses join.</p>
-            </div>
-            
-            <div class="glass-card text-center">
-                <div class="feature-icon mx-auto">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-3" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Enterprise SRE</h3>
-                <p class="leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">83% SRE ready with real-time monitoring, alerting, and performance optimization.</p>
-            </div>
-            
-            <div class="glass-card text-center">
-                <div class="feature-icon mx-auto">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-orange-400">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-3" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Security & Compliance</h3>
-                <p class="leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">SOC 2 Type II ready with comprehensive audit framework and compliance dashboard.</p>
-            </div>
-            
-            <div class="glass-card text-center">
-                <div class="feature-icon mx-auto">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-pink-400">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9-9a9 9 0 00-9 9m0 0a9 9 0 019-9"/>
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-3" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">W3C Standards</h3>
-                <p class="leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">Built on W3C Verifiable Credentials and DID standards for universal compatibility.</p>
+            <div class="feature-card">
+                <div class="feature-icon">🏢</div>
+                <h3 class="feature-title">Enterprise Ready</h3>
+                <p class="feature-description">
+                    SOC 2 compliant with comprehensive audit framework and 24/7 enterprise support.
+                </p>
             </div>
         </div>
     </div>
 </section>
 
 <!-- Pricing Section -->
-<section class="section-dark py-20">
-    <div class="container relative z-10">
-        <div class="text-center mb-16">
-            <h2 class="text-5xl font-bold mb-6" style="color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">Network-Effect Pricing</h2>
-            <p class="text-xl leading-relaxed" style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">Revolutionary pricing that gets better as the network grows</p>
-        </div>
+<section class="pricing-section">
+    <div class="container">
+        <h2 class="section-title">Simple, Transparent Pricing</h2>
+        <p class="section-subtitle">
+            Start free, scale as you grow. No hidden fees or surprise charges.
+        </p>
         
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            <!-- Free Tier -->
+        <div class="pricing-grid">
+            <!-- Free Plan -->
             <div class="pricing-card">
-                <div class="text-center mb-8">
-                    <h3 class="text-xl font-semibold text-white">Free</h3>
-                    <div class="text-4xl font-bold mt-4 mb-2 text-white">$0</div>
-                    <div class="text-gray-400">Up to 1,000 verifications/month</div>
-                </div>
-                <ul class="space-y-4 mb-8">
-                    <li class="flex items-center gap-3 text-gray-300">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Basic human verification
-                    </li>
-                    <li class="flex items-center gap-3 text-gray-300">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        API access
-                    </li>
-                    <li class="flex items-center gap-3 text-gray-300">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Community support
-                    </li>
+                <div class="plan-name">Free</div>
+                <div class="plan-price">$0</div>
+                <div class="plan-period">Up to 1,000 verifications/month</div>
+                <ul class="plan-features">
+                    <li>Basic human verification</li>
+                    <li>API access</li>
+                    <li>Community support</li>
+                    <li>Documentation</li>
                 </ul>
-                <a href="{{ url_for('onboarding.start') }}" class="btn-glass w-full text-center block">Get Started</a>
+                <a href="{{ url_for('onboarding.start') }}" class="btn-secondary" style="width: 100%; justify-content: center;">
+                    Get Started
+                </a>
             </div>
             
-            <!-- Standard Tier -->
+            <!-- Pro Plan -->
             <div class="pricing-card featured">
-                <div class="text-center mb-8">
-                    <h3 class="text-xl font-semibold text-white">Standard</h3>
-                    <div class="text-4xl font-bold mt-4 mb-2 text-white">$0.10</div>
-                    <div class="text-gray-400">per user per month + $2.00 onboarding</div>
-                </div>
-                <ul class="space-y-4 mb-8">
-                    <li class="flex items-center gap-3 text-gray-300">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Everything in Free
-                    </li>
-                    <li class="flex items-center gap-3 text-gray-300">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Unlimited verifications
-                    </li>
-                    <li class="flex items-center gap-3 text-gray-300">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Priority support
-                    </li>
-                    <li class="flex items-center gap-3 text-gray-300">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Advanced analytics
-                    </li>
+                <div class="plan-name">Professional</div>
+                <div class="plan-price">$49</div>
+                <div class="plan-period">per month</div>
+                <ul class="plan-features">
+                    <li>Unlimited verifications</li>
+                    <li>Advanced analytics</li>
+                    <li>Priority support</li>
+                    <li>Custom branding</li>
+                    <li>SLA guarantee</li>
                 </ul>
-                <a href="{{ url_for('onboarding.start') }}" class="btn-glow w-full text-center block">Start Trial</a>
+                <a href="{{ url_for('onboarding.start') }}" class="btn-primary" style="width: 100%; justify-content: center;">
+                    Start Trial
+                </a>
             </div>
             
-            <!-- Enterprise Tier -->
+            <!-- Enterprise Plan -->
             <div class="pricing-card">
-                <div class="text-center mb-8">
-                    <h3 class="text-xl font-semibold text-white">Enterprise</h3>
-                    <div class="text-4xl font-bold mt-4 mb-2 text-white">Custom</div>
-                    <div class="text-gray-400">Volume discounts available</div>
-                </div>
-                <ul class="space-y-4 mb-8">
-                    <li class="flex items-center gap-3 text-gray-300">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Everything in Standard
-                    </li>
-                    <li class="flex items-center gap-3 text-gray-300">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Dedicated support
-                    </li>
-                    <li class="flex items-center gap-3 text-gray-300">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Custom integrations
-                    </li>
-                    <li class="flex items-center gap-3 text-gray-300">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-green-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        SLA guarantees
-                    </li>
+                <div class="plan-name">Enterprise</div>
+                <div class="plan-price">Custom</div>
+                <div class="plan-period">Contact for pricing</div>
+                <ul class="plan-features">
+                    <li>Custom deployment</li>
+                    <li>Dedicated support</li>
+                    <li>Custom integrations</li>
+                    <li>Compliance assistance</li>
+                    <li>On-premise options</li>
                 </ul>
-                <a href="mailto:enterprise@lemma.network" class="btn-glass w-full text-center block">Contact Sales</a>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Call to Action -->
-<section class="section-dark py-20">
-    <div class="container relative z-10">
-        <div class="glass-card text-center max-w-4xl mx-auto">
-            <h2 class="text-4xl font-bold mb-6 text-white">Ready to Transform Your Platform?</h2>
-            <p class="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-                Join the digital verification revolution. Get started with Lemma today and experience the future of secure, privacy-first verification.
-            </p>
-            <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="{{ url_for('onboarding.start') }}" class="btn-glow">
-                    Start Your Free Trial
-                    <svg class="inline-block ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                    </svg>
-                </a>
-                <a href="/docs" class="btn-glass">
-                    View Documentation
+                <a href="/contact" class="btn-secondary" style="width: 100%; justify-content: center;">
+                    Contact Sales
                 </a>
             </div>
         </div>
     </div>
 </section>
-
-<script>
-// Track CTA clicks for analytics
-function trackCTAClick(action, location) {
-    console.log(`CTA Click: ${action} from ${location}`);
-    // Add your analytics tracking here
-}
-
-// Add smooth scrolling for anchor links
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        document.querySelector(this.getAttribute('href')).scrollIntoView({
-            behavior: 'smooth'
-        });
-    });
-});
-</script>
 {% endblock %} 
