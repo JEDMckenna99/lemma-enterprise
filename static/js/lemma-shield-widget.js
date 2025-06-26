@@ -2008,149 +2008,253 @@ try {
             const styles = document.createElement('style');
             styles.id = 'lemma-shield-widget-styles';
             styles.textContent = `
+                /* Lemma Shield Widget - Modern SaaS Design System */
+                
+                /* CSS Variables */
+                :root {
+                    --lemma-primary: #667eea;
+                    --lemma-primary-dark: #5a67d8;
+                    --lemma-primary-light: #7c3aed;
+                    --lemma-secondary: #f093fb;
+                    --lemma-gray-50: #f8fafc;
+                    --lemma-gray-100: #f1f5f9;
+                    --lemma-gray-200: #e2e8f0;
+                    --lemma-gray-300: #cbd5e1;
+                    --lemma-gray-400: #94a3b8;
+                    --lemma-gray-500: #64748b;
+                    --lemma-gray-600: #475569;
+                    --lemma-gray-700: #334155;
+                    --lemma-gray-800: #1e293b;
+                    --lemma-gray-900: #0f172a;
+                    --lemma-success: #10b981;
+                    --lemma-warning: #f59e0b;
+                    --lemma-error: #ef4444;
+                    --lemma-info: #3b82f6;
+                    --lemma-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+                    --lemma-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+                    --lemma-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+                    --lemma-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+                    --lemma-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                }
+                
+                /* Modern Overlay with Glassmorphic Effect */
                 .lemma-shield-overlay {
                     position: fixed;
                     top: 0;
                     left: 0;
                     right: 0;
                     bottom: 0;
-                    background: rgba(0, 0, 0, 0.7);
-                    backdrop-filter: blur(4px);
+                    background: linear-gradient(135deg, rgba(0, 0, 0, 0.6) 0%, rgba(26, 26, 46, 0.8) 100%);
+                    backdrop-filter: blur(12px) saturate(1.5);
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     z-index: 10000;
-                    animation: fadeIn 0.3s ease-out;
+                    animation: modernFadeIn 0.4s ease-out;
                 }
                 
+                /* Modern Widget Container */
                 .lemma-shield-widget {
-                    background: white;
-                    border-radius: 16px;
-                    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
-                    max-width: 480px;
+                    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
+                    backdrop-filter: blur(20px);
+                    border-radius: 24px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    box-shadow: 0 32px 64px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.05);
+                    max-width: 520px;
                     width: 90%;
                     max-height: 90vh;
                     overflow-y: auto;
-                    animation: slideUp 0.3s ease-out;
+                    animation: modernSlideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    position: relative;
                 }
                 
+                .lemma-shield-widget::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    height: 4px;
+                    background: linear-gradient(135deg, var(--lemma-primary) 0%, var(--lemma-primary-light) 100%);
+                    border-radius: 24px 24px 0 0;
+                }
+                
+                /* Modern Card Variants */
                 .lemma-card {
-                    /* Card styling already applied via lemma-shield-widget */
+                    background: var(--lemma-shield-widget);
+                    border-radius: 24px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    backdrop-filter: blur(20px);
                 }
                 
-                .lemma-card.success {
-                    border-top: 4px solid #10B981;
+                .lemma-card.success::before {
+                    background: linear-gradient(135deg, var(--lemma-success) 0%, #22c55e 100%);
                 }
                 
-                .lemma-card.error {
-                    border-top: 4px solid #EF4444;
+                .lemma-card.error::before {
+                    background: linear-gradient(135deg, var(--lemma-error) 0%, #f87171 100%);
                 }
                 
+                .lemma-card.warning::before {
+                    background: linear-gradient(135deg, var(--lemma-warning) 0%, #fbbf24 100%);
+                }
+                
+                /* Modern Header Design */
                 .lemma-shield-header, .lemma-card-header {
-                    padding: 2rem 2rem 1rem 2rem;
+                    padding: 2.5rem 2.5rem 1.5rem 2.5rem;
                     text-align: center;
-                    border-bottom: 1px solid #E5E7EB;
+                    border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+                    position: relative;
                 }
                 
                 .lemma-shield-icon, .lemma-logo, .stripe-logo, .success-icon, .error-icon {
-                    font-size: 2rem;
-                    margin-bottom: 1rem;
+                    font-size: 2.5rem;
+                    margin-bottom: 1.5rem;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    gap: 0.5rem;
+                    gap: 0.75rem;
+                    background: linear-gradient(135deg, var(--lemma-primary) 0%, var(--lemma-primary-light) 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
                 }
                 
                 .lemma-shield-header h2, .lemma-card-header h2 {
-                    margin: 0 0 0.5rem 0;
-                    color: #1F2937;
-                    font-size: 1.5rem;
-                    font-weight: 600;
+                    margin: 0 0 0.75rem 0;
+                    color: var(--lemma-gray-900);
+                    font-size: 1.75rem;
+                    font-weight: 700;
+                    font-family: var(--lemma-font-family);
+                    line-height: 1.2;
+                    letter-spacing: -0.025em;
                 }
                 
                 .lemma-shield-header p, .lemma-card-header p {
                     margin: 0;
-                    color: #6B7280;
-                    font-size: 0.875rem;
+                    color: var(--lemma-gray-600);
+                    font-size: 1rem;
+                    line-height: 1.5;
+                    font-family: var(--lemma-font-family);
                 }
                 
+                /* Modern Body Design */
                 .lemma-shield-body, .lemma-card-body {
-                    padding: 2rem;
+                    padding: 2.5rem;
                 }
                 
                 .privacy-section, .verification-info {
-                    margin-bottom: 1.5rem;
+                    margin-bottom: 2rem;
+                    padding: 1.5rem;
+                    background: linear-gradient(135deg, var(--lemma-gray-50) 0%, rgba(255, 255, 255, 0.8) 100%);
+                    border-radius: 16px;
+                    border: 1px solid var(--lemma-gray-200);
                 }
                 
                 .privacy-section h3, .verification-info h3 {
-                    margin: 0 0 0.75rem 0;
-                    color: #374151;
-                    font-size: 1.125rem;
+                    margin: 0 0 1rem 0;
+                    color: var(--lemma-gray-900);
+                    font-size: 1.25rem;
                     font-weight: 600;
+                    font-family: var(--lemma-font-family);
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+                
+                .privacy-section h3::before, .verification-info h3::before {
+                    content: '🔒';
+                    font-size: 1rem;
                 }
                 
                 .privacy-section ul, .verification-info ul {
-                    margin: 0.5rem 0;
-                    padding-left: 1.25rem;
-                    color: #4B5563;
+                    margin: 1rem 0;
+                    padding-left: 1.5rem;
+                    color: var(--lemma-gray-700);
+                    font-family: var(--lemma-font-family);
                 }
                 
                 .privacy-section li, .verification-info li {
-                    margin-bottom: 0.5rem;
+                    margin-bottom: 0.75rem;
+                    line-height: 1.5;
+                    position: relative;
+                }
+                
+                .privacy-section li::marker, .verification-info li::marker {
+                    color: var(--lemma-primary);
                 }
                 
                 .small-text {
                     font-size: 0.875rem;
-                    color: #6B7280;
+                    color: var(--lemma-gray-500);
+                    font-family: var(--lemma-font-family);
+                    line-height: 1.4;
                 }
                 
+                /* Modern Verification Steps */
                 .verification-steps {
-                    margin: 1.5rem 0;
-                    text-align: left;
+                    margin: 2rem 0;
+                    padding: 1.5rem;
+                    background: linear-gradient(135deg, var(--lemma-gray-50) 0%, rgba(255, 255, 255, 0.8) 100%);
+                    border-radius: 16px;
+                    border: 1px solid var(--lemma-gray-200);
                 }
                 
                 .verification-steps .step {
                     display: flex;
                     align-items: center;
-                    margin: 8px 0;
-                    opacity: 0.5;
-                    transition: all 0.3s ease;
+                    margin: 1rem 0;
+                    padding: 1rem;
+                    border-radius: 12px;
+                    opacity: 0.6;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    background: rgba(255, 255, 255, 0.5);
                 }
                 
                 .verification-steps .step.active {
                     opacity: 1;
+                    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(116, 75, 162, 0.1) 100%);
+                    border: 1px solid var(--lemma-primary);
+                    transform: translateX(8px);
+                    box-shadow: var(--lemma-shadow-md);
                 }
                 
                 .step-icon {
-                    width: 24px;
-                    height: 24px;
-                    background: #f8f9fa;
+                    width: 32px;
+                    height: 32px;
+                    background: var(--lemma-gray-200);
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    margin-right: 12px;
-                    font-size: 12px;
-                    border: 2px solid #e9ecef;
+                    margin-right: 1rem;
+                    font-size: 0.875rem;
+                    font-weight: 600;
+                    border: 2px solid var(--lemma-gray-300);
                     transition: all 0.3s ease;
+                    color: var(--lemma-gray-600);
                 }
                 
                 .step.active .step-icon {
-                    background: #635bff;
+                    background: var(--lemma-primary);
                     color: white;
-                    border-color: #635bff;
+                    border-color: var(--lemma-primary);
+                    box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
                 }
                 
                 .step-text {
-                    font-size: 14px;
-                    color: #6c757d;
-                }
-                
-                .step.active .step-text {
-                    color: #212529;
+                    font-size: 0.875rem;
+                    color: var(--lemma-gray-600);
+                    font-family: var(--lemma-font-family);
                     font-weight: 500;
                 }
                 
+                .step.active .step-text {
+                    color: var(--lemma-gray-900);
+                    font-weight: 600;
+                }
+                
+                /* Progress Steps Layout */
                 .step {
                     display: flex;
                     flex-direction: column;
@@ -2159,93 +2263,307 @@ try {
                     flex: 1;
                     position: relative;
                     z-index: 2;
+                    padding: 1.5rem 1rem;
                 }
                 
                 .step-number {
-                    width: 32px;
-                    height: 32px;
+                    width: 40px;
+                    height: 40px;
                     border-radius: 50%;
-                    background: #E5E7EB;
-                    color: #6B7280;
+                    background: var(--lemma-gray-200);
+                    color: var(--lemma-gray-600);
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-weight: 600;
-                    margin-bottom: 0.5rem;
+                    font-weight: 700;
+                    margin-bottom: 0.75rem;
+                    transition: all 0.3s ease;
+                    font-family: var(--lemma-font-family);
+                    border: 3px solid var(--lemma-gray-300);
                 }
                 
                 .step.active .step-number {
-                    background: #635BFF;
+                    background: var(--lemma-primary);
                     color: white;
+                    border-color: var(--lemma-primary);
+                    box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+                    transform: scale(1.1);
                 }
                 
                 .step-content h4 {
-                    margin: 0 0 0.25rem 0;
-                    font-size: 0.875rem;
+                    margin: 0 0 0.5rem 0;
+                    font-size: 1rem;
                     font-weight: 600;
-                    color: #374151;
+                    color: var(--lemma-gray-800);
+                    font-family: var(--lemma-font-family);
                 }
                 
                 .step-content p {
                     margin: 0;
-                    font-size: 0.75rem;
-                    color: #6B7280;
+                    font-size: 0.8125rem;
+                    color: var(--lemma-gray-600);
+                    line-height: 1.4;
+                    font-family: var(--lemma-font-family);
                 }
                 
+                .step.active .step-content h4 {
+                    color: var(--lemma-gray-900);
+                }
+                
+                .step.active .step-content p {
+                    color: var(--lemma-gray-700);
+                }
+                
+                /* Modern Notice */
                 .verification-notice {
-                    background: #F3F4F6;
-                    border: 1px solid #E5E7EB;
-                    border-radius: 8px;
-                    padding: 1rem;
-                    margin: 1.5rem 0;
+                    background: linear-gradient(135deg, var(--lemma-info), #60a5fa);
+                    color: white;
+                    border: none;
+                    border-radius: 16px;
+                    padding: 1.5rem;
+                    margin: 2rem 0;
+                    box-shadow: var(--lemma-shadow-lg);
                 }
                 
                 .verification-notice p {
                     margin: 0;
                     font-size: 0.875rem;
-                    color: #4B5563;
+                    line-height: 1.5;
+                    font-family: var(--lemma-font-family);
+                    font-weight: 500;
                 }
                 
+                /* Modern Action Buttons */
                 .lemma-card-actions {
                     display: flex;
                     gap: 1rem;
                     justify-content: flex-end;
-                    margin-top: 2rem;
+                    margin-top: 2.5rem;
+                    padding-top: 1.5rem;
+                    border-top: 1px solid rgba(226, 232, 240, 0.6);
                 }
                 
                 .lemma-btn {
-                    padding: 0.75rem 1.5rem;
-                    border-radius: 8px;
+                    padding: 1rem 2rem;
+                    border-radius: 12px;
                     font-size: 0.875rem;
                     font-weight: 600;
                     cursor: pointer;
                     border: none;
-                    transition: all 0.2s ease;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     text-decoration: none;
                     display: inline-flex;
                     align-items: center;
                     justify-content: center;
                     gap: 0.5rem;
+                    font-family: var(--lemma-font-family);
+                    min-width: 120px;
                 }
                 
                 .lemma-btn-primary {
-                    background: #635BFF;
+                    background: linear-gradient(135deg, var(--lemma-primary) 0%, var(--lemma-primary-light) 100%);
                     color: white;
+                    box-shadow: var(--lemma-shadow-md);
                 }
                 
                 .lemma-btn-primary:hover {
-                    background: #4F46E5;
-                    transform: translateY(-1px);
+                    transform: translateY(-2px);
+                    box-shadow: var(--lemma-shadow-lg);
+                    background: linear-gradient(135deg, var(--lemma-primary-dark) 0%, var(--lemma-primary) 100%);
                 }
                 
                 .lemma-btn-secondary {
-                    background: white;
-                    color: #374151;
-                    border: 1px solid #D1D5DB;
+                    background: rgba(255, 255, 255, 0.8);
+                    color: var(--lemma-gray-700);
+                    border: 1px solid var(--lemma-gray-300);
+                    backdrop-filter: blur(10px);
                 }
                 
                 .lemma-btn-secondary:hover {
-                    background: #F9FAFB;
+                    background: rgba(255, 255, 255, 1);
+                    border-color: var(--lemma-gray-400);
+                    transform: translateY(-1px);
+                    box-shadow: var(--lemma-shadow-md);
+                }
+                
+                /* Modern Animations */
+                @keyframes modernFadeIn {
+                    from {
+                        opacity: 0;
+                        backdrop-filter: blur(0px);
+                    }
+                    to {
+                        opacity: 1;
+                        backdrop-filter: blur(12px) saturate(1.5);
+                    }
+                }
+                
+                @keyframes modernSlideUp {
+                    from {
+                        opacity: 0;
+                        transform: translateY(60px) scale(0.95);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+                
+                @keyframes modernPulse {
+                    0%, 100% {
+                        opacity: 1;
+                        transform: scale(1);
+                    }
+                    50% {
+                        opacity: 0.8;
+                        transform: scale(1.05);
+                    }
+                }
+                
+                /* Loading States */
+                .lemma-loading {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 3rem 2rem;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                }
+                
+                .lemma-loading-spinner {
+                    width: 48px;
+                    height: 48px;
+                    border: 4px solid var(--lemma-gray-200);
+                    border-top: 4px solid var(--lemma-primary);
+                    border-radius: 50%;
+                    animation: modernSpin 1s linear infinite;
+                }
+                
+                @keyframes modernSpin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                
+                .lemma-loading-text {
+                    color: var(--lemma-gray-600);
+                    font-family: var(--lemma-font-family);
+                    font-weight: 500;
+                    text-align: center;
+                }
+                
+                /* Responsive Design */
+                @media (max-width: 640px) {
+                    .lemma-shield-widget {
+                        max-width: 95%;
+                        border-radius: 20px;
+                    }
+                    
+                    .lemma-shield-header, .lemma-card-header {
+                        padding: 2rem 1.5rem 1rem 1.5rem;
+                    }
+                    
+                    .lemma-shield-body, .lemma-card-body {
+                        padding: 1.5rem;
+                    }
+                    
+                    .lemma-shield-header h2, .lemma-card-header h2 {
+                        font-size: 1.5rem;
+                    }
+                    
+                    .privacy-section, .verification-info {
+                        padding: 1rem;
+                    }
+                    
+                    .verification-steps {
+                        padding: 1rem;
+                    }
+                    
+                    .step {
+                        padding: 1rem 0.5rem;
+                    }
+                    
+                    .step-number {
+                        width: 36px;
+                        height: 36px;
+                    }
+                    
+                    .lemma-card-actions {
+                        flex-direction: column-reverse;
+                        gap: 0.75rem;
+                    }
+                    
+                    .lemma-btn {
+                        width: 100%;
+                        justify-content: center;
+                    }
+                }
+                
+                /* Focus States for Accessibility */
+                .lemma-btn:focus {
+                    outline: 2px solid var(--lemma-primary);
+                    outline-offset: 2px;
+                }
+                
+                .step:focus-within {
+                    outline: 2px solid var(--lemma-primary);
+                    outline-offset: 2px;
+                    border-radius: 12px;
+                }
+                
+                /* Dark Mode Support */
+                @media (prefers-color-scheme: dark) {
+                    .lemma-shield-widget {
+                        background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                    }
+                    
+                    .lemma-shield-header, .lemma-card-header {
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                    }
+                    
+                    .lemma-shield-header h2, .lemma-card-header h2 {
+                        color: #f8fafc;
+                    }
+                    
+                    .lemma-shield-header p, .lemma-card-header p {
+                        color: #cbd5e1;
+                    }
+                    
+                    .privacy-section, .verification-info, .verification-steps {
+                        background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.6) 100%);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                    }
+                    
+                    .verification-steps .step {
+                        background: rgba(15, 23, 42, 0.5);
+                    }
+                    
+                    .verification-steps .step.active {
+                        background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(116, 75, 162, 0.2) 100%);
+                    }
+                    
+                    .lemma-card-actions {
+                        border-top: 1px solid rgba(255, 255, 255, 0.1);
+                    }
+                }
+                
+                /* Reduced Motion Support */
+                @media (prefers-reduced-motion: reduce) {
+                    .lemma-shield-widget,
+                    .lemma-shield-overlay,
+                    .verification-steps .step,
+                    .step-number,
+                    .step-icon,
+                    .lemma-btn,
+                    .lemma-loading-spinner {
+                        animation: none;
+                        transition: none;
+                    }
+                    
+                    .lemma-btn:hover,
+                    .step.active .step-number {
+                        transform: none;
+                    }
                 }
                 
                 .lemma-verify-btn {
