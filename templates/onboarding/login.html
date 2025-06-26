@@ -499,7 +499,7 @@
                 </div>
 
                 <form id="loginForm" class="modern-form">
-                    {{ csrf_token() }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     
                     <div class="form-group-modern">
                         <label for="email" class="form-label-modern">Email Address</label>
