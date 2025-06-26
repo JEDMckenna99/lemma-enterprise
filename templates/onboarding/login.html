@@ -593,6 +593,8 @@
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
+    console.log('Form submitted!');
+    
     const formData = new FormData(this);
     const data = {
         email: formData.get('email'),
@@ -600,22 +602,27 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
         csrf_token: formData.get('csrf_token')
     };
     
+    console.log('Login data:', { email: data.email, password: '***', csrf_token: data.csrf_token ? 'present' : 'missing' });
+    
     // Show loading state with smooth transition
     document.getElementById('submitBtn').style.display = 'none';
     document.getElementById('loadingState').classList.remove('hidden');
     document.getElementById('errorMessage').classList.add('hidden');
     
     try {
+        console.log('Sending login request...');
         const response = await fetch('{{ url_for("onboarding.login") }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': data.csrf_token
+                'X-CSRF-Token': data.csrf_token
             },
             body: JSON.stringify(data)
         });
         
+        console.log('Response status:', response.status);
         const result = await response.json();
+        console.log('Response data:', result);
         
         if (result.success) {
             // Success animation with modern styling
