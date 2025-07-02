@@ -1,19 +1,16 @@
 /**
- * Lemma Shield Widget - SIMPLIFIED v2.1 - Cache Refresh 2025-01-02T21:30:00Z
+ * Lemma Shield Widget - SIMPLIFIED v2.2 - FORCE CACHE REFRESH 2025-01-02T22:05:00Z
  * 
- * FIXED ISSUES:
- * - Removed infinite monitorVerificationProgress() loops
- * - Replaced complex checkVerificationStatus() with simplified checkVerificationStatusOnce() 
- * - Fixed showVerificationSuccess missing function error
- * - Static shield behavior - no more constant reappearing
- * - Clean error handling with simple refresh option
+ * CONFLICT RESOLVED:
+ * - Removed competing simple_shield_widget.js files causing initialization conflicts
+ * - DEPLOYMENT FORCED: Cache-busting to ensure old aggressive code is completely purged 
+ * - NO MORE: Multiple widget conflicts, aggressive fixes, periodic revocation loops
  * 
- * Provides a simplified inline verification flow:
- * 1. "Verify Human" button triggers verification
- * 2. Disclaimer card explains Lemma and privacy commitment
- * 3. Stripe verification card (same size as disclaimer)
- * 4. Single verification check (no loops)
- * 5. After success, shield protection is removed
+ * SIMPLIFIED STATIC SHIELD:
+ * - Single initialization with duplicate prevention
+ * - Static shield behavior - appears once when needed
+ * - Clean verification flow without infinite loops
+ * - Event-only monitoring (no periodic checks)
  * 
  * Usage:
  * const shieldWidget = new LemmaShieldWidget({
