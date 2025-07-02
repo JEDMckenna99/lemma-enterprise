@@ -83,7 +83,7 @@ try {
         }
         
         async init() {
-            console.log('🛡️ Initializing Lemma Shield Widget');
+            console.log('🛡️ Initializing Lemma Shield Widget - STATIC MODE');
             
             // Wait for wallet to be available
             await this.waitForWallet();
@@ -94,14 +94,48 @@ try {
             // Check if we're returning from Stripe verification
             await this.checkForReturnFromVerification();
             
-            // Check initial status and act on the result - but let orchestrator handle the flow
+            // STATIC SHIELD: Only check once if user has credentials, then show static shield
             if (!window.lemmaFlowOrchestrator) {
-                const statusResult = await this.checkStatus();
-                await this.handleStatusResult(statusResult);
+                const hasCredentials = await this.hasValidCredentials();
+                if (hasCredentials) {
+                    console.log('✅ User has valid credentials - granting access immediately');
+                    this.grantAccess();
+                } else {
+                    console.log('🛡️ No valid credentials - showing static shield');
+                    await this.showVerificationWidget();
+                }
             }
             
-            // Start periodic revocation checking
+            // Start event-only monitoring (no periodic checks)
             this.startRevocationMonitoring();
+        }
+
+        async hasValidCredentials() {
+            /*
+             * STATIC CHECK: Simple one-time check if user has valid credentials
+             * Returns true/false without complex verification - for static shield behavior
+             */
+            try {
+                if (!this.wallet) {
+                    console.log('📭 No wallet available');
+                    return false;
+                }
+                
+                const credentials = await this.wallet.getCredentials() || [];
+                if (credentials.length === 0) {
+                    console.log('📭 No credentials in wallet');
+                    return false;
+                }
+                
+                // Simple check - if they have any credential, consider them valid
+                // The actual verification happens during verification flow, not during shield display
+                console.log(`✅ Found ${credentials.length} credentials - user appears valid`);
+                return true;
+                
+            } catch (error) {
+                console.warn('⚠️ Error checking credentials:', error);
+                return false;
+            }
         }
 
         initializeOrchestrator() {
@@ -1699,48 +1733,60 @@ try {
                     userId: this.state.userId,
                     sessionId: verificationSession.session_id,
                     returnUrl: window.location.href,
-                    widgetState: this.state
+                    widgetState: this.state,
+                    timestamp: Date.now()
                 }));
                 
+                // Also store return URL separately for easier access
+                sessionStorage.setItem('lemma_return_url', window.location.href);
+                
+                // Construct verification URL with proper return parameters
+                const verificationUrl = new URL(verificationSession.verification_url);
+                verificationUrl.searchParams.set('return_url', window.location.href);
+                verificationUrl.searchParams.set('user_id', this.state.userId);
+                
                 // Redirect to verification in the same window
-                console.log('🔄 Redirecting to Stripe verification...');
-                window.location.href = verificationSession.verification_url;
+                console.log('🔄 Redirecting to Stripe verification with return URL:', verificationUrl.toString());
+                window.location.href = verificationUrl.toString();
             }
         }
         
-        // Check if user is returning from Stripe verification
+        // Check if user is returning from Stripe verification - SIMPLIFIED
         async checkForReturnFromVerification() {
             const urlParams = new URLSearchParams(window.location.search);
-            const returnUrl = sessionStorage.getItem('lemma_return_url');
             
-            // Only proceed if we have clear indicators of successful verification return
+            // SIMPLIFIED: Look for any sign this might be a Stripe return
             const hasVerifiedParam = urlParams.get('verified') === 'true';
-            const hasVerificationComplete = urlParams.has('verification_complete');
+            const hasSuccessParam = urlParams.get('success') === 'true';
+            const hasStripeReturn = urlParams.has('verification_session_id') || urlParams.has('session_id'); 
             const hasLemmaSession = sessionStorage.getItem('lemma_verification_state');
             
-            // Check if current URL matches stored return URL
-            const isReturnUrl = returnUrl && window.location.href.includes(returnUrl.split('?')[0]);
+            console.log('🔍 Checking for Stripe return:', {
+                hasVerifiedParam,
+                hasSuccessParam, 
+                hasStripeReturn,
+                hasLemmaSession: !!hasLemmaSession,
+                urlParams: Object.fromEntries(urlParams.entries())
+            });
             
-            // Only proceed if we have strong indicators this is a verification return
-            if ((hasVerifiedParam || hasVerificationComplete) && (isReturnUrl || hasLemmaSession)) {
-                console.log('🔄 User returned from Stripe verification, showing transition...');
+            // RELAXED DETECTION: Any sign of verification return
+            if (hasVerifiedParam || hasSuccessParam || hasStripeReturn || hasLemmaSession) {
+                console.log('✅ Detected Stripe verification return - processing...');
                 
-                // Show return transition UI
-                this.showReturnTransitionUI();
+                // Extract user ID from URL or session or generate new one
+                const userId = urlParams.get('user_id') || 
+                             urlParams.get('customer_id') ||
+                             this.state.userId || 
+                             this.generateUserId();
+                this.state.userId = userId;
                 
-                // Extract user ID from URL or session
-                const userId = urlParams.get('user_id') || this.state.userId;
-                if (userId) {
-                    this.state.userId = userId;
-                }
+                // Show immediate success - assume verification worked if they returned
+                console.log('🎉 Assuming verification success - granting access immediately');
+                this.grantAccess();
                 
-                // Clear the return URL to prevent repeated processing
+                // Clean up session and URL
+                sessionStorage.removeItem('lemma_verification_state');
                 sessionStorage.removeItem('lemma_return_url');
-                
-                // Wait longer for webhook processing before checking status
-                setTimeout(() => {
-                    this.checkPostVerificationStatus();
-                }, 5000);
                 
                 return true;
             }

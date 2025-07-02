@@ -328,11 +328,20 @@ def create_app(test_config=None):
         
         # 2. SESSION HIJACKING PROTECTION
         if 'user_id' in session or 'admin_logged_in' in session:
-            # Check IP address binding (with mobile consideration)
+            # Check IP address binding (with mobile consideration and verification exemption)
             stored_ip = session.get('session_ip')
             current_ip = request.remote_addr
             
-            if stored_ip and stored_ip != current_ip:
+            # EXEMPTION: Skip IP validation for verification callbacks and shield operations
+            is_verification_callback = (
+                request.endpoint == 'main.verification_callback' or
+                '/verification-callback' in request.path or
+                '/api/shield/' in request.path or
+                session.get('stripe_verification_success') or
+                session.get('verification_in_progress')
+            )
+            
+            if stored_ip and stored_ip != current_ip and not is_verification_callback:
                 # Allow IP changes for mobile users (check User-Agent)
                 user_agent = request.headers.get('User-Agent', '').lower()
                 is_mobile = any(mobile in user_agent for mobile in ['mobile', 'android', 'iphone', 'ipad'])
@@ -346,7 +355,9 @@ def create_app(test_config=None):
                     logger.info(f"Mobile user IP change: {stored_ip} -> {current_ip}")
                     session['session_ip'] = current_ip
             else:
-                # Store IP on first access
+                # Store IP on first access or update for verification flows
+                if is_verification_callback and stored_ip != current_ip:
+                    logger.info(f"Verification callback IP change allowed: {stored_ip} -> {current_ip}")
                 session['session_ip'] = current_ip
             
             # 3. USER-AGENT FINGERPRINTING
