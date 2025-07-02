@@ -3566,3 +3566,178 @@ def shield_get_credential():
     except Exception as e:
         logger.error(f"Shield get credential error: {e}")
         return jsonify({'error': 'Failed to get credential'}), 500
+
+# ============================================================================
+# CUSTOMER SDK API ENDPOINTS - Clean endpoints for customer integration
+# ============================================================================
+
+@api_bp.route('/api/verify-credential', methods=['POST'])
+@require_api_key
+@rate_limit
+def api_verify_credential():
+    """Customer SDK endpoint - Verify a credential via API."""
+    try:
+        data = request.get_json()
+        
+        if not data or not data.get('credential'):
+            return jsonify({'verified': False, 'error': 'Credential required'}), 400
+            
+        credential = data['credential']
+        challenge = data.get('challenge')
+        
+        # Use existing verification logic
+        credential_service = get_credential_service()
+        verification_result = credential_service.verify_credential(credential)
+        
+        if verification_result.get('valid', False):
+            # Check for revocation
+            revoked = False
+            try:
+                # Simple revocation check
+                credential_id = credential.get('id')
+                if credential_id:
+                    # Check local revocation cache
+                    revocation_cache = getattr(current_app, '_revoked_credentials_cache', {})
+                    revoked = credential_id in revocation_cache
+            except:
+                pass  # Ignore revocation check errors for now
+                
+            return jsonify({
+                'verified': True,
+                'revoked': revoked,
+                'issuer': verification_result.get('issuer'),
+                'timestamp': int(time.time())
+            })
+        else:
+            return jsonify({
+                'verified': False,
+                'error': verification_result.get('reason', 'Invalid credential')
+            })
+            
+    except Exception as e:
+        logger.error(f"Customer API verify credential error: {e}")
+        return jsonify({'verified': False, 'error': 'Verification failed'}), 500
+
+@api_bp.route('/api/start-verification', methods=['POST'])
+@require_api_key
+@rate_limit  
+def api_start_verification():
+    """Customer SDK endpoint - Start Stripe verification process."""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'Request data required'}), 400
+            
+        user_id = data.get('user_id')
+        return_url = data.get('return_url')
+        
+        if not user_id:
+            return jsonify({'error': 'user_id required'}), 400
+            
+        if not return_url:
+            return_url = request.referrer or 'https://lemma.id'
+            
+        # Create Stripe verification session
+        try:
+            from lemma.billing.stripe_manager import get_stripe_manager
+            stripe_manager = get_stripe_manager()
+            
+            if not stripe_manager.is_enabled():
+                return jsonify({'error': 'Verification service not available'}), 503
+                
+            # Create verification session
+            session_data = stripe_manager.create_identity_verification_session(
+                user_id=user_id,
+                return_url=return_url
+            )
+            
+            if session_data and session_data.get('url'):
+                return jsonify({
+                    'success': True,
+                    'verification_url': session_data['url'],
+                    'session_id': session_data.get('id'),
+                    'user_id': user_id
+                })
+            else:
+                return jsonify({'error': 'Failed to create verification session'}), 500
+                
+        except Exception as e:
+            logger.error(f"Error creating verification session: {e}")
+            return jsonify({'error': 'Failed to create verification session'}), 500
+            
+    except Exception as e:
+        logger.error(f"Customer API start verification error: {e}")
+        return jsonify({'error': 'Failed to start verification'}), 500
+
+@api_bp.route('/api/verification-status', methods=['POST'])
+@require_api_key
+@rate_limit
+def api_verification_status():
+    """Customer SDK endpoint - Check verification completion status."""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'verified': False, 'error': 'Request data required'}), 400
+            
+        user_id = data.get('user_id')
+        session_id = data.get('session_id')
+        
+        if not user_id:
+            return jsonify({'verified': False, 'error': 'user_id required'}), 400
+            
+        # Check if verification was completed
+        try:
+            from lemma.billing.stripe_manager import get_stripe_manager
+            stripe_manager = get_stripe_manager()
+            
+            if not stripe_manager.is_enabled():
+                return jsonify({'verified': False, 'error': 'Verification service not available'}), 503
+            
+            # Check verification status with Stripe
+            verification_result = stripe_manager.check_verification_status(user_id, session_id)
+            
+            if verification_result.get('verified'):
+                # Generate and return credential
+                credential_service = get_credential_service()
+                credential = credential_service.issue_credential(
+                    user_id=user_id,
+                    attributes={'isHuman': True, 'verified': True},
+                    include_offline=True
+                )
+                
+                # Format credential for wallet storage
+                wallet_credential = {
+                    "credential": credential,
+                    "wallet_metadata": {
+                        "added_at": credential.get('issuanceDate'),
+                        "holder_id": user_id,
+                        "status": "active",
+                        "display_name": "Lemma Human Verification",
+                        "fingerprint": credential.get('id')
+                    }
+                }
+                
+                return jsonify({
+                    'verified': True,
+                    'credential': wallet_credential,
+                    'timestamp': int(time.time())
+                })
+            else:
+                return jsonify({
+                    'verified': False,
+                    'error': verification_result.get('error', 'Verification not completed')
+                })
+                
+        except Exception as e:
+            logger.error(f"Error checking verification status: {e}")
+            return jsonify({'verified': False, 'error': 'Failed to check verification status'}), 500
+            
+    except Exception as e:
+        logger.error(f"Customer API verification status error: {e}")
+        return jsonify({'verified': False, 'error': 'Status check failed'}), 500
+
+# ============================================================================
+# END CUSTOMER SDK API ENDPOINTS 
+# ============================================================================

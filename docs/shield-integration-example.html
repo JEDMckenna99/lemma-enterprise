@@ -1,17 +1,531 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Lemma Shield Demo</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma Shield Integration Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .demo-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .demo-card h3 {
+            color: #6366f1;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .protected-content {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .protected-content.hidden {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .status-verified {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .status-unverified {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .status-error {
+            background: #fecaca;
+            color: #dc2626;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: #6366f1;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5b56e8;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .logs {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.875rem;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .metric {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #6366f1;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+        }
+
+        .integration-code {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            overflow-x: auto;
+        }
+
+        pre {
+            margin: 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+
+        @media (max-width: 768px) {
+            .demo-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
-  <h1>🛡️ Protected Content</h1>
-  <div id="lemma-shield"></div>
-  <div id="protected-content" style="display:none;">
-    <p>✅ Verified! This content is protected by Lemma Shield.</p>
-  </div>
-  <script src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/static/js/shield.js"></script>
-  <script>
-    // Shield will automatically handle verification flow
-  </script>
+    <!-- Lemma Shield Container -->
+    <div id="lemma-shield"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ Lemma Shield Integration Demo</h1>
+            <p>Complete example of the refactored shield widget with API integration & offline verification</p>
+        </div>
+
+        <div class="demo-grid">
+            <!-- Integration Example -->
+            <div class="demo-card">
+                <h3>📋 Integration Code</h3>
+                <p>Here's how to integrate Lemma Shield into your website:</p>
+                <div class="integration-code">
+                    <pre><code>&lt;!-- Include the Lemma Shield scripts --&gt;
+&lt;script src="https://lemma.id/static/js/lemma-shield-widget.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/static/js/lemma-shield-customer-sdk.js"&gt;&lt;/script&gt;
+
+&lt;!-- Initialize Lemma Shield --&gt;
+&lt;script&gt;
+const lemma = new LemmaSDK({
+    apiKey: 'your-api-key-here',
+    onVerified: (result) =&gt; {
+        console.log('User verified!', result);
+        // Enable protected features
+    },
+    onError: (error) =&gt; {
+        console.error('Error:', error);
+    }
+});
+&lt;/script&gt;</code></pre>
+                </div>
+            </div>
+
+            <!-- Status Dashboard -->
+            <div class="demo-card">
+                <h3>📊 Status Dashboard</h3>
+                <div id="status-indicator" class="status-indicator status-unverified">
+                    Initializing...
+                </div>
+                <div class="metrics">
+                    <div class="metric">
+                        <div id="verification-method" class="metric-value">-</div>
+                        <div class="metric-label">Method</div>
+                    </div>
+                    <div class="metric">
+                        <div id="offline-success" class="metric-value">0</div>
+                        <div class="metric-label">Offline Success</div>
+                    </div>
+                    <div id="uptime-metric" class="metric">
+                        <div id="uptime" class="metric-value">0s</div>
+                        <div class="metric-label">Uptime</div>
+                    </div>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="forceRecheck()">Force Recheck</button>
+                    <button class="btn btn-secondary" onclick="clearCredentials()">Clear & Reset</button>
+                    <button class="btn btn-secondary" onclick="showShield()">Show Shield</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Protected Content Area -->
+        <div class="protected-content" id="protected-content">
+            <h2>🔒 Protected Content Area</h2>
+            <p>This content is protected by Lemma Shield. You need to verify your humanity to access it.</p>
+            <div id="protected-features" style="display: none;">
+                <h3>✅ Access Granted!</h3>
+                <p>Congratulations! You've successfully verified your humanity using Lemma Shield.</p>
+                <p><strong>Verification Method:</strong> <span id="verification-method-display">Unknown</span></p>
+                <p><strong>Flow Type:</strong> <span id="flow-type-display">Unknown</span></p>
+                <div style="margin-top: 2rem; padding: 1rem; background: #f0f9ff; border-radius: 8px;">
+                    <h4>🚀 What just happened?</h4>
+                    <ul style="text-align: left; margin: 1rem 0;">
+                        <li><strong>CHECK FLOW:</strong> First, we checked for existing credentials in your browser</li>
+                        <li><strong>OFFLINE VERIFICATION:</strong> If found, we verified them locally (no network calls!)</li>
+                        <li><strong>API FALLBACK:</strong> If offline failed, we verified via the Lemma API</li>
+                        <li><strong>SHIELD FLOW:</strong> If no credentials, we showed the verification shield</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Logs -->
+        <div class="demo-card" style="margin-top: 2rem;">
+            <h3>📝 Live Event Logs</h3>
+            <div id="logs" class="logs">
+                <!-- Logs will appear here -->
+            </div>
+            <div class="controls">
+                <button class="btn btn-secondary" onclick="clearLogs()">Clear Logs</button>
+                <button class="btn btn-secondary" onclick="exportLogs()">Export Logs</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include Lemma Shield Scripts -->
+    <script src="/static/js/lemma-shield-widget.js"></script>
+    <script src="/static/js/lemma-shield-customer-sdk.js"></script>
+
+    <script>
+        // Demo application state
+        let demoState = {
+            verified: false,
+            logs: [],
+            startTime: Date.now(),
+            lemmaSDK: null
+        };
+
+        // Initialize the demo
+        function initDemo() {
+            log('🚀 Initializing Lemma Shield Demo');
+            
+            try {
+                // Create Lemma SDK instance
+                demoState.lemmaSDK = new LemmaSDK({
+                    apiKey: 'demo_api_key_' + Math.random().toString(36).substr(2, 9),
+                    apiBase: window.location.origin,
+                    debug: true,
+                    offlineFirst: true,
+                    fallbackEnabled: true,
+                    onVerified: handleVerified,
+                    onError: handleError,
+                    onRevoked: handleRevoked
+                });
+
+                log('✅ Lemma SDK initialized successfully');
+                updateStatusIndicator('Initialized', 'status-unverified');
+
+            } catch (error) {
+                log('❌ Failed to initialize Lemma SDK: ' + error.message);
+                updateStatusIndicator('Error: ' + error.message, 'status-error');
+            }
+
+            // Start uptime counter
+            setInterval(updateUptime, 1000);
+        }
+
+        // Event handlers
+        function handleVerified(result) {
+            log('✅ USER VERIFIED: ' + JSON.stringify(result, null, 2));
+            demoState.verified = true;
+            
+            updateStatusIndicator('Verified ✅', 'status-verified');
+            showProtectedContent(result);
+            updateMetrics();
+        }
+
+        function handleError(error) {
+            log('❌ ERROR: ' + JSON.stringify(error, null, 2));
+            updateStatusIndicator('Error: ' + error.error, 'status-error');
+        }
+
+        function handleRevoked(result) {
+            log('🚫 CREDENTIALS REVOKED: ' + JSON.stringify(result, null, 2));
+            demoState.verified = false;
+            
+            updateStatusIndicator('Revoked - Recheck Required', 'status-unverified');
+            hideProtectedContent();
+        }
+
+        // UI update functions
+        function updateStatusIndicator(text, className) {
+            const indicator = document.getElementById('status-indicator');
+            indicator.textContent = text;
+            indicator.className = 'status-indicator ' + className;
+        }
+
+        function showProtectedContent(result) {
+            const protectedContent = document.getElementById('protected-content');
+            const protectedFeatures = document.getElementById('protected-features');
+            
+            protectedContent.classList.remove('hidden');
+            protectedFeatures.style.display = 'block';
+            
+            document.getElementById('verification-method-display').textContent = result.method || 'Unknown';
+            document.getElementById('flow-type-display').textContent = result.flowType || 'Unknown';
+        }
+
+        function hideProtectedContent() {
+            const protectedContent = document.getElementById('protected-content');
+            const protectedFeatures = document.getElementById('protected-features');
+            
+            protectedContent.classList.add('hidden');
+            protectedFeatures.style.display = 'none';
+        }
+
+        function updateMetrics() {
+            if (!demoState.lemmaSDK) return;
+
+            try {
+                const status = demoState.lemmaSDK.getStatus();
+                const metrics = demoState.lemmaSDK.getMetrics();
+
+                document.getElementById('verification-method').textContent = 
+                    status.lastVerification?.method || '-';
+
+                if (metrics) {
+                    document.getElementById('offline-success').textContent = metrics.offlineSuccessRate || 0;
+                }
+            } catch (error) {
+                log('⚠️ Failed to update metrics: ' + error.message);
+            }
+        }
+
+        function updateUptime() {
+            const uptime = Math.floor((Date.now() - demoState.startTime) / 1000);
+            document.getElementById('uptime').textContent = uptime + 's';
+        }
+
+        // Control functions
+        async function forceRecheck() {
+            if (!demoState.lemmaSDK) {
+                log('❌ SDK not initialized');
+                return;
+            }
+
+            try {
+                log('🔄 Forcing credential recheck...');
+                await demoState.lemmaSDK.recheck();
+                log('✅ Recheck completed');
+            } catch (error) {
+                log('❌ Recheck failed: ' + error.message);
+            }
+        }
+
+        async function clearCredentials() {
+            if (!demoState.lemmaSDK) {
+                log('❌ SDK not initialized');
+                return;
+            }
+
+            try {
+                log('🗑️ Clearing all credentials...');
+                await demoState.lemmaSDK.clearCredentials();
+                demoState.verified = false;
+                hideProtectedContent();
+                updateStatusIndicator('Credentials Cleared', 'status-unverified');
+                log('✅ Credentials cleared successfully');
+            } catch (error) {
+                log('❌ Failed to clear credentials: ' + error.message);
+            }
+        }
+
+        function showShield() {
+            if (!demoState.lemmaSDK) {
+                log('❌ SDK not initialized');
+                return;
+            }
+
+            try {
+                log('🛡️ Showing verification shield...');
+                demoState.lemmaSDK.show();
+            } catch (error) {
+                log('❌ Failed to show shield: ' + error.message);
+            }
+        }
+
+        // Logging functions
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            
+            demoState.logs.push(logEntry);
+            
+            const logsContainer = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.textContent = logEntry;
+            logsContainer.appendChild(logDiv);
+            
+            // Auto-scroll to bottom
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+            
+            // Limit log entries to prevent memory issues
+            if (demoState.logs.length > 100) {
+                demoState.logs = demoState.logs.slice(-50);
+                logsContainer.innerHTML = '';
+                demoState.logs.forEach(log => {
+                    const div = document.createElement('div');
+                    div.textContent = log;
+                    logsContainer.appendChild(div);
+                });
+            }
+        }
+
+        function clearLogs() {
+            demoState.logs = [];
+            document.getElementById('logs').innerHTML = '';
+            log('📝 Logs cleared');
+        }
+
+        function exportLogs() {
+            const logs = demoState.logs.join('\n');
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `lemma-shield-logs-${new Date().toISOString()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            log('📄 Logs exported');
+        }
+
+        // Initialize demo when page loads
+        document.addEventListener('DOMContentLoaded', initDemo);
+
+        // Listen for global Lemma events
+        document.addEventListener('lemma:verified', (event) => {
+            log('🎉 Global event - lemma:verified: ' + JSON.stringify(event.detail));
+        });
+
+        document.addEventListener('lemma:error', (event) => {
+            log('🚨 Global event - lemma:error: ' + JSON.stringify(event.detail));
+        });
+
+        document.addEventListener('lemma:revoked', (event) => {
+            log('🔒 Global event - lemma:revoked: ' + JSON.stringify(event.detail));
+        });
+
+        // Expose demo functions to global scope for console debugging
+        window.demoState = demoState;
+        window.forceRecheck = forceRecheck;
+        window.clearCredentials = clearCredentials;
+        window.showShield = showShield;
+    </script>
 </body>
 </html> 
