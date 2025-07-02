@@ -2809,16 +2809,11 @@ try {
             document.head.appendChild(styles);
         }
         
-        // Force show the shield - used for testing and revocation scenarios
+        // Force show the shield - simplified without revocation detection
         forceShow(options = {}) {
             console.log('🚨 Force showing shield with options:', options);
             
-            // Set revocation trigger if this is a revocation scenario
-            if (options.reason === 'credential_revoked') {
-                sessionStorage.setItem('lemma_revocation_triggered', 'true');
-            }
-            
-            // Force show the widget
+            // Just show the widget - no revocation triggers
             this.showVerificationWidget();
             
             return this;
