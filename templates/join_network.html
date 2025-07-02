@@ -185,7 +185,7 @@
         gap: var(--space-2);
     }
 
-    /* Protected content styling */
+    /* Protection styling - content blurred until verified */
     .protected-content {
         transition: opacity 0.3s ease, filter 0.3s ease;
     }
@@ -194,6 +194,13 @@
         opacity: 0.3;
         filter: blur(2px);
         pointer-events: none;
+    }
+
+    /* Shield container styling */
+    #lemma-shield {
+        position: relative;
+        z-index: 1000;
+        margin: var(--space-8) 0;
     }
     
     @media (max-width: 768px) {
@@ -223,11 +230,11 @@
 {% endblock %}
 
 {% block content %}
-<!-- Lemma Shield Container - Required for shield widget -->
+<!-- Shield Widget Container - This will show for unverified users -->
 <div id="lemma-shield"></div>
 
 <div class="welcome-container">
-    <!-- Protected Content - Will be blurred until verified -->
+    <!-- Protected Content - Blurred until verified -->
     <div id="protected-content" class="protected-content lemma-protected">
         <!-- Welcome Banner Card -->
         <div class="welcome-banner">
@@ -291,101 +298,149 @@
             </div>
         </div>
         
-        <!-- Verification Section -->
+        <!-- Verification Section - Shows status after verification -->
         <div class="verification-section">
             <h2 class="text-2xl font-semibold mb-4">Verification Status</h2>
             
             <div id="verificationStatus">
-                <div class="status-indicator status-verified">
+                <!-- Will be populated by JavaScript when user is verified -->
+                <div class="status-indicator status-pending">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    Lemma Verified
+                    Verification Required
                 </div>
             </div>
             
             <p class="text-gray-600 mb-6">
-                Your Lemma credential is active and working across the network. You can test the revocation and re-verification process below.
+                Complete the verification above to access the Lemma network and claim your founding member status.
             </p>
             
-            <div class="feature-card">
-                <h4 class="font-semibold text-gray-900 mb-2">🚨 Test Revocation System:</h4>
-                <p class="text-gray-600 mb-4">
-                    Lemma provides enterprise-grade credential revocation capabilities. When a credential is revoked, 
-                    all sites using Lemma will immediately detect the revocation and require re-verification.
-                </p>
-                
-                <button id="revokeCredential" class="btn btn-revoke" style="font-weight: bold; padding: 12px 24px;">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: inline-block; margin-right: 8px;">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                    </svg>
-                    🚨 Clear & Test Re-verification
-                </button>
-                
-                <div id="revocationStatus" class="mt-4" style="display: none;"></div>
+            <div id="post-verification-section" style="display: none;">
+                <div class="feature-card">
+                    <h4 class="font-semibold text-gray-900 mb-2">🚨 Test Network Features:</h4>
+                    <p class="text-gray-600 mb-4">
+                        Once verified, you can test the complete Lemma network capabilities including credential revocation and re-verification.
+                    </p>
+                    
+                    <button id="revokeCredential" class="btn btn-revoke" style="font-weight: bold; padding: 12px 24px;">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: inline-block; margin-right: 8px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        🚨 Clear & Test Re-verification
+                    </button>
+                    
+                    <div id="revocationStatus" class="mt-4" style="display: none;"></div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Load Lemma Shield Widget -->
+<!-- Load Lemma Shield Widget Scripts -->
 <script src="{{ url_for('static', filename='js/lemma-shield-widget.js') }}"></script>
 <script src="{{ url_for('static', filename='js/lemma-shield-customer-sdk.js') }}"></script>
 
 <script>
-console.log('🛡️ JOIN NETWORK PAGE: Initializing Lemma Shield Protection');
+console.log('🛡️ JOIN NETWORK PAGE: Starting shield protection');
 
-// Initialize Lemma Shield to protect this page
+// Initialize shield protection immediately
 document.addEventListener('DOMContentLoaded', function() {
-    // Create Lemma SDK instance to protect the join network page
-    const lemma = new LemmaSDK({
-        apiKey: 'join_network_demo_key_' + Math.random().toString(36).substr(2, 9),
-        apiBase: window.location.origin,
-        containerId: 'lemma-shield',
-        debug: true,
-        
-        // Enable offline-first verification
-        offlineFirst: true,
-        fallbackEnabled: true,
-        
-        // Event handlers
-        onVerified: function(result) {
-            console.log('✅ User verified for join network page:', result);
+    console.log('🔄 DOM loaded, initializing Lemma Shield...');
+    
+    // Ensure content starts protected
+    const protectedContent = document.getElementById('protected-content');
+    if (protectedContent) {
+        protectedContent.classList.add('lemma-protected');
+        console.log('🔒 Content protected on page load');
+    }
+    
+    // Initialize shield with proper configuration
+    try {
+        // Use the Customer SDK to create shield instance
+        window.lemmaShield = new LemmaSDK({
+            apiKey: '{{ lemma_api_key }}',
+            apiBase: '{{ lemma_api_base }}',
+            containerId: 'lemma-shield',
+            debug: true,
             
-            // Remove protection from content
-            const protectedContent = document.getElementById('protected-content');
-            if (protectedContent) {
-                protectedContent.classList.remove('lemma-protected');
-                console.log('🔓 Protected content unlocked');
+            // Shield should appear for all unverified users
+            forceShield: true,
+            offlineFirst: true,
+            fallbackEnabled: true,
+            
+            // Event callbacks
+            onVerified: function(result) {
+                console.log('✅ User successfully verified:', result);
+                
+                // Unlock protected content
+                if (protectedContent) {
+                    protectedContent.classList.remove('lemma-protected');
+                    console.log('🔓 Protected content unlocked');
+                }
+                
+                // Update verification status
+                updateVerificationStatus('verified', result);
+                
+                // Show post-verification features
+                const postVerificationSection = document.getElementById('post-verification-section');
+                if (postVerificationSection) {
+                    postVerificationSection.style.display = 'block';
+                }
+            },
+            
+            onError: function(error) {
+                console.error('❌ Verification error:', error);
+                updateVerificationStatus('error', error);
+            },
+            
+            onRevoked: function(result) {
+                console.log('🚫 Credentials revoked:', result);
+                
+                // Re-protect content
+                if (protectedContent) {
+                    protectedContent.classList.add('lemma-protected');
+                    console.log('🔒 Content re-protected after revocation');
+                }
+                
+                // Update status
+                updateVerificationStatus('revoked', result);
+                
+                // Hide post-verification features
+                const postVerificationSection = document.getElementById('post-verification-section');
+                if (postVerificationSection) {
+                    postVerificationSection.style.display = 'none';
+                }
+            },
+            
+            onShieldShown: function() {
+                console.log('🛡️ Shield widget displayed for verification');
+            },
+            
+            onShieldHidden: function() {
+                console.log('👁️ Shield widget hidden - user verified');
             }
-            
-            // Update verification status
-            updateVerificationStatus('verified', result);
-        },
+        });
         
-        onError: function(error) {
-            console.error('❌ Verification error on join network page:', error);
-            updateVerificationStatus('error', error);
-        },
+        console.log('✅ Lemma Shield initialized successfully');
         
-        onRevoked: function(result) {
-            console.log('🚫 Credentials revoked on join network page:', result);
-            
-            // Re-protect content
-            const protectedContent = document.getElementById('protected-content');
-            if (protectedContent) {
-                protectedContent.classList.add('lemma-protected');
-                console.log('🔒 Protected content locked');
-            }
-            
-            updateVerificationStatus('revoked', result);
+    } catch (error) {
+        console.error('❌ Failed to initialize Lemma Shield:', error);
+        
+        // Fallback: Show a manual verification prompt
+        const shieldContainer = document.getElementById('lemma-shield');
+        if (shieldContainer) {
+            shieldContainer.innerHTML = `
+                <div style="background: var(--red-50); border: 1px solid var(--red-200); border-radius: var(--radius-lg); padding: var(--space-6); margin: var(--space-4) 0; text-align: center;">
+                    <h3 style="color: var(--red-700); margin-bottom: var(--space-2);">⚠️ Shield Initialization Error</h3>
+                    <p style="color: var(--red-600); margin-bottom: var(--space-4);">The verification system encountered an error. Please refresh the page to try again.</p>
+                    <button onclick="location.reload()" style="background: var(--red-500); color: white; border: none; padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); cursor: pointer;">
+                        🔄 Refresh Page
+                    </button>
+                </div>
+            `;
         }
-    });
-    
-    // Store for global access
-    window.lemmaShield = lemma;
-    
-    console.log('✅ Lemma Shield initialized for join network page');
+    }
 });
 
 // Update verification status display
@@ -402,8 +457,11 @@ function updateVerificationStatus(status, data) {
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    Lemma Verified (${data.method || 'unknown'})
+                    ✅ Lemma Network Member (${data.method || 'verified'})
                 </div>
+                <p style="color: var(--green-700); font-weight: 600; margin-top: var(--space-2);">
+                    🎉 Welcome to the Lemma Network! You're now verified across all network sites.
+                </p>
             `;
             break;
             
@@ -413,8 +471,11 @@ function updateVerificationStatus(status, data) {
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    Verification Error
+                    ❌ Verification Error
                 </div>
+                <p style="color: var(--red-700); margin-top: var(--space-2);">
+                    ${data.message || 'Please try the verification again.'}
+                </p>
             `;
             break;
             
@@ -424,8 +485,11 @@ function updateVerificationStatus(status, data) {
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    Verification Required
+                    🚨 Re-verification Required
                 </div>
+                <p style="color: var(--orange-700); margin-top: var(--space-2);">
+                    Your credentials have been cleared. Please complete verification again above.
+                </p>
             `;
             break;
     }
@@ -433,40 +497,54 @@ function updateVerificationStatus(status, data) {
     statusElement.innerHTML = statusHTML;
 }
 
-// Handle revocation testing
+// Handle credential revocation testing
 document.addEventListener('DOMContentLoaded', function() {
     const revokeButton = document.getElementById('revokeCredential');
     if (revokeButton) {
         revokeButton.addEventListener('click', async function() {
             console.log('🚨 Testing credential revocation...');
             
-            // Show status
             const statusElement = document.getElementById('revocationStatus');
             if (statusElement) {
                 statusElement.style.display = 'block';
                 statusElement.innerHTML = `
                     <div class="status-indicator status-pending">
                         <div class="loading-spinner"></div>
-                        Testing revocation flow...
+                        Clearing credentials and triggering re-verification...
                     </div>
                 `;
             }
             
             try {
-                // Clear credentials to simulate revocation
-                if (window.lemmaShield) {
+                if (window.lemmaShield && window.lemmaShield.clearCredentials) {
                     await window.lemmaShield.clearCredentials();
                     console.log('✅ Credentials cleared - shield should reappear');
+                    
+                    // Force shield to reappear
+                    if (window.lemmaShield.forceShow) {
+                        window.lemmaShield.forceShow();
+                    }
+                } else {
+                    // Manual credential clearing
+                    localStorage.removeItem('lemma_credentials');
+                    localStorage.removeItem('lemma_wallet');
+                    sessionStorage.clear();
+                    
+                    console.log('✅ Manual credential clearing completed');
+                    
+                    // Reload page to trigger shield
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
                 }
                 
-                // Update status
                 if (statusElement) {
                     statusElement.innerHTML = `
                         <div class="status-indicator status-verified">
                             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                             </svg>
-                            Revocation test completed - shield should be active
+                            ✅ Test completed - shield should now be active for re-verification
                         </div>
                     `;
                 }
@@ -480,7 +558,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
-                            Revocation test failed: ${error.message}
+                            ❌ Revocation test failed: ${error.message}
                         </div>
                     `;
                 }
@@ -489,7 +567,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Signature functionality
+// Signature canvas functionality
 document.addEventListener('DOMContentLoaded', function() {
     const canvas = document.getElementById('signatureCanvas');
     const clearBtn = document.getElementById('clearSignature');
@@ -501,7 +579,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let isDrawing = false;
     let hasSignature = false;
     
-    // Set up canvas
+    // Set up canvas scaling
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
@@ -565,7 +643,7 @@ document.addEventListener('DOMContentLoaded', function() {
     canvas.addEventListener('mouseup', stopDrawing);
     canvas.addEventListener('mouseout', stopDrawing);
     
-    // Touch events
+    // Touch events for mobile
     canvas.addEventListener('touchstart', startDrawing);
     canvas.addEventListener('touchmove', draw);
     canvas.addEventListener('touchend', stopDrawing);
@@ -581,10 +659,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Save signature
     saveBtn.addEventListener('click', function() {
         if (hasSignature) {
-            // Show success status
             const statusElement = document.getElementById('signatureStatus');
             statusElement.style.display = 'block';
-            
             console.log('✅ Signature saved as founding member');
         }
     });
