@@ -393,9 +393,16 @@
 <!-- This is exactly how a customer site would integrate Lemma protection -->
 
 <!-- Step 1: Load the Lemma Shield SDK -->
-<!-- SIMPLIFIED SHIELD - Clean Bot Shield Circuit -->
+<!-- MINIMAL SHIELD - Essential Bot Protection Only -->
 <script src="{{ url_for('static', filename='js/simple_shield_widget.js') }}"></script>
-<!-- Complex Shield - Fallback -->
+
+<!-- Disable complex widget debug spam -->
+<script>
+window.LEMMA_DEBUG_MODE = false; // Disable complex widget logging
+window.LEMMA_MINIMAL_MODE = true; // Enable minimal mode
+</script>
+
+<!-- Complex Shield - Silent Fallback -->
 <script src="{{ url_for('static', filename='js/lemma-shield-widget.js') }}"></script>
 
 <!-- Step 2: Customer site initialization (real production pattern) -->

@@ -15,10 +15,18 @@
  * });
  */
 
-// IMMEDIATE DEBUG LOGGING - This should execute right when script loads
-console.log('🚀 LEMMA SHIELD WIDGET: Script execution started at', new Date().toISOString());
-console.log('🔍 LEMMA SHIELD WIDGET: Window object available:', typeof window);
-console.log('🔍 LEMMA SHIELD WIDGET: Document ready state:', document.readyState);
+// Check if minimal mode is enabled first
+const isMinimalMode = window.LEMMA_MINIMAL_MODE || false;
+const debugMode = window.LEMMA_DEBUG_MODE !== false && !isMinimalMode;
+
+// Conditional debug logging
+if (debugMode) {
+    console.log('🚀 LEMMA SHIELD WIDGET: Script execution started at', new Date().toISOString());
+    console.log('🔍 LEMMA SHIELD WIDGET: Window object available:', typeof window);
+    console.log('🔍 LEMMA SHIELD WIDGET: Document ready state:', document.readyState);
+} else if (isMinimalMode) {
+    console.log('[COMPLEX-SHIELD] ⚠️ Minimal mode enabled - complex widget will be silent');
+}
 
 try {
     class LemmaShieldWidget {
