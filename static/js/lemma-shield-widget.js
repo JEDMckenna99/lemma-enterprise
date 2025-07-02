@@ -2995,340 +2995,55 @@ try {
         }
     }
 
-    // AGGRESSIVE FIX: Force methods to be available immediately and repeatedly
+    // SIMPLE INITIALIZATION: Clean, single-run initialization
     (function() {
-        console.log('🔧 AGGRESSIVE FORCE SHOW FIX EXECUTING');
+        console.log('🛡️ SIMPLE SHIELD INITIALIZATION');
         
-        // Define the forceShow function that we'll use everywhere
-        const forceShowFunction = function(options = {}) {
-            console.log('🚨 Force showing shield with options (AGGRESSIVE):', options);
+        // Simple forceShow function - no aggressive behavior
+        const simpleForceShow = function(options = {}) {
+            console.log('🛡️ Simple forceShow called:', options);
             
-            // Set revocation trigger if this is a revocation scenario
-            if (options.reason === 'credential_revoked') {
-                sessionStorage.setItem('lemma_revocation_triggered', 'true');
-            }
-            
-            // Try multiple ways to show the widget
             if (this && typeof this.showVerificationWidget === 'function') {
                 this.showVerificationWidget();
-            } else if (window.LemmaShieldWidget && window.LemmaShieldWidget.instance && typeof window.LemmaShieldWidget.instance.showVerificationWidget === 'function') {
-                window.LemmaShieldWidget.instance.showVerificationWidget();
             } else if (window.lemmaShieldWidget && typeof window.lemmaShieldWidget.showVerificationWidget === 'function') {
                 window.lemmaShieldWidget.showVerificationWidget();
             } else {
-                console.log('🔄 Creating emergency widget instance...');
-                try {
-                    const instance = new LemmaShieldWidget({
-                        widgetContainer: '#lemma-shield-container',
-                        apiEndpoint: '/api/shield',
-                        debug: true
-                    });
-                    window.lemmaShieldWidget = instance;
-                    instance.showVerificationWidget();
-                } catch (e) {
-                    console.error('Failed to create emergency instance:', e);
-                }
+                console.warn('⚠️ No shield widget available for forceShow');
             }
             
-            return this || window.LemmaShieldWidget?.instance || window.lemmaShieldWidget;
+            return this;
         };
         
-        // Static method for class
-        const staticForceShow = function(options = {}) {
-            console.log('🚨 Static forceShow called (AGGRESSIVE):', options);
-            if (LemmaShieldWidget.instance) {
-                return forceShowFunction.call(LemmaShieldWidget.instance, options);
-            } else {
-                return forceShowFunction.call(null, options);
-            }
-        };
-        
-        // Apply fixes immediately and repeatedly
-        const applyFixes = () => {
-            // Fix 1: Ensure class has static method
+        // Apply simple setup - ONLY ONCE
+        const simpleSetup = () => {
             if (typeof LemmaShieldWidget !== 'undefined') {
-                LemmaShieldWidget.forceShow = staticForceShow;
-                
-                // Fix 2: Ensure prototype has method
-                LemmaShieldWidget.prototype.forceShow = forceShowFunction;
-                
-                // Fix 3: Ensure instance has method if it exists
-                if (LemmaShieldWidget.instance) {
-                    LemmaShieldWidget.instance.forceShow = forceShowFunction.bind(LemmaShieldWidget.instance);
-                }
+                LemmaShieldWidget.forceShow = simpleForceShow;
+                LemmaShieldWidget.prototype.forceShow = simpleForceShow;
             }
             
-            // Fix 4: Ensure global instance has method
-            if (window.lemmaShieldWidget) {
-                window.lemmaShieldWidget.forceShow = forceShowFunction.bind(window.lemmaShieldWidget);
-            }
-            
-            // Fix 5: Ensure convenience object exists with methods
+            // Simple convenience object - no aggressive creation
             window.lemmaShield = window.lemmaShield || {};
-            window.lemmaShield.forceShow = forceShowFunction;
-            window.lemmaShield.show = forceShowFunction;
+            window.lemmaShield.forceShow = simpleForceShow;
             window.lemmaShield.getInstance = () => window.lemmaShieldWidget || window.LemmaShieldWidget?.instance;
             
-            console.log('✅ AGGRESSIVE FIX APPLIED');
+            console.log('✅ Simple shield setup complete');
         };
         
-        // Apply fixes immediately
-        applyFixes();
+        // Run setup once
+        simpleSetup();
         
-        // Apply fixes after DOM loads
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', applyFixes);
-        }
-        
-        // Apply fixes after window loads
-        window.addEventListener('load', applyFixes);
-        
-        // Apply fixes every 500ms for the first 5 seconds (aggressive)
-        let fixCount = 0;
-        const fixInterval = setInterval(() => {
-            applyFixes();
-            fixCount++;
-            if (fixCount >= 10) { // Stop after 5 seconds
-                clearInterval(fixInterval);
-                console.log('🏁 AGGRESSIVE FIX COMPLETE');
-            }
-        }, 500);
-        
-        console.log('🔧 AGGRESSIVE FORCE SHOW FIX INSTALLED');
+        console.log('🛡️ SIMPLE SHIELD INITIALIZATION COMPLETE');
     })();
 
-    // Auto-initialize if window is loaded
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            window.LemmaShieldWidget = LemmaShieldWidget;
-            // Create a default instance for immediate use
-            if (!LemmaShieldWidget.instance) {
-                window.lemmaShieldWidget = new LemmaShieldWidget({
-                    widgetContainer: '#lemma-shield-container',
-                    apiEndpoint: '/api/shield',
-                    debug: true
-                });
-            }
-            
-            // Add global convenience methods
-            window.lemmaShield = {
-                forceShow: (options = {}) => {
-                    if (window.lemmaShieldWidget) {
-                        return window.lemmaShieldWidget.forceShow(options);
-                    } else if (window.LemmaShieldWidget) {
-                        return window.LemmaShieldWidget.forceShow(options);
-                    } else {
-                        console.error('No Lemma Shield available');
-                        return null;
-                    }
-                },
-                show: (options = {}) => window.lemmaShield.forceShow(options),
-                getInstance: () => window.lemmaShieldWidget || window.LemmaShieldWidget?.instance
-            };
-        });
-    } else {
-        window.LemmaShieldWidget = LemmaShieldWidget;
-        // Create a default instance for immediate use
-        if (!LemmaShieldWidget.instance) {
-            window.lemmaShieldWidget = new LemmaShieldWidget({
-                widgetContainer: '#lemma-shield-container',
-                apiEndpoint: '/api/shield',
-                debug: true
-            });
-        }
-        
-        // Add global convenience methods
-        window.lemmaShield = {
-            forceShow: (options = {}) => {
-                if (window.lemmaShieldWidget) {
-                    return window.lemmaShieldWidget.forceShow(options);
-                } else if (window.LemmaShieldWidget) {
-                    return window.LemmaShieldWidget.forceShow(options);
-                } else {
-                    console.error('No Lemma Shield available');
-                    return null;
-                }
-            },
-            show: (options = {}) => window.lemmaShield.forceShow(options),
-            getInstance: () => window.lemmaShieldWidget || window.LemmaShieldWidget?.instance
-        };
-    } 
+    // Simple class export - no auto-initialization
+    window.LemmaShieldWidget = LemmaShieldWidget;
+    
+    console.log('🛡️ LemmaShieldWidget class available - ready for manual initialization'); 
 
-    // ULTRA-AGGRESSIVE FIX: Ensure forceShow methods are ALWAYS available
-    // This runs synchronously immediately after the script loads
-    window.addEventListener('load', () => {
-        console.log('🔧 ULTRA-AGGRESSIVE forceShow fix running...');
-        
-        // Define the ultimate forceShow function
-        const ultimateForceShow = (options = {}) => {
-            console.log('🚨 ULTRA-AGGRESSIVE forceShow called with:', options);
-            
-            // Try every possible way to show the shield
-            const attempts = [
-                () => window.lemmaShieldWidget?.showVerificationWidget?.(),
-                () => window.LemmaShieldWidget?.instance?.showVerificationWidget?.(),
-                () => window.lemmaShield?.getInstance?.()?.showVerificationWidget?.(),
-                () => {
-                    // Last resort: create new instance
-                    if (typeof LemmaShieldWidget !== 'undefined') {
-                        const instance = new LemmaShieldWidget({
-                            widgetContainer: '#lemma-shield-container',
-                            apiEndpoint: '/api/shield',
-                            debug: true
-                        });
-                        window.lemmaShieldWidget = instance;
-                        return instance.showVerificationWidget();
-                    }
-                }
-            ];
-            
-            for (const attempt of attempts) {
-                try {
-                    const result = attempt();
-                    if (result !== undefined) {
-                        console.log('✅ ULTRA-AGGRESSIVE forceShow succeeded');
-                        return result;
-                    }
-                } catch (e) {
-                    console.warn(`Attempt failed:`, e);
-                }
-            }
-            
-            console.error('❌ ULTRA-AGGRESSIVE forceShow failed - no working method found');
-            return null;
-        };
-        
-        // Force assign methods everywhere with extreme prejudice
-        const targets = [
-            { obj: window, key: 'lemmaShieldWidget' },
-            { obj: window, key: 'lemmaShield' },
-            { obj: window, key: 'LemmaShieldWidget' }
-        ];
-        
-        targets.forEach(({ obj, key }) => {
-            if (obj[key]) {
-                obj[key].forceShow = ultimateForceShow;
-                if (obj[key].prototype) {
-                    obj[key].prototype.forceShow = ultimateForceShow;
-                }
-            }
-            
-            // Also ensure the object exists with forceShow
-            if (!obj[key]) {
-                obj[key] = { forceShow: ultimateForceShow };
-            } else if (typeof obj[key] === 'object' && !obj[key].forceShow) {
-                obj[key].forceShow = ultimateForceShow;
-            }
-        });
-        
-        // Static method assignment with extreme prejudice
-        if (typeof LemmaShieldWidget !== 'undefined') {
-            LemmaShieldWidget.forceShow = ultimateForceShow;
-        }
-        
-        console.log('✅ ULTRA-AGGRESSIVE forceShow fix complete');
-        
-        // Verify methods are now available
-        const verification = {
-            'LemmaShieldWidget.forceShow': typeof LemmaShieldWidget?.forceShow,
-            'lemmaShield.forceShow': typeof window.lemmaShield?.forceShow,
-            'lemmaShieldWidget.forceShow': typeof window.lemmaShieldWidget?.forceShow
-        };
-        
-        console.log('🔍 Post-fix verification:', verification);
-    });
+    // Clean initialization complete - no aggressive fixes needed
 
-    // Also run immediately in case window is already loaded
-    setTimeout(() => {
-        const event = new Event('load');
-        window.dispatchEvent(event);
-    }, 100); 
-
-    // IMMEDIATE SYNCHRONOUS FIX - Runs right now, no waiting
-    (function() {
-        console.log('🚀 IMMEDIATE forceShow fix executing synchronously...');
-        
-            const emergencyForceShow = (options = {}) => {
-        console.log('🚨 EMERGENCY forceShow triggered:', options);
-        console.log('🔍 EMERGENCY: Available shield objects:');
-        console.log('  - window.lemmaShieldWidget:', typeof window.lemmaShieldWidget);
-        console.log('  - window.LemmaShieldWidget:', typeof window.LemmaShieldWidget);
-        console.log('  - LemmaShieldWidget instance:', window.LemmaShieldWidget?.instance ? 'exists' : 'missing');
-            
-            // Immediate attempts to show shield
-            const quickAttempts = [
-                () => {
-                    if (window.lemmaShieldWidget && window.lemmaShieldWidget.showVerificationWidget) {
-                        window.lemmaShieldWidget.showVerificationWidget();
-                        return true;
-                    }
-                },
-                () => {
-                    if (window.LemmaShieldWidget && window.LemmaShieldWidget.instance && window.LemmaShieldWidget.instance.showVerificationWidget) {
-                        window.LemmaShieldWidget.instance.showVerificationWidget();
-                        return true;
-                    }
-                },
-                () => {
-                    // Create instance if needed
-                    if (typeof LemmaShieldWidget !== 'undefined' && !window.lemmaShieldWidget) {
-                        try {
-                            window.lemmaShieldWidget = new LemmaShieldWidget({});
-                            window.lemmaShieldWidget.showVerificationWidget();
-                            return true;
-                        } catch (e) {
-                            console.warn('Emergency instance creation failed:', e);
-                        }
-                    }
-                }
-            ];
-            
-            for (const attempt of quickAttempts) {
-                try {
-                    if (attempt()) {
-                        console.log('✅ EMERGENCY forceShow succeeded');
-                        return;
-                    }
-                } catch (e) {
-                    console.warn('Emergency attempt failed:', e);
-                }
-            }
-            
-            console.log('⚠️ EMERGENCY forceShow will retry when instances are available');
-        };
-        
-        // Assign immediately to all possible objects
-        window.emergencyForceShow = emergencyForceShow;
-        
-        // Create placeholder objects with forceShow if they don't exist
-        if (!window.lemmaShield) {
-            window.lemmaShield = { forceShow: emergencyForceShow };
-        } else {
-            window.lemmaShield.forceShow = emergencyForceShow;
-        }
-        
-        if (!window.lemmaShieldWidget) {
-            window.lemmaShieldWidget = { forceShow: emergencyForceShow };
-        } else if (window.lemmaShieldWidget && typeof window.lemmaShieldWidget === 'object') {
-            window.lemmaShieldWidget.forceShow = emergencyForceShow;
-        }
-        
-        if (typeof LemmaShieldWidget !== 'undefined') {
-            LemmaShieldWidget.forceShow = emergencyForceShow;
-        } else {
-            // Create placeholder class
-            window.LemmaShieldWidget = { forceShow: emergencyForceShow };
-        }
-        
-            console.log('✅ IMMEDIATE forceShow fix applied synchronously');
-})();
-
-// FINAL DEBUG VERIFICATION - This should be the very last thing that executes
-console.log('🏁 LEMMA SHIELD WIDGET: Script execution completed');
-console.log('🔍 FINAL CHECK: LemmaShieldWidget available:', typeof LemmaShieldWidget);
-console.log('🔍 FINAL CHECK: window.lemmaShield available:', typeof window.lemmaShield);
-console.log('🔍 FINAL CHECK: window.emergencyForceShow available:', typeof window.emergencyForceShow);
-console.log('🔍 FINAL CHECK: Script fully loaded at', new Date().toISOString());
+// Shield widget class loaded and ready for use
+console.log('🛡️ Lemma Shield Widget loaded successfully');
 } catch (error) {
     console.error('❌ Error initializing Lemma Shield Widget:', error);
 }
