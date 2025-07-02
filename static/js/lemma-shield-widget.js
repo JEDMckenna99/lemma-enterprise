@@ -83,12 +83,19 @@ try {
         }
         
         async init() {
-            console.log('🛡️ Initializing Lemma Shield Widget - STATIC MODE');
+            // PREVENT MULTIPLE INITIALIZATION
+            if (this._initialized) {
+                console.log('⚠️ Widget already initialized - skipping duplicate initialization');
+                return;
+            }
+            this._initialized = true;
+            
+            console.log('🛡️ Initializing Lemma Shield Widget - STATIC MODE (once only)');
             
             // Wait for wallet to be available
             await this.waitForWallet();
             
-            // Initialize orchestrator integration
+            // Initialize orchestrator integration (once only)
             this.initializeOrchestrator();
             
             // Check if we're returning from Stripe verification
@@ -106,7 +113,7 @@ try {
                 }
             }
             
-            // Start event-only monitoring (no periodic checks)
+            // Start event-only monitoring (once only)
             this.startRevocationMonitoring();
         }
 
@@ -139,40 +146,67 @@ try {
         }
 
         initializeOrchestrator() {
+            // PREVENT DUPLICATE ORCHESTRATOR INITIALIZATION
+            if (this._orchestratorInitialized) {
+                console.log('⚠️ Orchestrator already initialized - skipping duplicate setup');
+                return;
+            }
+            this._orchestratorInitialized = true;
+            
             // Register this widget with the orchestrator
             if (window.lemmaFlowOrchestrator) {
                 console.log('🔗 Registering shield widget with orchestrator');
                 window.lemmaFlowOrchestrator.shieldWidget = this;
             } else {
-                // Wait for orchestrator and register when available
+                // Wait for orchestrator and register when available - NO LOOPS
+                let checkCount = 0;
+                const maxChecks = 50; // Max 5 seconds
                 const checkOrchestrator = () => {
+                    checkCount++;
                     if (window.lemmaFlowOrchestrator) {
                         console.log('🔗 Registering shield widget with orchestrator (delayed)');
                         window.lemmaFlowOrchestrator.shieldWidget = this;
-                    } else {
+                    } else if (checkCount < maxChecks) {
                         setTimeout(checkOrchestrator, 100);
+                    } else {
+                        console.log('⚠️ Orchestrator not found after 5 seconds - continuing without it');
                     }
                 };
                 checkOrchestrator();
             }
 
-            // Listen for orchestrator events
-            window.addEventListener('lemma-orchestrator-shield-show', () => {
+            // Listen for orchestrator events - ONCE ONLY  
+            const shieldShowHandler = () => {
+                console.log('🎯 Orchestrator shield-show event (ONCE ONLY)');
                 this.showVerificationWidget();
-            });
-
-            window.addEventListener('lemma-orchestrator-shield-hide', () => {
+            };
+            
+            const shieldHideHandler = () => {
+                console.log('🎯 Orchestrator shield-hide event (ONCE ONLY)');
                 this.hideShield();
-            });
-
-            window.addEventListener('lemma-orchestrator-credential-valid', () => {
+            };
+            
+            const credentialValidHandler = () => {
+                console.log('🎯 Orchestrator credential-valid event (ONCE ONLY)');
                 this.grantAccess();
-            });
+            };
+            
+            window.addEventListener('lemma-orchestrator-shield-show', shieldShowHandler, { once: false });
+            window.addEventListener('lemma-orchestrator-shield-hide', shieldHideHandler, { once: false });
+            window.addEventListener('lemma-orchestrator-credential-valid', credentialValidHandler, { once: false });
+            
+            // Store handlers for potential cleanup
+            this._orchestratorHandlers = { shieldShowHandler, shieldHideHandler, credentialValidHandler };
         }
         
         async waitForWallet() {
             return new Promise((resolve) => {
+                let checkCount = 0;
+                const maxChecks = 30; // Max 3 seconds for wallet
+                
                 const checkWallet = () => {
+                    checkCount++;
+                    
                     // Use the background wallet if available
                     if (window.lemmaBackgroundWallet) {
                         console.log('🎯 Using existing background wallet');
@@ -191,8 +225,12 @@ try {
                         console.log('⚠️ Using legacy LemmaWallet - consider upgrading to background wallet');
                         this.wallet = new window.LemmaWallet();
                         resolve();
-                    } else {
+                    } else if (checkCount < maxChecks) {
                         setTimeout(checkWallet, 100);
+                    } else {
+                        console.log('⚠️ No wallet found after 3 seconds - continuing without wallet');
+                        this.wallet = null;
+                        resolve();
                     }
                 };
                 checkWallet();
@@ -362,24 +400,36 @@ try {
         startRevocationMonitoring() {
             /*
              * SIMPLIFIED: No periodic revocation checking needed
-             * Revoked credentials are cleared by the revocation API - users just get new credentials
+             * PREVENT DUPLICATE EVENT LISTENERS
              */
-            console.log('🔄 Starting revocation event monitoring (no periodic checks)...');
+            if (this._revocationMonitoringStarted) {
+                console.log('⚠️ Revocation monitoring already started - skipping duplicate setup');
+                return;
+            }
+            this._revocationMonitoringStarted = true;
+            
+            console.log('🔄 Starting revocation event monitoring (once only, no periodic checks)...');
             
             // REMOVED: No periodic checking intervals
             // If a credential is revoked, the API clears it and user gets a new one
             
-            // Only listen for explicit revocation events (rare edge cases)
-            window.addEventListener('lemma-credential-revoked', async (event) => {
-                console.log('🚨 Explicit revocation event received:', event.detail);
+            // Only listen for explicit revocation events (rare edge cases) - ONCE ONLY
+            const credentialRevokedHandler = async (event) => {
+                console.log('🚨 Explicit revocation event received (ONCE ONLY):', event.detail);
                 this.handleCredentialRevoked(event.detail);
                 await this.showVerificationWidget();
-            });
+            };
             
-            window.addEventListener('lemma-force-verification', async (event) => {
-                console.log('🚨 Force verification event received:', event.detail);
+            const forceVerificationHandler = async (event) => {
+                console.log('🚨 Force verification event received (ONCE ONLY):', event.detail);
                 await this.showVerificationWidget();
-            });
+            };
+            
+            window.addEventListener('lemma-credential-revoked', credentialRevokedHandler);
+            window.addEventListener('lemma-force-verification', forceVerificationHandler);
+            
+            // Store handlers for potential cleanup
+            this._revocationHandlers = { credentialRevokedHandler, forceVerificationHandler };
         }
         
         // REMOVED: pausePeriodicChecks and resumePeriodicChecks methods
