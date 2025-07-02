@@ -287,93 +287,49 @@ try {
         
         async handleStatusResult(statusResult) {
             /*
-             * Handle the result from checkStatus and determine what action to take
+             * SIMPLIFIED: Handle the result from checkStatus with clean logic
+             * - If user has valid credentials: grant access
+             * - If user needs verification: show static shield
+             * - No complex action handling or multiple fallbacks
              */
             try {
                 console.log('🛡️ Processing shield status result:', statusResult);
                 
                 if (!statusResult) {
-                    console.warn('⚠️ No status result - showing shield as fallback');
+                    console.log('⚠️ No status result - showing shield');
                     await this.showVerificationWidget();
                     return;
                 }
                 
-                const { shield_action, verification_mode, offline_verification, success } = statusResult;
-                
-                // FIXED: Handle undefined shield_action by checking success status first
-                if (shield_action === 'allow_access' && success === true) {
-                    console.log('✅ Access allowed - hiding shield');
+                // SIMPLIFIED LOGIC: Just check if verification is successful
+                if (statusResult.success === true && statusResult.shield_action === 'allow_access') {
+                    console.log('✅ User has valid credentials - granting access');
                     this.grantAccess();
-                } else if (shield_action === 'require_verification' || 
-                          success === false || 
-                          !shield_action) {
-                    console.log(`🛡️ Verification required (action: ${shield_action || 'undefined'}, success: ${success}) - showing shield`);
-                    await this.showVerificationWidget();
                 } else {
-                    // Handle other specific actions or default case
-                    switch (shield_action) {
-                        case 'verify_did':
-                        case 'check_credentials':
-                        case 'check_revocation':
-                            console.log(`🔍 Shield action: ${shield_action} - showing verification widget`);
-                            await this.showVerificationWidget();
-                            break;
-                        default:
-                            console.log(`🔍 Unknown shield action: ${shield_action} - defaulting to verification`);
-                            await this.showVerificationWidget();
-                            break;
-                    }
-                }
-                
-                // Handle specific verification modes
-                if (verification_mode === 'offline_verified' && offline_verification) {
-                    console.log('🚀 Offline verification successful - access granted');
-                    this.grantAccess();
-                } else if (verification_mode === 'offline_failed') {
-                    console.log('❌ Offline verification failed - showing shield');
+                    console.log('🛡️ User needs verification - showing static shield');
                     await this.showVerificationWidget();
                 }
                 
             } catch (error) {
                 console.error('❌ Error handling status result:', error);
-                // Fallback to showing shield on error
+                // Always show shield on error
                 await this.showVerificationWidget();
             }
         }
         
         startRevocationMonitoring() {
             /*
-             * SIMPLIFIED: Start revocation monitoring with minimal API calls
-             * Only checks when user actually interacts with the page
+             * SIMPLIFIED: No periodic revocation checking needed
+             * Revoked credentials are cleared by the revocation API - users just get new credentials
              */
-            console.log('🔄 Starting simplified revocation monitoring...');
+            console.log('🔄 Starting revocation event monitoring (no periodic checks)...');
             
-            // SIMPLIFIED: Check only every 15 minutes to minimize API calls
-            this.revocationCheckInterval = setInterval(async () => {
-                try {
-                    console.log('🔍 Periodic revocation check (15min interval)...');
-                    const statusResult = await this.checkStatus();
-                    
-                    // If status changed to require verification, show shield
-                    if (statusResult && statusResult.shield_action === 'require_verification') {
-                        console.log('⚠️ Revocation detected - showing shield');
-                        await this.showVerificationWidget();
-                        
-                        // Clear the interval since we're now in verification mode
-                        if (this.revocationCheckInterval) {
-                            clearInterval(this.revocationCheckInterval);
-                            this.revocationCheckInterval = null;
-                        }
-                    }
-                    
-                } catch (error) {
-                    console.warn('⚠️ Revocation check error (will retry):', error);
-                }
-            }, 900000); // Check every 15 minutes - much less aggressive
+            // REMOVED: No periodic checking intervals
+            // If a credential is revoked, the API clears it and user gets a new one
             
-            // Also listen for custom revocation events
+            // Only listen for explicit revocation events (rare edge cases)
             window.addEventListener('lemma-credential-revoked', async (event) => {
-                console.log('🚨 Revocation event received:', event.detail);
+                console.log('🚨 Explicit revocation event received:', event.detail);
                 this.handleCredentialRevoked(event.detail);
                 await this.showVerificationWidget();
             });
@@ -382,13 +338,10 @@ try {
                 console.log('🚨 Force verification event received:', event.detail);
                 await this.showVerificationWidget();
             });
-            
-            window.addEventListener('lemma-security-lockout', async (event) => {
-                console.log('🚨 Security lockout event received:', event.detail);
-                this.handleCredentialRevoked(event.detail);
-                await this.showVerificationWidget();
-            });
         }
+        
+        // REMOVED: pausePeriodicChecks and resumePeriodicChecks methods
+        // No longer needed since we eliminated periodic checking entirely
         
         handleCredentialRevoked(eventDetail) {
             /*
@@ -1166,80 +1119,29 @@ try {
             try {
                 console.log('🛡️ Completing inline verification...');
                 
-                // Show loading state
-                this.showVerificationProcessingUI();
+                // Show simple processing state - NO LOOPS
+                this.showSimpleProcessingUI();
                 
-                // Wait for Stripe to process and retry verification status check
-                let attempts = 0;
-                const maxAttempts = 12; // Try for up to 60 seconds (12 * 5 seconds)
-                let result = null;
-                
-                while (attempts < maxAttempts) {
-                    attempts++;
-                    console.log(`🔄 Checking verification status (attempt ${attempts}/${maxAttempts})...`);
-                    
-                    // Wait before each attempt (progressive backoff)
-                    const waitTime = Math.min(2000 + (attempts * 1000), 8000); // 2s, 3s, 4s... up to 8s
-                    await new Promise(resolve => setTimeout(resolve, waitTime));
-                    
-                    result = await this.checkVerificationStatus();
-                    
-                    if (result && result.success && result.verified) {
-                        console.log('✅ Verification status confirmed - credential issued');
-                        // Success handled in checkVerificationStatus, no need to duplicate
-                        return; // Exit early to avoid showing success twice
-                    } else if (result && result.error && !result.error.includes('incomplete') && !result.error.includes('processing')) {
-                        // If it's a real error (not just "incomplete" or "processing"), break immediately
-                        console.error('❌ Verification failed with error:', result.error);
-                        break;
-                    } else {
-                        console.log(`⏳ Verification still processing... (${result ? (result.error || result.message || 'no response') : 'no response'})`);
-                    }
-                }
+                // Single verification status check with reasonable timeout
+                const result = await this.checkVerificationStatusOnce();
                 
                 if (result && result.success && result.verified) {
-                    console.log('✅ Inline verification completed successfully');
+                    console.log('✅ Verification completed successfully');
                     
-                    // CRITICAL FIX: Retrieve and store the credential after successful verification
-                    try {
-                        console.log('🔑 Retrieving credential for wallet storage...');
-                        const credentialResponse = await fetch(`${this.options.apiBase}/api/shield/get-credential`, {
-                            method: 'GET',
-                            credentials: 'same-origin',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest'
-                            }
-                        });
-                        
-                        if (credentialResponse.ok) {
-                            const credentialResult = await credentialResponse.json();
-                            if (credentialResult.success && credentialResult.credential && this.wallet) {
-                                console.log('💾 Storing credential in wallet...');
-                                await this.wallet.storeCredential(credentialResult.credential);
-                                console.log('✅ Credential stored successfully in wallet');
-                            } else {
-                                console.warn('⚠️ No credential available for wallet storage:', credentialResult.message);
-                            }
-                        } else {
-                            console.warn('⚠️ Failed to retrieve credential for wallet storage');
+                    // Store credential if available
+                    if (result.credential && this.wallet) {
+                        try {
+                            await this.wallet.storeCredential(result.credential);
+                            console.log('✅ Credential stored in wallet');
+                        } catch (credentialError) {
+                            console.warn('⚠️ Credential storage failed:', credentialError);
                         }
-                    } catch (credentialError) {
-                        console.error('❌ Failed to retrieve/store credential:', credentialError);
-                        // Don't fail the entire verification process for credential storage issues
                     }
                     
                     this.showSuccessAndGrantAccess();
                 } else {
-                    // Check if it's just a timing issue vs real failure
-                    const errorMessage = result && result.error;
-                    if (errorMessage && (errorMessage.includes('incomplete') || errorMessage.includes('processing'))) {
-                        console.log('⏳ Verification still in progress after maximum attempts - may need manual refresh');
-                        this.showVerificationTimeoutMessage();
-                    } else {
-                        console.error('❌ Verification failed:', errorMessage || 'Unknown error');
-                        this.options.onError(new Error(errorMessage || 'Verification failed - please try again'));
-                    }
+                    console.log('⏳ Verification still processing - showing wait message');
+                    this.showVerificationWaitMessage();
                 }
                 
             } catch (error) {
@@ -1247,8 +1149,8 @@ try {
                 this.options.onError(error);
             }
         }
-        
-        showVerificationProcessingUI() {
+
+        showSimpleProcessingUI() {
             const container = this.getShieldContainer();
             if (!container) return;
             
@@ -1263,137 +1165,88 @@ try {
                             <div class="verification-progress">
                                 <div class="lemma-spinner"></div>
                                 <p>This may take a few moments...</p>
-                                <div class="processing-steps">
-                                    <div class="step-item active" id="step-1">
+                                <div class="simple-steps">
+                                    <div class="step-item completed">
                                         <span class="step-icon">✅</span>
                                         <span class="step-text">Identity verification completed</span>
                                     </div>
-                                    <div class="step-item processing" id="step-2">
+                                    <div class="step-item processing">
                                         <span class="step-icon">🔄</span>
-                                        <span class="step-text">Credential issuance in progress</span>
+                                        <span class="step-text">Processing results...</span>
                                     </div>
-                                    <div class="step-item pending" id="step-3">
-                                        <span class="step-icon">⏳</span>
-                                        <span class="step-text">Wallet storage pending</span>
-                                    </div>
-                                </div>
-                                <div id="verification-error" class="verification-error" style="display: none;">
-                                    <div class="error-content">
-                                        <span class="error-icon">❌</span>
-                                        <span class="error-text">Verification failed. Please try again.</span>
-                                    </div>
-                                    <button class="retry-btn" onclick="window.location.reload()">Retry</button>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             `;
-            
-            // Start monitoring verification progress
-            this.monitorVerificationProgress();
         }
 
-        async monitorVerificationProgress() {
-            const maxAttempts = 45; // 45 seconds max (increased for better reliability)
-            let attempts = 0;
-            let consecutiveErrors = 0;
-            
-            const checkProgress = async () => {
-                attempts++;
-                console.log(`🔍 Checking verification progress (attempt ${attempts}/${maxAttempts})`);
+        async checkVerificationStatusOnce() {
+            try {
+                console.log('🔍 Single verification status check...');
                 
-                try {
-                    // Check verification status
-                    const response = await fetch('/api/shield/verification-status', {
-                        credentials: 'same-origin',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        console.log('📊 Verification status:', result);
-                        consecutiveErrors = 0; // Reset error counter on successful response
-                        
-                        if (result.success && result.verified) {
-                            console.log('✅ Verification completed! Moving to credential storage...');
-                            
-                            // Move to step 3 - wallet storage
-                            this.updateProgressStep(3, 'active', '🔄', 'Storing credential in wallet...');
-                            
-                            // Try to retrieve and store credential
-                            try {
-                                await this.handleCredentialStorage(result);
-                                
-                                // Complete - all steps done
-                                this.updateProgressStep(3, 'active', '✅', 'Wallet storage complete');
-                                
-                                // Hide processing UI and show success
-                                setTimeout(() => {
-                                    this.showVerificationSuccess(result);
-                                }, 1000);
-                                
-                                return true; // Success, stop monitoring
-                                
-                            } catch (storageError) {
-                                console.error('❌ Credential storage failed:', storageError);
-                                this.showVerificationError('Failed to store credential in wallet. Please refresh and try again.');
-                                return true; // Stop monitoring on error
-                            }
-                            
-                        } else if (result.error && !result.error.includes('processing') && !result.error.includes('incomplete') && !result.error.includes('not_started')) {
-                            console.error('❌ Verification failed:', result.error);
-                            this.showVerificationError(result.error);
-                            return true; // Stop monitoring on error
-                        } else {
-                            // Still processing, continue monitoring
-                            console.log('⏳ Verification still processing...', result.message || result.error);
-                            
-                            // Update step 2 status to show progress
-                            this.updateProgressStep(2, 'processing', '🔄', 'Credential issuance in progress...');
-                        }
-                    } else {
-                        consecutiveErrors++;
-                        console.warn(`⚠️ Verification status check failed: ${response.status} (error ${consecutiveErrors})`);
-                        
-                        // If too many consecutive errors, stop monitoring
-                        if (consecutiveErrors >= 5) {
-                            console.error('❌ Too many consecutive errors, stopping monitoring');
-                            this.showVerificationError('Unable to check verification status. Please refresh and try again.');
-                            return true;
-                        }
-                    }
-                    
-                } catch (error) {
-                    consecutiveErrors++;
-                    console.error(`❌ Error checking verification progress: ${error} (error ${consecutiveErrors})`);
-                    
-                    // If too many consecutive errors, stop monitoring
-                    if (consecutiveErrors >= 5) {
-                        console.error('❌ Too many consecutive errors, stopping monitoring');
-                        this.showVerificationError('Network error checking verification status. Please refresh and try again.');
-                        return true;
-                    }
-                }
+                // Use the existing shield verify-credentials endpoint
+                const response = await fetch(`${this.options.apiBase}/api/shield/verify-credentials`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        check_inline_verification: true,
+                        user_id: this.state.userId,
+                        session_id: this.state.verificationSessionId
+                    })
+                });
                 
-                // Continue monitoring if not complete and not at max attempts
-                if (attempts < maxAttempts) {
-                    // Use exponential backoff for errors, but keep checking every second for normal progress
-                    const delay = consecutiveErrors > 0 ? Math.min(5000, 1000 * Math.pow(2, consecutiveErrors - 1)) : 1000;
-                    setTimeout(checkProgress, delay);
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('📊 Single verification check result:', result);
+                    return result;
                 } else {
-                    console.error('❌ Verification monitoring timed out after 45 seconds');
-                    this.showVerificationError('Verification is taking longer than expected. Your verification may have completed - please refresh the page to check.');
+                    console.warn('⚠️ Verification status check failed:', response.status);
+                    return { success: false, error: `HTTP ${response.status}` };
                 }
-            };
-            
-            // Start checking after a brief delay
-            setTimeout(checkProgress, 1000);
+                
+            } catch (error) {
+                console.error('❌ Verification status check error:', error);
+                return { success: false, error: error.message };
+            }
         }
 
+        showVerificationWaitMessage() {
+            const container = this.getShieldContainer();
+            if (!container) return;
+            
+            container.innerHTML = `
+                <div class="lemma-shield-overlay">
+                    <div class="lemma-shield-widget lemma-card">
+                        <div class="lemma-card-header">
+                            <h2>⏳ Verification in Progress</h2>
+                            <p>Your verification is being processed</p>
+                        </div>
+                        <div class="lemma-card-body">
+                            <div class="wait-message">
+                                <div class="wait-icon">⏱️</div>
+                                <p>Your identity verification was completed successfully.</p>
+                                <p>Our system is now processing the results.</p>
+                                <p><strong>Please refresh this page in a few moments to continue.</strong></p>
+                                <br>
+                                <button class="lemma-btn lemma-btn-primary" onclick="window.location.reload()">
+                                    🔄 Refresh Page
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // REMOVE THE COMPLEX monitorVerificationProgress() FUNCTION ENTIRELY
+        // It was causing infinite loops and overcomplicating the flow
+        
         updateProgressStep(stepNumber, status, icon, text) {
             const stepEl = document.getElementById(`step-${stepNumber}`);
             if (stepEl) {
@@ -1404,78 +1257,42 @@ try {
         }
 
         showVerificationError(errorMessage) {
-            const errorEl = document.getElementById('verification-error');
-            if (errorEl) {
-                errorEl.style.display = 'block';
-                errorEl.querySelector('.error-text').textContent = errorMessage;
-            }
+            const container = this.getShieldContainer();
+            if (!container) return;
             
-            // Update step 2 to show error
-            this.updateProgressStep(2, 'error', '❌', 'Credential issuance failed');
+            container.innerHTML = `
+                <div class="lemma-shield-overlay">
+                    <div class="lemma-shield-widget lemma-card">
+                        <div class="lemma-card-header">
+                            <h2>❌ Verification Error</h2>
+                            <p>There was an issue with your verification</p>
+                        </div>
+                        <div class="lemma-card-body">
+                            <div class="error-message">
+                                <p>${errorMessage}</p>
+                                <button class="lemma-btn lemma-btn-primary" onclick="window.location.reload()">
+                                    🔄 Try Again
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         async handleCredentialStorage(verificationResult) {
             console.log('💾 Handling credential storage...');
             
-            // Try to get credential from verification result or fetch it
-            let credential = verificationResult.credential;
-            
-            if (!credential) {
-                console.log('🔍 Fetching credential from API...');
+            if (this.wallet && verificationResult.credential) {
                 try {
-                    const credentialResponse = await fetch('/api/shield/get-credential', {
-                        method: 'GET',
-                        credentials: 'same-origin',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    });
-                    
-                    if (credentialResponse.ok) {
-                        const credentialResult = await credentialResponse.json();
-                        if (credentialResult.success && credentialResult.credential) {
-                            credential = credentialResult.credential;
-                            console.log('✅ Retrieved credential from API');
-                        }
-                    } else {
-                        console.warn('⚠️ Could not fetch credential from API, status:', credentialResponse.status);
-                    }
-                } catch (fetchError) {
-                    console.warn('⚠️ Error fetching credential from API:', fetchError);
+                    await this.wallet.storeCredential(verificationResult.credential);
+                    console.log('✅ Credential stored successfully');
+                } catch (error) {
+                    console.error('❌ Credential storage failed:', error);
+                    throw error;
                 }
-            }
-            
-            // Try wallet storage if we have a credential and wallet
-            if (credential && this.wallet) {
-                console.log('✅ Storing credential in wallet...');
-                try {
-                    await this.wallet.storeCredential(credential);
-                    console.log('✅ Credential stored successfully in wallet');
-                    
-                    // CRITICAL: Verify complete verification protocol after credential issuance and storage
-                    console.log('🔬 POST-ISSUANCE: Verifying complete verification protocol...');
-                    try {
-                        const protocolVerification = await this.verifyVerificationProtocol(credential);
-                        if (protocolVerification.success) {
-                            console.log('✅ POST-ISSUANCE: Complete verification protocol validated - all components working');
-                        } else {
-                            console.warn('⚠️ POST-ISSUANCE: Protocol verification failed:', protocolVerification.error);
-                        }
-                    } catch (protocolError) {
-                        console.warn('⚠️ POST-ISSUANCE: Failed to verify complete verification protocol:', protocolError);
-                    }
-                    
-                } catch (walletError) {
-                    console.warn('⚠️ Wallet storage failed, but credential is available:', walletError);
-                    // Don't throw error - credential exists even if wallet storage fails
-                }
-            } else if (credential) {
-                console.log('✅ Credential available (wallet not initialized, but that\'s OK)');
-                // Credential exists, which is the important part
             } else {
-                // Only throw error if no credential at all
-                throw new Error('No credential available - verification may not be complete');
+                console.log('⚠️ No wallet or credential available for storage');
             }
         }
         
@@ -1583,6 +1400,8 @@ try {
              */
             try {
                 console.log('🛡️ Showing verification widget...');
+                
+                // No periodic checks to pause - simplified verification flow
                 
                 // Get the shield container
                 const container = this.getShieldContainer();
@@ -2287,6 +2106,8 @@ try {
 
         grantAccess() {
             console.log('✅ Granting access to protected content');
+            
+            // No periodic checks to resume - simplified access granting
             
             this.state.verified = true;
             this.state.currentStep = 'complete';

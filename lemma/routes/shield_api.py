@@ -126,54 +126,24 @@ def shield_status():
         if lemma_credential_id:
             credential_ids_to_check.append(lemma_credential_id)
         
-        # CRITICAL FIX: If no credentials provided, check for any recent revocations that should trigger shield
+        # SIMPLIFIED: If no credentials provided, just require normal verification
+        # No need to check for "recent revocations" - revoked credentials are cleared by revocation API
         if not credential_ids_to_check:
-            # Check if there are any recent shield triggers that should force verification
-            shield_triggers = getattr(current_app, '_shield_triggers', {})
-            revocation_cache = getattr(current_app, '_revoked_credentials_cache', {})
-            
-            if shield_triggers or revocation_cache:
-                # Recent revocations found - require verification
-                current_app.logger.info("[SHIELD-STATUS] No credentials provided but recent revocations detected")
-                response_time = (time.time() - start_time) * 1000
-                return jsonify({
-                    'shield_action': 'require_verification',
-                    'reason': 'recent_revocations_detected',
-                    'details': 'Recent credential revocations require new verification',
-                    'requires_verification': True,
-                    'force_appearance': True,
-                    'revocation_detected': True,
-                    'response_time_ms': round(response_time, 2),
-                    'detection_method': 'recent_revocation_check',
-                    'credentials_checked': 0,
-                    'revoked_count': len(revocation_cache),
-                    'trigger_count': len(shield_triggers)
-                }), 200
+            response_time = (time.time() - start_time) * 1000
+            return jsonify({
+                'success': False,
+                'shield_action': 'require_verification',
+                'reason': 'no_credentials_provided',
+                'details': 'No credentials found - verification required',
+                'credentials_checked': 0,
+                'revoked_count': 0,
+                'valid_count': 0,
+                'response_time_ms': round(response_time, 2),
+                'network_status': 'verification_required'
+            }), 200
         
-        # STEP 2: CHECK SHIELD TRIGGERS (Priority check for forced reappearance)
-        shield_triggers = getattr(current_app, '_shield_triggers', {})
-        for credential_id in credential_ids_to_check:
-            if credential_id in shield_triggers:
-                trigger_data = shield_triggers[credential_id]
-                
-                # Force shield appearance for revoked credentials
-                current_app.logger.info(f"[SHIELD-TRIGGER] Shield trigger detected for {credential_id}")
-                
-                # Remove trigger after processing
-                del shield_triggers[credential_id]
-                
-                response_time = (time.time() - start_time) * 1000
-                return jsonify({
-                    'shield_action': 'require_verification',
-                    'reason': 'credential_revoked_shield_trigger',
-                    'details': 'Credential was revoked - shield must reappear for re-verification',
-                    'revoked_credential_id': credential_id,
-                    'trigger_time': trigger_data.get('trigger_time'),
-                    'force_appearance': True,
-                    'revocation_detected': True,
-                    'response_time_ms': round(response_time, 2),
-                    'detection_method': 'shield_trigger_system'
-                }), 200
+        # STEP 2: SIMPLIFIED - Just check if credentials are valid or revoked
+        # No complex trigger system needed - revoked credentials are cleared by revocation API
         
         # STEP 3: COMPREHENSIVE REVOCATION CHECK (Multiple layers)
         revoked_credentials = []
@@ -1723,87 +1693,40 @@ def get_cached_revocation_status(credential_id):
         logger.error(f"Redis cache error: {e}")
         return None
 
-@shield_api.route('/verification-status', methods=['GET'])
-@csrf_protect()
+@shield_api.route('/api/shield/verification-status', methods=['GET'])
 @rate_limit
 def verification_status():
-    """Check the status of the current verification process."""
+    """
+    Simple verification status endpoint
+    Returns current user's verification status
+    """
     try:
-        # Check if user has completed verification
-        verified_user_id = session.get('verified_user_id')
-        verified_credential = session.get('verified_credential')
-        store_credential = session.get('store_credential')
-        verification_timestamp = session.get('verification_timestamp')
+        # Check if user is verified in session
+        is_verified = session.get('verified_user', False) or session.get('lemma_verified', False)
+        user_id = session.get('user_id') or session.get('lemma_user_id')
+        verification_time = session.get('verification_time') or session.get('lemma_verification_time')
         
-        # FIXED: Check for completed verification using multiple indicators
-        # Look for either verified_credential OR store_credential as indicators of completion
-        if (verified_user_id and verified_credential) or store_credential:
-            # User is verified and credential is ready
+        if is_verified and user_id:
             return jsonify({
                 'success': True,
                 'verified': True,
-                'status': 'completed',
-                'user_id': verified_user_id or session.get('user_id'),
-                'credential': store_credential,  # Include formatted credential for wallet storage
-                'verified_at': verification_timestamp or session.get('verification_time'),
-                'message': 'Verification completed successfully'
+                'user_id': user_id,
+                'verification_time': verification_time,
+                'status': 'verified'
             })
-        
-        # Check for Stripe verification in progress
-        stripe_session_id = session.get('stripe_session_id') or session.get('stripe_verification_session')
-        if stripe_session_id:
-            # Check Stripe verification status
-            verification_result = check_stripe_verification_completion(None, stripe_session_id)
-            
-            if verification_result and verification_result.get('verified'):
-                return jsonify({
-                    'success': True,
-                    'verified': True,
-                    'status': 'completed',
-                    'user_id': verification_result.get('user_id'),
-                    'credential': session.get('store_credential'),
-                    'message': 'Stripe verification completed'
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'verified': False,
-                    'status': 'processing',
-                    'message': 'Verification still in progress',
-                    'error': 'processing'
-                })
-        
-        # ADDITIONAL CHECK: Look for any signs of completed verification in session
-        if (session.get('verified_user', False) or 
-            session.get('verification_complete', False) or
-            session.get('credential_id') or
-            session.get('lemma_credential_id')):
-            
+        else:
             return jsonify({
-                'success': True,
-                'verified': True,
-                'status': 'completed',
-                'user_id': session.get('user_id') or verified_user_id,
-                'credential': store_credential,
-                'verified_at': session.get('verification_time') or verification_timestamp,
-                'message': 'Verification completed (detected from session)'
+                'success': False,
+                'verified': False,
+                'status': 'not_verified',
+                'message': 'User not verified'
             })
-        
-        # No verification in progress
-        return jsonify({
-            'success': False,
-            'verified': False,
-            'status': 'not_started',
-            'message': 'No verification process detected',
-            'error': 'incomplete'
-        })
-        
+            
     except Exception as e:
-        current_app.logger.error(f"Error checking verification status: {e}")
+        current_app.logger.error(f"Verification status check error: {e}")
         return jsonify({
             'success': False,
             'verified': False,
             'status': 'error',
-            'message': 'Error checking verification status',
             'error': str(e)
         }), 500 
