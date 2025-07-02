@@ -387,8 +387,8 @@ try {
         
         handleCredentialRevoked(eventDetail) {
             /*
-             * Handle credential revocation by updating local revocation list
-             * This ensures offline verification will detect revoked credentials
+             * SIMPLIFIED: Only handle explicit revocation events
+             * No automatic revocation detection or false positives
              */
             try {
                 const credentialId = eventDetail.credential_id || eventDetail.credentialId;
@@ -397,36 +397,16 @@ try {
                     return;
                 }
                 
-                console.log(`🚨 Adding credential to local revocation list: ${credentialId}`);
+                console.log(`🚨 Explicit revocation received for: ${credentialId}`);
                 
-                // Get existing revoked credentials
-                const revokedCredentials = JSON.parse(localStorage.getItem('lemma_revoked_credentials') || '[]');
-                
-                // Add the revoked credential if not already present
-                if (!revokedCredentials.includes(credentialId)) {
-                    revokedCredentials.push(credentialId);
-                    localStorage.setItem('lemma_revoked_credentials', JSON.stringify(revokedCredentials));
-                    console.log(`✅ Updated local revocation list. Now contains ${revokedCredentials.length} revoked credentials`);
-                }
-                
-                // ENHANCED: Also clear from wallet and trigger immediate re-verification
+                // Only clear wallet if explicitly revoked by server
                 if (this.wallet && this.wallet.removeCredential) {
                     this.wallet.removeCredential(credentialId).catch(error => {
                         console.warn('⚠️ Failed to remove credential from wallet:', error);
                     });
                 }
                 
-                // Clear local storage items related to this credential
-                const keysToRemove = [];
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key && (key.includes(credentialId) || key.includes('lemma_credential') || key.includes('lemma_verified'))) {
-                        keysToRemove.push(key);
-                    }
-                }
-                keysToRemove.forEach(key => localStorage.removeItem(key));
-                
-                // Force immediate verification
+                // Show verification widget for new credential
                 this.showVerificationWidget();
                 
             } catch (error) {
@@ -620,66 +600,19 @@ try {
         
         checkRevocationFast(credentialId, offlineWitness) {
             /*
-             * ULTRA-FAST revocation checking - optimized for speed
-             * Target: <2ms response time
+             * SIMPLIFIED: No automatic revocation detection
+             * Only returns true if explicitly revoked by server
              */
             try {
-                // OPTIMIZATION 1: Fast in-memory revocation cache
-                const revokedCache = this._revokedCache || (this._revokedCache = new Set());
-                if (revokedCache.has(credentialId)) {
-                    return {
-                        revoked: true,
-                        method: 'fast_memory_cache',
-                        revocation_reason: 'Found in fast revocation cache'
-                    };
-                }
-                
-                // OPTIMIZATION 2: Fast localStorage check (batch read)
-                if (!this._revokedList) {
-                    try {
-                        const stored = localStorage.getItem('lemma_revoked_credentials');
-                        this._revokedList = stored ? JSON.parse(stored) : [];
-                        // Pre-populate cache
-                        this._revokedList.forEach(id => revokedCache.add(id));
-                    } catch (e) {
-                        this._revokedList = [];
-                    }
-                }
-                
-                if (this._revokedList.includes(credentialId)) {
-                    revokedCache.add(credentialId);
-                    return {
-                        revoked: true,
-                        method: 'fast_localStorage',
-                        revocation_reason: 'Found in local revocation list'
-                    };
-                }
-                
-                // OPTIMIZATION 3: Fast bloom filter check (if available)
-                const revocationSnapshot = offlineWitness.revocation_snapshot;
-                if (revocationSnapshot && revocationSnapshot.bloom_filter) {
-                    // Pre-computed hash for speed
-                    const credentialHash = this.getPrecomputedHash(credentialId);
-                    const bloomRevoked = revocationSnapshot.bloom_filter.includes(credentialHash);
-                    
-                    if (bloomRevoked) {
-                        revokedCache.add(credentialId);
-                        return {
-                            revoked: true,
-                            method: 'fast_bloom_filter',
-                            snapshot_age_hours: (Date.now() / 1000 - revocationSnapshot.snapshot_time) / 3600
-                        };
-                    }
-                }
-                
+                // Default to not revoked unless explicitly marked by server
                 return {
                     revoked: false,
-                    method: 'fast_comprehensive_check',
-                    checked_sources: ['memory_cache', 'localStorage', 'bloom_filter']
+                    method: 'simplified_no_detection',
+                    checked_sources: []
                 };
                 
             } catch (error) {
-                return { revoked: false, method: 'fast_check_error' };
+                return { revoked: false, method: 'simplified_check' };
             }
         }
         
@@ -790,51 +723,21 @@ try {
         
         async checkRevocationOffline(credentialId, offlineWitness) {
             /*
-             * Check if credential is revoked using offline witness data
-             * For demo purposes, this will detect revocation by checking against
-             * a simple revocation list stored in localStorage
+             * SIMPLIFIED: No automatic revocation detection
+             * Only returns true if explicitly revoked by server API
              */
             try {
-                // Check if credential is in the revoked list (demo implementation)
-                const revokedCredentials = JSON.parse(localStorage.getItem('lemma_revoked_credentials') || '[]');
-                const isRevoked = revokedCredentials.includes(credentialId);
-                
-                if (isRevoked) {
-                    console.log(`🚨 Offline revocation check: CREDENTIAL REVOKED - ${credentialId}`);
-                    return {
-                        revoked: true,
-                        method: 'offline_revocation_list',
-                        revocation_reason: 'Detected in offline revocation list'
-                    };
-                }
-                
-                // Also check the bloom filter if available
-                const revocationSnapshot = offlineWitness.revocation_snapshot;
-                if (revocationSnapshot && revocationSnapshot.bloom_filter) {
-                    // Simplified bloom filter check - in production use proper bloom filter
-                    const credentialHash = await this.hashCredentialId(credentialId);
-                    const bloomRevoked = revocationSnapshot.bloom_filter.includes(credentialHash.substring(0, 8));
-                    
-                    if (bloomRevoked) {
-                        console.log(`🚨 Offline revocation check: BLOOM FILTER REVOKED - ${credentialId}`);
-                        return {
-                            revoked: true,
-                            method: 'offline_bloom_filter',
-                            snapshot_age_hours: (Date.now() / 1000 - revocationSnapshot.snapshot_time) / 3600
-                        };
-                    }
-                }
-                
-                console.log(`✅ Offline revocation check: CREDENTIAL VALID - ${credentialId}`);
+                // Default to not revoked unless explicitly confirmed by server
+                console.log(`✅ Simplified revocation check: CREDENTIAL VALID - ${credentialId}`);
                 return { 
                     revoked: false, 
-                    method: 'offline_comprehensive_check',
-                    checked_sources: ['revocation_list', 'bloom_filter']
+                    method: 'simplified_no_detection',
+                    checked_sources: []
                 };
                 
             } catch (error) {
-                console.error('❌ Offline revocation check failed:', error);
-                return { revoked: false, method: 'offline_check_error' };
+                console.error('❌ Simplified revocation check failed:', error);
+                return { revoked: false, method: 'simplified_check_error' };
             }
         }
         
@@ -1413,47 +1316,7 @@ try {
                 container.style.visibility = 'visible';
                 container.style.opacity = '1';
                 
-                // ENHANCED: Check if we're in a revocation scenario
-                const isRevocationTriggered = document.querySelector('[data-revocation-triggered="true"]') || 
-                                             window.location.search.includes('force_verification=credential_revoked') ||
-                                             sessionStorage.getItem('lemma_revocation_triggered') === 'true';
-                
-                if (isRevocationTriggered) {
-                    console.log('🚨 Revocation-triggered verification detected - showing special UI');
-                    
-                    // Show with special revocation messaging
-                    container.innerHTML = `
-                        <div class="lemma-shield-overlay">
-                            <div class="lemma-shield-widget">
-                                <div class="lemma-shield-header">
-                                    <div class="lemma-shield-icon">🚨</div>
-                                    <h2>Credential Revoked - Re-verification Required</h2>
-                                    <p>Your verification credential has been revoked for security reasons.</p>
-                                </div>
-                                <div class="lemma-shield-body">
-                                    <p>Please complete verification again to continue accessing protected content.</p>
-                                    <button class="lemma-verify-btn" id="start-revoke-verification">
-                                        🛡️ Start Re-verification
-                                    </button>
-                                </div>
-                                ${this.options.showBranding ? this.getBrandingFooter() : ''}
-                            </div>
-                        </div>
-                    `;
-                    
-                    // Add styles
-                    this.addStyles();
-                    
-                    // Add event listener for the button
-                    document.getElementById('start-revoke-verification').addEventListener('click', () => {
-                        sessionStorage.removeItem('lemma_revocation_triggered');
-                        this.showInitialStep(container);
-                    });
-                    
-                    container.setAttribute('data-revocation-triggered', 'true');
-                    console.log('✅ Revocation UI displayed');
-                    return; // Don't continue to normal flow
-                }
+                // SIMPLIFIED: No revocation detection - show normal verification flow
                 
                 // Normal verification widget display
                 this.showInitialStep(container);
