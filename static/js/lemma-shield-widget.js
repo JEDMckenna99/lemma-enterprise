@@ -335,15 +335,15 @@ try {
         
         startRevocationMonitoring() {
             /*
-             * Start periodic checking for credential revocation
-             * This ensures the shield reappears when credentials are revoked
+             * SIMPLIFIED: Start revocation monitoring with minimal API calls
+             * Only checks when user actually interacts with the page
              */
-            console.log('🔄 Starting revocation monitoring...');
+            console.log('🔄 Starting simplified revocation monitoring...');
             
-            // FIXED: Check every 5 minutes for revocation (reduced from 10 seconds to prevent rate limiting)
+            // SIMPLIFIED: Check only every 15 minutes to minimize API calls
             this.revocationCheckInterval = setInterval(async () => {
                 try {
-                    console.log('🔍 Periodic revocation check...');
+                    console.log('🔍 Periodic revocation check (15min interval)...');
                     const statusResult = await this.checkStatus();
                     
                     // If status changed to require verification, show shield
@@ -359,9 +359,9 @@ try {
                     }
                     
                 } catch (error) {
-                    console.warn('⚠️ Revocation check error (will retry in 5 minutes):', error);
+                    console.warn('⚠️ Revocation check error (will retry):', error);
                 }
-            }, 300000); // Check every 5 minutes (300 seconds) - much less aggressive
+            }, 900000); // Check every 15 minutes - much less aggressive
             
             // Also listen for custom revocation events
             window.addEventListener('lemma-credential-revoked', async (event) => {

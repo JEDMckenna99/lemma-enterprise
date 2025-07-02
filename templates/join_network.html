@@ -215,6 +215,11 @@
 <!-- Shield Container - CRITICAL: Must be present for shield to display -->
 <div id="lemma-shield-container" style="display: none;"></div>
 
+<!-- Shield Visual Indicator (only shows placeholder when not active) -->
+<div id="lemma-shield-placeholder" style="margin: var(--space-8) 0; border: 2px dashed var(--gray-300); border-radius: var(--radius-lg); padding: var(--space-4); text-align: center; background: var(--gray-50);">
+    <p style="color: var(--gray-500); margin: 0;">🛡️ Shield will appear here when active</p>
+</div>
+
 <div class="welcome-container">
     <!-- Welcome Banner Card -->
     <div class="welcome-banner">
@@ -375,8 +380,11 @@
         </div>
     </div>
 
-    <!-- Shield Container (should become visible when Shield is active) -->
-    <div id="lemma-shield-container" style="margin: var(--space-8) 0; border: 2px dashed var(--gray-300); border-radius: var(--radius-lg); padding: var(--space-4); text-align: center; background: var(--gray-50);">
+    <!-- Shield Container - CRITICAL: Must be properly hidden for shield to work -->
+    <div id="lemma-shield-container" style="display: none;"></div>
+    
+    <!-- Shield Status Indicator (only shows placeholder when shield is not active) -->
+    <div id="lemma-shield-placeholder" style="margin: var(--space-8) 0; border: 2px dashed var(--gray-300); border-radius: var(--radius-lg); padding: var(--space-4); text-align: center; background: var(--gray-50);">
         <p style="color: var(--gray-500); margin: 0;">🛡️ Shield will appear here when active</p>
     </div>
 </div>
@@ -385,6 +393,9 @@
 <!-- This is exactly how a customer site would integrate Lemma protection -->
 
 <!-- Step 1: Load the Lemma Shield SDK -->
+<!-- SIMPLIFIED SHIELD - Clean Bot Shield Circuit -->
+<script src="{{ url_for('static', filename='js/simple_shield_widget.js') }}"></script>
+<!-- Complex Shield - Fallback -->
 <script src="{{ url_for('static', filename='js/lemma-shield-widget.js') }}"></script>
 
 <!-- Step 2: Customer site initialization (real production pattern) -->
@@ -518,15 +529,52 @@ function initializeLemmaShield(options = {}) {
             lemmaShieldInitialized = true;
             
             // Initialize the shield protection
-            window.lemmaShield.init().then(() => {
+            window.lemmaShield.init().then(async () => {
                 console.log('✅ Lemma Shield protection ACTIVE');
                 console.log('🔒 Site is now protected by real Lemma Shield');
+                
+                // CRITICAL: Auto-protection for join network page - force check credentials
+                if (window.LemmaConfig.autoProtect) {
+                    console.log('🛡️ Auto-protection enabled - checking user credentials...');
+                    
+                    // Check if user has valid credentials
+                    try {
+                        const statusResult = await window.lemmaShield.checkStatus();
+                        console.log('📊 Status check result:', statusResult);
+                        
+                        // Force shield to show if user needs verification
+                        if (!statusResult.success || 
+                            statusResult.shield_action === 'require_verification' ||
+                            statusResult.shield_action === 'verify_did' ||
+                            !statusResult.offline_verification) {
+                            
+                            console.log('🚨 User needs verification - forcing shield display');
+                            setTimeout(() => {
+                                window.lemmaShield.showVerificationWidget();
+                                // Hide placeholder when shield is active
+                                const placeholder = document.getElementById('lemma-shield-placeholder');
+                                if (placeholder) placeholder.style.display = 'none';
+                            }, 500);
+                        } else {
+                            console.log('✅ User already verified - access granted');
+                        }
+                    } catch (error) {
+                        console.warn('⚠️ Status check failed - showing shield as fallback:', error);
+                        setTimeout(() => {
+                            window.lemmaShield.showVerificationWidget();
+                            const placeholder = document.getElementById('lemma-shield-placeholder');
+                            if (placeholder) placeholder.style.display = 'none';
+                        }, 500);
+                    }
+                }
                 
                 // If this is a forced initialization (e.g., after revocation), show shield immediately
                 if (options.force || options.reason === 'credential_revoked') {
                     console.log('🚨 Forced shield display:', options.reason);
                     setTimeout(() => {
                         window.lemmaShield.showVerificationWidget();
+                        const placeholder = document.getElementById('lemma-shield-placeholder');
+                        if (placeholder) placeholder.style.display = 'none';
                     }, 100);
                 }
                 
@@ -1510,6 +1558,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const debugBtn = document.getElementById('debugShield');
     const checkStatusBtn = document.getElementById('checkShieldStatus');
     const shieldDebugOutput = document.getElementById('shieldDebugOutput');
+    
+    function showDebugOutput(message) {
+        if (shieldDebugOutput) {
+            shieldDebugOutput.style.display = 'block';
+            shieldDebugOutput.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${message}</div>`;
+            shieldDebugOutput.scrollTop = shieldDebugOutput.scrollHeight;
+        }
+        console.log('🔧 SHIELD DEBUG:', message);
+    }
 
     if (forceShowBtn) {
         forceShowBtn.addEventListener('click', function() {
@@ -1518,6 +1575,13 @@ document.addEventListener('DOMContentLoaded', function() {
             shieldDebugOutput.innerHTML = '<strong>🛡️ Force Show Shield Results:</strong><br>';
             
             let attempts = [];
+            
+            // Hide placeholder first
+            const placeholder = document.getElementById('lemma-shield-placeholder');
+            if (placeholder) {
+                placeholder.style.display = 'none';
+                attempts.push('✅ Placeholder hidden');
+            }
             
             // Method 1: Direct container show
             const container = document.getElementById('lemma-shield-container');

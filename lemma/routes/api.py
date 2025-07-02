@@ -157,12 +157,28 @@ def rate_limit(f: Callable) -> Callable:
             if now - req_time > 60:
                 request_history[ip].remove(req_time)
         
+        # ENHANCED: Different rate limits for different endpoint types
+        # Shield endpoints need higher limits for proper operation
+        endpoint_path = request.endpoint or request.path
+        
+        # Determine rate limit based on endpoint
+        if any(shield_endpoint in str(endpoint_path) for shield_endpoint in [
+            'shield', 'verify-human', 'start-verification', 'verify-credential'
+        ]):
+            # Shield endpoints: 50 requests per 60 seconds (enough for proper operation)
+            max_requests = 50
+            limit_description = "Maximum 50 requests allowed per 60 seconds for shield operations"
+        else:
+            # Other endpoints: 20 requests per 60 seconds (increased from 10)
+            max_requests = 20
+            limit_description = "Maximum 20 requests allowed per 60 seconds"
+        
         # Check if rate limit exceeded
-        if len(request_history.get(ip, [])) >= 10:
-            current_app.logger.warning("Rate limit exceeded for IP: %s", ip)
+        if len(request_history.get(ip, [])) >= max_requests:
+            current_app.logger.warning("Rate limit exceeded for IP: %s (endpoint: %s, limit: %d)", ip, endpoint_path, max_requests)
             return jsonify({
                 "error": "Rate limit exceeded",
-                "message": "Maximum 10 requests allowed per 60 seconds"
+                "message": limit_description
             }), 429
         
         # Add current request

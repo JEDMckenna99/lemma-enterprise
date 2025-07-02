@@ -273,19 +273,35 @@ def shield_status():
                     'detection_layers': ['shield_triggers', 'memory_cache', 'session_cache', 'persistent_file', 'oprf_cascade']
                 }), 200
         else:
-            # All credentials appear valid
-            response_data = {
-                'shield_action': 'allow_access',
-                'reason': 'valid_credentials_confirmed',
-                'details': 'All checked credentials are valid',
-                'valid_credentials': valid_credentials,
-                'credentials_checked': len(credential_ids_to_check),
-                'revoked_count': 0,
-                'valid_count': len(valid_credentials),
-                'response_time_ms': round(response_time, 2),
-                'detection_layers': ['shield_triggers', 'memory_cache', 'session_cache', 'persistent_file', 'oprf_cascade'],
-                'network_status': 'access_granted'
-            }
+            # All credentials appear valid - but if no credentials to check, require verification
+            if not credential_ids_to_check:
+                response_data = {
+                    'success': False,
+                    'shield_action': 'require_verification',
+                    'reason': 'no_credentials_provided',
+                    'details': 'No credentials found - verification required',
+                    'credentials_checked': 0,
+                    'revoked_count': 0,
+                    'valid_count': 0,
+                    'response_time_ms': round(response_time, 2),
+                    'detection_layers': ['shield_triggers', 'memory_cache', 'session_cache', 'persistent_file', 'oprf_cascade'],
+                    'network_status': 'verification_required'
+                }
+            else:
+                # All credentials appear valid
+                response_data = {
+                    'success': True,
+                    'shield_action': 'allow_access',
+                    'reason': 'valid_credentials_confirmed',
+                    'details': 'All checked credentials are valid',
+                    'valid_credentials': valid_credentials,
+                    'credentials_checked': len(credential_ids_to_check),
+                    'revoked_count': 0,
+                    'valid_count': len(valid_credentials),
+                    'response_time_ms': round(response_time, 2),
+                    'detection_layers': ['shield_triggers', 'memory_cache', 'session_cache', 'persistent_file', 'oprf_cascade'],
+                    'network_status': 'access_granted'
+                }
             
             # Add current session info for admin dashboard
             if session.get('user_id'):
