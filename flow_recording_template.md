@@ -14,7 +14,7 @@ This template tests Lemma's bot shield system - a complete protection circuit th
 ## Basic Test Information
 - **Date:** 
 - **Environment:** (Production/Local/Staging)
-- **Test URL:** https://lemma-enterprise-0f6ba17076c1.herokuapp.com/shield-demo
+- **Test URL:** https://lemma.id/shield-demo
 - **Browser:** (Chrome/Firefox/Safari/Other)
 - **Device:** (Desktop/Mobile/Tablet)
 - **Test Key Status:** ☐ Using test key (bypasses human verification for testing)
@@ -27,7 +27,7 @@ This template tests Lemma's bot shield system - a complete protection circuit th
 ## 🛡️ FLOW 1: BOT SHIELD VERIFICATION (Human vs Bot Detection)
 
 ### Step 1.1: Initial Page Load - Bot Shield Activation
-- **URL:** https://lemma-enterprise-0f6ba17076c1.herokuapp.com/shield-demo
+- **URL:** https://lemma.id/shield-demo
 - **Bot shield blocks access immediately:** ☐ Yes ☐ No
 - **Shield shows "Human verification required":** ☐ Yes ☐ No
 - **Protected content hidden from bots:** ☐ Yes ☐ No
@@ -95,7 +95,7 @@ This template tests Lemma's bot shield system - a complete protection circuit th
 ## 🔄 FLOW 3: BOT DETECTION & EJECTION (Kick Suspected Bots Out)
 
 ### Step 3.1: Trigger Bot Ejection (Manual Test)
-- **Navigate to:** https://lemma-enterprise-0f6ba17076c1.herokuapp.com/admin/dashboard
+- **Navigate to:** https://lemma.id/admin/dashboard
 - **Login successful:** ☐ Yes ☐ No
 - **Find bot ejection section:** ☐ Found
 - **Click "Revoke Active Credential" button:** ☐ Clicked (simulates bot detection)

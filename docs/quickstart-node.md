@@ -15,7 +15,7 @@ const axios = require('axios');
 
 // Configure the API client
 const lemmaAPI = axios.create({
-  baseURL: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1',
+      baseURL: 'https://lemma.id/api/v1',
   headers: {
     'Authorization': 'Bearer YOUR_API_KEY_HERE',
     'Content-Type': 'application/json'

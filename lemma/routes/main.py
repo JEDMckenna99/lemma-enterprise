@@ -938,7 +938,7 @@ info:
   version: 2.7.0
   description: Human verification API
 servers:
-  - url: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api
+          - url: https://lemma.id/api
 paths:
   /health:
     get:

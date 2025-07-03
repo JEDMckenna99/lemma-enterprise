@@ -497,16 +497,10 @@ class OPRFClient:
         """
         # Auto-detect OPRF service URL if not provided
         if server_url is None:
-            # Check if internal OPRF service is enabled (integrated implementation)
-            if os.environ.get("OPRF_SERVICE_INTERNAL") == "true":
-                # Use integrated OPRF implementation - no external service needed
-                self.server_url = None  # Indicates integrated mode
-                self.offline_mode = False  # Use real crypto, just integrated
-                logger.info("Using integrated OPRF implementation (no external service)")
-            else:
-                # Use external service URL from environment or default
-                self.server_url = os.environ.get("OPRF_SERVICE_URL", "http://localhost:8080")
-                logger.info(f"Using external OPRF service at {self.server_url}")
+            # Always use integrated OPRF implementation - no external service needed
+            self.server_url = None  # Indicates integrated mode
+            self.offline_mode = False  # Use real crypto, just integrated
+            logger.info("Using integrated OPRF implementation (no external service)")
         else:
             self.server_url = server_url
             

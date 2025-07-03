@@ -165,7 +165,7 @@ import asyncio
 
 class AsyncLemmaShield:
     def __init__(self, api_key):
-        self.base_url = 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1'
+        self.base_url = 'https://lemma.id/api/v1'
         self.headers = {
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json'

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 shopify_bp = Blueprint('shopify', __name__, url_prefix='/shopify')
 
 # Configuration
-LEMMA_BASE_URL = os.environ.get('LEMMA_BASE_URL', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com')
+LEMMA_BASE_URL = os.environ.get('LEMMA_BASE_URL', 'https://lemma.id')
 
 @shopify_bp.route('/health')
 def health_check():

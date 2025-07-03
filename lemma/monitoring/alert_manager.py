@@ -81,11 +81,11 @@ class PagerDutyIntegration:
                         "current_value": str(alert.current_value),
                         "triggered_at": alert.triggered_at.isoformat(),
                         "auto_action": alert.auto_action,
-                        "dashboard_url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/admin"
+                        "dashboard_url": "https://lemma.id/admin"
                     }
                 },
                 "client": "Lemma Enterprise",
-                "client_url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com"
+                "client_url": "https://lemma.id"
             }
             
             response = requests.post(self.events_url, json=payload, timeout=10)
@@ -314,7 +314,7 @@ class AutoActionExecutor:
         try:
             # Call the revocation service to rollback
             response = requests.post(
-                "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/revocation/rollback",
+                "https://lemma.id/api/revocation/rollback",
                 json={"reason": f"Auto-rollback due to alert: {alert.id}"},
                 timeout=30
             )
@@ -372,7 +372,7 @@ class AlertManager:
             logger.warning("LEMMA_API_KEY not set - alert checks may fail")
         
         # Base URL for API calls
-        self.base_url = os.getenv('HEROKU_APP_URL', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com')
+        self.base_url = os.getenv('HEROKU_APP_URL', 'https://lemma.id')
         
         # Initialize integrations
         self.pagerduty = PagerDutyIntegration()

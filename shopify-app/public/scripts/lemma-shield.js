@@ -8,7 +8,7 @@
 
   // Configuration
   const LEMMA_CONFIG = window.LemmaConfig || {
-    baseUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com',
+            baseUrl: 'https://lemma.id',
     apiKey: null,
     shop: null,
     onboardingFee: 2.50

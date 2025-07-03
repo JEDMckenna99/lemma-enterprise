@@ -9,7 +9,7 @@ const { spawn } = require('child_process');
 
 // Configuration
 const APP_PORT = 3000;
-const LEMMA_BASE_URL = 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com';
+const LEMMA_BASE_URL = 'https://lemma.id';
 const TEST_TIMEOUT = 10000;
 
 let server;

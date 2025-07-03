@@ -64,7 +64,7 @@ export const LemmaInstances = {
    * Production Lemma instance
    */
   production: (apiKey?: string) => new LemmaClient({
-    instanceUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com',
+    instanceUrl: 'https://lemma.id',
     apiKey
   }),
   
@@ -88,7 +88,7 @@ export function isLemmaSupported(): boolean {
   
   // For Node.js, check for Node.js globals and fetch availability
   try {
-    return !!(typeof global !== 'undefined' && (global.fetch || global.process));
+    return !!(typeof global !== 'undefined' && typeof require !== 'undefined');
   } catch {
     return false;
   }

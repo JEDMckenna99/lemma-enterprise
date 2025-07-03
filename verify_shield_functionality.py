@@ -42,7 +42,7 @@ def test_shield_initialization(driver):
     
     try:
         # Navigate to join network page
-        url = "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/join-network"
+        url = "https://lemma.id/join-network"
         driver.get(url)
         
         # Wait for page to load

@@ -19,7 +19,7 @@ app.use(express.static('public'));
 // Initialize Lemma service
 const lemmaService = new LemmaVerificationService({
   apiKey: process.env.LEMMA_API_KEY,
-  baseUrl: process.env.LEMMA_BASE_URL || 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com',
+      baseUrl: process.env.LEMMA_BASE_URL || 'https://lemma.id',
   onboardingFee: 2.50 // Updated to $2.50 as requested
 });
 

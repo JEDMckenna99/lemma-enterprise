@@ -904,7 +904,7 @@ def _init_components(app):
     # Initialize OPRF cascade manager - ensure it works in Heroku
     try:
         # Check if OPRF is enabled
-        oprf_enabled = os.environ.get('OPRF_SERVICE_INTERNAL', 'false').lower() == 'true'
+        oprf_enabled = os.environ.get('OPRF_SERVICE_INTERNAL', 'true').lower() == 'true'
         
         if oprf_enabled:
             from lemma.core.cascaded_bloom import CascadedBloomRevocation, OPRFClient

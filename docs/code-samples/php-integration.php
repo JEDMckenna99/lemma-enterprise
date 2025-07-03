@@ -19,7 +19,7 @@ use Psr\Http\Message\ResponseInterface;
 // CONFIGURATION
 // ============================================================================
 
-define('LEMMA_BASE_URL', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com');
+define('LEMMA_BASE_URL', 'https://lemma.id');
 define('LEMMA_API_KEY', $_ENV['LEMMA_API_KEY'] ?? null);
 
 if (!LEMMA_API_KEY) {
@@ -621,7 +621,7 @@ function getLaravelConfig(): array
 {
     return [
         'api_key' => env('LEMMA_API_KEY'),
-        'base_url' => env('LEMMA_BASE_URL', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com'),
+        'base_url' => env('LEMMA_BASE_URL', 'https://lemma.id'),
         'domain' => env('LEMMA_DOMAIN', 'localhost'),
         'session_key' => 'lemma_verified',
     ];

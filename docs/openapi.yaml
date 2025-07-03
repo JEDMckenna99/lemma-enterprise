@@ -31,7 +31,7 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1
+  - url: https://lemma.id/api/v1
     description: Production server
   - url: http://localhost:5000/api/v1
     description: Development server

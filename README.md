@@ -218,7 +218,7 @@ const locationProof = await lemma.generateProof(['residency']);
 
 **Customer ID Example:** `c17940d1-568b-462f-a107-dccf82b4f2a5`  
 **API Key Format:** `lemma_82e39e7c79f09ff38f3480cf33324e6ee2a40ae2db03ef0c`  
-**Registration URL:** `https://lemma-enterprise-0f6ba17076c1.herokuapp.com/onboarding/register`
+**Registration URL:** `https://lemma.id/onboarding/register`
 
 ---
 

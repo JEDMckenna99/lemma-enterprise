@@ -191,7 +191,7 @@ Every user interaction with Lemma-protected content begins here:
 This circuit works seamlessly across any website with Lemma Shield integration:
 
 ```html
-<script src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/static/js/lemma-shield-widget.js"></script>
+    <script src="https://lemma.id/static/js/lemma-shield-widget.js"></script>
 <script>
     Lemma.init({
         apiKey: 'your-api-key',

@@ -43,7 +43,7 @@
     },
     "DID": {
       "description": "Decentralized Identifier for the issuer",
-      "value": "did:web:lemma-enterprise.herokuapp.com"
+      "value": "did:web:lemma.id"
     },
     "DID_METHOD": {
       "description": "DID method to use",

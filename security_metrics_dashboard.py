@@ -78,7 +78,7 @@ class SecurityMetricsDashboard:
         
         self.test_results = {
             'timestamp': datetime.utcnow().isoformat(),
-            'production_url': 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com',
+            'production_url': 'https://lemma.id',
             'test_results': {},
             'summary': {},
             'compliance_status': {}

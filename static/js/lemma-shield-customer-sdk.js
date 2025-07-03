@@ -27,7 +27,7 @@ class LemmaCustomerSDK {
             apiKey: config.apiKey,
             
             // API Configuration
-            apiBase: config.apiBase || 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com',
+            apiBase: config.apiBase || 'https://lemma.id',
             
             // UI Configuration
             containerId: config.containerId || 'lemma-shield',

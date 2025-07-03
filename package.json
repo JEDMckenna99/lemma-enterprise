@@ -5,7 +5,7 @@
   "scripts": {
     "build-oprf": "chmod +x bin/compile-oprf.sh && ./bin/compile-oprf.sh",
     "build-oprf-windows": "powershell -ExecutionPolicy Bypass -File bin/compile-oprf.ps1",
-    "test-oprf": "curl http://localhost:8080/health || echo 'OPRF service not running'"
+    "test-oprf": "echo 'OPRF service integrated into main app'"
   },
   "engines": {
     "node": "18.x"

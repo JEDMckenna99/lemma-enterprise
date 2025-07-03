@@ -11,7 +11,7 @@ const crypto = require('crypto');
 // CONFIGURATION
 // ============================================================================
 
-const LEMMA_BASE_URL = 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com';
+const LEMMA_BASE_URL = 'https://lemma.id';
 const LEMMA_API_KEY = process.env.LEMMA_API_KEY; // Your API key from onboarding
 
 if (!LEMMA_API_KEY) {
@@ -384,7 +384,7 @@ const LemmaGate = ({ children, fallback = null }) => {
     return (
       <div className="lemma-error">
         <p>Verification Error: {error}</p>
-        <button onClick={() => window.location.href = 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/verify'}>
+        <button onClick={() => window.location.href = 'https://lemma.id/verify'}>
           Get Verified
         </button>
       </div>
@@ -397,7 +397,7 @@ const LemmaGate = ({ children, fallback = null }) => {
         <h3>Human Verification Required</h3>
         <p>This content is only accessible to verified humans.</p>
         <a 
-          href="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/verify" 
+                      href="https://lemma.id/verify" 
           className="lemma-verify-button"
         >
           Verify with Lemma

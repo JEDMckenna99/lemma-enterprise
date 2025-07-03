@@ -9,7 +9,7 @@ import json
 import sys
 
 # Your Heroku app URL
-HEROKU_URL = "https://lemma-enterprise-0f6ba17076c1.herokuapp.com"
+HEROKU_URL = "https://lemma.id"
 
 def register_site():
     """Register your site as a customer."""

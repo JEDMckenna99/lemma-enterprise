@@ -516,7 +516,7 @@ class LemmaSimpleVerifier {
         
         // Add event listeners
         document.getElementById('lemma-verify-btn').onclick = () => {
-            window.location.href = 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/verify';
+                            window.location.href = 'https://lemma.id/verify';
         };
         
         document.getElementById('lemma-cancel-btn').onclick = () => {

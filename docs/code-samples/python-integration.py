@@ -21,7 +21,7 @@ from requests.packages.urllib3.util.retry import Retry
 # CONFIGURATION
 # ============================================================================
 
-LEMMA_BASE_URL = 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com'
+LEMMA_BASE_URL = 'https://lemma.id'
 LEMMA_API_KEY = os.environ.get('LEMMA_API_KEY')
 
 if not LEMMA_API_KEY:
