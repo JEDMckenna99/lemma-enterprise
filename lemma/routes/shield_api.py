@@ -1860,7 +1860,7 @@ def verify_credential():
 
 @shield_api.route('/api/verification-status', methods=['POST'])
 @rate_limit
-def verification_status():
+def check_verification_completion():
     """
     Check verification status for a user/session
     Used by the unified shield widget to check completion
