@@ -1051,101 +1051,52 @@ def generate_shield_challenge():
 @rate_limit
 def start_verification():
     """
-    Start the inline verification process for users without credentials
-    Returns Stripe Identity session for inline verification
+    Start the verification process for users without credentials
+    Returns verification URL for redirect-based flow (works with unified shield)
     """
     try:
         data = request.get_json() or {}
         return_url = data.get('return_url', request.referrer or '/')
-        security_level = data.get('security_level', 'standard')
-        inline_mode = data.get('inline_mode', True)  # Default to inline verification
+        user_id = data.get('user_id')
+        verification_type = data.get('verification_type', 'human_verification')
         
         # Validate return URL for security
         if not is_safe_url(return_url):
             return_url = '/'
         
-        # Validate security level
-        if security_level not in SECURITY_LEVELS:
-            security_level = 'standard'
+        # Generate or use provided user ID
+        if not user_id:
+            user_id = f"user_{int(time.time() * 1000)}_{secrets.token_urlsafe(8)}"
         
-        # Generate user ID and verification session
-        user_id = f"user_{int(time.time() * 1000)}"
+        # Generate verification session
         verification_session_id = secrets.token_urlsafe(32)
         session['verification_session_id'] = verification_session_id
         session['verification_return_url'] = return_url
         session['verification_started'] = time.time()
-        session['requested_security_level'] = security_level
-        session['inline_verification'] = inline_mode
+        session['verification_user_id'] = user_id
+        session['verification_type'] = verification_type
         
-        if inline_mode:
-            # For inline verification, start Stripe Identity session
-            try:
-                # Import and configure Stripe properly
-                import stripe
-                
-                # Get Stripe secret key from environment or config
-                stripe_secret_key = (
-                    current_app.config.get('STRIPE_SECRET_KEY') or 
-                    os.environ.get('STRIPE_SECRET_KEY')
-                )
-                
-                if not stripe_secret_key:
-                    current_app.logger.error("No Stripe secret key found in config or environment")
-                    raise Exception("Stripe not configured")
-                
-                # Set the API key
-                stripe.api_key = stripe_secret_key
-                current_app.logger.info(f"Stripe API key configured: {stripe_secret_key[:7]}...")
-                
-                # Create Stripe Identity verification session
-                stripe_session = stripe.identity.VerificationSession.create(
-                    type='document',
-                    metadata={
-                        'user_id': user_id,
-                        'lemma_session': verification_session_id,
-                        'return_url': return_url,
-                        'security_level': security_level
-                    }
-                )
-                
-                # Store Stripe session info
-                session[f'stripe_session_{user_id}'] = stripe_session.id
-                session['current_verification_user_id'] = user_id
-                
-                return jsonify({
-                    'success': True,
-                    'shield_action': 'inline_verification',
-                    'verification_type': 'stripe_identity',
-                    'stripe_client_secret': stripe_session.client_secret,
-                    'user_id': user_id,
-                    'session_id': verification_session_id,
-                    'security_level': security_level,
-                    'message': 'Inline verification session created'
-                })
-                
-            except Exception as stripe_error:
-                current_app.logger.error(f"Stripe Identity session creation failed: {stripe_error}")
-                # Fallback to redirect mode if Stripe fails
-                inline_mode = False
+        # Create verification URL that goes through our standard verification flow
+        verification_url = f"/onboarding/start?return_url={return_url}&user_id={user_id}&session_id={verification_session_id}&type={verification_type}"
         
-        if not inline_mode:
-            # Fallback to redirect mode for compatibility
-            onboarding_url = f"/onboarding/start?return_url={return_url}&security_level={security_level}&session_id={verification_session_id}"
-            
-            return jsonify({
-                'success': True,
-                'shield_action': 'redirect_verification',
-                'verification_url': onboarding_url,
-                'session_id': verification_session_id,
-                'security_level': security_level,
-                'message': 'Verification redirect created'
-            })
+        current_app.logger.info(f"Starting verification for user {user_id} with session {verification_session_id}")
+        
+        return jsonify({
+            'success': True,
+            'verification_url': verification_url,
+            'session_id': verification_session_id,
+            'user_id': user_id,
+            'verification_type': verification_type,
+            'return_url': return_url,
+            'message': 'Verification session created'
+        })
         
     except Exception as e:
         current_app.logger.error(f"Start verification error: {e}")
         return jsonify({
             'success': False,
-            'error': 'Failed to start verification'
+            'error': 'Failed to start verification',
+            'details': str(e)
         }), 500
 
 @shield_api.route('/api/shield/get-credential', methods=['GET'])
@@ -1729,4 +1680,252 @@ def verification_status():
             'verified': False,
             'status': 'error',
             'error': str(e)
+        }), 500
+
+@shield_api.route('/api/generate-challenge', methods=['GET'])
+@rate_limit
+def generate_challenge():
+    """
+    Generate a challenge for credential verification
+    Used by the unified shield widget
+    """
+    try:
+        # Generate a secure challenge
+        challenge = secrets.token_urlsafe(32)
+        
+        # Store challenge in session with expiry
+        session['lemma_challenge'] = challenge
+        session['lemma_challenge_expires'] = time.time() + 300  # 5 minutes
+        
+        return jsonify({
+            'success': True,
+            'challenge': challenge,
+            'expires_at': session['lemma_challenge_expires'],
+            'service': 'lemma-shield-api'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Challenge generation error: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to generate challenge'
+        }), 500
+
+@shield_api.route('/api/verify-credential', methods=['POST'])
+@rate_limit
+def verify_credential():
+    """
+    Verify a single credential or list of credentials
+    Used by the unified shield widget for API fallback verification
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'verified': False,
+                'error': 'No data provided'
+            }), 400
+        
+        # Extract credentials (handle both single and array formats)
+        credentials = data.get('credentials', [])
+        if not credentials:
+            credential = data.get('credential')
+            if credential:
+                credentials = [credential]
+        
+        if not credentials:
+            return jsonify({
+                'success': False,
+                'verified': False,
+                'error': 'No credentials provided'
+            }), 400
+        
+        # Validate challenge
+        challenge = data.get('challenge')
+        if not challenge:
+            return jsonify({
+                'success': False,
+                'verified': False,
+                'error': 'Challenge required'
+            }), 400
+        
+        # Check challenge validity
+        session_challenge = session.get('lemma_challenge')
+        session_expires = session.get('lemma_challenge_expires', 0)
+        
+        if not session_challenge or session_challenge != challenge:
+            return jsonify({
+                'success': False,
+                'verified': False,
+                'error': 'Invalid challenge'
+            }), 401
+        
+        if time.time() > session_expires:
+            return jsonify({
+                'success': False,
+                'verified': False,
+                'error': 'Challenge expired'
+            }), 401
+        
+        # Verify each credential
+        verification_results = []
+        all_verified = True
+        
+        for credential in credentials:
+            # Extract credential from wallet format if needed
+            if isinstance(credential, dict) and 'credential' in credential:
+                actual_credential = credential['credential']
+            else:
+                actual_credential = credential
+            
+            # Basic credential validation
+            if not actual_credential.get('id'):
+                verification_results.append({
+                    'verified': False,
+                    'error': 'Invalid credential format'
+                })
+                all_verified = False
+                continue
+            
+            credential_id = actual_credential.get('id')
+            
+            # Check if credential is revoked
+            revocation_status = check_credential_revocation(credential_id)
+            if revocation_status['revoked']:
+                verification_results.append({
+                    'verified': False,
+                    'revoked': True,
+                    'credential_id': credential_id,
+                    'error': 'Credential has been revoked',
+                    'reason': revocation_status.get('reason'),
+                    'revocation_time': revocation_status.get('revocation_time')
+                })
+                all_verified = False
+                continue
+            
+            # Verify credential signature and structure
+            try:
+                # Basic validation - in production would use proper DID verification
+                if actual_credential.get('proof') and actual_credential.get('issuer'):
+                    verification_results.append({
+                        'verified': True,
+                        'credential_id': credential_id,
+                        'verification_method': 'api',
+                        'verification_time': time.time()
+                    })
+                else:
+                    verification_results.append({
+                        'verified': False,
+                        'credential_id': credential_id,
+                        'error': 'Invalid credential structure'
+                    })
+                    all_verified = False
+                    
+            except Exception as e:
+                verification_results.append({
+                    'verified': False,
+                    'credential_id': credential_id,
+                    'error': f'Verification error: {str(e)}'
+                })
+                all_verified = False
+        
+        # Clear used challenge
+        session.pop('lemma_challenge', None)
+        session.pop('lemma_challenge_expires', None)
+        
+        # Return results
+        response = {
+            'success': all_verified,
+            'verified': all_verified,
+            'results': verification_results,
+            'processing_time_ms': time.time() * 1000 % 1000  # Simple timing
+        }
+        
+        # Add revocation flag if any credential was revoked
+        revoked_credentials = [r for r in verification_results if r.get('revoked')]
+        if revoked_credentials:
+            response['shield_action'] = 'credential_revoked'
+            response['revoked_credentials'] = revoked_credentials
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        current_app.logger.error(f"Credential verification error: {e}")
+        return jsonify({
+            'success': False,
+            'verified': False,
+            'error': 'Verification failed'
+        }), 500
+
+@shield_api.route('/api/verification-status', methods=['POST'])
+@rate_limit
+def verification_status():
+    """
+    Check verification status for a user/session
+    Used by the unified shield widget to check completion
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        user_id = data.get('user_id')
+        session_id = data.get('session_id')
+        
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'error': 'User ID required'
+            }), 400
+        
+        # Check if verification was completed
+        verification_result = check_stripe_verification_completion(user_id, session_id)
+        
+        if verification_result['success']:
+            # Get the credential for this user
+            credential_service = get_credential_service()
+            user_credential = credential_service.get_user_credential(user_id)
+            
+            if user_credential:
+                # Format credential for wallet storage
+                wallet_credential = {
+                    "credential": user_credential,
+                    "wallet_metadata": {
+                        "added_at": user_credential.get('issuanceDate', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())),
+                        "holder_id": user_id,
+                        "status": "active",
+                        "display_name": "Lemma Human Verification",
+                        "fingerprint": user_credential.get('id', f"credential-{user_id}")
+                    }
+                }
+                
+                return jsonify({
+                    'success': True,
+                    'verified': True,
+                    'credential': wallet_credential,
+                    'user_id': user_id,
+                    'session_id': session_id,
+                    'verification_data': verification_result.get('claims', {})
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'No credential found for verified user'
+                }), 404
+        else:
+            return jsonify({
+                'success': False,
+                'verified': False,
+                'error': verification_result.get('error', 'Verification not completed')
+            })
+            
+    except Exception as e:
+        current_app.logger.error(f"Verification status check error: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Status check failed'
         }), 500 

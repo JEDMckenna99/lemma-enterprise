@@ -339,12 +339,11 @@
 
 <!-- Load Lemma Shield Widget Scripts -->
 <script src="{{ url_for('static', filename='js/lemma-shield-widget.js') }}"></script>
-<script src="{{ url_for('static', filename='js/lemma-shield-customer-sdk.js') }}"></script>
 
 <script>
 console.log('🛡️ JOIN NETWORK PAGE: Starting shield protection');
 
-// Initialize shield protection immediately
+// Initialize shield protection immediately - EXACTLY like customer integration
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔄 DOM loaded, initializing Lemma Shield...');
     
@@ -355,21 +354,23 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('🔒 Content protected on page load');
     }
     
-    // Initialize shield with proper configuration
+    // Initialize shield with unified configuration - SAME AS CUSTOMER INTEGRATION
     try {
-        // Use the Customer SDK to create shield instance
-        window.lemmaShield = new LemmaSDK({
+        window.lemmaShield = new LemmaShield({
             apiKey: '{{ lemma_api_key }}',
             apiBase: '{{ lemma_api_base }}',
             containerId: 'lemma-shield',
             debug: true,
             
-            // Shield should appear for all unverified users
+            // Join Network specific: Force shield to appear for verification
             forceShield: true,
             offlineFirst: true,
             fallbackEnabled: true,
             
-            // Event callbacks
+            // Stripe Identity configuration
+            stripePublishableKey: 'pk_test_51QJDkbP8RRlCYD4t8GWdrvJOlE6bZRnSqJ8Xzx8mKJHdVE3I8eOhCvMXZjNGq0gJNvJKFGP9t8QXzlW8NNQ6M2kN00XBuMjIuM',
+            
+            // Event callbacks - SAME AS CUSTOMER INTEGRATION
             onVerified: function(result) {
                 console.log('✅ User successfully verified:', result);
                 
@@ -387,11 +388,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (postVerificationSection) {
                     postVerificationSection.style.display = 'block';
                 }
+                
+                // Show success message
+                showSuccessMessage('Welcome to the Lemma Network! 🎉');
             },
             
             onError: function(error) {
                 console.error('❌ Verification error:', error);
                 updateVerificationStatus('error', error);
+                showErrorMessage('Verification failed. Please try again.');
             },
             
             onRevoked: function(result) {
@@ -411,14 +416,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (postVerificationSection) {
                     postVerificationSection.style.display = 'none';
                 }
+                
+                showInfoMessage('Credentials cleared. Please verify again to continue.');
             },
             
             onShieldShown: function() {
                 console.log('🛡️ Shield widget displayed for verification');
+                // Content should be protected when shield is shown
+                if (protectedContent) {
+                    protectedContent.classList.add('lemma-protected');
+                }
             },
             
             onShieldHidden: function() {
                 console.log('👁️ Shield widget hidden - user verified');
+                // Content should be accessible when shield is hidden
+                if (protectedContent) {
+                    protectedContent.classList.remove('lemma-protected');
+                }
             }
         });
         
@@ -497,70 +512,121 @@ function updateVerificationStatus(status, data) {
     statusElement.innerHTML = statusHTML;
 }
 
+// Show success message
+function showSuccessMessage(message) {
+    const container = document.querySelector('.welcome-container');
+    if (container) {
+        const successDiv = document.createElement('div');
+        successDiv.style.cssText = `
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+            text-align: center;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            animation: slideIn 0.5s ease-out;
+        `;
+        successDiv.innerHTML = `
+            <style>
+                @keyframes slideIn {
+                    from { opacity: 0; transform: translateY(-20px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            </style>
+            ${message}
+        `;
+        container.prepend(successDiv);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            successDiv.remove();
+        }, 5000);
+    }
+}
+
+// Show error message
+function showErrorMessage(message) {
+    const container = document.querySelector('.welcome-container');
+    if (container) {
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+            text-align: center;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+            animation: slideIn 0.5s ease-out;
+        `;
+        errorDiv.innerHTML = `
+            <style>
+                @keyframes slideIn {
+                    from { opacity: 0; transform: translateY(-20px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            </style>
+            ${message}
+        `;
+        container.prepend(errorDiv);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            errorDiv.remove();
+        }, 5000);
+    }
+}
+
+// Show info message
+function showInfoMessage(message) {
+    const container = document.querySelector('.welcome-container');
+    if (container) {
+        const infoDiv = document.createElement('div');
+        infoDiv.style.cssText = `
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+            text-align: center;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            animation: slideIn 0.5s ease-out;
+        `;
+        infoDiv.innerHTML = `
+            <style>
+                @keyframes slideIn {
+                    from { opacity: 0; transform: translateY(-20px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            </style>
+            ${message}
+        `;
+        container.prepend(infoDiv);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            infoDiv.remove();
+        }, 5000);
+    }
+}
+
 // Handle credential revocation testing
 document.addEventListener('DOMContentLoaded', function() {
     const revokeButton = document.getElementById('revokeCredential');
     if (revokeButton) {
-        revokeButton.addEventListener('click', async function() {
-            console.log('🚨 Testing credential revocation...');
+        revokeButton.addEventListener('click', function() {
+            console.log('🚨 Manual credential revocation initiated');
             
-            const statusElement = document.getElementById('revocationStatus');
-            if (statusElement) {
-                statusElement.style.display = 'block';
-                statusElement.innerHTML = `
-                    <div class="status-indicator status-pending">
-                        <div class="loading-spinner"></div>
-                        Clearing credentials and triggering re-verification...
-                    </div>
-                `;
-            }
-            
-            try {
-                if (window.lemmaShield && window.lemmaShield.clearCredentials) {
-                    await window.lemmaShield.clearCredentials();
-                    console.log('✅ Credentials cleared - shield should reappear');
-                    
-                    // Force shield to reappear
-                    if (window.lemmaShield.forceShow) {
-                        window.lemmaShield.forceShow();
-                    }
-                } else {
-                    // Manual credential clearing
-                    localStorage.removeItem('lemma_credentials');
-                    localStorage.removeItem('lemma_wallet');
-                    sessionStorage.clear();
-                    
-                    console.log('✅ Manual credential clearing completed');
-                    
-                    // Reload page to trigger shield
-                    setTimeout(() => {
-                        location.reload();
-                    }, 1000);
-                }
-                
-                if (statusElement) {
-                    statusElement.innerHTML = `
-                        <div class="status-indicator status-verified">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                            ✅ Test completed - shield should now be active for re-verification
-                        </div>
-                    `;
-                }
-                
-            } catch (error) {
-                console.error('❌ Revocation test failed:', error);
-                
-                if (statusElement) {
-                    statusElement.innerHTML = `
-                        <div class="status-indicator status-error">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            ❌ Revocation test failed: ${error.message}
-                        </div>
-                    `;
+            // Show confirmation
+            if (confirm('This will clear your credentials and require re-verification. Continue?')) {
+                // Use the unified shield's revocation method
+                if (window.lemmaShield) {
+                    window.lemmaShield.clearCredentials();
+                    showInfoMessage('Credentials cleared! The shield should reappear for verification.');
                 }
             }
         });

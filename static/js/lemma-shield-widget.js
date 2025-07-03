@@ -1,11 +1,17 @@
 /**
- * Lemma Shield Widget - Unified SDK with API Integration & Offline Verification
- * Production-ready implementation for customer integration
- * Version 2.11.0 - Complete refactor with proper API integration
+ * Lemma Shield Widget - Production-Ready Three-Flow Circuit
+ * Complete integration: CHECK FLOW → SHIELD FLOW → REVOCATION FLOW
+ * Version 2.11.0 - Complete refactor with unified customer integration
  */
 
 class LemmaShield {
     constructor(options = {}) {
+        // Prevent duplicate initialization
+        if (window.lemmaShield && window.lemmaShield.state?.initialized) {
+            this.log('⚠️ Shield already initialized, returning existing instance');
+            return window.lemmaShield;
+        }
+
         // Customer configuration
         this.config = {
             apiKey: options.apiKey || '',
@@ -15,14 +21,18 @@ class LemmaShield {
             onVerified: options.onVerified || (() => {}),
             onError: options.onError || (() => {}),
             onRevoked: options.onRevoked || (() => {}),
+            onShieldShown: options.onShieldShown || (() => {}),
+            onShieldHidden: options.onShieldHidden || (() => {}),
             debug: options.debug || false,
             
             // Advanced options
-            offlineFirst: options.offlineFirst !== false, // Prefer offline verification
-            fallbackEnabled: options.fallbackEnabled !== false, // Allow API fallback
+            offlineFirst: options.offlineFirst !== false,
+            fallbackEnabled: options.fallbackEnabled !== false,
             challengeType: options.challengeType || 'human_verification',
-            retryAttempts: options.retryAttempts || 3,
-            cacheTimeout: options.cacheTimeout || 300000, // 5 minutes
+            forceShield: options.forceShield || false, // For join network page
+            
+            // Stripe Identity integration
+            stripePublishableKey: options.stripePublishableKey || 'pk_test_51QJDkbP8RRlCYD4t8GWdrvJOlE6bZRnSqJ8Xzx8mKJHdVE3I8eOhCvMXZjNGq0gJNvJKFGP9t8QXzlW8NNQ6M2kN00XBuMjIuM',
             
             // UI customization
             theme: options.theme || 'default',
@@ -36,21 +46,30 @@ class LemmaShield {
             verified: false,
             credentialsLoaded: false,
             lastVerification: null,
-            retryCount: 0
+            currentFlow: null,
+            shieldVisible: false
         };
 
         // Internal components
         this.wallet = new LemmaWallet(this.config);
         this.api = new LemmaAPI(this.config);
         this.ui = new LemmaUI(this.config);
+        this.stripe = new LemmaStripe(this.config);
         
         // Performance tracking
         this.metrics = {
             startTime: Date.now(),
-            verificationTimes: [],
+            flowExecutions: {
+                check: 0,
+                shield: 0,
+                revocation: 0
+            },
             offlineSuccessRate: 0,
             apiSuccessRate: 0
         };
+
+        // Store as global instance
+        window.lemmaShield = this;
 
         // Auto-initialize if requested
         if (this.config.autoInit) {
@@ -80,7 +99,8 @@ class LemmaShield {
             await Promise.all([
                 this.wallet.init(),
                 this.api.init(),
-                this.ui.init()
+                this.ui.init(),
+                this.stripe.init()
             ]);
             
             // Handle verification return if present
@@ -99,7 +119,7 @@ class LemmaShield {
     }
 
     validateConfig() {
-        if (!this.config.apiKey) {
+        if (!this.config.apiKey && !this.config.forceShield) {
             throw new Error('API key is required for Lemma Shield');
         }
         if (!this.config.apiBase) {
@@ -112,23 +132,33 @@ class LemmaShield {
         
         try {
             // FLOW 1: CHECK FLOW - Verify existing credentials
+            this.state.currentFlow = 'check';
+            this.metrics.flowExecutions.check++;
+            
             const checkResult = await this.executeCheckFlow();
+            
             if (checkResult.verified) {
+                this.state.currentFlow = 'verified';
                 return this.grantAccess('check_flow', checkResult);
             }
             
             // FLOW 2: SHIELD FLOW - User needs verification
-            if (checkResult.needsVerification) {
+            if (checkResult.needsVerification || this.config.forceShield) {
+                this.state.currentFlow = 'shield';
+                this.metrics.flowExecutions.shield++;
                 return await this.executeShieldFlow();
             }
             
             // FLOW 3: REVOCATION FLOW - Handle revoked credentials
             if (checkResult.revoked) {
+                this.state.currentFlow = 'revocation';
+                this.metrics.flowExecutions.revocation++;
                 return await this.executeRevocationFlow();
             }
             
             // Fallback - show shield
             this.log('🛡️ Fallback - showing shield');
+            this.state.currentFlow = 'shield';
             await this.executeShieldFlow();
             
         } catch (error) {
@@ -215,23 +245,17 @@ class LemmaShield {
         
         try {
             this.state.verifying = true;
+            this.state.shieldVisible = true;
             
             // Show verification UI
             await this.ui.showShield();
             
-            // Wait for user interaction
-            const verificationResult = await this.waitForUserVerification();
+            // Notify that shield is shown
+            this.config.onShieldShown();
             
-            if (verificationResult.success) {
-                // Store new credential
-                if (verificationResult.credential) {
-                    await this.wallet.storeCredential(verificationResult.credential);
-                }
-                
-                this.grantAccess('shield_flow', verificationResult);
-            } else {
-                throw new Error(verificationResult.error || 'Verification failed');
-            }
+            // Start verification process
+            this.log('🚀 Starting Stripe Identity verification process');
+            await this.stripe.startVerification();
             
         } catch (error) {
             this.log('❌ Shield flow error:', error);
@@ -245,18 +269,30 @@ class LemmaShield {
         this.log('🚫 Executing REVOCATION FLOW - cleaning revoked credentials');
         
         try {
-            // Clear all credentials
+            // Clear all credentials from wallet
             await this.wallet.clearCredentials();
             
-            // Notify callback
-            if (this.config.onRevoked) {
-                this.config.onRevoked({
-                    action: 'credentials_revoked',
-                    timestamp: Date.now()
-                });
+            // Clear session storage
+            if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.removeItem('lemma_credentials');
+                sessionStorage.removeItem('lemma_user_id');
             }
             
+            // Clear local storage
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem('lemma_credentials');
+                localStorage.removeItem('lemma_user_id');
+            }
+            
+            // Notify callback
+            this.config.onRevoked({
+                action: 'credentials_revoked',
+                timestamp: Date.now(),
+                flow: 'revocation'
+            });
+            
             // Show shield for new verification
+            this.log('🛡️ Showing shield after revocation');
             await this.executeShieldFlow();
             
         } catch (error) {
@@ -311,21 +347,21 @@ class LemmaShield {
 
     verifyOfflineProof(credential) {
         try {
-            // Simplified cryptographic verification
-            // In production, this would use proper WebCrypto API
+            // Extract credential from wallet format if needed
+            const actualCredential = credential.credential || credential;
             
-            if (!credential.proof || !credential.proof.jws) {
+            // Basic validation
+            if (!actualCredential.proof || !actualCredential.proof.jws) {
                 return false;
             }
 
             // Basic signature structure validation
-            const jwsParts = credential.proof.jws.split('.');
+            const jwsParts = actualCredential.proof.jws.split('.');
             if (jwsParts.length !== 3) {
                 return false;
             }
 
-            // Additional validation would go here
-            // For now, we trust the structure is valid
+            // Additional validation would go here with proper WebCrypto API
             return true;
             
         } catch (error) {
@@ -336,9 +372,11 @@ class LemmaShield {
 
     async checkLocalRevocation(credential) {
         try {
+            // Get credential ID from different possible formats
+            const credentialId = this.extractCredentialId(credential);
+            
             // Check against local revocation cache
             const revokedList = JSON.parse(localStorage.getItem('lemma_revoked_credentials') || '[]');
-            const credentialId = credential.id || credential.credentialSubject?.id;
             
             if (revokedList.includes(credentialId)) {
                 return { revoked: true, reason: 'Found in local revocation list' };
@@ -352,6 +390,17 @@ class LemmaShield {
         }
     }
 
+    extractCredentialId(credential) {
+        // Handle different credential formats
+        if (credential.credential) {
+            // Wallet format
+            return credential.credential.id || credential.credential.credentialSubject?.id;
+        } else {
+            // Direct credential format
+            return credential.id || credential.credentialSubject?.id;
+        }
+    }
+
     async verifyWithAPI(credential) {
         this.log('🌐 Attempting API verification');
         
@@ -359,7 +408,7 @@ class LemmaShield {
             const challenge = await this.api.generateChallenge();
             
             const response = await this.api.verifyCredential({
-                credential: credential,
+                credentials: [credential],
                 challenge: challenge.challenge
             });
 
@@ -371,17 +420,17 @@ class LemmaShield {
                     challenge: challenge.challenge,
                     response_time: response.processing_time_ms
                 };
-            } else if (response.revoked) {
+            } else if (response.shield_action === 'credential_revoked') {
                 this.log('🚫 Credential revoked (API)');
                 return {
                     verified: false,
                     revoked: true,
-                    reason: response.reason || 'Revoked by issuer'
+                    reason: response.error || 'Revoked by issuer'
                 };
             } else {
                 return {
                     verified: false,
-                    reason: response.reason || 'API verification failed'
+                    reason: response.error || 'API verification failed'
                 };
             }
 
@@ -392,57 +441,6 @@ class LemmaShield {
                 reason: error.message,
                 network_error: true
             };
-        }
-    }
-
-    async waitForUserVerification() {
-        return new Promise((resolve, reject) => {
-            // Set up event listener for verification completion
-            const handleVerification = (event) => {
-                if (event.detail && event.detail.type === 'lemma_verification_complete') {
-                    document.removeEventListener('lemma_verification_complete', handleVerification);
-                    resolve(event.detail.result);
-                }
-            };
-            
-            document.addEventListener('lemma_verification_complete', handleVerification);
-            
-            // Set timeout for verification
-            const timeout = setTimeout(() => {
-                document.removeEventListener('lemma_verification_complete', handleVerification);
-                reject(new Error('Verification timeout'));
-            }, 300000); // 5 minutes timeout
-            
-            // Store timeout for cleanup
-            this._verificationTimeout = timeout;
-        });
-    }
-
-    async startVerification() {
-        this.log('🚀 Starting user verification');
-        
-        try {
-            // Show loading state
-            this.ui.showLoading();
-            
-            // Create verification session via API
-            const session = await this.api.startVerification({
-                return_url: window.location.href,
-                user_id: this.generateUserId(),
-                verification_type: this.config.challengeType
-            });
-
-            if (session.verification_url) {
-                // Redirect to verification provider (e.g., Stripe)
-                window.location.href = session.verification_url;
-            } else {
-                throw new Error('No verification URL received');
-            }
-
-        } catch (error) {
-            this.log('❌ Verification start failed:', error);
-            this.ui.showError(error.message);
-            throw error;
         }
     }
 
@@ -465,18 +463,8 @@ class LemmaShield {
                     // Store new credential
                     await this.wallet.storeCredential(result.credential);
                     
-                    // Dispatch completion event
-                    const event = new CustomEvent('lemma_verification_complete', {
-                        detail: {
-                            type: 'lemma_verification_complete',
-                            result: {
-                                success: true,
-                                credential: result.credential,
-                                method: 'verification_return'
-                            }
-                        }
-                    });
-                    document.dispatchEvent(event);
+                    // Grant access
+                    this.grantAccess('verification_return', result);
                     
                     // Clean URL
                     window.history.replaceState({}, document.title, window.location.pathname);
@@ -496,22 +484,28 @@ class LemmaShield {
         this.log(`✅ Access granted via ${flowType}`);
         
         this.state.verified = true;
+        this.state.shieldVisible = false;
+        this.state.currentFlow = 'verified';
         this.state.lastVerification = {
             timestamp: Date.now(),
-            method: result.method,
+            method: result.method || flowType,
             flowType: flowType
         };
         
         // Hide UI
         this.ui.hide();
         
+        // Notify that shield is hidden
+        this.config.onShieldHidden();
+        
         // Call success callback
         this.config.onVerified({
             verified: true,
             timestamp: Date.now(),
-            method: result.method,
+            method: result.method || flowType,
             flowType: flowType,
-            credential: result.credential
+            credential: result.credential,
+            flow: flowType
         });
     }
 
@@ -525,39 +519,32 @@ class LemmaShield {
         this.config.onError({
             error: error.message,
             timestamp: Date.now(),
-            state: this.state
+            state: this.state,
+            flow: this.state.currentFlow
         });
-    }
-
-    generateUserId() {
-        let userId = localStorage.getItem('lemma_user_id');
-        if (!userId) {
-            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('lemma_user_id', userId);
-        }
-        return userId;
     }
 
     // Public API methods
     async forceRecheck() {
         this.log('🔄 Force rechecking credentials');
         this.state.verified = false;
+        this.state.currentFlow = null;
         await this.executeProtectionFlow();
     }
 
     async clearCredentials() {
-        this.log('🗑️ Clearing all credentials');
-        await this.wallet.clearCredentials();
-        this.state.verified = false;
-        await this.executeShieldFlow();
+        this.log('🗑️ Clearing all credentials (manual revocation)');
+        await this.executeRevocationFlow();
     }
 
     hide() {
         this.ui.hide();
+        this.state.shieldVisible = false;
     }
 
     show() {
         this.ui.show();
+        this.state.shieldVisible = true;
     }
 
     getMetrics() {
@@ -820,42 +807,94 @@ class LemmaUI {
             ">
                 <div class="lemma-shield-modal" style="
                     background: white;
-                    border-radius: 12px;
+                    border-radius: 16px;
                     padding: 2rem;
-                    max-width: 400px;
+                    max-width: 480px;
                     width: 90%;
                     text-align: center;
-                    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+                    border: 1px solid #e6e6e6;
                 ">
                     <div style="font-size: 3rem; margin-bottom: 1rem;">🛡️</div>
-                    <h2 style="margin: 0 0 1rem 0; color: #333; font-size: 1.5rem;">Human Verification Required</h2>
-                    <p style="color: #666; margin-bottom: 2rem; line-height: 1.4;">
-                        This content is protected by Lemma. Please verify you're human to continue.
+                    <h2 style="margin: 0 0 1rem 0; color: #333; font-size: 1.5rem; font-weight: 600;">Join the Lemma Network</h2>
+                    <p style="color: #666; margin-bottom: 1rem; line-height: 1.5; font-size: 15px;">
+                        Complete human verification to join the verified network and eliminate captchas forever.
                     </p>
+                    
+                    <!-- Verification Steps -->
+                    <div style="
+                        background: #f8f9fa;
+                        border-radius: 12px;
+                        padding: 1.5rem;
+                        margin: 1.5rem 0;
+                        text-align: left;
+                        border: 1px solid #e9ecef;
+                    ">
+                        <h3 style="margin: 0 0 1rem 0; color: #495057; font-size: 16px; font-weight: 600;">What you'll need:</h3>
+                        <ul style="margin: 0; padding-left: 1.2rem; color: #6c757d; font-size: 14px; line-height: 1.6;">
+                            <li>📱 Government-issued photo ID (driver's license, passport, etc.)</li>
+                            <li>🤳 Take a selfie to verify your identity</li>
+                            <li>⏱️ Process takes 30-60 seconds</li>
+                            <li>🔐 Powered by Stripe Identity - bank-level security</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Benefits -->
+                    <div style="
+                        background: linear-gradient(135deg, #f8f9ff 0%, #e8f3ff 100%);
+                        border-radius: 12px;
+                        padding: 1.5rem;
+                        margin: 1.5rem 0;
+                        text-align: left;
+                        border: 1px solid #e1e8ff;
+                    ">
+                        <h3 style="margin: 0 0 1rem 0; color: #4c63d2; font-size: 16px; font-weight: 600;">✨ Benefits:</h3>
+                        <ul style="margin: 0; padding-left: 1.2rem; color: #5a6c8a; font-size: 14px; line-height: 1.6;">
+                            <li>🚫 No more captchas on any network site</li>
+                            <li>⚡ Instant verification across all platforms</li>
+                            <li>🔒 Complete privacy - no personal data stored</li>
+                            <li>🌐 Works offline after initial setup</li>
+                        </ul>
+                    </div>
+                    
                     <button id="lemma-verify-btn" style="
-                        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+                        background: linear-gradient(135deg, #635bff, #7c3aed);
                         color: white;
                         border: none;
-                        padding: 12px 24px;
-                        border-radius: 8px;
+                        padding: 16px 32px;
+                        border-radius: 12px;
                         font-size: 16px;
                         font-weight: 600;
                         cursor: pointer;
                         width: 100%;
                         margin-bottom: 1rem;
-                        transition: transform 0.1s ease;
-                    " onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
-                        Verify Human
+                        transition: all 0.2s ease;
+                        box-shadow: 0 4px 12px rgba(99, 91, 255, 0.3);
+                    " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(99, 91, 255, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(99, 91, 255, 0.3)';">
+                        🚀 Start Verification with Stripe Identity
                     </button>
+                    
+                    <p style="
+                        font-size: 12px;
+                        color: #8b949e;
+                        margin: 0;
+                        line-height: 1.4;
+                    ">
+                        🔐 Secure verification powered by Stripe Identity<br/>
+                        ✅ GDPR compliant • No personal data stored by Lemma
+                    </p>
+                    
                     ${this.config.showBranding ? `
-                        <p style="
-                            font-size: 12px;
-                            color: #999;
-                            margin: 0;
-                        ">
-                            🔐 Privacy-first • No personal data stored<br/>
-                            Powered by <strong>Lemma</strong>
-                        </p>
+                        <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e9ecef;">
+                            <p style="
+                                font-size: 12px;
+                                color: #6c757d;
+                                margin: 0;
+                                line-height: 1.4;
+                            ">
+                                Powered by <strong style="color: #495057;">Lemma</strong> - Privacy-first verification network
+                            </p>
+                        </div>
                     ` : ''}
                 </div>
             </div>
@@ -863,12 +902,12 @@ class LemmaUI {
 
         container.style.display = 'block';
 
-        // Add click handler
+        // Add click handler for verification button
         const verifyBtn = document.getElementById('lemma-verify-btn');
         if (verifyBtn) {
             verifyBtn.addEventListener('click', () => {
                 if (window.lemmaShield) {
-                    window.lemmaShield.startVerification();
+                    window.lemmaShield.stripe.startVerification();
                 }
             });
         }
@@ -878,12 +917,12 @@ class LemmaUI {
         const modal = document.querySelector('.lemma-shield-modal');
         if (modal) {
             modal.innerHTML = `
-                <div style="text-align: center;">
+                <div style="text-align: center; padding: 2rem;">
                     <div style="
                         width: 40px;
                         height: 40px;
                         border: 4px solid #f3f3f3;
-                        border-top: 4px solid #6366f1;
+                        border-top: 4px solid #635bff;
                         border-radius: 50%;
                         animation: lemma-spin 1s linear infinite;
                         margin: 0 auto 1rem auto;
@@ -905,12 +944,24 @@ class LemmaUI {
         const modal = document.querySelector('.lemma-shield-modal');
         if (modal) {
             modal.innerHTML = `
-                <div style="text-align: center;">
+                <div style="text-align: center; padding: 2rem;">
                     <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
-                    <h2 style="margin: 0 0 1rem 0; color: #dc2626;">Verification Error</h2>
+                    <h2 style="margin: 0 0 1rem 0; color: #dc2626; font-weight: 600;">Verification Error</h2>
                     <p style="color: #666; margin-bottom: 2rem; line-height: 1.4;">${message}</p>
-                    <button onclick="window.lemmaShield?.showShield?.()" style="
-                        background: #6366f1;
+                    <button onclick="window.lemmaShield?.show?.()" style="
+                        background: #635bff;
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        margin-right: 1rem;
+                    ">
+                        Try Again
+                    </button>
+                    <button onclick="window.lemmaShield?.hide?.()" style="
+                        background: #6c757d;
                         color: white;
                         border: none;
                         padding: 12px 24px;
@@ -918,7 +969,7 @@ class LemmaUI {
                         cursor: pointer;
                         font-weight: 600;
                     ">
-                        Try Again
+                        Cancel
                     </button>
                 </div>
             `;
@@ -936,6 +987,112 @@ class LemmaUI {
         const container = document.getElementById(this.containerId);
         if (container) {
             container.style.display = 'block';
+        }
+    }
+}
+
+/**
+ * Stripe Integration Component - Handles Stripe Identity verification
+ */
+class LemmaStripe {
+    constructor(config) {
+        this.config = config;
+        this.stripe = null;
+        this.sessionId = null;
+        this.userId = null;
+    }
+
+    async init() {
+        // Initialize Stripe if needed
+        if (this.config.stripePublishableKey && typeof Stripe !== 'undefined') {
+            this.stripe = Stripe(this.config.stripePublishableKey);
+        }
+    }
+
+    async startVerification() {
+        try {
+            // Generate unique user ID
+            this.userId = this.generateUserId();
+            
+            // Create verification session via API
+            const session = await this.createVerificationSession();
+            
+            if (session.verification_url) {
+                // Store session info
+                this.sessionId = session.session_id;
+                
+                // Show loading state
+                this.showStripeLoading();
+                
+                // Redirect to Stripe Identity
+                window.location.href = session.verification_url;
+            } else {
+                throw new Error('No verification URL received');
+            }
+            
+        } catch (error) {
+            console.error('Stripe verification start failed:', error);
+            throw error;
+        }
+    }
+
+    async createVerificationSession() {
+        const response = await fetch(`${this.config.apiBase}/api/shield/start-verification`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': this.config.apiKey
+            },
+            body: JSON.stringify({
+                return_url: window.location.href,
+                user_id: this.userId,
+                verification_type: this.config.challengeType
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to create verification session: ${response.status}`);
+        }
+
+        return await response.json();
+    }
+
+    generateUserId() {
+        let userId = localStorage.getItem('lemma_user_id');
+        if (!userId) {
+            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('lemma_user_id', userId);
+        }
+        return userId;
+    }
+
+    showStripeLoading() {
+        const modal = document.querySelector('.lemma-shield-modal');
+        if (modal) {
+            modal.innerHTML = `
+                <div style="text-align: center; padding: 2rem;">
+                    <div style="
+                        width: 40px;
+                        height: 40px;
+                        border: 4px solid #f3f3f3;
+                        border-top: 4px solid #635bff;
+                        border-radius: 50%;
+                        animation: lemma-stripe-spin 1s linear infinite;
+                        margin: 0 auto 1rem auto;
+                    "></div>
+                    <h2 style="margin: 0 0 1rem 0; color: #333;">Redirecting to Stripe Identity...</h2>
+                    <p style="color: #666; line-height: 1.4;">
+                        You'll be redirected to Stripe's secure verification system.<br/>
+                        Complete the identity verification to join the Lemma network.
+                    </p>
+                </div>
+                <style>
+                    @keyframes lemma-stripe-spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                </style>
+            `;
         }
     }
 }
