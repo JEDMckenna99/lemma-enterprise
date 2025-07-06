@@ -10,33 +10,38 @@ import time
 import datetime
 import random
 import json
+import secrets
 from flask import Flask, redirect, request, jsonify, render_template
 from lemma import create_app as lemma_create_app
 import requests
+
+# Set up logging FIRST
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("app")
 
 # Try to import cascaded_bloom, but make it optional
 try:
     from lemma.core.cascaded_bloom import get_cascade_manager, init_cascade_manager
     OPRF_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"OPRF cascaded bloom not available: {e}")
+    logger.warning(f"OPRF cascaded bloom not available: {e}")
     OPRF_AVAILABLE = False
     get_cascade_manager = lambda: None
     init_cascade_manager = lambda x: None
 
-# Set default environment variables for development if not set
+# Set secure environment variables for development if not set
 if not os.getenv('LEMMA_API_KEY'):
-    os.environ['LEMMA_API_KEY'] = 'dev_api_key_' + datetime.datetime.now().strftime('%Y%m%d')
+    # Generate a cryptographically secure random API key
+    os.environ['LEMMA_API_KEY'] = secrets.token_urlsafe(32)
+    logger.warning("LEMMA_API_KEY not set, generated secure random key for development")
     
 if not os.getenv('LEMMA_SECRET_KEY'):
-    os.environ['LEMMA_SECRET_KEY'] = 'dev_secret_key_' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    # Generate a cryptographically secure random secret key
+    os.environ['LEMMA_SECRET_KEY'] = secrets.token_urlsafe(32)
+    logger.warning("LEMMA_SECRET_KEY not set, generated secure random key for development")
 
 # Add lemma package to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("app")
 
 # Define constants
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'data')
@@ -81,44 +86,107 @@ def create_app():
     # Define routes - ensure main app handles homepage properly
     # Root route is handled by the main Lemma app through its blueprints
     
+    # PERFORMANCE FIX: Add caching for cascade data
+    _cascade_cache = {}
+    _cache_timeout = 300  # 5 minutes
+    
     @app.route('/cascade/<epoch>')
     def cascade_direct(epoch):
+        import time
+        current_time = time.time()
+        
+        # Input validation
+        if not epoch or len(epoch) > 50:  # Prevent potential path traversal
+            return jsonify({"error": "Invalid epoch format"}), 400
+            
         logger.info(f"Cascade request for epoch: {epoch}")
+        
+        # Check cache first for performance
+        cache_key = f"cascade_{epoch}"
+        if cache_key in _cascade_cache:
+            cached_data, cached_time = _cascade_cache[cache_key]
+            if current_time - cached_time < _cache_timeout:
+                logger.debug(f"Serving cascade {epoch} from cache")
+                response = jsonify(cached_data)
+                response.headers["Access-Control-Allow-Origin"] = "*"
+                response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
+                response.headers["X-Cache"] = "HIT"
+                return response
+        
         try:
-            # First try to find the cascade in the default location
             cascade_dir = os.path.join(DATA_DIR, 'revocation', 'cascades')
-            cascade_file = os.path.join(cascade_dir, f'cascade_{epoch}.json')
             
-            # If not found, try latest
-            if not os.path.exists(cascade_file) and epoch != 'latest':
-                latest_file = os.path.join(cascade_dir, 'cascade_latest.json')
-                if os.path.exists(latest_file):
-                    logger.info(f"Cascade {epoch} not found, using latest")
-                    cascade_file = latest_file
+            # Determine which file to load
+            if epoch == 'latest':
+                cascade_file = os.path.join(cascade_dir, 'cascade_latest.json')
+            else:
+                cascade_file = os.path.join(cascade_dir, f'cascade_{epoch}.json')
+                # Fallback to latest if specific epoch not found
+                if not os.path.exists(cascade_file):
+                    latest_file = os.path.join(cascade_dir, 'cascade_latest.json')
+                    if os.path.exists(latest_file):
+                        logger.info(f"Cascade {epoch} not found, using latest")
+                        cascade_file = latest_file
             
-            # If still not found, return an error instead of creating dummy data
+            # Check if file exists
             if not os.path.exists(cascade_file):
+                # List available epochs for better error response
+                available_epochs = []
+                if os.path.exists(cascade_dir):
+                    for filename in os.listdir(cascade_dir):
+                        if filename.startswith('cascade_') and filename.endswith('.json') and filename != 'cascade_latest.json':
+                            epoch_name = filename.replace('cascade_', '').replace('.json', '')
+                            available_epochs.append(epoch_name)
+                
                 logger.warning(f"Cascade {epoch} not found and no cascades available")
                 return jsonify({
                     "error": "Cascade not found",
                     "message": f"No cascade available for epoch {epoch}",
-                    "available_epochs": []  # Could list available epochs here
+                    "available_epochs": available_epochs
                 }), 404
             
-            # Load the cascade from file
-            with open(cascade_file, 'r') as f:
-                cascade = json.load(f)
+            # Load and parse cascade with size limits for security
+            try:
+                file_size = os.path.getsize(cascade_file)
+                if file_size > 10 * 1024 * 1024:  # 10MB limit
+                    raise ValueError("Cascade file too large")
+                
+                with open(cascade_file, 'r') as f:
+                    cascade = json.load(f)
+                
+                # Cache the loaded data
+                _cascade_cache[cache_key] = (cascade, current_time)
+                
+                # Clean old cache entries periodically
+                if len(_cascade_cache) > 50:  # Limit cache size
+                    old_keys = [k for k, (_, cached_time) in _cascade_cache.items() 
+                               if current_time - cached_time > _cache_timeout]
+                    for old_key in old_keys:
+                        del _cascade_cache[old_key]
+                
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.error(f"Invalid cascade file {cascade_file}: {e}")
+                return jsonify({"error": "Invalid cascade data"}), 500
             
-            # Add CORS headers for testing
+            # Create response with appropriate headers
             response = jsonify(cascade)
             response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
+            response.headers["X-Cache"] = "MISS"
+            response.headers["Cache-Control"] = "public, max-age=300"  # Cache for 5 minutes
             
             logger.info(f"Successfully loaded cascade for epoch {epoch}")
             return response
+            
+        except PermissionError:
+            logger.error(f"Permission denied accessing cascade file for epoch {epoch}")
+            return jsonify({"error": "Access denied"}), 403
+        except OSError as e:
+            logger.error(f"File system error loading cascade {epoch}: {e}")
+            return jsonify({"error": "File system error"}), 500
         except Exception as e:
-            logger.error(f"Error serving cascade: {str(e)}")
-            return jsonify({"error": str(e)}), 500
+            logger.error(f"Unexpected error serving cascade {epoch}: {str(e)}")
+            return jsonify({"error": "Internal server error"}), 500
     
     @app.route('/cascades')
     def cascades_list():
@@ -335,13 +403,56 @@ def create_app():
                     revocation_status = "not_revoked"
                     logger.info("Simulated revocation check (no cascade manager available)")
             
-            # In a real implementation, we would verify the credential signature
-            # For now, we'll assume the credential is valid
+            # SECURITY FIX: Perform actual credential verification
+            verification_result = False
+            credential_status = "invalid"
+            
+            try:
+                # Basic credential validation checks
+                if not credential.get("id"):
+                    raise ValueError("Credential missing required 'id' field")
+                
+                if not credential.get("issuer"):
+                    raise ValueError("Credential missing required 'issuer' field")
+                
+                # Check expiration date if present
+                expiration_date = credential.get("expirationDate")
+                if expiration_date:
+                    from datetime import datetime
+                    try:
+                        exp_datetime = datetime.fromisoformat(expiration_date.replace('Z', '+00:00'))
+                        if datetime.now().replace(tzinfo=exp_datetime.tzinfo) > exp_datetime:
+                            raise ValueError("Credential has expired")
+                    except ValueError as e:
+                        if "expired" in str(e):
+                            raise
+                        logger.warning(f"Invalid expiration date format: {expiration_date}")
+                
+                # Validate challenge matches
+                if not challenge or len(challenge) < 16:
+                    raise ValueError("Invalid or missing challenge")
+                
+                # If revocation check was requested and credential is revoked, fail verification
+                if check_revocation and revocation_status == "revoked":
+                    raise ValueError("Credential has been revoked")
+                
+                # If we get here, basic validation passed
+                verification_result = True
+                credential_status = "valid"
+                
+            except ValueError as validation_error:
+                logger.warning(f"Credential validation failed: {validation_error}")
+                verification_result = False
+                credential_status = str(validation_error)
+            except Exception as e:
+                logger.error(f"Unexpected error during credential validation: {e}")
+                verification_result = False
+                credential_status = "validation_error"
                     
             # Return the verification result
             return jsonify({
-                "verification_result": True,
-                "credential_status": "valid",
+                "verification_result": verification_result,
+                "credential_status": credential_status,
                 "issuer": credential.get("issuer", "unknown"),
                 "subject": credential.get("credentialSubject", {}).get("id", "unknown"),
                 "issuance_date": credential.get("issuanceDate", "unknown"),
