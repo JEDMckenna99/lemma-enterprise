@@ -119,6 +119,8 @@
 - **Zero Dependencies**: Completely self-contained with no external requirements
 - **65KB Bundle Size**: Meets 30-100KB per 1M revoked IDs specification
 - **WebAssembly Ready**: Prepared for future compilation and optimization
+- **Development Mode**: Relaxed validation for testing with graceful fallback handling
+- **Performance Optimized**: Deterministic JSON stringification and efficient signature verification
 
 ### **🔄 BOT SHIELD CIRCUIT DIAGRAM**
 
