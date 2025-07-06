@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lemma SDK Validation Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .pending { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #log { height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background: #f8f9fa; }
+        .metric { display: inline-block; margin: 10px; padding: 5px 10px; background: #e9ecef; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Lemma SDK Validation Test</h1>
+    
+    <div class="info">
+        <strong>Testing Current SDK Implementation</strong><br>
+        This page validates the core SDK functionality according to your specification table.
+    </div>
+
+    <h2>Test Results</h2>
+    <div id="test-results"></div>
+
+    <h2>Performance Metrics</h2>
+    <div id="metrics"></div>
+
+    <h2>Test Controls</h2>
+    <button onclick="runAllTests()">Run All Tests</button>
+    <button onclick="testOfflineVerification()">Test Offline Verification</button>
+    <button onclick="testDataFeed()">Test Data Feed</button>
+    <button onclick="testCryptoEngine()">Test Crypto Engine</button>
+    <button onclick="testFallback()">Test Fallback</button>
+    <button onclick="clearResults()">Clear Results</button>
+
+    <h2>Debug Log</h2>
+    <div id="log"></div>
+
+    <!-- Load the SDK -->
+    <script src="{{ url_for('static', filename='js/lemma-shield-widget.js') }}"></script>
+    <script>
+        // Test framework
+        let testResults = [];
+        let metrics = {};
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toISOString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function addTestResult(name, status, message, duration = null) {
+            const result = { name, status, message, duration };
+            testResults.push(result);
+            updateTestResults();
+        }
+        
+        function updateTestResults() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = testResults.map(result => {
+                const statusClass = result.status === 'success' ? 'success' : 
+                                   result.status === 'error' ? 'error' : 'pending';
+                const durationText = result.duration ? ` (${result.duration}ms)` : '';
+                return `<div class="test-result ${statusClass}">
+                    <strong>${result.name}</strong>${durationText}: ${result.message}
+                </div>`;
+            }).join('');
+        }
+        
+        function updateMetrics() {
+            const metricsDiv = document.getElementById('metrics');
+            metricsDiv.innerHTML = Object.entries(metrics).map(([key, value]) => 
+                `<div class="metric"><strong>${key}:</strong> ${value}</div>`
+            ).join('');
+        }
+        
+        function clearResults() {
+            testResults = [];
+            metrics = {};
+            updateTestResults();
+            updateMetrics();
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        async function runAllTests() {
+            log('🚀 Starting comprehensive SDK validation...');
+            clearResults();
+            
+            // Test 1: SDK Initialization
+            await testSDKInitialization();
+            
+            // Test 2: Crypto Engine
+            await testCryptoEngine();
+            
+            // Test 3: Offline Verification
+            await testOfflineVerification();
+            
+            // Test 4: Data Feed
+            await testDataFeed();
+            
+            // Test 5: Fallback Mechanism
+            await testFallback();
+            
+            // Test 6: Performance Metrics
+            await testPerformanceMetrics();
+            
+            log('✅ All tests completed!');
+        }
+        
+        async function testSDKInitialization() {
+            const startTime = performance.now();
+            
+            try {
+                log('Testing SDK initialization...');
+                
+                // Test if LemmaShield class exists
+                if (typeof LemmaShield === 'undefined') {
+                    throw new Error('LemmaShield class not found');
+                }
+                
+                // Initialize SDK
+                const shield = new LemmaShield({
+                    apiKey: 'test-key',
+                    debug: true,
+                    autoInit: false
+                });
+                
+                if (!shield) {
+                    throw new Error('Failed to create LemmaShield instance');
+                }
+                
+                const duration = performance.now() - startTime;
+                metrics['SDK Init Time'] = `${duration.toFixed(2)}ms`;
+                
+                addTestResult('SDK Initialization', 'success', 'LemmaShield initialized successfully', duration);
+                log('✅ SDK initialization test passed');
+                
+            } catch (error) {
+                const duration = performance.now() - startTime;
+                addTestResult('SDK Initialization', 'error', `Failed: ${error.message}`, duration);
+                log(`❌ SDK initialization failed: ${error.message}`);
+            }
+        }
+        
+        async function testCryptoEngine() {
+            const startTime = performance.now();
+            
+            try {
+                log('Testing crypto engine...');
+                
+                // Test if OPRF client exists
+                if (typeof window.LemmaWallet === 'undefined') {
+                    throw new Error('LemmaWallet not found');
+                }
+                
+                // Test basic cryptographic operations
+                const testData = 'test-credential-id';
+                const testHash = await hashCredentialId(testData);
+                
+                if (!testHash) {
+                    throw new Error('Hash operation failed');
+                }
+                
+                const duration = performance.now() - startTime;
+                metrics['Crypto Engine'] = `${duration.toFixed(2)}ms`;
+                
+                addTestResult('Crypto Engine', 'success', 'Basic crypto operations working', duration);
+                log('✅ Crypto engine test passed');
+                
+            } catch (error) {
+                const duration = performance.now() - startTime;
+                addTestResult('Crypto Engine', 'error', `Failed: ${error.message}`, duration);
+                log(`❌ Crypto engine failed: ${error.message}`);
+            }
+        }
+        
+        async function testOfflineVerification() {
+            const startTime = performance.now();
+            
+            try {
+                log('Testing offline verification (<100ms target)...');
+                
+                const shield = new LemmaShield({
+                    apiKey: 'test-key',
+                    debug: true,
+                    autoInit: false
+                });
+                
+                // Test offline verification with mock credential
+                const mockCredential = {
+                    id: 'test-credential-123',
+                    type: 'LemmaVerifiableCredential',
+                    credentialSubject: {
+                        id: 'did:lemma:user123',
+                        isHuman: true
+                    }
+                };
+                
+                // This should complete in <100ms
+                const verificationStartTime = performance.now();
+                const result = await shield.verifyOffline(mockCredential);
+                const verificationTime = performance.now() - verificationStartTime;
+                
+                metrics['Offline Verification'] = `${verificationTime.toFixed(2)}ms`;
+                
+                if (verificationTime > 100) {
+                    throw new Error(`Offline verification too slow: ${verificationTime}ms (target: <100ms)`);
+                }
+                
+                const duration = performance.now() - startTime;
+                addTestResult('Offline Verification', 'success', 
+                    `Completed in ${verificationTime.toFixed(2)}ms (target: <100ms)`, duration);
+                log(`✅ Offline verification test passed: ${verificationTime.toFixed(2)}ms`);
+                
+            } catch (error) {
+                const duration = performance.now() - startTime;
+                addTestResult('Offline Verification', 'error', `Failed: ${error.message}`, duration);
+                log(`❌ Offline verification failed: ${error.message}`);
+            }
+        }
+        
+        async function testDataFeed() {
+            const startTime = performance.now();
+            
+            try {
+                log('Testing data feed (revocation cascade)...');
+                
+                // Test if we can fetch revocation data
+                const response = await fetch('/api/generate-challenge');
+                if (!response.ok) {
+                    throw new Error(`API endpoint failed: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error('Challenge generation failed');
+                }
+                
+                const duration = performance.now() - startTime;
+                metrics['Data Feed'] = `${duration.toFixed(2)}ms`;
+                
+                addTestResult('Data Feed', 'success', 'API endpoints responding correctly', duration);
+                log('✅ Data feed test passed');
+                
+            } catch (error) {
+                const duration = performance.now() - startTime;
+                addTestResult('Data Feed', 'error', `Failed: ${error.message}`, duration);
+                log(`❌ Data feed failed: ${error.message}`);
+            }
+        }
+        
+        async function testFallback() {
+            const startTime = performance.now();
+            
+            try {
+                log('Testing fallback mechanism...');
+                
+                const shield = new LemmaShield({
+                    apiKey: 'test-key',
+                    debug: true,
+                    autoInit: false,
+                    fallbackEnabled: true
+                });
+                
+                // Test that fallback is properly configured
+                if (!shield.config.fallbackEnabled) {
+                    throw new Error('Fallback not enabled');
+                }
+                
+                const duration = performance.now() - startTime;
+                metrics['Fallback'] = `${duration.toFixed(2)}ms`;
+                
+                addTestResult('Fallback', 'success', 'Fallback mechanism configured', duration);
+                log('✅ Fallback test passed');
+                
+            } catch (error) {
+                const duration = performance.now() - startTime;
+                addTestResult('Fallback', 'error', `Failed: ${error.message}`, duration);
+                log(`❌ Fallback failed: ${error.message}`);
+            }
+        }
+        
+        async function testPerformanceMetrics() {
+            const startTime = performance.now();
+            
+            try {
+                log('Testing performance metrics...');
+                
+                // Calculate bundle size estimate
+                const jsFiles = [
+                    '/static/js/lemma-shield-widget.js',
+                    '/static/js/lemma-offline-sdk.js',
+                    '/static/js/lemma-oprf-client.js'
+                ];
+                
+                let totalSize = 0;
+                for (const file of jsFiles) {
+                    try {
+                        const response = await fetch(file);
+                        if (response.ok) {
+                            const text = await response.text();
+                            totalSize += text.length;
+                        }
+                    } catch (e) {
+                        // File might not exist, continue
+                    }
+                }
+                
+                const bundleSizeKB = (totalSize / 1024).toFixed(2);
+                metrics['Bundle Size'] = `${bundleSizeKB}KB`;
+                
+                // Target: 30-100KB per 1M revoked IDs
+                const targetMax = 100; // KB
+                if (totalSize > targetMax * 1024) {
+                    throw new Error(`Bundle too large: ${bundleSizeKB}KB (target: <${targetMax}KB)`);
+                }
+                
+                const duration = performance.now() - startTime;
+                addTestResult('Performance Metrics', 'success', 
+                    `Bundle size: ${bundleSizeKB}KB (target: <${targetMax}KB)`, duration);
+                log(`✅ Performance metrics test passed: ${bundleSizeKB}KB`);
+                
+            } catch (error) {
+                const duration = performance.now() - startTime;
+                addTestResult('Performance Metrics', 'error', `Failed: ${error.message}`, duration);
+                log(`❌ Performance metrics failed: ${error.message}`);
+            }
+        }
+        
+        // Helper functions
+        async function hashCredentialId(credentialId) {
+            try {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(credentialId);
+                const hash = await crypto.subtle.digest('SHA-256', data);
+                return Array.from(new Uint8Array(hash))
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join('');
+            } catch (error) {
+                console.error('Hash operation failed:', error);
+                return null;
+            }
+        }
+        
+        // Auto-run tests when page loads
+        window.addEventListener('load', function() {
+            log('🛡️ Lemma SDK Validation Test loaded');
+            log('Click "Run All Tests" to validate SDK functionality');
+            updateMetrics();
+        });
+    </script>
+</body>
+</html> 

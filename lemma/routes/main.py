@@ -1118,4 +1118,14 @@ def react_components_test():
     """Test page for React components."""
     return render_template('react_demo.html')
 
+@main_bp.route('/sdk-test')
+def sdk_test():
+    """Serve the SDK validation test page"""
+    return render_template('sdk_test.html')
+
+@main_bp.route('/sdk-demo')
+def sdk_demo():
+    """Serve the unified SDK demo page"""
+    return render_template('sdk_demo.html')
+
 
