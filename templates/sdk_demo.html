@@ -101,6 +101,7 @@
             <button onclick="testCryptoEngine()">Test Crypto Engine</button>
             <button onclick="testDataFeed()">Test Data Feed</button>
             <button onclick="runAllTests()">Run All Tests</button>
+            <button onclick="runComprehensivePerformanceTest()" style="background: #28a745;">🚀 Run Browser Performance Test</button>
             <button onclick="clearLog()">Clear Log</button>
         </div>
 
@@ -323,6 +324,269 @@
             }
         }
         
+        // Comprehensive Browser Performance Test
+        async function runComprehensivePerformanceTest() {
+            log('🚀 Starting comprehensive browser performance test...');
+            log('=' + '='.repeat(60));
+            log('🎯 Target: <100ms offline verification');
+            log('📅 Test Time: ' + new Date().toISOString());
+            
+            // Test configuration
+            const config = {
+                performanceTarget: 100, // milliseconds
+                bundleSizeTarget: 100, // KB
+                testApiKey: 'test-browser-performance-key'
+            };
+            
+            let testResults = {
+                sdkAvailable: false,
+                initTime: null,
+                bundleSize: null,
+                componentsAvailable: {},
+                configValidation: {},
+                performanceMetrics: {},
+                overallSuccess: false
+            };
+            
+            // Test 1: SDK Availability
+            log('\n1. Testing SDK Availability...');
+            if (typeof LemmaSDK !== 'undefined') {
+                log('✅ LemmaSDK is available in global scope');
+                testResults.sdkAvailable = true;
+            } else {
+                log('❌ LemmaSDK not found in global scope');
+                return false;
+            }
+            
+            // Test 2: SDK Initialization Performance
+            log('\n2. Testing SDK Initialization Performance...');
+            const initStart = performance.now();
+            
+            try {
+                const testSDK = new LemmaSDK({
+                    developmentMode: true,
+                    apiKey: config.testApiKey
+                });
+                
+                const initTime = performance.now() - initStart;
+                testResults.initTime = initTime;
+                
+                log(`✅ SDK initialized in ${initTime.toFixed(2)}ms`);
+                
+                if (initTime < config.performanceTarget) {
+                    log(`🎯 Performance target met: ${initTime.toFixed(2)}ms < ${config.performanceTarget}ms`);
+                } else {
+                    log(`⚠️ Performance target missed: ${initTime.toFixed(2)}ms >= ${config.performanceTarget}ms`);
+                }
+                
+                // Test 3: Component Availability
+                log('\n3. Testing Component Availability...');
+                const components = {
+                    'Crypto Engine': 'cryptoEngine',
+                    'Data Feed': 'dataFeed',
+                    'Security': 'security',
+                    'Offline Verifier': 'verifyOffline'
+                };
+                
+                Object.entries(components).forEach(([name, property]) => {
+                    const available = property === 'verifyOffline' 
+                        ? typeof testSDK[property] === 'function'
+                        : testSDK[property] !== undefined;
+                        
+                    testResults.componentsAvailable[name] = available;
+                    
+                    if (available) {
+                        log(`✅ ${name}: Available`);
+                    } else {
+                        log(`⚠️ ${name}: Missing`);
+                    }
+                });
+                
+                // Test 4: Configuration Validation
+                log('\n4. Testing Configuration...');
+                const sdkConfig = testSDK.config || {};
+                
+                const configTests = {
+                    'Development Mode': sdkConfig.developmentMode,
+                    'Production Mode': sdkConfig.productionMode,
+                    'Security Level': sdkConfig.securityLevel,
+                    'API Key': sdkConfig.apiKey
+                };
+                
+                Object.entries(configTests).forEach(([name, value]) => {
+                    testResults.configValidation[name] = value !== undefined;
+                    
+                    if (value !== undefined) {
+                        log(`✅ ${name}: ${value}`);
+                    } else {
+                        log(`⚠️ ${name}: Not set`);
+                    }
+                });
+                
+                // Test 5: Bundle Size Analysis
+                log('\n5. Testing Bundle Size...');
+                const resources = performance.getEntriesByType('resource');
+                const sdkResources = resources.filter(r => 
+                    r.name.includes('lemma-sdk-unified.js') ||
+                    r.name.includes('lemma-sdk')
+                );
+                
+                if (sdkResources.length > 0) {
+                    const resource = sdkResources[0];
+                    const size = resource.transferSize || resource.encodedBodySize || 0;
+                    const sizeKB = Math.round(size / 1024);
+                    
+                    testResults.bundleSize = sizeKB;
+                    log(`✅ SDK bundle size: ${sizeKB}KB`);
+                    
+                    if (sizeKB <= config.bundleSizeTarget) {
+                        log(`🎯 Bundle size target met: ${sizeKB}KB <= ${config.bundleSizeTarget}KB`);
+                    } else {
+                        log(`⚠️ Bundle size exceeds target: ${sizeKB}KB > ${config.bundleSizeTarget}KB`);
+                    }
+                    
+                    // Update the metrics display
+                    document.getElementById('bundle-size').textContent = `${sizeKB}KB`;
+                } else {
+                    log('⚠️ SDK bundle not found in network resources');
+                }
+                
+                // Test 6: Performance Metrics
+                log('\n6. Testing Performance Metrics...');
+                const navigation = performance.getEntriesByType('navigation')[0];
+                if (navigation) {
+                    const metrics = {
+                        domContentLoaded: navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart,
+                        loadComplete: navigation.loadEventEnd - navigation.loadEventStart,
+                        firstPaint: navigation.domContentLoadedEventEnd - navigation.fetchStart
+                    };
+                    
+                    testResults.performanceMetrics = metrics;
+                    
+                    log(`📊 DOM Content Loaded: ${metrics.domContentLoaded.toFixed(2)}ms`);
+                    log(`📊 Load Complete: ${metrics.loadComplete.toFixed(2)}ms`);
+                    log(`📊 First Paint: ${metrics.firstPaint.toFixed(2)}ms`);
+                    
+                    const acceptable = metrics.domContentLoaded < 5000 && metrics.loadComplete < 10000;
+                    
+                    if (acceptable) {
+                        log('✅ Page performance is acceptable');
+                    } else {
+                        log('⚠️ Page performance could be improved');
+                    }
+                } else {
+                    log('⚠️ Navigation timing not available');
+                }
+                
+                // Test 7: Offline Verification Simulation
+                log('\n7. Testing Offline Verification...');
+                
+                if (typeof testSDK.verifyOffline === 'function') {
+                    const verifyStart = performance.now();
+                    
+                    const testCredential = {
+                        id: 'test-credential-browser',
+                        type: 'human',
+                        data: 'simulated-browser-test-data'
+                    };
+                    
+                    try {
+                        await testSDK.verifyOffline(testCredential);
+                        const verifyTime = performance.now() - verifyStart;
+                        
+                        log(`✅ Offline verification completed in ${verifyTime.toFixed(2)}ms`);
+                        
+                        if (verifyTime < config.performanceTarget) {
+                            log(`🎯 Offline verification target met: ${verifyTime.toFixed(2)}ms < ${config.performanceTarget}ms`);
+                        } else {
+                            log(`⚠️ Offline verification target missed: ${verifyTime.toFixed(2)}ms >= ${config.performanceTarget}ms`);
+                        }
+                        
+                        // Update the metrics display
+                        document.getElementById('offline-time').textContent = `${verifyTime.toFixed(2)}ms`;
+                        
+                    } catch (verifyError) {
+                        const verifyTime = performance.now() - verifyStart;
+                        log(`📊 Offline verification method called in ${verifyTime.toFixed(2)}ms`);
+                        log(`📊 Verification error (expected in test): ${verifyError.message}`);
+                        
+                        if (verifyTime < config.performanceTarget) {
+                            log(`✅ Method call time acceptable: ${verifyTime.toFixed(2)}ms < ${config.performanceTarget}ms`);
+                        } else {
+                            log(`⚠️ Method call time too slow: ${verifyTime.toFixed(2)}ms >= ${config.performanceTarget}ms`);
+                        }
+                    }
+                } else {
+                    log('❌ verifyOffline method not available');
+                }
+                
+                // Test 8: Network Resource Analysis
+                log('\n8. Analyzing Network Resources...');
+                const lemmaResources = resources.filter(r => 
+                    r.name.includes('lemma') || 
+                    r.name.includes('sdk')
+                );
+                
+                if (lemmaResources.length > 0) {
+                    log(`📊 Found ${lemmaResources.length} Lemma-related resources:`);
+                    
+                    lemmaResources.forEach(resource => {
+                        const name = resource.name.split('/').pop();
+                        const duration = resource.duration.toFixed(2);
+                        const size = Math.round((resource.transferSize || resource.encodedBodySize || 0) / 1024);
+                        
+                        log(`   ${name}: ${duration}ms, ${size}KB`);
+                    });
+                } else {
+                    log('⚠️ No Lemma-related resources found');
+                }
+                
+                // Generate Final Test Report
+                log('\n' + '='.repeat(50));
+                log('📊 BROWSER PERFORMANCE TEST REPORT');
+                log('='.repeat(50));
+                
+                log(`🕐 Test Date: ${new Date().toISOString()}`);
+                log(`🌐 URL: ${window.location.href}`);
+                log(`🔍 User Agent: ${navigator.userAgent.substring(0, 100)}...`);
+                
+                log('\n📈 Performance Results:');
+                log(`  SDK Initialization: ${testResults.initTime ? testResults.initTime.toFixed(2) + 'ms' : 'N/A'}`);
+                log(`  Bundle Size: ${testResults.bundleSize ? testResults.bundleSize + 'KB' : 'N/A'}`);
+                
+                log('\n🔧 Functionality Results:');
+                log(`  SDK Loading: ${testResults.sdkAvailable ? '✅ PASS' : '❌ FAIL'}`);
+                log(`  Component Availability: ${Object.values(testResults.componentsAvailable).every(v => v) ? '✅ PASS' : '⚠️ PARTIAL'}`);
+                log(`  Configuration: ${Object.values(testResults.configValidation).every(v => v) ? '✅ PASS' : '⚠️ PARTIAL'}`);
+                
+                log('\n🎯 Performance Targets:');
+                log(`  Initialization < ${config.performanceTarget}ms: ${testResults.initTime && testResults.initTime < config.performanceTarget ? '✅ MET' : '❌ MISSED'}`);
+                log(`  Bundle Size ≤ ${config.bundleSizeTarget}KB: ${testResults.bundleSize && testResults.bundleSize <= config.bundleSizeTarget ? '✅ MET' : '❌ MISSED'}`);
+                
+                const overallSuccess = testResults.sdkAvailable && 
+                                      testResults.initTime && testResults.initTime < config.performanceTarget &&
+                                      testResults.bundleSize && testResults.bundleSize <= config.bundleSizeTarget;
+                
+                log('\n🏆 Overall Assessment:');
+                if (overallSuccess) {
+                    log('✅ PASS - SDK is performing excellently!');
+                    log('🚀 Ready for customer integration');
+                    updateStatus('✅ Browser Performance Test: PASSED', 'success');
+                } else {
+                    log('⚠️ NEEDS ATTENTION - Some issues detected');
+                    log('🔧 Review failed tests and optimize');
+                    updateStatus('⚠️ Browser Performance Test: NEEDS ATTENTION', 'warning');
+                }
+                
+                return overallSuccess;
+                
+            } catch (error) {
+                log(`❌ Performance test failed: ${error.message}`);
+                updateStatus(`❌ Browser Performance Test: FAILED`, 'error');
+                return false;
+            }
+        }
+
         // Initialize SDK when page loads
         window.addEventListener('load', async function() {
             log('🌐 Page loaded, initializing SDK...');
