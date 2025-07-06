@@ -19,7 +19,7 @@ class LemmaSDK {
             apiBase: options.apiBase || window.location.origin,
             instanceUrl: options.instanceUrl || 'https://lemma.id',
             debug: options.debug || false,
-            developmentMode: options.developmentMode !== false, // Enable dev mode by default
+            developmentMode: options.developmentMode === true, // Disable dev mode by default for production
             
             // Performance targets
             offlineVerificationTarget: 100, // ms
@@ -42,6 +42,12 @@ class LemmaSDK {
             securityLevel: options.securityLevel || 'balanced', // 'performance', 'balanced', 'paranoid'
             maxTimingVariance: options.maxTimingVariance || 5, // ms - for constant-time operations
             secureWipeEnabled: options.secureWipeEnabled || false, // Secure memory wiping
+            
+            // Production Optimization Settings
+            productionMode: options.productionMode !== false, // Enable production optimizations by default
+            strictValidation: options.strictValidation !== false, // Strict validation in production
+            performanceLogging: options.performanceLogging || false, // Detailed performance logging
+            errorReporting: options.errorReporting || false, // Error reporting to monitoring systems
             
             // Audit and Compliance
             auditLogging: options.auditLogging || false, // Security audit logging
@@ -102,6 +108,12 @@ class LemmaSDK {
         this.log('🚀 Initializing Lemma SDK...');
         
         try {
+            // Apply production optimizations if enabled
+            if (this.config.productionMode && !this.config.developmentMode) {
+                await this.applyProductionOptimizations();
+                this.log('✅ Production optimizations applied');
+            }
+            
             // Initialize security hardening first
             await this.security.init();
             this.log('✅ Security hardening initialized');
@@ -136,6 +148,41 @@ class LemmaSDK {
             this.log('❌ SDK initialization failed:', error);
             throw error;
         }
+    }
+    
+    /**
+     * Apply production optimizations for better performance and security
+     */
+    async applyProductionOptimizations() {
+        this.log('🔧 Applying production optimizations...');
+        
+        // Disable debug logging in production
+        if (!this.config.performanceLogging) {
+            this.config.debug = false;
+        }
+        
+        // Enable strict validation
+        this.config.strictValidation = true;
+        
+        // Enable hardware-backed features if available
+        if (this.security && typeof this.security.detectHardwareFeatures === 'function') {
+            const hardwareFeatures = await this.security.detectHardwareFeatures();
+            if (hardwareFeatures.tpm || hardwareFeatures.secureEnclave) {
+                this.config.hardwareBacked = true;
+                this.log('✅ Hardware-backed security enabled');
+            }
+        }
+        
+        // Optimize performance targets for production
+        this.config.offlineVerificationTarget = 50; // Stricter target for production
+        
+        // Enable constant-time operations
+        this.config.constantTime = true;
+        
+        // Enable secure memory wiping
+        this.config.secureWipeEnabled = true;
+        
+        this.log('✅ Production optimizations configured');
     }
 
     /**
@@ -722,6 +769,35 @@ class LemmaCryptoEngine {
                 return;
             }
             
+            // Production WebAssembly optimization detection
+            if (this.config.productionMode && !this.config.developmentMode) {
+                console.log('🔧 Initializing WebAssembly for production optimization...');
+                
+                // Check for advanced WebAssembly features
+                const wasmFeatures = {};
+                
+                // Check for WebAssembly SIMD support
+                if (typeof WebAssembly.SIMD !== 'undefined') {
+                    wasmFeatures.simd = true;
+                    console.log('✅ WebAssembly SIMD support detected');
+                }
+                
+                // Check for WebAssembly BigInt support
+                if (typeof BigInt !== 'undefined') {
+                    wasmFeatures.bigint = true;
+                    console.log('✅ BigInt support available for large integer operations');
+                }
+                
+                // Check for WebAssembly threads
+                if (typeof SharedArrayBuffer !== 'undefined') {
+                    wasmFeatures.threads = true;
+                    console.log('✅ WebAssembly threads support available');
+                }
+                
+                this.wasmFeatures = wasmFeatures;
+                console.log('🚀 WebAssembly optimization features:', wasmFeatures);
+            }
+            
             // Try to load pre-compiled WASM module (future enhancement)
             // For now, we'll prepare the structure for when WASM is available
             this.wasmModule = {
@@ -729,11 +805,15 @@ class LemmaCryptoEngine {
                 ed25519_verify: null,
                 oprf_unblind: null,
                 bloom_check: null,
-                constant_time_eq: null
+                constant_time_eq: null,
+                features: this.wasmFeatures || {}
             };
             
             // In the future, load actual WASM:
-            // const wasmBytes = await fetch('/static/wasm/lemma-crypto.wasm');
+            // const wasmUrl = this.config.productionMode ? 
+            //     '/static/wasm/lemma-crypto-optimized.wasm' : 
+            //     '/static/wasm/lemma-crypto.wasm';
+            // const wasmBytes = await fetch(wasmUrl);
             // const wasmModule = await WebAssembly.instantiate(await wasmBytes.arrayBuffer());
             // this.wasmModule = wasmModule.instance.exports;
             
