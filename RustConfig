@@ -1,5 +1,5 @@
 VERSION=stable
-RUST_CARGO_BUILD_FLAGS=--release --features python
+RUST_CARGO_BUILD_FLAGS="--release --features python"
 
 # Heroku-specific environment variables
 export CC=gcc
