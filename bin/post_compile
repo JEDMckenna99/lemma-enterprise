@@ -6,6 +6,10 @@ echo "================================================================="
 # Exit on any error
 set -e
 
+# Add more debug output
+log "🐛 DEBUG: Starting post-compile with enhanced debugging"
+log "🐛 DEBUG: Buildpack order check - Rust should be available now"
+
 # Environment setup
 export BUILD_DIR=${BUILD_DIR:-$(pwd)}
 export CACHE_DIR=${CACHE_DIR:-/tmp/cache}
