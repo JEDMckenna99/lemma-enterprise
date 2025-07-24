@@ -107,14 +107,7 @@ quickcheck = "1.0"
 qrcode = "0.14"
 image = "0.25"
 
-[[bench]]
-name = "benchmarks"
-harness = false
-required-features = ["criterion"]
-
-[[bin]]
-name = "test_core_crypto"
-path = "test_core_crypto.rs"
+# Removed benchmark and binary configurations for clean deployment
 
 [features]
 default = ["native"]
