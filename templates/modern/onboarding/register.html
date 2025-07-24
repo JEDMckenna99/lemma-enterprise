@@ -1,0 +1,755 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Get Started - Lemma Enterprise{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stripe-design-system.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/modern-2025-saas.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/form-enhancements-2025.css') }}">
+<style>
+/* Registration Page - Modern SaaS Design */
+.registration-hero {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.registration-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="80" cy="40" r="1" fill="rgba(255,255,255,0.08)"/><circle cx="40" cy="80" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+    opacity: 0.3;
+}
+
+.registration-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--space-6);
+    position: relative;
+    z-index: 1;
+}
+
+.registration-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-16);
+    align-items: center;
+}
+
+.registration-left {
+    color: white;
+    padding-right: var(--space-8);
+}
+
+.registration-headline {
+    font-size: 3.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: var(--space-6);
+    background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.8) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.registration-subtitle {
+    font-size: 1.25rem;
+    line-height: 1.6;
+    margin-bottom: var(--space-8);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.feature-grid {
+    display: grid;
+    gap: var(--space-4);
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.feature-icon {
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.registration-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: var(--space-10);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.registration-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.card-header {
+    text-align: center;
+    margin-bottom: var(--space-8);
+}
+
+.card-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: var(--space-2);
+    letter-spacing: -0.025em;
+}
+
+.card-subtitle {
+    color: var(--gray-600);
+    font-size: 1.125rem;
+    line-height: 1.6;
+}
+
+.modern-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+
+.form-group-modern {
+    position: relative;
+}
+
+.form-label-modern {
+    display: block;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin-bottom: var(--space-2);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.form-input-modern {
+    width: 100%;
+    padding: var(--space-4) var(--space-4);
+    border: 2px solid var(--gray-200);
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: white;
+    font-weight: 500;
+}
+
+.form-input-modern:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    transform: translateY(-1px);
+}
+
+.form-input-modern::placeholder {
+    color: var(--gray-400);
+    font-weight: 400;
+}
+
+.form-help-modern {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    margin-top: var(--space-1);
+}
+
+.btn-submit-modern {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: var(--space-4) var(--space-6);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+    min-height: 56px;
+}
+
+.btn-submit-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+}
+
+.btn-submit-modern:active {
+    transform: translateY(0);
+}
+
+.loading-state-modern {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    justify-content: center;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.loading-spinner-modern {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--gray-300);
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.error-message-modern {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    padding: var(--space-4);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.success-state-modern {
+    color: #059669;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.social-proof {
+    margin-top: var(--space-8);
+    text-align: center;
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--gray-200);
+}
+
+.social-proof-text {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    margin-bottom: var(--space-4);
+}
+
+.customer-logos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-6);
+    opacity: 0.6;
+}
+
+.customer-logo {
+    width: 80px;
+    height: 32px;
+    background: var(--gray-300);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    font-weight: 600;
+}
+
+.footer-link-modern {
+    text-align: center;
+    margin-top: var(--space-6);
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.footer-link-modern a {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.footer-link-modern a:hover {
+    color: #5a52d5;
+}
+
+.steps-preview {
+    margin-top: var(--space-8);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: var(--space-6);
+    backdrop-filter: blur(10px);
+}
+
+.steps-title {
+    color: white;
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: var(--space-4);
+    text-align: center;
+}
+
+.steps-list {
+    display: grid;
+    gap: var(--space-4);
+}
+
+.step-item-modern {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.step-number {
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+    flex-shrink: 0;
+}
+
+.step-text {
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .registration-content {
+        grid-template-columns: 1fr;
+        gap: var(--space-8);
+        text-align: center;
+    }
+    
+    .registration-left {
+        padding-right: 0;
+        order: 2;
+    }
+    
+    .registration-card {
+        order: 1;
+    }
+    
+    .registration-headline {
+        font-size: 2.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .registration-hero {
+        padding: var(--space-6) 0;
+        min-height: auto;
+    }
+    
+    .registration-card {
+        padding: var(--space-6);
+        border-radius: 16px;
+        margin: var(--space-4);
+    }
+    
+    .registration-headline {
+        font-size: 2rem;
+    }
+    
+    .steps-preview {
+        display: none;
+    }
+    
+    .customer-logos {
+        flex-wrap: wrap;
+        gap: var(--space-4);
+    }
+}
+
+.hidden { display: none; }
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="registration-hero">
+    <div class="registration-container">
+        <div class="registration-content">
+            <!-- Left Side - Marketing Content -->
+            <div class="registration-left">
+                <h1 class="registration-headline">
+                    Build trust at scale
+                </h1>
+                <p class="registration-subtitle">
+                    Join thousands of companies using Lemma's enterprise verification platform to protect their users and prevent bot attacks.
+                </p>
+                
+                <div class="feature-grid">
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 12l2 2 4-4"/>
+                            </svg>
+                        </div>
+                        <span>99.99% uptime SLA with global infrastructure</span>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                        </div>
+                        <span>Enterprise-grade security and compliance</span>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                            </svg>
+                        </div>
+                        <span>Sub-150ms response times worldwide</span>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                            </svg>
+                        </div>
+                        <span>Start at $0.045/month per user</span>
+                    </div>
+                </div>
+
+                <div class="steps-preview">
+                    <h3 class="steps-title">Get started in 3 simple steps</h3>
+                    <div class="steps-list">
+                        <div class="step-item-modern">
+                            <div class="step-number">1</div>
+                            <div class="step-text">Verify domain ownership</div>
+                        </div>
+                        <div class="step-item-modern">
+                            <div class="step-number">2</div>
+                            <div class="step-text">Get your API keys</div>
+                        </div>
+                        <div class="step-item-modern">
+                            <div class="step-number">3</div>
+                            <div class="step-text">Start protecting users</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side - Registration Form -->
+            <div class="registration-card fade-in">
+                <div class="card-header">
+                    <h2 class="card-title">Create your account</h2>
+                    <p class="card-subtitle">Join the enterprise verification platform</p>
+                </div>
+
+                <form id="registrationForm" class="modern-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    
+                    <div class="form-group-modern">
+                        <label for="email" class="form-label-modern">Work Email</label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            required 
+                            class="form-input-modern"
+                            placeholder="name@company.com"
+                            autocomplete="email"
+                        >
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label for="company" class="form-label-modern">Company Name</label>
+                        <input 
+                            type="text" 
+                            id="company" 
+                            name="company" 
+                            class="form-input-modern"
+                            placeholder="Acme Corporation"
+                            autocomplete="organization"
+                        >
+                        <div class="form-help-modern">Optional - helps us customize your experience</div>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label for="domain" class="form-label-modern">Website Domain</label>
+                        <input 
+                            type="text" 
+                            id="domain" 
+                            name="domain" 
+                            required 
+                            class="form-input-modern"
+                            placeholder="yourcompany.com"
+                            autocomplete="url"
+                        >
+                        <div class="form-help-modern">Don't include https:// or www.</div>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label for="password" class="form-label-modern">Password</label>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            required 
+                            class="form-input-modern"
+                            placeholder="Create a secure password"
+                            autocomplete="new-password"
+                            minlength="8"
+                        >
+                        <div class="form-help-modern">Minimum 8 characters required</div>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label for="confirm_password" class="form-label-modern">Confirm Password</label>
+                        <input 
+                            type="password" 
+                            id="confirm_password" 
+                            name="confirm_password" 
+                            required 
+                            class="form-input-modern"
+                            placeholder="Confirm your password"
+                            autocomplete="new-password"
+                            minlength="8"
+                        >
+                        <div class="form-help-modern">Must match the password above</div>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="btn-submit-modern">
+                        <span class="btn-text">Create Account</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </form>
+
+                <!-- Loading State -->
+                <div id="loadingState" class="loading-state-modern hidden">
+                    <div class="loading-spinner-modern"></div>
+                    <span>Creating your account...</span>
+                </div>
+
+                <!-- Error Message -->
+                <div id="errorMessage" class="error-message-modern hidden">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    <span id="errorText">Error message will appear here</span>
+                </div>
+
+                <!-- Social Proof -->
+                <div class="social-proof">
+                    <div class="social-proof-text">Trusted by innovative companies worldwide</div>
+                    <div class="customer-logos">
+                        <div class="customer-logo">TechCorp</div>
+                        <div class="customer-logo">StartupXYZ</div>
+                        <div class="customer-logo">Enterprise Co</div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="footer-link-modern">
+                    Already have an account? 
+                    <a href="{{ url_for('onboarding.login') }}">Sign in</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Enhanced form submission with modern UX
+document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = {
+        email: formData.get('email'),
+        company: formData.get('company'),
+        domain: formData.get('domain'),
+        password: formData.get('password'),
+        confirm_password: formData.get('confirm_password'),
+        csrf_token: formData.get('csrf_token')
+    };
+    
+    // Show loading state with smooth transition
+    document.getElementById('submitBtn').style.display = 'none';
+    document.getElementById('loadingState').classList.remove('hidden');
+    document.getElementById('errorMessage').classList.add('hidden');
+    
+    try {
+        const response = await fetch('{{ url_for("onboarding.register") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': data.csrf_token
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Success animation with modern styling
+            document.getElementById('loadingState').innerHTML = `
+                <div class="success-state-modern">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 12l2 2 4-4"/>
+                        <circle cx="12" cy="12" r="9"/>
+                    </svg>
+                    <span>Account created successfully!</span>
+                </div>
+            `;
+            
+            // Add success pulse animation
+            document.getElementById('loadingState').style.color = '#059669';
+            
+            setTimeout(() => {
+                window.location.href = result.next_step;
+            }, 1500);
+        } else {
+            // Show error with better UX
+            document.getElementById('errorText').textContent = result.error;
+            document.getElementById('errorMessage').classList.remove('hidden');
+            
+            // Reset form state
+            document.getElementById('submitBtn').style.display = 'flex';
+            document.getElementById('loadingState').classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Registration error:', error);
+        document.getElementById('errorText').textContent = 'Network error. Please try again.';
+        document.getElementById('errorMessage').classList.remove('hidden');
+        
+        // Reset form state
+        document.getElementById('submitBtn').style.display = 'flex';
+        document.getElementById('loadingState').classList.add('hidden');
+    }
+});
+
+// Domain input formatting with better UX
+document.getElementById('domain').addEventListener('input', function(e) {
+    let value = e.target.value;
+    
+    // Clean up domain input
+    value = value.replace(/^https?:\/\//, '');
+    value = value.replace(/^www\./, '');
+    value = value.replace(/\/$/, '');
+    value = value.toLowerCase();
+    
+    e.target.value = value;
+    
+    // Add visual feedback for valid domains
+    if (value && value.includes('.') && value.length > 3) {
+        e.target.style.borderColor = '#059669';
+        e.target.style.boxShadow = '0 0 0 4px rgba(5, 150, 105, 0.1)';
+    } else {
+        e.target.style.borderColor = '';
+        e.target.style.boxShadow = '';
+    }
+});
+
+// Enhanced form validation with real-time feedback
+function validateForm() {
+    const email = document.getElementById('email').value;
+    const domain = document.getElementById('domain').value;
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirm_password').value;
+    const submitBtn = document.getElementById('submitBtn');
+    
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    const domainValid = /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.([a-zA-Z]{2,}|[a-zA-Z]{2,}\.[a-zA-Z]{2,})$/.test(domain);
+    const passwordValid = password.length >= 8;
+    const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
+    
+    if (emailValid && domainValid && passwordValid && passwordsMatch) {
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+        submitBtn.style.transform = 'translateY(0)';
+    } else {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.6';
+        submitBtn.style.transform = 'translateY(1px)';
+    }
+}
+
+// Add validation listeners
+document.getElementById('email').addEventListener('input', validateForm);
+document.getElementById('domain').addEventListener('input', validateForm);
+document.getElementById('password').addEventListener('input', validateForm);
+document.getElementById('confirm_password').addEventListener('input', validateForm);
+
+// Initial validation
+validateForm();
+
+// Add focus animations
+document.querySelectorAll('.form-input-modern').forEach(input => {
+    input.addEventListener('focus', function() {
+        this.parentElement.style.transform = 'translateY(-2px)';
+    });
+    
+    input.addEventListener('blur', function() {
+        this.parentElement.style.transform = 'translateY(0)';
+    });
+});
+
+// Page load animation
+document.addEventListener('DOMContentLoaded', function() {
+    const card = document.querySelector('.registration-card');
+    const leftContent = document.querySelector('.registration-left');
+    
+    setTimeout(() => {
+        card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
+    }, 200);
+    
+    setTimeout(() => {
+        leftContent.style.opacity = '1';
+        leftContent.style.transform = 'translateX(0)';
+    }, 400);
+});
+</script>
+{% endblock %} 

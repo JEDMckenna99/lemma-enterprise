@@ -1,0 +1,236 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Pricing - Lemma Verification Platform{% endblock %}
+{% block description %}Simple, transparent pricing for the Lemma verification platform. Start free, scale as you grow.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .pricing-hero {
+            background: var(--gray-50);
+            padding: var(--space-16) 0;
+            text-align: center;
+        }
+        
+        .pricing-plans {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--space-8);
+            margin: var(--space-12) 0;
+        }
+        
+        .pricing-card {
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            padding: var(--space-8);
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        
+        .pricing-card.featured {
+            border-color: var(--primary-500);
+            box-shadow: 0 8px 25px rgba(99, 91, 255, 0.15);
+        }
+        
+        .pricing-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .pricing-badge {
+            background: var(--primary-500);
+            color: var(--white);
+            padding: var(--space-1) var(--space-3);
+            border-radius: 20px;
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: var(--space-4);
+            display: inline-block;
+        }
+        
+        .price {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--gray-800);
+            margin-bottom: var(--space-2);
+        }
+        
+        .price-unit {
+            font-size: var(--font-size-sm);
+            color: var(--gray-500);
+            font-weight: 400;
+        }
+        
+        .feature-list {
+            text-align: left;
+            margin: var(--space-6) 0;
+        }
+        
+        .feature-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: var(--space-3);
+            font-size: var(--font-size-sm);
+        }
+        
+        .feature-check {
+            color: var(--success);
+            margin-right: var(--space-3);
+            font-weight: bold;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<!-- Pricing Hero -->
+<section class="pricing-hero">
+    <div class="stripe-container">
+        <h1 class="hero-title">Simple, Transparent Pricing</h1>
+        <p class="hero-subtitle">
+            Start free, scale as you grow. No hidden fees, no surprises.
+        </p>
+    </div>
+</section>
+
+<!-- Pricing Plans -->
+<section class="section">
+    <div class="stripe-container">
+        <div class="pricing-plans">
+            <!-- Network Plan -->
+            <div class="pricing-card featured">
+                <div class="pricing-badge">Most Popular</div>
+                <h3>Network Partner</h3>
+                <div class="price">$0.10<span class="price-unit">/user/month</span></div>
+                <p class="text-secondary">Perfect for websites that need bot protection</p>
+                
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Unlimited verifications
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Microsecond-level performance
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        99.9% offline operation
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Cross-site network effects
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Zero-knowledge privacy
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary btn-lg w-full">Join Network</button>
+            </div>
+
+            <!-- Enterprise Plan -->
+            <div class="pricing-card">
+                <h3>Enterprise Licensing</h3>
+                <div class="price">$200K<span class="price-unit">-2M/year</span></div>
+                <p class="text-secondary">White-label the engine for your industry</p>
+                
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Full engine licensing
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Custom implementations
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Industry-specific packages
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Dedicated support
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        SLA guarantees
+                    </div>
+                </div>
+                
+                <button class="btn btn-outline btn-lg w-full">Contact Sales</button>
+            </div>
+
+            <!-- Developer Plan -->
+            <div class="pricing-card">
+                <h3>Developer</h3>
+                <div class="price">Free<span class="price-unit">/testing</span></div>
+                <p class="text-secondary">Perfect for development and testing</p>
+                
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        1,000 verifications/month
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Full API access
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Documentation & examples
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Community support
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        No credit card required
+                    </div>
+                </div>
+                
+                <button class="btn btn-ghost btn-lg w-full">Start Free</button>
+            </div>
+        </div>
+
+        <!-- FAQ Section -->
+        <div class="section-header" style="margin-top: var(--space-20);">
+            <h2>Frequently Asked Questions</h2>
+        </div>
+        
+        <div class="card-grid-2">
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h4>How does network pricing work?</h4>
+                    <p>You pay $0.10 per user per month, regardless of how many times they verify. Once a user is verified in the network, they can access any partner site without additional charges.</p>
+                </div>
+            </div>
+            
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h4>What's included in enterprise licensing?</h4>
+                    <p>Full access to the Lemma verification engine, custom implementations for your industry, dedicated support, and SLA guarantees. Perfect for banking, healthcare, gaming, and supply chain.</p>
+                </div>
+            </div>
+            
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h4>Can I start with the free plan?</h4>
+                    <p>Absolutely! The developer plan includes 1,000 verifications per month with full API access. No credit card required to get started.</p>
+                </div>
+            </div>
+            
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h4>How fast is the verification?</h4>
+                    <p>Lemma provides microsecond-level verification (0.05-1µs typical) with 99.9% offline operation. No network calls needed for most verifications.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %} 

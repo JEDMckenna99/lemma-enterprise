@@ -1,0 +1,204 @@
+#!/bin/bash
+
+echo "🦀 HEROKU POST-COMPILE: Building Rust lemma-crypto engine"
+echo "================================================================="
+
+# Exit on any error
+set -e
+
+# Environment setup
+export BUILD_DIR=${BUILD_DIR:-$(pwd)}
+export CACHE_DIR=${CACHE_DIR:-/tmp/cache}
+export CC=gcc
+export CXX=g++
+export RUSTFLAGS="-C linker=gcc -C target-cpu=generic"
+
+echo "📍 Current directory: $(pwd)"
+echo "📁 Build directory: $BUILD_DIR"
+echo "💾 Cache directory: $CACHE_DIR"
+
+# Function to log with timestamp
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# Check if Rust is available
+if ! command -v cargo &> /dev/null; then
+    log "❌ CRITICAL: Cargo not found. Checking for Rust installation..."
+    
+    # Common Rust paths on Heroku
+    RUST_PATHS=(
+        "/app/.heroku/rust/bin"
+        "/tmp/cache/.heroku/rust/bin"
+        "$HOME/.cargo/bin"
+        "/usr/local/cargo/bin"
+    )
+    
+    RUST_FOUND=false
+    for rust_path in "${RUST_PATHS[@]}"; do
+        if [ -d "$rust_path" ]; then
+            export PATH="$rust_path:$PATH"
+            log "✅ Added Rust path: $rust_path"
+            if command -v cargo &> /dev/null; then
+                RUST_FOUND=true
+                break
+            fi
+        fi
+    done
+    
+    if [ "$RUST_FOUND" = false ]; then
+        log "❌ FATAL: Rust not found in any expected location"
+        log "Available directories in /app:"
+        find /app -maxdepth 2 -type d 2>/dev/null | head -20
+        exit 1
+    fi
+fi
+
+# Verify Rust installation
+log "🔍 Rust version: $(rustc --version)"
+log "🔍 Cargo version: $(cargo --version)"
+
+# Navigate to lemma-crypto directory
+if [ ! -d "lemma-crypto" ]; then
+    log "❌ FATAL: lemma-crypto directory not found"
+    log "Current directory contents:"
+    ls -la
+    exit 1
+fi
+
+cd lemma-crypto
+log "📂 Entered lemma-crypto directory"
+
+# Install maturin
+log "📦 Installing maturin..."
+pip install --no-cache-dir maturin==1.4.0 || {
+    log "❌ Failed to install maturin"
+    exit 1
+}
+
+# Verify maturin installation
+log "🔍 Maturin version: $(maturin --version)"
+
+# Build the Rust library with Python bindings
+log "🔨 Building Rust library with Python bindings..."
+
+# Set additional environment variables for Heroku
+export PYTHON_SYS_EXECUTABLE=$(which python3)
+export PYO3_PYTHON=$(which python3)
+
+# Build with verbose output for debugging
+maturin build --release --features python --interpreter python3 --compatibility linux --verbose || {
+    log "❌ FATAL: maturin build failed"
+    log "Python executable: $(which python3)"
+    log "Python version: $(python3 --version)"
+    log "Cargo.toml contents:"
+    head -30 Cargo.toml
+    log "Available Python packages:"
+    pip list | head -20
+    exit 1
+}
+
+# Find and install the built wheel
+log "🔍 Looking for built wheel..."
+WHEEL_DIR="target/wheels"
+if [ ! -d "$WHEEL_DIR" ]; then
+    log "❌ FATAL: Wheel directory not found"
+    log "Target directory contents:"
+    ls -la target/ 2>/dev/null || echo "No target directory"
+    exit 1
+fi
+
+WHEEL_FILE=$(find "$WHEEL_DIR" -name "lemma_crypto-*.whl" | head -1)
+if [ -z "$WHEEL_FILE" ]; then
+    log "❌ FATAL: No wheel file found"
+    log "Wheels directory contents:"
+    ls -la "$WHEEL_DIR"
+    exit 1
+fi
+
+log "📦 Found wheel: $WHEEL_FILE"
+
+# Install the wheel
+log "📥 Installing wheel..."
+pip install --no-cache-dir --force-reinstall "$WHEEL_FILE" || {
+    log "❌ FATAL: Wheel installation failed"
+    exit 1
+}
+
+# Verify installation
+log "🧪 Testing Rust engine installation..."
+cd ..  # Go back to project root
+
+# Enhanced verification with detailed debugging
+python3 -c "
+import sys
+import os
+print(f'Python version: {sys.version}')
+print(f'Python executable: {sys.executable}')
+print(f'Python path: {sys.path}')
+print(f'Current directory: {os.getcwd()}')
+
+# List available packages
+try:
+    import pkg_resources
+    installed_packages = [d for d in pkg_resources.working_set]
+    lemma_packages = [p for p in installed_packages if 'lemma' in str(p).lower()]
+    print(f'Lemma-related packages: {lemma_packages}')
+except:
+    pass
+
+# Attempt import with detailed error reporting
+try:
+    print('Attempting to import lemma_crypto...')
+    import lemma_crypto
+    print(f'✅ lemma_crypto module imported: {lemma_crypto}')
+    
+    print('Attempting to import PyLemmaCore...')
+    from lemma_crypto import PyLemmaCore
+    print('✅ PyLemmaCore imported successfully')
+    
+    print('Attempting to initialize PyLemmaCore...')
+    core = PyLemmaCore()
+    print('✅ SUCCESS: Rust engine imported and initialized!')
+    
+    # Create success markers
+    with open('.rust_engine_success', 'w') as f:
+        f.write('rust_engine_available=true\nbuild_time=$(date)\nengine_status=operational')
+    with open('/app/.rust_engine_success', 'w') as f:
+        f.write('rust_engine_available=true\nbuild_time=$(date)\nengine_status=operational')
+        
+except ImportError as e:
+    print(f'❌ IMPORT ERROR: {e}')
+    print('Searching for lemma_crypto files...')
+    import glob
+    lemma_files = glob.glob('**/*lemma*', recursive=True)
+    print(f'Found lemma files: {lemma_files[:10]}')
+    exit(1)
+except Exception as e:
+    print(f'❌ OTHER ERROR: {e}')
+    import traceback
+    traceback.print_exc()
+    exit(1)
+" || {
+    log "❌ FATAL: Rust engine verification failed"
+    log "Directory contents:"
+    ls -la
+    log "Site-packages contents:"
+    find /app/.heroku/python/lib/python*/site-packages -name "*lemma*" 2>/dev/null || echo "No lemma packages found"
+    exit 1
+}
+
+log "🎉 SUCCESS: Rust engine built and installed successfully!"
+log "📊 Build completed in $(date)"
+
+# Create comprehensive success marker
+cat > .rust_engine_success << EOF
+rust_engine_available=true
+build_time=$(date)
+engine_status=operational
+wheel_file=$WHEEL_FILE
+rust_version=$(rustc --version)
+maturin_version=$(maturin --version)
+EOF
+
+echo "🦀 POST-COMPILE COMPLETED SUCCESSFULLY 🎉" 

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "lemma-crypto"
+version = "0.1.0"
+description = "Lemma Universal Verification Engine - Python bindings"
+authors = [{name = "Lemma Team"}]
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = []
+
+[tool.maturin]
+features = ["pyo3/extension-module", "python"]
+module-name = "lemma_crypto"
+python-source = "python"
+# Ensure compatibility with Heroku's Linux environment
+compatibility = "linux"
+strip = true 

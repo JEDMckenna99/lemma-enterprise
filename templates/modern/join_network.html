@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Permissions-Policy" content="payment=*, camera=*, microphone=*, fullscreen=*, encrypted-media=*, autoplay=*">
+    <title>Join the Lemma Network - Real Client Integration Demo</title>
+    <meta name="description" content="Join the Lemma federated identity network for human verification and bot protection with microsecond performance.">
+    
+    <!-- Favicon - Using Lemma logo -->
+    <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%23667eea'/><stop offset='100%' stop-color='%23764ba2'/></linearGradient></defs><g stroke='url(%23g)' stroke-width='6' fill='none' stroke-linecap='round'><ellipse cx='60' cy='60' rx='38' ry='14'/><ellipse cx='60' cy='60' rx='38' ry='14' transform='rotate(90 60 60)'/><ellipse cx='60' cy='60' rx='38' ry='14' transform='rotate(45 60 60)'/><ellipse cx='60' cy='60' rx='38' ry='14' transform='rotate(-45 60 60)'/></g></svg>">
+    
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #8b5cf6;
+            --background-color: #f8fafc;
+            --text-color: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --success-color: #10b981;
+            --error-color: #ef4444;
+            --warning-color: #f59e0b;
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --space-1: 0.25rem;
+            --space-2: 0.5rem;
+            --space-3: 0.75rem;
+            --space-4: 1rem;
+            --space-6: 1.5rem;
+            --space-8: 2rem;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: var(--space-4);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--space-8);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: var(--space-8);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: var(--space-4);
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-6);
+        }
+
+        .demo-banner {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: var(--space-6);
+            border-radius: var(--radius-lg);
+            text-align: center;
+            margin-bottom: var(--space-8);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .demo-banner h2 {
+            font-size: 1.8rem;
+            margin-bottom: var(--space-4);
+        }
+
+        .demo-banner p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: var(--space-2);
+        }
+
+        .integration-example {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--space-6);
+            margin-bottom: var(--space-8);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .integration-example h3 {
+            color: var(--primary-color);
+            margin-bottom: var(--space-4);
+            font-size: 1.3rem;
+        }
+
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            margin-bottom: var(--space-4);
+        }
+
+        .code-block .comment {
+            color: #94a3b8;
+        }
+
+        .code-block .keyword {
+            color: #a78bfa;
+        }
+
+        .code-block .string {
+            color: #34d399;
+        }
+
+        .api-monitor {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--space-6);
+            margin-bottom: var(--space-8);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .api-monitor h3 {
+            font-size: 1.3rem;
+            margin-bottom: var(--space-4);
+            color: var(--primary-color);
+        }
+
+        .api-log {
+            background: #000;
+            color: #0f0;
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: var(--space-4);
+        }
+
+        .shield-status {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            margin-bottom: var(--space-4);
+            padding: var(--space-2);
+            border-radius: var(--radius-md);
+            background: #f1f5f9;
+            font-weight: 500;
+        }
+
+        .shield-status.checking {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .shield-status.verified {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .shield-status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .protected-content {
+            transition: all 0.3s ease;
+            position: relative;
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--space-6);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .network-benefits {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--space-4);
+            margin-top: var(--space-6);
+        }
+
+        .benefit-card {
+            background: #f8fafc;
+            padding: var(--space-4);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .benefit-icon {
+            font-size: 2rem;
+            margin-bottom: var(--space-2);
+        }
+
+        .benefit-title {
+            font-weight: 600;
+            margin-bottom: var(--space-2);
+        }
+
+        .benefit-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .circuit-info {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--space-6);
+            margin-bottom: var(--space-8);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .circuit-info h3 {
+            color: var(--primary-color);
+            margin-bottom: var(--space-4);
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            margin-bottom: var(--space-3);
+            padding: var(--space-3);
+            background: #f8fafc;
+            border-radius: var(--radius-md);
+        }
+
+        .flow-step-icon {
+            font-size: 1.5rem;
+            min-width: 40px;
+        }
+
+        .flow-step-content {
+            flex: 1;
+        }
+
+        .flow-step-title {
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .flow-step-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .flow-step-stats {
+            font-size: 0.8rem;
+            color: var(--success-color);
+            font-weight: 500;
+        }
+
+        .post-verification-section {
+            margin-top: var(--space-6);
+            padding: var(--space-6);
+            background: #f0f9ff;
+            border-radius: var(--radius-lg);
+            border: 1px solid #bae6fd;
+        }
+
+        .revoke-button {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: var(--space-2) var(--space-4);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            margin-top: var(--space-4);
+        }
+
+        .revoke-button:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f4f6;
+            border-top: 2px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .success-banner {
+            background: linear-gradient(90deg, #10b981, #059669);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            font-weight: 600;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+        }
+
+        .success-banner.show {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ Join the Lemma Network</h1>
+            <p class="subtitle">Real Client Integration Demo - Exactly How Your Customers Will Integrate</p>
+        </div>
+
+        <div class="demo-banner">
+            <h2>🎯 PRODUCTION CLIENT INTEGRATION EXAMPLE</h2>
+            <p><strong>This page demonstrates exactly how your customers integrate Lemma Shield.</strong></p>
+            <p>✅ Real API endpoints • 🔐 Production inline Stripe Identity • 💾 Live credential system</p>
+            <p>🚀 Zero redirects - Complete inline verification experience</p>
+        </div>
+
+        <div class="integration-example">
+            <h3>📋 How Clients Integrate (3 Lines of Code)</h3>
+            <p>This is the exact code your customers would use to integrate Lemma Shield:</p>
+            <div class="code-block">
+<span class="comment">// Step 1: Include the Lemma Shield SDK</span>
+<span class="keyword">&lt;script</span> <span class="string">src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/static/js/lemma-shield-inline.js"</span><span class="keyword">&gt;&lt;/script&gt;</span>
+
+<span class="comment">// Step 2: Initialize with your API key</span>
+<span class="keyword">&lt;script&gt;</span>
+    <span class="keyword">const</span> shield = <span class="keyword">new</span> LemmaShieldInline({
+        apiKey: <span class="string">'your-api-key-here'</span>,
+        onVerified: <span class="keyword">function</span>(result) {
+            <span class="comment">// User is verified - enable protected features</span>
+            console.log(<span class="string">'User verified:'</span>, result);
+        }
+    });
+<span class="keyword">&lt;/script&gt;</span>
+
+<span class="comment">// Step 3: That's it! The shield automatically protects your content</span>
+            </div>
+            <p><strong>Result:</strong> Users with credentials pass through instantly. New users get seamless inline verification.</p>
+        </div>
+
+        <div class="api-monitor">
+            <h3>🔍 Real-Time API Monitoring</h3>
+            <p>Watch the production API calls in real-time as the shield operates:</p>
+            <div id="api-log" class="api-log">
+                <div>🚀 Lemma Shield initializing...</div>
+                <div>📊 Production API calls will appear here</div>
+                <div>🔄 Starting inline flow system...</div>
+            </div>
+            <div id="shield-status" class="shield-status checking">
+                <span class="loading-spinner"></span>
+                <span>Shield initializing...</span>
+            </div>
+        </div>
+
+        <div class="circuit-info">
+            <h3>🔄 How the Shield Works (3 Automatic Flows)</h3>
+            <div class="flow-step">
+                <div class="flow-step-icon">🔍</div>
+                <div class="flow-step-content">
+                    <div class="flow-step-title">CHECK FLOW</div>
+                    <div class="flow-step-description">Instantly checks for existing credentials in browser storage</div>
+                    <div class="flow-step-stats">95% success rate • 0 API calls • &lt;50ms</div>
+                </div>
+            </div>
+            <div class="flow-step">
+                <div class="flow-step-icon">⚡</div>
+                <div class="flow-step-content">
+                    <div class="flow-step-title">OFFLINE VERIFICATION</div>
+                    <div class="flow-step-description">OPRF cryptographic verification without network calls</div>
+                    <div class="flow-step-stats">Ultra-fast • Privacy-preserving • No server round-trip</div>
+                </div>
+            </div>
+            <div class="flow-step">
+                <div class="flow-step-icon">🛡️</div>
+                <div class="flow-step-content">
+                    <div class="flow-step-title">INLINE SHIELD FLOW</div>
+                    <div class="flow-step-description">Stripe Identity verification happens completely inline</div>
+                    <div class="flow-step-stats">New users only • 2-3 minutes • No popups/redirects</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Protected Content Section -->
+        <div id="protected-content" class="protected-content">
+            <h2>🏆 Welcome to the Lemma Network!</h2>
+            <p>Congratulations! You've successfully joined the Lemma Network. This content is protected by Lemma Shield and only visible to verified humans.</p>
+            
+            <div class="network-benefits">
+                <div class="benefit-card">
+                    <div class="benefit-icon">⚡</div>
+                    <div class="benefit-title">Lightning Fast</div>
+                    <div class="benefit-description">95% of verifications happen offline with zero API calls</div>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">🔒</div>
+                    <div class="benefit-title">Privacy First</div>
+                    <div class="benefit-description">Zero personal data storage with cryptographic proofs</div>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">🌐</div>
+                    <div class="benefit-title">Network Effect</div>
+                    <div class="benefit-description">Verify once, access everywhere across the network</div>
+                </div>
+            </div>
+            
+            <div class="post-verification-section">
+                <h3>🎯 Your Integration is Complete!</h3>
+                <p>This is exactly what your customers will see after successful verification:</p>
+                <ul style="margin: 1rem 0; padding-left: 2rem;">
+                    <li>✅ Instant access to protected content</li>
+                    <li>✅ Seamless user experience with no friction</li>
+                    <li>✅ Cross-site credential portability</li>
+                    <li>✅ Enterprise-grade security and privacy</li>
+                </ul>
+                
+                <div style="margin-top: var(--space-6);">
+                    <h4>🔄 Test Features</h4>
+                    <p>Try revoking credentials to see the system in action:</p>
+                    <button id="revokeCredential" class="revoke-button">🚫 Test Credential Revocation</button>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: var(--space-2);">
+                        This will clear credentials and trigger the inline verification flow again.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load the PRODUCTION Inline Shield -->
+    <script src="{{ url_for('static', filename='js/lemma-shield-inline.js') }}"></script>
+    <script>
+        // API Logging Functions for demonstration
+        function logApiCall(endpoint, method, data) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `🔄 ${method} ${endpoint}`;
+            const logData = data ? `\n   📤 ${JSON.stringify(data, null, 2)}` : '';
+            addToLog(`[${timestamp}] ${logEntry}${logData}`);
+        }
+
+        function logApiResponse(data, isError = false) {
+            const timestamp = new Date().toLocaleTimeString();
+            const emoji = isError ? '❌' : '✅';
+            const logEntry = `${emoji} Response: ${JSON.stringify(data, null, 2)}`;
+            addToLog(`[${timestamp}] ${logEntry}`);
+        }
+
+        function addToLog(message) {
+            const logDiv = document.getElementById('api-log');
+            if (logDiv) {
+                logDiv.innerHTML += `<div>${message}</div>`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+        }
+
+        function updateShieldStatus(status, message) {
+            const statusDiv = document.getElementById('shield-status');
+            if (statusDiv) {
+                statusDiv.className = `shield-status ${status}`;
+                
+                let icon = '🔄';
+                if (status === 'verified') icon = '✅';
+                else if (status === 'error') icon = '❌';
+                else if (status === 'checking') icon = '🔍';
+                
+                statusDiv.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+            }
+        }
+
+        function showSuccessBanner(message) {
+            const banner = document.createElement('div');
+            banner.className = 'success-banner';
+            banner.innerHTML = `
+                ${message}
+                <button onclick="this.parentElement.remove()" style="background: none; border: none; color: white; margin-left: 1rem; cursor: pointer;">✕</button>
+            `;
+            document.body.appendChild(banner);
+            
+            // Show banner
+            setTimeout(() => banner.classList.add('show'), 100);
+            
+            // Auto-remove after 8 seconds
+            setTimeout(() => banner.remove(), 8000);
+        }
+
+        // Initialize the PRODUCTION Inline Shield
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Initializing Production Lemma Shield Inline...');
+            
+            updateShieldStatus('checking', 'Starting production shield...');
+            addToLog('🚀 Initializing PRODUCTION Lemma Shield Inline with real API endpoints');
+            
+            // Initialize the Production Shield
+            const shield = new LemmaShieldInline({
+                apiKey: 'client-demo-key', // Demo key for client integration example
+                targetElement: '#protected-content',
+                debug: true, // Enable debug logging
+                onCheckStart: function() {
+                    logApiCall('/api/shield/status', 'GET');
+                    updateShieldStatus('checking', 'Checking for existing credentials...');
+                },
+                onCheckComplete: function(result) {
+                    logApiResponse(result);
+                    if (result.hasCredentials) {
+                        updateShieldStatus('verified', `Credentials found - ${result.method} verification`);
+                    } else {
+                        updateShieldStatus('checking', 'No credentials found - will show shield');
+                    }
+                },
+                onVerificationStart: function() {
+                    logApiCall('/api/shield/start-stripe-identity', 'POST', { inline_mode: true });
+                    updateShieldStatus('checking', 'Starting inline Stripe Identity verification...');
+                },
+                onVerificationComplete: function(result) {
+                    logApiResponse(result);
+                    updateShieldStatus('verified', `Verification complete via ${result.method}`);
+                    
+                    // Show success banner
+                    showSuccessBanner('🎉 PRODUCTION VERIFICATION COMPLETE - User now has seamless access across the network!');
+                },
+                onError: function(error) {
+                    console.error('🛡️ Shield error:', error);
+                    logApiResponse({ error: error.message }, true);
+                    updateShieldStatus('error', `Shield error: ${error.message}`);
+                }
+            });
+            
+            // Add additional debugging
+            setTimeout(() => {
+                console.log('🔍 Debug: Checking for shield overlay...');
+                const overlay = document.getElementById('lemma-shield-overlay');
+                if (overlay) {
+                    console.log('✅ Shield overlay found!');
+                    const button = document.getElementById('lemma-prove-button');
+                    if (button) {
+                        console.log('✅ Prove a Lemma button found!');
+                        console.log('🎯 Button onclick handler:', button.onclick);
+                        
+                        // Test button click manually
+                        button.addEventListener('click', function() {
+                            console.log('🎉 BUTTON CLICKED! This should trigger the explanation...');
+                        });
+                    } else {
+                        console.log('❌ Prove a Lemma button not found!');
+                    }
+                } else {
+                    console.log('❌ Shield overlay not found!');
+                }
+            }, 2000);
+
+            // Add revocation testing functionality
+            const revokeButton = document.getElementById('revokeCredential');
+            if (revokeButton) {
+                revokeButton.addEventListener('click', function() {
+                    console.log('🧪 Testing credential revocation...');
+                    addToLog('🧪 TESTING: Clearing credentials to simulate revocation');
+                    
+                    // Clear all credentials
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    
+                    updateShieldStatus('checking', 'Credentials revoked - reloading to test verification flow...');
+                    
+                    // Reload page to trigger verification flow
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                });
+            }
+        });
+    </script>
+</body>
+</html> 

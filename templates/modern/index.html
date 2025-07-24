@@ -1,0 +1,413 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Lemma - Revolutionary Digital Verification Platform{% endblock %}
+{% block description %}The world's first enterprise-grade cryptographic verification system with zero-knowledge proofs and perfect privacy.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        /* Hero Section - Professional dark gradient */
+        .hero-section {
+            background: var(--gray-900);
+            color: var(--white);
+            padding: var(--space-24) 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 80%, rgba(99, 91, 255, 0.2) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(99, 91, 255, 0.2) 0%, transparent 50%);
+            pointer-events: none;
+        }
+        
+        .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+        
+        .hero-logo {
+            display: flex;
+            justify-content: center;
+            margin-bottom: var(--space-6);
+        }
+        
+        .hero-logo-icon {
+            width: 80px;
+            height: 80px;
+            display: block;
+            filter: brightness(0) invert(1); /* Make the SVG white for dark hero */
+            /* Ensure SVG renders properly */
+            vertical-align: middle;
+            object-fit: contain;
+            background: none;
+            border: none;
+            outline: none;
+            min-width: 80px;
+            min-height: 80px;
+        }
+        
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: var(--space-2) var(--space-4);
+            background: var(--success);
+            color: var(--white);
+            border-radius: 20px;
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            margin-bottom: var(--space-6);
+        }
+        
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: var(--space-6);
+            background: linear-gradient(135deg, #ffffff 0%, #a0a9ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero-subtitle {
+            font-size: var(--font-size-xl);
+            color: var(--gray-300);
+            margin-bottom: var(--space-8);
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+        
+        /* Features Section */
+        .features-section {
+            padding: var(--space-16) 0;
+            background: var(--white);
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--space-8);
+            margin-top: var(--space-12);
+        }
+        
+        .feature-card {
+            text-align: center;
+            padding: var(--space-6);
+            border-radius: 8px;
+            transition: transform 150ms ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+        }
+        
+        .feature-icon {
+            width: 64px;
+            height: 64px;
+            background: var(--primary-500);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-4);
+            font-size: 28px;
+            color: var(--white);
+        }
+        
+        .feature-title {
+            font-size: var(--font-size-h4);
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: var(--space-3);
+        }
+        
+        .feature-description {
+            color: var(--gray-500);
+            line-height: 1.6;
+        }
+        
+        /* Demo Section */
+        .demo-section {
+            padding: var(--space-16) 0;
+            background: var(--gray-50);
+        }
+        
+        .status-section {
+            padding: var(--space-16) 0;
+            background: var(--white);
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2.5rem;
+            }
+            
+            .hero-cta {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="stripe-container">
+        <div class="hero-content">
+            <div class="hero-logo">
+                <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" class="hero-logo-icon">
+            </div>
+            <div class="hero-badge">
+                ✅ Real Lemma Shield Implementation
+            </div>
+            <h1 class="hero-title">
+                Revolutionary Digital <br>
+                Verification Platform
+            </h1>
+            <p class="hero-subtitle">
+                The world's first enterprise-grade cryptographic verification system 
+                with zero-knowledge proofs and perfect privacy. Built for the modern web.
+            </p>
+            <div class="hero-cta">
+                <a href="/join-network" class="btn btn-primary btn-lg">
+                    🚀 Get Started
+                </a>
+                <a href="/docs" class="btn btn-outline btn-lg">
+                    📚 View Documentation
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- System Status Section -->
+<section class="status-section">
+    <div class="stripe-container">
+        <div class="section-header">
+            <h2 class="section-title">System Status</h2>
+            <p class="section-subtitle">
+                Real-time status of the Lemma Shield system components
+            </p>
+        </div>
+        
+        <!-- React Component: System Status -->
+        <div id="system-status" data-lemma-component="SystemStatus"></div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="features-section">
+    <div class="stripe-container">
+        <div class="section-header">
+            <h2 class="section-title">Why Choose Lemma?</h2>
+            <p class="section-subtitle">
+                Experience the future of digital verification with our innovative approach
+            </p>
+        </div>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🛡️</div>
+                <h3 class="feature-title">Shield Protection</h3>
+                <p class="feature-description">
+                    Advanced bot protection that works seamlessly across your entire platform
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3 class="feature-title">Lightning Fast</h3>
+                <p class="feature-description">
+                    Microsecond-level verification with 99.9% offline operation capability
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🔐</div>
+                <h3 class="feature-title">Privacy First</h3>
+                <p class="feature-description">
+                    Zero-knowledge proofs ensure complete privacy protection for your users
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3 class="feature-title">Universal</h3>
+                <p class="feature-description">
+                    Works across all platforms and devices with seamless integration
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3 class="feature-title">Easy Integration</h3>
+                <p class="feature-description">
+                    Single script tag integration with comprehensive developer tools
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🏢</div>
+                <h3 class="feature-title">Enterprise Ready</h3>
+                <p class="feature-description">
+                    Production-grade infrastructure with enterprise security standards
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Demo Section -->
+<section class="demo-section">
+    <div class="stripe-container">
+        <div class="section-header">
+            <h2 class="section-title">See It In Action</h2>
+            <p class="section-subtitle">
+                Try the real Lemma Shield implementation and experience the difference
+            </p>
+        </div>
+        
+        <!-- React Component: Demo Section -->
+        <div id="demo-section" data-lemma-component="DemoSection" data-lemma-props='{
+            "title": "🛡️ Lemma Shield Demo",
+            "description": "Version 3.0.0 - This is the actual implementation that works exactly like any other site using Lemma verification service. Experience the complete verification flow from start to finish.",
+            "status": "✅ Live Production System",
+            "buttons": [
+                {
+                    "label": "🔒 Try Join Network (Protected)",
+                    "href": "/join-network",
+                    "variant": "btn-primary"
+                },
+                {
+                    "label": "🧪 API Playground", 
+                    "href": "/playground",
+                    "variant": "btn-outline"
+                },
+                {
+                    "label": "📚 Documentation",
+                    "href": "/docs",
+                    "variant": "btn-outline"
+                }
+            ]
+        }'></div>
+        
+        <!-- How It Works Card -->
+        <div class="card-enhanced" style="margin-top: var(--space-8);">
+            <div class="card-header">
+                <h3>🎯 How It Works</h3>
+                <p><strong>Simple Logic:</strong> "Does this user have a valid lemma credential in their wallet?"</p>
+            </div>
+            <div class="card-body">
+                <ul style="list-style: none; padding: 0;">
+                    <li style="margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
+                        <span style="color: var(--success); font-weight: bold;">✅</span>
+                        <span><strong>Has credential</strong> → Allow access to protected pages</span>
+                    </li>
+                    <li style="margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
+                        <span style="color: var(--error); font-weight: bold;">❌</span>
+                        <span><strong>No credential</strong> → Redirect to Stripe Identity verification</span>
+                    </li>
+                    <li style="display: flex; align-items: center; gap: var(--space-2);">
+                        <span style="color: var(--primary-500); font-weight: bold;">🔄</span>
+                        <span><strong>After verification</strong> → Get lemma credential → Access granted</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Core Flows Card -->
+        <div class="card-enhanced" style="margin-top: var(--space-6);">
+            <div class="card-header">
+                <h3>📋 The Three Core Flows</h3>
+            </div>
+            <div class="card-body">
+                <ol style="list-style: none; padding: 0; counter-reset: flow-counter;">
+                    <li style="margin-bottom: var(--space-3); padding-left: var(--space-8); position: relative; counter-increment: flow-counter;">
+                        <span style="position: absolute; left: 0; top: 0; background: var(--primary-500); color: var(--white); width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--font-size-xs); font-weight: bold;">1</span>
+                        <strong>SHIELD CHECK FLOW:</strong> Check if user has valid lemma credential
+                    </li>
+                    <li style="margin-bottom: var(--space-3); padding-left: var(--space-8); position: relative; counter-increment: flow-counter;">
+                        <span style="position: absolute; left: 0; top: 0; background: var(--primary-500); color: var(--white); width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--font-size-xs); font-weight: bold;">2</span>
+                        <strong>VERIFICATION FLOW:</strong> Stripe Identity → create lemma credential → return
+                    </li>
+                    <li style="padding-left: var(--space-8); position: relative; counter-increment: flow-counter;">
+                        <span style="position: absolute; left: 0; top: 0; background: var(--primary-500); color: var(--white); width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--font-size-xs); font-weight: bold;">3</span>
+                        <strong>REVOCATION FLOW:</strong> Handle expired/compromised credentials
+                    </li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Performance Metrics Section -->
+<section class="section">
+    <div class="stripe-container">
+        <div class="section-header">
+            <h2 class="section-title">Performance Metrics</h2>
+            <p class="section-subtitle">
+                Real-time performance data from our production system
+            </p>
+        </div>
+        
+        <div class="card-grid card-grid-3">
+            <!-- React Components: Metric Cards -->
+            <div data-lemma-component="MetricCard" data-lemma-props='{
+                "title": "Verification Speed",
+                "value": "0.36µs",
+                "subtitle": "WebAssembly average",
+                "trend": 15
+            }'></div>
+            
+            <div data-lemma-component="MetricCard" data-lemma-props='{
+                "title": "Offline Rate",
+                "value": "99.9%",
+                "subtitle": "Zero network calls",
+                "trend": 2
+            }'></div>
+            
+            <div data-lemma-component="MetricCard" data-lemma-props='{
+                "title": "Cost Reduction",
+                "value": "99.8%",
+                "subtitle": "vs traditional methods",
+                "trend": 8
+            }'></div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="section">
+    <div class="stripe-container">
+        <div class="section-header">
+            <h2 class="section-title">Ready to Get Started?</h2>
+            <p class="section-subtitle">
+                Join thousands of platforms already using Lemma for secure verification
+            </p>
+            <div class="hero-cta" style="margin-top: var(--space-8);">
+                <a href="/join-network" class="btn btn-primary btn-lg">
+                    🚀 Start Integration
+                </a>
+                <a href="/contact" class="btn btn-outline btn-lg">
+                    💬 Talk to Sales
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %} 

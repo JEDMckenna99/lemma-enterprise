@@ -1,0 +1,52 @@
+# Rust target directories - too large for Heroku
+target/
+lemma-crypto/target/
+*/target/
+
+# Rust build artifacts
+*.rlib
+*.so
+*.dll
+*.dylib
+
+# Python wheels (generated during build)
+wheels/
+*.whl
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Node modules if any
+node_modules/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.* 

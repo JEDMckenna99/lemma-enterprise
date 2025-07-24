@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Failed - Lemma Shield</title>
+    <meta name="description" content="Human verification failed. Please try again or contact support for assistance.">
+    
+    <!-- Favicon - Using Lemma logo -->
+    <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%23667eea'/><stop offset='100%' stop-color='%23764ba2'/></linearGradient></defs><g stroke='url(%23g)' stroke-width='6' fill='none' stroke-linecap='round'><ellipse cx='60' cy='60' rx='38' ry='14'/><ellipse cx='60' cy='60' rx='38' ry='14' transform='rotate(90 60 60)'/><ellipse cx='60' cy='60' rx='38' ry='14' transform='rotate(45 60 60)'/><ellipse cx='60' cy='60' rx='38' ry='14' transform='rotate(-45 60 60)'/></g></svg>">
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            max-width: 600px;
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        h1 {
+            color: #ef4444;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+        
+        .error-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            color: #b91c1c;
+        }
+        
+        .status-info {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-family: monospace;
+        }
+        
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: linear-gradient(45deg, #6366f1, #764ba2);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .button-secondary {
+            background: #6b7280;
+        }
+        
+        .help-text {
+            color: #6b7280;
+            font-size: 0.9em;
+            margin-top: 20px;
+        }
+        
+        .actions {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo-section">
+            <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" style="width: 48px; height: 48px; margin-bottom: 20px;">
+        </div>
+        <div class="error-icon">❌</div>
+        <h1>Verification Failed</h1>
+        
+        <div class="error-message">
+            <h3>Unable to verify your identity</h3>
+            <p>The Stripe Identity verification could not be completed successfully.</p>
+        </div>
+        
+        {% if status %}
+        <div class="status-info">
+            <strong>Status:</strong> {{ status }}
+        </div>
+        {% endif %}
+        
+        {% if error %}
+        <div class="status-info">
+            <strong>Error:</strong> {{ error }}
+        </div>
+        {% endif %}
+        
+        <div class="help-text">
+            <p><strong>What can you do?</strong></p>
+            <ul style="text-align: left; display: inline-block;">
+                <li>Try the verification process again</li>
+                <li>Ensure you have a valid government-issued ID</li>
+                <li>Check that your camera and microphone are working</li>
+                <li>Contact support if the issue persists</li>
+            </ul>
+        </div>
+        
+        <div class="actions">
+            <a href="/lemma/start-verification" class="button">Try Again</a>
+            <a href="/" class="button button-secondary">Go Home</a>
+        </div>
+    </div>
+</body>
+</html> 
