@@ -21,4 +21,6 @@ module-name = "lemma_crypto"
 python-source = "python"
 # Ensure compatibility with Heroku's Linux environment
 compatibility = "linux"
-strip = true 
+strip = true
+# Build with release profile for performance
+profile = "release" 

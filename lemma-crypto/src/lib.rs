@@ -115,7 +115,7 @@ pub type ClaimSet = HashMap<String, serde_json::Value>;
 pub type VerificationMetadata = HashMap<String, serde_json::Value>;
 
 #[cfg(feature = "python")]
-pub mod simple_python;
+pub mod python;
 
 #[cfg(feature = "wasm")]
 pub mod wasm;
