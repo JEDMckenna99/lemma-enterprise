@@ -1,0 +1,36 @@
+{
+  "source": {
+    "include": [
+      "src/",
+      "README.md"
+    ],
+    "includePattern": "\\.(js|ts)$",
+    "exclude": [
+      "node_modules/",
+      "dist/",
+      "build/",
+      "*.test.js",
+      "*.test.ts"
+    ]
+  },
+  "opts": {
+    "destination": "./docs/",
+    "recurse": true,
+    "readme": "./README.md"
+  },
+  "plugins": [
+    "plugins/markdown",
+    "plugins/typescript"
+  ],
+  "templates": {
+    "cleverLinks": false,
+    "monospaceLinks": false
+  },
+  "typescript": {
+    "moduleRoot": "src"
+  },
+  "metadata": {
+    "title": "Lemma Verification SDK Documentation",
+    "description": "Comprehensive documentation for the Lemma offline credential verification system"
+  }
+} 

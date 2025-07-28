@@ -1,0 +1,23 @@
+# Multi-stage Docker build for creating Linux wheels
+FROM rust:1.75 AS rust-builder
+
+# Install Python and maturin
+RUN apt-get update && apt-get install -y python3 python3-pip python3-dev
+RUN pip3 install maturin==1.4.0
+
+# Set working directory
+WORKDIR /app
+
+# Copy the Rust project
+COPY lemma-crypto/ lemma-crypto/
+
+# Build the wheel for Linux
+RUN cd lemma-crypto && maturin build --release --features python --target x86_64-unknown-linux-gnu
+
+# Create output directory and copy wheel
+RUN mkdir -p /wheels
+RUN cp lemma-crypto/target/wheels/*.whl /wheels/
+
+# Second stage to extract just the wheel
+FROM scratch AS output
+COPY --from=rust-builder /wheels /wheels 

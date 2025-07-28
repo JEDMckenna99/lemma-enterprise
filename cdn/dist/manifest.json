@@ -1,0 +1,89 @@
+{
+  "version": "1.0.0",
+  "timestamp": "2025-07-16T00:18:35.338Z",
+  "baseUrl": "https://cdn.lemma.id/",
+  "javascript": {
+    "lemma-auto": {
+      "original": {
+        "path": "js/lemma-auto.js",
+        "size": 20077
+      },
+      "minified": {
+        "path": "js/lemma-auto.min.js",
+        "size": 9880,
+        "integrity": "sha384-mA9qn2Wyz5npMOL8rAXcy5AjEiwX53wS0D/ovp6pnaHIWxnH2qtNSD4nCRORL7Nz",
+        "compression": {
+          "gzip": "js/lemma-auto.min.js.gz",
+          "brotli": "js/lemma-auto.min.js.br"
+        }
+      }
+    },
+    "lemma-verification-flow": {
+      "original": {
+        "path": "js/lemma-verification-flow.js",
+        "size": 33876
+      },
+      "minified": {
+        "path": "js/lemma-verification-flow.min.js",
+        "size": 22204,
+        "integrity": "sha384-hwOPaY4bxT5vKfcQ1pZXmvY0BcePUK4x0ugHj8aPuXoNnlYKnlnkRENVTx0Qmbeq",
+        "compression": {
+          "gzip": "js/lemma-verification-flow.min.js.gz",
+          "brotli": "js/lemma-verification-flow.min.js.br"
+        }
+      }
+    },
+    "lemma-shield-inline": {
+      "original": {
+        "path": "js/lemma-shield-inline.js",
+        "size": 36130
+      },
+      "minified": {
+        "path": "js/lemma-shield-inline.min.js",
+        "size": 21042,
+        "integrity": "sha384-O2NTJvJSlxcOu9J3Un+jEysTwbPwovQ6Ns3M+uYGHT50d9SHRx6LUlSi3KWPIdv+",
+        "compression": {
+          "gzip": "js/lemma-shield-inline.min.js.gz",
+          "brotli": "js/lemma-shield-inline.min.js.br"
+        }
+      }
+    }
+  },
+  "css": {
+    "lemma-styles": {
+      "original": {
+        "path": "css/lemma-styles.css",
+        "size": 15470
+      },
+      "minified": {
+        "path": "css/lemma-styles.min.css",
+        "size": 10579,
+        "integrity": "sha384-4zOov/DJXrM+nV1JZbf58opglmt1wZQxaAvLghxrqJJOnKbCf7EzeZMr6VC64xjZ",
+        "compression": {
+          "gzip": "css/lemma-styles.min.css.gz",
+          "brotli": "css/lemma-styles.min.css.br"
+        }
+      }
+    },
+    "stripe-design": {
+      "original": {
+        "path": "css/stripe-design.css",
+        "size": 14198
+      },
+      "minified": {
+        "path": "css/stripe-design.min.css",
+        "size": 10402,
+        "integrity": "sha384-pTh1T3HcMn4coUE64jq2CnJBlQwGELAsDCXjQ7Cvpwp4L4Z948kK9177H+5e67X5",
+        "compression": {
+          "gzip": "css/stripe-design.min.css.gz",
+          "brotli": "css/stripe-design.min.css.br"
+        }
+      }
+    }
+  },
+  "examples": {
+    "basicIntegration": "<!-- Basic Lemma Integration -->\n<script src=\"https://cdn.lemma.id/js/lemma-auto.min.js\" \n        integrity=\"sha384-mA9qn2Wyz5npMOL8rAXcy5AjEiwX53wS0D/ovp6pnaHIWxnH2qtNSD4nCRORL7Nz\"\n        crossorigin=\"anonymous\"></script>\n<div data-lemma-verify=\"auto\" \n     data-lemma-credential-type=\"identity\">\n  <p>Loading verification...</p>\n</div>",
+    "withCSS": "<!-- Lemma with Styling -->\n<link rel=\"stylesheet\" \n      href=\"https://cdn.lemma.id/css/lemma-styles.min.css\"\n      integrity=\"sha384-4zOov/DJXrM+nV1JZbf58opglmt1wZQxaAvLghxrqJJOnKbCf7EzeZMr6VC64xjZ\"\n      crossorigin=\"anonymous\">\n<script src=\"https://cdn.lemma.id/js/lemma-auto.min.js\" \n        integrity=\"sha384-mA9qn2Wyz5npMOL8rAXcy5AjEiwX53wS0D/ovp6pnaHIWxnH2qtNSD4nCRORL7Nz\"\n        crossorigin=\"anonymous\"></script>",
+    "selfHosted": "<!-- Self-hosted version -->\n<script src=\"/static/js/lemma-auto.min.js\"></script>\n<div data-lemma-verify=\"auto\" data-lemma-api-key=\"your-api-key\">\n  <!-- Your credential verification content -->\n</div>"
+  }
+}

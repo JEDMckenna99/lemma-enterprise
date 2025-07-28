@@ -1,0 +1,106 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": false,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    
+    // Path mapping for better imports
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/types": ["src/types"],
+      "@/utils": ["src/utils"],
+      "@/components": ["src/components"]
+    },
+    
+    // Declaration files
+    "declaration": true,
+    "declarationMap": true,
+    "declarationDir": "./dist",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    
+    // Strict type checking
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    
+    // Advanced options
+    "preserveWatchOutput": true,
+    "pretty": true,
+    "listEmittedFiles": false,
+    "listFiles": false,
+    
+    // Source maps for debugging
+    "sourceMap": true,
+    "inlineSourceMap": false,
+    "inlineSources": false,
+    
+    // Emit
+    "removeComments": false,
+    "preserveConstEnums": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": [
+    "src/**/*",
+    "examples/**/*",
+    "*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "docs",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "storybook-static"
+  ],
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  },
+  "typedocOptions": {
+    "entryPoints": ["src/index.ts", "src/lemma.d.ts"],
+    "out": "docs/typedoc",
+    "theme": "default",
+    "includeVersion": true,
+    "excludePrivate": true,
+    "excludeProtected": false,
+    "excludeExternals": true,
+    "readme": "README.md",
+    "name": "Lemma Verification SDK",
+    "includeHierarchy": true,
+    "categorizeByGroup": true,
+    "defaultCategory": "Other",
+    "categoryOrder": [
+      "Core",
+      "Types",
+      "Components",
+      "Utils",
+      "Error Handling",
+      "Other"
+    ]
+  }
+} 

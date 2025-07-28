@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Lemma DevTools Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #34495e;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+
+        .header .logo {
+            width: 24px;
+            height: 24px;
+            margin-right: 8px;
+            border-radius: 4px;
+            background: #3498db;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .header .controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+        }
+
+        .btn.danger {
+            background: #e74c3c;
+        }
+
+        .btn.danger:hover {
+            background: #c0392b;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .tabs {
+            display: flex;
+            background: #ecf0f1;
+            border-bottom: 1px solid #bdc3c7;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: white;
+            border-bottom-color: #3498db;
+            color: #3498db;
+        }
+
+        .tab:hover {
+            background: #d5dbdb;
+        }
+
+        .tab-content {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            background: white;
+        }
+
+        .tab-panel {
+            display: none;
+            height: 100%;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        .status-bar {
+            background: #34495e;
+            color: white;
+            padding: 8px 16px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #95a5a6;
+        }
+
+        .status-dot.active {
+            background: #2ecc71;
+        }
+
+        .status-dot.error {
+            background: #e74c3c;
+        }
+
+        .event-log {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 16px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+
+        .event-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #34495e;
+        }
+
+        .event-item:last-child {
+            border-bottom: none;
+        }
+
+        .event-timestamp {
+            color: #95a5a6;
+            margin-right: 8px;
+        }
+
+        .event-type {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .event-type.verification {
+            color: #3498db;
+        }
+
+        .event-type.error {
+            color: #e74c3c;
+        }
+
+        .event-type.sdk {
+            color: #2ecc71;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .metric-card {
+            background: #ecf0f1;
+            padding: 16px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+        }
+
+        .verification-list {
+            background: #ecf0f1;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .verification-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #bdc3c7;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .verification-item:last-child {
+            border-bottom: none;
+        }
+
+        .verification-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .verification-status.success {
+            color: #2ecc71;
+        }
+
+        .verification-status.error {
+            color: #e74c3c;
+        }
+
+        .verification-timing {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 11px;
+            color: #7f8c8d;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #95a5a6;
+        }
+
+        .settings-form {
+            max-width: 400px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <div class="logo">L</div>
+            Lemma DevTools
+        </h1>
+        <div class="controls">
+            <button class="btn" id="refresh-btn">Refresh</button>
+            <button class="btn danger" id="clear-btn">Clear</button>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="tabs">
+            <div class="tab active" data-tab="overview">Overview</div>
+            <div class="tab" data-tab="events">Events</div>
+            <div class="tab" data-tab="verifications">Verifications</div>
+            <div class="tab" data-tab="performance">Performance</div>
+            <div class="tab" data-tab="settings">Settings</div>
+        </div>
+
+        <div class="tab-content">
+            <!-- Overview Tab -->
+            <div class="tab-panel active" id="overview-panel">
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="total-verifications">0</div>
+                        <div class="metric-label">Total Verifications</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="success-rate">0%</div>
+                        <div class="metric-label">Success Rate</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="avg-time">0ms</div>
+                        <div class="metric-label">Average Time</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="error-count">0</div>
+                        <div class="metric-label">Errors</div>
+                    </div>
+                </div>
+
+                <h3>Recent Events</h3>
+                <div class="event-log" id="recent-events">
+                    <div class="no-data">No events yet. Start using Lemma to see debugging information.</div>
+                </div>
+            </div>
+
+            <!-- Events Tab -->
+            <div class="tab-panel" id="events-panel">
+                <h3>Event Log</h3>
+                <div class="event-log" id="all-events">
+                    <div class="no-data">No events recorded.</div>
+                </div>
+            </div>
+
+            <!-- Verifications Tab -->
+            <div class="tab-panel" id="verifications-panel">
+                <h3>Verification History</h3>
+                <div class="verification-list" id="verification-list">
+                    <div class="no-data">No verifications recorded.</div>
+                </div>
+            </div>
+
+            <!-- Performance Tab -->
+            <div class="tab-panel" id="performance-panel">
+                <h3>Performance Analysis</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="perf-total-time">0ms</div>
+                        <div class="metric-label">Total Time</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="perf-min-time">0ms</div>
+                        <div class="metric-label">Minimum Time</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="perf-max-time">0ms</div>
+                        <div class="metric-label">Maximum Time</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="perf-median-time">0ms</div>
+                        <div class="metric-label">Median Time</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div class="tab-panel" id="settings-panel">
+                <h3>DevTools Settings</h3>
+                <div class="settings-form">
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="debug-mode" checked>
+                            <label for="debug-mode" class="form-label">Enable Debug Mode</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="auto-refresh" checked>
+                            <label for="auto-refresh" class="form-label">Auto Refresh</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="refresh-interval" class="form-label">Refresh Interval (ms)</label>
+                        <input type="number" id="refresh-interval" class="form-control" value="1000" min="100">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-indicator">
+            <div class="status-dot" id="connection-status"></div>
+            <span id="connection-text">Disconnected</span>
+        </div>
+        <div class="status-indicator">
+            <span id="event-count">0 events</span>
+        </div>
+        <div class="status-indicator">
+            <span id="last-update">Never</span>
+        </div>
+    </div>
+
+    <script src="panel.js"></script>
+</body>
+</html> 

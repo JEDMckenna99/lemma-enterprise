@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma Browser Wallet Integration</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .wallet-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .wallet-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .wallet-status {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        
+        .credential-list {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        button:disabled {
+            background: gray;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .performance-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .metric {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4ecdc4;
+        }
+        
+        .log {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .success {
+            color: #4ecdc4;
+        }
+        
+        .error {
+            color: #ff6b6b;
+        }
+        
+        .info {
+            color: #45aaf2;
+        }
+    </style>
+</head>
+<body>
+    <div class="wallet-container">
+        <div class="wallet-header">
+            <h1>🦀 Lemma Crypto Wallet</h1>
+            <p>Rust-powered device wallet with microsecond verification</p>
+        </div>
+        
+        <div class="wallet-status" id="walletStatus">
+            <h3>📱 Wallet Status: <span id="status">Initializing...</span></h3>
+            <p>WebAssembly Engine: <span id="wasmStatus">Loading...</span></p>
+            <p>Credentials Stored: <span id="credentialCount">0</span></p>
+            <p>Last Verification: <span id="lastVerification">Never</span></p>
+        </div>
+        
+        <div class="performance-metrics">
+            <div class="metric">
+                <div class="metric-value" id="avgVerificationTime">-</div>
+                <div>Avg Verification (µs)</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="cacheHitRate">-</div>
+                <div>Cache Hit Rate (%)</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="offlineRate">-</div>
+                <div>Offline Rate (%)</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="totalVerifications">0</div>
+                <div>Total Verifications</div>
+            </div>
+        </div>
+        
+        <div>
+            <h3>🔧 Wallet Operations</h3>
+            <button onclick="initializeWallet()">Initialize Wallet</button>
+            <button onclick="createIdentityCredential()">Create Identity</button>
+            <button onclick="createAgeCredential()">Create Age Verification</button>
+            <button onclick="verifyCredentials()">Verify All Credentials</button>
+            <button onclick="performanceTest()">Performance Test</button>
+            <button onclick="clearWallet()">Clear Wallet</button>
+        </div>
+        
+        <div class="credential-list">
+            <h3>💾 Stored Credentials</h3>
+            <div id="credentialsList">No credentials stored</div>
+        </div>
+        
+        <div class="log" id="logOutput">
+            <div class="info">Lemma Crypto Wallet - Browser Integration</div>
+            <div class="info">Ready to initialize Rust-powered wallet...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        // This would be the actual WebAssembly module in production
+        // import init, { LemmaBotShield } from './pkg/lemma_crypto.js';
+        
+        // Simulated WebAssembly interface for demonstration
+        class LemmaWalletWASM {
+            constructor() {
+                this.credentials = new Map();
+                this.verificationCount = 0;
+                this.performanceMetrics = {
+                    avgVerificationTime: 0,
+                    cacheHitRate: 0,
+                    offlineRate: 99.9,
+                    totalVerifications: 0
+                };
+            }
+            
+            async initialize() {
+                // Simulate WASM initialization
+                await new Promise(resolve => setTimeout(resolve, 100));
+                this.log('✅ WebAssembly module initialized', 'success');
+                this.log('✅ Rust crypto engine loaded', 'success');
+                return true;
+            }
+            
+            async storeCredential(credentialData) {
+                const fingerprint = `cred_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                
+                // Simulate microsecond storage time
+                const startTime = performance.now();
+                await new Promise(resolve => setTimeout(resolve, 1)); // Simulate work
+                const endTime = performance.now();
+                const storageTimeUs = (endTime - startTime) * 1000; // Convert to microseconds
+                
+                this.credentials.set(fingerprint, {
+                    data: credentialData,
+                    fingerprint: fingerprint,
+                    storedAt: Date.now(),
+                    storageTime: storageTimeUs
+                });
+                
+                this.log(`💾 Stored credential: ${fingerprint} (${storageTimeUs.toFixed(2)}µs)`, 'success');
+                this.updateStatus();
+                
+                return fingerprint;
+            }
+            
+            async verifyCredentials() {
+                const startTime = performance.now();
+                
+                // Simulate verification
+                await new Promise(resolve => setTimeout(resolve, 1));
+                
+                const endTime = performance.now();
+                const verificationTimeUs = (endTime - startTime) * 1000;
+                
+                this.verificationCount++;
+                this.performanceMetrics.totalVerifications++;
+                this.performanceMetrics.avgVerificationTime = 
+                    (this.performanceMetrics.avgVerificationTime * (this.performanceMetrics.totalVerifications - 1) + verificationTimeUs) 
+                    / this.performanceMetrics.totalVerifications;
+                
+                // Simulate cache hit rate improvement over time
+                this.performanceMetrics.cacheHitRate = Math.min(99.8, this.performanceMetrics.totalVerifications * 2);
+                
+                this.log(`⚡ Verified ${this.credentials.size} credentials (${verificationTimeUs.toFixed(2)}µs)`, 'success');
+                this.updateMetrics();
+                this.updateStatus();
+                
+                return Array.from(this.credentials.values()).map(cred => ({
+                    fingerprint: cred.fingerprint,
+                    verified: true,
+                    verificationTime: verificationTimeUs
+                }));
+            }
+            
+            getCredentialCount() {
+                return this.credentials.size;
+            }
+            
+            clearCredentials() {
+                this.credentials.clear();
+                this.log('🗑️ Cleared all credentials', 'info');
+                this.updateStatus();
+            }
+            
+            log(message, type = 'info') {
+                const logOutput = document.getElementById('logOutput');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.className = type;
+                logEntry.textContent = `[${timestamp}] ${message}`;
+                logOutput.appendChild(logEntry);
+                logOutput.scrollTop = logOutput.scrollHeight;
+            }
+            
+            updateStatus() {
+                document.getElementById('credentialCount').textContent = this.credentials.size;
+                document.getElementById('lastVerification').textContent = 
+                    this.verificationCount > 0 ? new Date().toLocaleTimeString() : 'Never';
+                
+                // Update credentials list
+                const credentialsList = document.getElementById('credentialsList');
+                if (this.credentials.size === 0) {
+                    credentialsList.innerHTML = 'No credentials stored';
+                } else {
+                    credentialsList.innerHTML = Array.from(this.credentials.values())
+                        .map(cred => `
+                            <div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px;">
+                                <strong>🎫 ${cred.data.type}</strong><br>
+                                <small>Fingerprint: ${cred.fingerprint}</small><br>
+                                <small>Stored: ${new Date(cred.storedAt).toLocaleString()}</small><br>
+                                <small>Storage Time: ${cred.storageTime.toFixed(2)}µs</small>
+                            </div>
+                        `).join('');
+                }
+            }
+            
+            updateMetrics() {
+                document.getElementById('avgVerificationTime').textContent = 
+                    this.performanceMetrics.avgVerificationTime.toFixed(2);
+                document.getElementById('cacheHitRate').textContent = 
+                    this.performanceMetrics.cacheHitRate.toFixed(1);
+                document.getElementById('offlineRate').textContent = 
+                    this.performanceMetrics.offlineRate.toFixed(1);
+                document.getElementById('totalVerifications').textContent = 
+                    this.performanceMetrics.totalVerifications;
+            }
+        }
+        
+        // Global wallet instance
+        let lemmaWallet = null;
+        
+        // Initialize wallet
+        window.initializeWallet = async function() {
+            try {
+                document.getElementById('status').textContent = 'Initializing...';
+                document.getElementById('wasmStatus').textContent = 'Loading...';
+                
+                lemmaWallet = new LemmaWalletWASM();
+                const initialized = await lemmaWallet.initialize();
+                
+                if (initialized) {
+                    document.getElementById('status').textContent = 'Ready';
+                    document.getElementById('wasmStatus').textContent = 'Loaded';
+                    lemmaWallet.log('🦀 Lemma wallet initialized successfully!', 'success');
+                    lemmaWallet.updateMetrics();
+                }
+            } catch (error) {
+                lemmaWallet?.log(`❌ Initialization failed: ${error.message}`, 'error');
+                document.getElementById('status').textContent = 'Error';
+            }
+        };
+        
+        // Create identity credential
+        window.createIdentityCredential = async function() {
+            if (!lemmaWallet) {
+                alert('Please initialize wallet first');
+                return;
+            }
+            
+            try {
+                const credentialData = {
+                    type: 'Identity Verification',
+                    isHuman: true,
+                    verificationMethod: 'stripe_identity',
+                    deviceStored: true,
+                    timestamp: Date.now()
+                };
+                
+                await lemmaWallet.storeCredential(credentialData);
+            } catch (error) {
+                lemmaWallet.log(`❌ Failed to create identity credential: ${error.message}`, 'error');
+            }
+        };
+        
+        // Create age credential
+        window.createAgeCredential = async function() {
+            if (!lemmaWallet) {
+                alert('Please initialize wallet first');
+                return;
+            }
+            
+            try {
+                const credentialData = {
+                    type: 'Age Verification',
+                    ageVerified: true,
+                    ageRange: '18_plus',
+                    jurisdiction: 'US',
+                    timestamp: Date.now()
+                };
+                
+                await lemmaWallet.storeCredential(credentialData);
+            } catch (error) {
+                lemmaWallet.log(`❌ Failed to create age credential: ${error.message}`, 'error');
+            }
+        };
+        
+        // Verify all credentials
+        window.verifyCredentials = async function() {
+            if (!lemmaWallet) {
+                alert('Please initialize wallet first');
+                return;
+            }
+            
+            if (lemmaWallet.getCredentialCount() === 0) {
+                lemmaWallet.log('⚠️ No credentials to verify', 'info');
+                return;
+            }
+            
+            try {
+                const results = await lemmaWallet.verifyCredentials();
+                lemmaWallet.log(`✅ Verification complete: ${results.length} credentials verified`, 'success');
+            } catch (error) {
+                lemmaWallet.log(`❌ Verification failed: ${error.message}`, 'error');
+            }
+        };
+        
+        // Performance test
+        window.performanceTest = async function() {
+            if (!lemmaWallet) {
+                alert('Please initialize wallet first');
+                return;
+            }
+            
+            lemmaWallet.log('🚀 Starting performance test (100 verifications)...', 'info');
+            
+            try {
+                const iterations = 100;
+                let totalTime = 0;
+                
+                for (let i = 0; i < iterations; i++) {
+                    const startTime = performance.now();
+                    await lemmaWallet.verifyCredentials();
+                    const endTime = performance.now();
+                    totalTime += (endTime - startTime) * 1000; // Convert to microseconds
+                }
+                
+                const avgTime = totalTime / iterations;
+                lemmaWallet.log(`🎯 Performance test complete: ${avgTime.toFixed(2)}µs average`, 'success');
+                
+                if (avgTime < 1) {
+                    lemmaWallet.log('🚀 MICROSECOND PERFORMANCE ACHIEVED!', 'success');
+                } else if (avgTime < 10) {
+                    lemmaWallet.log('⚡ Excellent sub-10µs performance!', 'success');
+                }
+            } catch (error) {
+                lemmaWallet.log(`❌ Performance test failed: ${error.message}`, 'error');
+            }
+        };
+        
+        // Clear wallet
+        window.clearWallet = function() {
+            if (!lemmaWallet) {
+                alert('Please initialize wallet first');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to clear all credentials?')) {
+                lemmaWallet.clearCredentials();
+            }
+        };
+        
+        // Auto-initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                initializeWallet();
+            }, 500);
+        });
+    </script>
+</body>
+</html> 

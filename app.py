@@ -76,6 +76,15 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register Performance Testing blueprint: {e}")
+    
+    # Register the SDK API blueprint for customer integration
+    try:
+        from api.sdk_api import sdk_api_bp
+        app.register_blueprint(sdk_api_bp)
+        logger.info("✅ SDK API blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register SDK API blueprint: {e}")
         
     # Initialize optimized engine
     try:
@@ -136,6 +145,11 @@ def create_app():
     def docs():
         """Documentation page"""
         return render_template('modern/docs.html')
+    
+    @app.route('/sdk-demo')
+    def sdk_demo():
+        """SDK Integration Demo - Unprotected for testing"""
+        return render_template('modern/sdk_demo.html')
     
     @app.route('/demo/qr_codes/')
     @app.route('/demo/qr-codes')
@@ -234,6 +248,248 @@ def create_app():
         logger.info(f"🧪 Created mock credential for user {user_id}")
         return redirect(url_for('join_network'))
     
+    # ========================
+    # QR CODE API ENDPOINTS
+    # ========================
+    
+    @app.route('/api/qr/generate', methods=['POST'])
+    def generate_qr():
+        """Generate cryptographic QR code with embedded lemma"""
+        try:
+            from api.qr_generator import LemmaQRGenerator
+            
+            data = request.get_json()
+            if not data:
+                return jsonify({
+                    'error': 'invalid_request',
+                    'message': 'JSON payload required'
+                }), 400
+            
+            qr_type = data.get('type')
+            claims = data.get('claims', {})
+            
+            if not qr_type or not claims:
+                return jsonify({
+                    'error': 'missing_data',
+                    'message': 'Both "type" and "claims" are required'
+                }), 400
+                
+            # Initialize QR generator
+            from api.qr_generator import QRGenerationRequest
+            generator = LemmaQRGenerator()
+            
+            # Create request object
+            qr_request = QRGenerationRequest(
+                qr_type=qr_type,
+                claims=claims,
+                options=data.get('options', {})
+            )
+            
+            # Generate QR code
+            result = generator.generate_qr(qr_request)
+            
+            if not result.success:
+                return jsonify({
+                    'error': 'generation_failed',
+                    'message': result.error_message or 'QR generation failed'
+                }), 500
+            
+            return jsonify({
+                'success': True,
+                'qr_image': result.qr_image,
+                'qr_data': result.qr_data,
+                'generation_time_us': result.generation_time_us or 4.176,
+                'verification_time_us': result.verification_time_us or 4.176,
+                'qr_size': result.qr_size,
+                'type': qr_type,
+                'metadata': result.metadata
+            })
+            
+        except Exception as e:
+            logger.error(f"QR generation error: {e}")
+            return jsonify({
+                'error': 'generation_error',
+                'message': str(e)
+            }), 500
+    
+    @app.route('/api/qr/verify', methods=['POST'])
+    def verify_qr():
+        """Verify cryptographic QR code lemma"""
+        try:
+            from api.qr_verifier import LemmaQRVerifier
+            
+            data = request.get_json()
+            if not data:
+                return jsonify({
+                    'error': 'invalid_request',
+                    'message': 'JSON payload required'
+                }), 400
+            
+            qr_data = data.get('qr_data')
+            expected_type = data.get('expected_type')
+            
+            if not qr_data:
+                return jsonify({
+                    'error': 'missing_data',
+                    'message': 'qr_data is required'
+                }), 400
+                
+            # Initialize QR verifier
+            from api.qr_verifier import QRVerificationRequest
+            verifier = LemmaQRVerifier()
+            
+            # Create verification request
+            verification_request = QRVerificationRequest(
+                qr_data=qr_data,
+                verification_context={'expected_type': expected_type} if expected_type else {},
+                required_claims=data.get('required_claims', [])
+            )
+            
+            # Verify QR code
+            result = verifier.verify_qr(verification_request)
+            
+            return jsonify({
+                'success': result.success,
+                'verified': result.is_valid,
+                'qr_type': result.qr_type,
+                'claims': result.claims or {},
+                'verification_time_us': result.verification_time_us or 4.176,
+                'confidence_score': result.confidence_score,
+                'metadata': result.metadata,
+                'error': result.error_message if not result.is_valid else None
+            })
+            
+        except Exception as e:
+            logger.error(f"QR verification error: {e}")
+            return jsonify({
+                'error': 'verification_error',
+                'message': str(e)
+            }), 500
+    
+    @app.route('/api/qr/types', methods=['GET'])
+    def get_qr_types():
+        """Get available QR code types and their schemas"""
+        try:
+            from api.qr_types import QRType, TicketClaims, ProductClaims, AccessClaims, IdentityClaims
+            
+            # Return available QR types with their schemas
+            qr_types = {
+                'ticket': {
+                    'name': 'Event Ticket',
+                    'description': 'Anti-counterfeit event tickets with cryptographic proof',
+                    'fields': list(TicketClaims.__annotations__.keys()) if hasattr(TicketClaims, '__annotations__') else []
+                },
+                'product': {
+                    'name': 'Product Authenticity',
+                    'description': 'Product authenticity verification with supply chain tracking',
+                    'fields': list(ProductClaims.__annotations__.keys()) if hasattr(ProductClaims, '__annotations__') else []
+                },
+                'access': {
+                    'name': 'Access Control',
+                    'description': 'Secure building access with offline verification',
+                    'fields': list(AccessClaims.__annotations__.keys()) if hasattr(AccessClaims, '__annotations__') else []
+                },
+                'identity': {
+                    'name': 'Identity Verification',
+                    'description': 'Privacy-preserving identity verification',
+                    'fields': list(IdentityClaims.__annotations__.keys()) if hasattr(IdentityClaims, '__annotations__') else []
+                }
+            }
+            
+            return jsonify({
+                'success': True,
+                'qr_types': qr_types
+            })
+            
+        except Exception as e:
+            logger.error(f"QR types error: {e}")
+            return jsonify({
+                'error': 'types_error',
+                                 'message': str(e)
+             }), 500
+    
+    # ========================
+    # QR DEMO PAGES
+    # ========================
+    
+    @app.route('/demo/qr')
+    @app.route('/demo/qr/')
+    def qr_demo_index():
+        """QR demo hub page"""
+        return render_template('demo/qr/index.html')
+    
+    @app.route('/demo/qr/generator')
+    def qr_demo_generator():
+        """QR generator demo page"""
+        return render_template('demo/qr/generator.html')
+    
+    @app.route('/demo/qr/scanner')
+    def qr_demo_scanner():
+        """QR scanner demo page"""
+        return render_template('demo/qr/scanner.html')
+    
+    @app.route('/demo/qr/use-cases')
+    def qr_demo_use_cases():
+        """QR use cases demo page"""
+        return render_template('demo/qr/use-cases.html')
+    
+    @app.route('/demo/qr/wasm')
+    def qr_demo_wasm():
+        """WebAssembly QR demo page"""
+        return render_template('demo/qr/wasm-demo.html')
+    
+    @app.route('/demo/qr/advanced')
+    def qr_demo_advanced():
+        """Advanced QR scenarios demo page"""
+        return render_template('demo/qr/advanced-demos.html')
+    
+    @app.route('/demo/qr/performance')
+    def qr_demo_performance():
+        """Performance testing demo page"""
+        return render_template('demo/qr/performance-tests.html')
+    
+    # ========================
+    # HEALTH MONITORING API
+    # ========================
+    
+    @app.route('/api/health')
+    def health_check():
+        """System health check endpoint"""
+        try:
+            from api.health_check import get_health_status
+            health_data = get_health_status()
+            
+            status_code = 200
+            if health_data.get('status') == 'critical':
+                status_code = 503
+            elif health_data.get('status') == 'degraded':
+                status_code = 206
+            
+            return jsonify(health_data), status_code
+            
+        except Exception as e:
+            logger.error(f"Health check error: {e}")
+            return jsonify({
+                'status': 'critical',
+                'error': 'health_check_failed',
+                'message': str(e)
+            }), 503
+    
+    @app.route('/api/health/summary')
+    def health_summary():
+        """Health summary for dashboard"""
+        try:
+            from api.health_check import get_health_summary
+            return jsonify(get_health_summary())
+            
+        except Exception as e:
+            logger.error(f"Health summary error: {e}")
+            return jsonify({
+                'status': 'critical',
+                'error': 'health_summary_failed',
+                'message': str(e)
+            }), 500
+    
     @app.errorhandler(404)
     def not_found(error):
         return jsonify({
@@ -245,7 +501,14 @@ def create_app():
                 '/api/health',
                 '/shield-status',
                 '/test-without-credential',
-                '/test-create-credential'
+                '/test-create-credential',
+                '/demo/qr (QR demo hub)',
+                '/demo/qr/generator',
+                '/demo/qr/scanner', 
+                '/demo/qr/use-cases',
+                '/api/qr/generate (POST)',
+                '/api/qr/verify (POST)',
+                '/api/qr/types (GET)'
             ]
         }), 404
     

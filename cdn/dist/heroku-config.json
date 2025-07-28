@@ -1,0 +1,25 @@
+{
+  "static": {
+    "directories": [
+      {
+        "path": "/cdn/dist",
+        "headers": {
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+          "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept"
+        }
+      }
+    ]
+  },
+  "cdn": {
+    "baseUrl": "https://your-app.herokuapp.com/cdn/dist",
+    "compressionEnabled": true,
+    "cacheTtl": 31536000
+  },
+  "build": {
+    "commands": [
+      "cd cdn && node build.js"
+    ]
+  }
+}

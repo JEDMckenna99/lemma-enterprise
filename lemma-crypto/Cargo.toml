@@ -130,6 +130,8 @@ native = [
 ]
 python = ["pyo3", "pythonize", "native"]
 wasm = ["wasm-bindgen", "js-sys", "web-sys", "serde-wasm-bindgen"]
+wasm-qr = ["wasm", "qrcode_gen"]
+qr-verification = ["qrcode_gen"]
 benchmark = ["criterion", "native"]
 qrcode_gen = ["qrcode", "image"]
 hsm = ["pkcs11"]

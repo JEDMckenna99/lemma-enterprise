@@ -1,0 +1,6 @@
+{
+  "user_id": "rust_engine_test",
+  "action": "verify",
+  "client_available": false,
+  "fallback_reason": "client_timeout"
+} 
