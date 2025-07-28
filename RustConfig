@@ -1,13 +1,3 @@
 VERSION=stable
-
-# Build the lemma-crypto directory with Python bindings
 RUST_CARGO_BUILD_DIR=lemma-crypto
-RUST_CARGO_BUILD_FLAGS="--release"
-
-# Heroku-specific environment variables
-export CC=gcc
-export CXX=g++
-export RUSTFLAGS="-C linker=gcc -C target-cpu=generic"
-
-# Don't skip the build - let the Rust buildpack handle it
-RUST_SKIP_BUILD=0 
+RUST_CARGO_BUILD_FLAGS="--release" 

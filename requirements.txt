@@ -5,4 +5,5 @@ gunicorn==21.2.0
 maturin==1.4.0
 setuptools-rust==1.7.0
 
-# lemma-crypto will be built and installed by post_compile hook 
+# Install lemma-crypto directly from the subdirectory
+-e ./lemma-crypto 
