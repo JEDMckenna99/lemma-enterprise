@@ -369,19 +369,7 @@ lemma.protectElement('#protected-content');
             <p>✅ <strong>Real SDK</strong> • ✅ <strong>Real APIs</strong> • ✅ <strong>Real Stripe Identity</strong> • ✅ <strong>Real Performance</strong></p>
         </div>
 
-        <div class="api-monitor">
-            <h3>🔍 Real-Time API Monitoring</h3>
-            <p>Watch the production API calls in real-time as the SDK operates:</p>
-            <div id="api-log" class="api-log">
-                <div>🚀 Lemma SDK initializing...</div>
-                <div>📊 Production API calls will appear here</div>
-                <div>🔄 Starting identity network integration...</div>
-            </div>
-            <div id="shield-status" class="shield-status checking">
-                <span class="loading-spinner"></span>
-                <span>SDK initializing...</span>
-            </div>
-        </div>
+
 
         <div class="circuit-info">
             <h3>🔄 How the Identity Network Works (3 Automatic Flows)</h3>
@@ -436,193 +424,32 @@ lemma.protectElement('#protected-content');
                 </div>
             </div>
             
-            <div class="credential-details">
-                <h3>🎫 Your Identity Credentials</h3>
-                <div id="credential-display">
-                    <p>Loading credential details...</p>
-                </div>
-            </div>
+
         </div>
     </div>
 
-    <!-- Success banner -->
-    <div id="success-banner" class="success-banner">
-        <div>🎉 Identity verification complete - Welcome to the network!</div>
-    </div>
 
-    <!-- Load the actual production SDK that customers would use -->
-    <script src="{{ url_for('static', filename='js/lemma-sdk-customer.js') }}"></script>
+
+    <!-- Load the Simple Lemma Bot Shield -->
+    <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}"></script>
     
     <script>
         // === PRODUCTION CUSTOMER INTEGRATION EXAMPLE ===
         // This is the exact code your customers would copy and paste
         
-        console.log('🚀 Starting PRODUCTION Lemma SDK Integration Demo');
+        console.log('🚀 Simple Lemma Bot Shield Demo');
         
-        // API monitoring functions
-        function logApiCall(endpoint, method, data = null) {
-            const timestamp = new Date().toLocaleTimeString();
-            const logEntry = `[${timestamp}] ${method} ${endpoint}`;
-            const apiLog = document.getElementById('api-log');
-            
-            const logDiv = document.createElement('div');
-            logDiv.innerHTML = `📡 <strong>${logEntry}</strong>`;
-            if (data) {
-                logDiv.innerHTML += `<br>&nbsp;&nbsp;&nbsp;&nbsp;📤 ${JSON.stringify(data, null, 2)}`;
-            }
-            apiLog.appendChild(logDiv);
-            apiLog.scrollTop = apiLog.scrollHeight;
-        }
+        // === CUSTOMER INTEGRATION CODE (3 LINES) ===
+        // This is the exact code your customers would copy and paste
         
-        function logApiResponse(response, isError = false) {
-            const timestamp = new Date().toLocaleTimeString();
-            const apiLog = document.getElementById('api-log');
-            
-            const logDiv = document.createElement('div');
-            logDiv.innerHTML = `📥 <strong>[${timestamp}] Response</strong><br>&nbsp;&nbsp;&nbsp;&nbsp;${isError ? '❌' : '✅'} ${JSON.stringify(response, null, 2)}`;
-            logDiv.style.color = isError ? '#ef4444' : '#10b981';
-            apiLog.appendChild(logDiv);
-            apiLog.scrollTop = apiLog.scrollHeight;
-        }
-        
-        function updateShieldStatus(status, message) {
-            const statusElement = document.getElementById('shield-status');
-            const spinner = statusElement.querySelector('.loading-spinner');
-            
-            statusElement.className = `shield-status ${status}`;
-            statusElement.querySelector('span:last-child').textContent = message;
-            
-            if (status === 'verified' || status === 'error') {
-                spinner.style.display = 'none';
-            } else {
-                spinner.style.display = 'inline-block';
-            }
-        }
-        
-        function showSuccessBanner(message) {
-            const banner = document.getElementById('success-banner');
-            banner.innerHTML = `<div>${message}</div>`;
-            banner.classList.add('show');
-            
-            setTimeout(() => {
-                banner.classList.remove('show');
-            }, 5000);
-        }
-        
-        function displayCredentialDetails(credential) {
-            const display = document.getElementById('credential-display');
-            if (!credential) {
-                display.innerHTML = '<p>No credential details available</p>';
-                return;
-            }
-            
-            display.innerHTML = `
-                <div class="credential-item">
-                    <strong>🆔 Credential ID:</strong> ${credential.id}
-                </div>
-                <div class="credential-item">
-                    <strong>🏛️ Issuer:</strong> ${credential.issuer}
-                </div>
-                <div class="credential-item">
-                    <strong>✅ Human Verified:</strong> ${credential.claims?.isHuman ? 'Yes' : 'No'}
-                </div>
-                <div class="credential-item">
-                    <strong>🎯 Verification Level:</strong> ${credential.claims?.verificationLevel || 'Unknown'}
-                </div>
-                <div class="credential-item">
-                    <strong>🔐 Verification Method:</strong> ${credential.claims?.verificationMethod || 'Unknown'}
-                </div>
-                <div class="credential-item">
-                    <strong>⏰ Verified At:</strong> ${credential.claims?.verifiedAt ? new Date(credential.claims.verifiedAt * 1000).toLocaleString() : 'Unknown'}
-                </div>
-            `;
-        }
-        
-        // === CUSTOMER INTEGRATION CODE STARTS HERE ===
-        // Your customers would copy everything from this line down
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            updateShieldStatus('checking', 'Initializing Lemma SDK...');
-            
-            // Initialize the Production Lemma SDK
-            const lemma = new LemmaSDK({
-                apiKey: 'demo-integration-key-12345', // Customer would use their real API key
-                enableBotShield: true,
-                enableIdentityNetwork: true,
-                debug: true, // Customers would set this to false in production
-                
-                // Event callbacks
-                onInitialized: function() {
-                    console.log('✅ Lemma SDK initialized successfully');
-                    updateShieldStatus('checking', 'SDK ready - checking for credentials...');
-                },
-                
-                onCredentialCheck: function(result) {
-                    logApiCall('/api/sdk/check-credentials', 'POST', { 
-                        backgroundCheck: true,
-                        walletSync: true 
-                    });
-                    
-                    if (result.hasCredentials) {
-                        logApiResponse({
-                            hasCredentials: true,
-                            credentialCount: result.credentials.length,
-                            verificationMethod: result.method,
-                            performanceMs: result.timing?.total || 0
-                        });
-                        updateShieldStatus('verified', `Credentials found - ${result.method} verification`);
-                        displayCredentialDetails(result.credentials[0]);
-                    } else {
-                        logApiResponse({
-                            hasCredentials: false,
-                            reason: result.reason || 'No valid credentials found'
-                        });
-                        updateShieldStatus('checking', 'No credentials found - starting identity verification...');
-                    }
-                },
-                
-                onIdentityVerificationStart: function() {
-                    logApiCall('/api/sdk/start-identity-verification', 'POST', { 
-                        provider: 'stripe_identity',
-                        inline_mode: true 
-                    });
-                    updateShieldStatus('checking', 'Starting Stripe Identity KYC verification...');
-                },
-                
-                onIdentityVerificationComplete: function(result) {
-                    logApiResponse({
-                        verified: result.verified,
-                        credentialId: result.credential?.id,
-                        claims: result.credential?.claims,
-                        method: result.method,
-                        performanceUs: result.timing?.verificationUs
-                    });
-                    
-                    if (result.verified) {
-                        updateShieldStatus('verified', `Identity verification complete - ${result.timing?.verificationUs}µs`);
-                        showSuccessBanner('🎉 IDENTITY VERIFICATION COMPLETE - Welcome to the Lemma Network!');
-                        displayCredentialDetails(result.credential);
-                    } else {
-                        updateShieldStatus('error', 'Identity verification failed');
-                    }
-                },
-                
-                onError: function(error) {
-                    console.error('🛡️ Lemma SDK error:', error);
-                    logApiResponse({ error: error.message }, true);
-                    updateShieldStatus('error', `SDK error: ${error.message}`);
-                }
-            });
-            
-            // Protect the content element - this is what customers would do
-            lemma.protectElement('#protected-content');
-            
-            // Additional debugging for demo purposes
-            setTimeout(() => {
-                console.log('🔍 SDK State:', lemma.getState());
-                console.log('📊 Performance Metrics:', lemma.getPerformanceMetrics());
-            }, 1000);
+        // Line 1: Initialize the bot shield
+        const shield = new LemmaBotShield({ 
+            apiKey: 'demo-integration-key-12345', // Customer uses their real API key
+            debug: true 
         });
+        
+        // Line 2: Protect the content
+        shield.protect('#protected-content');
     </script>
 </body>
 </html> 

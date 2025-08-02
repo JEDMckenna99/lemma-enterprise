@@ -3,7 +3,6 @@ Lemma Rebuild - Real Lemma Shield Implementation
 Version 3.0.0 - Correct shield that checks for valid lemma credentials
 """
 import os
-import time
 import logging
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 
@@ -112,24 +111,24 @@ def create_app():
     
     @app.route('/join')  
     @app.route('/join-network')
+    @lemma_shield_required
     def join_network():
         """
-        UNPROTECTED DEMO ROUTE: Join the Lemma Network page
+        PROTECTED ROUTE: Join the Lemma Network page
         
-        This route demonstrates how customers would integrate the Lemma SDK.
-        It performs identity verification rather than requiring it.
+        This route is protected by the Lemma Shield.
+        Only users with valid lemma credentials can access this page.
         """
-        logger.info("🚀 Showing join network integration demo page")
+        logger.info("✅ User passed Lemma Shield - accessing join network page")
         
-        # Check if user is already verified (for display purposes)
+        # Get user's credential info for the page
         credential = session.get('lemma_credential', {})
-        user_id = session.get('user_id', f'demo_user_{int(time.time())}')
-        verified = session.get('verified_user', False)
+        user_id = session.get('user_id', 'Anonymous')
         
         return render_template('modern/join_network.html', 
                              credential=credential,
                              user_id=user_id,
-                             verified=verified)
+                             verified=True)
     
     # Missing route placeholders
     @app.route('/pricing')
