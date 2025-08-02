@@ -260,24 +260,20 @@ class LemmaSDK {
             console.log('🎫 Initializing Stripe Identity...', verificationSession);
         }
         
-        // Handle demo mode or force demo mode for stability
-        const shouldUseDemoMode = verificationSession.demo_mode || 
-                                 verificationSession.session_id.startsWith('vs_demo_') ||
-                                 window.location.hostname.includes('herokuapp.com'); // Force demo on Heroku for stability
-        
-        if (shouldUseDemoMode) {
+        // Handle demo mode only if explicitly set by server
+        if (verificationSession.demo_mode || verificationSession.session_id.startsWith('vs_demo_')) {
             await this.initializeDemoIdentityFlow(verificationSession, element);
             return;
         }
         
         try {
-            // Load Stripe Identity SDK
-            if (!window.StripeIdentity) {
+            // Load Stripe.js (main library, not separate Identity SDK)
+            if (!window.Stripe) {
                 await this.loadStripeIdentitySDK();
             }
             
-            // Create Stripe instance with publishable key (we'll need to get this from the server)
-            const stripe = window.Stripe('pk_test_TYooMQauvdEDq54NiTphI7jx'); // Demo publishable key
+            // Create Stripe instance with publishable key
+            const stripe = window.Stripe('pk_test_TYooMQauvdEDq54NiTphI7jx');
             
             // Get the verification element container
             const identityContainer = element.querySelector('.identity-verification-container');
@@ -285,45 +281,50 @@ class LemmaSDK {
                 throw new Error('Identity verification container not found');
             }
             
-            // Create and mount the verification element
+            if (this.config.debug) {
+                console.log('🎫 Creating Stripe Identity verification element...', {
+                    client_secret: verificationSession.client_secret.substring(0, 20) + '...'
+                });
+            }
+            
+            // Create elements instance
             const elements = stripe.elements({
                 clientSecret: verificationSession.client_secret
             });
             
-            const verificationElement = elements.create('identityVerification');
-            verificationElement.mount(identityContainer);
+            // Create identity verification element
+            const identityVerification = elements.create('identityVerification');
+            
+            // Mount the element
+            identityVerification.mount(identityContainer);
             
             if (this.config.debug) {
                 console.log('✅ Stripe Identity element mounted successfully');
             }
             
-            // Handle verification completion
-            verificationElement.on('ready', () => {
+            // Handle events
+            identityVerification.on('ready', () => {
                 if (this.config.debug) {
                     console.log('✅ Stripe Identity verification ready');
                 }
             });
             
-            verificationElement.on('change', (event) => {
+            identityVerification.on('complete', (event) => {
                 if (this.config.debug) {
-                    console.log('🔄 Stripe Identity status changed:', event);
+                    console.log('🎉 Stripe Identity verification completed!', event);
                 }
-                
-                if (event.complete) {
-                    // Verification completed
-                    this.handleIdentityVerificationComplete(verificationSession.session_id, element);
-                }
+                // Handle successful verification
+                this.handleIdentityVerificationComplete(verificationSession.session_id, element);
             });
             
-            verificationElement.on('error', (event) => {
+            identityVerification.on('error', (event) => {
                 console.error('❌ Stripe Identity error:', event.error);
                 this.config.onError(new Error(event.error.message || 'Stripe Identity verification failed'));
             });
             
         } catch (error) {
             console.error('❌ Failed to initialize Stripe Identity:', error);
-            // Fallback to demo mode if Stripe Identity fails
-            await this.initializeDemoIdentityFlow(verificationSession, element);
+            this.config.onError(new Error('Failed to initialize Stripe Identity: ' + error.message));
         }
     }
     
@@ -397,7 +398,8 @@ class LemmaSDK {
                 },
                 body: JSON.stringify({
                     session_id: sessionId,
-                    enable_rust_engine: true
+                    enable_rust_engine: true,
+                    demo_mode: false // Ensure we don't use demo mode
                 })
             });
             
@@ -534,34 +536,26 @@ class LemmaSDK {
     
     async loadStripeIdentitySDK() {
         return new Promise((resolve, reject) => {
-            // Check if Stripe Identity is already loaded
-            if (window.StripeIdentity) {
+            // Check if Stripe.js is already loaded
+            if (window.Stripe) {
                 resolve();
                 return;
             }
             
-            // First load the main Stripe.js if not loaded
-            if (!window.Stripe) {
-                const stripeScript = document.createElement('script');
-                stripeScript.src = 'https://js.stripe.com/v3/';
-                stripeScript.onload = () => {
-                    // After main Stripe loads, we can use Stripe Identity
-                    if (this.config.debug) {
-                        console.log('✅ Stripe.js loaded, Stripe Identity available');
-                    }
-                    window.StripeIdentity = window.Stripe; // Use main Stripe for Identity
-                    resolve();
-                };
-                stripeScript.onerror = (error) => {
-                    console.error('❌ Failed to load Stripe.js:', error);
-                    reject(error);
-                };
-                document.head.appendChild(stripeScript);
-            } else {
-                // Stripe already loaded
-                window.StripeIdentity = window.Stripe;
+            // Load the main Stripe.js library
+            const stripeScript = document.createElement('script');
+            stripeScript.src = 'https://js.stripe.com/v3/';
+            stripeScript.onload = () => {
+                if (this.config.debug) {
+                    console.log('✅ Stripe.js loaded successfully');
+                }
                 resolve();
-            }
+            };
+            stripeScript.onerror = (error) => {
+                console.error('❌ Failed to load Stripe.js:', error);
+                reject(error);
+            };
+            document.head.appendChild(stripeScript);
         });
     }
     
