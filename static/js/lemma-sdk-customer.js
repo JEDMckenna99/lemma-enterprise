@@ -554,23 +554,18 @@ class LemmaSDK {
                 return;
             }
             
-            // Load the main Stripe.js library with Identity support
+            // Load the main Stripe.js library (Identity is included)
             const stripeScript = document.createElement('script');
-            stripeScript.src = 'https://js.stripe.com/v3/identity/';
+            stripeScript.src = 'https://js.stripe.com/v3/';
             stripeScript.onload = () => {
                 if (this.config.debug) {
-                    console.log('✅ Stripe Identity SDK loaded successfully');
+                    console.log('✅ Stripe.js loaded successfully (Identity included)');
                 }
                 resolve();
             };
             stripeScript.onerror = (error) => {
-                console.error('❌ Failed to load Stripe Identity SDK:', error);
-                // Fallback to regular Stripe.js
-                const fallbackScript = document.createElement('script');
-                fallbackScript.src = 'https://js.stripe.com/v3/';
-                fallbackScript.onload = resolve;
-                fallbackScript.onerror = reject;
-                document.head.appendChild(fallbackScript);
+                console.error('❌ Failed to load Stripe.js:', error);
+                reject(error);
             };
             document.head.appendChild(stripeScript);
         });
