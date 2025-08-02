@@ -272,8 +272,8 @@ class LemmaSDK {
                 await this.loadStripeIdentitySDK();
             }
             
-            // Create Stripe instance with publishable key
-            const stripe = window.Stripe('pk_test_TYooMQauvdEDq54NiTphI7jx');
+            // Create Stripe instance with matching publishable key from server
+            const stripe = window.Stripe('pk_test_51RJNLBDIouMeOMab56ZoLLf7qyXOfw2dWq8dDnhihzcc9hOHhw2xqyvzEUXbfZDsYyAnZNa5ADkycRpqUvDzMr3G00CgiM8efu');
             
             // Get the verification element container
             const identityContainer = element.querySelector('.identity-verification-container');
