@@ -113,12 +113,12 @@ def test_performance():
             'expires_at': int(time.time()) + 3600
         }
         
-        # Perform test verification
-        start_time = time.time_ns()
+        # Perform test verification with high-precision timing
+        start_time = time.perf_counter_ns()
         result = rust_engine.verify_credential(json.dumps(test_credential))
-        end_time = time.time_ns()
+        end_time = time.perf_counter_ns()
         
-        verification_time_us = (end_time - start_time) / 1000
+        verification_time_us = (end_time - start_time) / 1000  # Convert nanoseconds to microseconds
         
         if verification_time_us < 10:  # Target: <10µs for optimal performance
             logger.info(f"✅ Rust engine performance test: {verification_time_us:.1f}µs (EXCELLENT)")
@@ -227,20 +227,27 @@ def has_valid_lemma_credential(user_id: str = None) -> Dict[str, Any]:
             if RUST_ENGINE_AVAILABLE and rust_engine:
                 try:
                     credential_json = json.dumps(credential)
+                    
+                    # Measure ONLY the Rust engine verification time with high precision
+                    rust_start_time = time.perf_counter_ns()
                     result = rust_engine.verify_credential(credential_json)
+                    rust_end_time = time.perf_counter_ns()
                     rust_engine_used = True
                     
-                    verification_time = time.time_ns() - start_time
+                    # Calculate actual Rust engine verification time in microseconds
+                    rust_verification_time_us = (rust_end_time - rust_start_time) / 1000
+                    total_function_time = time.time_ns() - start_time
                     
                     if result.verified:
-                        logger.info(f"✅ Background wallet: Found valid isHuman credential - {verification_time/1000:.1f}µs")
+                        logger.info(f"✅ Background wallet: Found valid isHuman credential - {rust_verification_time_us:.1f}µs (Rust engine) | Total: {total_function_time/1000000:.1f}ms")
                         
                         return {
                             'has_credential': True,
                             'credential': credential,
                             'reason': 'valid_identity_network_credential',
-                            'verification_time_ns': verification_time,
-                            'verification_time_us': result.verification_time_ns / 1000,
+                            'verification_time_ns': rust_end_time - rust_start_time,
+                            'verification_time_us': rust_verification_time_us,
+                            'total_function_time_ns': total_function_time,
                             'background_wallet_hit': True,
                             'rust_engine_used': True,
                             'confidence': result.confidence if hasattr(result, 'confidence') else 0.95,
