@@ -350,7 +350,7 @@
             <p>This is the exact code your customers would use to integrate Lemma Identity Network:</p>
             <div class="code-block">
 <span class="comment">// Step 1: Include the Lemma SDK</span>
-&lt;script src="https://cdn.lemma.id/sdk/lemma-sdk.min.js"&gt;&lt;/script&gt;
+&lt;script src="{{ url_for('static', filename='js/lemma-sdk-customer.js') }}"&gt;&lt;/script&gt;
 
 <span class="comment">// Step 2: Initialize with API key</span>
 const lemma = new LemmaSDK({ 

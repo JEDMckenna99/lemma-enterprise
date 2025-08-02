@@ -260,6 +260,12 @@ class LemmaSDK {
             console.log('🎫 Initializing Stripe Identity...', verificationSession);
         }
         
+        // Handle demo mode
+        if (verificationSession.demo_mode || verificationSession.session_id.startsWith('vs_demo_')) {
+            await this.initializeDemoIdentityFlow(verificationSession, element);
+            return;
+        }
+        
         // Load Stripe Identity SDK
         if (!window.StripeIdentity) {
             await this.loadStripeIdentitySDK();
@@ -282,6 +288,59 @@ class LemmaSDK {
                 console.error('Stripe Identity error:', event.error);
                 this.config.onError(new Error(event.error.message));
             });
+        }
+    }
+    
+    async initializeDemoIdentityFlow(verificationSession, element) {
+        if (this.config.debug) {
+            console.log('🎭 Initializing DEMO identity verification flow...');
+        }
+        
+        const identityContainer = element.querySelector('.identity-verification-container');
+        if (identityContainer) {
+            // Create demo verification UI
+            identityContainer.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #1e293b;">
+                    <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 0.5rem 0;">🎭 DEMO MODE: Identity Verification</h4>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">This is a demo simulation of Stripe Identity KYC verification</p>
+                    </div>
+                    <div style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 2rem; margin: 1rem 0;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
+                        <p style="color: #64748b; margin: 0 0 1rem 0;">In production, users would upload their government ID and take a selfie</p>
+                        <button id="demo-verify-btn" style="
+                            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+                            color: white;
+                            border: none;
+                            padding: 0.75rem 2rem;
+                            border-radius: 6px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            font-size: 1rem;
+                        ">Complete Demo Verification</button>
+                    </div>
+                    <div style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">
+                        <p><strong>Demo Features:</strong></p>
+                        <p>✅ Document verification • ✅ Liveness detection • ✅ Identity matching</p>
+                        <p>✅ KYC compliance • ✅ Microsecond verification • ✅ Rust-powered credentials</p>
+                    </div>
+                </div>
+            `;
+            
+            // Handle demo verification button click
+            const demoBtn = identityContainer.querySelector('#demo-verify-btn');
+            if (demoBtn) {
+                demoBtn.addEventListener('click', async () => {
+                    demoBtn.textContent = 'Processing...';
+                    demoBtn.style.opacity = '0.7';
+                    demoBtn.disabled = true;
+                    
+                    // Simulate verification delay
+                    setTimeout(async () => {
+                        await this.handleIdentityVerificationComplete(verificationSession.session_id, element);
+                    }, 2000);
+                });
+            }
         }
     }
     
