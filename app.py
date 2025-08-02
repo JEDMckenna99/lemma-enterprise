@@ -111,15 +111,14 @@ def create_app():
     
     @app.route('/join')  
     @app.route('/join-network')
-    @lemma_shield_required
     def join_network():
         """
-        PROTECTED ROUTE: Join the Lemma Network page
+        Join the Lemma Network page - Bot Shield Integration Demo
         
-        This route is protected by the Lemma Shield.
-        Only users with valid lemma credentials can access this page.
+        This route serves the page that demonstrates the JavaScript bot shield.
+        The bot shield will check for credentials and handle verification flow.
         """
-        logger.info("✅ User passed Lemma Shield - accessing join network page")
+        logger.info("📄 Serving join network page with bot shield integration")
         
         # Get user's credential info for the page
         credential = session.get('lemma_credential', {})
@@ -128,7 +127,7 @@ def create_app():
         return render_template('modern/join_network.html', 
                              credential=credential,
                              user_id=user_id,
-                             verified=True)
+                             verified=False)  # Bot shield will handle verification
     
     # Missing route placeholders
     @app.route('/pricing')
