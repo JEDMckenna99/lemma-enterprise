@@ -283,7 +283,10 @@ class LemmaSDK {
             
             if (this.config.debug) {
                 console.log('🎫 Creating Stripe Identity verification element...', {
-                    client_secret: verificationSession.client_secret.substring(0, 20) + '...'
+                    client_secret: verificationSession.client_secret.substring(0, 20) + '...',
+                    full_client_secret: verificationSession.client_secret,
+                    client_secret_length: verificationSession.client_secret.length,
+                    client_secret_ends_with: verificationSession.client_secret.slice(-10)
                 });
             }
             

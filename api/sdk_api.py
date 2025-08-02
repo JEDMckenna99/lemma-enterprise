@@ -214,10 +214,14 @@ def start_identity_verification():
             'started_at': time.time()
         }
         
+        # Debug: Check client_secret format before sending
+        client_secret = session_result['client_secret']
+        logger.info(f"🔍 Sending client_secret to frontend: {client_secret[:20]}... (length: {len(client_secret)})")
+        
         return jsonify({
             'success': True,
             'session_id': session_result['session_id'],
-            'client_secret': session_result['client_secret'],
+            'client_secret': client_secret,
             'url': session_result['url'],
             'user_id': user_id,
             'provider': provider,
