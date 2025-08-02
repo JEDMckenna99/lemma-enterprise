@@ -336,6 +336,14 @@ class LemmaSDK {
             
         } catch (error) {
             console.error('❌ Failed to initialize Stripe Identity:', error);
+            
+            // Fallback: If inline mode fails, redirect to full Stripe Identity page
+            if (verificationSession.url) {
+                console.log('🔄 Inline mode failed, redirecting to full Stripe Identity verification...');
+                window.location.href = verificationSession.url;
+                return;
+            }
+            
             this.config.onError(new Error('Failed to initialize Stripe Identity: ' + error.message));
         }
     }
