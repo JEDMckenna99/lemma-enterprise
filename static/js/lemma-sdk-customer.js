@@ -281,18 +281,24 @@ class LemmaSDK {
                 throw new Error('Identity verification container not found');
             }
             
+            // Clean up client_secret - remove any trailing periods or whitespace
+            const cleanClientSecret = verificationSession.client_secret.trim().replace(/\.$/, '');
+            
             if (this.config.debug) {
                 console.log('🎫 Creating Stripe Identity verification element...', {
                     client_secret: verificationSession.client_secret.substring(0, 20) + '...',
-                    full_client_secret: verificationSession.client_secret,
-                    client_secret_length: verificationSession.client_secret.length,
-                    client_secret_ends_with: verificationSession.client_secret.slice(-10)
+                    original_client_secret: verificationSession.client_secret,
+                    cleaned_client_secret: cleanClientSecret,
+                    original_length: verificationSession.client_secret.length,
+                    cleaned_length: cleanClientSecret.length,
+                    client_secret_ends_with: verificationSession.client_secret.slice(-10),
+                    cleaned_ends_with: cleanClientSecret.slice(-10)
                 });
             }
             
-            // Create elements instance
+            // Create elements instance with cleaned client secret
             const elements = stripe.elements({
-                clientSecret: verificationSession.client_secret
+                clientSecret: cleanClientSecret
             });
             
             // Create identity verification element
