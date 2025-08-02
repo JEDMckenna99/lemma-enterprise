@@ -229,7 +229,7 @@ class LemmaBotShield {
                     'Authorization': `Bearer ${this.config.apiKey}`
                 },
                 body: JSON.stringify({
-                    provider: 'stripe',
+                    provider: 'stripe_identity',
                     inline_mode: false, // Use redirect mode (which works!)
                     return_url: window.location.href
                 })
