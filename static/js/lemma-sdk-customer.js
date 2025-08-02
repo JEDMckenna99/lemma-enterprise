@@ -296,13 +296,16 @@ class LemmaSDK {
                 });
             }
             
-            // Create elements instance with cleaned client secret
-            const elements = stripe.elements({
-                clientSecret: cleanClientSecret
+            // Use the standard Stripe Identity Elements pattern
+            const stripe_elements = stripe.elements({
+                clientSecret: cleanClientSecret,
+                appearance: {
+                    theme: 'stripe'
+                }
             });
             
-            // Create identity verification element
-            const identityVerification = elements.create('identityVerification');
+            // Create identity verification element  
+            const identityVerification = stripe_elements.create('identityVerification');
             
             // Mount the element
             identityVerification.mount(identityContainer);
@@ -551,18 +554,23 @@ class LemmaSDK {
                 return;
             }
             
-            // Load the main Stripe.js library
+            // Load the main Stripe.js library with Identity support
             const stripeScript = document.createElement('script');
-            stripeScript.src = 'https://js.stripe.com/v3/';
+            stripeScript.src = 'https://js.stripe.com/v3/identity/';
             stripeScript.onload = () => {
                 if (this.config.debug) {
-                    console.log('✅ Stripe.js loaded successfully');
+                    console.log('✅ Stripe Identity SDK loaded successfully');
                 }
                 resolve();
             };
             stripeScript.onerror = (error) => {
-                console.error('❌ Failed to load Stripe.js:', error);
-                reject(error);
+                console.error('❌ Failed to load Stripe Identity SDK:', error);
+                // Fallback to regular Stripe.js
+                const fallbackScript = document.createElement('script');
+                fallbackScript.src = 'https://js.stripe.com/v3/';
+                fallbackScript.onload = resolve;
+                fallbackScript.onerror = reject;
+                document.head.appendChild(fallbackScript);
             };
             document.head.appendChild(stripeScript);
         });
