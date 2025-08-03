@@ -157,19 +157,30 @@ class StripeManager:
             # Add verification report if available
             if session.last_verification_report:
                 report = session.last_verification_report
-                verification_data['verification_report'] = {
-                    'id': report.id,
-                    'type': report.type,
-                    'status': report.status,
-                    'created': report.created
-                }
                 
-                # Add document details if available
-                if hasattr(report, 'document') and report.document:
-                    verification_data['document'] = {
-                        'status': report.document.status,
-                        'type': report.document.type
+                # Handle case where report is just a string ID vs full object
+                if isinstance(report, str):
+                    # If it's just an ID string, retrieve the full report
+                    try:
+                        report = stripe.identity.VerificationReport.retrieve(report)
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not retrieve verification report {report}: {e}")
+                        report = None
+                
+                if report and hasattr(report, 'id'):
+                    verification_data['verification_report'] = {
+                        'id': report.id,
+                        'type': getattr(report, 'type', 'unknown'),
+                        'status': getattr(report, 'status', 'unknown'),
+                        'created': getattr(report, 'created', None)
                     }
+                    
+                    # Add document details if available
+                    if hasattr(report, 'document') and report.document:
+                        verification_data['document'] = {
+                            'status': getattr(report.document, 'status', 'unknown'),
+                            'type': getattr(report.document, 'type', 'unknown')
+                        }
             
             logger.info(f"✅ Retrieved Stripe Identity session {session_id} with status {session.status}")
             
