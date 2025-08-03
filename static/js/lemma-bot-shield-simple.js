@@ -48,6 +48,13 @@ class LemmaBotShield {
             console.log('🛡️ Protecting element:', elementSelector);
         }
         
+        // Check if returning from Stripe verification
+        const stripeReturn = this.checkStripeReturn();
+        if (stripeReturn) {
+            await this.handleStripeReturn(stripeReturn);
+            return;
+        }
+        
         // Check for existing lemma in background
         const hasLemma = await this.checkForExistingLemma();
         
@@ -57,6 +64,82 @@ class LemmaBotShield {
         } else {
             // User needs lemma - show verification widget
             this.showVerificationWidget(element);
+        }
+    }
+    
+    /**
+     * Check if user is returning from Stripe Identity verification
+     */
+    checkStripeReturn() {
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Stripe Identity returns with 'session' parameter containing the session ID
+        const sessionId = urlParams.get('session');
+        
+        if (sessionId) {
+            if (this.config.debug) {
+                console.log('🔄 Detected Stripe verification return:', { sessionId });
+            }
+            return { sessionId };
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Handle return from Stripe Identity verification
+     */
+    async handleStripeReturn(stripeReturn) {
+        try {
+            if (this.config.debug) {
+                console.log('🎉 Processing Stripe verification completion...');
+            }
+            
+            // Complete the identity verification (this creates and stores the lemma)
+            const response = await fetch(`${this.config.apiBase}/api/sdk/complete-identity-verification`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.config.apiKey}`
+                },
+                body: JSON.stringify({
+                    session_id: stripeReturn.sessionId,
+                    enable_rust_engine: true
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.verified) {
+                if (this.config.debug) {
+                    console.log('✅ Lemma credential created and stored!', {
+                        credential_id: result.credential?.id,
+                        verification_time_us: result.verification_time_us
+                    });
+                }
+                
+                // Clean up URL parameters
+                const cleanUrl = window.location.origin + window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+                
+                // Show protected content
+                const element = document.querySelector('#main-protected-content');
+                if (element) {
+                    this.showProtectedContent(element);
+                }
+                
+            } else {
+                throw new Error(result.message || 'Credential creation failed');
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to complete verification:', error);
+            
+            // Show verification widget as fallback
+            const element = document.querySelector('#main-protected-content');
+            if (element) {
+                this.showVerificationWidget(element);
+            }
         }
     }
     
