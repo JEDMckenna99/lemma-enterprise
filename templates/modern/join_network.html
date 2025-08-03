@@ -431,16 +431,38 @@
                     <div class="benefit-description">Verify once, access everywhere with seamless bot shield</div>
                 </div>
             </div>
+
+            <!-- REVOCATION CONTROLS -->
+            <div class="revocation-section" style="margin-top: 40px; padding: 20px; border: 2px solid #ffc107; border-radius: 8px; background: #fffbf0;">
+                <h4 style="color: #856404; margin-bottom: 15px;">
+                    <i class="fas fa-exclamation-triangle"></i> Network Revocation
+                </h4>
+                <p style="color: #856404; margin-bottom: 20px; font-size: 14px;">
+                    <strong>OPRF + Bloom Filter Cryptographic Revocation:</strong><br>
+                    Instantly invalidate your lemma across the entire federated network using privacy-preserving cryptographic revocation. 
+                    Your credential will be marked invalid in the distributed bloom filter, enabling offline revocation checking.
+                </p>
+                
+                <button id="revoke-lemma-btn" class="btn btn-danger" style="margin-right: 10px;">
+                    <i class="fas fa-ban"></i> Revoke My Lemma
+                </button>
+                
+                <button id="clear-wallet-btn" class="btn btn-warning">
+                    <i class="fas fa-trash"></i> Clear Wallet Only
+                </button>
+                
+                <div id="revocation-status" class="mt-3" style="display: none;"></div>
+            </div>
         </div> <!-- End of success-content -->
     </div>
 
 
 
             <!-- Load Federated Wallet for Cross-Tab Persistence -->
-        <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=1754257000"></script>
+        <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=1754258000"></script>
     
     <!-- Load the Simple Lemma Bot Shield -->
-    <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}?v=1754257000"></script>
+    <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}?v=1754258000"></script>
     
     <script>
         // === PRODUCTION CUSTOMER INTEGRATION EXAMPLE ===
@@ -476,6 +498,138 @@
         
         // Line 2: Protect the main page content (real customer integration)
         shield.protect('#main-protected-content');
+
+        // === REVOCATION CONTROLS ===
+        // Handle revocation button clicks
+        document.addEventListener('DOMContentLoaded', function() {
+            const revokeBtn = document.getElementById('revoke-lemma-btn');
+            const clearWalletBtn = document.getElementById('clear-wallet-btn');
+            const revocationStatus = document.getElementById('revocation-status');
+
+            if (revokeBtn) {
+                revokeBtn.addEventListener('click', async function() {
+                    console.log('🚨 Starting OPRF + Bloom Filter revocation...');
+                    
+                    // Confirm revocation
+                    if (!confirm('⚠️ NETWORK REVOCATION\n\nThis will instantly invalidate your lemma across the entire Lemma network using cryptographic revocation (OPRF + Bloom Filter).\n\nYou will need to re-verify to access any Lemma-protected sites.\n\nContinue?')) {
+                        return;
+                    }
+
+                    revokeBtn.disabled = true;
+                    revokeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Revoking...';
+                    
+                    revocationStatus.style.display = 'block';
+                    revocationStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-cog fa-spin"></i> Performing cryptographic revocation...</div>';
+
+                    try {
+                        // Step 1: Get current credentials for revocation
+                        const credentials = await shield.backgroundWallet.getCredentials('identity');
+                        
+                        if (credentials.length === 0) {
+                            throw new Error('No credentials found to revoke');
+                        }
+
+                        // Step 2: Call revocation API (OPRF + Bloom Filter)
+                        const response = await fetch('/api/sdk/revoke-credential', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer demo-integration-key-12345'
+                            },
+                            body: JSON.stringify({
+                                credentials: credentials,
+                                revocationType: 'oprf_bloom_filter',
+                                reason: 'user_requested'
+                            })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`Revocation API failed: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+
+                        // Step 3: Clear local wallet
+                        await shield.backgroundWallet.clearAll();
+
+                        // Step 4: Show success and reload shield
+                        revocationStatus.innerHTML = `
+                            <div class="alert alert-success">
+                                <h6><i class="fas fa-check-circle"></i> Revocation Complete!</h6>
+                                <p class="mb-2"><strong>OPRF Evaluation:</strong> ${result.oprf_time_us || 'N/A'}µs</p>
+                                <p class="mb-2"><strong>Bloom Filter Update:</strong> ${result.bloom_update_time_us || 'N/A'}µs</p>
+                                <p class="mb-0"><strong>Network Propagation:</strong> Instant (distributed bloom filter)</p>
+                            </div>
+                        `;
+
+                        // Step 5: Kick user out of network (reload page to show shield)
+                        setTimeout(() => {
+                            location.reload();
+                        }, 3000);
+
+                    } catch (error) {
+                        console.error('❌ Revocation failed:', error);
+                        revocationStatus.innerHTML = `
+                            <div class="alert alert-danger">
+                                <h6><i class="fas fa-exclamation-triangle"></i> Revocation Failed</h6>
+                                <p class="mb-0">Error: ${error.message}</p>
+                                <p class="mb-0 small mt-2">Clearing local wallet only...</p>
+                            </div>
+                        `;
+
+                        // Fallback: clear local wallet anyway
+                        await shield.backgroundWallet.clearAll();
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                    }
+
+                    revokeBtn.disabled = false;
+                    revokeBtn.innerHTML = '<i class="fas fa-ban"></i> Revoke My Lemma';
+                });
+            }
+
+            if (clearWalletBtn) {
+                clearWalletBtn.addEventListener('click', async function() {
+                    console.log('🗑️ Clearing wallet only (no network revocation)...');
+                    
+                    if (!confirm('Clear wallet only?\n\nThis will remove your lemma from this device but NOT revoke it from the network.\n\nOther devices may still have access.\n\nContinue?')) {
+                        return;
+                    }
+
+                    clearWalletBtn.disabled = true;
+                    clearWalletBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Clearing...';
+
+                    try {
+                        await shield.backgroundWallet.clearAll();
+                        
+                        revocationStatus.style.display = 'block';
+                        revocationStatus.innerHTML = `
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-info-circle"></i> Wallet Cleared</h6>
+                                <p class="mb-0">Local credentials removed. Network credentials still valid on other devices.</p>
+                            </div>
+                        `;
+
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+
+                    } catch (error) {
+                        console.error('❌ Wallet clear failed:', error);
+                        revocationStatus.innerHTML = `
+                            <div class="alert alert-danger">
+                                <h6><i class="fas fa-exclamation-triangle"></i> Clear Failed</h6>
+                                <p class="mb-0">Error: ${error.message}</p>
+                            </div>
+                        `;
+                    }
+
+                    clearWalletBtn.disabled = false;
+                    clearWalletBtn.innerHTML = '<i class="fas fa-trash"></i> Clear Wallet Only';
+                });
+            }
+        });
     </script>
 </body>
 </html> 
