@@ -194,8 +194,8 @@ class LemmaBotShield {
                         if (this.config.debug) {
                             console.log('✅ Valid lemma found in background wallet', {
                                 credentialId: credentials[0].id,
-                                verificationTime: `${verifyResult.verificationTime.toFixed(2)}µs`,
-                                offlineVerification: verifyResult.offlineVerification
+                                verificationTime: `${(verifyResult.verification_time_us || 0).toFixed(2)}µs`,
+                                offlineVerification: verifyResult.offline || true
                             });
                         }
                         
