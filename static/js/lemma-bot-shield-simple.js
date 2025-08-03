@@ -73,14 +73,14 @@ class LemmaBotShield {
     checkStripeReturn() {
         const urlParams = new URLSearchParams(window.location.search);
         
-        // Stripe Identity returns with 'session' parameter containing the session ID
-        const sessionId = urlParams.get('session');
+        // Look for our custom verification_return parameter
+        const verificationReturn = urlParams.get('verification_return');
         
-        if (sessionId) {
+        if (verificationReturn === 'true') {
             if (this.config.debug) {
-                console.log('🔄 Detected Stripe verification return:', { sessionId });
+                console.log('🔄 Detected Stripe verification return');
             }
-            return { sessionId };
+            return { verificationReturn: true };
         }
         
         return null;
@@ -103,7 +103,7 @@ class LemmaBotShield {
                     'Authorization': `Bearer ${this.config.apiKey}`
                 },
                 body: JSON.stringify({
-                    session_id: stripeReturn.sessionId,
+                    verification_return: true,
                     enable_rust_engine: true
                 })
             });
@@ -119,8 +119,9 @@ class LemmaBotShield {
                 }
                 
                 // Clean up URL parameters
-                const cleanUrl = window.location.origin + window.location.pathname;
-                window.history.replaceState({}, document.title, cleanUrl);
+                const url = new URL(window.location);
+                url.searchParams.delete('verification_return');
+                window.history.replaceState({}, document.title, url);
                 
                 // Show protected content
                 const element = document.querySelector('#main-protected-content');
@@ -324,7 +325,7 @@ class LemmaBotShield {
                 body: JSON.stringify({
                     provider: 'stripe_identity',
                     inline_mode: false, // Use redirect mode (which works!)
-                    return_url: window.location.href
+                    return_url: window.location.origin + window.location.pathname + '?verification_return=true'
                 })
             });
             
