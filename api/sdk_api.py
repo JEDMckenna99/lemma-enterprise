@@ -249,13 +249,27 @@ def complete_identity_verification():
         start_time = time.time()
         data = request.get_json() or {}
         session_id = data.get('session_id')
+        verification_return = data.get('verification_return', False)
         enable_rust_engine = data.get('enable_rust_engine', True)
         
-        if not session_id:
+        # Handle return from Stripe Identity without explicit session ID
+        if verification_return and not session_id:
+            # Use the most recent verification session from Flask session
+            verification_session = session.get('sdk_verification_session')
+            if verification_session:
+                session_id = verification_session['session_id']
+                logger.info(f"🔄 Using session from Flask session: {session_id}")
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'no_verification_session',
+                    'message': 'No active verification session found'
+                }), 400
+        elif not session_id:
             return jsonify({
                 'success': False,
                 'error': 'missing_session_id',
-                'message': 'Stripe verification session ID required'
+                'message': 'Stripe verification session ID or verification_return flag required'
             }), 400
         
         # Get session info
