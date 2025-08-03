@@ -533,7 +533,8 @@ def check_stripe_verification():
                     # CREDENTIAL GENERATION: Create credential for verified user
                     credential = create_credential_from_stripe_verification(user_id, session_id)
                     
-                    # Mark as verified in session
+                    # Mark as verified in session (make it persistent)
+                    session.permanent = True  # CRITICAL: Make this session persistent across browser restarts
                     session['stripe_identity_verified'] = True
                     session['verified_user_id'] = user_id
                     session['verified_user'] = True

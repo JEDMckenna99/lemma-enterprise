@@ -4,6 +4,7 @@ Version 3.0.0 - Correct shield that checks for valid lemma credentials
 """
 import os
 import logging
+from datetime import timedelta
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 
 # Set up logging
@@ -99,6 +100,11 @@ def create_app():
     app.config['SESSION_COOKIE_SECURE'] = not app.config['DEBUG']
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    
+    # CRITICAL: Make sessions persistent so credentials survive browser restarts
+    app.config['SESSION_PERMANENT'] = True
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # Credentials persist for 30 days
+    app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Refresh expiration on each request
     
     # ============================================================================
     # ROUTES

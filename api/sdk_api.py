@@ -338,7 +338,8 @@ def complete_identity_verification():
                 logger.warning(f"Rust verification error: {e}")
                 verification_time_us = (time.time() - rust_start) * 1_000_000
         
-        # Store credential in session
+        # Store credential in session (make it persistent)
+        session.permanent = True  # CRITICAL: Make this session persistent across browser restarts
         session['stripe_identity_verified'] = True
         session['verified_user_id'] = user_id
         session['verified_user'] = True
@@ -395,6 +396,7 @@ def store_credential():
         logger.info(f"💾 Storing credential in background wallet: {credential.get('id', 'unknown')}")
         
         # Store in session (in production, this would go to encrypted storage)
+        session.permanent = True  # CRITICAL: Make this session persistent across browser restarts
         current_credentials = session.get('lemma_credentials', [])
         
         # Avoid duplicates
