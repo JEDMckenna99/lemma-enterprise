@@ -150,7 +150,7 @@ class LemmaBackgroundWallet {
         
         try {
             // Store in all layers for maximum reliability
-            await Promise.all([
+            const storageResults = await Promise.allSettled([
                 this.storeInMemory(credentialWithMetadata),
                 this.storeInIndexedDB(credentialWithMetadata),
                 this.storeInLocalStorage(credentialWithMetadata)
@@ -160,7 +160,12 @@ class LemmaBackgroundWallet {
                 console.log('✅ Credential stored across all layers:', {
                     id: credentialWithMetadata.id,
                     packageType: credentialWithMetadata.packageType,
-                    networkShared: credentialWithMetadata.networkShared
+                    networkShared: credentialWithMetadata.networkShared,
+                    storageResults: storageResults.map((result, index) => ({
+                        layer: ['memory', 'indexedDB', 'localStorage'][index],
+                        status: result.status,
+                        error: result.status === 'rejected' ? result.reason?.message : null
+                    }))
                 });
             }
             
@@ -222,7 +227,17 @@ class LemmaBackgroundWallet {
      * Check if user has valid lemma credentials
      */
     async hasValidCredentials(packageType = 'identity') {
+        await this.init(); // Ensure initialized
+        
         const credentials = await this.getCredentials(packageType);
+        
+        if (this.config.debug) {
+            console.log(`🔍 hasValidCredentials(${packageType}): Found ${credentials.length} credentials`);
+            if (credentials.length > 0) {
+                console.log('📋 Credential IDs:', credentials.map(c => c.id));
+            }
+        }
+        
         return credentials.length > 0;
     }
     

@@ -27,7 +27,7 @@ class LemmaBotShield {
         };
         
         // Initialize background wallet for federated network
-        this.backgroundWallet = new LemmaBackgroundWallet({ 
+        this.backgroundWallet = new LemmaFederatedWallet({ 
             debug: this.config.debug 
         });
         
@@ -52,6 +52,9 @@ class LemmaBotShield {
         if (this.config.debug) {
             console.log('🛡️ Protecting element:', elementSelector);
         }
+        
+        // CRITICAL: Ensure background wallet is initialized before checking
+        await this.backgroundWallet.init();
         
         // Check if returning from Stripe verification
         const stripeReturn = this.checkStripeReturn();
