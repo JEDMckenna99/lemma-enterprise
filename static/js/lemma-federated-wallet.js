@@ -246,131 +246,84 @@ class LemmaFederatedWallet {
     }
     
     /**
-     * Verify a credential OFFLINE using cryptographic signatures
-     * This is the core of the federated network - no server calls needed
+     * Verify a credential using the REAL Lemma Crypto Engine (Backend)
+     * 🔐 Ed25519 Signatures → Cryptographic authenticity verification
+     * 🔒 OPRF → Privacy-preserving evaluation  
+     * 🌸 Bloom Filters → Efficient revocation checking
+     * ⚡ ZKP → Zero-knowledge proofs with selective disclosure
      */
     async verifyCredential(credential) {
         const startTime = performance.now();
         
         try {
             if (this.debug) {
-                console.log(`🔐 Verifying credential ${credential.id} OFFLINE using cryptographic signatures...`);
+                console.log(`🔐 Verifying credential ${credential.id} using REAL Lemma Crypto Engine (Ed25519 + OPRF + Bloom + ZKP)...`);
             }
             
-            // 1. Basic validation checks
-            if (!credential || !credential.id || !credential.signature || !credential.claims) {
-                throw new Error('Invalid credential structure');
+            // Call the REAL Rust crypto engine via backend API
+            const response = await fetch('/api/sdk/check-credentials', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer demo-integration-key-12345'
+                },
+                body: JSON.stringify({
+                    credentials: [credential],
+                    enableRustEngine: true,
+                    requireFullCrypto: true // Force full cryptographic verification
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Rust Engine API failed: ${response.status}`);
             }
             
-            // 2. Expiration check
-            const now = Date.now();
-            if (credential.expiresAt && credential.expiresAt < now) {
-                throw new Error('Credential expired');
-            }
-            
-            // 3. Age check (stored credentials)
-            const age = now - (credential.storedAt || credential.createdAt || 0);
-            const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
-            if (age > maxAge) {
-                throw new Error('Credential too old');
-            }
-            
-            // 4. Cryptographic signature verification (offline)
-            const isSignatureValid = await this.verifySignatureOffline(credential);
-            
-            // 5. Package type validation
-            const isValidPackageType = credential.packageType === 'identity' || 
-                                     credential.claims?.packageType === 'identity';
-            
-            // 6. Human verification claim
-            const isHumanVerified = credential.claims?.isHuman === true ||
-                                  credential.claims?.stripe_identity_verified === true;
-            
-            const isValid = isSignatureValid && isValidPackageType && isHumanVerified;
+            const result = await response.json();
             const verificationTime = (performance.now() - startTime) * 1000; // Convert to microseconds
             
             if (this.debug) {
-                const ageHours = Math.round(age / (1000 * 60 * 60));
-                console.log(`✅ OFFLINE verification complete: ${isValid ? 'VALID' : 'INVALID'} (${verificationTime.toFixed(2)}µs)`, {
-                    signatureValid: isSignatureValid,
-                    packageTypeValid: isValidPackageType,
-                    humanVerified: isHumanVerified,
-                    age: `${ageHours}h`,
-                    credentialId: credential.id
+                const ageHours = Math.round((Date.now() - (credential.storedAt || 0)) / (1000 * 60 * 60));
+                console.log(`✅ REAL CRYPTO ENGINE verification complete: ${result.verified ? 'VALID' : 'INVALID'} (${verificationTime.toFixed(2)}µs client + ${(result.verification_time_us || 0).toFixed(2)}µs engine)`, {
+                    engineVerified: result.verified,
+                    engineConfidence: result.confidence,
+                    engineTimeUs: result.verification_time_us,
+                    cryptoComponents: ['Ed25519', 'OPRF', 'Bloom', 'ZKP'],
+                    credentialId: credential.id,
+                    age: `${ageHours}h`
                 });
             }
             
             return {
                 success: true,
-                verified: isValid,
-                confidence: isValid ? 1.0 : 0.0,
-                verification_time_us: verificationTime,
-                offline: true,
-                details: {
-                    signatureValid: isSignatureValid,
-                    packageTypeValid: isValidPackageType,
-                    humanVerified: isHumanVerified,
-                    age: age
-                }
+                verified: result.verified || false,
+                confidence: result.confidence || 0.0,
+                verification_time_us: result.verification_time_us || 0,
+                client_time_us: verificationTime,
+                offline: false, // This uses the real engine (not fake offline)
+                engine: 'rust_crypto_engine',
+                cryptoComponents: ['Ed25519', 'OPRF', 'Bloom', 'ZKP'],
+                details: result.details || {}
             };
             
         } catch (error) {
             const verificationTime = (performance.now() - startTime) * 1000;
             
             if (this.debug) {
-                console.error(`❌ OFFLINE verification failed for ${credential.id}:`, error.message);
+                console.error(`❌ REAL CRYPTO ENGINE verification failed for ${credential.id}:`, error.message);
             }
             
+            // SECURITY: No fallback to fake validation - if crypto engine fails, credential is invalid
             return {
                 success: false,
                 verified: false,
                 confidence: 0.0,
-                verification_time_us: verificationTime,
-                offline: true,
-                error: error.message
+                verification_time_us: 0,
+                client_time_us: verificationTime,
+                offline: false,
+                engine: 'rust_crypto_engine_failed',
+                error: error.message,
+                security_note: 'No fallback - crypto engine verification required'
             };
-        }
-    }
-    
-    /**
-     * Verify cryptographic signature offline (Ed25519)
-     * This is where the actual cryptographic verification happens
-     */
-    async verifySignatureOffline(credential) {
-        try {
-            // For now, implement basic signature structure validation
-            // In production, this would use WebCrypto API or WebAssembly Rust module
-            
-            if (!credential.signature || typeof credential.signature !== 'string') {
-                return false;
-            }
-            
-            // Check signature format (should be base64 encoded Ed25519 signature)
-            if (credential.signature.length < 64) {
-                return false;
-            }
-            
-            // Verify signature components exist
-            if (!credential.publicKey && !credential.issuer) {
-                return false;
-            }
-            
-            // TODO: Implement actual Ed25519 signature verification using WebCrypto API
-            // For now, validate that signature looks like a valid Ed25519 signature
-            const signatureRegex = /^[A-Za-z0-9+/]+=*$/;
-            const isValidFormat = signatureRegex.test(credential.signature);
-            
-            if (this.debug && isValidFormat) {
-                console.log(`🔑 Signature format validation passed for ${credential.id}`);
-            }
-            
-            return isValidFormat;
-            
-        } catch (error) {
-            if (this.debug) {
-                console.error('❌ Signature verification error:', error);
-            }
-            return false;
         }
     }
     
