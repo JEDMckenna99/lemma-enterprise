@@ -115,10 +115,20 @@ class LemmaBotShield {
      * Show protected content (user has verified lemma)
      */
     showProtectedContent(element) {
-        element.style.display = 'block';
+        // Hide the protected element (which should be the main content)
+        element.style.display = 'none';
+        
+        // Show success content if it exists
+        const successContent = document.querySelector('#success-content');
+        if (successContent) {
+            successContent.style.display = 'block';
+        } else {
+            // Fallback: show the original protected content
+            element.style.display = 'block';
+        }
         
         if (this.config.debug) {
-            console.log('✅ Showing protected content');
+            console.log('✅ Showing verified user content');
         }
     }
     

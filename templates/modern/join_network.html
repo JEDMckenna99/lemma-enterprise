@@ -183,7 +183,12 @@
             color: #991b1b;
         }
 
-        .protected-content {
+        .main-protected-content {
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .success-content {
             transition: all 0.3s ease;
             position: relative;
             background: white;
@@ -338,28 +343,29 @@
             <p class="subtitle">Real Client Integration Demo - Exactly How Your Customers Will Integrate</p>
         </div>
 
-        <div class="demo-banner">
-            <h2>🎯 PRODUCTION CLIENT INTEGRATION EXAMPLE</h2>
-            <p><strong>This page demonstrates exactly how your customers integrate Lemma Shield.</strong></p>
-            <p>✅ Real API endpoints • 🔐 Production inline Stripe Identity • 💾 Live credential system</p>
-            <p>🚀 Zero redirects - Complete inline verification experience</p>
-        </div>
+        <!-- Main Protected Content - This is what customers would protect -->
+        <div id="main-protected-content" class="main-protected-content">
+            <div class="demo-banner">
+                <h2>🎯 PRODUCTION CLIENT INTEGRATION EXAMPLE</h2>
+                <p><strong>This page demonstrates exactly how your customers integrate Lemma Shield.</strong></p>
+                <p>✅ Real API endpoints • 🔐 Production inline Stripe Identity • 💾 Live credential system</p>
+                <p>🚀 Zero redirects - Complete inline verification experience</p>
+            </div>
 
-        <div class="integration-example">
+            <div class="integration-example">
             <h3>📋 How Clients Integrate (3 Lines of Code)</h3>
             <p>This is the exact code your customers would use to integrate Lemma Identity Network:</p>
             <div class="code-block">
-<span class="comment">// Step 1: Include the Lemma SDK</span>
-&lt;script src="{{ url_for('static', filename='js/lemma-sdk-customer.js') }}"&gt;&lt;/script&gt;
+                <span class="comment">// Step 1: Include the Lemma Bot Shield</span>
+                &lt;script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}"&gt;&lt;/script&gt;
 
-<span class="comment">// Step 2: Initialize with API key</span>
-const lemma = new LemmaSDK({ 
-    apiKey: 'your-api-key',
-    enableBotShield: true 
-});
+                <span class="comment">// Step 2: Initialize the bot shield</span>
+                const shield = new LemmaBotShield({ 
+                    apiKey: 'your-api-key'
+                });
 
-<span class="comment">// Step 3: Protect any content</span>
-lemma.protectElement('#protected-content');
+                <span class="comment">// Step 3: Protect your page content</span>
+                shield.protect('#your-main-content');
             </div>
         </div>
 
@@ -398,9 +404,11 @@ lemma.protectElement('#protected-content');
                 </div>
             </div>
         </div>
+        
+        </div> <!-- End of main-protected-content -->
 
-        <!-- Protected Content Section -->
-        <div id="protected-content" class="protected-content">
+        <!-- Success Content - Shown after verification -->
+        <div id="success-content" class="success-content" style="display: none;">
             <h2>🏆 Welcome to the Lemma Identity Network!</h2>
             <p>Congratulations! You've successfully joined the Lemma Identity Network. This content is protected by bot shield and only visible to verified humans with valid identity credentials.</p>
             
@@ -423,9 +431,7 @@ lemma.protectElement('#protected-content');
                     <div class="benefit-description">Verify once, access everywhere with seamless bot shield</div>
                 </div>
             </div>
-            
-
-        </div>
+        </div> <!-- End of success-content -->
     </div>
 
 
@@ -448,8 +454,8 @@ lemma.protectElement('#protected-content');
             debug: true 
         });
         
-        // Line 2: Protect the content
-        shield.protect('#protected-content');
+        // Line 2: Protect the main page content (real customer integration)
+        shield.protect('#main-protected-content');
     </script>
 </body>
 </html> 
