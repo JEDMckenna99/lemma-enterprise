@@ -437,14 +437,31 @@
 
 
             <!-- Load Federated Wallet for Cross-Tab Persistence -->
-        <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=1754253900"></script>
     
     <!-- Load the Simple Lemma Bot Shield -->
-    <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}?v=1754253900"></script>
     
     <script>
         // === PRODUCTION CUSTOMER INTEGRATION EXAMPLE ===
         // This is the exact code your customers would copy and paste
+        
+        // === DEBUG: Check if Federated Wallet is available ===
+        console.log('🔍 DEBUG: Checking LemmaFederatedWallet availability...');
+        
+        if (typeof LemmaFederatedWallet !== 'undefined') {
+            console.log('✅ LemmaFederatedWallet class is available');
+            
+            // Test instantiation
+            try {
+                const testWallet = new LemmaFederatedWallet({ debug: true });
+                console.log('✅ LemmaFederatedWallet instantiated successfully');
+            } catch (error) {
+                console.error('❌ LemmaFederatedWallet instantiation failed:', error);
+            }
+        } else {
+            console.error('❌ LemmaFederatedWallet class not found - script not loading!');
+        }
         
         console.log('🚀 Simple Lemma Bot Shield Demo');
         
