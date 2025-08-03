@@ -338,18 +338,13 @@ def complete_identity_verification():
                 logger.warning(f"Rust verification error: {e}")
                 verification_time_us = (time.time() - rust_start) * 1_000_000
         
-        # Store credential in session (make it persistent)
-        session.permanent = True  # CRITICAL: Make this session persistent across browser restarts
-        session['stripe_identity_verified'] = True
-        session['verified_user_id'] = user_id
-        session['verified_user'] = True
-        session['verification_time'] = time.time()
-        session['stored_credential'] = credential
-        session['lemma_credentials'] = [credential]
-        session['credential_id'] = credential['id']
+        # FEDERATED NETWORK: Return credential to client for background wallet storage
+        # No server-side storage needed - credentials work across all sites
         
-        # Clear verification session
+        # Clear verification session  
         session.pop('sdk_verification_session', None)
+        
+        logger.info(f"✅ Credential created and returned to client for federated network storage: {credential['id']}")
         
         end_time = time.time()
         
