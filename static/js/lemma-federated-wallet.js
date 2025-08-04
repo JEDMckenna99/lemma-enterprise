@@ -28,13 +28,42 @@ class LemmaFederatedWallet {
             lastRevocationSync: 0
         };
         
+        // Background security check configuration
+        this.securityConfig = {
+            enabled: options.backgroundChecks !== false, // Default enabled
+            securityLevel: options.securityLevel || 'medium', // 'low', 'medium', 'high', 'critical'
+            checkInterval: this.getCheckIntervalForLevel(options.securityLevel || 'medium'),
+            customInterval: options.customCheckInterval || null,
+            checkOnEvents: options.checkOnEvents || ['entry', 'checkout', 'sensitive_action'],
+            maxConsecutiveFailures: options.maxFailures || 3,
+            gracePeriod: options.gracePeriod || (24 * 60 * 60 * 1000), // 24 hours
+            lastBackgroundCheck: 0,
+            consecutiveFailures: 0,
+            activeIntervalId: null
+        };
+        
         // Network registry cache
         this.didRegistry = new Map();
         this.revocationBloomFilter = new Set();
         
         if (this.debug) {
             console.log('🎯 Lemma Federated Wallet starting with network sync...');
+            console.log(`🛡️ Security level: ${this.securityConfig.securityLevel}, check interval: ${this.securityConfig.checkInterval / 1000}s`);
         }
+    }
+    
+    /**
+     * Get background check interval for security level
+     */
+    getCheckIntervalForLevel(level) {
+        const intervals = {
+            'low': 30 * 60 * 1000,        // 30 minutes - Basic sites
+            'medium': 5 * 60 * 1000,      // 5 minutes - E-commerce  
+            'high': 2 * 60 * 1000,        // 2 minutes - Financial services
+            'critical': 60 * 1000,        // 1 minute - Banks, high-security
+            'realtime': 10 * 1000         // 10 seconds - Ultra-high security
+        };
+        return intervals[level] || intervals['medium'];
     }
     
     /**
@@ -53,7 +82,10 @@ class LemmaFederatedWallet {
             // 3. Start network sync
             this.startNetworkSync();
             
-            // 4. Mark as ready
+            // 4. Start background security checks
+            this.startBackgroundChecks();
+            
+            // 5. Mark as ready
             this.isReady = true;
             
             if (this.debug) {
@@ -609,6 +641,308 @@ class LemmaFederatedWallet {
         
         if (this.debug) {
             console.log(`📡 Network sync started - interval: ${this.networkConfig.syncInterval / 1000}s`);
+        }
+    }
+    
+    /**
+     * Start background credential checks based on security level
+     */
+    startBackgroundChecks() {
+        if (!this.securityConfig.enabled) {
+            if (this.debug) {
+                console.log('🛡️ Background security checks disabled');
+            }
+            return;
+        }
+        
+        // Use custom interval if specified, otherwise use security level interval
+        const checkInterval = this.securityConfig.customInterval || this.securityConfig.checkInterval;
+        
+        // Initial check
+        this.performBackgroundCheck();
+        
+        // Schedule recurring checks
+        this.securityConfig.activeIntervalId = setInterval(() => {
+            this.performBackgroundCheck();
+        }, checkInterval);
+        
+        if (this.debug) {
+            const intervalSeconds = checkInterval / 1000;
+            console.log(`🛡️ Background security checks started - level: ${this.securityConfig.securityLevel}, interval: ${intervalSeconds}s`);
+        }
+    }
+    
+    /**
+     * Stop background credential checks
+     */
+    stopBackgroundChecks() {
+        if (this.securityConfig.activeIntervalId) {
+            clearInterval(this.securityConfig.activeIntervalId);
+            this.securityConfig.activeIntervalId = null;
+            
+            if (this.debug) {
+                console.log('🛡️ Background security checks stopped');
+            }
+        }
+    }
+    
+    /**
+     * Perform a background credential check (silent, non-intrusive)
+     */
+    async performBackgroundCheck() {
+        if (!this.securityConfig.enabled) return;
+        
+        const startTime = performance.now();
+        
+        try {
+            // Get all credentials for background checking
+            const credentials = Array.from(this.memoryCache.values());
+            
+            if (credentials.length === 0) {
+                if (this.debug) {
+                    console.log('🛡️ Background check: No credentials to verify');
+                }
+                return { success: true, credentialsChecked: 0 };
+            }
+            
+            let validCredentials = 0;
+            let revokedCredentials = 0;
+            let failedChecks = 0;
+            
+            for (const credential of credentials) {
+                try {
+                    // Step 1: Fast local revocation check (bloom filter - ~0.1µs)
+                    const isRevoked = await this.isCredentialRevoked(credential);
+                    if (isRevoked) {
+                        revokedCredentials++;
+                        
+                        // Remove revoked credential immediately
+                        await this.removeCredential(credential.id);
+                        
+                        if (this.debug) {
+                            console.warn(`🚫 Background check: Removed revoked credential ${credential.id}`);
+                        }
+                        
+                        // Trigger security event
+                        this.triggerSecurityEvent('credential_revoked', {
+                            credentialId: credential.id,
+                            detectedAt: Date.now(),
+                            source: 'background_check'
+                        });
+                        
+                        continue;
+                    }
+                    
+                    // Step 2: Fast DID validation (local registry - ~0.1µs)
+                    if (credential.issuer) {
+                        const issuerValidation = await this.validateIssuerDid(credential.issuer);
+                        if (!issuerValidation.valid) {
+                            failedChecks++;
+                            
+                            if (this.debug) {
+                                console.warn(`⚠️ Background check: Invalid issuer for ${credential.id}: ${issuerValidation.reason}`);
+                            }
+                            continue;
+                        }
+                    }
+                    
+                    // Step 3: Check credential age and validity
+                    const now = Date.now();
+                    if (credential.expires_at && credential.expires_at * 1000 < now) {
+                        // Remove expired credential
+                        await this.removeCredential(credential.id);
+                        
+                        if (this.debug) {
+                            console.warn(`⏰ Background check: Removed expired credential ${credential.id}`);
+                        }
+                        continue;
+                    }
+                    
+                    validCredentials++;
+                    
+                } catch (error) {
+                    failedChecks++;
+                    if (this.debug) {
+                        console.warn(`❌ Background check failed for ${credential.id}:`, error.message);
+                    }
+                }
+            }
+            
+            const checkTime = (performance.now() - startTime);
+            this.securityConfig.lastBackgroundCheck = Date.now();
+            
+            // Reset consecutive failures on successful check
+            if (failedChecks === 0) {
+                this.securityConfig.consecutiveFailures = 0;
+            } else {
+                this.securityConfig.consecutiveFailures++;
+            }
+            
+            if (this.debug) {
+                console.log(`🛡️ Background check complete: ${validCredentials} valid, ${revokedCredentials} revoked, ${failedChecks} failed (${checkTime.toFixed(2)}ms)`);
+            }
+            
+            return {
+                success: true,
+                credentialsChecked: credentials.length,
+                validCredentials,
+                revokedCredentials,
+                failedChecks,
+                checkTimeMs: checkTime
+            };
+            
+        } catch (error) {
+            this.securityConfig.consecutiveFailures++;
+            
+            if (this.debug) {
+                console.error('❌ Background security check failed:', error);
+            }
+            
+            return {
+                success: false,
+                error: error.message,
+                consecutiveFailures: this.securityConfig.consecutiveFailures
+            };
+        }
+    }
+    
+    /**
+     * Trigger background check on specific events
+     */
+    async checkOnEvent(eventType = 'unknown') {
+        if (!this.securityConfig.enabled) return;
+        
+        if (!this.securityConfig.checkOnEvents.includes(eventType)) {
+            return; // Event not configured for checking
+        }
+        
+        if (this.debug) {
+            console.log(`🛡️ Event-triggered security check: ${eventType}`);
+        }
+        
+        const result = await this.performBackgroundCheck();
+        
+        // For sensitive events, may want stricter handling
+        if (eventType === 'checkout' || eventType === 'sensitive_action') {
+            if (!result.success || result.revokedCredentials > 0) {
+                this.triggerSecurityEvent('security_check_failed', {
+                    eventType,
+                    result,
+                    timestamp: Date.now()
+                });
+                
+                return { 
+                    passed: false, 
+                    reason: 'security_check_failed',
+                    details: result 
+                };
+            }
+        }
+        
+        return { passed: true, details: result };
+    }
+    
+    /**
+     * Update security configuration
+     */
+    updateSecurityConfig(newConfig) {
+        const oldLevel = this.securityConfig.securityLevel;
+        
+        // Update configuration
+        Object.assign(this.securityConfig, newConfig);
+        
+        // Recalculate interval if security level changed
+        if (newConfig.securityLevel && newConfig.securityLevel !== oldLevel) {
+            this.securityConfig.checkInterval = this.getCheckIntervalForLevel(newConfig.securityLevel);
+        }
+        
+        // Restart background checks with new configuration
+        if (this.securityConfig.enabled) {
+            this.stopBackgroundChecks();
+            this.startBackgroundChecks();
+        }
+        
+        if (this.debug) {
+            console.log(`🛡️ Security config updated: level=${this.securityConfig.securityLevel}, interval=${this.securityConfig.checkInterval / 1000}s`);
+        }
+    }
+    
+    /**
+     * Get current security status
+     */
+    getSecurityStatus() {
+        const now = Date.now();
+        const timeSinceLastCheck = now - this.securityConfig.lastBackgroundCheck;
+        
+        return {
+            enabled: this.securityConfig.enabled,
+            securityLevel: this.securityConfig.securityLevel,
+            checkInterval: this.securityConfig.checkInterval,
+            lastCheck: this.securityConfig.lastBackgroundCheck,
+            timeSinceLastCheck,
+            consecutiveFailures: this.securityConfig.consecutiveFailures,
+            isHealthy: this.securityConfig.consecutiveFailures < this.securityConfig.maxConsecutiveFailures,
+            nextCheckIn: this.securityConfig.checkInterval - (timeSinceLastCheck % this.securityConfig.checkInterval)
+        };
+    }
+    
+    /**
+     * Trigger security event (can be overridden by sites for custom handling)
+     */
+    triggerSecurityEvent(eventType, details) {
+        const event = {
+            type: eventType,
+            timestamp: Date.now(),
+            details,
+            securityLevel: this.securityConfig.securityLevel
+        };
+        
+        if (this.debug) {
+            console.warn(`🚨 Security event: ${eventType}`, details);
+        }
+        
+        // Dispatch custom event for sites to listen to
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('lemma-security-event', { 
+                detail: event 
+            }));
+        }
+        
+        // Site-specific security event handler (can be overridden)
+        if (typeof this.onSecurityEvent === 'function') {
+            this.onSecurityEvent(event);
+        }
+    }
+    
+    /**
+     * Remove a credential from all storage layers
+     */
+    async removeCredential(credentialId) {
+        try {
+            // Remove from memory cache
+            this.memoryCache.delete(credentialId);
+            
+            // Remove from IndexedDB
+            if (this.db) {
+                const transaction = this.db.transaction(['credentials'], 'readwrite');
+                const store = transaction.objectStore('credentials');
+                store.delete(credentialId);
+            }
+            
+            // Update localStorage
+            const allCredentials = Array.from(this.memoryCache.values());
+            localStorage.setItem(this.storageKey, JSON.stringify(allCredentials));
+            
+            if (this.debug) {
+                console.log(`🗑️ Removed credential: ${credentialId}`);
+            }
+            
+            return true;
+        } catch (error) {
+            if (this.debug) {
+                console.error(`❌ Failed to remove credential ${credentialId}:`, error);
+            }
+            return false;
         }
     }
 }

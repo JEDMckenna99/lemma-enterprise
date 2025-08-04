@@ -17,7 +17,14 @@ class LemmaBotShield {
         this.config = {
             apiKey: options.apiKey || 'demo-integration-key-12345',
             apiBase: options.apiBase || window.location.origin,
-            debug: options.debug || false
+            debug: options.debug || false,
+            
+            // Background security check configuration
+            securityLevel: options.securityLevel || 'medium', // 'low', 'medium', 'high', 'critical', 'realtime'
+            customCheckInterval: options.customCheckInterval || null, // Custom interval in milliseconds
+            checkOnEvents: options.checkOnEvents || ['entry', 'checkout', 'sensitive_action'],
+            backgroundChecks: options.backgroundChecks !== false, // Default enabled
+            onSecurityEvent: options.onSecurityEvent || null // Custom security event handler
         };
         
         this.state = {
@@ -26,13 +33,32 @@ class LemmaBotShield {
             verifying: false
         };
         
-        // Initialize background wallet for federated network
+        // Initialize background wallet for federated network with security config
         this.backgroundWallet = new LemmaFederatedWallet({ 
-            debug: this.config.debug 
+            debug: this.config.debug,
+            securityLevel: this.config.securityLevel,
+            customCheckInterval: this.config.customCheckInterval,
+            checkOnEvents: this.config.checkOnEvents,
+            backgroundChecks: this.config.backgroundChecks
         });
+        
+        // Set custom security event handler if provided
+        if (this.config.onSecurityEvent) {
+            this.backgroundWallet.onSecurityEvent = this.config.onSecurityEvent;
+        }
         
         if (this.config.debug) {
             console.log('🛡️ Lemma Bot Shield initialized (Federated Network Mode)');
+            console.log(`🛡️ Security level: ${this.config.securityLevel}`);
+            
+            const intervals = {
+                'low': '30min', 'medium': '5min', 'high': '2min', 
+                'critical': '1min', 'realtime': '10sec'
+            };
+            const intervalText = this.config.customCheckInterval 
+                ? `${this.config.customCheckInterval / 1000}s` 
+                : intervals[this.config.securityLevel];
+            console.log(`🛡️ Background checks: ${intervalText}`);
         }
     }
     
@@ -380,6 +406,69 @@ class LemmaBotShield {
             
         } finally {
             this.state.verifying = false;
+        }
+    }
+    
+    /**
+     * Trigger event-based security check
+     * Usage: shield.checkOnEvent('checkout') before processing payment
+     */
+    async checkOnEvent(eventType = 'unknown') {
+        if (this.config.debug) {
+            console.log(`🛡️ Event-triggered security check: ${eventType}`);
+        }
+        
+        return await this.backgroundWallet.checkOnEvent(eventType);
+    }
+    
+    /**
+     * Update security configuration dynamically
+     * Usage: shield.updateSecurityLevel('critical') for high-security operations
+     */
+    updateSecurityLevel(newLevel) {
+        this.config.securityLevel = newLevel;
+        this.backgroundWallet.updateSecurityConfig({
+            securityLevel: newLevel
+        });
+        
+        if (this.config.debug) {
+            console.log(`🛡️ Security level updated to: ${newLevel}`);
+        }
+    }
+    
+    /**
+     * Set custom check interval
+     * Usage: shield.setCheckInterval(30000) for 30-second checks
+     */
+    setCheckInterval(intervalMs) {
+        this.config.customCheckInterval = intervalMs;
+        this.backgroundWallet.updateSecurityConfig({
+            customInterval: intervalMs
+        });
+        
+        if (this.config.debug) {
+            console.log(`🛡️ Check interval updated to: ${intervalMs / 1000}s`);
+        }
+    }
+    
+    /**
+     * Get current security status
+     */
+    getSecurityStatus() {
+        return this.backgroundWallet.getSecurityStatus();
+    }
+    
+    /**
+     * Enable/disable background checks
+     */
+    setBackgroundChecks(enabled) {
+        this.config.backgroundChecks = enabled;
+        this.backgroundWallet.updateSecurityConfig({
+            enabled: enabled
+        });
+        
+        if (this.config.debug) {
+            console.log(`🛡️ Background checks ${enabled ? 'enabled' : 'disabled'}`);
         }
     }
 }
