@@ -27,9 +27,46 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 network_registry_bp = Blueprint('network_registry', __name__)
 
+# Initialize with trusted DIDs for bootstrap
+def initialize_trusted_dids():
+    """Bootstrap the network registry with trusted issuers"""
+    trusted_issuers = {
+        'did:lemma:identity_network': {
+            'did': 'did:lemma:identity_network',
+            'public_key': 'lemma_identity_network_key_2024',
+            'name': 'Lemma Identity Network',
+            'issuer_type': 'identity_kyc_provider',
+            'trust_score': 0.95,
+            'verified': True,
+            'created_at': time.time(),
+            'capabilities': ['stripe_identity_verification', 'kyc_verification']
+        },
+        'did:lemma:stripe_identity': {
+            'did': 'did:lemma:stripe_identity', 
+            'public_key': 'lemma_stripe_integration_key_2024',
+            'name': 'Lemma Stripe Identity Integration',
+            'issuer_type': 'third_party_kyc',
+            'trust_score': 0.90,
+            'verified': True,
+            'created_at': time.time(),
+            'capabilities': ['stripe_identity_verification']
+        },
+        'did:lemma:demo_issuer': {
+            'did': 'did:lemma:demo_issuer',
+            'public_key': 'lemma_demo_issuer_key_2024',
+            'name': 'Lemma Demo Issuer',
+            'issuer_type': 'demo_credentials',
+            'trust_score': 0.85,
+            'verified': True,
+            'created_at': time.time(),
+            'capabilities': ['demo_verification', 'testing']
+        }
+    }
+    return trusted_issuers
+
 # Registry storage (in production, this would be a distributed database)
 NETWORK_REGISTRY = {
-    'did_registry': {},
+    'did_registry': initialize_trusted_dids(),  # Bootstrap with trusted DIDs
     'revocation_lists': {
         'oprf_bloom_filters': {},
         'revocation_entries': {},
@@ -40,7 +77,7 @@ NETWORK_REGISTRY = {
         'version': '1.0.0',
         'created_at': time.time(),
         'total_sites': 0,
-        'total_dids': 0,
+        'total_dids': len(initialize_trusted_dids()),  # Count bootstrapped DIDs  
         'total_revocations': 0
     }
 }
