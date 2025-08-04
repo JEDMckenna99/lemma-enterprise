@@ -19,8 +19,21 @@ class LemmaFederatedWallet {
         this.db = null;
         this.memoryCache = new Map();
         
+        // Network registry configuration
+        this.networkConfig = {
+            registryUrl: options.networkRegistryUrl || '',
+            authKey: options.networkAuthKey || 'lemma_network_master_key_2024',
+            syncInterval: options.syncInterval || (5 * 60 * 1000), // 5 minutes
+            lastDidSync: 0,
+            lastRevocationSync: 0
+        };
+        
+        // Network registry cache
+        this.didRegistry = new Map();
+        this.revocationBloomFilter = new Set();
+        
         if (this.debug) {
-            console.log('🎯 Lemma Federated Wallet starting...');
+            console.log('🎯 Lemma Federated Wallet starting with network sync...');
         }
     }
     
@@ -37,7 +50,10 @@ class LemmaFederatedWallet {
             // 2. Load existing credentials
             await this.loadExistingCredentials();
             
-            // 3. Mark as ready
+            // 3. Start network sync
+            this.startNetworkSync();
+            
+            // 4. Mark as ready
             this.isReady = true;
             
             if (this.debug) {
@@ -260,7 +276,56 @@ class LemmaFederatedWallet {
                 console.log(`🔐 Verifying credential ${credential.id} using REAL Lemma Crypto Engine (Ed25519 + OPRF + Bloom + ZKP)...`);
             }
             
-            // Call the REAL Rust crypto engine via backend API
+            // Step 1: Check network revocation status first (fast local check)
+            const isRevoked = await this.isCredentialRevoked(credential);
+            if (isRevoked) {
+                const verificationTime = (performance.now() - startTime) * 1000;
+                
+                if (this.debug) {
+                    console.log(`🚫 Credential ${credential.id} is REVOKED - blocked by network revocation list`);
+                }
+                
+                return {
+                    success: false,
+                    verified: false,
+                    confidence: 0.0,
+                    verification_time_us: 0,
+                    client_time_us: verificationTime,
+                    offline: true, // Using local revocation cache
+                    engine: 'network_revocation_check',
+                    revoked: true,
+                    reason: 'credential_revoked_in_network'
+                };
+            }
+            
+            // Step 2: Validate issuer DID (if configured)
+            if (credential.issuer) {
+                const issuerValidation = await this.validateIssuerDid(credential.issuer);
+                if (!issuerValidation.valid) {
+                    const verificationTime = (performance.now() - startTime) * 1000;
+                    
+                    if (this.debug) {
+                        console.log(`⚠️ Credential ${credential.id} has invalid issuer: ${credential.issuer}`);
+                    }
+                    
+                    return {
+                        success: false,
+                        verified: false,
+                        confidence: 0.0,
+                        verification_time_us: 0,
+                        client_time_us: verificationTime,
+                        offline: true,
+                        engine: 'network_did_validation',
+                        reason: issuerValidation.reason
+                    };
+                }
+                
+                if (this.debug) {
+                    console.log(`✅ Issuer DID validated: ${credential.issuer} (trust: ${issuerValidation.trustScore})`);
+                }
+            }
+            
+            // Step 3: Call the REAL Rust crypto engine via backend API
             const response = await fetch('/api/sdk/check-credentials', {
                 method: 'POST',
                 headers: {
@@ -374,6 +439,177 @@ class LemmaFederatedWallet {
             const ageHours = Math.round(age / (1000 * 60 * 60));
             console.log(`  📄 ${cred.id} (${cred.packageType}) - ${ageHours}h old`);
         });
+    }
+    
+    /**
+     * Sync DID registry from network
+     */
+    async syncDidRegistry() {
+        if (!this.networkConfig.registryUrl) return false;
+        
+        try {
+            const response = await fetch('/api/network/did-registry', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Network ${this.networkConfig.authKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                if (data.success && data.needs_update) {
+                    // Update local DID registry cache
+                    Object.entries(data.registry).forEach(([did, issuerInfo]) => {
+                        this.didRegistry.set(did, {
+                            ...issuerInfo,
+                            lastUpdated: Date.now()
+                        });
+                    });
+                    
+                    this.networkConfig.lastDidSync = Date.now();
+                    
+                    if (this.debug) {
+                        console.log(`📋 DID registry synced: ${Object.keys(data.registry).length} issuers`);
+                    }
+                    
+                    return true;
+                }
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ DID registry sync failed:', error.message);
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Sync revocation lists from network
+     */
+    async syncRevocationLists() {
+        if (!this.networkConfig.registryUrl) return false;
+        
+        try {
+            const response = await fetch('/api/network/revocation-lists', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Network ${this.networkConfig.authKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    last_sync: this.networkConfig.lastRevocationSync
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                if (data.success && data.has_updates) {
+                    // Update local revocation bloom filter
+                    Object.keys(data.revocation_updates).forEach(credentialId => {
+                        this.revocationBloomFilter.add(credentialId);
+                    });
+                    
+                    // Update OPRF bloom filter entries
+                    Object.keys(data.bloom_filter_updates).forEach(oprfEval => {
+                        this.revocationBloomFilter.add(oprfEval);
+                    });
+                    
+                    this.networkConfig.lastRevocationSync = data.sync_timestamp;
+                    
+                    if (this.debug) {
+                        console.log(`🚫 Revocation lists synced: ${Object.keys(data.revocation_updates).length} updates`);
+                    }
+                    
+                    return true;
+                }
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Revocation list sync failed:', error.message);
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if a credential is revoked using network data
+     */
+    async isCredentialRevoked(credential) {
+        // Check local bloom filter first (fast)
+        if (this.revocationBloomFilter.has(credential.id)) {
+            if (this.debug) {
+                console.log(`🚫 Credential ${credential.id} is revoked (bloom filter hit)`);
+            }
+            return true;
+        }
+        
+        // For OPRF-based checking, we'd need the OPRF evaluation
+        // This is a simplified version
+        const oprfEval = `oprf_${credential.id}_${Math.floor(credential.issued_at / 86400)}`;
+        if (this.revocationBloomFilter.has(oprfEval)) {
+            if (this.debug) {
+                console.log(`🚫 Credential ${credential.id} is revoked (OPRF bloom filter hit)`);
+            }
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Validate issuer DID using network registry
+     */
+    async validateIssuerDid(issuerDid) {
+        const issuerInfo = this.didRegistry.get(issuerDid);
+        
+        if (!issuerInfo) {
+            if (this.debug) {
+                console.warn(`⚠️ Unknown issuer DID: ${issuerDid}`);
+            }
+            return {
+                valid: false,
+                reason: 'unknown_issuer',
+                trustScore: 0
+            };
+        }
+        
+        return {
+            valid: issuerInfo.verified,
+            trustScore: issuerInfo.trust_score || 0,
+            issuerName: issuerInfo.name,
+            issuerType: issuerInfo.issuer_type
+        };
+    }
+    
+    /**
+     * Start background network sync
+     */
+    startNetworkSync() {
+        if (!this.networkConfig.registryUrl) {
+            if (this.debug) {
+                console.log('📡 Network sync disabled - no registry URL configured');
+            }
+            return;
+        }
+        
+        // Initial sync
+        this.syncDidRegistry();
+        this.syncRevocationLists();
+        
+        // Schedule periodic syncs
+        setInterval(() => {
+            this.syncDidRegistry();
+            this.syncRevocationLists();
+        }, this.networkConfig.syncInterval);
+        
+        if (this.debug) {
+            console.log(`📡 Network sync started - interval: ${this.networkConfig.syncInterval / 1000}s`);
+        }
     }
 }
 

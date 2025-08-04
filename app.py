@@ -86,6 +86,15 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register SDK API blueprint: {e}")
+    
+    # Register the Network Registry blueprint for DID and revocation distribution
+    try:
+        from api.network_registry import network_registry_bp
+        app.register_blueprint(network_registry_bp)
+        logger.info("✅ Network Registry API blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register Network Registry blueprint: {e}")
         
     # Initialize optimized engine
     try:

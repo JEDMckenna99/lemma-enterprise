@@ -16,6 +16,8 @@ import secrets
 import logging
 from functools import wraps
 import json
+import requests
+import hashlib
 
 # Import existing shield functionality
 from .shield import create_credential_from_stripe_verification
@@ -25,6 +27,77 @@ logger = logging.getLogger(__name__)
 
 # Create SDK API blueprint
 sdk_api_bp = Blueprint('sdk_api', __name__)
+
+# Network Registry Configuration
+NETWORK_REGISTRY_URL = "http://localhost:5000"  # In production, this would be the registry service URL
+NETWORK_AUTH_KEY = "lemma_network_master_key_2024"  # In production, use secure key management
+
+def distribute_did_to_network(did: str, public_key: str, issuer_info: dict) -> bool:
+    """
+    Distribute a newly created DID to the network registry
+    
+    This ensures all sites using Lemma can verify credentials from this issuer
+    """
+    try:
+        response = requests.post(
+            f"{NETWORK_REGISTRY_URL}/api/network/register-did",
+            headers={
+                'Authorization': f'Network {NETWORK_AUTH_KEY}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'did': did,
+                'public_key': public_key,
+                'issuer_info': issuer_info
+            },
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"✅ DID distributed to network: {did}")
+            return result.get('success', False)
+        else:
+            logger.warning(f"⚠️ Failed to distribute DID to network: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Network DID distribution failed: {e}")
+        return False
+
+def distribute_revocation_to_network(credential_id: str, oprf_evaluation: str, bloom_hash: str, reason: str) -> bool:
+    """
+    Distribute credential revocation to the network registry
+    
+    This ensures all sites using Lemma immediately know about revoked credentials
+    """
+    try:
+        response = requests.post(
+            f"{NETWORK_REGISTRY_URL}/api/network/register-revocation",
+            headers={
+                'Authorization': f'Network {NETWORK_AUTH_KEY}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'credential_id': credential_id,
+                'oprf_evaluation': oprf_evaluation,
+                'bloom_hash': bloom_hash,
+                'reason': reason
+            },
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"✅ Revocation distributed to network: {credential_id}")
+            return result.get('success', False)
+        else:
+            logger.warning(f"⚠️ Failed to distribute revocation to network: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Network revocation distribution failed: {e}")
+        return False
 
 # Try to import Rust engine
 try:
@@ -543,9 +616,24 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_re
     # Extract identity details from Stripe result (in production, more comprehensive)
     identity_details = stripe_result.get('identity_details', {})
     
+    # Generate issuer DID and register with network
+    issuer_did = 'did:lemma:identity_network'
+    issuer_public_key = secrets.token_hex(32)  # In production, use real Ed25519 public key
+    
+    # Register issuer DID with network registry
+    issuer_info = {
+        'name': 'Lemma Identity Network',
+        'issuer_type': 'identity_kyc_provider',
+        'trust_score': 0.95,
+        'verified': True
+    }
+    
+    # Attempt to distribute DID to network (non-blocking)
+    distribute_did_to_network(issuer_did, issuer_public_key, issuer_info)
+    
     credential = {
         'id': f"identity_kyc_{user_id}_{current_time}",
-        'issuer': 'did:lemma:identity_network',
+        'issuer': issuer_did,
         'subject': f'did:lemma:user:{user_id}',
         'issued_at': current_time,
         'expires_at': current_time + (86400 * 365),  # 1 year expiry
@@ -674,16 +762,25 @@ def revoke_credential():
             bloom_time_us = (bloom_end - bloom_start) / 1000
             total_bloom_time_us += bloom_time_us
             
+            # Step 3: Distribute revocation to network registry
+            network_distributed = distribute_revocation_to_network(
+                credential_id, 
+                oprf_evaluation, 
+                bloom_hash, 
+                reason
+            )
+            
             revocation_results.append({
                 'credential_id': credential_id,
                 'oprf_evaluation': oprf_evaluation[:32] + "...",  # Truncate for privacy
                 'bloom_hash': bloom_hash[:16] + "...",  # Truncate for privacy
                 'oprf_time_us': oprf_time_us,
                 'bloom_time_us': bloom_time_us,
+                'network_distributed': network_distributed,
                 'revoked_at': time.time()
             })
             
-            logger.info(f"✅ Credential {credential_id} revoked: OPRF={oprf_time_us:.2f}µs, Bloom={bloom_time_us:.2f}µs")
+            logger.info(f"✅ Credential {credential_id} revoked: OPRF={oprf_time_us:.2f}µs, Bloom={bloom_time_us:.2f}µs, Network={network_distributed}")
         
         # Step 3: Update session to revoke locally
         session.pop('verified_user', None)
