@@ -110,6 +110,15 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register Stripe Checkout blueprint: {e}")
+    
+    # Register the Usage Billing blueprint for per-user pricing
+    try:
+        from api.usage_billing import usage_billing_bp
+        app.register_blueprint(usage_billing_bp)
+        logger.info("✅ Usage Billing API blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register Usage Billing blueprint: {e}")
         
     # Initialize optimized engine
     try:

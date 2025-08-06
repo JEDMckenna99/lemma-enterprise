@@ -214,9 +214,9 @@
                     </div>
                 </div>
                 
-                <a href="/join-network" class="btn btn-primary btn-lg" style="font-size: var(--font-size-lg); padding: var(--space-4) var(--space-8);">
+                <button onclick="startBillingSetup()" class="btn btn-primary btn-lg" style="font-size: var(--font-size-lg); padding: var(--space-4) var(--space-8);">
                     Start Protecting Your Site
-                </a>
+                </button>
                 
                 <p style="margin-top: var(--space-4); font-size: var(--font-size-sm); color: var(--gray-500);">
                     No monthly minimums • No setup fees • Cancel anytime
@@ -266,6 +266,46 @@
         
         // Initialize calculator
         calculateCost();
+        
+        // Billing setup function
+        async function startBillingSetup() {
+            const userCount = parseInt(document.getElementById('userCount').value) || 1000;
+            
+            // For now, redirect to join network page with user count
+            // In a full implementation, this would open a Stripe Checkout session
+            const params = new URLSearchParams({
+                users: userCount,
+                billing: 'per_user'
+            });
+            
+            window.location.href = `/join-network?${params.toString()}`;
+        }
+        
+        // API integration for cost estimation
+        async function getExactCostEstimate(userCount) {
+            try {
+                const response = await fetch('/api/billing/estimate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_count: userCount
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    return data;
+                } else {
+                    console.error('Failed to get cost estimate');
+                    return null;
+                }
+            } catch (error) {
+                console.error('Error getting cost estimate:', error);
+                return null;
+            }
+        }
         </script>
         
         <!-- Competitive Comparison -->
