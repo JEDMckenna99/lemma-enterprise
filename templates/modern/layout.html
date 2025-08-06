@@ -17,6 +17,9 @@
     <!-- Consolidated Design System -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma-design-system.css') }}">
     
+    <!-- Preload critical assets -->
+    <link rel="preload" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" as="image" type="image/svg+xml">
+    
     <!-- React 18 for components -->
     {% block react_scripts %}
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -513,6 +516,19 @@
             });
         });
     });
+    
+    // Register service worker to prevent caching errors
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(function(registration) {
+                    console.log('[SW] Service Worker registered successfully:', registration.scope);
+                })
+                .catch(function(error) {
+                    console.log('[SW] Service Worker registration failed:', error);
+                });
+        });
+    }
     </script>
 </body>
 </html> 

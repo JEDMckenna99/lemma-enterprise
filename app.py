@@ -18,6 +18,12 @@ def create_app():
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-for-testing')
     app.config['DEBUG'] = os.environ.get('FLASK_ENV') == 'development'
     
+    # Configure MIME types for proper asset serving
+    import mimetypes
+    mimetypes.add_type('image/svg+xml', '.svg')
+    mimetypes.add_type('application/javascript', '.js')
+    mimetypes.add_type('text/css', '.css')
+    
     # Enhanced configuration for bot shield
     app.config['STRIPE_SECRET_KEY'] = os.environ.get('STRIPE_SECRET_KEY')
     app.config['STRIPE_PUBLISHABLE_KEY'] = os.environ.get('STRIPE_PUBLISHABLE_KEY')
