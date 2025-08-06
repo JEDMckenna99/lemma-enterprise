@@ -1,267 +1,731 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Pricing - Lemma Verification Platform{% endblock %}
-{% block description %}Simple, transparent pricing for the Lemma verification platform. Start free, scale as you grow.{% endblock %}
+{% block title %}Pricing - Lemma Shield{% endblock %}
+{% block description %}Simple per-user pricing that scales with your business. No hidden fees, no minimum commitments.{% endblock %}
 
 {% block head %}
     {{ super() }}
     <style>
+        /* Modern Pricing Page Styles */
+        .pricing-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 var(--space-6);
+        }
+
+        /* Hero Section */
         .pricing-hero {
-            background: var(--gray-50);
-            padding: var(--space-16) 0;
+            background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);
+            padding: var(--space-20) 0 var(--space-16);
             text-align: center;
+            border-bottom: 1px solid var(--gray-100);
         }
-        
-        .pricing-plans {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: var(--space-8);
-            margin: var(--space-12) 0;
+
+        .hero-badge {
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            color: var(--white);
+            padding: var(--space-2) var(--space-4);
+            border-radius: 50px;
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: var(--space-4);
+            box-shadow: 0 4px 12px rgba(99, 91, 255, 0.3);
         }
-        
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: var(--space-4);
+            line-height: 1.1;
+        }
+
+        .hero-subtitle {
+            font-size: var(--font-size-xl);
+            color: var(--gray-600);
+            margin-bottom: var(--space-8);
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+
+        /* Main Pricing Card */
+        .pricing-main {
+            padding: var(--space-16) 0;
+            background: var(--white);
+        }
+
         .pricing-card {
             background: var(--white);
             border: 2px solid var(--gray-200);
-            border-radius: 12px;
-            padding: var(--space-8);
+            border-radius: 24px;
+            padding: var(--space-12);
             text-align: center;
-            transition: all 0.2s ease;
+            position: relative;
+            max-width: 600px;
+            margin: 0 auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
         }
-        
-        .pricing-card.featured {
-            border-color: var(--primary-500);
-            box-shadow: 0 8px 25px rgba(99, 91, 255, 0.15);
-        }
-        
+
         .pricing-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            transform: translateY(-8px);
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.12);
+            border-color: var(--primary-300);
         }
-        
+
         .pricing-badge {
-            background: var(--primary-500);
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
             color: var(--white);
-            padding: var(--space-1) var(--space-3);
-            border-radius: 20px;
-            font-size: var(--font-size-xs);
-            font-weight: 600;
+            padding: var(--space-2) var(--space-6);
+            border-radius: 50px;
+            font-size: var(--font-size-sm);
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: var(--space-4);
-            display: inline-block;
+            box-shadow: 0 4px 12px rgba(99, 91, 255, 0.3);
         }
-        
-        .price {
-            font-size: 3rem;
+
+        .pricing-header {
+            margin-bottom: var(--space-8);
+        }
+
+        .pricing-title {
+            font-size: var(--font-size-2xl);
             font-weight: 700;
-            color: var(--gray-800);
+            color: var(--gray-900);
             margin-bottom: var(--space-2);
         }
-        
+
+        .pricing-description {
+            color: var(--gray-600);
+            font-size: var(--font-size-lg);
+            line-height: 1.6;
+        }
+
+        /* Price Display */
+        .price-display {
+            margin: var(--space-8) 0;
+            padding: var(--space-8);
+            background: linear-gradient(135deg, var(--gray-50), var(--white));
+            border-radius: 16px;
+            border: 1px solid var(--gray-100);
+        }
+
+        .price-main {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: var(--space-2);
+            margin-bottom: var(--space-2);
+        }
+
+        .price-amount {
+            font-size: 4rem;
+            font-weight: 900;
+            color: var(--primary-600);
+            line-height: 1;
+        }
+
+        .price-currency {
+            font-size: var(--font-size-xl);
+            font-weight: 600;
+            color: var(--primary-600);
+        }
+
         .price-unit {
-            font-size: var(--font-size-sm);
+            font-size: var(--font-size-lg);
             color: var(--gray-500);
-            font-weight: 400;
+            font-weight: 500;
         }
-        
-        .feature-list {
-            text-align: left;
-            margin: var(--space-6) 0;
+
+        .price-secondary {
+            font-size: var(--font-size-base);
+            color: var(--gray-600);
+            margin-top: var(--space-2);
         }
-        
+
+        .price-highlight {
+            color: var(--primary-600);
+            font-weight: 600;
+        }
+
+        /* Features Section */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--space-6);
+            margin: var(--space-10) 0;
+        }
+
         .feature-item {
             display: flex;
-            align-items: center;
-            margin-bottom: var(--space-3);
-            font-size: var(--font-size-sm);
+            align-items: flex-start;
+            gap: var(--space-3);
+            padding: var(--space-4);
+            background: var(--gray-50);
+            border-radius: 12px;
+            transition: all 0.2s ease;
         }
-        
-        .feature-check {
-            color: var(--success);
-            margin-right: var(--space-3);
+
+        .feature-item:hover {
+            background: var(--primary-50);
+            transform: translateY(-2px);
+        }
+
+        .feature-icon {
+            flex-shrink: 0;
+            width: 24px;
+            height: 24px;
+            background: var(--success);
+            color: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
             font-weight: bold;
+            margin-top: 2px;
+        }
+
+        .feature-text {
+            font-size: var(--font-size-base);
+            color: var(--gray-700);
+            line-height: 1.5;
+            font-weight: 500;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            margin-top: var(--space-12);
+            padding: var(--space-8);
+            background: linear-gradient(135deg, var(--primary-50), var(--white));
+            border-radius: 20px;
+            border: 1px solid var(--primary-100);
+        }
+
+        .cta-button {
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            color: var(--white);
+            border: none;
+            padding: var(--space-4) var(--space-8);
+            border-radius: 50px;
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(99, 91, 255, 0.3);
+            min-width: 280px;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(99, 91, 255, 0.4);
+            background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+        }
+
+        .cta-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .cta-tagline {
+            margin-top: var(--space-4);
+            font-size: var(--font-size-sm);
+            color: var(--gray-500);
+            font-weight: 500;
+        }
+
+        /* Calculator Section */
+        .calculator-section {
+            background: var(--white);
+            padding: var(--space-16) 0;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        .calculator-card {
+            background: linear-gradient(135deg, var(--gray-50), var(--white));
+            border: 2px solid var(--gray-200);
+            border-radius: 20px;
+            padding: var(--space-10);
+            max-width: 500px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .calculator-title {
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: var(--space-6);
+        }
+
+        .input-group {
+            margin-bottom: var(--space-6);
+        }
+
+        .input-label {
+            display: block;
+            font-size: var(--font-size-base);
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: var(--space-2);
+        }
+
+        .user-input {
+            width: 100%;
+            padding: var(--space-4);
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.2s ease;
+            background: var(--white);
+        }
+
+        .user-input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.1);
+        }
+
+        .cost-breakdown {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 16px;
+            padding: var(--space-6);
+            margin: var(--space-6) 0;
+        }
+
+        .cost-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-3) 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .cost-row:last-child {
+            border-bottom: none;
+            font-weight: 700;
+            font-size: var(--font-size-lg);
+            color: var(--primary-600);
+        }
+
+        .cost-label {
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        .cost-value {
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+
+        /* FAQ Section */
+        .faq-section {
+            background: var(--gray-50);
+            padding: var(--space-16) 0;
+        }
+
+        .faq-title {
+            text-align: center;
+            font-size: var(--font-size-3xl);
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: var(--space-12);
+        }
+
+        .faq-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: var(--space-6);
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .faq-item {
+            background: var(--white);
+            border-radius: 16px;
+            padding: var(--space-6);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+        }
+
+        .faq-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .faq-question {
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: var(--space-3);
+        }
+
+        .faq-answer {
+            color: var(--gray-600);
+            line-height: 1.6;
+        }
+
+        /* Comparison Table */
+        .comparison-section {
+            background: var(--white);
+            padding: var(--space-16) 0;
+        }
+
+        .comparison-title {
+            text-align: center;
+            font-size: var(--font-size-3xl);
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: var(--space-4);
+        }
+
+        .comparison-subtitle {
+            text-align: center;
+            font-size: var(--font-size-lg);
+            color: var(--gray-600);
+            margin-bottom: var(--space-12);
+        }
+
+        .comparison-table {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .table-header {
+            background: linear-gradient(135deg, var(--gray-900), var(--gray-800));
+            color: var(--white);
+            font-weight: 700;
+        }
+
+        .table-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            align-items: center;
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .table-row:last-child {
+            border-bottom: none;
+        }
+
+        .table-row:nth-child(even) {
+            background: var(--gray-50);
+        }
+
+        .lemma-highlight {
+            background: var(--primary-50) !important;
+            font-weight: 600;
+            color: var(--primary-700);
+        }
+
+        .table-cell {
+            padding: var(--space-2) 0;
+        }
+
+        .price-cell {
+            font-weight: 700;
+            font-size: var(--font-size-lg);
+        }
+
+        .lemma-price {
+            color: var(--primary-600);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2.5rem;
+            }
+
+            .pricing-card {
+                margin: 0 var(--space-4);
+                padding: var(--space-8);
+            }
+
+            .price-amount {
+                font-size: 3rem;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .faq-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .table-row {
+                grid-template-columns: 1fr;
+                gap: var(--space-2);
+                text-align: left;
+            }
+
+            .table-header {
+                display: none;
+            }
         }
     </style>
-    
-    <script>
-        // Stripe subscription handling
-        function subscribeToPlan(planType) {
-            // Plan configuration mapping
-            const plans = {
-                'starter': {
-                    name: 'Starter',
-                    price: '$29/month',
-                    priceId: 'price_1RtBQFDIouMeOMabSXK43jDW', // Will be updated with correct recurring price
-                    features: ['Up to 10,000 verifications/month', 'Email support']
-                },
-                'professional': {
-                    name: 'Professional', 
-                    price: '$99/month',
-                    priceId: 'price_1RtBQGDIouMeOMabRGaVYg0A', // Will be updated with correct recurring price
-                    features: ['Up to 100,000 verifications/month', 'Priority support', 'Advanced analytics']
-                },
-                'enterprise': {
-                    name: 'Enterprise',
-                    price: '$499/month', 
-                    priceId: 'price_1RtBQGDIouMeOMab4DsImBZ3', // Will be updated with correct recurring price
-                    features: ['Unlimited verifications', 'Dedicated support', 'White-label options']
-                }
-            };
-            
-            const selectedPlan = plans[planType];
-            
-            if (planType === 'enterprise') {
-                // For enterprise, redirect to contact sales
-                window.location.href = '/contact?plan=enterprise';
-                return;
-            }
-            
-            // For starter and professional, redirect to Stripe Checkout
-            fetch('/api/create-checkout-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    priceId: selectedPlan.priceId,
-                    planType: planType
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.url) {
-                    window.location.href = data.url;
-                } else {
-                    console.error('Failed to create checkout session:', data.error);
-                    alert('Sorry, there was an error processing your request. Please try again.');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Sorry, there was an error processing your request. Please try again.');
-            });
-        }
-    </script>
 {% endblock %}
 
 {% block content %}
-<!-- Pricing Hero -->
-<section class="pricing-hero">
-    <div class="stripe-container">
-        <h1 class="hero-title">Pay Only For What You Use</h1>
-        <p class="hero-subtitle">
-            Simple per-user pricing that scales with your business. No hidden fees, no minimum commitments.
-        </p>
-    </div>
-</section>
+    <!-- Hero Section -->
+    <section class="pricing-hero">
+        <div class="pricing-container">
+            <div class="hero-badge">Simple Pricing</div>
+            <h1 class="hero-title">Pay Only For What You Use</h1>
+            <p class="hero-subtitle">
+                Simple per-user pricing that scales with your business. No hidden fees, no minimum commitments, no setup costs.
+            </p>
+        </div>
+    </section>
 
-<!-- Pricing Plans -->
-<section class="section">
-    <div class="stripe-container">
-        <!-- Simple Per-User Pricing -->
-        <div class="card-enhanced" style="max-width: 600px; margin: 0 auto;">
-            <div class="card-body text-center">
-                <h2 style="color: var(--primary-500); margin-bottom: var(--space-6);">Simple Per-User Pricing</h2>
+    <!-- Main Pricing Section -->
+    <section class="pricing-main">
+        <div class="pricing-container">
+            <div class="pricing-card">
+                <div class="pricing-badge">Most Popular</div>
                 
-                <!-- Main Pricing -->
-                <div style="margin-bottom: var(--space-8);">
-                    <div class="price" style="display: flex; align-items: center; justify-content: center; gap: var(--space-4); margin-bottom: var(--space-4);">
-                        <span style="font-size: 4rem; font-weight: 700; color: var(--primary-500);">$0.10</span>
-                        <div style="text-align: left;">
-                            <div style="font-size: var(--font-size-lg); font-weight: 600; color: var(--gray-700);">per user</div>
-                            <div style="font-size: var(--font-size-sm); color: var(--gray-500);">per month</div>
-                        </div>
+                <div class="pricing-header">
+                    <h2 class="pricing-title">Per-User Billing</h2>
+                    <p class="pricing-description">
+                        Pay only for verified users on your platform. Perfect for any size business.
+                    </p>
+                </div>
+
+                <div class="price-display">
+                    <div class="price-main">
+                        <span class="price-currency">$</span>
+                        <span class="price-amount">0.10</span>
+                        <span class="price-unit">per user per month</span>
                     </div>
-                    
-                    <div style="font-size: var(--font-size-lg); color: var(--gray-600); margin-bottom: var(--space-2);">
-                        + <strong style="color: var(--primary-500);">$2.00</strong> one-time setup fee per new user
-                    </div>
-                    <div style="font-size: var(--font-size-sm); color: var(--gray-500);">
-                        (covers Stripe Identity verification cost)
+                    <div class="price-secondary">
+                        + <span class="price-highlight">$2.00</span> one-time setup fee per new user<br>
+                        <small>(covers Stripe Identity verification cost)</small>
                     </div>
                 </div>
-                
-                <!-- What's Included -->
-                <div class="feature-list" style="text-align: left; max-width: 400px; margin: 0 auto var(--space-8);">
-                    <h4 style="text-align: center; margin-bottom: var(--space-4); color: var(--gray-800);">Everything Included:</h4>
+
+                <div class="features-grid">
                     <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Unlimited verifications per user
+                        <div class="feature-icon">✓</div>
+                        <div class="feature-text">Microsecond verification speed</div>
                     </div>
                     <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Microsecond-level performance (0.36µs avg)
+                        <div class="feature-icon">✓</div>
+                        <div class="feature-text">99.9% offline operation</div>
                     </div>
                     <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        99.9% offline operation - no network calls
+                        <div class="feature-icon">✓</div>
+                        <div class="feature-text">Cross-site network effects</div>
                     </div>
                     <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Cross-site network effects
+                        <div class="feature-icon">✓</div>
+                        <div class="feature-text">Privacy-first verification</div>
                     </div>
                     <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Privacy-first verification (no data stored)
+                        <div class="feature-icon">✓</div>
+                        <div class="feature-text">One script tag integration</div>
                     </div>
                     <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        5-minute integration with one script tag
+                        <div class="feature-icon">✓</div>
+                        <div class="feature-text">Real-time bot detection</div>
                     </div>
                     <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        24/7 email support
+                        <div class="feature-icon">✓</div>
+                        <div class="feature-text">Advanced analytics dashboard</div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">✓</div>
+                        <div class="feature-text">24/7 email support</div>
                     </div>
                 </div>
+
+                <div class="cta-section">
+                    <button onclick="startBillingSetup()" class="cta-button">
+                        Start Protecting Your Site
+                    </button>
+                    <p class="cta-tagline">
+                        No monthly minimums • Cancel anytime • 30-day money-back guarantee
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Calculator -->
+    <section class="calculator-section">
+        <div class="pricing-container">
+            <div class="calculator-card">
+                <h3 class="calculator-title">Pricing Calculator</h3>
                 
-                <button onclick="startBillingSetup()" class="btn btn-primary btn-lg" style="font-size: var(--font-size-lg); padding: var(--space-4) var(--space-8);">
-                    Start Protecting Your Site
-                </button>
-                
-                <p style="margin-top: var(--space-4); font-size: var(--font-size-sm); color: var(--gray-500);">
-                    No monthly minimums • No setup fees • Cancel anytime
+                <div class="input-group">
+                    <label class="input-label" for="userCount">Expected Monthly Users</label>
+                    <input type="number" id="userCount" class="user-input" value="1000" min="1" onchange="calculateCost()">
+                </div>
+
+                <div class="cost-breakdown">
+                    <div class="cost-row">
+                        <span class="cost-label">Monthly Users:</span>
+                        <span class="cost-value" id="monthlyUsers">1,000</span>
+                    </div>
+                    <div class="cost-row">
+                        <span class="cost-label">Monthly Cost:</span>
+                        <span class="cost-value" id="monthlyCost">$100.00</span>
+                    </div>
+                    <div class="cost-row">
+                        <span class="cost-label">One-time Setup:</span>
+                        <span class="cost-value" id="setupCost">$2,000.00</span>
+                    </div>
+                    <div class="cost-row">
+                        <span class="cost-label">Total First Month:</span>
+                        <span class="cost-value" id="totalCost">$2,100.00</span>
+                    </div>
+                </div>
+
+                <p style="font-size: var(--font-size-sm); color: var(--gray-500); margin-top: var(--space-4);">
+                    Setup fee is only charged once per new user. Returning users are free.
                 </p>
             </div>
         </div>
-        
-        <!-- Pricing Calculator -->
-        <div class="card-enhanced" style="max-width: 500px; margin: var(--space-12) auto 0;">
-            <div class="card-body">
-                <h3 style="text-align: center; margin-bottom: var(--space-6);">Calculate Your Monthly Cost</h3>
-                
-                <div style="margin-bottom: var(--space-4);">
-                    <label style="display: block; margin-bottom: var(--space-2); font-weight: 600;">Number of verified users:</label>
-                    <input type="number" id="userCount" value="1000" min="1" max="1000000" 
-                           style="width: 100%; padding: var(--space-3); border: 2px solid var(--gray-200); border-radius: 6px; font-size: var(--font-size-base);"
-                           oninput="calculateCost()">
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq-section">
+        <div class="pricing-container">
+            <h2 class="faq-title">Frequently Asked Questions</h2>
+            
+            <div class="faq-grid">
+                <div class="faq-item">
+                    <h3 class="faq-question">How does per-user billing work?</h3>
+                    <p class="faq-answer">
+                        You're billed $0.10 for each unique user that gets verified through Lemma Shield each month. New users incur a one-time $2.00 setup fee to cover identity verification costs.
+                    </p>
                 </div>
-                
-                <div style="background: var(--gray-50); padding: var(--space-4); border-radius: 8px; margin-bottom: var(--space-4);">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-2);">
-                        <span>Monthly cost (<span id="monthlyUsers">1,000</span> users × $0.10):</span>
-                        <strong id="monthlyCost">$100.00</strong>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: var(--font-size-sm); color: var(--gray-600);">
-                        <span>One-time setup (new users × $2.00):</span>
-                        <span id="setupCost">$2,000.00</span>
-                    </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">What's included in the price?</h3>
+                    <p class="faq-answer">
+                        Everything: microsecond verification, bot detection, privacy protection, analytics dashboard, API access, and 24/7 support. No hidden fees or feature restrictions.
+                    </p>
                 </div>
-                
-                <div style="text-align: center; font-size: var(--font-size-sm); color: var(--gray-600);">
-                    Setup fee only applies to new users joining your platform
+
+                <div class="faq-item">
+                    <h3 class="faq-question">Why is there a $2 setup fee?</h3>
+                    <p class="faq-answer">
+                        The setup fee covers the cost of Stripe Identity verification for new users. This ensures every user is properly verified and helps maintain the integrity of the network.
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">How fast is verification?</h3>
+                    <p class="faq-answer">
+                        Lemma Shield verifies users in microseconds (4.176µs average) - that's 1000x faster than traditional solutions. 99.9% of verifications work offline.
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">Can I cancel anytime?</h3>
+                    <p class="faq-answer">
+                        Yes! Cancel anytime with no penalties. You'll only be charged for users verified in the current billing cycle. No long-term contracts or commitments.
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">How does this compare to competitors?</h3>
+                    <p class="faq-answer">
+                        Lemma Shield costs 90% less than alternatives like Auth0 ($23/month per 1000 users) or Okta ($2/user/month), while providing faster, more secure verification.
+                    </p>
                 </div>
             </div>
         </div>
-        
-        <script>
+    </section>
+
+    <!-- Competitive Comparison -->
+    <section class="comparison-section">
+        <div class="pricing-container">
+            <h2 class="comparison-title">Why Lemma Costs 90% Less</h2>
+            <p class="comparison-subtitle">
+                Compare our transparent per-user pricing with traditional authentication providers
+            </p>
+
+            <div class="comparison-table">
+                <div class="table-row table-header">
+                    <div class="table-cell">Provider</div>
+                    <div class="table-cell">Cost per 1000 users</div>
+                    <div class="table-cell">Verification Speed</div>
+                    <div class="table-cell">Setup Complexity</div>
+                </div>
+
+                <div class="table-row lemma-highlight">
+                    <div class="table-cell"><strong>Lemma Shield</strong></div>
+                    <div class="table-cell price-cell lemma-price">$100/month</div>
+                    <div class="table-cell">4.176µs</div>
+                    <div class="table-cell">One script tag</div>
+                </div>
+
+                <div class="table-row">
+                    <div class="table-cell">Auth0</div>
+                    <div class="table-cell price-cell">$2,000/month</div>
+                    <div class="table-cell">200-500ms</div>
+                    <div class="table-cell">Complex integration</div>
+                </div>
+
+                <div class="table-row">
+                    <div class="table-cell">Okta</div>
+                    <div class="table-cell price-cell">$2,000/month</div>
+                    <div class="table-cell">300-800ms</div>
+                    <div class="table-cell">Enterprise setup</div>
+                </div>
+
+                <div class="table-row">
+                    <div class="table-cell">Cloudflare Bot Management</div>
+                    <div class="table-cell price-cell">$200/month</div>
+                    <div class="table-cell">50-100ms</div>
+                    <div class="table-cell">DNS configuration</div>
+                </div>
+
+                <div class="table-row">
+                    <div class="table-cell">reCAPTCHA Enterprise</div>
+                    <div class="table-cell price-cell">$100/month</div>
+                    <div class="table-cell">2-5 seconds</div>
+                    <div class="table-cell">API integration</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // Enhanced pricing calculator
         function calculateCost() {
             const userCount = parseInt(document.getElementById('userCount').value) || 0;
-            const monthlyTotal = userCount * 0.10;
-            const setupTotal = userCount * 2.00;
+            const monthlyRate = 0.10;
+            const setupFeePerUser = 2.00;
+            
+            const monthlyTotal = userCount * monthlyRate;
+            const setupTotal = userCount * setupFeePerUser;
+            const totalFirstMonth = monthlyTotal + setupTotal;
             
             document.getElementById('monthlyUsers').textContent = userCount.toLocaleString();
             document.getElementById('monthlyCost').textContent = '$' + monthlyTotal.toFixed(2);
             document.getElementById('setupCost').textContent = '$' + setupTotal.toFixed(2);
+            document.getElementById('totalCost').textContent = '$' + totalFirstMonth.toFixed(2);
         }
         
         // Initialize calculator
@@ -320,7 +784,7 @@
                 button.disabled = false;
             }
         }
-        
+
         // API integration for cost estimation
         async function getExactCostEstimate(userCount) {
             try {
@@ -346,131 +810,5 @@
                 return null;
             }
         }
-        </script>
-        
-        <!-- Competitive Comparison -->
-        <div class="section-header" style="margin-top: var(--space-20);">
-            <h2>Why Lemma Costs 90% Less Than Competitors</h2>
-            <p class="section-subtitle">
-                Compare our per-user pricing to traditional auth and bot protection services
-            </p>
-        </div>
-        
-        <div class="card-enhanced" style="margin-bottom: var(--space-12);">
-            <div class="card-body">
-                <div style="overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; margin: var(--space-4) 0;">
-                        <thead>
-                            <tr style="border-bottom: 2px solid var(--gray-200);">
-                                <th style="text-align: left; padding: var(--space-3); font-weight: 600;">Service</th>
-                                <th style="text-align: center; padding: var(--space-3); font-weight: 600;">Pricing</th>
-                                <th style="text-align: center; padding: var(--space-3); font-weight: 600;">1,000 Users/Month</th>
-                                <th style="text-align: center; padding: var(--space-3); font-weight: 600;">Performance</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style="background: var(--success-50); border: 2px solid var(--success-200);">
-                                <td style="padding: var(--space-3); font-weight: 600; color: var(--success-700);">
-                                    🏆 Lemma Shield
-                                </td>
-                                <td style="padding: var(--space-3); text-align: center; font-weight: 600; color: var(--success-700);">
-                                    $0.10/user/month
-                                </td>
-                                <td style="padding: var(--space-3); text-align: center; font-weight: 600; color: var(--success-700);">
-                                    $100/month
-                                </td>
-                                <td style="padding: var(--space-3); text-align: center; font-weight: 600; color: var(--success-700);">
-                                    0.36µs
-                                </td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid var(--gray-200);">
-                                <td style="padding: var(--space-3);">Auth0</td>
-                                <td style="padding: var(--space-3); text-align: center;">$23+/month base</td>
-                                <td style="padding: var(--space-3); text-align: center; color: var(--error);">$23-240/month</td>
-                                <td style="padding: var(--space-3); text-align: center;">~100ms</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid var(--gray-200);">
-                                <td style="padding: var(--space-3);">Okta</td>
-                                <td style="padding: var(--space-3); text-align: center;">$2-8/user/month</td>
-                                <td style="padding: var(--space-3); text-align: center; color: var(--error);">$2,000-8,000/month</td>
-                                <td style="padding: var(--space-3); text-align: center;">~200ms</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid var(--gray-200);">
-                                <td style="padding: var(--space-3);">Cloudflare Bot Management</td>
-                                <td style="padding: var(--space-3); text-align: center;">$200+/month</td>
-                                <td style="padding: var(--space-3); text-align: center; color: var(--error);">$200-500+/month</td>
-                                <td style="padding: var(--space-3); text-align: center;">~50ms</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: var(--space-3);">reCAPTCHA Enterprise</td>
-                                <td style="padding: var(--space-3); text-align: center;">$1-3/1000 calls</td>
-                                <td style="padding: var(--space-3); text-align: center; color: var(--error);">$100-3,000/month</td>
-                                <td style="padding: var(--space-3); text-align: center;">~500ms</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div style="background: var(--primary-50); padding: var(--space-4); border-radius: 8px; margin-top: var(--space-6); text-align: center;">
-                    <h4 style="color: var(--primary-700); margin-bottom: var(--space-2);">💰 Lemma is 90-95% cheaper than competitors</h4>
-                    <p style="color: var(--primary-600); margin-bottom: var(--space-2);">
-                        <strong>Plus you get:</strong> 1000x faster performance, 99.9% offline operation, and privacy-first verification
-                    </p>
-                    <p style="font-size: var(--font-size-sm); color: var(--primary-600);">
-                        *Competitor pricing based on published rates as of 2024. Performance measured in typical verification response times.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- FAQ Section -->
-        <div class="section-header" style="margin-top: var(--space-20);">
-            <h2>Frequently Asked Questions</h2>
-        </div>
-        
-        <div class="card-grid-2">
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>How does per-user billing work?</h4>
-                    <p>You pay $0.10 per month for each verified user on your platform. New users have a one-time $2 setup fee to cover identity verification costs. No monthly minimums or commitments.</p>
-                </div>
-            </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>What's included in the $0.10 per user?</h4>
-                    <p>Everything! Unlimited verifications per user, microsecond performance, 99.9% offline operation, cross-site network effects, and full support. No feature restrictions.</p>
-                </div>
-            </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>Why is there a $2 setup fee for new users?</h4>
-                    <p>The one-time $2 fee covers the cost of Stripe Identity verification to ensure each user is real. This prevents bot accounts and keeps your platform secure.</p>
-                </div>
-            </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>How does this compare to competitors?</h4>
-                    <p>Our $0.10/user/month significantly undercuts Auth0 ($23+/month), Okta ($2+/user/month), and bot protection services ($100s/month) while providing faster, more secure verification.</p>
-                </div>
-            </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>How fast is the verification?</h4>
-                    <p>Lemma provides microsecond-level verification (0.36µs average) with 99.9% offline operation. No network calls needed for most verifications, making it the fastest solution available.</p>
-                </div>
-            </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>Can I cancel anytime?</h4>
-                    <p>Yes! No contracts or commitments. You only pay for active users each month. Stop using the service and you stop paying - it's that simple.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-{% endblock %} 
+    </script>
+{% endblock %}
