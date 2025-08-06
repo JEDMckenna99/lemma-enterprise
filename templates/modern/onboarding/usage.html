@@ -228,57 +228,62 @@
                         </div>
                     </div>
 
-                    <!-- Pricing Tiers -->
+                    <!-- Subscription Plans -->
                     <div class="pricing-section">
-                        <h3 class="pricing-section-title">Pricing Tiers</h3>
+                        <h3 class="pricing-section-title">Subscription Plans</h3>
                         <div class="pricing-tiers">
-                            <!-- Free Tier -->
-                            <div class="pricing-tier {% if usage_30d.pricing_tier == 'free' %}pricing-tier-active{% endif %}">
+                            <!-- Starter Plan -->
+                            <div class="pricing-tier {% if usage_30d.pricing_tier == 'starter' %}pricing-tier-active{% endif %}">
                                 <div class="pricing-tier-content">
                                     <div class="pricing-tier-info">
-                                        <h4 class="pricing-tier-name">Free Tier</h4>
-                                        <p class="pricing-tier-description">First {{ "{:,}".format(pricing.free_tier) }} verifications</p>
+                                        <h4 class="pricing-tier-name">Starter</h4>
+                                        <p class="pricing-tier-description">Up to 10,000 verifications/month</p>
                                     </div>
                                     <div class="pricing-tier-price">
-                                        <span class="price-amount price-amount-success">$0.00</span>
-                                        {% if usage_30d.pricing_tier == 'free' %}
+                                        <span class="price-amount price-amount-success">$29/month</span>
+                                        {% if usage_30d.pricing_tier == 'starter' %}
                                             <span class="price-badge badge badge-success">CURRENT</span>
                                         {% endif %}
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Standard Tier -->
-                            <div class="pricing-tier {% if usage_30d.pricing_tier == 'standard' %}pricing-tier-active{% endif %}">
+                            <!-- Professional Plan -->
+                            <div class="pricing-tier {% if usage_30d.pricing_tier == 'professional' %}pricing-tier-active{% endif %}">
                                 <div class="pricing-tier-content">
                                     <div class="pricing-tier-info">
-                                        <h4 class="pricing-tier-name">Standard Tier</h4>
-                                        <p class="pricing-tier-description">${{ pricing.price_per_verification }} per verification</p>
+                                        <h4 class="pricing-tier-name">Professional</h4>
+                                        <p class="pricing-tier-description">Up to 100,000 verifications/month</p>
                                     </div>
                                     <div class="pricing-tier-price">
-                                        <span class="price-amount price-amount-primary">${{ pricing.price_per_verification }}</span>
-                                        {% if usage_30d.pricing_tier == 'standard' %}
+                                        <span class="price-amount price-amount-primary">$99/month</span>
+                                        {% if usage_30d.pricing_tier == 'professional' %}
                                             <span class="price-badge badge badge-primary">CURRENT</span>
                                         {% endif %}
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Enterprise Tier -->
+                            <!-- Enterprise Plan -->
                             <div class="pricing-tier {% if usage_30d.pricing_tier == 'enterprise' %}pricing-tier-active{% endif %}">
                                 <div class="pricing-tier-content">
                                     <div class="pricing-tier-info">
-                                        <h4 class="pricing-tier-name">Enterprise Tier</h4>
-                                        <p class="pricing-tier-description">${{ pricing.enterprise_discount }} per verification</p>
+                                        <h4 class="pricing-tier-name">Enterprise</h4>
+                                        <p class="pricing-tier-description">Unlimited verifications</p>
                                     </div>
                                     <div class="pricing-tier-price">
-                                        <span class="price-amount price-amount-warning">${{ pricing.enterprise_discount }}</span>
+                                        <span class="price-amount price-amount-warning">$499/month</span>
                                         {% if usage_30d.pricing_tier == 'enterprise' %}
                                             <span class="price-badge badge badge-warning">CURRENT</span>
                                         {% endif %}
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                        
+                        <div class="pricing-cta">
+                            <p class="text-secondary">Need to upgrade or change your plan?</p>
+                            <a href="/pricing" class="btn btn-primary">View All Plans</a>
                         </div>
                     </div>
 

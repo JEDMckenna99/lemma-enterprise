@@ -101,6 +101,15 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register Network Registry blueprint: {e}")
+    
+    # Register the Stripe Checkout blueprint for subscription management
+    try:
+        from api.stripe_checkout import stripe_checkout_bp
+        app.register_blueprint(stripe_checkout_bp)
+        logger.info("✅ Stripe Checkout API blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register Stripe Checkout blueprint: {e}")
         
     # Initialize optimized engine
     try:

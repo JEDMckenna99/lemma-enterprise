@@ -82,6 +82,66 @@
             font-weight: bold;
         }
     </style>
+    
+    <script>
+        // Stripe subscription handling
+        function subscribeToPlan(planType) {
+            // Plan configuration mapping
+            const plans = {
+                'starter': {
+                    name: 'Starter',
+                    price: '$29/month',
+                    priceId: 'price_1RtBQFDIouMeOMabSXK43jDW', // Will be updated with correct recurring price
+                    features: ['Up to 10,000 verifications/month', 'Email support']
+                },
+                'professional': {
+                    name: 'Professional', 
+                    price: '$99/month',
+                    priceId: 'price_1RtBQGDIouMeOMabRGaVYg0A', // Will be updated with correct recurring price
+                    features: ['Up to 100,000 verifications/month', 'Priority support', 'Advanced analytics']
+                },
+                'enterprise': {
+                    name: 'Enterprise',
+                    price: '$499/month', 
+                    priceId: 'price_1RtBQGDIouMeOMab4DsImBZ3', // Will be updated with correct recurring price
+                    features: ['Unlimited verifications', 'Dedicated support', 'White-label options']
+                }
+            };
+            
+            const selectedPlan = plans[planType];
+            
+            if (planType === 'enterprise') {
+                // For enterprise, redirect to contact sales
+                window.location.href = '/contact?plan=enterprise';
+                return;
+            }
+            
+            // For starter and professional, redirect to Stripe Checkout
+            fetch('/api/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    priceId: selectedPlan.priceId,
+                    planType: planType
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.url) {
+                    window.location.href = data.url;
+                } else {
+                    console.error('Failed to create checkout session:', data.error);
+                    alert('Sorry, there was an error processing your request. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Sorry, there was an error processing your request. Please try again.');
+            });
+        }
+    </script>
 {% endblock %}
 
 {% block content %}
@@ -90,7 +150,7 @@
     <div class="stripe-container">
         <h1 class="hero-title">Simple, Transparent Pricing</h1>
         <p class="hero-subtitle">
-            Start free, scale as you grow. No hidden fees, no surprises.
+            Choose the plan that fits your needs. No hidden fees, cancel anytime.
         </p>
     </div>
 </section>
@@ -99,17 +159,16 @@
 <section class="section">
     <div class="stripe-container">
         <div class="pricing-plans">
-            <!-- Network Plan -->
-            <div class="pricing-card featured">
-                <div class="pricing-badge">Most Popular</div>
-                <h3>Network Partner</h3>
-                <div class="price">$0.10<span class="price-unit">/user/month</span></div>
-                <p class="text-secondary">Perfect for websites that need bot protection</p>
+            <!-- Starter Plan -->
+            <div class="pricing-card">
+                <h3>Starter</h3>
+                <div class="price">$29<span class="price-unit">/month</span></div>
+                <p class="text-secondary">Perfect for small to medium websites</p>
                 
                 <div class="feature-list">
                     <div class="feature-item">
                         <span class="feature-check">✓</span>
-                        Unlimited verifications
+                        Up to 10,000 verifications/month
                     </div>
                     <div class="feature-item">
                         <span class="feature-check">✓</span>
@@ -125,23 +184,64 @@
                     </div>
                     <div class="feature-item">
                         <span class="feature-check">✓</span>
-                        Zero-knowledge privacy
+                        Email support
                     </div>
                 </div>
                 
-                <button class="btn btn-primary btn-lg w-full">Join Network</button>
+                <a href="https://buy.stripe.com/test_4gM00jf25ePx7MogWA0sU00" class="btn btn-outline btn-lg w-full">Get Started</a>
             </div>
 
-            <!-- Enterprise Plan -->
-            <div class="pricing-card">
-                <h3>Enterprise Licensing</h3>
-                <div class="price">$200K<span class="price-unit">-2M/year</span></div>
-                <p class="text-secondary">White-label the engine for your industry</p>
+            <!-- Professional Plan -->
+            <div class="pricing-card featured">
+                <div class="pricing-badge">Most Popular</div>
+                <h3>Professional</h3>
+                <div class="price">$99<span class="price-unit">/month</span></div>
+                <p class="text-secondary">Advanced features for growing businesses</p>
                 
                 <div class="feature-list">
                     <div class="feature-item">
                         <span class="feature-check">✓</span>
-                        Full engine licensing
+                        Up to 100,000 verifications/month
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Priority support
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Advanced analytics dashboard
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Custom integration assistance
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        SLA: 99.9% uptime guarantee
+                    </div>
+                </div>
+                
+                <a href="https://buy.stripe.com/test_fZucN57zDgXFeaMayc0sU01" class="btn btn-primary btn-lg w-full">Choose Professional</a>
+            </div>
+
+            <!-- Enterprise Plan -->
+            <div class="pricing-card">
+                <h3>Enterprise</h3>
+                <div class="price">$499<span class="price-unit">/month</span></div>
+                <p class="text-secondary">Full-scale enterprise protection</p>
+                
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Unlimited verifications
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        White-label options
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        Dedicated support team
                     </div>
                     <div class="feature-item">
                         <span class="feature-check">✓</span>
@@ -149,51 +249,11 @@
                     </div>
                     <div class="feature-item">
                         <span class="feature-check">✓</span>
-                        Industry-specific packages
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Dedicated support
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        SLA guarantees
+                        SLA: 99.99% uptime + 4hr response
                     </div>
                 </div>
                 
-                <button class="btn btn-outline btn-lg w-full">Contact Sales</button>
-            </div>
-
-            <!-- Developer Plan -->
-            <div class="pricing-card">
-                <h3>Developer</h3>
-                <div class="price">Free<span class="price-unit">/testing</span></div>
-                <p class="text-secondary">Perfect for development and testing</p>
-                
-                <div class="feature-list">
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        1,000 verifications/month
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Full API access
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Documentation & examples
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Community support
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        No credit card required
-                    </div>
-                </div>
-                
-                <button class="btn btn-ghost btn-lg w-full">Start Free</button>
+                <a href="https://buy.stripe.com/test_9B68wP7zDfTBc2EbCg0sU02" class="btn btn-outline btn-lg w-full">Get Enterprise</a>
             </div>
         </div>
 
@@ -205,22 +265,22 @@
         <div class="card-grid-2">
             <div class="card-enhanced">
                 <div class="card-body">
-                    <h4>How does network pricing work?</h4>
-                    <p>You pay $0.10 per user per month, regardless of how many times they verify. Once a user is verified in the network, they can access any partner site without additional charges.</p>
+                    <h4>How does subscription billing work?</h4>
+                    <p>All plans are billed monthly. You get access to unlimited bot protection with verification limits based on your plan. Upgrade or downgrade anytime.</p>
                 </div>
             </div>
             
             <div class="card-enhanced">
                 <div class="card-body">
-                    <h4>What's included in enterprise licensing?</h4>
-                    <p>Full access to the Lemma verification engine, custom implementations for your industry, dedicated support, and SLA guarantees. Perfect for banking, healthcare, gaming, and supply chain.</p>
+                    <h4>What payment methods do you accept?</h4>
+                    <p>We accept all major credit cards, debit cards, and digital wallets through our secure Stripe integration. All payments are processed securely.</p>
                 </div>
             </div>
             
             <div class="card-enhanced">
                 <div class="card-body">
-                    <h4>Can I start with the free plan?</h4>
-                    <p>Absolutely! The developer plan includes 1,000 verifications per month with full API access. No credit card required to get started.</p>
+                    <h4>Can I cancel my subscription anytime?</h4>
+                    <p>Yes, you can cancel your subscription at any time. Your access will continue until the end of your current billing period, with no cancellation fees.</p>
                 </div>
             </div>
             
