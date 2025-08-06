@@ -114,9 +114,9 @@
 <section class="section">
     <div class="stripe-container">
         <div class="performance-highlight">
-            <h2 style="margin-bottom: var(--space-4);">⚡ 4.2 Minute Integration</h2>
+            <h2 style="margin-bottom: var(--space-4);">⚡ 3-Line Integration</h2>
             <p style="font-size: var(--font-size-lg); opacity: 0.9;">
-                From zero to production-ready verification in less than 5 minutes.
+                From zero to production-ready identity network in under 5 minutes.
             </p>
         </div>
         
@@ -124,99 +124,125 @@
             <!-- Quick Start -->
             <div class="docs-card">
                 <div class="docs-icon">🚀</div>
-                <h3>Quick Start <span class="integration-time">< 2 min</span></h3>
-                <p>Get started with a single script tag - zero configuration required.</p>
+                <h3>Quick Start <span class="integration-time">< 3 min</span></h3>
+                <p>Join the Lemma Identity Network with 3 lines of code - production ready immediately.</p>
                 
-                <div class="code-snippet">&lt;!-- Zero-config integration --&gt;
-&lt;script src="/js/lemma-bot-shield-simple.js" 
-        data-api-key="your-api-key"&gt;&lt;/script&gt;
+                <div class="code-snippet">&lt;!-- 1. Load the Lemma Identity Network --&gt;
+&lt;script src="https://lemma.id/js/lemma-federated-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
 
-&lt;!-- Instant bot protection --&gt;
-&lt;button data-lemma-verify="human"&gt;
-  Verify Human
-&lt;/button&gt;</div>
+&lt;!-- 2. Initialize with your API key --&gt;
+&lt;script&gt;
+  const shield = new LemmaBotShield({ 
+    apiKey: 'your-production-api-key',
+    apiBase: 'https://lemma.id'
+  });
+  
+  // 3. Protect any element instantly
+  shield.protect('#protected-content');
+&lt;/script&gt;</div>
                 
-                <a href="#quick-start" class="btn btn-primary btn-sm">Get Started</a>
+                <a href="#integration-guide" class="btn btn-primary btn-sm">Full Integration Guide</a>
             </div>
 
-            <!-- React Integration -->
+            <!-- Identity Network -->
             <div class="docs-card">
-                <div class="docs-icon">⚛️</div>
-                <h3>React Components <span class="integration-time">< 3 min</span></h3>
-                <p>Professional React components with TypeScript support and auto-mounting.</p>
+                <div class="docs-icon">🌐</div>
+                <h3>Identity Network <span class="integration-time">Cross-site</span></h3>
+                <p>Users verify once, access everywhere. Real federated identity with zero-knowledge privacy.</p>
                 
-                <div class="code-snippet">// Auto-mounting components
-&lt;div data-lemma-component="StatusCard" 
-     data-lemma-props='{"type": "success"}'&gt;
-&lt;/div&gt;
+                <div class="code-snippet">// Check if user is already verified in network
+const wallet = new LemmaFederatedWallet({ debug: true });
+await wallet.init();
 
-// Manual integration
-import { Lemma } from '@lemma/sdk';
-const result = await lemma.verify(credential);</div>
-                
-                <a href="#react" class="btn btn-primary btn-sm">View React Docs</a>
-            </div>
-
-            <!-- API Reference -->
-            <div class="docs-card">
-                <div class="docs-icon">📚</div>
-                <h3>API Reference</h3>
-                <p>Complete API documentation with interactive examples and performance metrics.</p>
-                
-                <div class="code-snippet">POST /api/verify
-
-{
-  "credential": {
-    "type": "identity",
-    "claims": { "isHuman": true },
-    "signature": "ed25519_signature"
-  }
+if (await wallet.hasValidCredentials()) {
+  // User already verified - instant access
+  showProtectedContent();
+} else {
+  // User needs verification - redirect to Stripe Identity
+  initiateVerification();
 }
 
-// Response: ~0.36µs verification time</div>
+// 99.9% offline operation - no server calls needed</div>
                 
-                <a href="/playground" class="btn btn-primary btn-sm">Try API Playground</a>
+                <a href="#network-integration" class="btn btn-primary btn-sm">Network Docs</a>
             </div>
 
-            <!-- Performance Guide -->
+            <!-- Production APIs -->
+            <div class="docs-card">
+                <div class="docs-icon">📚</div>
+                <h3>Production APIs</h3>
+                <p>Real-time verification with Rust backend - 4.176µs performance with production cryptography.</p>
+                
+                <div class="code-snippet">// Client-side verification (preferred)
+const result = await shield.verifyUser();
+if (result.verified) {
+  console.log('Human verified:', result.confidence);
+}
+
+// Server-side API (fallback)
+POST https://lemma.id/api/verify
+{
+  "credential": "base64_encoded_credential",
+  "context": { "action": "checkout" }
+}
+
+// Response: 4.176µs verification time</div>
+                
+                <a href="/playground" class="btn btn-primary btn-sm">Try Live API</a>
+            </div>
+
+            <!-- Real-time Security -->
             <div class="docs-card">
                 <div class="docs-icon">⚡</div>
-                <h3>Performance Optimization</h3>
-                <p>Achieve microsecond verification with advanced caching and optimization techniques.</p>
+                <h3>Real-time Security</h3>
+                <p>Continuous background verification with configurable security levels and threat detection.</p>
                 
-                <div class="code-snippet">// Performance configuration
-const lemma = new Lemma({
+                <div class="code-snippet">// Configure security monitoring
+const shield = new LemmaBotShield({
   apiKey: 'your-key',
-  cacheSize: 1000,
-  predictiveCaching: true,
-  simdOptimization: true
+  securityLevel: 'high', // 'low', 'medium', 'high', 'critical'
+  backgroundChecks: true,
+  checkOnEvents: ['entry', 'checkout', 'sensitive_action'],
+  maxFailures: 3,
+  gracePeriod: 24 * 60 * 60 * 1000 // 24 hours
 });
 
-// Result: 0.05-1µs verification</div>
+// Real-time threat detection active</div>
                 
-                <a href="#performance" class="btn btn-primary btn-sm">Optimization Guide</a>
+                <a href="#security-config" class="btn btn-primary btn-sm">Security Guide</a>
             </div>
 
             <!-- Bot Shield -->
             <div class="docs-card">
                 <div class="docs-icon">🛡️</div>
-                <h3>Hybrid Bot Shield</h3>
-                <p>Deploy enterprise-grade bot protection with 99.9% offline operation.</p>
+                <h3>Production Bot Shield</h3>
+                <p>Enterprise-grade bot protection with federated network integration and real-time threat detection.</p>
                 
-                <div class="code-snippet">// Bot Shield Protection
-&lt;script src="/js/lemma-bot-shield-simple.js"&gt;
-&lt;/script&gt;
+                <div class="code-snippet">// Complete Bot Shield Setup
+&lt;script src="https://lemma.id/js/lemma-federated-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
 
 &lt;script&gt;
-const shield = new LemmaBotShield({ 
-  apiKey: 'your-api-key'
+// Initialize federated wallet for network access
+const wallet = new LemmaFederatedWallet({ 
+  debug: false,
+  networkRegistryUrl: 'https://lemma.id/api/network'
 });
-shield.protect('#protected-content');
-&lt;/script&gt;
 
-// 4.176µs verification performance</div>
+// Initialize shield with network integration
+const shield = new LemmaBotShield({ 
+  apiKey: 'your-production-api-key',
+  apiBase: 'https://lemma.id',
+  securityLevel: 'medium'
+});
+
+// Protect any content instantly
+shield.protect('#checkout-form');
+shield.protect('#user-dashboard');
+&lt;/script&gt;</div>
                 
-                <a href="/demo/hybrid-shield-demo.html" class="btn btn-primary btn-sm">View Demo</a>
+                <a href="/join-network" class="btn btn-primary btn-sm">See Live Demo</a>
             </div>
 
             <!-- Enterprise -->
@@ -247,7 +273,7 @@ lemma.register_package(GamingAgePackage);
                 <span class="feature-check">✓</span>
                 <div>
                     <strong>Microsecond Performance</strong><br>
-                    0.05-1µs verification time with 99.9% offline operation
+                    4.176µs verification time with 99.9% offline operation
                 </div>
             </div>
             
@@ -278,8 +304,8 @@ lemma.register_package(GamingAgePackage);
             <div class="feature-item">
                 <span class="feature-check">✓</span>
                 <div>
-                    <strong>Network Effects</strong><br>
-                    Verify once, access everywhere in the network
+                    <strong>Federated Network</strong><br>
+                    Verify once with Stripe Identity, access everywhere in the network
                 </div>
             </div>
             
@@ -292,39 +318,258 @@ lemma.register_package(GamingAgePackage);
             </div>
         </div>
 
+        <!-- Complete Integration Examples -->
+        <div class="section-header" style="margin-top: var(--space-20);" id="network-integration">
+            <h2>Real Integration Examples</h2>
+            <p>Copy-paste examples for common use cases</p>
+        </div>
+        
+        <div class="card-grid-2">
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h4>🛒 E-commerce Checkout Protection</h4>
+                    <p>Protect checkout flows and prevent bot purchases</p>
+                    <div class="code-snippet" style="font-size: 11px;">// E-commerce Integration
+&lt;script src="https://lemma.id/js/lemma-federated-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+const shield = new LemmaBotShield({
+  apiKey: 'your-api-key',
+  apiBase: 'https://lemma.id',
+  securityLevel: 'high', // High security for payments
+  checkOnEvents: ['checkout', 'payment']
+});
+
+// Protect checkout button
+shield.protect('#checkout-btn');
+
+// Verify before payment processing
+document.getElementById('checkout-btn').addEventListener('click', async (e) => {
+  e.preventDefault();
+  
+  const result = await shield.verifyUser();
+  if (result.verified && result.confidence > 0.8) {
+    processPayment();
+  } else {
+    showHumanVerification();
+  }
+});
+&lt;/script&gt;</div>
+                </div>
+            </div>
+            
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h4>🎮 Gaming Platform Integration</h4>
+                    <p>Prevent bot farming and ensure fair play</p>
+                    <div class="code-snippet" style="font-size: 11px;">// Gaming Platform Integration
+const wallet = new LemmaFederatedWallet({
+  debug: false,
+  networkRegistryUrl: 'https://lemma.id/api/network'
+});
+
+const shield = new LemmaBotShield({
+  apiKey: 'gaming-platform-key',
+  apiBase: 'https://lemma.id',
+  securityLevel: 'critical', // Max security for gaming
+  backgroundChecks: true,
+  checkOnEvents: ['match_start', 'reward_claim', 'trade']
+});
+
+await wallet.init();
+
+// Check if player is verified in network
+if (await wallet.hasValidCredentials()) {
+  allowGameplay();
+} else {
+  requireVerification();
+}
+
+// Continuous monitoring during gameplay
+shield.protect('#game-container');
+shield.startBackgroundMonitoring();
+</div>
+                </div>
+            </div>
+            
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h4>💰 Financial Services</h4>
+                    <p>KYC compliance with federated identity</p>
+                    <div class="code-snippet" style="font-size: 11px;">// Financial Services Integration
+const wallet = new LemmaFederatedWallet({
+  debug: false,
+  securityLevel: 'critical',
+  gracePeriod: 0 // No grace period for finance
+});
+
+const shield = new LemmaBotShield({
+  apiKey: 'fintech-api-key',
+  apiBase: 'https://lemma.id',
+  securityLevel: 'critical',
+  maxFailures: 1, // Zero tolerance
+  checkOnEvents: ['login', 'transfer', 'withdrawal']
+});
+
+// Check existing KYC status across network
+await wallet.init();
+const credentials = await wallet.getValidCredentials();
+
+if (credentials && credentials.kyc_verified) {
+  // User already KYC verified in network
+  allowFinancialServices();
+} else {
+  // Redirect to Stripe Identity for KYC
+  window.location.href = '/verify?return_url=' + encodeURIComponent(window.location.href);
+}
+</div>
+                </div>
+            </div>
+            
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h4>📱 Social Platform</h4>
+                    <p>Prevent fake accounts and bot interactions</p>
+                    <div class="code-snippet" style="font-size: 11px;">// Social Platform Integration
+const shield = new LemmaBotShield({
+  apiKey: 'social-platform-key',
+  apiBase: 'https://lemma.id',
+  securityLevel: 'medium',
+  backgroundChecks: true,
+  checkOnEvents: ['post', 'comment', 'like', 'follow']
+});
+
+// Protect user actions
+shield.protect('#post-form');
+shield.protect('#comment-form');
+shield.protect('.follow-button');
+
+// Verify before high-impact actions
+async function handleUserAction(action) {
+  const result = await shield.verifyUser();
+  
+  if (result.verified) {
+    executeAction(action);
+  } else {
+    showCaptchaOrVerification();
+  }
+}
+
+// Background monitoring for suspicious patterns
+shield.onSecurityEvent = (event) => {
+  if (event.type === 'suspicious_activity') {
+    temporarilyLimitActions();
+  }
+};
+</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Configuration -->
+        <div class="section-header" style="margin-top: var(--space-20);" id="security-config">
+            <h2>Security Configuration Guide</h2>
+            <p>Configure security levels and monitoring for your use case</p>
+        </div>
+        
+        <div class="card-enhanced">
+            <div class="card-body">
+                <h4>Security Level Configuration</h4>
+                <div class="code-snippet">// Security Levels and Their Use Cases
+
+// LOW SECURITY - Content sites, blogs
+const shield = new LemmaBotShield({
+  securityLevel: 'low',
+  backgroundChecks: false,
+  checkOnEvents: ['comment', 'contact_form']
+});
+
+// MEDIUM SECURITY - E-commerce, SaaS platforms  
+const shield = new LemmaBotShield({
+  securityLevel: 'medium',
+  backgroundChecks: true,
+  checkOnEvents: ['checkout', 'signup', 'sensitive_action'],
+  maxFailures: 3,
+  gracePeriod: 24 * 60 * 60 * 1000 // 24 hours
+});
+
+// HIGH SECURITY - Financial services, healthcare
+const shield = new LemmaBotShield({
+  securityLevel: 'high', 
+  backgroundChecks: true,
+  checkOnEvents: ['login', 'transfer', 'data_access'],
+  maxFailures: 2,
+  gracePeriod: 60 * 60 * 1000 // 1 hour
+});
+
+// CRITICAL SECURITY - Gaming, high-value transactions
+const shield = new LemmaBotShield({
+  securityLevel: 'critical',
+  backgroundChecks: true,
+  checkOnEvents: ['any_action'],
+  maxFailures: 1,
+  gracePeriod: 0 // No grace period
+});
+
+// CUSTOM INTERVALS - Fine-grained control
+const shield = new LemmaBotShield({
+  securityLevel: 'custom',
+  customCheckInterval: 30 * 1000, // 30 seconds
+  backgroundChecks: true
+});</div>
+            </div>
+        </div>
+
         <!-- Getting Started Steps -->
-        <div class="section-header" style="margin-top: var(--space-20);">
-            <h2>Getting Started in 3 Steps</h2>
+        <div class="section-header" style="margin-top: var(--space-20);" id="integration-guide">
+            <h2>Complete Integration Guide</h2>
+            <p>Step-by-step guide to join the Lemma Identity Network</p>
         </div>
         
         <div class="card-grid-3">
             <div class="card-enhanced">
                 <div class="card-body">
                     <div style="background: var(--primary-500); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: var(--space-4);">1</div>
-                    <h4>Add Script Tag</h4>
-                    <p>Include the Lemma auto-script with your API key</p>
-                    <div class="code-snippet" style="font-size: 12px;">&lt;script src="/js/lemma-bot-shield-simple.js" 
-        data-api-key="your-key"&gt;&lt;/script&gt;</div>
+                    <h4>Load Identity Network</h4>
+                    <p>Include both the federated wallet and bot shield for complete network access</p>
+                    <div class="code-snippet" style="font-size: 11px;">&lt;!-- Load Lemma Identity Network --&gt;
+&lt;script src="https://lemma.id/js/lemma-federated-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;</div>
                 </div>
             </div>
             
             <div class="card-enhanced">
                 <div class="card-body">
                     <div style="background: var(--primary-500); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: var(--space-4);">2</div>
-                    <h4>Add Data Attributes</h4>
-                    <p>Use data attributes for automatic component mounting</p>
-                    <div class="code-snippet" style="font-size: 12px;">&lt;button data-lemma-verify="human"&gt;
-  Verify Human
-&lt;/button&gt;</div>
+                    <h4>Initialize & Configure</h4>
+                    <p>Set up the federated wallet and shield with your API key and security preferences</p>
+                    <div class="code-snippet" style="font-size: 11px;">const wallet = new LemmaFederatedWallet({
+  debug: false,
+  networkRegistryUrl: 'https://lemma.id/api/network'
+});
+
+const shield = new LemmaBotShield({
+  apiKey: 'your-production-api-key',
+  apiBase: 'https://lemma.id',
+  securityLevel: 'medium'
+});</div>
                 </div>
             </div>
             
             <div class="card-enhanced">
                 <div class="card-body">
                     <div style="background: var(--success); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: var(--space-4);">✓</div>
-                    <h4>Production Ready</h4>
-                    <p>Enterprise-grade verification with microsecond performance</p>
-                    <div style="background: var(--success); color: white; padding: var(--space-2); border-radius: 4px; text-align: center; font-size: var(--font-size-sm); font-weight: 600;">⚡ 0.36µs verification</div>
+                    <h4>Protect & Verify</h4>
+                    <p>Instantly protect content and verify users across the entire network</p>
+                    <div class="code-snippet" style="font-size: 11px;">// Protect any element
+shield.protect('#protected-content');
+
+// Check network verification status
+if (await wallet.hasValidCredentials()) {
+  showProtectedContent();
+}</div>
+                    <div style="background: var(--success); color: white; padding: var(--space-2); border-radius: 4px; text-align: center; font-size: var(--font-size-sm); font-weight: 600;">⚡ 4.176µs verification</div>
                 </div>
             </div>
         </div>
