@@ -128,6 +128,15 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register Automated Billing blueprint: {e}")
+    
+    # Register the MAU API blueprint for Monthly Active User tracking
+    try:
+        from api.mau_api import mau_api_bp
+        app.register_blueprint(mau_api_bp)
+        logger.info("✅ MAU API blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register MAU API blueprint: {e}")
         
     # Initialize optimized engine
     try:

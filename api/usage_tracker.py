@@ -1,9 +1,10 @@
 """
 Usage Tracking System for Lemma Shield
-Automatically tracks verified users and reports usage to Stripe for billing
+Tracks Monthly Active Users (MAU) for accurate billing
 
-This integrates with the shield verification process to automatically
-track and bill for verified users.
+This integrates with the shield verification process to track only
+users who are actually active each month, using privacy-preserving
+salted identifiers.
 """
 
 import os
@@ -15,12 +16,16 @@ from collections import defaultdict
 import threading
 import time
 
+# Import the new MAU tracker
+from api.mau_tracker import mau_tracker, track_user_activity
+
 logger = logging.getLogger(__name__)
 
 class UsageTracker:
-    """Tracks verified users for automated billing"""
+    """Tracks Monthly Active Users for accurate billing"""
     
     def __init__(self):
+        # Legacy support - will be migrated to MAU tracker
         self.verified_users = defaultdict(set)  # customer_id -> set of user_ids
         self.daily_counts = defaultdict(lambda: defaultdict(int))  # customer_id -> date -> count
         self.lock = threading.Lock()
@@ -29,41 +34,47 @@ class UsageTracker:
         self.reporting_thread = threading.Thread(target=self._background_reporter, daemon=True)
         self.reporting_thread.start()
         
+        logger.info("Usage Tracker initialized with MAU tracking integration")
+        
     def track_verified_user(self, customer_id: str, user_id: str, 
                            timestamp: Optional[datetime] = None) -> bool:
         """
-        Track a verified user for billing purposes
+        Track a verified user for MAU billing purposes
         
         Args:
             customer_id: The customer's Stripe ID
-            user_id: Unique identifier for the verified user
+            user_id: Unique identifier for the verified user (email, username, etc.)
             timestamp: When verification occurred (defaults to now)
             
         Returns:
-            True if this is a new user for the month, False if already tracked
+            True if this is a new monthly active user, False if already active this month
         """
         if not timestamp:
             timestamp = datetime.utcnow()
-            
+        
+        # Use the new MAU tracker for privacy-preserving tracking
+        tracking_result = track_user_activity(customer_id, user_id, timestamp)
+        
+        # Legacy tracking for backwards compatibility (will be phased out)
         date_key = timestamp.strftime('%Y-%m-%d')
         month_key = timestamp.strftime('%Y-%m')
         
         with self.lock:
-            # Track this user for the customer
             user_set = self.verified_users[customer_id]
-            is_new_user = user_id not in user_set
+            is_legacy_new_user = user_id not in user_set
             
-            if is_new_user:
+            if is_legacy_new_user:
                 user_set.add(user_id)
                 self.daily_counts[customer_id][date_key] += 1
-                
-                logger.info(f"New verified user tracked: {customer_id} -> {user_id}")
-                
-                # If this is a new user, they incur the $2 setup fee
-                if is_new_user:
-                    self._track_setup_fee(customer_id, user_id)
-                
-            return is_new_user
+        
+        # Check if this is a new monthly active user (for billing)
+        is_new_monthly_user = tracking_result['was_new_monthly_user']
+        
+        if is_new_monthly_user:
+            logger.info(f"New monthly active user: {customer_id} -> {tracking_result['salted_user_id']}")
+        
+        # Note: Setup fees are now handled separately since we only charge for MAU
+        return is_new_monthly_user
     
     def _track_setup_fee(self, customer_id: str, user_id: str):
         """Track setup fee for new user (to be invoiced)"""
@@ -72,16 +83,15 @@ class UsageTracker:
     
     def get_monthly_user_count(self, customer_id: str, 
                               month: Optional[datetime] = None) -> int:
-        """Get total verified users for a customer in a given month"""
+        """Get Monthly Active Users (MAU) for a customer in a given month"""
         if not month:
-            month = datetime.utcnow()
-            
-        month_key = month.strftime('%Y-%m')
+            month_str = datetime.utcnow().strftime('%Y-%m')
+        else:
+            month_str = month.strftime('%Y-%m')
         
-        with self.lock:
-            # Count unique users for the month
-            total_users = len(self.verified_users.get(customer_id, set()))
-            return total_users
+        # Use the new MAU tracker for accurate monthly billing
+        mau_data = mau_tracker.get_monthly_mau(customer_id, month_str)
+        return mau_data['mau_count']
     
     def get_usage_summary(self, customer_id: str, 
                          start_date: datetime, end_date: datetime) -> Dict[str, Any]:
