@@ -51,16 +51,7 @@ def initialize_trusted_dids():
             'created_at': time.time(),
             'capabilities': ['stripe_identity_verification']
         },
-        'did:lemma:demo_issuer': {
-            'did': 'did:lemma:demo_issuer',
-            'public_key': 'lemma_demo_issuer_key_2024',
-            'name': 'Lemma Demo Issuer',
-            'issuer_type': 'demo_credentials',
-            'trust_score': 0.85,
-            'verified': True,
-            'created_at': time.time(),
-            'capabilities': ['demo_verification', 'testing']
-        }
+
     }
     return trusted_issuers
 
@@ -390,52 +381,22 @@ def network_health():
         'last_activity': NETWORK_REGISTRY['network_metadata'].get('last_updated', 0)
     })
 
-# Initialize some demo data
-def initialize_demo_registry():
-    """Initialize the registry with demo data"""
-    # Add Lemma network issuer DID
-    lemma_issuer_did = "did:lemma:network_issuer_2024"
-    NETWORK_REGISTRY['did_registry'][lemma_issuer_did] = {
-        'did': lemma_issuer_did,
-        'public_key': '1234567890abcdef' * 4,  # Demo public key
-        'registered_at': time.time(),
-        'trust_score': 0.99,
-        'issuer_type': 'lemma_network',
-        'issuer_name': 'Lemma Identity Network',
-        'verified': True,
-        'total_credentials_issued': 0,
-        'metadata': {
-            'created_by': 'network_bootstrap',
-            'network_distributed': True,
-            'last_activity': time.time()
-        }
-    }
+# Initialize production network registry
+def initialize_production_registry():
+    """Initialize the registry with production trusted issuers"""
+    # Initialize from trusted issuers defined above
+    trusted_issuers = initialize_trusted_dids()
     
-    # Add Stripe integration issuer
-    stripe_issuer_did = "did:lemma:stripe_kyc_issuer"
-    NETWORK_REGISTRY['did_registry'][stripe_issuer_did] = {
-        'did': stripe_issuer_did,
-        'public_key': 'abcdef1234567890' * 4,  # Demo public key
-        'registered_at': time.time(),
-        'trust_score': 0.95,
-        'issuer_type': 'kyc_provider',
-        'issuer_name': 'Stripe Identity KYC',
-        'verified': True,
-        'total_credentials_issued': 0,
-        'metadata': {
-            'created_by': 'stripe_integration',
-            'network_distributed': True,
-            'last_activity': time.time()
-        }
-    }
+    for did, issuer_data in trusted_issuers.items():
+        NETWORK_REGISTRY['did_registry'][did] = issuer_data
     
     NETWORK_REGISTRY['network_metadata']['total_dids'] = len(NETWORK_REGISTRY['did_registry'])
     NETWORK_REGISTRY['network_metadata']['last_updated'] = time.time()
     
-    logger.info(f"🌐 Initialized network registry with {len(NETWORK_REGISTRY['did_registry'])} demo DIDs")
+    logger.info(f"🌐 Initialized production network registry with {len(NETWORK_REGISTRY['did_registry'])} trusted issuers")
 
-# Initialize demo data when module is imported
-initialize_demo_registry()
+# Initialize production registry when module is imported
+initialize_production_registry()
 
 # Export the blueprint
 __all__ = ['network_registry_bp']

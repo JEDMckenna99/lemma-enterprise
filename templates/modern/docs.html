@@ -128,7 +128,7 @@
                 <p>Get started with a single script tag - zero configuration required.</p>
                 
                 <div class="code-snippet">&lt;!-- Zero-config integration --&gt;
-&lt;script src="https://cdn.lemma.id/lemma-auto.js" 
+&lt;script src="/js/lemma-bot-shield-simple.js" 
         data-api-key="your-api-key"&gt;&lt;/script&gt;
 
 &lt;!-- Instant bot protection --&gt;
@@ -203,15 +203,18 @@ const lemma = new Lemma({
                 <h3>Hybrid Bot Shield</h3>
                 <p>Deploy enterprise-grade bot protection with 99.9% offline operation.</p>
                 
-                <div class="code-snippet">// Hybrid protection
-&lt;script src="/js/lemma-hybrid-shield.js"&gt;
+                <div class="code-snippet">// Bot Shield Protection
+&lt;script src="/js/lemma-bot-shield-simple.js"&gt;
 &lt;/script&gt;
 
-&lt;form data-lemma-protect="bot-shield"&gt;
-  &lt;!-- Protected form --&gt;
-&lt;/form&gt;
+&lt;script&gt;
+const shield = new LemmaBotShield({ 
+  apiKey: 'your-api-key'
+});
+shield.protect('#protected-content');
+&lt;/script&gt;
 
-// 0.36µs client + 1-50ms server fallback</div>
+// 4.176µs verification performance</div>
                 
                 <a href="/demo/hybrid-shield-demo.html" class="btn btn-primary btn-sm">View Demo</a>
             </div>
@@ -300,7 +303,7 @@ lemma.register_package(GamingAgePackage);
                     <div style="background: var(--primary-500); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: var(--space-4);">1</div>
                     <h4>Add Script Tag</h4>
                     <p>Include the Lemma auto-script with your API key</p>
-                    <div class="code-snippet" style="font-size: 12px;">&lt;script src="https://cdn.lemma.id/lemma-auto.js" 
+                    <div class="code-snippet" style="font-size: 12px;">&lt;script src="/js/lemma-bot-shield-simple.js" 
         data-api-key="your-key"&gt;&lt;/script&gt;</div>
                 </div>
             </div>

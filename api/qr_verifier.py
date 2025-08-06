@@ -56,23 +56,16 @@ class LemmaQRVerifier:
             # Initialize actual Rust engine
             self.rust_engine = PyLemmaCore()
             self.qr_verifier = QRLemmaVerifier(self.rust_engine)
-            self.mock_mode = False
         else:
-            # Mock mode for development
-            self.rust_engine = None
-            self.qr_verifier = None
-            self.mock_mode = True
-            print("Warning: Running in mock mode - Rust engine not available")
+            # Rust engine is required for production
+            raise RuntimeError("Rust backend is required for production QR verification. Mock mode has been removed.")
     
     def verify_qr(self, request: QRVerificationRequest) -> QRVerificationResult:
         """Verify a QR code with embedded lemma"""
         start_time = time.perf_counter()
         
         try:
-            if self.mock_mode:
-                return self._verify_mock_qr(request, start_time)
-            else:
-                return self._verify_rust_qr(request, start_time)
+            return self._verify_rust_qr(request, start_time)
                 
         except Exception as e:
             verification_time = (time.perf_counter() - start_time) * 1_000_000
@@ -122,97 +115,7 @@ class LemmaQRVerifier:
             confidence_score=0.999 if result.is_valid else 0.001
         )
     
-    def _verify_mock_qr(self, request: QRVerificationRequest, start_time: float) -> QRVerificationResult:
-        """Verify mock QR for development/testing"""
-        # Simulate processing time
-        time.sleep(0.0041)  # 4.1ms to simulate 4.176µs processing (scaled up for demo)
-        
-        # Parse QR data
-        if isinstance(request.qr_data, str):
-            try:
-                qr_data = json.loads(request.qr_data)
-            except json.JSONDecodeError:
-                return QRVerificationResult(
-                    success=False,
-                    is_valid=False,
-                    error_message="Invalid JSON in QR data",
-                    verification_time_us=(time.perf_counter() - start_time) * 1_000_000
-                )
-        else:
-            qr_data = request.qr_data
-        
-        # Mock verification logic
-        is_valid = True
-        error_messages = []
-        
-        # Check basic structure
-        if "lemma" not in qr_data:
-            is_valid = False
-            error_messages.append("Missing lemma data")
-        
-        if "qr_type" not in qr_data:
-            is_valid = False
-            error_messages.append("Missing qr_type")
-        
-        if "metadata" not in qr_data:
-            is_valid = False
-            error_messages.append("Missing metadata")
-        
-        # Check expiration
-        if is_valid and "metadata" in qr_data and "expires_at" in qr_data["metadata"]:
-            expires_at = qr_data["metadata"]["expires_at"]
-            current_time = int(time.time())
-            if current_time > expires_at:
-                is_valid = False
-                error_messages.append("QR code has expired")
-        
-        # Check required claims
-        if is_valid and request.required_claims and "lemma" in qr_data and "claims" in qr_data["lemma"]:
-            claims = qr_data["lemma"]["claims"]
-            for required_claim in request.required_claims:
-                if required_claim not in claims:
-                    is_valid = False
-                    error_messages.append(f"Missing required claim: {required_claim}")
-        
-        # Mock signature verification
-        if is_valid and "lemma" in qr_data and "signature" in qr_data["lemma"]:
-            signature = qr_data["lemma"]["signature"]
-            if not signature.startswith("mock_signature_"):
-                is_valid = False
-                error_messages.append("Invalid signature format")
-        
-        verification_time = (time.perf_counter() - start_time) * 1_000_000
-        
-        # Extract claims and metadata
-        claims = qr_data.get("lemma", {}).get("claims", {}) if is_valid else {}
-        metadata = qr_data.get("metadata", {}) if is_valid else {}
-        qr_type = qr_data.get("qr_type", "unknown")
-        
-        # Add verification metadata
-        metadata.update({
-            "mock_mode": True,
-            "verification_method": "mock",
-            "current_time": int(time.time()),
-            "verifier_version": "mock_1.0.0"
-        })
-        
-        return QRVerificationResult(
-            success=True,
-            is_valid=is_valid,
-            qr_type=qr_type,
-            verification_time_us=4.176,  # Mock the expected performance
-            claims=claims,
-            metadata=metadata,
-            error_message="; ".join(error_messages) if error_messages else None,
-            performance_metrics={
-                "decode_time_us": verification_time * 0.1,
-                "lemma_verification_time_us": 4.176,
-                "total_time_us": verification_time,
-                "cache_hit": False,
-                "overall_time_us": verification_time
-            },
-            confidence_score=0.999 if is_valid else 0.001
-        )
+
     
     def verify_specific_qr_type(self, qr_data: Union[str, Dict[str, Any]], 
                                qr_type: str, context: Optional[Dict[str, Any]] = None) -> QRVerificationResult:
@@ -220,12 +123,9 @@ class LemmaQRVerifier:
         if context is None:
             context = {}
         
-        if self.mock_mode:
-            # Mock type-specific verification
-            return self._verify_mock_type_specific(qr_data, qr_type, context)
-        else:
-            # Use actual Rust verifier with type-specific methods
-            if isinstance(qr_data, dict):
+
+        # Use actual Rust verifier with type-specific methods
+        if isinstance(qr_data, dict):
                 qr_json = json.dumps(qr_data)
             else:
                 qr_json = qr_data
@@ -257,82 +157,7 @@ class LemmaQRVerifier:
                 error_message=result.error_message,
                 confidence_score=0.999 if result.is_valid else 0.001
             )
-    
-    def _verify_mock_type_specific(self, qr_data: Union[str, Dict[str, Any]], 
-                                  qr_type: str, context: Dict[str, Any]) -> QRVerificationResult:
-        """Mock type-specific verification"""
-        start_time = time.perf_counter()
-        
-        # Parse data
-        if isinstance(qr_data, str):
-            try:
-                data = json.loads(qr_data)
-            except json.JSONDecodeError:
-                return QRVerificationResult(
-                    success=False,
-                    is_valid=False,
-                    error_message="Invalid JSON data"
-                )
-        else:
-            data = qr_data
-        
-        # Type-specific validation
-        is_valid = True
-        error_messages = []
-        
-        if qr_type == "ticket":
-            required_fields = ["event_id", "event_name", "seat", "venue"]
-            for field in required_fields:
-                if field not in data.get("lemma", {}).get("claims", {}):
-                    is_valid = False
-                    error_messages.append(f"Missing ticket field: {field}")
-        
-        elif qr_type == "product":
-            required_fields = ["product_id", "manufacturer", "serial_number"]
-            for field in required_fields:
-                if field not in data.get("lemma", {}).get("claims", {}):
-                    is_valid = False
-                    error_messages.append(f"Missing product field: {field}")
-        
-        elif qr_type == "access":
-            required_fields = ["employee_id", "department", "access_zones"]
-            claims = data.get("lemma", {}).get("claims", {})
-            for field in required_fields:
-                if field not in claims:
-                    is_valid = False
-                    error_messages.append(f"Missing access field: {field}")
-                    
-            # Check required zones if specified
-            if "required_zones" in context and is_valid:
-                user_zones = claims.get("access_zones", [])
-                for zone in context["required_zones"]:
-                    if zone not in user_zones:
-                        is_valid = False
-                        error_messages.append(f"Access denied to zone: {zone}")
-        
-        elif qr_type == "identity":
-            required_fields = ["identity_did", "verification_type"]
-            for field in required_fields:
-                if field not in data.get("lemma", {}).get("claims", {}):
-                    is_valid = False
-                    error_messages.append(f"Missing identity field: {field}")
-        
-        verification_time = (time.perf_counter() - start_time) * 1_000_000
-        
-        return QRVerificationResult(
-            success=True,
-            is_valid=is_valid,
-            qr_type=qr_type,
-            verification_time_us=4.176,
-            claims=data.get("lemma", {}).get("claims", {}),
-            metadata={
-                **data.get("metadata", {}),
-                "type_specific_verification": True,
-                "context": context
-            },
-            error_message="; ".join(error_messages) if error_messages else None,
-            confidence_score=0.999 if is_valid else 0.001
-        )
+
 
 # Flask/FastAPI integration helpers
 def create_qr_verifier_endpoints(app, verifier: Optional[LemmaQRVerifier] = None):

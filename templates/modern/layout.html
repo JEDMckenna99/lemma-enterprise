@@ -14,11 +14,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;425;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;600&display=swap" rel="stylesheet">
     
-    <!-- Professional Design System -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma-stripe-system.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/modern-saas-enhancements.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/card-components.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/form-enhancements.css') }}">
+    <!-- Consolidated Design System -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma-design-system.css') }}">
     
     <!-- React 18 for components -->
     {% block react_scripts %}
@@ -61,14 +58,14 @@
                     <div class="dropdown-menu" role="menu">
                         <a href="/join-network" class="dropdown-item" role="menuitem">
                             <div class="dropdown-item-content">
-                                <div class="dropdown-item-title">🛡️ Join the Network</div>
+                                <div class="dropdown-item-title">Join the Network</div>
                                 <div class="dropdown-item-desc">Try out the shield & join the network</div>
                             </div>
                         </a>
                         <div class="dropdown-divider"></div>
                         <a href="/demo/qr_codes/" class="dropdown-item" role="menuitem">
                             <div class="dropdown-item-content">
-                                <div class="dropdown-item-title">📱 Lemma QR Codes</div>
+                                <div class="dropdown-item-title">Lemma QR Codes</div>
                                 <div class="dropdown-item-desc">Demo universal QR verification</div>
                             </div>
                         </a>

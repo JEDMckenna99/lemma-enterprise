@@ -99,18 +99,7 @@ class LemmaFederatedWallet {
                     capabilities: ['stripe_identity_verification']
                 }
             },
-            {
-                did: 'did:lemma:demo_issuer',
-                publicKey: 'lemma_demo_issuer_key_2024',
-                issuerInfo: {
-                    name: 'Lemma Demo Issuer',
-                    issuer_type: 'demo_credentials',
-                    trust_score: 0.85,
-                    verified: true,
-                    created_at: Date.now(),
-                    capabilities: ['demo_verification', 'testing']
-                }
-            }
+
         ];
         
         // Add to DID registry

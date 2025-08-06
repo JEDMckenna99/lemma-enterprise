@@ -55,24 +55,16 @@ class LemmaQRGenerator:
             self.rust_engine = PyLemmaCore()
             self.qr_generator = QRLemmaGenerator(self.rust_engine)
             self.qr_encoder = QREncoder()
-            self.mock_mode = False
         else:
-            # Mock mode for development
-            self.rust_engine = None
-            self.qr_generator = None
-            self.qr_encoder = None
-            self.mock_mode = True
-            print("Warning: Running in mock mode - Rust engine not available")
+            # Rust engine is required for production
+            raise RuntimeError("Rust backend is required for production QR generation. Mock mode has been removed.")
     
     def generate_qr(self, request: QRGenerationRequest) -> QRGenerationResult:
         """Generate a QR code with embedded lemma"""
         start_time = time.perf_counter()
         
         try:
-            if self.mock_mode:
-                return self._generate_mock_qr(request, start_time)
-            else:
-                return self._generate_rust_qr(request, start_time)
+            return self._generate_rust_qr(request, start_time)
                 
         except Exception as e:
             generation_time = (time.perf_counter() - start_time) * 1_000_000
