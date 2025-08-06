@@ -35,6 +35,10 @@ class MAUTracker:
         # Daily tracking for rolling windows: customer_id -> date -> set of salted_user_ids
         self.daily_active_users = defaultdict(lambda: defaultdict(set))
         
+        # Stripe Identity verification tracking: customer_id -> month -> set of salted_user_ids
+        # This tracks users who went through initial Stripe Identity verification ($2 fee)
+        self.stripe_identity_verifications = defaultdict(lambda: defaultdict(set))
+        
         self.lock = threading.Lock()
         
         # Start background cleanup thread
@@ -76,7 +80,8 @@ class MAUTracker:
         return f"salted_{salted_hash[:16]}"  # Use first 16 chars for compact storage
     
     def track_user_activity(self, customer_id: str, user_id: str, 
-                           timestamp: Optional[datetime] = None) -> Dict[str, Any]:
+                           timestamp: Optional[datetime] = None, 
+                           stripe_identity_verified: bool = False) -> Dict[str, Any]:
         """
         Track a user's activity for MAU calculation
         
@@ -84,6 +89,7 @@ class MAUTracker:
             customer_id: Customer's Stripe ID
             user_id: Original user identifier (email, username, etc.)
             timestamp: When activity occurred (defaults to now)
+            stripe_identity_verified: True if user completed Stripe Identity verification ($2 fee)
             
         Returns:
             Dictionary with tracking results and MAU info
@@ -99,7 +105,7 @@ class MAUTracker:
         date_key = timestamp.strftime('%Y-%m-%d')
         
         with self.lock:
-            # Track for monthly billing
+            # Track for monthly billing (MAU)
             was_new_monthly_user = salted_user_id not in self.monthly_active_users[customer_id][month_key]
             self.monthly_active_users[customer_id][month_key].add(salted_user_id)
             
@@ -107,13 +113,22 @@ class MAUTracker:
             was_new_daily_user = salted_user_id not in self.daily_active_users[customer_id][date_key]
             self.daily_active_users[customer_id][date_key].add(salted_user_id)
             
+            # Track Stripe Identity verifications (for $2 fee)
+            was_new_stripe_identity = False
+            if stripe_identity_verified:
+                was_new_stripe_identity = salted_user_id not in self.stripe_identity_verifications[customer_id][month_key]
+                self.stripe_identity_verifications[customer_id][month_key].add(salted_user_id)
+            
             # Calculate current MAU (rolling 30 days)
             rolling_mau = self._calculate_rolling_mau(customer_id, timestamp)
             
             # Calculate monthly MAU (calendar month)
             monthly_mau = len(self.monthly_active_users[customer_id][month_key])
+            
+            # Calculate monthly Stripe Identity verifications
+            monthly_stripe_identity = len(self.stripe_identity_verifications[customer_id][month_key])
         
-        logger.info(f"User activity tracked: {customer_id} -> {salted_user_id} (new_monthly: {was_new_monthly_user})")
+        logger.info(f"User activity tracked: {customer_id} -> {salted_user_id} (MAU: {was_new_monthly_user}, Identity: {was_new_stripe_identity})")
         
         return {
             'customer_id': customer_id,
@@ -121,7 +136,9 @@ class MAUTracker:
             'month': month_key,
             'was_new_monthly_user': was_new_monthly_user,
             'was_new_daily_user': was_new_daily_user,
+            'was_new_stripe_identity': was_new_stripe_identity,
             'current_monthly_mau': monthly_mau,
+            'monthly_stripe_identity_count': monthly_stripe_identity,
             'rolling_30_day_mau': rolling_mau,
             'timestamp': timestamp.isoformat()
         }
@@ -144,32 +161,48 @@ class MAUTracker:
     
     def get_monthly_mau(self, customer_id: str, month: Optional[str] = None) -> Dict[str, Any]:
         """
-        Get MAU for a specific month (calendar month billing)
+        Get MAU and Stripe Identity billing data for a specific month
         
         Args:
             customer_id: Customer's Stripe ID
             month: Month in YYYY-MM format (defaults to current month)
             
         Returns:
-            Dictionary with MAU data for billing
+            Dictionary with MAU and Stripe Identity data for billing
         """
         if not month:
             month = datetime.utcnow().strftime('%Y-%m')
         
         with self.lock:
+            # Monthly Active Users (MAU) - $0.10 each
             mau_count = len(self.monthly_active_users[customer_id][month])
             active_users = list(self.monthly_active_users[customer_id][month])
+            
+            # Stripe Identity verifications - $2.00 each
+            stripe_identity_count = len(self.stripe_identity_verifications[customer_id][month])
+            stripe_identity_users = list(self.stripe_identity_verifications[customer_id][month])
         
-        # Calculate billing amount
-        monthly_cost = mau_count * 0.10  # $0.10 per active user
+        # Calculate billing amounts
+        mau_cost = mau_count * 0.10  # $0.10 per monthly active user
+        stripe_identity_cost = stripe_identity_count * 2.00  # $2.00 per Stripe Identity verification
+        total_cost = mau_cost + stripe_identity_cost
         
         return {
             'customer_id': customer_id,
             'month': month,
             'mau_count': mau_count,
-            'monthly_cost': monthly_cost,
+            'mau_cost': mau_cost,
+            'stripe_identity_count': stripe_identity_count,
+            'stripe_identity_cost': stripe_identity_cost,
+            'total_monthly_cost': total_cost,
             'active_user_hashes': active_users,  # Salted hashes for verification
-            'billing_period': f"{month}-01 to {month}-31"
+            'stripe_identity_hashes': stripe_identity_users,  # Users who did Identity verification
+            'billing_period': f"{month}-01 to {month}-31",
+            'billing_breakdown': {
+                'mau_billing': f"{mau_count} users × $0.10 = ${mau_cost:.2f}",
+                'identity_billing': f"{stripe_identity_count} verifications × $2.00 = ${stripe_identity_cost:.2f}",
+                'total': f"${total_cost:.2f}"
+            }
         }
     
     def get_rolling_mau(self, customer_id: str, reference_date: Optional[datetime] = None) -> Dict[str, Any]:
@@ -267,26 +300,53 @@ class MAUTracker:
         return {
             'customer_id': customer_id,
             'billing_month': month,
-            'billable_users': mau_data['mau_count'],
-            'unit_price': 0.10,
-            'total_amount': mau_data['monthly_cost'],
+            'mau_billing': {
+                'count': mau_data['mau_count'],
+                'unit_price': 0.10,
+                'total_amount': mau_data['mau_cost'],
+                'description': 'Monthly Active Users'
+            },
+            'stripe_identity_billing': {
+                'count': mau_data['stripe_identity_count'],
+                'unit_price': 2.00,
+                'total_amount': mau_data['stripe_identity_cost'],
+                'description': 'Stripe Identity Verifications'
+            },
+            'total_amount': mau_data['total_monthly_cost'],
             'currency': 'usd',
-            'billing_type': 'monthly_active_users',
+            'billing_breakdown': mau_data['billing_breakdown'],
             'verification_hash': hashlib.sha256(
-                f"{customer_id}:{month}:{mau_data['mau_count']}".encode()
+                f"{customer_id}:{month}:{mau_data['mau_count']}:{mau_data['stripe_identity_count']}".encode()
             ).hexdigest()[:16]
         }
 
 # Global MAU tracker instance
 mau_tracker = MAUTracker()
 
-def track_user_activity(customer_id: str, user_id: str) -> Dict[str, Any]:
+def track_user_activity(customer_id: str, user_id: str, timestamp: Optional[datetime] = None, 
+                       stripe_identity_verified: bool = False) -> Dict[str, Any]:
     """
     Convenience function to track user activity for MAU billing
     
-    This should be called whenever a user visits a page with Lemma Shield
+    Args:
+        customer_id: Customer's Stripe ID
+        user_id: User identifier (email, username, etc.)
+        timestamp: When activity occurred (defaults to now)
+        stripe_identity_verified: True if user completed Stripe Identity verification ($2 fee)
+    
+    This should be called:
+    1. Whenever a user visits a page with Lemma Shield (stripe_identity_verified=False)
+    2. When a user completes Stripe Identity verification (stripe_identity_verified=True)
     """
-    return mau_tracker.track_user_activity(customer_id, user_id)
+    return mau_tracker.track_user_activity(customer_id, user_id, timestamp, stripe_identity_verified)
+
+def track_stripe_identity_verification(customer_id: str, user_id: str, timestamp: Optional[datetime] = None) -> Dict[str, Any]:
+    """
+    Convenience function to track Stripe Identity verification for $2 billing
+    
+    This should be called when a user successfully completes Stripe Identity verification
+    """
+    return mau_tracker.track_user_activity(customer_id, user_id, timestamp, stripe_identity_verified=True)
 
 def get_monthly_billing_data(customer_id: str, month: Optional[str] = None) -> Dict[str, Any]:
     """Get MAU billing data for a specific month"""
@@ -297,4 +357,4 @@ def get_customer_analytics(customer_id: str, days: int = 30) -> Dict[str, Any]:
     return mau_tracker.get_customer_analytics(customer_id, days)
 
 # Export the tracker and functions
-__all__ = ['mau_tracker', 'track_user_activity', 'get_monthly_billing_data', 'get_customer_analytics']
+__all__ = ['mau_tracker', 'track_user_activity', 'track_stripe_identity_verification', 'get_monthly_billing_data', 'get_customer_analytics']

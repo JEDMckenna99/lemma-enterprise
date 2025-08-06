@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from typing import Dict, Any, Optional
 
-from api.mau_tracker import mau_tracker, track_user_activity, get_monthly_billing_data, get_customer_analytics
+from api.mau_tracker import mau_tracker, track_user_activity, track_stripe_identity_verification, get_monthly_billing_data, get_customer_analytics
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,50 @@ mau_api_bp = Blueprint('mau_api', __name__)
 def track_user():
     """
     Track user activity for MAU calculation
+    
+    Expected payload:
+    {
+        "customer_id": "cus_stripe_customer_id",
+        "user_id": "user@example.com",
+        "timestamp": "2024-01-15T10:30:00Z" (optional),
+        "stripe_identity_verified": false (optional, default false)
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        customer_id = data.get('customer_id')
+        user_id = data.get('user_id')
+        timestamp_str = data.get('timestamp')
+        stripe_identity_verified = data.get('stripe_identity_verified', False)
+        
+        if not customer_id or not user_id:
+            return jsonify({'error': 'customer_id and user_id are required'}), 400
+        
+        # Parse timestamp if provided
+        timestamp = None
+        if timestamp_str:
+            try:
+                timestamp = datetime.fromisoformat(timestamp_str.replace('Z', ''))
+            except ValueError:
+                return jsonify({'error': 'Invalid timestamp format. Use ISO format.'}), 400
+        
+        # Track the user activity
+        result = track_user_activity(customer_id, user_id, timestamp, stripe_identity_verified)
+        
+        return jsonify({
+            'success': True,
+            'tracking_result': result
+        })
+        
+    except Exception as e:
+        logger.error(f"Error tracking user activity: {e}")
+        return jsonify({'error': 'Failed to track user activity'}), 500
+
+@mau_api_bp.route('/api/mau/track/stripe-identity', methods=['POST'])
+def track_stripe_identity():
+    """
+    Track Stripe Identity verification for $2.00 billing
     
     Expected payload:
     {
@@ -45,17 +89,18 @@ def track_user():
             except ValueError:
                 return jsonify({'error': 'Invalid timestamp format. Use ISO format.'}), 400
         
-        # Track the user activity
-        result = track_user_activity(customer_id, user_id, timestamp)
+        # Track the Stripe Identity verification
+        result = track_stripe_identity_verification(customer_id, user_id, timestamp)
         
         return jsonify({
             'success': True,
-            'tracking_result': result
+            'tracking_result': result,
+            'billing_note': 'User will be charged $2.00 for Stripe Identity verification'
         })
         
     except Exception as e:
-        logger.error(f"Error tracking user activity: {e}")
-        return jsonify({'error': 'Failed to track user activity'}), 500
+        logger.error(f"Error tracking Stripe Identity verification: {e}")
+        return jsonify({'error': 'Failed to track Stripe Identity verification'}), 500
 
 @mau_api_bp.route('/api/mau/billing/<customer_id>', methods=['GET'])
 def get_billing_data(customer_id):
@@ -193,8 +238,8 @@ def track_users_batch():
     {
         "customer_id": "cus_stripe_customer_id",
         "users": [
-            {"user_id": "user1@example.com", "timestamp": "2024-01-15T10:30:00Z"},
-            {"user_id": "user2@example.com", "timestamp": "2024-01-15T10:31:00Z"},
+            {"user_id": "user1@example.com", "timestamp": "2024-01-15T10:30:00Z", "stripe_identity_verified": false},
+            {"user_id": "user2@example.com", "timestamp": "2024-01-15T10:31:00Z", "stripe_identity_verified": true},
             ...
         ]
     }
@@ -221,6 +266,7 @@ def track_users_batch():
             try:
                 user_id = user_data.get('user_id')
                 timestamp_str = user_data.get('timestamp')
+                stripe_identity_verified = user_data.get('stripe_identity_verified', False)
                 
                 if not user_id:
                     errors.append(f"User {i}: user_id is required")
@@ -232,7 +278,7 @@ def track_users_batch():
                     timestamp = datetime.fromisoformat(timestamp_str.replace('Z', ''))
                 
                 # Track the user activity
-                result = track_user_activity(customer_id, user_id, timestamp)
+                result = track_user_activity(customer_id, user_id, timestamp, stripe_identity_verified)
                 results.append(result)
                 
             except Exception as e:
