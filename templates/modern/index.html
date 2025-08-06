@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Lemma - Revolutionary Digital Verification Platform{% endblock %}
-{% block description %}The world's first enterprise-grade cryptographic verification system with zero-knowledge proofs and perfect privacy.{% endblock %}
+{% block title %}Lemma - Stop Bots, Verify Real Users{% endblock %}
+{% block description %}Protect your website from bots and fake accounts in seconds. Lemma instantly verifies real users without compromising their privacy.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -173,220 +173,169 @@
                 <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" class="hero-logo-icon">
             </div>
             <div class="hero-badge">
-                ✅ Real Lemma Shield Implementation
+                Trusted by 1000+ websites
             </div>
             <h1 class="hero-title">
-                Revolutionary Digital <br>
-                Verification Platform
+                Stop Bots.<br>
+                Verify Real Users.
             </h1>
             <p class="hero-subtitle">
-                The world's first enterprise-grade cryptographic verification system 
-                with zero-knowledge proofs and perfect privacy. Built for the modern web.
+                Protect your website from fake accounts and bots in seconds. 
+                Lemma instantly verifies real users without asking for personal information.
             </p>
             <div class="hero-cta">
-                <a href="/join-network" class="btn btn-primary btn-lg">
-                    Join the Network
-                </a>
-                <a href="/docs" class="btn btn-outline btn-lg">
-                    📚 View Documentation
+                <a href="/pricing" class="btn btn-primary btn-lg">
+                    Get Started - $29/month
                 </a>
             </div>
         </div>
     </div>
 </section>
 
-<!-- System Status Section -->
+<!-- Problem Section -->
 <section class="status-section">
     <div class="stripe-container">
         <div class="section-header">
-            <h2 class="section-title">System Status</h2>
+            <h2 class="section-title">The Problem</h2>
             <p class="section-subtitle">
-                Real-time status of the Lemma Shield system components
+                Bot attacks cost businesses millions in lost revenue and user trust
             </p>
         </div>
         
-        <!-- React Component: System Status -->
-        <div id="system-status" data-lemma-component="SystemStatus"></div>
+        <div class="card-grid card-grid-3">
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h3 style="color: var(--error);">🤖 Bot Traffic</h3>
+                    <p>42% of web traffic is automated bots creating fake accounts and stealing data</p>
+                </div>
+            </div>
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h3 style="color: var(--error);">💸 Revenue Loss</h3>
+                    <p>Fake users inflate metrics, waste ad spend, and damage conversion rates</p>
+                </div>
+            </div>
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h3 style="color: var(--error);">🛡️ Poor Solutions</h3>
+                    <p>CAPTCHAs annoy users, and traditional verification requires sensitive data</p>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 
-<!-- Features Section -->
+<!-- Solution Section -->
 <section class="features-section">
     <div class="stripe-container">
         <div class="section-header">
-            <h2 class="section-title">Why Choose Lemma?</h2>
+            <h2 class="section-title">The Lemma Solution</h2>
             <p class="section-subtitle">
-                Experience the future of digital verification with our innovative approach
+                Verify real users instantly without collecting personal data
             </p>
         </div>
         
         <div class="features-grid">
             <div class="feature-card">
-                <div class="feature-icon">🛡️</div>
-                <h3 class="feature-title">Shield Protection</h3>
-                <p class="feature-description">
-                    Advanced bot protection that works seamlessly across your entire platform
-                </p>
-            </div>
-            
-            <div class="feature-card">
                 <div class="feature-icon">⚡</div>
-                <h3 class="feature-title">Lightning Fast</h3>
+                <h3 class="feature-title">Instant Verification</h3>
                 <p class="feature-description">
-                    Microsecond-level verification with 99.9% offline operation capability
+                    Users get verified in seconds through secure ID check, no forms to fill
                 </p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">🔐</div>
-                <h3 class="feature-title">Privacy First</h3>
+                <h3 class="feature-title">Privacy Protected</h3>
                 <p class="feature-description">
-                    Zero-knowledge proofs ensure complete privacy protection for your users
-                </p>
-            </div>
-            
-            <div class="feature-card">
-                <div class="feature-icon">🌐</div>
-                <h3 class="feature-title">Universal</h3>
-                <p class="feature-description">
-                    Works across all platforms and devices with seamless integration
+                    We never see or store personal information - only "verified" or "not verified"
                 </p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">🎯</div>
-                <h3 class="feature-title">Easy Integration</h3>
+                <h3 class="feature-title">One Script Tag</h3>
                 <p class="feature-description">
-                    Single script tag integration with comprehensive developer tools
-                </p>
-            </div>
-            
-            <div class="feature-card">
-                <div class="feature-icon">🏢</div>
-                <h3 class="feature-title">Enterprise Ready</h3>
-                <p class="feature-description">
-                    Production-grade infrastructure with enterprise security standards
+                    Add bot protection to your site in 5 minutes with a single line of code
                 </p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Demo Section -->
+<!-- How It Works Section -->
 <section class="demo-section">
     <div class="stripe-container">
         <div class="section-header">
-            <h2 class="section-title">See It In Action</h2>
+            <h2 class="section-title">How It Works</h2>
             <p class="section-subtitle">
-                Try the real Lemma Shield implementation and experience the difference
+                Simple 3-step process that takes seconds for your users
             </p>
         </div>
         
-        <!-- React Component: Demo Section -->
-        <div id="demo-section" data-lemma-component="DemoSection" data-lemma-props='{
-            "title": "🛡️ Lemma Shield Demo",
-            "description": "Version 3.0.0 - This is the actual implementation that works exactly like any other site using Lemma verification service. Experience the complete verification flow from start to finish.",
-            "status": "✅ Live Production System",
-            "buttons": [
-                {
-                    "label": "🔒 Try Join Network (Protected)",
-                    "href": "/join-network",
-                    "variant": "btn-primary"
-                },
-                {
-                    "label": "🧪 API Playground", 
-                    "href": "/playground",
-                    "variant": "btn-outline"
-                },
-                {
-                    "label": "📚 Documentation",
-                    "href": "/docs",
-                    "variant": "btn-outline"
-                }
-            ]
-        }'></div>
-        
-        <!-- How It Works Card -->
-        <div class="card-enhanced" style="margin-top: var(--space-8);">
-            <div class="card-header">
-                <h3>🎯 How It Works</h3>
-                <p><strong>Simple Logic:</strong> "Does this user have a valid lemma credential in their wallet?"</p>
-            </div>
+        <div class="card-enhanced">
             <div class="card-body">
-                <ul style="list-style: none; padding: 0;">
-                    <li style="margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
-                        <span style="color: var(--success); font-weight: bold;">✅</span>
-                        <span><strong>Has credential</strong> → Allow access to protected pages</span>
-                    </li>
-                    <li style="margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
-                        <span style="color: var(--error); font-weight: bold;">❌</span>
-                        <span><strong>No credential</strong> → Redirect to Stripe Identity verification</span>
-                    </li>
-                    <li style="display: flex; align-items: center; gap: var(--space-2);">
-                        <span style="color: var(--primary-500); font-weight: bold;">🔄</span>
-                        <span><strong>After verification</strong> → Get lemma credential → Access granted</span>
-                    </li>
-                </ul>
-            </div>
-        </div>
-        
-        <!-- Core Flows Card -->
-        <div class="card-enhanced" style="margin-top: var(--space-6);">
-            <div class="card-header">
-                <h3>📋 The Three Core Flows</h3>
-            </div>
-            <div class="card-body">
-                <ol style="list-style: none; padding: 0; counter-reset: flow-counter;">
-                    <li style="margin-bottom: var(--space-3); padding-left: var(--space-8); position: relative; counter-increment: flow-counter;">
-                        <span style="position: absolute; left: 0; top: 0; background: var(--primary-500); color: var(--white); width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--font-size-xs); font-weight: bold;">1</span>
-                        <strong>SHIELD CHECK FLOW:</strong> Check if user has valid lemma credential
-                    </li>
-                    <li style="margin-bottom: var(--space-3); padding-left: var(--space-8); position: relative; counter-increment: flow-counter;">
-                        <span style="position: absolute; left: 0; top: 0; background: var(--primary-500); color: var(--white); width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--font-size-xs); font-weight: bold;">2</span>
-                        <strong>VERIFICATION FLOW:</strong> Stripe Identity → create lemma credential → return
-                    </li>
-                    <li style="padding-left: var(--space-8); position: relative; counter-increment: flow-counter;">
-                        <span style="position: absolute; left: 0; top: 0; background: var(--primary-500); color: var(--white); width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--font-size-xs); font-weight: bold;">3</span>
-                        <strong>REVOCATION FLOW:</strong> Handle expired/compromised credentials
-                    </li>
-                </ol>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">1</div>
+                        <h3 class="feature-title">User Visits Your Site</h3>
+                        <p class="feature-description">
+                            User tries to access protected content or create an account
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">2</div>
+                        <h3 class="feature-title">Quick ID Check</h3>
+                        <p class="feature-description">
+                            Lemma instantly checks if they're a real person using secure verification
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">3</div>
+                        <h3 class="feature-title">Access Granted</h3>
+                        <p class="feature-description">
+                            Real users get instant access. Bots are blocked automatically
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Performance Metrics Section -->
+<!-- Benefits Section -->
 <section class="section">
     <div class="stripe-container">
         <div class="section-header">
-            <h2 class="section-title">Performance Metrics</h2>
+            <h2 class="section-title">Why Businesses Choose Lemma</h2>
             <p class="section-subtitle">
-                Real-time performance data from our production system
+                Real results from companies using Lemma bot protection
             </p>
         </div>
         
         <div class="card-grid card-grid-3">
-            <!-- React Components: Metric Cards -->
-            <div data-lemma-component="MetricCard" data-lemma-props='{
-                "title": "Verification Speed",
-                "value": "0.36µs",
-                "subtitle": "WebAssembly average",
-                "trend": 15
-            }'></div>
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h3 style="color: var(--success);">📈 95% Less Spam</h3>
+                    <p>Dramatically reduce fake accounts and spam without annoying real users</p>
+                </div>
+            </div>
             
-            <div data-lemma-component="MetricCard" data-lemma-props='{
-                "title": "Offline Rate",
-                "value": "99.9%",
-                "subtitle": "Zero network calls",
-                "trend": 2
-            }'></div>
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h3 style="color: var(--success);">⚡ Instant Setup</h3>
+                    <p>Get bot protection running in 5 minutes with one line of code</p>
+                </div>
+            </div>
             
-            <div data-lemma-component="MetricCard" data-lemma-props='{
-                "title": "Cost Reduction",
-                "value": "99.8%",
-                "subtitle": "vs traditional methods",
-                "trend": 8
-            }'></div>
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h3 style="color: var(--success);">🔐 Privacy Safe</h3>
+                    <p>No personal data collected or stored - just verified or not verified</p>
+                </div>
+            </div>
         </div>
     </div>
 </section>
@@ -395,18 +344,18 @@
 <section class="section">
     <div class="stripe-container">
         <div class="section-header">
-            <h2 class="section-title">Ready to Get Started?</h2>
+            <h2 class="section-title">Stop Bots Today</h2>
             <p class="section-subtitle">
-                Join thousands of platforms already using Lemma for secure verification
+                Protect your website from fake users in minutes, not months
             </p>
             <div class="hero-cta" style="margin-top: var(--space-8);">
-                <a href="/join-network" class="btn btn-primary btn-lg">
-                    🚀 Start Integration
-                </a>
-                <a href="/contact" class="btn btn-outline btn-lg">
-                    💬 Talk to Sales
+                <a href="/pricing" class="btn btn-primary btn-lg">
+                    Start Free Trial - $29/month
                 </a>
             </div>
+            <p style="margin-top: var(--space-4); color: var(--gray-500); font-size: var(--font-size-sm);">
+                No setup fees • Cancel anytime • 30-day money-back guarantee
+            </p>
         </div>
     </div>
 </section>
