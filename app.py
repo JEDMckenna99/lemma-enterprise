@@ -119,6 +119,15 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register Usage Billing blueprint: {e}")
+    
+    # Register the Automated Billing blueprint for full automation
+    try:
+        from api.automated_billing import automated_billing_bp
+        app.register_blueprint(automated_billing_bp)
+        logger.info("✅ Automated Billing API blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register Automated Billing blueprint: {e}")
         
     # Initialize optimized engine
     try:
