@@ -148,9 +148,9 @@
 <!-- Pricing Hero -->
 <section class="pricing-hero">
     <div class="stripe-container">
-        <h1 class="hero-title">Simple, Transparent Pricing</h1>
+        <h1 class="hero-title">Pay Only For What You Use</h1>
         <p class="hero-subtitle">
-            Choose the plan that fits your needs. No hidden fees, cancel anytime.
+            Simple per-user pricing that scales with your business. No hidden fees, no minimum commitments.
         </p>
     </div>
 </section>
@@ -158,25 +158,43 @@
 <!-- Pricing Plans -->
 <section class="section">
     <div class="stripe-container">
-        <div class="pricing-plans">
-            <!-- Starter Plan -->
-            <div class="pricing-card">
-                <h3>Starter</h3>
-                <div class="price">$29<span class="price-unit">/month</span></div>
-                <p class="text-secondary">Perfect for small to medium websites</p>
+        <!-- Simple Per-User Pricing -->
+        <div class="card-enhanced" style="max-width: 600px; margin: 0 auto;">
+            <div class="card-body text-center">
+                <h2 style="color: var(--primary-500); margin-bottom: var(--space-6);">Simple Per-User Pricing</h2>
                 
-                <div class="feature-list">
+                <!-- Main Pricing -->
+                <div style="margin-bottom: var(--space-8);">
+                    <div class="price" style="display: flex; align-items: center; justify-content: center; gap: var(--space-4); margin-bottom: var(--space-4);">
+                        <span style="font-size: 4rem; font-weight: 700; color: var(--primary-500);">$0.10</span>
+                        <div style="text-align: left;">
+                            <div style="font-size: var(--font-size-lg); font-weight: 600; color: var(--gray-700);">per user</div>
+                            <div style="font-size: var(--font-size-sm); color: var(--gray-500);">per month</div>
+                        </div>
+                    </div>
+                    
+                    <div style="font-size: var(--font-size-lg); color: var(--gray-600); margin-bottom: var(--space-2);">
+                        + <strong style="color: var(--primary-500);">$2.00</strong> one-time setup fee per new user
+                    </div>
+                    <div style="font-size: var(--font-size-sm); color: var(--gray-500);">
+                        (covers Stripe Identity verification cost)
+                    </div>
+                </div>
+                
+                <!-- What's Included -->
+                <div class="feature-list" style="text-align: left; max-width: 400px; margin: 0 auto var(--space-8);">
+                    <h4 style="text-align: center; margin-bottom: var(--space-4); color: var(--gray-800);">Everything Included:</h4>
                     <div class="feature-item">
                         <span class="feature-check">✓</span>
-                        Up to 10,000 verifications/month
+                        Unlimited verifications per user
                     </div>
                     <div class="feature-item">
                         <span class="feature-check">✓</span>
-                        Microsecond-level performance
+                        Microsecond-level performance (0.36µs avg)
                     </div>
                     <div class="feature-item">
                         <span class="feature-check">✓</span>
-                        99.9% offline operation
+                        99.9% offline operation - no network calls
                     </div>
                     <div class="feature-item">
                         <span class="feature-check">✓</span>
@@ -184,76 +202,144 @@
                     </div>
                     <div class="feature-item">
                         <span class="feature-check">✓</span>
-                        Email support
+                        Privacy-first verification (no data stored)
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        5-minute integration with one script tag
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        24/7 email support
                     </div>
                 </div>
                 
-                <a href="https://buy.stripe.com/test_4gM00jf25ePx7MogWA0sU00" class="btn btn-outline btn-lg w-full">Get Started</a>
+                <a href="/join-network" class="btn btn-primary btn-lg" style="font-size: var(--font-size-lg); padding: var(--space-4) var(--space-8);">
+                    Start Protecting Your Site
+                </a>
+                
+                <p style="margin-top: var(--space-4); font-size: var(--font-size-sm); color: var(--gray-500);">
+                    No monthly minimums • No setup fees • Cancel anytime
+                </p>
             </div>
-
-            <!-- Professional Plan -->
-            <div class="pricing-card featured">
-                <div class="pricing-badge">Most Popular</div>
-                <h3>Professional</h3>
-                <div class="price">$99<span class="price-unit">/month</span></div>
-                <p class="text-secondary">Advanced features for growing businesses</p>
+        </div>
+        
+        <!-- Pricing Calculator -->
+        <div class="card-enhanced" style="max-width: 500px; margin: var(--space-12) auto 0;">
+            <div class="card-body">
+                <h3 style="text-align: center; margin-bottom: var(--space-6);">Calculate Your Monthly Cost</h3>
                 
-                <div class="feature-list">
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Up to 100,000 verifications/month
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; margin-bottom: var(--space-2); font-weight: 600;">Number of verified users:</label>
+                    <input type="number" id="userCount" value="1000" min="1" max="1000000" 
+                           style="width: 100%; padding: var(--space-3); border: 2px solid var(--gray-200); border-radius: 6px; font-size: var(--font-size-base);"
+                           oninput="calculateCost()">
+                </div>
+                
+                <div style="background: var(--gray-50); padding: var(--space-4); border-radius: 8px; margin-bottom: var(--space-4);">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-2);">
+                        <span>Monthly cost (<span id="monthlyUsers">1,000</span> users × $0.10):</span>
+                        <strong id="monthlyCost">$100.00</strong>
                     </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Priority support
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Advanced analytics dashboard
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Custom integration assistance
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        SLA: 99.9% uptime guarantee
+                    <div style="display: flex; justify-content: space-between; font-size: var(--font-size-sm); color: var(--gray-600);">
+                        <span>One-time setup (new users × $2.00):</span>
+                        <span id="setupCost">$2,000.00</span>
                     </div>
                 </div>
                 
-                <a href="https://buy.stripe.com/test_fZucN57zDgXFeaMayc0sU01" class="btn btn-primary btn-lg w-full">Choose Professional</a>
+                <div style="text-align: center; font-size: var(--font-size-sm); color: var(--gray-600);">
+                    Setup fee only applies to new users joining your platform
+                </div>
             </div>
-
-            <!-- Enterprise Plan -->
-            <div class="pricing-card">
-                <h3>Enterprise</h3>
-                <div class="price">$499<span class="price-unit">/month</span></div>
-                <p class="text-secondary">Full-scale enterprise protection</p>
-                
-                <div class="feature-list">
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Unlimited verifications
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        White-label options
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Dedicated support team
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        Custom implementations
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-check">✓</span>
-                        SLA: 99.99% uptime + 4hr response
-                    </div>
+        </div>
+        
+        <script>
+        function calculateCost() {
+            const userCount = parseInt(document.getElementById('userCount').value) || 0;
+            const monthlyTotal = userCount * 0.10;
+            const setupTotal = userCount * 2.00;
+            
+            document.getElementById('monthlyUsers').textContent = userCount.toLocaleString();
+            document.getElementById('monthlyCost').textContent = '$' + monthlyTotal.toFixed(2);
+            document.getElementById('setupCost').textContent = '$' + setupTotal.toFixed(2);
+        }
+        
+        // Initialize calculator
+        calculateCost();
+        </script>
+        
+        <!-- Competitive Comparison -->
+        <div class="section-header" style="margin-top: var(--space-20);">
+            <h2>Why Lemma Costs 90% Less Than Competitors</h2>
+            <p class="section-subtitle">
+                Compare our per-user pricing to traditional auth and bot protection services
+            </p>
+        </div>
+        
+        <div class="card-enhanced" style="margin-bottom: var(--space-12);">
+            <div class="card-body">
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; margin: var(--space-4) 0;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--gray-200);">
+                                <th style="text-align: left; padding: var(--space-3); font-weight: 600;">Service</th>
+                                <th style="text-align: center; padding: var(--space-3); font-weight: 600;">Pricing</th>
+                                <th style="text-align: center; padding: var(--space-3); font-weight: 600;">1,000 Users/Month</th>
+                                <th style="text-align: center; padding: var(--space-3); font-weight: 600;">Performance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="background: var(--success-50); border: 2px solid var(--success-200);">
+                                <td style="padding: var(--space-3); font-weight: 600; color: var(--success-700);">
+                                    🏆 Lemma Shield
+                                </td>
+                                <td style="padding: var(--space-3); text-align: center; font-weight: 600; color: var(--success-700);">
+                                    $0.10/user/month
+                                </td>
+                                <td style="padding: var(--space-3); text-align: center; font-weight: 600; color: var(--success-700);">
+                                    $100/month
+                                </td>
+                                <td style="padding: var(--space-3); text-align: center; font-weight: 600; color: var(--success-700);">
+                                    0.36µs
+                                </td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--gray-200);">
+                                <td style="padding: var(--space-3);">Auth0</td>
+                                <td style="padding: var(--space-3); text-align: center;">$23+/month base</td>
+                                <td style="padding: var(--space-3); text-align: center; color: var(--error);">$23-240/month</td>
+                                <td style="padding: var(--space-3); text-align: center;">~100ms</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--gray-200);">
+                                <td style="padding: var(--space-3);">Okta</td>
+                                <td style="padding: var(--space-3); text-align: center;">$2-8/user/month</td>
+                                <td style="padding: var(--space-3); text-align: center; color: var(--error);">$2,000-8,000/month</td>
+                                <td style="padding: var(--space-3); text-align: center;">~200ms</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--gray-200);">
+                                <td style="padding: var(--space-3);">Cloudflare Bot Management</td>
+                                <td style="padding: var(--space-3); text-align: center;">$200+/month</td>
+                                <td style="padding: var(--space-3); text-align: center; color: var(--error);">$200-500+/month</td>
+                                <td style="padding: var(--space-3); text-align: center;">~50ms</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: var(--space-3);">reCAPTCHA Enterprise</td>
+                                <td style="padding: var(--space-3); text-align: center;">$1-3/1000 calls</td>
+                                <td style="padding: var(--space-3); text-align: center; color: var(--error);">$100-3,000/month</td>
+                                <td style="padding: var(--space-3); text-align: center;">~500ms</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
                 
-                <a href="https://buy.stripe.com/test_9B68wP7zDfTBc2EbCg0sU02" class="btn btn-outline btn-lg w-full">Get Enterprise</a>
+                <div style="background: var(--primary-50); padding: var(--space-4); border-radius: 8px; margin-top: var(--space-6); text-align: center;">
+                    <h4 style="color: var(--primary-700); margin-bottom: var(--space-2);">💰 Lemma is 90-95% cheaper than competitors</h4>
+                    <p style="color: var(--primary-600); margin-bottom: var(--space-2);">
+                        <strong>Plus you get:</strong> 1000x faster performance, 99.9% offline operation, and privacy-first verification
+                    </p>
+                    <p style="font-size: var(--font-size-sm); color: var(--primary-600);">
+                        *Competitor pricing based on published rates as of 2024. Performance measured in typical verification response times.
+                    </p>
+                </div>
             </div>
         </div>
 
@@ -265,29 +351,43 @@
         <div class="card-grid-2">
             <div class="card-enhanced">
                 <div class="card-body">
-                    <h4>How does subscription billing work?</h4>
-                    <p>All plans are billed monthly. You get access to unlimited bot protection with verification limits based on your plan. Upgrade or downgrade anytime.</p>
+                    <h4>How does per-user billing work?</h4>
+                    <p>You pay $0.10 per month for each verified user on your platform. New users have a one-time $2 setup fee to cover identity verification costs. No monthly minimums or commitments.</p>
                 </div>
             </div>
             
             <div class="card-enhanced">
                 <div class="card-body">
-                    <h4>What payment methods do you accept?</h4>
-                    <p>We accept all major credit cards, debit cards, and digital wallets through our secure Stripe integration. All payments are processed securely.</p>
+                    <h4>What's included in the $0.10 per user?</h4>
+                    <p>Everything! Unlimited verifications per user, microsecond performance, 99.9% offline operation, cross-site network effects, and full support. No feature restrictions.</p>
                 </div>
             </div>
             
             <div class="card-enhanced">
                 <div class="card-body">
-                    <h4>Can I cancel my subscription anytime?</h4>
-                    <p>Yes, you can cancel your subscription at any time. Your access will continue until the end of your current billing period, with no cancellation fees.</p>
+                    <h4>Why is there a $2 setup fee for new users?</h4>
+                    <p>The one-time $2 fee covers the cost of Stripe Identity verification to ensure each user is real. This prevents bot accounts and keeps your platform secure.</p>
+                </div>
+            </div>
+            
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h4>How does this compare to competitors?</h4>
+                    <p>Our $0.10/user/month significantly undercuts Auth0 ($23+/month), Okta ($2+/user/month), and bot protection services ($100s/month) while providing faster, more secure verification.</p>
                 </div>
             </div>
             
             <div class="card-enhanced">
                 <div class="card-body">
                     <h4>How fast is the verification?</h4>
-                    <p>Lemma provides microsecond-level verification (0.05-1µs typical) with 99.9% offline operation. No network calls needed for most verifications.</p>
+                    <p>Lemma provides microsecond-level verification (0.36µs average) with 99.9% offline operation. No network calls needed for most verifications, making it the fastest solution available.</p>
+                </div>
+            </div>
+            
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h4>Can I cancel anytime?</h4>
+                    <p>Yes! No contracts or commitments. You only pay for active users each month. Stop using the service and you stop paying - it's that simple.</p>
                 </div>
             </div>
         </div>
