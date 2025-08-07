@@ -1,0 +1,262 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Sign In - Lemma Shield{% endblock %}
+{% block description %}Sign in to your Lemma Shield account to manage API keys and view usage analytics.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .login-container {
+            max-width: 400px;
+            margin: var(--space-20) auto;
+            padding: 0 var(--space-6);
+        }
+
+        .login-card {
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 20px;
+            padding: var(--space-10);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: var(--space-8);
+        }
+
+        .login-title {
+            font-size: var(--font-size-3xl);
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: var(--space-2);
+        }
+
+        .login-subtitle {
+            color: var(--gray-600);
+            font-size: var(--font-size-lg);
+            line-height: 1.6;
+        }
+
+        .form-group {
+            margin-bottom: var(--space-6);
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: var(--space-2);
+            font-size: var(--font-size-base);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: var(--space-4);
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            font-size: var(--font-size-base);
+            transition: all 0.2s ease;
+            background: var(--white);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.1);
+        }
+
+        .form-input.error {
+            border-color: var(--error);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+
+        .error-message {
+            color: var(--error);
+            font-size: var(--font-size-sm);
+            margin-top: var(--space-1);
+            display: none;
+        }
+
+        .login-button {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            color: var(--white);
+            border: none;
+            padding: var(--space-4);
+            border-radius: 12px;
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: var(--space-4);
+        }
+
+        .login-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(99, 91, 255, 0.4);
+            background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+        }
+
+        .login-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .register-link {
+            text-align: center;
+            margin-top: var(--space-6);
+            padding-top: var(--space-6);
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .register-link a {
+            color: var(--primary-600);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .register-link a:hover {
+            color: var(--primary-700);
+            text-decoration: underline;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: var(--space-2);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .login-note {
+            background: var(--primary-50);
+            border: 1px solid var(--primary-200);
+            border-radius: 12px;
+            padding: var(--space-4);
+            margin-bottom: var(--space-6);
+            color: var(--primary-800);
+            font-size: var(--font-size-sm);
+        }
+
+        .login-note strong {
+            color: var(--primary-900);
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1 class="login-title">Welcome Back</h1>
+                <p class="login-subtitle">
+                    Sign in to access your Lemma Shield dashboard
+                </p>
+            </div>
+
+            <div class="login-note">
+                <strong>Note:</strong> We use a simplified login system. Just enter your email address to access your account and API keys.
+            </div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label" for="email">Email Address</label>
+                    <input type="email" id="email" name="email" class="form-input" required 
+                           placeholder="Enter your registered email">
+                    <div class="error-message" id="emailError"></div>
+                </div>
+
+                <button type="submit" class="login-button" id="loginButton">
+                    Sign In to Dashboard
+                </button>
+            </form>
+
+            <div class="register-link">
+                Don't have an account? <a href="/register">Create one here</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const button = document.getElementById('loginButton');
+            const originalText = button.innerHTML;
+            
+            // Clear previous errors
+            clearErrors();
+            
+            // Show loading state
+            button.disabled = true;
+            button.innerHTML = '<span class="loading-spinner"></span>Signing in...';
+            
+            try {
+                const formData = new FormData(this);
+                const data = Object.fromEntries(formData.entries());
+                
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Redirect to dashboard
+                    window.location.href = result.redirect_url || '/dashboard';
+                } else {
+                    // Show error
+                    showError('email', result.error || 'Login failed');
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                }
+                
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('email', 'Network error. Please try again.');
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        });
+        
+        function clearErrors() {
+            const errorElements = document.querySelectorAll('.error-message');
+            errorElements.forEach(el => {
+                el.style.display = 'none';
+                el.textContent = '';
+            });
+            
+            const inputs = document.querySelectorAll('.form-input');
+            inputs.forEach(input => input.classList.remove('error'));
+        }
+        
+        function showError(field, message) {
+            const errorElement = document.getElementById(field + 'Error');
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+                
+                const input = document.getElementById(field);
+                if (input) {
+                    input.classList.add('error');
+                }
+            }
+        }
+        
+        // Auto-focus email input
+        document.getElementById('email').focus();
+    </script>
+{% endblock %}

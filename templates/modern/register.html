@@ -1,0 +1,372 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Create Account - Lemma Shield{% endblock %}
+{% block description %}Create your Lemma Shield account and get API keys to protect your website in minutes.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .register-container {
+            max-width: 500px;
+            margin: var(--space-16) auto;
+            padding: 0 var(--space-6);
+        }
+
+        .register-card {
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 20px;
+            padding: var(--space-10);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+        }
+
+        .register-header {
+            text-align: center;
+            margin-bottom: var(--space-8);
+        }
+
+        .register-title {
+            font-size: var(--font-size-3xl);
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: var(--space-2);
+        }
+
+        .register-subtitle {
+            color: var(--gray-600);
+            font-size: var(--font-size-lg);
+            line-height: 1.6;
+        }
+
+        .form-group {
+            margin-bottom: var(--space-6);
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: var(--space-2);
+            font-size: var(--font-size-base);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: var(--space-4);
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            font-size: var(--font-size-base);
+            transition: all 0.2s ease;
+            background: var(--white);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.1);
+        }
+
+        .form-input.error {
+            border-color: var(--error);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+
+        .form-help {
+            font-size: var(--font-size-sm);
+            color: var(--gray-500);
+            margin-top: var(--space-1);
+        }
+
+        .error-message {
+            color: var(--error);
+            font-size: var(--font-size-sm);
+            margin-top: var(--space-1);
+            display: none;
+        }
+
+        .register-button {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            color: var(--white);
+            border: none;
+            padding: var(--space-4);
+            border-radius: 12px;
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: var(--space-4);
+        }
+
+        .register-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(99, 91, 255, 0.4);
+            background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+        }
+
+        .register-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .login-link {
+            text-align: center;
+            margin-top: var(--space-6);
+            padding-top: var(--space-6);
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .login-link a {
+            color: var(--primary-600);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .login-link a:hover {
+            color: var(--primary-700);
+            text-decoration: underline;
+        }
+
+        .success-message {
+            background: var(--success-50);
+            border: 1px solid var(--success-200);
+            color: var(--success-800);
+            padding: var(--space-4);
+            border-radius: 12px;
+            margin-bottom: var(--space-6);
+            display: none;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: var(--space-2);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .api-key-display {
+            background: var(--gray-50);
+            border: 2px solid var(--primary-200);
+            border-radius: 12px;
+            padding: var(--space-4);
+            margin-top: var(--space-4);
+            display: none;
+        }
+
+        .api-key-label {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: var(--space-2);
+        }
+
+        .api-key-value {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: var(--font-size-sm);
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: var(--space-3);
+            word-break: break-all;
+            position: relative;
+        }
+
+        .copy-button {
+            position: absolute;
+            top: var(--space-2);
+            right: var(--space-2);
+            background: var(--primary-500);
+            color: var(--white);
+            border: none;
+            padding: var(--space-1) var(--space-2);
+            border-radius: 6px;
+            font-size: var(--font-size-xs);
+            cursor: pointer;
+        }
+
+        .copy-button:hover {
+            background: var(--primary-600);
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="register-container">
+        <div class="register-card">
+            <div class="register-header">
+                <h1 class="register-title">Create Your Account</h1>
+                <p class="register-subtitle">
+                    Get your API keys and start protecting your website in under 2 minutes
+                </p>
+            </div>
+
+            <div class="success-message" id="successMessage">
+                <strong>Account created successfully!</strong> Your API key has been generated below.
+            </div>
+
+            <form id="registerForm">
+                <div class="form-group">
+                    <label class="form-label" for="email">Email Address *</label>
+                    <input type="email" id="email" name="email" class="form-input" required>
+                    <div class="form-help">We'll use this for important account notifications</div>
+                    <div class="error-message" id="emailError"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="name">Full Name *</label>
+                    <input type="text" id="name" name="name" class="form-input" required>
+                    <div class="error-message" id="nameError"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="company">Company Name *</label>
+                    <input type="text" id="company" name="company" class="form-input" required>
+                    <div class="form-help">The organization that will be using Lemma Shield</div>
+                    <div class="error-message" id="companyError"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="billingEmail">Billing Email (Optional)</label>
+                    <input type="email" id="billingEmail" name="billing_email" class="form-input">
+                    <div class="form-help">Leave empty to use your main email for billing</div>
+                    <div class="error-message" id="billingEmailError"></div>
+                </div>
+
+                <button type="submit" class="register-button" id="registerButton">
+                    Create Account & Get API Keys
+                </button>
+            </form>
+
+            <div class="api-key-display" id="apiKeyDisplay">
+                <div class="api-key-label">Your API Key (save this securely):</div>
+                <div class="api-key-value">
+                    <span id="apiKeyValue"></span>
+                    <button class="copy-button" onclick="copyApiKey()">Copy</button>
+                </div>
+                <div class="form-help" style="margin-top: var(--space-2);">
+                    <strong>Important:</strong> Save this API key securely. You can generate additional keys from your dashboard.
+                </div>
+                <button onclick="goToDashboard()" class="register-button" style="margin-top: var(--space-4);">
+                    Go to Dashboard
+                </button>
+            </div>
+
+            <div class="login-link">
+                Already have an account? <a href="/login">Sign in here</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const button = document.getElementById('registerButton');
+            const originalText = button.innerHTML;
+            
+            // Clear previous errors
+            clearErrors();
+            
+            // Show loading state
+            button.disabled = true;
+            button.innerHTML = '<span class="loading-spinner"></span>Creating account...';
+            
+            try {
+                const formData = new FormData(this);
+                const data = Object.fromEntries(formData.entries());
+                
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Show success message
+                    document.getElementById('successMessage').style.display = 'block';
+                    
+                    // Hide form
+                    document.getElementById('registerForm').style.display = 'none';
+                    
+                    // Show API key
+                    document.getElementById('apiKeyValue').textContent = result.api_key;
+                    document.getElementById('apiKeyDisplay').style.display = 'block';
+                    
+                    // Scroll to top
+                    window.scrollTo(0, 0);
+                    
+                } else {
+                    // Show error
+                    showError('general', result.error || 'Registration failed');
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                }
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                showError('general', 'Network error. Please try again.');
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        });
+        
+        function clearErrors() {
+            const errorElements = document.querySelectorAll('.error-message');
+            errorElements.forEach(el => {
+                el.style.display = 'none';
+                el.textContent = '';
+            });
+            
+            const inputs = document.querySelectorAll('.form-input');
+            inputs.forEach(input => input.classList.remove('error'));
+        }
+        
+        function showError(field, message) {
+            const errorElement = document.getElementById(field + 'Error');
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+                
+                const input = document.getElementById(field);
+                if (input) {
+                    input.classList.add('error');
+                }
+            } else {
+                // General error
+                alert(message);
+            }
+        }
+        
+        function copyApiKey() {
+            const apiKeyValue = document.getElementById('apiKeyValue').textContent;
+            navigator.clipboard.writeText(apiKeyValue).then(() => {
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                }, 2000);
+            });
+        }
+        
+        function goToDashboard() {
+            window.location.href = '/dashboard';
+        }
+        
+        // Auto-focus first input
+        document.getElementById('email').focus();
+    </script>
+{% endblock %}

@@ -137,6 +137,15 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register MAU API blueprint: {e}")
+    
+    # Register the Customer Accounts blueprint for account management
+    try:
+        from api.customer_accounts import customer_accounts_bp
+        app.register_blueprint(customer_accounts_bp)
+        logger.info("✅ Customer Accounts blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register Customer Accounts blueprint: {e}")
         
     # Initialize optimized engine
     try:
