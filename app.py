@@ -146,6 +146,15 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register Customer Accounts blueprint: {e}")
+    
+    # Register the QR Generator blueprint for QR code generation
+    try:
+        from api.qr_generator import qr_generator_bp
+        app.register_blueprint(qr_generator_bp)
+        logger.info("✅ QR Generator blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register QR Generator blueprint: {e}")
         
     # Initialize optimized engine
     try:

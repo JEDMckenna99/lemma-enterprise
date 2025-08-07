@@ -394,7 +394,7 @@
     </div>
 
     <!-- QR Code Generation -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Generate QR codes
@@ -403,6 +403,13 @@
 
         async function generateQRCodes() {
             try {
+                // Check if QRCode library is loaded
+                if (typeof QRCode === 'undefined') {
+                    console.error('❌ QRCode library not loaded');
+                    showFallbackQRCodes();
+                    return;
+                }
+
                 // Basic QR Code
                 await QRCode.toCanvas(document.getElementById('basicQR'), 'https://lemma.id', {
                     width: 200,
@@ -413,95 +420,123 @@
                     }
                 });
 
-                // Lemma Event Ticket QR
-                const ticketData = JSON.stringify({
-                    type: 'lemma_verification',
-                    qr_type: 'ticket',
-                    claims: {
-                        event_name: 'Tech Conference 2024',
-                        ticket_id: 'TC2024-001',
-                        seat: 'A-15',
-                        date: '2024-12-15',
-                        valid_until: '2024-12-15T23:59:59Z'
-                    },
-                    lemma_signature: 'lemma:sig:abc123...def456',
-                    offline_verification: true,
-                    verification_time_us: 4.2
-                });
-
-                await QRCode.toCanvas(document.getElementById('ticketQR'), ticketData, {
-                    width: 200,
-                    margin: 2,
-                    color: {
-                        dark: '#6366f1',
-                        light: '#FFFFFF'
+                // Fetch demo QR codes from API
+                try {
+                    const response = await fetch('/api/qr/demo-codes');
+                    const data = await response.json();
+                    
+                    if (data.success && data.demo_codes) {
+                        const codes = data.demo_codes;
+                        const colors = {
+                            ticket: '#6366f1',
+                            product: '#059669', 
+                            access: '#dc2626'
+                        };
+                        
+                        // Generate QR codes from API data
+                        for (const code of codes) {
+                            const canvasId = code.id + 'QR';
+                            const color = colors[code.id] || '#000000';
+                            
+                            await QRCode.toCanvas(document.getElementById(canvasId), code.data, {
+                                width: 200,
+                                margin: 2,
+                                color: {
+                                    dark: color,
+                                    light: '#FFFFFF'
+                                }
+                            });
+                        }
+                        
+                        console.log('✅ All QR codes generated successfully from API');
+                    } else {
+                        throw new Error('API returned no demo codes');
                     }
-                });
-
-                // Lemma Product Authentication QR
-                const productData = JSON.stringify({
-                    type: 'lemma_verification',
-                    qr_type: 'product',
-                    claims: {
-                        product_name: 'Premium Headphones',
-                        serial_number: 'PH-2024-789',
-                        manufacturer: 'AudioTech Inc',
-                        manufactured_date: '2024-01-15',
-                        batch_id: 'BATCH-001'
-                    },
-                    lemma_signature: 'lemma:sig:xyz789...uvw123',
-                    offline_verification: true,
-                    verification_time_us: 3.8
-                });
-
-                await QRCode.toCanvas(document.getElementById('productQR'), productData, {
-                    width: 200,
-                    margin: 2,
-                    color: {
-                        dark: '#059669',
-                        light: '#FFFFFF'
-                    }
-                });
-
-                // Lemma Access Control QR
-                const accessData = JSON.stringify({
-                    type: 'lemma_verification',
-                    qr_type: 'access',
-                    claims: {
-                        access_level: 'Level 3',
-                        building: 'Main Office',
-                        room: 'Conference Room B',
-                        valid_from: '2024-08-07T09:00:00Z',
-                        valid_until: '2024-08-07T18:00:00Z',
-                        user_id: 'emp_001'
-                    },
-                    lemma_signature: 'lemma:sig:mno345...rst678',
-                    offline_verification: true,
-                    verification_time_us: 5.1
-                });
-
-                await QRCode.toCanvas(document.getElementById('accessQR'), accessData, {
-                    width: 200,
-                    margin: 2,
-                    color: {
-                        dark: '#dc2626',
-                        light: '#FFFFFF'
-                    }
-                });
-
-                console.log('✅ All QR codes generated successfully');
+                } catch (apiError) {
+                    console.warn('⚠️ API failed, using fallback QR codes:', apiError);
+                    await generateFallbackLemmaQRs();
+                }
 
             } catch (error) {
                 console.error('❌ Failed to generate QR codes:', error);
-                
-                // Fallback: show text instead of QR codes
-                ['basicQR', 'ticketQR', 'productQR', 'accessQR'].forEach(id => {
-                    const element = document.getElementById(id);
-                    if (element && !element.querySelector('canvas')) {
-                        element.innerHTML = '<div style="padding: 20px; font-size: 12px;">QR Code<br>Generation<br>Failed</div>';
+                showFallbackQRCodes();
+            }
+        }
+
+        async function generateFallbackLemmaQRs() {
+            // Fallback Lemma QR codes with demo signatures
+            const fallbackCodes = [
+                {
+                    id: 'ticket',
+                    data: JSON.stringify({
+                        type: 'lemma_verification',
+                        qr_type: 'ticket',
+                        claims: {
+                            event_name: 'Tech Conference 2024',
+                            ticket_id: 'TC2024-001',
+                            seat: 'A-15'
+                        },
+                        lemma_signature: 'lemma:sig:demo_ticket_abc123',
+                        verification_time_us: 4.2
+                    }),
+                    color: '#6366f1'
+                },
+                {
+                    id: 'product',
+                    data: JSON.stringify({
+                        type: 'lemma_verification',
+                        qr_type: 'product',
+                        claims: {
+                            product_name: 'Premium Headphones',
+                            serial_number: 'PH-2024-789'
+                        },
+                        lemma_signature: 'lemma:sig:demo_product_xyz789',
+                        verification_time_us: 3.8
+                    }),
+                    color: '#059669'
+                },
+                {
+                    id: 'access',
+                    data: JSON.stringify({
+                        type: 'lemma_verification',
+                        qr_type: 'access',
+                        claims: {
+                            access_level: 'Level 3',
+                            building: 'Main Office'
+                        },
+                        lemma_signature: 'lemma:sig:demo_access_mno345',
+                        verification_time_us: 5.1
+                    }),
+                    color: '#dc2626'
+                }
+            ];
+
+            for (const code of fallbackCodes) {
+                await QRCode.toCanvas(document.getElementById(code.id + 'QR'), code.data, {
+                    width: 200,
+                    margin: 2,
+                    color: {
+                        dark: code.color,
+                        light: '#FFFFFF'
                     }
                 });
             }
+        }
+
+        function showFallbackQRCodes() {
+            // Show text fallback when QR generation completely fails
+            const qrElements = ['basicQR', 'ticketQR', 'productQR', 'accessQR'];
+            qrElements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element && !element.querySelector('canvas')) {
+                    element.innerHTML = `
+                        <div style="padding: 40px; font-size: 14px; color: #666; text-align: center; border: 2px dashed #ddd; border-radius: 8px;">
+                            📱 QR Code<br>
+                            <small>Use mobile to scan</small>
+                        </div>
+                    `;
+                }
+            });
         }
     </script>
 {% endblock %}
