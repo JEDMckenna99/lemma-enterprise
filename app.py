@@ -211,6 +211,16 @@ def create_app():
         """Documentation page"""
         return render_template('modern/docs.html')
     
+    @app.route('/qr-reader')
+    def qr_reader():
+        """Mobile-optimized QR code reader with offline verification"""
+        return render_template('modern/qr_reader.html')
+    
+    @app.route('/qr-demo')
+    def qr_demo():
+        """QR code demo page with test codes for offline verification"""
+        return render_template('modern/qr_demo.html')
+    
     @app.route('/sdk-demo')
     def sdk_demo():
         """SDK Integration Demo - Unprotected for testing"""

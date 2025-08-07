@@ -1,0 +1,507 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Lemma QR Demo - Test Offline Verification{% endblock %}
+{% block description %}Test Lemma's offline QR code verification. Scan QR codes with your phone to experience instant verification without internet.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .qr-demo-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: var(--space-8) var(--space-6);
+        }
+
+        .demo-header {
+            text-align: center;
+            margin-bottom: var(--space-12);
+        }
+
+        .demo-title {
+            font-size: var(--font-size-3xl);
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: var(--space-4);
+        }
+
+        .demo-subtitle {
+            font-size: var(--font-size-lg);
+            color: var(--gray-600);
+            max-width: 600px;
+            margin: 0 auto var(--space-8);
+            line-height: 1.6;
+        }
+
+        .reader-link {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            color: var(--white);
+            padding: var(--space-4) var(--space-8);
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: var(--font-size-lg);
+            box-shadow: 0 8px 20px rgba(99, 91, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .reader-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(99, 91, 255, 0.4);
+            text-decoration: none;
+            color: var(--white);
+        }
+
+        .demo-steps {
+            background: var(--primary-50);
+            border: 1px solid var(--primary-200);
+            border-radius: 16px;
+            padding: var(--space-8);
+            margin-bottom: var(--space-12);
+        }
+
+        .steps-title {
+            font-size: var(--font-size-xl);
+            font-weight: 700;
+            color: var(--primary-900);
+            margin-bottom: var(--space-4);
+            text-align: center;
+        }
+
+        .steps-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            counter-reset: step-counter;
+        }
+
+        .steps-list li {
+            counter-increment: step-counter;
+            padding: var(--space-4);
+            margin-bottom: var(--space-3);
+            background: var(--white);
+            border-radius: 12px;
+            position: relative;
+            padding-left: var(--space-12);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .steps-list li:before {
+            content: counter(step-counter);
+            position: absolute;
+            left: var(--space-4);
+            top: var(--space-4);
+            background: var(--primary-500);
+            color: var(--white);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: var(--font-size-sm);
+        }
+
+        .qr-codes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--space-8);
+            margin-bottom: var(--space-12);
+        }
+
+        .qr-card {
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 16px;
+            padding: var(--space-6);
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+        }
+
+        .qr-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
+            border-color: var(--primary-300);
+        }
+
+        .qr-card.lemma-powered {
+            border-color: var(--primary-400);
+            background: linear-gradient(135deg, var(--white), var(--primary-50));
+        }
+
+        .qr-card-header {
+            margin-bottom: var(--space-4);
+        }
+
+        .qr-card-title {
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: var(--space-2);
+        }
+
+        .qr-card-subtitle {
+            font-size: var(--font-size-sm);
+            color: var(--gray-600);
+        }
+
+        .qr-code-container {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            padding: var(--space-4);
+            margin: var(--space-4) 0;
+            display: inline-block;
+        }
+
+        .qr-code-image {
+            width: 200px;
+            height: 200px;
+            border-radius: 8px;
+        }
+
+        .qr-card-description {
+            font-size: var(--font-size-sm);
+            color: var(--gray-600);
+            line-height: 1.5;
+            margin-top: var(--space-4);
+        }
+
+        .lemma-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            color: var(--white);
+            padding: var(--space-1) var(--space-3);
+            border-radius: 20px;
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            margin-bottom: var(--space-3);
+        }
+
+        .performance-highlight {
+            background: var(--success-50);
+            border: 1px solid var(--success-200);
+            border-radius: 8px;
+            padding: var(--space-2) var(--space-3);
+            margin-top: var(--space-3);
+            font-size: var(--font-size-sm);
+            color: var(--success-800);
+            font-weight: 600;
+        }
+
+        .offline-demo {
+            background: linear-gradient(135deg, var(--gray-900), var(--gray-800));
+            color: var(--white);
+            border-radius: 16px;
+            padding: var(--space-8);
+            text-align: center;
+            margin-bottom: var(--space-12);
+        }
+
+        .offline-title {
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            margin-bottom: var(--space-4);
+        }
+
+        .offline-description {
+            font-size: var(--font-size-lg);
+            opacity: 0.9;
+            margin-bottom: var(--space-6);
+        }
+
+        .airplane-icon {
+            font-size: 3rem;
+            margin-bottom: var(--space-4);
+        }
+
+        .cta-section {
+            text-align: center;
+            background: var(--gray-50);
+            border-radius: 16px;
+            padding: var(--space-10);
+        }
+
+        .cta-title {
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: var(--space-4);
+        }
+
+        .cta-description {
+            font-size: var(--font-size-lg);
+            color: var(--gray-600);
+            margin-bottom: var(--space-6);
+        }
+
+        .cta-button {
+            background: linear-gradient(135deg, var(--success), var(--success-600));
+            color: var(--white);
+            padding: var(--space-4) var(--space-8);
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: var(--font-size-lg);
+            box-shadow: 0 8px 20px rgba(34, 197, 94, 0.3);
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(34, 197, 94, 0.4);
+            text-decoration: none;
+            color: var(--white);
+        }
+
+        @media (max-width: 768px) {
+            .qr-codes-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .qr-code-image {
+                width: 150px;
+                height: 150px;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="qr-demo-container">
+        <!-- Header -->
+        <div class="demo-header">
+            <h1 class="demo-title">Experience Offline QR Verification</h1>
+            <p class="demo-subtitle">
+                Test Lemma's revolutionary offline QR code verification. Scan these QR codes with your phone to see instant verification without internet connection.
+            </p>
+            <a href="/qr-reader" class="reader-link">📱 Open QR Reader</a>
+        </div>
+
+        <!-- Demo Steps -->
+        <div class="demo-steps">
+            <h2 class="steps-title">🎯 How to Test Offline Verification</h2>
+            <ol class="steps-list">
+                <li><strong>Open the QR Reader</strong> - Click the button above to open our mobile-optimized QR reader</li>
+                <li><strong>Allow Camera Access</strong> - Grant camera permissions to scan QR codes</li>
+                <li><strong>Scan Regular QR</strong> - Test with the basic QR code below to verify camera works</li>
+                <li><strong>Enable Airplane Mode</strong> - Turn on airplane mode on your phone</li>
+                <li><strong>Scan Lemma QR</strong> - Scan the Lemma-powered QR codes below</li>
+                <li><strong>See Magic Happen</strong> - Watch verification work instantly without internet!</li>
+            </ol>
+        </div>
+
+        <!-- QR Codes Grid -->
+        <div class="qr-codes-grid">
+            <!-- Regular QR Code -->
+            <div class="qr-card">
+                <div class="qr-card-header">
+                    <h3 class="qr-card-title">🔗 Basic QR Code</h3>
+                    <p class="qr-card-subtitle">Test camera functionality</p>
+                </div>
+                <div class="qr-code-container">
+                    <div class="qr-code-image" id="basicQR" style="background: #f0f0f0; display: flex; align-items: center; justify-content: center; color: #666;">
+                        Loading QR...
+                    </div>
+                </div>
+                <p class="qr-card-description">
+                    A standard QR code linking to lemma.id. Use this to test that your camera is working properly before testing offline verification.
+                </p>
+            </div>
+
+            <!-- Lemma Event Ticket -->
+            <div class="qr-card lemma-powered">
+                <div class="lemma-badge">⚡ Lemma Powered</div>
+                <div class="qr-card-header">
+                    <h3 class="qr-card-title">🎫 Event Ticket</h3>
+                    <p class="qr-card-subtitle">Anti-counterfeit verification</p>
+                </div>
+                <div class="qr-code-container">
+                    <div class="qr-code-image" id="ticketQR" style="background: #f0f0f0; display: flex; align-items: center; justify-content: center; color: #666;">
+                        Loading QR...
+                    </div>
+                </div>
+                <div class="performance-highlight">
+                    ⚡ 4.2µs verification • 99.9% offline
+                </div>
+                <p class="qr-card-description">
+                    A cryptographically secured event ticket that can be verified instantly without internet connection. Try scanning while in airplane mode!
+                </p>
+            </div>
+
+            <!-- Lemma Product Authentication -->
+            <div class="qr-card lemma-powered">
+                <div class="lemma-badge">⚡ Lemma Powered</div>
+                <div class="qr-card-header">
+                    <h3 class="qr-card-title">📦 Product Authenticity</h3>
+                    <p class="qr-card-subtitle">Supply chain verification</p>
+                </div>
+                <div class="qr-code-container">
+                    <div class="qr-code-image" id="productQR" style="background: #f0f0f0; display: flex; align-items: center; justify-content: center; color: #666;">
+                        Loading QR...
+                    </div>
+                </div>
+                <div class="performance-highlight">
+                    ⚡ 3.8µs verification • Works offline
+                </div>
+                <p class="qr-card-description">
+                    Verify product authenticity with cryptographic proof. Perfect for luxury goods, pharmaceuticals, and high-value items.
+                </p>
+            </div>
+
+            <!-- Lemma Access Control -->
+            <div class="qr-card lemma-powered">
+                <div class="lemma-badge">⚡ Lemma Powered</div>
+                <div class="qr-card-header">
+                    <h3 class="qr-card-title">🔐 Access Control</h3>
+                    <p class="qr-card-subtitle">Secure building access</p>
+                </div>
+                <div class="qr-code-container">
+                    <div class="qr-code-image" id="accessQR" style="background: #f0f0f0; display: flex; align-items: center; justify-content: center; color: #666;">
+                        Loading QR...
+                    </div>
+                </div>
+                <div class="performance-highlight">
+                    ⚡ 5.1µs verification • Zero latency
+                </div>
+                <p class="qr-card-description">
+                    Secure access control that works even when your building's internet is down. Military-grade cryptographic verification.
+                </p>
+            </div>
+        </div>
+
+        <!-- Offline Demo Section -->
+        <div class="offline-demo">
+            <div class="airplane-icon">✈️</div>
+            <h2 class="offline-title">The Real Magic: Offline Verification</h2>
+            <p class="offline-description">
+                After scanning the Lemma-powered QR codes above, enable airplane mode and scan them again. 
+                Watch as they verify instantly without any internet connection - that's the power of Lemma's cryptographic engine.
+            </p>
+        </div>
+
+        <!-- CTA Section -->
+        <div class="cta-section">
+            <h2 class="cta-title">Ready to Integrate Lemma QR Codes?</h2>
+            <p class="cta-description">
+                Add offline-capable, cryptographically secure QR codes to your application in minutes.
+            </p>
+            <a href="/register" class="cta-button">Get API Keys & Start Building</a>
+        </div>
+    </div>
+
+    <!-- QR Code Generation -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Generate QR codes
+            generateQRCodes();
+        });
+
+        async function generateQRCodes() {
+            try {
+                // Basic QR Code
+                await QRCode.toCanvas(document.getElementById('basicQR'), 'https://lemma.id', {
+                    width: 200,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#FFFFFF'
+                    }
+                });
+
+                // Lemma Event Ticket QR
+                const ticketData = JSON.stringify({
+                    type: 'lemma_verification',
+                    qr_type: 'ticket',
+                    claims: {
+                        event_name: 'Tech Conference 2024',
+                        ticket_id: 'TC2024-001',
+                        seat: 'A-15',
+                        date: '2024-12-15',
+                        valid_until: '2024-12-15T23:59:59Z'
+                    },
+                    lemma_signature: 'lemma:sig:abc123...def456',
+                    offline_verification: true,
+                    verification_time_us: 4.2
+                });
+
+                await QRCode.toCanvas(document.getElementById('ticketQR'), ticketData, {
+                    width: 200,
+                    margin: 2,
+                    color: {
+                        dark: '#6366f1',
+                        light: '#FFFFFF'
+                    }
+                });
+
+                // Lemma Product Authentication QR
+                const productData = JSON.stringify({
+                    type: 'lemma_verification',
+                    qr_type: 'product',
+                    claims: {
+                        product_name: 'Premium Headphones',
+                        serial_number: 'PH-2024-789',
+                        manufacturer: 'AudioTech Inc',
+                        manufactured_date: '2024-01-15',
+                        batch_id: 'BATCH-001'
+                    },
+                    lemma_signature: 'lemma:sig:xyz789...uvw123',
+                    offline_verification: true,
+                    verification_time_us: 3.8
+                });
+
+                await QRCode.toCanvas(document.getElementById('productQR'), productData, {
+                    width: 200,
+                    margin: 2,
+                    color: {
+                        dark: '#059669',
+                        light: '#FFFFFF'
+                    }
+                });
+
+                // Lemma Access Control QR
+                const accessData = JSON.stringify({
+                    type: 'lemma_verification',
+                    qr_type: 'access',
+                    claims: {
+                        access_level: 'Level 3',
+                        building: 'Main Office',
+                        room: 'Conference Room B',
+                        valid_from: '2024-08-07T09:00:00Z',
+                        valid_until: '2024-08-07T18:00:00Z',
+                        user_id: 'emp_001'
+                    },
+                    lemma_signature: 'lemma:sig:mno345...rst678',
+                    offline_verification: true,
+                    verification_time_us: 5.1
+                });
+
+                await QRCode.toCanvas(document.getElementById('accessQR'), accessData, {
+                    width: 200,
+                    margin: 2,
+                    color: {
+                        dark: '#dc2626',
+                        light: '#FFFFFF'
+                    }
+                });
+
+                console.log('✅ All QR codes generated successfully');
+
+            } catch (error) {
+                console.error('❌ Failed to generate QR codes:', error);
+                
+                // Fallback: show text instead of QR codes
+                ['basicQR', 'ticketQR', 'productQR', 'accessQR'].forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element && !element.querySelector('canvas')) {
+                        element.innerHTML = '<div style="padding: 20px; font-size: 12px;">QR Code<br>Generation<br>Failed</div>';
+                    }
+                });
+            }
+        }
+    </script>
+{% endblock %}

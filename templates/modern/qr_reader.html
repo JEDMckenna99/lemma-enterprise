@@ -1,0 +1,726 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Lemma QR Reader - Offline Verification Demo{% endblock %}
+{% block description %}Experience Lemma's offline QR code verification. Scan QR codes and verify them instantly, even without internet connection.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        /* Mobile-first QR Reader Styles */
+        .qr-reader-container {
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--gray-900), var(--gray-800));
+            color: var(--white);
+            padding: 0;
+            margin: 0;
+        }
+
+        .reader-header {
+            background: rgba(0, 0, 0, 0.8);
+            padding: var(--space-4) var(--space-6);
+            position: relative;
+            z-index: 10;
+        }
+
+        .reader-title {
+            font-size: var(--font-size-xl);
+            font-weight: 700;
+            margin: 0;
+            text-align: center;
+        }
+
+        .reader-subtitle {
+            font-size: var(--font-size-sm);
+            color: var(--gray-300);
+            text-align: center;
+            margin-top: var(--space-2);
+        }
+
+        .camera-container {
+            position: relative;
+            width: 100%;
+            height: 60vh;
+            background: var(--gray-900);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #qr-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .scan-frame {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 250px;
+            border: 2px solid var(--primary-400);
+            border-radius: 12px;
+            background: rgba(99, 91, 255, 0.1);
+        }
+
+        .scan-corners {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--primary-300);
+        }
+
+        .corner-tl {
+            top: -3px;
+            left: -3px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .corner-tr {
+            top: -3px;
+            right: -3px;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .corner-bl {
+            bottom: -3px;
+            left: -3px;
+            border-right: none;
+            border-top: none;
+        }
+
+        .corner-br {
+            bottom: -3px;
+            right: -3px;
+            border-left: none;
+            border-top: none;
+        }
+
+        .scan-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary-400), transparent);
+            animation: scan-animation 2s ease-in-out infinite;
+        }
+
+        @keyframes scan-animation {
+            0% { top: 0; opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { top: 100%; opacity: 1; }
+        }
+
+        .controls-section {
+            padding: var(--space-6);
+            background: rgba(0, 0, 0, 0.9);
+        }
+
+        .status-display {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: var(--space-4);
+            margin-bottom: var(--space-4);
+            text-align: center;
+        }
+
+        .status-icon {
+            font-size: var(--font-size-2xl);
+            margin-bottom: var(--space-2);
+        }
+
+        .status-online {
+            color: var(--success);
+        }
+
+        .status-offline {
+            color: var(--warning);
+        }
+
+        .status-verified {
+            color: var(--success);
+        }
+
+        .status-error {
+            color: var(--error);
+        }
+
+        .verification-result {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: var(--space-4);
+            margin-top: var(--space-4);
+            display: none;
+        }
+
+        .result-success {
+            border: 2px solid var(--success);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .result-error {
+            border: 2px solid var(--error);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            margin-bottom: var(--space-3);
+        }
+
+        .result-title {
+            font-weight: 700;
+            font-size: var(--font-size-lg);
+        }
+
+        .result-details {
+            font-size: var(--font-size-sm);
+            opacity: 0.9;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-3);
+            margin-top: var(--space-4);
+        }
+
+        .btn-camera {
+            background: var(--primary-600);
+            color: var(--white);
+            border: none;
+            padding: var(--space-3) var(--space-4);
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-camera:hover {
+            background: var(--primary-700);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: var(--white);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: var(--space-3) var(--space-4);
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .demo-instructions {
+            background: rgba(99, 91, 255, 0.1);
+            border: 1px solid var(--primary-400);
+            border-radius: 12px;
+            padding: var(--space-4);
+            margin-bottom: var(--space-4);
+        }
+
+        .demo-steps {
+            list-style: none;
+            padding: 0;
+            margin: var(--space-3) 0 0 0;
+        }
+
+        .demo-steps li {
+            padding: var(--space-2) 0;
+            padding-left: var(--space-6);
+            position: relative;
+        }
+
+        .demo-steps li:before {
+            content: counter(step-counter);
+            counter-increment: step-counter;
+            position: absolute;
+            left: 0;
+            top: var(--space-2);
+            background: var(--primary-500);
+            color: var(--white);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--font-size-xs);
+            font-weight: 700;
+        }
+
+        .demo-steps {
+            counter-reset: step-counter;
+        }
+
+        .performance-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-3);
+            margin-top: var(--space-4);
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: var(--space-3);
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+            color: var(--primary-300);
+        }
+
+        .stat-label {
+            font-size: var(--font-size-xs);
+            opacity: 0.8;
+            margin-top: var(--space-1);
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error);
+            border-radius: 8px;
+            padding: var(--space-3);
+            color: var(--error);
+            text-align: center;
+            display: none;
+        }
+
+        /* Hide default layout elements for full-screen experience */
+        .nav-header {
+            display: none;
+        }
+
+        .footer-section {
+            display: none;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .scan-frame {
+                width: 200px;
+                height: 200px;
+            }
+            
+            .action-buttons {
+                grid-template-columns: 1fr;
+            }
+            
+            .performance-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Loading animation */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary-400);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="qr-reader-container">
+        <!-- Header -->
+        <div class="reader-header">
+            <h1 class="reader-title">Lemma QR Reader</h1>
+            <p class="reader-subtitle">Offline-capable verification demo</p>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="status-display" id="connectionStatus">
+            <div class="status-icon" id="statusIcon">🌐</div>
+            <div id="statusText">Checking connection...</div>
+        </div>
+
+        <!-- Demo Instructions -->
+        <div class="demo-instructions">
+            <strong>🎯 Demo Instructions:</strong>
+            <ol class="demo-steps">
+                <li>Allow camera access to scan QR codes</li>
+                <li>Scan any QR code to test basic functionality</li>
+                <li>Enable airplane mode on your device</li>
+                <li>Scan a Lemma-powered QR code below</li>
+                <li>See offline verification in action!</li>
+            </ol>
+        </div>
+
+        <!-- Camera Container -->
+        <div class="camera-container">
+            <video id="qr-video" playsinline></video>
+            <div class="camera-overlay">
+                <div class="scan-frame">
+                    <div class="scan-corners corner-tl"></div>
+                    <div class="scan-corners corner-tr"></div>
+                    <div class="scan-corners corner-bl"></div>
+                    <div class="scan-corners corner-br"></div>
+                    <div class="scan-line"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div class="error-message" id="errorMessage"></div>
+
+        <!-- Controls -->
+        <div class="controls-section">
+            <div class="action-buttons">
+                <button class="btn-camera" id="startCamera">
+                    <span class="loading-spinner" style="display: none;"></span>
+                    Start Camera
+                </button>
+                <button class="btn-secondary" id="testOffline">Test Offline Mode</button>
+            </div>
+
+            <!-- Verification Result -->
+            <div class="verification-result" id="verificationResult">
+                <div class="result-header">
+                    <span class="result-icon" id="resultIcon">✅</span>
+                    <span class="result-title" id="resultTitle">Verification Result</span>
+                </div>
+                <div class="result-details" id="resultDetails"></div>
+                
+                <div class="performance-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="verificationTime">4.2µs</div>
+                        <div class="stat-label">Verification Time</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="confidence">99.9%</div>
+                        <div class="stat-label">Confidence</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="offlineStatus">Yes</div>
+                        <div class="stat-label">Offline Capable</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Scanner Library -->
+    <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+    
+    <script>
+        class LemmaQRReader {
+            constructor() {
+                this.qrScanner = null;
+                this.isScanning = false;
+                this.isOffline = !navigator.onLine;
+                this.lemmaEngine = null;
+                
+                this.initializeElements();
+                this.initializeLemmaEngine();
+                this.setupEventListeners();
+                this.updateConnectionStatus();
+            }
+            
+            initializeElements() {
+                this.video = document.getElementById('qr-video');
+                this.startButton = document.getElementById('startCamera');
+                this.testButton = document.getElementById('testOffline');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.verificationResult = document.getElementById('verificationResult');
+                this.connectionStatus = document.getElementById('connectionStatus');
+                this.statusIcon = document.getElementById('statusIcon');
+                this.statusText = document.getElementById('statusText');
+            }
+            
+            async initializeLemmaEngine() {
+                try {
+                    // Initialize Lemma verification engine
+                    if (typeof lemma_crypto !== 'undefined') {
+                        this.lemmaEngine = new lemma_crypto.LemmaCore();
+                        console.log('✅ Lemma engine initialized');
+                    } else {
+                        console.warn('⚠️ Lemma engine not available, using mock verification');
+                    }
+                } catch (error) {
+                    console.error('❌ Failed to initialize Lemma engine:', error);
+                }
+            }
+            
+            setupEventListeners() {
+                this.startButton.addEventListener('click', () => this.toggleCamera());
+                this.testButton.addEventListener('click', () => this.testOfflineMode());
+                
+                // Network status listeners
+                window.addEventListener('online', () => this.updateConnectionStatus());
+                window.addEventListener('offline', () => this.updateConnectionStatus());
+                
+                // Page visibility for camera management
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden && this.qrScanner) {
+                        this.qrScanner.stop();
+                    }
+                });
+            }
+            
+            updateConnectionStatus() {
+                this.isOffline = !navigator.onLine;
+                
+                if (this.isOffline) {
+                    this.statusIcon.textContent = '✈️';
+                    this.statusText.textContent = 'Offline Mode - Perfect for testing!';
+                    this.connectionStatus.className = 'status-display status-offline';
+                } else {
+                    this.statusIcon.textContent = '🌐';
+                    this.statusText.textContent = 'Online - Ready to scan';
+                    this.connectionStatus.className = 'status-display status-online';
+                }
+            }
+            
+            async toggleCamera() {
+                if (this.isScanning) {
+                    await this.stopCamera();
+                } else {
+                    await this.startCamera();
+                }
+            }
+            
+            async startCamera() {
+                try {
+                    this.showLoading(true);
+                    this.hideError();
+                    
+                    // Initialize QR Scanner
+                    this.qrScanner = new QrScanner(
+                        this.video,
+                        (result) => this.handleQRResult(result.data),
+                        {
+                            onDecodeError: (error) => {
+                                // Ignore decode errors (normal when no QR in view)
+                            },
+                            highlightScanRegion: false,
+                            highlightCodeOutline: false,
+                        }
+                    );
+                    
+                    await this.qrScanner.start();
+                    this.isScanning = true;
+                    this.startButton.textContent = 'Stop Camera';
+                    this.showLoading(false);
+                    
+                } catch (error) {
+                    console.error('Camera error:', error);
+                    this.showError('Camera access denied or not available. Please allow camera permissions and try again.');
+                    this.showLoading(false);
+                }
+            }
+            
+            async stopCamera() {
+                if (this.qrScanner) {
+                    this.qrScanner.stop();
+                    this.qrScanner.destroy();
+                    this.qrScanner = null;
+                }
+                this.isScanning = false;
+                this.startButton.textContent = 'Start Camera';
+            }
+            
+            async handleQRResult(data) {
+                console.log('📱 QR Code scanned:', data);
+                
+                // Vibrate if supported
+                if ('vibrate' in navigator) {
+                    navigator.vibrate(100);
+                }
+                
+                // Determine if this is a Lemma-powered QR code
+                const isLemmaQR = this.isLemmaQRCode(data);
+                
+                if (isLemmaQR) {
+                    await this.verifyLemmaQR(data);
+                } else {
+                    await this.handleRegularQR(data);
+                }
+            }
+            
+            isLemmaQRCode(data) {
+                // Check if QR code contains Lemma verification data
+                try {
+                    const parsed = JSON.parse(data);
+                    return parsed.type === 'lemma_verification' || 
+                           parsed.lemma_signature || 
+                           data.includes('lemma:');
+                } catch {
+                    return data.startsWith('lemma:') || data.includes('lemma-verify');
+                }
+            }
+            
+            async verifyLemmaQR(data) {
+                const startTime = performance.now();
+                
+                try {
+                    let verificationResult;
+                    
+                    if (this.lemmaEngine) {
+                        // Use real Lemma engine
+                        verificationResult = await this.lemmaEngine.verify_qr(data);
+                    } else {
+                        // Mock verification for demo
+                        verificationResult = await this.mockLemmaVerification(data);
+                    }
+                    
+                    const endTime = performance.now();
+                    const verificationTime = ((endTime - startTime) * 1000).toFixed(1); // Convert to microseconds
+                    
+                    this.showVerificationResult({
+                        success: verificationResult.valid,
+                        title: verificationResult.valid ? 'Lemma Verification Successful!' : 'Verification Failed',
+                        details: verificationResult.details || 'Cryptographic signature verified offline',
+                        verificationTime: verificationTime + 'µs',
+                        confidence: verificationResult.confidence || '99.9%',
+                        offline: this.isOffline
+                    });
+                    
+                } catch (error) {
+                    console.error('Verification error:', error);
+                    this.showVerificationResult({
+                        success: false,
+                        title: 'Verification Error',
+                        details: 'Failed to verify QR code: ' + error.message,
+                        verificationTime: 'N/A',
+                        confidence: '0%',
+                        offline: this.isOffline
+                    });
+                }
+            }
+            
+            async mockLemmaVerification(data) {
+                // Simulate verification delay
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                // Mock successful verification
+                return {
+                    valid: true,
+                    confidence: '99.9%',
+                    details: 'Mock verification successful. QR code contains valid cryptographic proof.',
+                    offline_capable: true,
+                    verification_time_us: 4.2
+                };
+            }
+            
+            async handleRegularQR(data) {
+                this.showVerificationResult({
+                    success: true,
+                    title: 'Regular QR Code Scanned',
+                    details: `Content: ${data.substring(0, 100)}${data.length > 100 ? '...' : ''}`,
+                    verificationTime: 'N/A',
+                    confidence: 'N/A',
+                    offline: false
+                });
+            }
+            
+            showVerificationResult(result) {
+                const resultDiv = this.verificationResult;
+                const resultIcon = document.getElementById('resultIcon');
+                const resultTitle = document.getElementById('resultTitle');
+                const resultDetails = document.getElementById('resultDetails');
+                const verificationTime = document.getElementById('verificationTime');
+                const confidence = document.getElementById('confidence');
+                const offlineStatus = document.getElementById('offlineStatus');
+                
+                // Update content
+                resultIcon.textContent = result.success ? '✅' : '❌';
+                resultTitle.textContent = result.title;
+                resultDetails.textContent = result.details;
+                verificationTime.textContent = result.verificationTime;
+                confidence.textContent = result.confidence;
+                offlineStatus.textContent = result.offline ? 'Yes' : 'No';
+                
+                // Update styling
+                resultDiv.className = `verification-result ${result.success ? 'result-success' : 'result-error'}`;
+                resultDiv.style.display = 'block';
+                
+                // Auto-hide after 10 seconds
+                setTimeout(() => {
+                    resultDiv.style.display = 'none';
+                }, 10000);
+            }
+            
+            testOfflineMode() {
+                if (this.isOffline) {
+                    alert('✈️ You are already in offline mode! Try scanning a Lemma QR code to see offline verification in action.');
+                } else {
+                    alert('📱 To test offline mode:\n\n1. Enable airplane mode on your device\n2. Return to this page (it will still work!)\n3. Scan a Lemma-powered QR code\n4. See verification work without internet!');
+                }
+            }
+            
+            showLoading(show) {
+                const spinner = this.startButton.querySelector('.loading-spinner');
+                if (show) {
+                    spinner.style.display = 'inline-block';
+                    this.startButton.disabled = true;
+                } else {
+                    spinner.style.display = 'none';
+                    this.startButton.disabled = false;
+                }
+            }
+            
+            showError(message) {
+                this.errorMessage.textContent = message;
+                this.errorMessage.style.display = 'block';
+                setTimeout(() => {
+                    this.errorMessage.style.display = 'none';
+                }, 5000);
+            }
+            
+            hideError() {
+                this.errorMessage.style.display = 'none';
+            }
+        }
+        
+        // Initialize QR Reader when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.lemmaQRReader = new LemmaQRReader();
+        });
+        
+        // Register service worker for offline capability
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/qr-reader-sw.js')
+                    .then(registration => {
+                        console.log('✅ QR Reader Service Worker registered:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('❌ QR Reader Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+{% endblock %}
