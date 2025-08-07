@@ -52,8 +52,10 @@ self.addEventListener('fetch', event => {
 
   // Skip Cloudflare analytics and other external scripts
   if (event.request.url.includes('cloudflareinsights.com') || 
-      event.request.url.includes('beacon.min.js')) {
+      event.request.url.includes('beacon.min.js') ||
+      event.request.url.includes('static.cloudflareinsights.com')) {
     console.log('[SW] Skipping external analytics:', event.request.url);
+    // Don't intercept these requests at all
     return;
   }
 

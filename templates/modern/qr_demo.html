@@ -393,13 +393,50 @@
         </div>
     </div>
 
-    <!-- QR Code Generation -->
-    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <!-- QR Code Generation - Multiple CDN fallbacks -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Generate QR codes
-            generateQRCodes();
+        // Disable Cloudflare Rocket Loader for QR code scripts
+        window.addEventListener('DOMContentLoaded', function() {
+            // Try multiple CDNs for QRCode library
+            const qrScripts = [
+                'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js',
+                'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js',
+                'https://cdn.skypack.dev/qrcode@1.5.3'
+            ];
+            
+            let scriptIndex = 0;
+            
+            function loadQRScript() {
+                if (scriptIndex >= qrScripts.length) {
+                    console.error('❌ All QRCode CDNs failed, using fallback');
+                    generateQRCodes();
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = qrScripts[scriptIndex];
+                script.async = false; // Prevent Rocket Loader interference
+                script.defer = false;
+                script.setAttribute('data-cfasync', 'false'); // Disable Cloudflare async
+                
+                script.onload = function() {
+                    console.log('✅ QRCode library loaded from:', qrScripts[scriptIndex]);
+                    generateQRCodes();
+                };
+                
+                script.onerror = function() {
+                    console.warn('⚠️ Failed to load QRCode from:', qrScripts[scriptIndex]);
+                    scriptIndex++;
+                    loadQRScript();
+                };
+                
+                document.head.appendChild(script);
+            }
+            
+            loadQRScript();
         });
+    </script>
+    <script data-cfasync="false">
 
         async function generateQRCodes() {
             try {
@@ -524,19 +561,56 @@
         }
 
         function showFallbackQRCodes() {
-            // Show text fallback when QR generation completely fails
-            const qrElements = ['basicQR', 'ticketQR', 'productQR', 'accessQR'];
-            qrElements.forEach(id => {
-                const element = document.getElementById(id);
-                if (element && !element.querySelector('canvas')) {
+            // Show visual fallback QR codes using Google Charts API
+            const qrElements = [
+                { id: 'basicQR', data: 'https://lemma.id', title: 'Basic QR' },
+                { 
+                    id: 'ticketQR', 
+                    data: JSON.stringify({
+                        type: 'lemma_verification',
+                        qr_type: 'ticket',
+                        claims: { event_name: 'Tech Conference 2024', ticket_id: 'TC2024-001' },
+                        lemma_signature: 'lemma:sig:demo_ticket_abc123'
+                    }), 
+                    title: 'Event Ticket' 
+                },
+                { 
+                    id: 'productQR', 
+                    data: JSON.stringify({
+                        type: 'lemma_verification',
+                        qr_type: 'product',
+                        claims: { product_name: 'Premium Headphones', serial_number: 'PH-2024-789' },
+                        lemma_signature: 'lemma:sig:demo_product_xyz789'
+                    }), 
+                    title: 'Product Auth' 
+                },
+                { 
+                    id: 'accessQR', 
+                    data: JSON.stringify({
+                        type: 'lemma_verification',
+                        qr_type: 'access',
+                        claims: { access_level: 'Level 3', building: 'Main Office' },
+                        lemma_signature: 'lemma:sig:demo_access_mno345'
+                    }), 
+                    title: 'Access Control' 
+                }
+            ];
+            
+            qrElements.forEach(qr => {
+                const element = document.getElementById(qr.id);
+                if (element && !element.querySelector('canvas') && !element.querySelector('img')) {
+                    // Use Google Charts API as fallback
+                    const encodedData = encodeURIComponent(qr.data);
                     element.innerHTML = `
-                        <div style="padding: 40px; font-size: 14px; color: #666; text-align: center; border: 2px dashed #ddd; border-radius: 8px;">
-                            📱 QR Code<br>
-                            <small>Use mobile to scan</small>
-                        </div>
+                        <img src="https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodedData}" 
+                             alt="${qr.title} QR Code" 
+                             style="width: 200px; height: 200px; border-radius: 8px;"
+                             onerror="this.style.display='none'; this.parentNode.innerHTML='<div style=\\"padding: 40px; font-size: 14px; color: #666; text-align: center; border: 2px dashed #ddd; border-radius: 8px;\\">📱 ${qr.title}<br><small>Scan with mobile</small></div>';">
                     `;
                 }
             });
+            
+            console.log('✅ Fallback QR codes generated using Google Charts API');
         }
     </script>
 {% endblock %}
