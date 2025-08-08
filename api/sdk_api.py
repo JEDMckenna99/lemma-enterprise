@@ -28,9 +28,16 @@ logger = logging.getLogger(__name__)
 # Create SDK API blueprint
 sdk_api_bp = Blueprint('sdk_api', __name__)
 
-# Network Registry Configuration
-NETWORK_REGISTRY_URL = "http://localhost:5000"  # In production, this would be the registry service URL
+# Network Registry Configuration - Federated Network
+NETWORK_REGISTRY_URL = "http://localhost:5000"  # Local registry for fallback
 NETWORK_AUTH_KEY = "lemma_network_master_key_2024"  # In production, use secure key management
+
+# Federated Network Endpoints - All deployments in the Lemma network
+FEDERATED_NETWORK_ENDPOINTS = [
+    "https://lemma-enterprise-0f6ba17076c1.herokuapp.com",      # Production lemma.id
+    "https://lemma-identity-network-2d96786d6ffb.herokuapp.com", # Identity network
+    # Add more network participants here
+]
 
 def distribute_did_to_network(did: str, public_key: str, issuer_info: dict) -> bool:
     """
@@ -67,9 +74,9 @@ def distribute_did_to_network(did: str, public_key: str, issuer_info: dict) -> b
 
 def distribute_revocation_to_network(credential_id: str, oprf_evaluation: str, bloom_hash: str, reason: str) -> bool:
     """
-    Distribute credential revocation to the network registry
+    Distribute credential revocation to the LOCAL network registry
     
-    This ensures all sites using Lemma immediately know about revoked credentials
+    This is for backward compatibility - use distribute_revocation_to_federated_network for full coverage
     """
     try:
         response = requests.post(
@@ -89,15 +96,112 @@ def distribute_revocation_to_network(credential_id: str, oprf_evaluation: str, b
         
         if response.status_code == 200:
             result = response.json()
-            logger.info(f"✅ Revocation distributed to network: {credential_id}")
+            logger.info(f"✅ Revocation distributed to local network: {credential_id}")
             return result.get('success', False)
         else:
-            logger.warning(f"⚠️ Failed to distribute revocation to network: {response.status_code}")
+            logger.warning(f"⚠️ Failed to distribute revocation to local network: {response.status_code}")
             return False
             
     except Exception as e:
-        logger.warning(f"⚠️ Network revocation distribution failed: {e}")
+        logger.warning(f"⚠️ Local network revocation distribution failed: {e}")
         return False
+
+def distribute_revocation_to_federated_network(credential_id: str, oprf_evaluation: str, bloom_hash: str, reason: str) -> dict:
+    """
+    Distribute credential revocation to ALL deployments in the federated network
+    
+    This ensures that when a lemma is revoked on lemma.id (lemma-enterprise), 
+    it's also immediately revoked on lemma-identity-network and all other participants.
+    
+    Returns detailed results of distribution to each endpoint.
+    """
+    import os
+    current_deployment = os.environ.get('HEROKU_APP_NAME', 'unknown')
+    
+    distribution_results = {
+        'total_endpoints': len(FEDERATED_NETWORK_ENDPOINTS),
+        'successful_distributions': 0,
+        'failed_distributions': 0,
+        'results': [],
+        'credential_id': credential_id,
+        'federated_revocation': True
+    }
+    
+    logger.info(f"🌐 Starting federated revocation for {credential_id} from {current_deployment}")
+    
+    for endpoint in FEDERATED_NETWORK_ENDPOINTS:
+        endpoint_result = {
+            'endpoint': endpoint,
+            'success': False,
+            'response_time_ms': 0,
+            'error': None
+        }
+        
+        try:
+            start_time = time.perf_counter()
+            
+            # Skip self to avoid infinite loops
+            if current_deployment in endpoint:
+                endpoint_result['success'] = True
+                endpoint_result['error'] = 'self_skip'
+                endpoint_result['response_time_ms'] = 0
+                logger.info(f"⏭️ Skipping self deployment: {endpoint}")
+            else:
+                response = requests.post(
+                    f"{endpoint}/api/network/register-revocation",
+                    headers={
+                        'Authorization': f'Network {NETWORK_AUTH_KEY}',
+                        'Content-Type': 'application/json',
+                        'X-Federated-From': current_deployment
+                    },
+                    json={
+                        'credential_id': credential_id,
+                        'oprf_evaluation': oprf_evaluation,
+                        'bloom_hash': bloom_hash,
+                        'reason': reason,
+                        'federated_revocation': True,
+                        'source_deployment': current_deployment
+                    },
+                    timeout=10  # Longer timeout for cross-deployment calls
+                )
+                
+                end_time = time.perf_counter()
+                endpoint_result['response_time_ms'] = (end_time - start_time) * 1000
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    endpoint_result['success'] = result.get('success', False)
+                    if endpoint_result['success']:
+                        distribution_results['successful_distributions'] += 1
+                        logger.info(f"✅ Federated revocation successful: {endpoint} ({endpoint_result['response_time_ms']:.1f}ms)")
+                    else:
+                        endpoint_result['error'] = result.get('error', 'unknown_error')
+                        distribution_results['failed_distributions'] += 1
+                        logger.warning(f"⚠️ Federated revocation failed: {endpoint} - {endpoint_result['error']}")
+                else:
+                    endpoint_result['error'] = f"http_{response.status_code}"
+                    distribution_results['failed_distributions'] += 1
+                    logger.warning(f"⚠️ Federated revocation HTTP error: {endpoint} - {response.status_code}")
+                    
+        except requests.exceptions.Timeout:
+            endpoint_result['error'] = 'timeout'
+            distribution_results['failed_distributions'] += 1
+            logger.warning(f"⏰ Federated revocation timeout: {endpoint}")
+            
+        except Exception as e:
+            endpoint_result['error'] = str(e)
+            distribution_results['failed_distributions'] += 1
+            logger.error(f"❌ Federated revocation error: {endpoint} - {e}")
+        
+        distribution_results['results'].append(endpoint_result)
+    
+    # Calculate success rate
+    total_attempts = distribution_results['successful_distributions'] + distribution_results['failed_distributions']
+    success_rate = (distribution_results['successful_distributions'] / total_attempts * 100) if total_attempts > 0 else 0
+    
+    logger.info(f"🌐 Federated revocation complete for {credential_id}: {distribution_results['successful_distributions']}/{total_attempts} successful ({success_rate:.1f}%)")
+    
+    return distribution_results
 
 # Try to import Rust engine
 try:
@@ -749,8 +853,16 @@ def revoke_credential():
             bloom_time_us = (bloom_end - bloom_start) / 1000
             total_bloom_time_us += bloom_time_us
             
-            # Step 3: Distribute revocation to network registry
-            network_distributed = distribute_revocation_to_network(
+            # Step 3: Distribute revocation to FEDERATED network (all deployments)
+            federated_results = distribute_revocation_to_federated_network(
+                credential_id, 
+                oprf_evaluation, 
+                bloom_hash, 
+                reason
+            )
+            
+            # Also distribute to local network for backward compatibility
+            local_network_distributed = distribute_revocation_to_network(
                 credential_id, 
                 oprf_evaluation, 
                 bloom_hash, 
@@ -763,11 +875,12 @@ def revoke_credential():
                 'bloom_hash': bloom_hash[:16] + "...",  # Truncate for privacy
                 'oprf_time_us': oprf_time_us,
                 'bloom_time_us': bloom_time_us,
-                'network_distributed': network_distributed,
+                'local_network_distributed': local_network_distributed,
+                'federated_network_results': federated_results,
                 'revoked_at': time.time()
             })
             
-            logger.info(f"✅ Credential {credential_id} revoked: OPRF={oprf_time_us:.2f}µs, Bloom={bloom_time_us:.2f}µs, Network={network_distributed}")
+            logger.info(f"✅ Credential {credential_id} revoked: OPRF={oprf_time_us:.2f}µs, Bloom={bloom_time_us:.2f}µs, Local={local_network_distributed}, Federated={federated_results['successful_distributions']}/{federated_results['total_endpoints']}")
         
         # Step 3: Update session to revoke locally
         session.pop('verified_user', None)
