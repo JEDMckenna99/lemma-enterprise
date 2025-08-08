@@ -54,7 +54,7 @@ except ImportError as e:
     except Exception as e:
         print(f"⚠️ Could not check installed packages: {e}")
     
-    logging.warning("Rust engine not available - using fallback verification")
+    logging.error("Rust engine not available - bot shield requires Rust engine")
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,7 @@ def verify_credentials_offline(credentials: List[Dict[str, Any]]) -> Tuple[List[
     """
     if not RUST_ENGINE_AVAILABLE or not rust_engine:
         logger.warning("Rust engine not available - falling back to Python verification")
-        return fallback_verification_batch(credentials)
+        raise RuntimeError("Rust engine required for bot shield credential verification")
     
     valid_credentials = []
     invalid_credentials = []
@@ -177,36 +177,11 @@ def verify_credentials_offline(credentials: List[Dict[str, Any]]) -> Tuple[List[
     except Exception as e:
         logger.error(f"Rust verification failed: {e}")
         # Fall back to Python verification
-        return fallback_verification_batch(credentials)
+        raise RuntimeError("Rust engine required for bot shield credential verification")
     
     return valid_credentials, invalid_credentials
 
-def fallback_verification_batch(credentials: List[Dict[str, Any]]) -> Tuple[List[Dict], List[Dict]]:
-    """Fallback verification when Rust engine is not available"""
-    valid_credentials = []
-    invalid_credentials = []
-    
-    for cred in credentials:
-        # Simple validation
-        if not cred.get('id') or not cred.get('issuer'):
-            invalid_credentials.append({
-                'credential_id': cred.get('id', 'unknown'),
-                'verified': False,
-                'reason': 'invalid_credential_structure',
-                'verification_time_ns': 1000000,  # 1ms fallback
-                'method': 'python_fallback'
-            })
-        else:
-            # For demo purposes, assume valid
-            valid_credentials.append({
-                'credential_id': cred.get('id', 'unknown'),
-                'verified': True,
-                'reason': 'fallback_verification',
-                'verification_time_ns': 5000000,  # 5ms fallback
-                'method': 'python_fallback'
-            })
-    
-    return valid_credentials, invalid_credentials
+# Fallback verification removed - Bot shield requires Rust engine for all cryptographic operations
 
 def create_credential_from_stripe_verification_rust(user_id: str, session_id: str) -> Dict[str, Any]:
     """
@@ -220,8 +195,9 @@ def create_credential_from_stripe_verification_rust(user_id: str, session_id: st
     global rust_engine, RUST_ENGINE_AVAILABLE
     
     if not RUST_ENGINE_AVAILABLE or rust_engine is None:
-        logger.warning("⚠️ Rust engine not available - using Python fallback for identity lemma creation")
-        return create_python_identity_credential_fallback(user_id, session_id)
+        logger.error("❌ Rust engine not available - cannot create identity lemma")
+        logger.error("❌ Bot shield requires Rust engine for cryptographic operations")
+        raise RuntimeError("Rust engine required for bot shield operations")
     
     current_time = int(time.time())
     
@@ -251,56 +227,10 @@ def create_credential_from_stripe_verification_rust(user_id: str, session_id: st
         
     except Exception as e:
         logger.error(f"❌ Failed to create identity lemma with Rust engine: {e}")
-        logger.warning("⚠️ Falling back to Python credential creation")
-        return create_python_identity_credential_fallback(user_id, session_id)
+        logger.error("❌ Bot shield requires Rust engine for cryptographic operations")
+        raise RuntimeError(f"Rust engine identity lemma creation failed: {e}")
 
-def create_python_identity_credential_fallback(user_id: str, session_id: str) -> Dict[str, Any]:
-    """
-    Python fallback for creating identity credentials when Rust engine is unavailable.
-    Creates the same 3 essential claims as the Rust engine.
-    """
-    import uuid
-    import hashlib
-    import hmac
-    
-    current_time = int(time.time())
-    credential_id = str(uuid.uuid4())
-    
-    # Create the same 3 essential claims as Rust engine
-    claims = {
-        "packageType": "identity",
-        "isHuman": True, 
-        "verificationMethod": "stripe_identity",
-        "verifiedAt": current_time,
-        "sessionId": session_id,
-        # Federated network claims
-        "networkId": "lemma_federated_network",
-        "crossDeploymentVerification": True,
-        "portabilityProof": "network_wide_verification"
-    }
-    
-    # Create basic credential structure (Python fallback)
-    credential = {
-        "id": credential_id,
-        "type": "VerifiableCredential",
-        "issuer": f"did:lemma:federated:issuer:python_fallback",
-        "subject": f"did:lemma:federated:user:{user_id}",
-        "issuanceDate": current_time,
-        "expirationDate": current_time + (86400 * 365),  # 1 year
-        "claims": claims,
-        "proof": {
-            "type": "PythonFallbackProof",
-            "created": current_time,
-            "proofPurpose": "assertionMethod",
-            "verificationMethod": "python_fallback",
-            "signature": hashlib.sha256(f"{credential_id}{user_id}{session_id}".encode()).hexdigest()
-        }
-    }
-    
-    logger.warning(f"⚠️ Created Python fallback identity credential {credential_id} for user {user_id}")
-    logger.warning("🔧 Rust engine should be rebuilt to use proper cryptographic proofs")
-    
-    return credential
+# Python fallback removed - Bot shield requires Rust engine for cryptographic operations
 
 def create_credential_from_stripe_verification(user_id: str, session_id: str) -> Dict[str, Any]:
     """
@@ -357,7 +287,7 @@ def shield_status():
                 'credentials_checked': 0,
                 'response_time_ns': response_time,
                 'response_time_us': round(response_time / 1000, 2),
-                'engine': 'rust_ready' if RUST_ENGINE_AVAILABLE else 'python_fallback'
+                'engine': 'rust_microsecond'
             })
         
         # CHECK FLOW - Offline verification (95% success path)
@@ -384,7 +314,7 @@ def shield_status():
                 'invalid_count': len(invalid_credentials),
                 'response_time_ns': response_time,
                 'response_time_us': round(response_time / 1000, 2),
-                'engine': 'rust_microsecond' if RUST_ENGINE_AVAILABLE else 'python_fallback',
+                'engine': 'rust_microsecond',
                 'performance_metrics': {
                     'average_verification_time_ns': avg_verification_time,
                     'offline_rate_percent': offline_rate * 100,
@@ -406,7 +336,7 @@ def shield_status():
                 'invalid_count': len(invalid_credentials),
                 'response_time_ns': response_time,
                 'response_time_us': round(response_time / 1000, 2),
-                'engine': 'rust_microsecond' if RUST_ENGINE_AVAILABLE else 'python_fallback'
+                'engine': 'rust_microsecond'
             })
             
     except Exception as e:
@@ -856,7 +786,7 @@ def shield_config():
         
         config = {
             'shield_enabled': True,
-            'engine': 'rust_microsecond' if RUST_ENGINE_AVAILABLE else 'python_fallback',
+            'engine': 'rust_microsecond',
             'features': {
                 'rust_engine': RUST_ENGINE_AVAILABLE,
                 'microsecond_verification': RUST_ENGINE_AVAILABLE,

@@ -660,15 +660,13 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_re
         return credential
         
     except ImportError:
-        logger.warning("⚠️ Rust engine not available - using Python fallback for enhanced identity credential creation")
-        # Use the same fallback as the main shield
-        from api.shield import create_python_identity_credential_fallback
-        return create_python_identity_credential_fallback(user_id, session_id)
+        logger.error("❌ Rust engine not available - cannot create enhanced identity credential")
+        logger.error("❌ SDK requires Rust engine for cryptographic operations")
+        raise RuntimeError("Rust engine required for SDK identity credential creation")
     except Exception as e:
         logger.error(f"❌ Failed to create enhanced identity credential with Rust engine: {e}")
-        logger.warning("⚠️ Falling back to Python credential creation")
-        from api.shield import create_python_identity_credential_fallback
-        return create_python_identity_credential_fallback(user_id, session_id)
+        logger.error("❌ SDK requires Rust engine for cryptographic operations")
+        raise RuntimeError(f"Rust engine enhanced identity credential creation failed: {e}")
 
 @sdk_api_bp.route('/api/sdk/revoke-credential', methods=['POST'])
 @validate_api_key
