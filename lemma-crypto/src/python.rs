@@ -636,7 +636,7 @@ impl PyLemmaCore {
         Ok(results)
     }
 
-    /// Create FEDERATED identity credential from Stripe KYC data (CORE FEATURE - FIXED)
+    /// Create FEDERATED identity credential from Stripe KYC data (CORE FEATURE - FIXED v2)
     pub fn create_federated_identity_credential_from_stripe(&self, user_id: String, session_id: String) -> PyResult<String> {
         // ❌ OLD WAY: Local credential that only works on this deployment
         // ✅ NEW WAY: Federated credential that works across ALL deployments
