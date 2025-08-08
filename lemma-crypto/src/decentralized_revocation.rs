@@ -98,10 +98,10 @@ pub enum RevocationReason {
 /// Proof that the revoking party has authority to revoke
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthorityProof {
-    /// Authority public key
-    pub authority_key: VerifyingKey,
-    /// Signature proving authority
-    pub authority_signature: Signature,
+    /// Authority public key (as bytes for serialization)
+    pub authority_key: Vec<u8>,
+    /// Signature proving authority (as bytes for serialization)
+    pub authority_signature: Vec<u8>,
     /// Timestamp of proof
     pub proof_timestamp: u64,
 }
@@ -126,10 +126,10 @@ pub struct ConsensusState {
 pub struct ConsensusSignature {
     /// Node identifier
     pub node_id: String,
-    /// Node's public key
-    pub node_key: VerifyingKey,
-    /// Signature on the consensus data
-    pub signature: Signature,
+    /// Node's public key (as bytes for serialization)
+    pub node_key: Vec<u8>,
+    /// Signature on the consensus data (as bytes for serialization)
+    pub signature: Vec<u8>,
     /// Timestamp of signature
     pub timestamp: u64,
 }
@@ -145,8 +145,8 @@ pub struct RevocationSyncMessage {
     pub to_node: Option<String>,
     /// Updated revocation data
     pub revocation_data: RevocationSyncData,
-    /// Message signature
-    pub message_signature: Signature,
+    /// Message signature (as bytes for serialization)
+    pub message_signature: Vec<u8>,
     /// Timestamp
     pub timestamp: u64,
 }
@@ -200,8 +200,8 @@ pub struct DecentralizedRevocationManager {
 pub struct NetworkPeer {
     /// Peer node ID
     pub node_id: String,
-    /// Peer public key
-    pub public_key: VerifyingKey,
+    /// Peer public key (as bytes)
+    pub public_key: Vec<u8>,
     /// Peer endpoint URL
     pub endpoint: String,
     /// Last successful sync timestamp
@@ -387,8 +387,8 @@ impl DecentralizedRevocationManager {
         let signature = self.signing_key.sign(proof_data.as_bytes());
         
         Ok(AuthorityProof {
-            authority_key: self.signing_key.verifying_key(),
-            authority_signature: signature,
+            authority_key: self.signing_key.verifying_key().to_bytes().to_vec(),
+            authority_signature: signature.to_bytes().to_vec(),
             proof_timestamp: timestamp,
         })
     }
@@ -419,7 +419,7 @@ impl DecentralizedRevocationManager {
             from_node: self.node_id.clone(),
             to_node: None, // Broadcast
             revocation_data: sync_data,
-            message_signature: Signature::from_bytes(&[0u8; 64]), // Placeholder
+            message_signature: vec![0u8; 64], // Placeholder
             timestamp: current_time,
         };
         
@@ -450,8 +450,8 @@ impl DecentralizedRevocationManager {
         
         let consensus_signature = ConsensusSignature {
             node_id: self.node_id.clone(),
-            node_key: self.signing_key.verifying_key(),
-            signature,
+            node_key: self.signing_key.verifying_key().to_bytes().to_vec(),
+            signature: signature.to_bytes().to_vec(),
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
@@ -550,14 +550,14 @@ mod tests {
         let peers = vec![
             NetworkPeer {
                 node_id: "lemma-enterprise".to_string(),
-                public_key: SigningKey::generate(&mut OsRng).verifying_key(),
+                public_key: SigningKey::generate(&mut OsRng).verifying_key().to_bytes().to_vec(),
                 endpoint: "https://lemma-enterprise.herokuapp.com".to_string(),
                 last_sync: 0,
                 is_online: true,
             },
             NetworkPeer {
                 node_id: "lemma-federated-identity".to_string(),
-                public_key: SigningKey::generate(&mut OsRng).verifying_key(),
+                public_key: SigningKey::generate(&mut OsRng).verifying_key().to_bytes().to_vec(),
                 endpoint: "https://lemma-identity-network.herokuapp.com".to_string(),
                 last_sync: 0,
                 is_online: true,

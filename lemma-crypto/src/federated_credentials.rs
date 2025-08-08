@@ -48,16 +48,16 @@ impl FederatedCredentialId {
 pub struct DecentralizedIdentityDocument {
     /// DID identifier
     pub id: String,
-    /// Network-wide public key for verification
-    pub public_key: VerifyingKey,
+    /// Network-wide public key for verification (as bytes for serialization)
+    pub public_key: Vec<u8>,
     /// Service endpoints across the federation
     pub service_endpoints: Vec<ServiceEndpoint>,
     /// Creation timestamp
     pub created: u64,
     /// Last update timestamp  
     pub updated: u64,
-    /// Network signature proving authenticity
-    pub network_signature: Option<Signature>,
+    /// Network signature proving authenticity (as bytes for serialization)
+    pub network_signature: Option<Vec<u8>>,
 }
 
 /// Service endpoint for federated network access
@@ -86,8 +86,8 @@ pub struct FederatedCredential {
     pub issued_at: u64,
     /// Expiration timestamp
     pub expires_at: Option<u64>,
-    /// Network-wide cryptographic signature
-    pub network_signature: Signature,
+    /// Network-wide cryptographic signature (as bytes for serialization)
+    pub network_signature: Vec<u8>,
     /// Portability proof (allows cross-deployment verification)
     pub portability_proof: PortabilityProof,
 }
@@ -112,8 +112,8 @@ pub struct NetworkMembershipProof {
     pub merkle_proof: Vec<[u8; 32]>,
     /// Network root hash
     pub network_root: [u8; 32],
-    /// Signature from network authority
-    pub authority_signature: Signature,
+    /// Signature from network authority (as bytes for serialization)
+    pub authority_signature: Vec<u8>,
 }
 
 /// Data needed for cross-deployment verification
@@ -147,8 +147,8 @@ pub struct ConsensusData {
     pub round: u64,
     /// Participating nodes
     pub participants: Vec<String>,
-    /// Consensus signature
-    pub consensus_signature: Signature,
+    /// Consensus signature (as bytes for serialization)
+    pub consensus_signature: Vec<u8>,
 }
 
 /// Revocation data for network-wide revocation checking
@@ -169,8 +169,8 @@ pub struct RevocationProof {
     pub inclusion_proof: Vec<[u8; 32]>,
     /// Revocation registry root
     pub registry_root: [u8; 32],
-    /// Authority signature
-    pub authority_signature: Signature,
+    /// Authority signature (as bytes for serialization)
+    pub authority_signature: Vec<u8>,
 }
 
 /// Federated credential issuer that creates portable credentials
@@ -190,8 +190,8 @@ pub struct NetworkParameters {
     pub shared_oprf_key: [u8; 32],
     /// Shared Bloom filter parameters
     pub bloom_params: BloomFilterParams,
-    /// Network authority public key
-    pub network_authority_key: VerifyingKey,
+    /// Network authority public key (as bytes for serialization)
+    pub network_authority_key: Vec<u8>,
     /// Service endpoints for the network
     pub service_endpoints: Vec<ServiceEndpoint>,
 }
@@ -235,7 +235,7 @@ impl FederatedCredentialIssuer {
         // Create issuer DID
         let issuer_did = DecentralizedIdentityDocument {
             id: format!("did:lemma:issuer:{}", self.network_id),
-            public_key: self.signing_key.verifying_key(),
+            public_key: self.signing_key.verifying_key().to_bytes().to_vec(),
             service_endpoints: self.network_params.service_endpoints.clone(),
             created: current_time,
             updated: current_time,
@@ -245,7 +245,7 @@ impl FederatedCredentialIssuer {
         // Create subject DID
         let subject_did = DecentralizedIdentityDocument {
             id: format!("did:lemma:user:{}", subject_id),
-            public_key: self.signing_key.verifying_key(), // In reality, user's key
+            public_key: self.signing_key.verifying_key().to_bytes().to_vec(), // In reality, user's key
             service_endpoints: self.network_params.service_endpoints.clone(),
             created: current_time,
             updated: current_time,
@@ -263,7 +263,7 @@ impl FederatedCredentialIssuer {
             claims,
             issued_at: current_time,
             expires_at,
-            network_signature: Signature::from_bytes(&[0u8; 64]), // Placeholder
+            network_signature: vec![0u8; 64], // Placeholder
             portability_proof,
         };
         
@@ -271,7 +271,7 @@ impl FederatedCredentialIssuer {
         let credential_bytes = serde_json::to_vec(&credential)
             .map_err(|e| LemmaError::Serialization(e.to_string()))?;
         let signature = self.signing_key.sign(&credential_bytes);
-        credential.network_signature = signature;
+        credential.network_signature = signature.to_bytes().to_vec();
         
         Ok(credential)
     }
@@ -287,7 +287,7 @@ impl FederatedCredentialIssuer {
             network_id: self.network_id.clone(),
             merkle_proof: vec![], // Would be computed from network registry
             network_root: [0u8; 32], // Would be actual network root
-            authority_signature: Signature::from_bytes(&[0u8; 64]), // Authority signature
+            authority_signature: vec![0u8; 64], // Authority signature
         };
         
         // Create cross-deployment data
@@ -297,7 +297,7 @@ impl FederatedCredentialIssuer {
             consensus_data: ConsensusData {
                 round: 1,
                 participants: vec![self.network_id.clone()],
-                consensus_signature: Signature::from_bytes(&[0u8; 64]),
+                consensus_signature: vec![0u8; 64],
             },
         };
         
@@ -330,8 +330,8 @@ impl FederatedCredentialIssuer {
 pub struct FederatedCredentialVerifier {
     /// Network parameters
     network_params: NetworkParameters,
-    /// Network authority public key for verification
-    network_authority_key: VerifyingKey,
+    /// Network authority public key for verification (as bytes)
+    network_authority_key: Vec<u8>,
 }
 
 impl FederatedCredentialVerifier {
@@ -351,8 +351,20 @@ impl FederatedCredentialVerifier {
         let credential_bytes = serde_json::to_vec(credential)
             .map_err(|e| LemmaError::Serialization(e.to_string()))?;
         
-        credential.issuer_did.public_key
-            .verify(&credential_bytes, &credential.network_signature)
+        // Convert bytes back to VerifyingKey for verification
+        let public_key_bytes: [u8; 32] = credential.issuer_did.public_key.as_slice()
+            .try_into()
+            .map_err(|_| LemmaError::Crypto("Invalid public key length".to_string()))?;
+        let public_key = VerifyingKey::from_bytes(&public_key_bytes)
+            .map_err(|e| LemmaError::Crypto(format!("Invalid public key: {}", e)))?;
+        
+        let signature_bytes: [u8; 64] = credential.network_signature.as_slice()
+            .try_into()
+            .map_err(|_| LemmaError::Crypto("Invalid signature length".to_string()))?;
+        let signature = Signature::from_bytes(&signature_bytes);
+        
+        public_key
+            .verify(&credential_bytes, &signature)
             .map_err(|e| LemmaError::Crypto(format!("Signature verification failed: {}", e)))?;
         
         // 2. Verify network membership
@@ -402,7 +414,7 @@ mod tests {
                 error_rate: 0.01,
                 network_hmac_key: [2u8; 32],
             },
-            network_authority_key: SigningKey::generate(&mut OsRng).verifying_key(),
+            network_authority_key: SigningKey::generate(&mut OsRng).verifying_key().to_bytes().to_vec(),
             service_endpoints: vec![],
         };
         
@@ -442,7 +454,7 @@ mod tests {
                 error_rate: 0.01,
                 network_hmac_key: [4u8; 32], // Same HMAC key across network
             },
-            network_authority_key: SigningKey::generate(&mut OsRng).verifying_key(),
+            network_authority_key: SigningKey::generate(&mut OsRng).verifying_key().to_bytes().to_vec(),
             service_endpoints: vec![],
         };
         
