@@ -271,8 +271,7 @@ def register_revocation():
     """
     Register credential revocation in the network registry
     
-    Called by the revocation system to distribute OPRF + Bloom Filter updates.
-    Handles both local and federated revocations.
+    Called by the revocation system to distribute OPRF + Bloom Filter updates
     """
     try:
         data = request.get_json() or {}
@@ -281,8 +280,6 @@ def register_revocation():
         oprf_evaluation = data.get('oprf_evaluation')
         bloom_hash = data.get('bloom_hash')
         revocation_reason = data.get('reason', 'user_requested')
-        is_federated = data.get('federated_revocation', False)
-        source_deployment = data.get('source_deployment', 'unknown')
         
         if not credential_id or not oprf_evaluation:
             return jsonify({
@@ -293,27 +290,6 @@ def register_revocation():
         
         current_time = time.time()
         
-        # Check if this revocation already exists (prevent duplicates)
-        if credential_id in NETWORK_REGISTRY['revocation_lists']['revocation_entries']:
-            existing_entry = NETWORK_REGISTRY['revocation_lists']['revocation_entries'][credential_id]
-            logger.info(f"🔄 Revocation already exists for {credential_id}, updating metadata")
-            
-            # Update metadata for federated tracking
-            if is_federated:
-                existing_entry['federated_sources'] = existing_entry.get('federated_sources', [])
-                if source_deployment not in existing_entry['federated_sources']:
-                    existing_entry['federated_sources'].append(source_deployment)
-                existing_entry['last_federated_update'] = current_time
-            
-            return jsonify({
-                'success': True,
-                'message': 'Revocation already registered',
-                'credential_id': credential_id,
-                'revoked_at': existing_entry['revoked_at'],
-                'federated_revocation': is_federated,
-                'duplicate_prevention': True
-            })
-        
         # Add to revocation registry
         revocation_entry = {
             'credential_id': credential_id,
@@ -322,25 +298,19 @@ def register_revocation():
             'revoked_at': current_time,
             'reason': revocation_reason,
             'network_distributed': True,
-            'propagation_time': 0,  # Instant propagation
-            'federated_revocation': is_federated,
-            'source_deployment': source_deployment,
-            'federated_sources': [source_deployment] if is_federated else []
+            'propagation_time': 0  # Instant propagation
         }
         
         NETWORK_REGISTRY['revocation_lists']['revocation_entries'][credential_id] = revocation_entry
         NETWORK_REGISTRY['revocation_lists']['oprf_bloom_filters'][oprf_evaluation] = {
             'bloom_hash': bloom_hash,
             'added_at': current_time,
-            'network_level': 'global',
-            'federated': is_federated,
-            'source_deployment': source_deployment
+            'network_level': 'global'
         }
         NETWORK_REGISTRY['revocation_lists']['last_updated'] = current_time
         NETWORK_REGISTRY['network_metadata']['total_revocations'] = len(NETWORK_REGISTRY['revocation_lists']['revocation_entries'])
         
-        revocation_type = "federated" if is_federated else "local"
-        logger.info(f"🚫 Registered {revocation_type} revocation in network: {credential_id} (reason: {revocation_reason}, source: {source_deployment})")
+        logger.info(f"🚫 Registered revocation in network: {credential_id} (reason: {revocation_reason})")
         
         return jsonify({
             'success': True,
@@ -349,9 +319,6 @@ def register_revocation():
             'network_propagation': 'instant',
             'oprf_distributed': True,
             'bloom_filter_updated': True,
-            'federated_revocation': is_federated,
-            'source_deployment': source_deployment,
-            'revoked_at': current_time,
             'total_network_revocations': len(NETWORK_REGISTRY['revocation_lists']['revocation_entries'])
         })
         
@@ -360,45 +327,6 @@ def register_revocation():
         return jsonify({
             'success': False,
             'error': 'revocation_registration_failed',
-            'message': str(e)
-        }), 500
-
-@network_registry_bp.route('/api/network/check-revocation/<credential_id>', methods=['GET'])
-@require_network_auth  
-def check_revocation_status(credential_id: str):
-    """
-    Check if a credential is revoked in the network registry
-    
-    This allows verification across the federated network
-    """
-    try:
-        revocation_entries = NETWORK_REGISTRY['revocation_lists']['revocation_entries']
-        
-        if credential_id in revocation_entries:
-            entry = revocation_entries[credential_id]
-            return jsonify({
-                'success': True,
-                'credential_id': credential_id,
-                'revoked': True,
-                'revoked_at': entry['revoked_at'],
-                'reason': entry['reason'],
-                'federated_revocation': entry.get('federated_revocation', False),
-                'source_deployment': entry.get('source_deployment', 'unknown'),
-                'federated_sources': entry.get('federated_sources', [])
-            })
-        else:
-            return jsonify({
-                'success': True,
-                'credential_id': credential_id,
-                'revoked': False,
-                'message': 'Credential not found in revocation list'
-            })
-            
-    except Exception as e:
-        logger.error(f"❌ Revocation check failed: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'revocation_check_failed',
             'message': str(e)
         }), 500
 

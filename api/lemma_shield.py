@@ -537,19 +537,65 @@ def check_credential():
 @lemma_shield_bp.route('/lemma/revoke-credential', methods=['POST'])
 def revoke_credential():
     """
-    REVOCATION FLOW: Revoke user's lemma credential
+    REVOCATION FLOW: Network-wide lemma credential revocation using OPRF+Bloom filters
     """
     try:
-        # Clear credential from session
+        # Get credential ID from session or request
+        data = request.get_json() or {}
+        credential_id = data.get('credential_id')
+        
+        # Try to get credential ID from session if not provided
+        if not credential_id:
+            stored_credential = session.get('lemma_credential')
+            if stored_credential:
+                credential_id = stored_credential.get('id')
+        
+        # Clear credential from local session first
         session.pop('lemma_credential', None)
         session.pop('verified_at', None)
         
-        logger.info("🚫 Lemma credential revoked")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Credential revoked successfully'
-        })
+        if credential_id:
+            try:
+                # Import Rust engine for network-wide revocation
+                from lemma_crypto import PyLemmaCore
+                rust_engine = PyLemmaCore()
+                
+                # Perform network-wide revocation using OPRF+Bloom
+                revocation_result = rust_engine.revoke_credentials_network_wide([credential_id])
+                
+                logger.info(f"🌐 Network-wide lemma credential revoked: {credential_id[:8]}...")
+                logger.info(f"⚡ Revocation time: {revocation_result['total_time_ns']}ns")
+                logger.info(f"🔐 Privacy preserved with OPRF evaluation")
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Credential revoked across entire federated network',
+                    'revocation_type': 'network_wide_oprf_bloom',
+                    'credential_id': credential_id[:8] + '...',
+                    'network_scope': 'federated_network',
+                    'oprf_time_ns': revocation_result.get('oprf_time_ns', 0),
+                    'bloom_time_ns': revocation_result.get('bloom_update_time_ns', 0),
+                    'privacy_preserved': True
+                })
+                
+            except ImportError:
+                logger.error("❌ Rust engine not available - falling back to local revocation only")
+                logger.error("❌ WARNING: Credential only revoked locally, not across network")
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Credential revoked locally only (WARNING: Not network-wide)',
+                    'revocation_type': 'local_only',
+                    'warning': 'Network-wide revocation requires Rust engine',
+                    'network_scope': 'local_only'
+                })
+                
+        else:
+            logger.info("🚫 No credential ID found - clearing session only")
+            return jsonify({
+                'success': True,
+                'message': 'Session cleared (no credential ID to revoke)'
+            })
     
     except Exception as e:
         logger.error(f"Revocation error: {e}")

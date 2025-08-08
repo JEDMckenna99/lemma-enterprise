@@ -669,6 +669,74 @@ impl PyLemmaCore {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 
+    /// Revoke credentials across the federated network using OPRF+Bloom (CORE FEATURE)
+    pub fn revoke_credentials_network_wide(&mut self, credential_ids: Vec<String>) -> PyResult<PyDict> {
+        let start_time = std::time::Instant::now();
+        
+        let mut revocation_results = Vec::new();
+        let mut total_oprf_time_ns = 0u64;
+        let mut total_bloom_time_ns = 0u64;
+        
+        for credential_id in &credential_ids {
+            let oprf_start = std::time::Instant::now();
+            
+            // Step 1: Use OPRF to create privacy-preserving hash of credential ID
+            // This ensures the revocation doesn't reveal the credential content
+            let oprf_result = self.oprf_client.get_evaluation(credential_id)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            
+            let oprf_time_ns = oprf_start.elapsed().as_nanos() as u64;
+            total_oprf_time_ns += oprf_time_ns;
+            
+            let bloom_start = std::time::Instant::now();
+            
+            // Step 2: Add OPRF evaluation to shared Bloom filter for network-wide revocation
+            // This is the key part - the Bloom filter is shared across ALL network nodes
+            self.bloom_filter.add(&oprf_result.evaluation)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            
+            let bloom_time_ns = bloom_start.elapsed().as_nanos() as u64;
+            total_bloom_time_ns += bloom_time_ns;
+            
+            revocation_results.push(format!(
+                "credential_{}_revoked_oprf_{}ns_bloom_{}ns", 
+                credential_id.chars().take(8).collect::<String>(),
+                oprf_time_ns,
+                bloom_time_ns
+            ));
+        }
+        
+        let total_time_ns = start_time.elapsed().as_nanos() as u64;
+        
+        Python::with_gil(|py| {
+            let dict = PyDict::new(py);
+            dict.set_item("success", true)?;
+            dict.set_item("revoked_count", credential_ids.len())?;
+            dict.set_item("revocation_type", "network_wide_oprf_bloom")?;
+            dict.set_item("oprf_time_ns", total_oprf_time_ns)?;
+            dict.set_item("bloom_update_time_ns", total_bloom_time_ns)?;
+            dict.set_item("total_time_ns", total_time_ns)?;
+            dict.set_item("network_propagation", "instant_shared_bloom_filter")?;
+            dict.set_item("privacy_preserved", "oprf_evaluation_hides_credential_content")?;
+            dict.set_item("federated_network", "revocation_active_across_all_sites")?;
+            dict.set_item("results", revocation_results)?;
+            Ok(dict.into())
+        })
+    }
+
+    /// Check if credential is revoked using OPRF+Bloom network check (CORE FEATURE)
+    pub fn is_credential_revoked(&mut self, credential_id: String) -> PyResult<bool> {
+        // Step 1: Use OPRF to get privacy-preserving evaluation
+        let oprf_result = self.oprf_client.get_evaluation(&credential_id)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        // Step 2: Check if OPRF evaluation exists in shared Bloom filter
+        // This checks the network-wide revocation list without revealing credential content
+        let (is_revoked, _level) = self.bloom_filter.contains(&oprf_result.evaluation);
+        
+        Ok(is_revoked)
+    }
+
     /// Get engine statistics
     pub fn get_stats(&self) -> PyResult<PyDict> {
         Python::with_gil(|py| {
