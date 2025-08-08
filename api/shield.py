@@ -140,7 +140,7 @@ def verify_credentials_offline(credentials: List[Dict[str, Any]]) -> Tuple[List[
             credential_id = cred.get('id', '')
             if credential_id:
                 try:
-                    is_revoked = rust_engine.is_credential_revoked(credential_id)
+                    is_revoked = rust_engine.is_credential_revoked_network_wide(credential_id)
                     if is_revoked:
                         logger.warning(f"🚫 Credential {credential_id[:8]}... is REVOKED across federated network")
                         # Add to invalid credentials with revocation info

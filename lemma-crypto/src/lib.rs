@@ -39,6 +39,10 @@ pub mod zkp_claims;
 // NEW: Background Wallet for microsecond credential storage
 pub mod wallet;
 
+// NEW: True federated/decentralized credentials
+pub mod federated_credentials;
+pub mod decentralized_revocation;
+
 // Re-export commonly used types
 pub use crate::oprf::{OPRFClient, OPRFServer, OPRFResult, RealisticOPRFClient};
 pub use crate::bloom::{BloomFilter, CascadedBloomFilter};
