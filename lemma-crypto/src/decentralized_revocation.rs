@@ -13,7 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::{Arc, Mutex};
 
 use crate::{LemmaError, Result};
-use crate::authenticated_bloom::{AuthenticatedBloomFilter, HMACKey};
+use crate::bloom::{BloomFilter, CascadedBloomFilter};
 use crate::oprf::{OPRFClient, OPRFResult};
 
 /// Network-wide revocation registry that syncs across all deployments
@@ -56,7 +56,7 @@ pub struct SharedFilterParams {
     /// Target error rate
     pub error_rate: f64,
     /// Shared HMAC key for network integrity
-    pub shared_hmac_key: HMACKey,
+    pub shared_hmac_key: [u8; 32],
     /// Shared OPRF key for privacy-preserving evaluation
     pub shared_oprf_key: [u8; 32],
 }
@@ -346,11 +346,11 @@ impl DecentralizedRevocationManager {
         registry: &mut DecentralizedRevocationRegistry,
         oprf_evaluation: &[u8; 32],
     ) -> Result<()> {
-        // Create authenticated Bloom filter from shared data
-        let mut bloom_filter = AuthenticatedBloomFilter::new(
+        // Create Bloom filter from shared data
+        let mut bloom_filter = CascadedBloomFilter::new(
+            3, // 3 levels
             registry.shared_bloom_filter.params.filter_size / 8, // Convert bits to capacity
             registry.shared_bloom_filter.params.error_rate,
-            registry.shared_bloom_filter.params.shared_hmac_key,
         )?;
         
         // Add the OPRF evaluation to the filter
@@ -369,11 +369,11 @@ impl DecentralizedRevocationManager {
         registry: &DecentralizedRevocationRegistry,
         oprf_evaluation: &[u8; 32],
     ) -> Result<bool> {
-        // Create authenticated Bloom filter from shared data
-        let bloom_filter = AuthenticatedBloomFilter::new(
+        // Create Bloom filter from shared data
+        let bloom_filter = CascadedBloomFilter::new(
+            3, // 3 levels
             registry.shared_bloom_filter.params.filter_size / 8,
             registry.shared_bloom_filter.params.error_rate,
-            registry.shared_bloom_filter.params.shared_hmac_key,
         )?;
         
         // Check if the OPRF evaluation is in the filter

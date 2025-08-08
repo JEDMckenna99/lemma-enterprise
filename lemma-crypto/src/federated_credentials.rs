@@ -337,7 +337,7 @@ pub struct FederatedCredentialVerifier {
 impl FederatedCredentialVerifier {
     /// Create a new federated credential verifier
     pub fn new(network_params: NetworkParameters) -> Self {
-        let network_authority_key = network_params.network_authority_key;
+        let network_authority_key = network_params.network_authority_key.clone();
         
         Self {
             network_params,
