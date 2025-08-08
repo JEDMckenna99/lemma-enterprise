@@ -636,6 +636,39 @@ impl PyLemmaCore {
         Ok(results)
     }
 
+    /// Create identity credential from Stripe KYC data (CORE FEATURE)
+    pub fn create_identity_credential_from_stripe(&self, user_id: String, session_id: String) -> PyResult<String> {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        
+        // Create the 3 essential claims for identity lemma
+        let mut claims_map = std::collections::HashMap::new();
+        claims_map.insert("packageType".to_string(), serde_json::Value::String("identity".to_string()));
+        claims_map.insert("isHuman".to_string(), serde_json::Value::Bool(true));
+        claims_map.insert("verificationMethod".to_string(), serde_json::Value::String("stripe_identity".to_string()));
+        claims_map.insert("verifiedAt".to_string(), serde_json::Value::Number(serde_json::Number::from(current_time)));
+        claims_map.insert("sessionId".to_string(), serde_json::Value::String(session_id));
+        
+        // Create subject DID
+        let subject_did = format!("did:lemma:user:{}", user_id);
+        
+        // Set expiry to 1 year
+        let expires_at = Some(current_time + (86400 * 365));
+        
+        // Use the internal credential issuer to create the credential with cryptographic proof
+        let credential = self.credential_issuer.inner.issue_credential(
+            subject_did,
+            claims_map,
+            expires_at
+        ).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        // Return credential as JSON
+        credential.to_json()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
     /// Get engine statistics
     pub fn get_stats(&self) -> PyResult<PyDict> {
         Python::with_gil(|py| {
