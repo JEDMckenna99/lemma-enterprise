@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cross-Site Lemma Test - Lemma Federated Identity</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 30px;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            color: #FFD700;
+            font-size: 2em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .test-section {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #FFD700;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .status.success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #22c55e;
+        }
+        .status.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #ef4444;
+        }
+        .status.warning {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #f59e0b;
+        }
+        .status.info {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            color: #3b82f6;
+        }
+        button {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .log {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .timestamp {
+            color: #888;
+            font-size: 11px;
+        }
+        .site-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .site-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .site-card.current {
+            border-color: #FFD700;
+        }
+        .site-url {
+            color: #FFD700;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .instructions {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .instructions h3 {
+            color: #3b82f6;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🔄 Lemma Cross-Site Test</div>
+            <p>Test federated identity lemma recognition across network sites</p>
+        </div>
+
+        <div class="instructions">
+            <h3>🧪 How to Test Cross-Site Lemma Recognition:</h3>
+            <ol>
+                <li><strong>Step 1:</strong> Complete Stripe Identity verification on <strong>lemma.id</strong></li>
+                <li><strong>Step 2:</strong> Visit <strong>lemma-identity-network</strong> (this page)</li>
+                <li><strong>Step 3:</strong> Click "Check Network Identity Lemma" below</li>
+                <li><strong>Step 4:</strong> Should find your identity lemma from the network without re-verification</li>
+            </ol>
+        </div>
+
+        <div class="site-info">
+            <div class="site-card">
+                <div class="site-url">lemma.id</div>
+                <div>Primary Site</div>
+                <div style="font-size: 12px; color: #888; margin-top: 5px;">
+                    Where you complete Stripe verification
+                </div>
+            </div>
+            <div class="site-card current">
+                <div class="site-url">lemma-identity-network</div>
+                <div>Federated Site</div>
+                <div style="font-size: 12px; color: #888; margin-top: 5px;">
+                    Should recognize your lemma instantly
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🌐 Network Sync Status</h3>
+            <div id="networkStatus" class="status info">Checking network connectivity...</div>
+            <button onclick="checkNetworkSync()" id="checkNetworkBtn">Check Network Sync</button>
+            <button onclick="checkSharedLemma()" id="checkLemmaBtn">Check Network Identity Lemma</button>
+            <button onclick="testRevocationSync()" id="testRevocationBtn">Test Revocation Sync</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Test Results</h3>
+            <div id="testResults">
+                <div class="status info">Click buttons above to run tests...</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Debug Log</h3>
+            <div id="debugLog" class="log">
+                <div class="log-entry">
+                    <span class="timestamp">[Loading]</span> Cross-site lemma test initialized
+                </div>
+            </div>
+            <button onclick="clearLog()" style="background: #666;">Clear Log</button>
+        </div>
+    </div>
+
+    <script>
+        let debugLog = [];
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = { timestamp, message, type };
+            debugLog.push(entry);
+            
+            const logElement = document.getElementById('debugLog');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+            logElement.appendChild(logEntry);
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function clearLog() {
+            document.getElementById('debugLog').innerHTML = '';
+            debugLog = [];
+            log('Debug log cleared');
+        }
+        
+        function updateStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.className = `status ${type}`;
+            element.textContent = message;
+        }
+        
+        async function checkNetworkSync() {
+            log('🔄 Checking network sync status...');
+            updateStatus('networkStatus', 'Checking network sync...', 'info');
+            
+            try {
+                const response = await fetch('/api/network/sync/status', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Network sync active: ${data.network_nodes} nodes, ${data.shared_identity_lemmas} shared lemmas`);
+                    updateStatus('networkStatus', `Network sync active: ${data.shared_identity_lemmas} shared lemmas`, 'success');
+                    
+                    const results = document.getElementById('testResults');
+                    results.innerHTML = `
+                        <div class="status success">✅ Network Sync Active</div>
+                        <div style="margin-top: 10px;">
+                            <strong>Network Nodes:</strong> ${data.network_nodes}<br>
+                            <strong>Shared Identity Lemmas:</strong> ${data.shared_identity_lemmas}<br>
+                            <strong>Shared Bloom Filter Size:</strong> ${data.shared_bloom_filter_size}<br>
+                            <strong>Known Endpoints:</strong> ${data.known_endpoints?.join(', ') || 'None'}
+                        </div>
+                    `;
+                } else {
+                    log(`❌ Network sync check failed: ${response.status}`);
+                    updateStatus('networkStatus', 'Network sync not available', 'error');
+                }
+            } catch (error) {
+                log(`❌ Network sync error: ${error.message}`);
+                updateStatus('networkStatus', 'Network sync error', 'error');
+            }
+        }
+        
+        async function checkSharedLemma() {
+            log('🆔 Checking for shared network identity lemma...');
+            
+            // Get user ID from session or prompt
+            let userId = sessionStorage.getItem('test_user_id');
+            if (!userId) {
+                userId = prompt('Enter your user ID (from Stripe verification):');
+                if (!userId) {
+                    log('❌ User ID required for lemma check');
+                    return;
+                }
+                sessionStorage.setItem('test_user_id', userId);
+            }
+            
+            try {
+                log(`🔍 Looking for identity lemma for user: ${userId.substring(0, 8)}...`);
+                
+                // Check if we can find a shared identity lemma for this user
+                const response = await fetch('/api/shield/check-stripe-verification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        session_id: 'test_session_' + Date.now()
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success && data.verification_source === 'federated_network_identity_lemma') {
+                        log('✅ SUCCESS: Found shared identity lemma from federated network!');
+                        log(`🌐 Network-wide recognition: ${data.network_wide}`);
+                        log(`🔗 Cross-site valid: ${data.cross_site_valid}`);
+                        
+                        const results = document.getElementById('testResults');
+                        results.innerHTML = `
+                            <div class="status success">✅ Cross-Site Lemma Recognition Working!</div>
+                            <div style="margin-top: 10px;">
+                                <strong>Verification Source:</strong> ${data.verification_source}<br>
+                                <strong>Network Wide:</strong> ${data.network_wide}<br>
+                                <strong>Cross-Site Valid:</strong> ${data.cross_site_valid}<br>
+                                <strong>User ID:</strong> ${userId.substring(0, 8)}...<br>
+                                <strong>Message:</strong> ${data.message}
+                            </div>
+                        `;
+                    } else if (data.success) {
+                        log('⚠️ User verified but not from network lemma');
+                        log(`📍 Verification source: ${data.verification_source || 'local'}`);
+                        
+                        const results = document.getElementById('testResults');
+                        results.innerHTML = `
+                            <div class="status warning">⚠️ Local verification only</div>
+                            <div style="margin-top: 10px;">
+                                User is verified but identity lemma not found in shared network.<br>
+                                <strong>Source:</strong> ${data.verification_source || 'local'}
+                            </div>
+                        `;
+                    } else {
+                        log('❌ No identity lemma found for user');
+                        log(`💡 User may need to complete Stripe verification first`);
+                        
+                        const results = document.getElementById('testResults');
+                        results.innerHTML = `
+                            <div class="status error">❌ No Identity Lemma Found</div>
+                            <div style="margin-top: 10px;">
+                                User needs to complete Stripe Identity verification on lemma.id first.
+                            </div>
+                        `;
+                    }
+                } else {
+                    log(`❌ Lemma check failed: ${response.status}`);
+                    const results = document.getElementById('testResults');
+                    results.innerHTML = `<div class="status error">❌ Check failed: ${response.status}</div>`;
+                }
+            } catch (error) {
+                log(`❌ Lemma check error: ${error.message}`);
+                const results = document.getElementById('testResults');
+                results.innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function testRevocationSync() {
+            log('🚫 Testing revocation sync (demo mode)...');
+            
+            try {
+                // This is just a demo - in real usage, revocation would be triggered by admin action
+                log('📡 Simulating revocation sync check...');
+                
+                const response = await fetch('/api/network/sync/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Revocation sync active: ${data.shared_bloom_filter_size} entries in bloom filter`);
+                    
+                    const results = document.getElementById('testResults');
+                    results.innerHTML = `
+                        <div class="status success">✅ Revocation Sync Active</div>
+                        <div style="margin-top: 10px;">
+                            <strong>Bloom Filter Size:</strong> ${data.shared_bloom_filter_size}<br>
+                            <em>Note: This is a demo. Real revocation would be triggered by admin action.</em>
+                        </div>
+                    `;
+                } else {
+                    log('❌ Revocation sync not available');
+                }
+            } catch (error) {
+                log(`❌ Revocation test error: ${error.message}`);
+            }
+        }
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🚀 Cross-site lemma test page loaded');
+            log('🌐 Current site: ' + window.location.hostname);
+            
+            // Auto-check network sync on load
+            setTimeout(checkNetworkSync, 1000);
+        });
+        
+        // Auto-refresh network status every 30 seconds
+        setInterval(() => {
+            if (document.getElementById('networkStatus').textContent.includes('active')) {
+                checkNetworkSync();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

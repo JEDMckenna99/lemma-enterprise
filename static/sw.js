@@ -50,12 +50,16 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Skip Cloudflare analytics and other external scripts
+  // Skip Cloudflare analytics and other external scripts - DO NOT INTERCEPT
   if (event.request.url.includes('cloudflareinsights.com') || 
       event.request.url.includes('beacon.min.js') ||
-      event.request.url.includes('static.cloudflareinsights.com')) {
-    console.log('[SW] Skipping external analytics:', event.request.url);
-    // Don't intercept these requests at all
+      event.request.url.includes('static.cloudflareinsights.com') ||
+      event.request.url.includes('analytics') ||
+      event.request.url.includes('beacon') ||
+      event.request.url.includes('gtag') ||
+      event.request.url.includes('google-analytics')) {
+    console.log('[SW] Ignoring external analytics (no response):', event.request.url);
+    // Let the browser handle these requests natively - don't intercept
     return;
   }
 

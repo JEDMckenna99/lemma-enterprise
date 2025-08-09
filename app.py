@@ -238,6 +238,12 @@ def create_app():
         """QR code demo page with test codes for offline verification"""
         return render_template('modern/qr_demo.html')
     
+    @app.route('/test-cross-site')
+    def test_cross_site():
+        """Cross-site lemma recognition test page"""
+        with open('static/test-cross-site-lemma.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    
     @app.route('/sdk-demo')
     def sdk_demo():
         """SDK Integration Demo - Unprotected for testing"""
