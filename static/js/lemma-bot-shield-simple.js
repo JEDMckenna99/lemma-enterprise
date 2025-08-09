@@ -42,7 +42,7 @@ class LemmaBotShield {
             backgroundChecks: this.config.backgroundChecks,
             // CRITICAL: Configure network registry for cross-site sync
             networkRegistryUrl: this.config.apiBase + '/api/network/sync',
-            networkAuthKey: 'lemma_federated_network_key_2024'
+            networkAuthKey: 'lemma_network_federated_sync_2024'
         });
         
         // Set custom security event handler if provided

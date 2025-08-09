@@ -22,7 +22,7 @@ class LemmaFederatedWallet {
         // Network registry configuration
         this.networkConfig = {
             registryUrl: options.networkRegistryUrl || '',
-            authKey: options.networkAuthKey || 'lemma_network_master_key_2024',
+            authKey: options.networkAuthKey || 'lemma_network_federated_sync_2024',
             syncInterval: options.syncInterval || (5 * 60 * 1000), // 5 minutes
             lastDidSync: 0,
             lastRevocationSync: 0
