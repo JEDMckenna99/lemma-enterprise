@@ -13,6 +13,9 @@ Provides:
 from flask import Blueprint, request, jsonify, session
 import time
 import secrets
+
+# Import real-time network sync for federated identity
+from .realtime_network_sync import sync_manager
 import logging
 from functools import wraps
 import json
@@ -656,6 +659,13 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_re
         logger.info(f"📋 Claims: packageType={credential.get('claims', {}).get('packageType')}, "
                    f"isHuman={credential.get('claims', {}).get('isHuman')}, "
                    f"verificationMethod={credential.get('claims', {}).get('verificationMethod')}")
+        
+        # CRITICAL: Add identity lemma to shared network storage for cross-site recognition
+        try:
+            sync_manager.add_shared_identity_lemma(credential['id'], credential)
+            logger.info(f"🌐 Added enhanced identity credential to federated network for cross-site recognition")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to add enhanced identity credential to network storage: {e}")
         
         return credential
         

@@ -16,6 +16,9 @@ from flask import Blueprint, request, jsonify, session, current_app
 from functools import wraps
 from typing import Dict, List, Optional, Any, Tuple
 
+# Import real-time network sync for federated identity
+from .realtime_network_sync import sync_manager
+
 # Import Rust engine with proper Python bindings
 try:
     from lemma_crypto import PyLemmaCore, PyVerificationResult
@@ -136,20 +139,33 @@ def verify_credentials_offline(credentials: List[Dict[str, Any]]) -> Tuple[List[
             # Convert credential to JSON for Rust engine
             credential_json = json.dumps(cred)
             
-            # CRITICAL: Check network-wide revocation BEFORE verification
+            # CRITICAL: Check REAL-TIME network-wide revocation BEFORE verification
             credential_id = cred.get('id', '')
             if credential_id:
                 try:
-                    is_revoked = rust_engine.is_credential_revoked_network_wide(credential_id)
+                    # First check real-time shared bloom filter (instant)
+                    oprf_hash = cred.get('oprfHash', f"oprf_{credential_id}")
+                    is_revoked_realtime = sync_manager.is_credential_revoked(credential_id, oprf_hash)
+                    
+                    # Fallback to Rust engine check if real-time check passes
+                    is_revoked_rust = False
+                    if not is_revoked_realtime and RUST_ENGINE_AVAILABLE and rust_engine:
+                        is_revoked_rust = rust_engine.is_credential_revoked_network_wide(credential_id)
+                    
+                    is_revoked = is_revoked_realtime or is_revoked_rust
+                    
                     if is_revoked:
-                        logger.warning(f"🚫 Credential {credential_id[:8]}... is REVOKED across federated network")
+                        revocation_source = "realtime_bloom_filter" if is_revoked_realtime else "rust_engine"
+                        logger.warning(f"🚫 Credential {credential_id[:8]}... is REVOKED across federated network (source: {revocation_source})")
                         # Add to invalid credentials with revocation info
                         invalid_credentials.append({
                             'credential_id': credential_id,
                             'verified': False,
                             'error': 'credential_revoked',
                             'revocation_scope': 'federated_network',
-                            'network_wide': True
+                            'network_wide': True,
+                            'revocation_source': revocation_source,
+                            'realtime_check': True
                         })
                         continue
                 except Exception as e:
@@ -223,6 +239,13 @@ def create_credential_from_stripe_verification_rust(user_id: str, session_id: st
                    f"isHuman={credential.get('claims', {}).get('isHuman')}, "
                    f"verificationMethod={credential.get('claims', {}).get('verificationMethod')}")
         
+        # CRITICAL: Add identity lemma to shared network storage for cross-site recognition
+        try:
+            sync_manager.add_shared_identity_lemma(credential['id'], credential)
+            logger.info(f"🌐 Added identity lemma to federated network for cross-site recognition")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to add identity lemma to network storage: {e}")
+        
         return credential
         
     except Exception as e:
@@ -239,6 +262,43 @@ def create_credential_from_stripe_verification(user_id: str, session_id: str) ->
     IMPORTANT: This now uses the Rust engine as the primary method since cryptography is core technology.
     """
     return create_credential_from_stripe_verification_rust(user_id, session_id)
+
+def check_shared_network_identity_lemma(user_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Check if user already has a valid identity lemma in the shared federated network
+    This enables cross-site recognition without re-verification
+    """
+    try:
+        # Check shared network storage for existing identity lemma
+        shared_lemma = sync_manager.get_shared_identity_lemma(user_id=user_id)
+        
+        if shared_lemma:
+            lemma_data = shared_lemma.get('data', {})
+            lemma_id = shared_lemma.get('id', '')
+            issued_at = shared_lemma.get('issued_at', 0)
+            
+            # Check if lemma is still valid (not expired)
+            current_time = time.time()
+            expiry_time = issued_at + (365 * 24 * 60 * 60)  # 1 year expiry
+            
+            if current_time < expiry_time:
+                # Check if lemma is not revoked
+                oprf_hash = f"oprf_{lemma_id}"
+                is_revoked = sync_manager.is_credential_revoked(lemma_id, oprf_hash)
+                
+                if not is_revoked:
+                    logger.info(f"✅ Found valid shared identity lemma for user {user_id[:8]}... in federated network")
+                    return lemma_data
+                else:
+                    logger.warning(f"🚫 Found shared identity lemma for user {user_id[:8]}... but it's REVOKED")
+            else:
+                logger.warning(f"⏰ Found shared identity lemma for user {user_id[:8]}... but it's EXPIRED")
+        
+        return None
+        
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to check shared network identity lemma for user {user_id[:8]}...: {e}")
+        return None
 
 # API Endpoints following the circuit diagram
 @shield_bp.route('/api/shield/status', methods=['GET', 'POST'])
@@ -446,6 +506,33 @@ def check_stripe_verification():
                 'shield_action': 'require_verification'
             }), 400
         
+        # FIRST: Check if user already has valid identity lemma in shared federated network
+        shared_network_lemma = check_shared_network_identity_lemma(user_id)
+        if shared_network_lemma:
+            # User already has valid identity lemma across the network - allow through
+            session['lemma_credentials'] = [shared_network_lemma]
+            session['stored_credential'] = shared_network_lemma
+            session['verified_user'] = True
+            session['stripe_identity_verified'] = True
+            session['verified_user_id'] = user_id
+            session['stripe_verification_session_id'] = session_id
+            session.permanent = True
+            
+            logger.info(f"✅ User {user_id[:8]}... recognized from federated network identity lemma")
+            
+            return jsonify({
+                'success': True,
+                'verified': True,
+                'user_id': user_id,
+                'session_id': session_id,
+                'verification_source': 'federated_network_identity_lemma',
+                'network_wide': True,
+                'cross_site_valid': True,
+                'credential': shared_network_lemma,
+                'shield_action': 'allow_through',
+                'message': 'User recognized from federated identity network'
+            })
+        
         # Check if verification was completed in session
         if (session.get('stripe_identity_verified') and 
             session.get('verified_user_id') == user_id and
@@ -628,9 +715,19 @@ def revoke_credentials():
                 'shield_action': 'require_verification'
             })
         
-        # Use Rust engine for proper network-wide revocation
-        logger.info(f"🦀 Using Rust engine for network-wide revocation of {len(credential_ids)} credentials")
+        # Use BOTH real-time network sync AND Rust engine for comprehensive revocation
+        logger.info(f"🦀 Using real-time network sync + Rust engine for network-wide revocation of {len(credential_ids)} credentials")
         
+        # Step 1: Add to real-time shared bloom filter for instant propagation
+        for credential_id in credential_ids:
+            try:
+                oprf_hash = f"oprf_{credential_id}_{int(time.time())}"
+                sync_manager.add_to_shared_bloom_filter(credential_id, oprf_hash)
+                logger.info(f"🚫 Added {credential_id[:8]}... to real-time shared bloom filter")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to add {credential_id[:8]}... to real-time bloom filter: {e}")
+        
+        # Step 2: Use Rust engine for cryptographic revocation (fallback/verification)
         revocation_result = rust_engine.revoke_credentials_network_wide(credential_ids)
         
         logger.info(f"🌐 Network-wide revocation completed: {revocation_result['revoked_count']} credentials")

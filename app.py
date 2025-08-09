@@ -152,9 +152,17 @@ def create_app():
         from api.qr_generator import qr_generator_bp
         app.register_blueprint(qr_generator_bp)
         logger.info("✅ QR Generator blueprint registered")
-        
     except Exception as e:
         logger.error(f"❌ Failed to register QR Generator blueprint: {e}")
+    
+    # Register Real-Time Network Sync API
+    try:
+        from api.realtime_network_sync import network_sync_bp
+        app.register_blueprint(network_sync_bp)
+        logger.info("✅ Real-Time Network Sync blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register Real-Time Network Sync blueprint: {e}")
         
     # Initialize optimized engine
     try:

@@ -22,6 +22,9 @@ from flask import Blueprint, request, jsonify, session, redirect, url_for, rende
 from functools import wraps
 from typing import Dict, List, Optional, Any
 
+# Import real-time network sync for federated identity
+from .realtime_network_sync import sync_manager
+
 # Define logger FIRST before any usage
 logger = logging.getLogger(__name__)
 
@@ -346,6 +349,13 @@ def create_lemma_credential(user_id: str, stripe_session_id: str) -> Dict[str, A
         logger.info(f"📋 Claims: packageType={credential.get('claims', {}).get('packageType')}, "
                    f"isHuman={credential.get('claims', {}).get('isHuman')}, "
                    f"verificationMethod={credential.get('claims', {}).get('verificationMethod')}")
+        
+        # CRITICAL: Add identity lemma to shared network storage for cross-site recognition
+        try:
+            sync_manager.add_shared_identity_lemma(credential['id'], credential)
+            logger.info(f"🌐 Added lemma credential to federated network for cross-site recognition")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to add lemma credential to network storage: {e}")
         
         return credential
         
