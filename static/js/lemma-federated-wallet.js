@@ -99,7 +99,18 @@ class LemmaFederatedWallet {
                     capabilities: ['stripe_identity_verification']
                 }
             },
-
+            {
+                did: 'did:lemma:federated:issuer',
+                publicKey: 'lemma_federated_network_key_2024',
+                issuerInfo: {
+                    name: 'Lemma Federated Identity Network',
+                    issuer_type: 'federated_identity_provider',
+                    trust_score: 1.0,
+                    verified: true,
+                    created_at: Date.now(),
+                    capabilities: ['federated_identity_verification', 'stripe_identity_verification', 'cross_site_recognition']
+                }
+            }
         ];
         
         // Add to DID registry
@@ -515,12 +526,14 @@ class LemmaFederatedWallet {
             
             // Step 2: Validate issuer DID (if configured)
             if (credential.issuer) {
-                const issuerValidation = await this.validateIssuerDid(credential.issuer);
+                // Extract issuer ID from issuer object or use issuer directly if it's a string
+                const issuerDid = typeof credential.issuer === 'object' ? credential.issuer.id : credential.issuer;
+                const issuerValidation = await this.validateIssuerDid(issuerDid);
                 if (!issuerValidation.valid) {
                     const verificationTime = (performance.now() - startTime) * 1000;
                     
                     if (this.debug) {
-                        console.log(`⚠️ Credential ${credential.id} has invalid issuer: ${credential.issuer}`);
+                        console.log(`⚠️ Credential ${credential.id} has invalid issuer: ${issuerDid}`);
                     }
                     
                     return {
@@ -923,7 +936,9 @@ class LemmaFederatedWallet {
                     
                     // Step 2: Fast DID validation (local registry - ~0.1µs)
                     if (credential.issuer) {
-                        const issuerValidation = await this.validateIssuerDid(credential.issuer);
+                        // Extract issuer ID from issuer object or use issuer directly if it's a string
+                        const issuerDid = typeof credential.issuer === 'object' ? credential.issuer.id : credential.issuer;
+                        const issuerValidation = await this.validateIssuerDid(issuerDid);
                         if (!issuerValidation.valid) {
                             failedChecks++;
                             
