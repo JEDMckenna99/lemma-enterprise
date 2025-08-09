@@ -33,6 +33,9 @@ class LemmaBotShield {
             verifying: false
         };
         
+        // Store reference to protected element for cross-tab updates
+        this.protectedElement = null;
+        
         // Initialize background wallet for federated network with security config
         this.backgroundWallet = new LemmaFederatedWallet({ 
             debug: this.config.debug,
@@ -50,6 +53,9 @@ class LemmaBotShield {
             this.backgroundWallet.onSecurityEvent = this.config.onSecurityEvent;
         }
         
+        // Listen for credential updates from other tabs
+        this.setupCrossTabListeners();
+        
         if (this.config.debug) {
             console.log('🛡️ Lemma Bot Shield initialized (Federated Network Mode)');
             console.log(`🛡️ Security level: ${this.config.securityLevel}`);
@@ -66,6 +72,58 @@ class LemmaBotShield {
     }
     
     /**
+     * Setup cross-tab listeners for credential updates
+     */
+    setupCrossTabListeners() {
+        try {
+            // Listen for credential updates from the federated wallet
+            window.addEventListener('lemma-credentials-updated', (event) => {
+                this.handleCredentialUpdate(event.detail);
+            });
+            
+            if (this.config.debug) {
+                console.log('📡 Cross-tab credential update listeners setup');
+            }
+        } catch (error) {
+            if (this.config.debug) {
+                console.warn('⚠️ Cross-tab listener setup failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Handle credential updates from other tabs
+     */
+    async handleCredentialUpdate(detail) {
+        try {
+            if (this.config.debug) {
+                console.log(`📡 Credential update received from ${detail.source}:`, detail);
+            }
+            
+            // Re-check credentials and update protection status
+            if (this.protectedElement) {
+                const hasCredentials = await this.backgroundWallet.hasValidCredentials('identity');
+                
+                if (hasCredentials) {
+                    this.showProtectedContent(this.protectedElement);
+                    if (this.config.debug) {
+                        console.log('✅ Protected content shown due to cross-tab credential sync');
+                    }
+                } else {
+                    this.showVerificationWidget(this.protectedElement);
+                    if (this.config.debug) {
+                        console.log('⚠️ Protected content hidden due to cross-tab credential removal');
+                    }
+                }
+            }
+        } catch (error) {
+            if (this.config.debug) {
+                console.warn('⚠️ Credential update handling failed:', error.message);
+            }
+        }
+    }
+    
+    /**
      * Protect an element with the bot shield
      */
     async protect(elementSelector) {
@@ -74,6 +132,9 @@ class LemmaBotShield {
             console.error('❌ Element not found:', elementSelector);
             return;
         }
+        
+        // Store element reference for cross-tab updates
+        this.protectedElement = element;
         
         // Hide protected content immediately
         element.style.display = 'none';

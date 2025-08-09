@@ -46,6 +46,11 @@ class LemmaFederatedWallet {
         this.didRegistry = new Map();
         this.revocationBloomFilter = new Set();
         
+        // Cross-tab synchronization
+        this.broadcastChannel = null;
+        this.storageEventListener = null;
+        this.setupCrossTabSync();
+        
         // Initialize with trusted DIDs (bootstrap for existing system)
         this.initializeTrustedDIDs();
         
@@ -124,6 +129,372 @@ class LemmaFederatedWallet {
     }
     
     /**
+     * Setup cross-tab synchronization using BroadcastChannel and storage events
+     */
+    setupCrossTabSync() {
+        try {
+            // 1. BroadcastChannel for immediate cross-tab communication
+            if (typeof BroadcastChannel !== 'undefined') {
+                this.broadcastChannel = new BroadcastChannel('lemma_federated_wallet');
+                this.broadcastChannel.addEventListener('message', (event) => {
+                    this.handleCrossTabMessage(event.data);
+                });
+                
+                if (this.debug) {
+                    console.log('📡 BroadcastChannel initialized for cross-tab sync');
+                }
+            }
+            
+            // 2. Storage event listener for localStorage changes from other tabs
+            this.storageEventListener = (event) => {
+                if (event.key === this.storageKey && event.newValue !== event.oldValue) {
+                    this.handleStorageChange(event);
+                }
+            };
+            
+            window.addEventListener('storage', this.storageEventListener);
+            
+            if (this.debug) {
+                console.log('📡 Storage event listener setup for cross-tab sync');
+            }
+            
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Cross-tab sync setup failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Handle cross-tab messages via BroadcastChannel
+     */
+    handleCrossTabMessage(data) {
+        if (!data || !data.type) return;
+        
+        try {
+            switch (data.type) {
+                case 'credential_stored':
+                    this.handleRemoteCredentialStored(data.credential);
+                    break;
+                case 'credential_removed':
+                    this.handleRemoteCredentialRemoved(data.credentialId);
+                    break;
+                case 'credentials_cleared':
+                    this.handleRemoteCredentialsCleared();
+                    break;
+                case 'sync_request':
+                    this.handleSyncRequest(data.tabId);
+                    break;
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Cross-tab message handling failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Handle localStorage storage changes from other tabs
+     */
+    handleStorageChange(event) {
+        try {
+            if (this.debug) {
+                console.log('📡 Storage change detected from another tab');
+            }
+            
+            // Reload credentials from localStorage
+            const newCredentials = event.newValue ? JSON.parse(event.newValue) : [];
+            
+            if (Array.isArray(newCredentials)) {
+                // Clear current memory cache
+                this.memoryCache.clear();
+                
+                // Load new credentials
+                newCredentials.forEach(cred => {
+                    this.memoryCache.set(cred.id, cred);
+                });
+                
+                if (this.debug) {
+                    console.log(`📡 Synced ${newCredentials.length} credentials from other tab`);
+                }
+                
+                // Notify any listening components about the credential update
+                this.notifyCredentialUpdate('cross_tab_sync');
+            }
+            
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Storage change handling failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Handle remote credential storage from another tab
+     */
+    handleRemoteCredentialStored(credential) {
+        if (!credential || !credential.id) return;
+        
+        try {
+            // Add to memory cache if not already present
+            if (!this.memoryCache.has(credential.id)) {
+                this.memoryCache.set(credential.id, credential);
+                
+                if (this.debug) {
+                    console.log(`📡 Added credential from another tab: ${credential.id}`);
+                }
+                
+                this.notifyCredentialUpdate('remote_store');
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Remote credential storage handling failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Handle remote credential removal from another tab
+     */
+    handleRemoteCredentialRemoved(credentialId) {
+        if (!credentialId) return;
+        
+        try {
+            if (this.memoryCache.has(credentialId)) {
+                this.memoryCache.delete(credentialId);
+                
+                if (this.debug) {
+                    console.log(`📡 Removed credential from another tab: ${credentialId}`);
+                }
+                
+                this.notifyCredentialUpdate('remote_remove');
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Remote credential removal handling failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Handle remote credentials clearing from another tab
+     */
+    handleRemoteCredentialsCleared() {
+        try {
+            this.memoryCache.clear();
+            
+            if (this.debug) {
+                console.log('📡 Cleared all credentials due to remote clear');
+            }
+            
+            this.notifyCredentialUpdate('remote_clear');
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Remote credentials clearing failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Handle sync request from another tab
+     */
+    handleSyncRequest(requestingTabId) {
+        try {
+            // Send current credentials to requesting tab
+            const credentials = Array.from(this.memoryCache.values());
+            
+            if (this.broadcastChannel && credentials.length > 0) {
+                this.broadcastChannel.postMessage({
+                    type: 'sync_response',
+                    tabId: Date.now(), // Our tab ID
+                    targetTabId: requestingTabId,
+                    credentials: credentials
+                });
+                
+                if (this.debug) {
+                    console.log(`📡 Sent sync response with ${credentials.length} credentials`);
+                }
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Sync request handling failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Notify components about credential updates
+     */
+    notifyCredentialUpdate(source) {
+        try {
+            // Dispatch custom event for components to listen to
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('lemma-credentials-updated', {
+                    detail: {
+                        source: source,
+                        credentialCount: this.memoryCache.size,
+                        timestamp: Date.now()
+                    }
+                }));
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Credential update notification failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Broadcast credential storage to other tabs
+     */
+    broadcastCredentialStored(credential) {
+        try {
+            if (this.broadcastChannel) {
+                this.broadcastChannel.postMessage({
+                    type: 'credential_stored',
+                    credential: credential,
+                    timestamp: Date.now()
+                });
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Credential storage broadcast failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Broadcast credential removal to other tabs
+     */
+    broadcastCredentialRemoved(credentialId) {
+        try {
+            if (this.broadcastChannel) {
+                this.broadcastChannel.postMessage({
+                    type: 'credential_removed',
+                    credentialId: credentialId,
+                    timestamp: Date.now()
+                });
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Credential removal broadcast failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Broadcast credentials clearing to other tabs
+     */
+    broadcastCredentialsCleared() {
+        try {
+            if (this.broadcastChannel) {
+                this.broadcastChannel.postMessage({
+                    type: 'credentials_cleared',
+                    timestamp: Date.now()
+                });
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Credentials clear broadcast failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Request sync from other tabs (useful when initializing)
+     */
+    requestSyncFromOtherTabs() {
+        try {
+            if (this.broadcastChannel) {
+                const tabId = Date.now();
+                this.broadcastChannel.postMessage({
+                    type: 'sync_request',
+                    tabId: tabId,
+                    timestamp: Date.now()
+                });
+                
+                if (this.debug) {
+                    console.log('📡 Requested sync from other tabs');
+                }
+                
+                // Listen for sync responses for a short time
+                const responseHandler = (event) => {
+                    const data = event.data;
+                    if (data.type === 'sync_response' && data.targetTabId === tabId) {
+                        this.handleSyncResponse(data);
+                    }
+                };
+                
+                this.broadcastChannel.addEventListener('message', responseHandler);
+                
+                // Stop listening after 2 seconds
+                setTimeout(() => {
+                    this.broadcastChannel.removeEventListener('message', responseHandler);
+                }, 2000);
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Sync request failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Handle sync response from another tab
+     */
+    handleSyncResponse(data) {
+        try {
+            if (data.credentials && Array.isArray(data.credentials)) {
+                let addedCount = 0;
+                
+                data.credentials.forEach(cred => {
+                    if (!this.memoryCache.has(cred.id)) {
+                        this.memoryCache.set(cred.id, cred);
+                        addedCount++;
+                    }
+                });
+                
+                if (this.debug && addedCount > 0) {
+                    console.log(`📡 Synced ${addedCount} credentials from tab ${data.tabId}`);
+                }
+                
+                if (addedCount > 0) {
+                    this.notifyCredentialUpdate('cross_tab_initial_sync');
+                }
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Sync response handling failed:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Cleanup cross-tab synchronization
+     */
+    cleanupCrossTabSync() {
+        try {
+            if (this.broadcastChannel) {
+                this.broadcastChannel.close();
+                this.broadcastChannel = null;
+            }
+            
+            if (this.storageEventListener) {
+                window.removeEventListener('storage', this.storageEventListener);
+                this.storageEventListener = null;
+            }
+            
+            if (this.debug) {
+                console.log('📡 Cross-tab sync cleaned up');
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Cross-tab sync cleanup failed:', error.message);
+            }
+        }
+    }
+    
+    /**
      * Initialize wallet - MUST be called before use
      */
     async init() {
@@ -151,7 +522,12 @@ class LemmaFederatedWallet {
             // 4. Start background security checks
             this.startBackgroundChecks();
             
-            // 5. Mark as ready
+            // 5. Request sync from other tabs if no credentials found locally
+            if (this.memoryCache.size === 0) {
+                this.requestSyncFromOtherTabs();
+            }
+            
+            // 6. Mark as ready
             this.isReady = true;
             
             if (this.debug) {
@@ -420,11 +796,15 @@ class LemmaFederatedWallet {
                 }
             }
             
+            // 6. CRITICAL: Broadcast to other tabs for immediate cross-tab sync
+            this.broadcastCredentialStored(credentialWithMeta);
+            
             if (this.debug) {
                 console.log('✅ Credential stored:', {
                     id: credentialWithMeta.id,
                     packageType: credentialWithMeta.packageType,
-                    storageResults: results
+                    storageResults: results,
+                    crossTabBroadcast: true
                 });
             }
             
@@ -699,8 +1079,11 @@ class LemmaFederatedWallet {
             console.warn('Storage clear failed:', error);
         }
         
+        // Broadcast clearing to other tabs
+        this.broadcastCredentialsCleared();
+        
         if (this.debug) {
-            console.log('🗑️ All credentials cleared');
+            console.log('🗑️ All credentials cleared (broadcast to other tabs)');
         }
     }
     
@@ -1225,8 +1608,11 @@ class LemmaFederatedWallet {
             const allCredentials = Array.from(this.memoryCache.values());
             localStorage.setItem(this.storageKey, JSON.stringify(allCredentials));
             
+            // Broadcast removal to other tabs
+            this.broadcastCredentialRemoved(credentialId);
+            
             if (this.debug) {
-                console.log(`🗑️ Removed credential: ${credentialId}`);
+                console.log(`🗑️ Removed credential: ${credentialId} (broadcast to other tabs)`);
             }
             
             return true;
