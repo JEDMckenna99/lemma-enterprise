@@ -248,20 +248,23 @@ class LemmaBotShield {
      * Show protected content (user has verified lemma)
      */
     showProtectedContent(element) {
-        // Hide the protected element (which should be the main content)
-        element.style.display = 'none';
+        // FIXED: Show the protected content (user is verified)
+        element.style.display = 'block';
         
-        // Show success content if it exists
+        // Hide any verification widgets or error messages
+        const verificationWidget = document.querySelector('#lemma-verification-widget');
+        if (verificationWidget) {
+            verificationWidget.style.display = 'none';
+        }
+        
+        // Show success content if it exists (additional success message)
         const successContent = document.querySelector('#success-content');
         if (successContent) {
             successContent.style.display = 'block';
-        } else {
-            // Fallback: show the original protected content
-            element.style.display = 'block';
         }
         
         if (this.config.debug) {
-            console.log('✅ Showing verified user content');
+            console.log('✅ Showing verified user content - user has valid lemma credentials');
         }
     }
     

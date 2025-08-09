@@ -127,7 +127,12 @@ class LemmaFederatedWallet {
      * Initialize wallet - MUST be called before use
      */
     async init() {
-        if (this.isReady) return;
+        if (this.isReady) {
+            if (this.debug) {
+                console.log('📋 Federated wallet already initialized');
+            }
+            return;
+        }
         
         try {
             if (this.debug) {
@@ -151,12 +156,16 @@ class LemmaFederatedWallet {
             
             if (this.debug) {
                 console.log(`✅ Federated wallet ready - ${this.memoryCache.size} credentials loaded`);
-                console.log('📊 Credentials in memory:', Array.from(this.memoryCache.values()).map(c => ({
-                    id: c.id,
-                    packageType: c.packageType,
-                    storedAt: new Date(c.storedAt).toLocaleString(),
-                    isHuman: c.claims?.isHuman
-                })));
+                if (this.memoryCache.size > 0) {
+                    console.log('📊 Credentials in memory:', Array.from(this.memoryCache.values()).map(c => ({
+                        id: c.id,
+                        packageType: c.packageType,
+                        storedAt: new Date(c.storedAt).toLocaleString(),
+                        isHuman: c.claims?.isHuman
+                    })));
+                } else {
+                    console.log('📊 No credentials found in storage layers');
+                }
                 this.logStorageStatus();
             }
             
@@ -200,6 +209,9 @@ class LemmaFederatedWallet {
      * Load existing credentials from all storage layers
      */
     async loadExistingCredentials() {
+        let indexedDBCount = 0;
+        let localStorageCount = 0;
+        
         // 1. Try IndexedDB first
         if (this.db) {
             try {
@@ -213,14 +225,20 @@ class LemmaFederatedWallet {
                         credentials.forEach(cred => {
                             this.memoryCache.set(cred.id, cred);
                         });
-                        if (this.debug) console.log(`📊 Loaded ${credentials.length} from IndexedDB`);
+                        indexedDBCount = credentials.length;
+                        if (this.debug) console.log(`📊 Loaded ${credentials.length} credentials from IndexedDB`);
                         resolve();
                     };
-                    request.onerror = () => resolve(); // Don't fail
+                    request.onerror = () => {
+                        if (this.debug) console.warn('IndexedDB load failed:', request.error);
+                        resolve(); // Don't fail
+                    };
                 });
             } catch (error) {
                 if (this.debug) console.warn('IndexedDB load failed:', error);
             }
+        } else {
+            if (this.debug) console.log('📊 IndexedDB not available, skipping...');
         }
         
         // 2. Fallback to localStorage
@@ -229,16 +247,48 @@ class LemmaFederatedWallet {
             if (stored) {
                 const credentials = JSON.parse(stored);
                 if (Array.isArray(credentials)) {
+                    let addedCount = 0;
                     credentials.forEach(cred => {
                         if (!this.memoryCache.has(cred.id)) {
                             this.memoryCache.set(cred.id, cred);
+                            addedCount++;
                         }
                     });
-                    if (this.debug) console.log(`📊 Loaded ${credentials.length} from localStorage`);
+                    localStorageCount = credentials.length;
+                    if (this.debug) console.log(`📊 Loaded ${credentials.length} credentials from localStorage (${addedCount} new)`);
                 }
+            } else {
+                if (this.debug) console.log('📊 No credentials found in localStorage');
             }
         } catch (error) {
             if (this.debug) console.warn('localStorage load failed:', error);
+        }
+        
+        // 3. Check sessionStorage for temporary credentials
+        try {
+            const sessionStored = sessionStorage.getItem(this.storageKey);
+            if (sessionStored) {
+                const credentials = JSON.parse(sessionStored);
+                if (Array.isArray(credentials)) {
+                    let addedCount = 0;
+                    credentials.forEach(cred => {
+                        if (!this.memoryCache.has(cred.id)) {
+                            this.memoryCache.set(cred.id, cred);
+                            addedCount++;
+                        }
+                    });
+                    if (this.debug && addedCount > 0) {
+                        console.log(`📊 Loaded ${addedCount} additional credentials from sessionStorage`);
+                    }
+                }
+            }
+        } catch (error) {
+            if (this.debug) console.warn('sessionStorage load failed:', error);
+        }
+        
+        if (this.debug) {
+            const totalCredentials = this.memoryCache.size;
+            console.log(`📊 Total credentials loaded: ${totalCredentials} (IndexedDB: ${indexedDBCount}, localStorage: ${localStorageCount})`);
         }
     }
     
@@ -673,6 +723,39 @@ class LemmaFederatedWallet {
             const ageHours = Math.round(age / (1000 * 60 * 60));
             console.log(`  📄 ${cred.id} (${cred.packageType}) - ${ageHours}h old`);
         });
+    }
+    
+    /**
+     * Debug method: Test storage functionality
+     */
+    async testStorage() {
+        if (!this.debug) return;
+        
+        console.log('🧪 Testing storage functionality...');
+        
+        // Test credential
+        const testCred = {
+            id: 'test_cred_' + Date.now(),
+            packageType: 'identity',
+            claims: { isHuman: true },
+            storedAt: Date.now()
+        };
+        
+        // Store test credential
+        const result = await this.storeCredential(testCred);
+        console.log('🧪 Store result:', result);
+        
+        // Check if it can be retrieved
+        const hasValid = await this.hasValidCredentials('identity');
+        console.log('🧪 hasValidCredentials result:', hasValid);
+        
+        // Get credentials
+        const credentials = await this.getCredentials('identity');
+        console.log('🧪 getCredentials result:', credentials.length, 'credentials');
+        
+        // Clean up test credential
+        await this.removeCredential(testCred.id);
+        console.log('🧪 Test credential removed');
     }
     
     /**
