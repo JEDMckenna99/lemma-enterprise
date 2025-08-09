@@ -276,6 +276,47 @@ class LemmaFederatedWallet {
             // 4. Set session marker
             sessionStorage.setItem(this.sessionKey, 'true');
             
+            // 5. CRITICAL: Share to federated network for cross-site recognition
+            let networkShared = false;
+            if (this.networkConfig.registryUrl && credentialWithMeta.packageType === 'identity') {
+                try {
+                    const networkResponse = await fetch(`${this.networkConfig.registryUrl}/add-identity-lemma`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Network ${this.networkConfig.authKey}`
+                        },
+                        body: JSON.stringify({
+                            type: 'identity_lemma',
+                            timestamp: Date.now(),
+                            data: {
+                                lemma_id: credentialWithMeta.id,
+                                lemma_data: credentialWithMeta,
+                                user_id: credentialWithMeta.subject?.id?.replace('did:lemma:federated:user:', '') || 
+                                         credentialWithMeta.id.replace('cred_fed_', ''),
+                                network_scope: 'federated',
+                                cross_site_valid: true
+                            }
+                        })
+                    });
+                    
+                    if (networkResponse.ok) {
+                        networkShared = true;
+                        if (this.debug) {
+                            console.log('🌐 Identity lemma shared to federated network for cross-site recognition');
+                        }
+                    } else {
+                        if (this.debug) {
+                            console.warn('⚠️ Failed to share to network:', networkResponse.status);
+                        }
+                    }
+                } catch (error) {
+                    if (this.debug) {
+                        console.warn('⚠️ Network sharing failed:', error.message);
+                    }
+                }
+            }
+            
             if (this.debug) {
                 console.log('✅ Credential stored:', {
                     id: credentialWithMeta.id,
@@ -284,7 +325,13 @@ class LemmaFederatedWallet {
                 });
             }
             
-            return { success: true, results };
+            return { 
+                success: true, 
+                results,
+                credentialId: credentialWithMeta.id,
+                networkShared: networkShared,
+                layers: Object.keys(results).filter(k => results[k])
+            };
             
         } catch (error) {
             console.error('❌ Store credential failed:', error);
@@ -312,7 +359,55 @@ class LemmaFederatedWallet {
             }
         }
         
+        // If no local credentials, check shared network for cross-site recognition
+        if (!hasCredentials && this.networkConfig.registryUrl && packageType === 'identity') {
+            try {
+                const networkResponse = await fetch(`${this.networkConfig.registryUrl}/check-shared-identity`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Network ${this.networkConfig.authKey}`
+                    },
+                    body: JSON.stringify({
+                        user_id: this.getCurrentUserId(),
+                        check_cross_site: true
+                    })
+                });
+                
+                if (networkResponse.ok) {
+                    const networkResult = await networkResponse.json();
+                    if (networkResult.success && networkResult.has_valid_identity) {
+                        if (this.debug) {
+                            console.log('🌐 Found valid identity lemma in federated network');
+                        }
+                        return true;
+                    }
+                }
+            } catch (error) {
+                if (this.debug) {
+                    console.warn('⚠️ Network identity check failed:', error.message);
+                }
+            }
+        }
+        
         return hasCredentials;
+    }
+    
+    /**
+     * Get current user ID for network checks
+     */
+    getCurrentUserId() {
+        // Try to get from stored credentials
+        for (const credential of this.memoryCache.values()) {
+            if (credential.subject?.id) {
+                return credential.subject.id.replace('did:lemma:federated:user:', '');
+            }
+        }
+        
+        // Fallback to session-based ID
+        return sessionStorage.getItem('lemma_user_id') || 
+               localStorage.getItem('lemma_user_id') ||
+               'anonymous_' + Date.now();
     }
     
     /**

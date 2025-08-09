@@ -426,5 +426,134 @@ def initialize_network_sync():
     except Exception as e:
         logger.error(f"❌ Failed to initialize network sync: {e}")
 
+@network_sync_bp.route('/api/network/sync/check-shared-identity', methods=['POST'])
+def check_shared_identity():
+    """Check if user has valid identity lemma in shared network"""
+    try:
+        # Verify network authorization
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Network '):
+            return jsonify({
+                'success': False,
+                'error': 'missing_network_auth',
+                'message': 'Network authorization required'
+            }), 401
+        
+        network_key = auth_header[8:]  # Remove 'Network ' prefix
+        if network_key != sync_manager.network_key:
+            return jsonify({
+                'success': False,
+                'error': 'invalid_network_key',
+                'message': 'Invalid network authorization key'
+            }), 401
+        
+        # Get user ID from request
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'error': 'missing_user_id',
+                'message': 'User ID required'
+            }), 400
+        
+        # Check for shared identity lemma
+        with sync_manager.sync_lock:
+            user_key = f"user:{user_id}"
+            has_identity = user_key in sync_manager.shared_identity_lemmas
+            
+            if has_identity:
+                identity_data = sync_manager.shared_identity_lemmas[user_key]
+                logger.info(f"🌐 Found shared identity lemma for user {user_id[:8]}...")
+                
+                return jsonify({
+                    'success': True,
+                    'has_valid_identity': True,
+                    'lemma_id': identity_data.get('id'),
+                    'issued_at': identity_data.get('issued_at'),
+                    'cross_site_valid': True
+                })
+            else:
+                logger.info(f"🔍 No shared identity lemma found for user {user_id[:8]}...")
+                return jsonify({
+                    'success': True,
+                    'has_valid_identity': False
+                })
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to check shared identity: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@network_sync_bp.route('/api/network/sync/add-identity-lemma', methods=['POST'])
+def add_identity_lemma():
+    """Add identity lemma to shared network storage"""
+    try:
+        # Verify network authorization
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Network '):
+            return jsonify({
+                'success': False,
+                'error': 'missing_network_auth',
+                'message': 'Network authorization required'
+            }), 401
+        
+        network_key = auth_header[8:]  # Remove 'Network ' prefix
+        if network_key != sync_manager.network_key:
+            return jsonify({
+                'success': False,
+                'error': 'invalid_network_key',
+                'message': 'Invalid network authorization key'
+            }), 401
+        
+        # Get identity lemma data from request
+        data = request.get_json()
+        lemma_data = data.get('data', {})
+        lemma_id = lemma_data.get('lemma_id')
+        user_id = lemma_data.get('user_id')
+        
+        if not lemma_id or not user_id:
+            return jsonify({
+                'success': False,
+                'error': 'missing_data',
+                'message': 'Lemma ID and User ID required'
+            }), 400
+        
+        # Add to shared network storage
+        with sync_manager.sync_lock:
+            # Store by lemma ID
+            sync_manager.shared_identity_lemmas[lemma_id] = {
+                'id': lemma_id,
+                'data': lemma_data.get('lemma_data'),
+                'issued_at': data.get('timestamp', time.time()),
+                'network_scope': 'federated',
+                'cross_site_valid': True,
+                'issuer_network': 'lemma_federated_identity'
+            }
+            
+            # Also index by user ID for cross-site lookup
+            user_key = f"user:{user_id}"
+            sync_manager.shared_identity_lemmas[user_key] = sync_manager.shared_identity_lemmas[lemma_id]
+            
+            logger.info(f"🌐 Added identity lemma to shared network: {lemma_id[:8]}... for user {user_id[:8]}...")
+        
+        # Broadcast to other network nodes
+        try:
+            broadcast_count = sync_manager.broadcast_to_network('identity_lemma', data.get('data', {}))
+            logger.info(f"📡 Broadcasted identity lemma to {broadcast_count} network nodes")
+        except Exception as broadcast_error:
+            logger.warning(f"⚠️ Failed to broadcast identity lemma: {broadcast_error}")
+        
+        return jsonify({
+            'success': True,
+            'lemma_id': lemma_id,
+            'network_shared': True,
+            'cross_site_valid': True
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to add identity lemma: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # Auto-initialize when module is imported
 initialize_network_sync()
