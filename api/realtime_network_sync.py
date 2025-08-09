@@ -298,8 +298,8 @@ def receive_network_update():
         data = request.get_json() or {}
         update_type = data.get('type')
         
-        if update_type == 'revocation_update':
-            # Apply revocation update instantly
+        if update_type == 'bloom_filter':
+            # Apply bloom filter update instantly
             credential_id = data.get('credential_id')
             oprf_hash = data.get('oprf_hash')
             
@@ -309,31 +309,24 @@ def receive_network_update():
                     if oprf_hash:
                         sync_manager.shared_bloom_filter.add(oprf_hash)
                 
-                logger.info(f"🚫 Applied network revocation update: {credential_id[:8]}...")
+                logger.info(f"🚫 Applied network bloom filter update: {credential_id[:8]}...")
         
-        elif update_type == 'identity_lemma_update':
+        elif update_type == 'identity_lemma':
             # Apply identity lemma update instantly
             lemma_id = data.get('lemma_id')
-            lemma_data = data.get('lemma_data')
+            lemma_data = data.get('lemma_data', {})
+            user_id = data.get('user_id')
             
-            if lemma_id and lemma_data:
+            if lemma_id and user_id:
                 with sync_manager.sync_lock:
-                    sync_manager.shared_identity_lemmas[lemma_id] = {
-                        'id': lemma_id,
-                        'data': lemma_data,
-                        'issued_at': data.get('timestamp', time.time()),
-                        'network_scope': 'federated',
-                        'cross_site_valid': True,
-                        'issuer_network': 'lemma_federated_identity'
+                    sync_manager.shared_identity_lemmas[user_id] = {
+                        'lemma_id': lemma_id,
+                        'lemma_data': lemma_data,
+                        'timestamp': data.get('timestamp', time.time()),
+                        'source': 'network_sync'
                     }
-                    
-                    # Also index by user ID
-                    user_id = lemma_data.get('subject', {}).get('id', '').replace('did:lemma:federated:user:', '')
-                    if user_id:
-                        user_key = f"user:{user_id}"
-                        sync_manager.shared_identity_lemmas[user_key] = sync_manager.shared_identity_lemmas[lemma_id]
                 
-                logger.info(f"🆔 Applied network identity lemma update: {lemma_id[:8]}...")
+                logger.info(f"🆔 Applied network identity lemma update: {lemma_id[:8]}... for user {user_id[:8]}...")
         
         return jsonify({'success': True, 'applied': True})
         
@@ -415,81 +408,7 @@ def get_sync_status():
         logger.error(f"❌ Failed to get sync status: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@network_sync_bp.route('/api/network/sync/receive-update', methods=['POST'])
-def receive_network_update():
-    """Receive and process network sync updates"""
-    try:
-        # Verify network authorization
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Network '):
-            return jsonify({
-                'success': False,
-                'error': 'missing_network_auth',
-                'message': 'Network authorization required'
-            }), 401
-        
-        network_key = auth_header[8:]  # Remove 'Network ' prefix
-        if network_key != sync_manager.network_key:
-            return jsonify({
-                'success': False,
-                'error': 'invalid_network_key',
-                'message': 'Invalid network authorization key'
-            }), 401
-        
-        # Get update data
-        update_data = request.get_json()
-        if not update_data:
-            return jsonify({
-                'success': False,
-                'error': 'missing_data',
-                'message': 'Update data required'
-            }), 400
-        
-        update_type = update_data.get('type')
-        timestamp = update_data.get('timestamp', time.time())
-        
-        logger.info(f"📥 Received network update: {update_type}")
-        
-        with sync_manager.sync_lock:
-            if update_type == 'identity_lemma':
-                # Add identity lemma to local shared storage
-                lemma_id = update_data.get('lemma_id')
-                lemma_data = update_data.get('lemma_data', {})
-                user_id = update_data.get('user_id')
-                
-                if lemma_id and user_id:
-                    sync_manager.shared_identity_lemmas[user_id] = {
-                        'lemma_id': lemma_id,
-                        'lemma_data': lemma_data,
-                        'timestamp': timestamp,
-                        'source': 'network_sync'
-                    }
-                    logger.info(f"✅ Added network identity lemma: {lemma_id} for user {user_id[:8]}...")
-                
-            elif update_type == 'bloom_filter':
-                # Add to shared bloom filter
-                credential_id = update_data.get('credential_id')
-                oprf_hash = update_data.get('oprf_hash')
-                
-                if credential_id:
-                    sync_manager.shared_bloom_filter.add(credential_id)
-                if oprf_hash:
-                    sync_manager.shared_bloom_filter.add(oprf_hash)
-                
-                logger.info(f"✅ Added to shared bloom filter: {credential_id}")
-        
-        return jsonify({
-            'success': True,
-            'message': f'Successfully processed {update_type} update',
-            'timestamp': time.time()
-        })
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to process network update: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+
 
 # Initialize network sync on module load
 def initialize_network_sync():
