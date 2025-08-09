@@ -48,7 +48,7 @@ def measure_local_rust_speed(num_tests: int = NUM_TESTS) -> Dict[str, Any]:
             
             # This is where the actual verification would happen
             # For now, we'll simulate the verification process
-            result = core.verify_basic(json.dumps(test_credential))
+            result = core.verify_credential(json.dumps(test_credential))
             
             end_time = time.perf_counter()
             verification_time = (end_time - start_time) * 1_000_000  # Convert to microseconds

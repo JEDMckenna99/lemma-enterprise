@@ -1,0 +1,19 @@
+{
+  "timestamp": 1754774321.9844222,
+  "local": {
+    "engine": "local_rust",
+    "success": true,
+    "num_tests": 100,
+    "avg_time_us": 4.818999586859718,
+    "median_time_us": 3.5999983083456755,
+    "min_time_us": 3.2999960239976645,
+    "max_time_us": 32.60000084992498,
+    "std_dev_us": 4.122778937907068,
+    "verifications_per_second": 207511.94972640494
+  },
+  "heroku": {
+    "engine": "heroku_rust",
+    "success": false,
+    "error": "Status check failed: 404"
+  }
+}

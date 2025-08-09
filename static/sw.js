@@ -50,16 +50,25 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Skip Cloudflare analytics and other external scripts - DO NOT INTERCEPT
+  // Skip ALL external scripts and analytics - DO NOT INTERCEPT ANYTHING EXTERNAL
+  if (!event.request.url.startsWith(self.location.origin)) {
+    console.log('[SW] Ignoring external request:', event.request.url);
+    // Let the browser handle these requests natively - don't intercept
+    return;
+  }
+  
+  // Additional safety: Skip known analytics patterns
   if (event.request.url.includes('cloudflareinsights.com') || 
       event.request.url.includes('beacon.min.js') ||
       event.request.url.includes('static.cloudflareinsights.com') ||
       event.request.url.includes('analytics') ||
       event.request.url.includes('beacon') ||
       event.request.url.includes('gtag') ||
-      event.request.url.includes('google-analytics')) {
-    console.log('[SW] Ignoring external analytics (no response):', event.request.url);
-    // Let the browser handle these requests natively - don't intercept
+      event.request.url.includes('google-analytics') ||
+      event.request.url.includes('googletagmanager') ||
+      event.request.url.includes('facebook.com') ||
+      event.request.url.includes('twitter.com')) {
+    console.log('[SW] Ignoring analytics/tracking script:', event.request.url);
     return;
   }
 

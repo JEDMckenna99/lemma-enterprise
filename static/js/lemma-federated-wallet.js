@@ -119,6 +119,10 @@ class LemmaFederatedWallet {
         if (this.isReady) return;
         
         try {
+            if (this.debug) {
+                console.log('🚀 Initializing Federated Wallet...');
+            }
+            
             // 1. Initialize IndexedDB
             await this.initDB();
             
@@ -136,6 +140,12 @@ class LemmaFederatedWallet {
             
             if (this.debug) {
                 console.log(`✅ Federated wallet ready - ${this.memoryCache.size} credentials loaded`);
+                console.log('📊 Credentials in memory:', Array.from(this.memoryCache.values()).map(c => ({
+                    id: c.id,
+                    packageType: c.packageType,
+                    storedAt: new Date(c.storedAt).toLocaleString(),
+                    isHuman: c.claims?.isHuman
+                })));
                 this.logStorageStatus();
             }
             
@@ -222,6 +232,35 @@ class LemmaFederatedWallet {
     }
     
     /**
+     * Log current storage status for debugging
+     */
+    logStorageStatus() {
+        try {
+            const memoryCount = this.memoryCache.size;
+            const sessionActive = sessionStorage.getItem(this.sessionKey) === 'true';
+            
+            let localStorageCount = 0;
+            try {
+                const stored = localStorage.getItem(this.storageKey);
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    localStorageCount = Array.isArray(parsed) ? parsed.length : 0;
+                }
+            } catch (e) {}
+            
+            console.log('📊 Storage Status:');
+            console.log(`  Memory Cache: ${memoryCount} credentials`);
+            console.log(`  Session Active: ${sessionActive}`);
+            console.log(`  LocalStorage: ${localStorageCount} credentials`);
+            console.log(`  IndexedDB: ${this.db ? 'Available' : 'Not Available'}`);
+            console.log(`  Network Registry: ${this.networkConfig.registryUrl ? 'Configured' : 'Not Configured'}`);
+            
+        } catch (error) {
+            console.warn('Storage status logging failed:', error);
+        }
+    }
+    
+    /**
      * Store a credential with maximum redundancy
      */
     async storeCredential(credential) {
@@ -269,6 +308,9 @@ class LemmaFederatedWallet {
                 const allCredentials = Array.from(this.memoryCache.values());
                 localStorage.setItem(this.storageKey, JSON.stringify(allCredentials));
                 results.localStorage = true;
+                if (this.debug) {
+                    console.log(`💾 Stored ${allCredentials.length} credentials to localStorage`);
+                }
             } catch (error) {
                 if (this.debug) console.warn('localStorage store failed:', error);
             }

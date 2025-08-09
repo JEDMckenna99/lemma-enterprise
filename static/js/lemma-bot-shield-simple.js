@@ -17,7 +17,7 @@ class LemmaBotShield {
         this.config = {
             apiKey: options.apiKey || 'demo-integration-key-12345',
             apiBase: options.apiBase || window.location.origin,
-            debug: options.debug || false,
+            debug: options.debug !== false, // Default enabled for troubleshooting
             
             // Background security check configuration
             securityLevel: options.securityLevel || 'medium', // 'low', 'medium', 'high', 'critical', 'realtime'
