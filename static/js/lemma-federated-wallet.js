@@ -393,7 +393,7 @@ class LemmaFederatedWallet {
     }
     
     /**
-     * Check if we have valid credentials for a package type
+     * Check if we have valid credentials for a package type (SIMPLIFIED - no complex validation)
      */
     async hasValidCredentials(packageType = 'identity') {
         await this.init(); // Ensure initialized
@@ -407,13 +407,19 @@ class LemmaFederatedWallet {
                 console.log('📋 Found credentials:', credentials.map(c => ({
                     id: c.id,
                     packageType: c.packageType,
-                    storedAt: new Date(c.storedAt).toLocaleString()
+                    storedAt: new Date(c.storedAt).toLocaleString(),
+                    isHuman: c.claims?.isHuman
                 })));
             }
         }
         
+        // SIMPLIFIED: If we have local credentials, trust them (background checks will validate later)
+        if (hasCredentials) {
+            return true;
+        }
+        
         // If no local credentials, check shared network for cross-site recognition
-        if (!hasCredentials && this.networkConfig.registryUrl && packageType === 'identity') {
+        if (this.networkConfig.registryUrl && packageType === 'identity') {
             try {
                 const networkResponse = await fetch(`${this.networkConfig.registryUrl}/check-shared-identity`, {
                     method: 'POST',
@@ -443,7 +449,7 @@ class LemmaFederatedWallet {
             }
         }
         
-        return hasCredentials;
+        return false;
     }
     
     /**

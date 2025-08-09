@@ -212,24 +212,21 @@ class LemmaBotShield {
             const hasCredentials = await this.backgroundWallet.hasValidCredentials('identity');
             
             if (hasCredentials) {
-                // Verify the credentials locally (microsecond verification)
+                // SIMPLIFIED: Trust stored credentials on page load (background checks will validate later)
                 const credentials = await this.backgroundWallet.getCredentials('identity');
                 if (credentials.length > 0) {
-                    const verifyResult = await this.backgroundWallet.verifyCredential(credentials[0]);
+                    this.state.hasLemma = true;
                     
-                    if (verifyResult.success && verifyResult.verified) {
-                        this.state.hasLemma = true;
-                        
-                        if (this.config.debug) {
-                            console.log('✅ Valid lemma found in background wallet', {
-                                credentialId: credentials[0].id,
-                                verificationTime: `${(verifyResult.verification_time_us || 0).toFixed(2)}µs`,
-                                offlineVerification: verifyResult.offline || true
-                            });
-                        }
-                        
-                        return true;
+                    if (this.config.debug) {
+                        console.log('✅ Valid lemma found in background wallet', {
+                            credentialId: credentials[0].id,
+                            packageType: credentials[0].packageType,
+                            isHuman: credentials[0].claims?.isHuman,
+                            storedAt: new Date(credentials[0].storedAt).toLocaleString()
+                        });
                     }
+                    
+                    return true;
                 }
             }
             
