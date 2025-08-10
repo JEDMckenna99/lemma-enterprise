@@ -40,18 +40,21 @@ class NetworkSyncManager:
         self.last_sync_times = {}  # Track last sync with each node
         self.sync_lock = Lock()
         
+        # Import network configuration
+        from .network_config import NETWORK_CONFIG, get_federation_endpoints, get_own_endpoint
+        
         # Network configuration
-        self.network_key = "lemma_network_federated_sync_2024"
-        self.sync_interval = 5  # 5 seconds for near real-time
+        self.network_key = NETWORK_CONFIG["network_authority_key"]
+        self.sync_interval = NETWORK_CONFIG["sync_interval"]
         self.max_retry_attempts = 3
+        self.own_endpoint = get_own_endpoint()
+        self.node_id = NETWORK_CONFIG["node_id"]
         
-        # Known network endpoints (in production, this would be service discovery)
-        self.known_endpoints = [
-            "https://lemma-enterprise-0f6ba170c1.herokuapp.com",
-            "https://lemma-identity-network-2d96786d6ffb.herokuapp.com"
-        ]
+        # Federation endpoints (excluding self)
+        self.known_endpoints = get_federation_endpoints()
         
-        logger.info("🌐 NetworkSyncManager initialized for federated identity network")
+        logger.info(f"🌐 NetworkSyncManager initialized for {NETWORK_CONFIG['node_name']}")
+        logger.info(f"🔗 Federation endpoints: {self.known_endpoints}")
     
     def add_network_node(self, endpoint: str):
         """Add a network node for synchronization"""

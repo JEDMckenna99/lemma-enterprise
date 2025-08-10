@@ -21,12 +21,13 @@ logger = logging.getLogger(__name__)
 # Federation join blueprint
 federation_join_bp = Blueprint('federation_join', __name__)
 
-# Network configuration
+# Import environment-specific network configuration
+from .network_config import NETWORK_CONFIG as BASE_CONFIG
+
+# Network configuration with federation-specific settings
 NETWORK_CONFIG = {
-    "network_did": "did:lemma:network",
-    "network_name": "Lemma Federated Identity Network",
+    **BASE_CONFIG,
     "current_epoch": int(time.time() // 86400),  # Daily epochs
-    "network_authority_key": "lemma_network_federated_sync_2024",
     "join_token_ttl": 3600,  # 1 hour
 }
 
@@ -77,11 +78,7 @@ class NetworkJoinManager:
                     "epoch": NETWORK_CONFIG["current_epoch"],
                     "total_revocations": len(revocation_items)
                 },
-                "network_endpoints": [
-                    "https://lemma-8b58c15b2f1b.herokuapp.com",
-                    "https://lemma-enterprise-0f6ba17076c1.herokuapp.com",
-                    "https://lemma-identity-network-2d96786d6ffb.herokuapp.com"
-                ],
+                "network_endpoints": NETWORK_CONFIG["all_network_endpoints"],
                 "capabilities": [
                     "identity_verification",
                     "cross_site_recognition", 

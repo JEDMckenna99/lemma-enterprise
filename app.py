@@ -181,6 +181,15 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register Privacy Enhancements blueprint: {e}")
+    
+    # Register Client Network Configuration API
+    try:
+        from api.network_client_config import client_config_bp
+        app.register_blueprint(client_config_bp)
+        logger.info("✅ Client Network Configuration blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register Client Network Configuration blueprint: {e}")
         
     # Initialize optimized engine
     try:

@@ -37,16 +37,8 @@ class LemmaBotShield {
         this.protectedElement = null;
         
         // Initialize background wallet for federated network with security config
-        this.backgroundWallet = new LemmaFederatedWallet({ 
-            debug: this.config.debug,
-            securityLevel: this.config.securityLevel,
-            customCheckInterval: this.config.customCheckInterval,
-            checkOnEvents: this.config.checkOnEvents,
-            backgroundChecks: this.config.backgroundChecks,
-            // CRITICAL: Configure network registry for cross-site sync
-            networkRegistryUrl: this.config.apiBase + '/api/network/sync',
-            networkAuthKey: 'lemma_network_federated_sync_2024'
-        });
+        // Initialize federated wallet with dynamic network configuration
+        this.initializeFederatedWallet();
         
         // Set custom security event handler if provided
         if (this.config.onSecurityEvent) {
@@ -68,6 +60,63 @@ class LemmaBotShield {
                 ? `${this.config.customCheckInterval / 1000}s` 
                 : intervals[this.config.securityLevel];
             console.log(`🛡️ Background checks: ${intervalText}`);
+        }
+    }
+    
+    /**
+     * Initialize federated wallet with dynamic network configuration
+     */
+    async initializeFederatedWallet() {
+        try {
+            // Fetch network configuration from server
+            const configResponse = await fetch(`${this.config.apiBase}/api/network/client-config`);
+            let networkConfig = {
+                networkRegistryUrl: this.config.apiBase + '/api/network/sync',
+                networkAuthKey: 'lemma_network_federated_sync_2024'
+            };
+            
+            if (configResponse.ok) {
+                const serverConfig = await configResponse.json();
+                if (serverConfig.success) {
+                    networkConfig = {
+                        networkRegistryUrl: serverConfig.network_registry_url,
+                        networkAuthKey: serverConfig.network_auth_key,
+                        syncInterval: serverConfig.sync_interval,
+                        federationEndpoints: serverConfig.federation_endpoints,
+                        nodeId: serverConfig.node_id
+                    };
+                    
+                    if (this.config.debug) {
+                        console.log(`🌐 Loaded network config for ${serverConfig.node_name}:`, networkConfig);
+                    }
+                }
+            }
+            
+            // Initialize federated wallet with network configuration
+            this.backgroundWallet = new LemmaFederatedWallet({
+                debug: this.config.debug,
+                securityLevel: this.config.securityLevel,
+                customCheckInterval: this.config.customCheckInterval,
+                checkOnEvents: this.config.checkOnEvents,
+                backgroundChecks: this.config.backgroundChecks,
+                ...networkConfig
+            });
+            
+        } catch (error) {
+            if (this.config.debug) {
+                console.warn('⚠️ Failed to load network config, using defaults:', error.message);
+            }
+            
+            // Fallback to default configuration
+            this.backgroundWallet = new LemmaFederatedWallet({
+                debug: this.config.debug,
+                securityLevel: this.config.securityLevel,
+                customCheckInterval: this.config.customCheckInterval,
+                checkOnEvents: this.config.checkOnEvents,
+                backgroundChecks: this.config.backgroundChecks,
+                networkRegistryUrl: this.config.apiBase + '/api/network/sync',
+                networkAuthKey: 'lemma_network_federated_sync_2024'
+            });
         }
     }
     
@@ -138,6 +187,14 @@ class LemmaBotShield {
         
         // Hide protected content immediately
         element.style.display = 'none';
+        
+        // Ensure wallet is initialized before proceeding
+        if (!this.backgroundWallet) {
+            if (this.config.debug) {
+                console.log('⏳ Waiting for federated wallet initialization...');
+            }
+            await this.initializeFederatedWallet();
+        }
         
         if (this.config.debug) {
             console.log('🛡️ Protecting element:', elementSelector);
