@@ -851,6 +851,9 @@ class LemmaFederatedWallet {
         // If no local credentials, check shared network for cross-site recognition
         if (this.networkConfig.registryUrl && packageType === 'identity') {
             try {
+                // Use PPID for privacy-preserving network lookup
+                const ppid = await this.generatePPIDForOrigin();
+                
                 const networkResponse = await fetch(`${this.networkConfig.registryUrl}/check-shared-identity`, {
                     method: 'POST',
                     headers: {
@@ -858,7 +861,8 @@ class LemmaFederatedWallet {
                         'Authorization': `Network ${this.networkConfig.authKey}`
                     },
                     body: JSON.stringify({
-                        user_id: this.getCurrentUserId(),
+                        ppid: ppid,
+                        origin: window.location.origin,
                         check_cross_site: true
                     })
                 });
@@ -867,7 +871,7 @@ class LemmaFederatedWallet {
                     const networkResult = await networkResponse.json();
                     if (networkResult.success && networkResult.has_valid_identity) {
                         if (this.debug) {
-                            console.log('🌐 Found valid identity lemma in federated network');
+                            console.log('🌐 Found valid identity lemma in federated network via PPID');
                         }
                         return true;
                     }
@@ -883,7 +887,7 @@ class LemmaFederatedWallet {
     }
     
     /**
-     * Get current user ID for network checks
+     * Get current user ID for network checks (PPID-aware)
      */
     getCurrentUserId() {
         // Try to get from stored credentials
@@ -897,6 +901,125 @@ class LemmaFederatedWallet {
         return sessionStorage.getItem('lemma_user_id') || 
                localStorage.getItem('lemma_user_id') ||
                'anonymous_' + Date.now();
+    }
+    
+    /**
+     * Generate PPID for current origin
+     */
+    async generatePPIDForOrigin(globalUserId = null) {
+        try {
+            const userId = globalUserId || this.getCurrentUserId();
+            const origin = window.location.origin;
+            
+            // Generate PPID using privacy API
+            const response = await fetch('/api/privacy/generate-ppid', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Network ${this.networkConfig.authKey}`
+                },
+                body: JSON.stringify({
+                    global_user_id: userId,
+                    site_origin: origin
+                })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (this.debug) {
+                    console.log(`🔐 Generated PPID for origin ${origin}`);
+                }
+                return result.ppid;
+            } else {
+                if (this.debug) {
+                    console.warn('⚠️ Failed to generate PPID, using global user ID');
+                }
+                return userId;
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ PPID generation failed:', error.message);
+            }
+            return globalUserId || this.getCurrentUserId();
+        }
+    }
+    
+    /**
+     * Start proof-of-possession verification flow
+     */
+    async startPoPVerification() {
+        try {
+            const origin = window.location.origin;
+            const currentEpoch = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+            
+            const response = await fetch('/api/privacy/verify-start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    origin: origin,
+                    epoch: currentEpoch
+                })
+            });
+            
+            if (response.ok) {
+                const challenge = await response.json();
+                if (this.debug) {
+                    console.log(`🎯 Started PoP verification with challenge ${challenge.challenge_id}`);
+                }
+                return challenge;
+            } else {
+                throw new Error(`PoP challenge failed: ${response.status}`);
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ PoP verification start failed:', error.message);
+            }
+            throw error;
+        }
+    }
+    
+    /**
+     * Complete proof-of-possession verification
+     */
+    async completePoPVerification(challengeId, credential, userKeyProof) {
+        try {
+            const timestamp = new Date().toISOString();
+            
+            const presentation = {
+                selectiveDisclosure: ['isHuman'],
+                proof: userKeyProof || `mock_proof_${challengeId}_${timestamp}`
+            };
+            
+            const response = await fetch('/api/privacy/verify-complete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    challenge_id: challengeId,
+                    lemma: credential,
+                    presentation: presentation,
+                    ts: timestamp
+                })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (this.debug) {
+                    console.log(`✅ Completed PoP verification for challenge ${challengeId}`);
+                }
+                return result;
+            } else {
+                throw new Error(`PoP completion failed: ${response.status}`);
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ PoP verification completion failed:', error.message);
+            }
+            throw error;
+        }
     }
     
     /**

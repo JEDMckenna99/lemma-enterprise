@@ -99,6 +99,24 @@ class NetworkSyncManager:
             if user_id:
                 user_key = f"user:{user_id}"
                 self.shared_identity_lemmas[user_key] = network_lemma
+                
+                # Generate PPID indexes for known origins (for privacy-preserving lookup)
+                try:
+                    from api.privacy_enhancements import privacy_manager
+                    known_origins = [
+                        "https://lemma-8b58c15b2f1b.herokuapp.com",
+                        "https://lemma-enterprise-0f6ba17076c1.herokuapp.com", 
+                        "https://lemma-identity-network-2d96786d6ffb.herokuapp.com"
+                    ]
+                    
+                    for origin in known_origins:
+                        ppid = privacy_manager.generate_ppid(user_id, origin)
+                        ppid_key = f"ppid:{ppid}"
+                        self.shared_identity_lemmas[ppid_key] = network_lemma
+                        
+                except ImportError:
+                    # Privacy enhancements not available, skip PPID indexing
+                    pass
             
             logger.info(f"🆔 Added identity lemma to shared network: {lemma_id[:8]}... for user {user_id[:8]}...")
             
@@ -447,25 +465,39 @@ def check_shared_identity():
                 'message': 'Invalid network authorization key'
             }), 401
         
-        # Get user ID from request
+        # Get user ID or PPID from request
         data = request.get_json()
         user_id = data.get('user_id')
+        ppid = data.get('ppid')
+        origin = data.get('origin')
         
-        if not user_id:
+        # Support both legacy user_id and new PPID-based lookup
+        lookup_key = None
+        if ppid and origin:
+            # PPID-based lookup for privacy
+            lookup_key = f"ppid:{ppid}"
+            if logger.isEnabledFor(logging.INFO):
+                logger.info(f"🔐 PPID-based identity lookup for origin {origin}")
+        elif user_id:
+            # Legacy user_id lookup
+            lookup_key = f"user:{user_id}"
+            if logger.isEnabledFor(logging.INFO):
+                logger.info(f"🔍 Legacy user_id lookup for {user_id[:8]}...")
+        else:
             return jsonify({
                 'success': False,
-                'error': 'missing_user_id',
-                'message': 'User ID required'
+                'error': 'missing_identifier',
+                'message': 'Either user_id or (ppid + origin) required'
             }), 400
         
         # Check for shared identity lemma
         with sync_manager.sync_lock:
-            user_key = f"user:{user_id}"
-            has_identity = user_key in sync_manager.shared_identity_lemmas
+            has_identity = lookup_key in sync_manager.shared_identity_lemmas
             
             if has_identity:
-                identity_data = sync_manager.shared_identity_lemmas[user_key]
-                logger.info(f"🌐 Found shared identity lemma for user {user_id[:8]}...")
+                identity_data = sync_manager.shared_identity_lemmas[lookup_key]
+                identifier_desc = ppid[:12] if ppid else user_id[:8]
+                logger.info(f"🌐 Found shared identity lemma for {identifier_desc}...")
                 
                 return jsonify({
                     'success': True,
@@ -475,7 +507,8 @@ def check_shared_identity():
                     'cross_site_valid': True
                 })
             else:
-                logger.info(f"🔍 No shared identity lemma found for user {user_id[:8]}...")
+                identifier_desc = ppid[:12] if ppid else user_id[:8]
+                logger.info(f"🔍 No shared identity lemma found for {identifier_desc}...")
                 return jsonify({
                     'success': True,
                     'has_valid_identity': False

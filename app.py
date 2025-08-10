@@ -163,6 +163,24 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register Real-Time Network Sync blueprint: {e}")
+    
+    # Register Federation Join API
+    try:
+        from api.federation_join import federation_join_bp
+        app.register_blueprint(federation_join_bp)
+        logger.info("✅ Federation Join blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register Federation Join blueprint: {e}")
+    
+    # Register Privacy Enhancements API  
+    try:
+        from api.privacy_enhancements import privacy_bp
+        app.register_blueprint(privacy_bp)
+        logger.info("✅ Privacy Enhancements blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register Privacy Enhancements blueprint: {e}")
         
     # Initialize optimized engine
     try:
