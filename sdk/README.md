@@ -27,6 +27,23 @@ console.log('Verified:', result.verified);
 console.log('Time:', result.timing.verification + 'µs');
 ```
 
+### 🌐 **3-Line Federation Join** (Recommended)
+```html
+<!-- 1. Join the federated network -->
+<script src="https://lemma.id/join?site=yoursite.com"></script>
+
+<!-- 2. Protect any content -->
+<div data-lemma-protect>Members-only content here</div>
+
+<!-- 3. That's it! Cross-site verification enabled -->
+```
+
+**Benefits:**
+- ✅ **Verify once, access everywhere** - Users verified on any Lemma site can access your content
+- ✅ **Microsecond performance** - 1-50µs verification with Rust cryptography
+- ✅ **Zero setup** - Automatic federation join and configuration
+- ✅ **Bot protection** - Cryptographic human verification
+
 ### Zero-Config HTML Integration
 ```html
 <!-- Single script tag -->

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3-Line Lemma Integration Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .hero {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px;
+        }
+        
+        .example {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px 0;
+            border-left: 5px solid #10b981;
+        }
+        
+        .protected-content {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .protected-content h2 {
+            margin-bottom: 15px;
+        }
+        
+        .protected-content button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .protected-content button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+        
+        .step {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .step h3 {
+            color: #10b981;
+            margin-bottom: 15px;
+        }
+        
+        .status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            font-size: 14px;
+            z-index: 10000;
+            border-left: 4px solid #10b981;
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>🔐 3-Line Integration</h1>
+        <p>Join the Lemma federated network with minimal code</p>
+    </div>
+    
+    <div class="example">
+        <h2>Complete Integration Code:</h2>
+        <pre><code>&lt;!-- Step 1: Include Lemma --&gt;
+&lt;script src="https://lemma.id/join?site=yoursite.com"&gt;&lt;/script&gt;
+
+&lt;!-- Step 2: Protect content --&gt;
+&lt;div data-lemma-protect&gt;
+    Your protected content here
+&lt;/div&gt;
+
+&lt;!-- Step 3: That's it! --&gt;</code></pre>
+    </div>
+    
+    <div class="step">
+        <h3>What This Does:</h3>
+        <ul>
+            <li>✅ Automatically joins your site to the Lemma federation</li>
+            <li>✅ Loads federated wallet and bot shield</li>
+            <li>✅ Protects elements with <code>data-lemma-protect</code></li>
+            <li>✅ Enables cross-site verification (verify once, access everywhere)</li>
+            <li>✅ Provides microsecond verification performance</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h3>Advanced Usage (Optional):</h3>
+        <pre><code>// Listen for ready event
+window.addEventListener('lemma:ready', function(event) {
+    console.log('Lemma ready!', event.detail);
+});
+
+// Manual control
+Lemma.protect('#specific-element');  // Protect specific elements
+Lemma.verify();                      // Trigger verification
+console.log(Lemma.status());         // Check status</code></pre>
+    </div>
+    
+    <div class="step">
+        <h3>Live Demo:</h3>
+        <p>The content below is protected by Lemma. Only verified humans can access it:</p>
+        
+        <div data-lemma-protect class="protected-content">
+            <h2>🎉 Protected Content</h2>
+            <p>Congratulations! You're seeing this because you're a verified human.</p>
+            <button onclick="alert('🔐 Lemma verification successful!')">
+                Click Me (Verified Humans Only)
+            </button>
+        </div>
+    </div>
+    
+    <div class="step">
+        <h3>Benefits:</h3>
+        <ul>
+            <li><strong>⚡ Fast:</strong> 1-50 microsecond verification</li>
+            <li><strong>🌐 Federated:</strong> Users verify once, access everywhere</li>
+            <li><strong>🔒 Private:</strong> Zero-knowledge proofs, no PII storage</li>
+            <li><strong>🛡️ Secure:</strong> Bot protection with cryptographic guarantees</li>
+            <li><strong>📱 Easy:</strong> Works across all devices and browsers</li>
+        </ul>
+    </div>
+    
+    <!-- The 3-line integration in action: -->
+    <script src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/join?site=demo.lemma.id"></script>
+    
+    <script>
+        // Show integration status
+        window.addEventListener('lemma:ready', function(event) {
+            const status = document.createElement('div');
+            status.className = 'status';
+            status.innerHTML = '✅ Lemma Federation Active';
+            document.body.appendChild(status);
+            
+            setTimeout(() => status.remove(), 5000);
+            
+            console.log('🔐 Lemma Federation Ready:', event.detail);
+        });
+    </script>
+</body>
+</html>

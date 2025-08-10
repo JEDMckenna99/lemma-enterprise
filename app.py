@@ -190,6 +190,15 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register Client Network Configuration blueprint: {e}")
+    
+    # Register Simple Join API (3-line integration)
+    try:
+        from api.simple_join import simple_join_bp
+        app.register_blueprint(simple_join_bp)
+        logger.info("✅ Simple Join API blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register Simple Join API blueprint: {e}")
         
     # Initialize optimized engine
     try:
