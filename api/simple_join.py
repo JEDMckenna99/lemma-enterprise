@@ -71,10 +71,12 @@ def auto_join_script():
         debug: true
     }};
     
-    // Load the federated wallet
-    const walletScript = document.createElement('script');
-    walletScript.src = LEMMA_CONFIG.apiBase + '/static/js/lemma-federated-wallet.js';
-    walletScript.onload = function() {{
+    // Ensure DOM is ready before manipulating elements
+    function initializeLemma() {{
+        // Load the federated wallet
+        const walletScript = document.createElement('script');
+        walletScript.src = LEMMA_CONFIG.apiBase + '/static/js/lemma-federated-wallet.js';
+        walletScript.onload = function() {{
         // Initialize federated wallet
         window.lemmaWallet = new LemmaFederatedWallet({{
             networkRegistryUrl: LEMMA_CONFIG.networkRegistryUrl,
@@ -123,9 +125,17 @@ def auto_join_script():
                 document.dispatchEvent(new Event('DOMContentLoaded'));
             }}
         }};
-        document.head.appendChild(shieldScript);
+        (document.head || document.documentElement).appendChild(shieldScript);
     }};
-    document.head.appendChild(walletScript);
+    (document.head || document.documentElement).appendChild(walletScript);
+    }}
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {{
+        document.addEventListener('DOMContentLoaded', initializeLemma);
+    }} else {{
+        initializeLemma();
+    }}
     
     // Add some basic CSS for protected content
     const style = document.createElement('style');
@@ -184,16 +194,23 @@ def auto_join_script():
             border-left: 4px solid #10b981;
         }}
     `;
-    document.head.appendChild(style);
+    (document.head || document.documentElement).appendChild(style);
     
-    // Show federation status
-    const statusDiv = document.createElement('div');
-    statusDiv.className = 'lemma-status';
-    statusDiv.innerHTML = '🔐 Joined Lemma Federation';
-    document.body.appendChild(statusDiv);
-    
-    // Auto-remove status after 3 seconds
-    setTimeout(() => statusDiv.remove(), 3000);
+    // Show federation status when body is ready
+    function showStatus() {{
+        if (document.body) {{
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'lemma-status';
+            statusDiv.innerHTML = '🔐 Joined Lemma Federation';
+            document.body.appendChild(statusDiv);
+            
+            // Auto-remove status after 3 seconds
+            setTimeout(() => statusDiv.remove(), 3000);
+        }} else {{
+            setTimeout(showStatus, 100);
+        }}
+    }}
+    showStatus();
     
 }})();
 
@@ -216,13 +233,24 @@ window.Lemma = {{
         }}
     }},
     
+    authenticate: function() {{
+        if (window.lemmaWallet) {{
+            return window.lemmaWallet.checkCredentials();
+        }} else {{
+            return Promise.resolve({{ verified: false, error: 'Wallet not ready' }});
+        }}
+    }},
+    
     status: function() {{
+        const currentOrigin = window.location.origin;
+        const nodeId = 'auto_' + btoa(currentOrigin).replace(/[^a-zA-Z0-9]/g, '').substring(0, 12);
         return {{
             ready: !!(window.lemmaWallet && window.lemmaShield),
             wallet: !!window.lemmaWallet,
             shield: !!window.lemmaShield,
             origin: currentOrigin,
-            nodeId: LEMMA_CONFIG.nodeId
+            nodeId: nodeId,
+            config: typeof LEMMA_CONFIG !== 'undefined' ? LEMMA_CONFIG : null
         }};
     }}
 }};
