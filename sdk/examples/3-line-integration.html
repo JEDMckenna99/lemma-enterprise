@@ -122,27 +122,56 @@
     </div>
     
     <div class="step">
-        <h3>What This Does:</h3>
+        <h3>What This Enables:</h3>
+        
+        <h4>🔐 VERIFICATION (One-Time Identity Creation)</h4>
         <ul>
-            <li>✅ Automatically joins your site to the Lemma federation</li>
-            <li>✅ Loads federated wallet and bot shield</li>
-            <li>✅ Protects elements with <code>data-lemma-protect</code></li>
-            <li>✅ Enables cross-site verification (verify once, access everywhere)</li>
-            <li>✅ Provides microsecond verification performance</li>
+            <li>✅ First-time users complete Stripe KYC verification</li>
+            <li>✅ Creates cryptographically-signed identity credentials</li>
+            <li>✅ ~500ms API calls for credential issuance</li>
+            <li>✅ Stores credentials in federated wallet</li>
+        </ul>
+        
+        <h4>⚡ AUTHENTICATION (Ongoing Access Control)</h4>
+        <ul>
+            <li>✅ Microsecond credential validation (~1-50µs)</li>
+            <li>✅ Offline authentication via Rust/WASM SDK</li>
+            <li>✅ Cross-site access (authenticate once, access everywhere)</li>
+            <li>✅ Background security checks and real-time updates</li>
         </ul>
     </div>
     
     <div class="step">
         <h3>Advanced Usage (Optional):</h3>
+        
+        <h4>🔐 Manual Verification (Identity Creation)</h4>
+        <pre><code>// Trigger verification flow for new users
+Lemma.verify();  // Redirects to Stripe KYC
+
+// Listen for verification completion
+window.addEventListener('lemma:verified', function(event) {
+    console.log('New identity credential:', event.detail.credential);
+});</code></pre>
+        
+        <h4>⚡ Manual Authentication (Access Control)</h4>
+        <pre><code>// Check authentication status (microsecond response)
+const auth = await Lemma.authenticate();
+console.log('Authenticated:', auth.verified, 'Time:', auth.timing + 'µs');
+
+// Manual protection control
+Lemma.protect('#specific-element');  // Protect specific elements
+console.log(Lemma.status());         // Check federation status</code></pre>
+        
+        <h4>🔄 Event Handling</h4>
         <pre><code>// Listen for ready event
 window.addEventListener('lemma:ready', function(event) {
-    console.log('Lemma ready!', event.detail);
+    console.log('Lemma federation ready!', event.detail);
 });
 
-// Manual control
-Lemma.protect('#specific-element');  // Protect specific elements
-Lemma.verify();                      // Trigger verification
-console.log(Lemma.status());         // Check status</code></pre>
+// Listen for authentication updates
+window.addEventListener('lemma:auth-update', function(event) {
+    console.log('Auth status changed:', event.detail.verified);
+});</code></pre>
     </div>
     
     <div class="step">
@@ -159,13 +188,29 @@ console.log(Lemma.status());         // Check status</code></pre>
     </div>
     
     <div class="step">
-        <h3>Benefits:</h3>
+        <h3>Two-Process Benefits:</h3>
+        
+        <h4>🔐 Verification Benefits:</h4>
         <ul>
-            <li><strong>⚡ Fast:</strong> 1-50 microsecond verification</li>
-            <li><strong>🌐 Federated:</strong> Users verify once, access everywhere</li>
-            <li><strong>🔒 Private:</strong> Zero-knowledge proofs, no PII storage</li>
-            <li><strong>🛡️ Secure:</strong> Bot protection with cryptographic guarantees</li>
-            <li><strong>📱 Easy:</strong> Works across all devices and browsers</li>
+            <li><strong>🎯 One-Time Setup:</strong> Complete Stripe KYC once per user</li>
+            <li><strong>🔒 Cryptographic Proof:</strong> Ed25519 signatures for authenticity</li>
+            <li><strong>🌐 Network Sharing:</strong> Credentials work across all federated sites</li>
+            <li><strong>🛡️ Human Verification:</strong> Liveness detection prevents deepfakes</li>
+        </ul>
+        
+        <h4>⚡ Authentication Benefits:</h4>
+        <ul>
+            <li><strong>⚡ Microsecond Speed:</strong> 1-50µs offline validation</li>
+            <li><strong>🔒 Zero Network Calls:</strong> Fully offline after initial setup</li>
+            <li><strong>📱 Cross-Device:</strong> Works on all devices and browsers</li>
+            <li><strong>🔄 Real-Time Updates:</strong> Background sync with federation</li>
+        </ul>
+        
+        <h4>🌐 Combined Power:</h4>
+        <ul>
+            <li><strong>🎯 Verify Once, Authenticate Everywhere:</strong> Ultimate user experience</li>
+            <li><strong>🚀 Infinite Scale:</strong> Authentication performance never degrades</li>
+            <li><strong>🔒 Maximum Security:</strong> Cryptographic + behavioral verification</li>
         </ul>
     </div>
     

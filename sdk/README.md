@@ -54,11 +54,27 @@ console.log('Time:', result.timing.verification + 'µs');
 <div data-lemma-result></div>
 ```
 
-## 🎯 **Features**
+## 🎯 **Two-Process Architecture**
 
-- **⚡ Ultra-fast**: 32.8µs verification time
-- **🔒 Offline-first**: Zero network calls during verification
-- **📱 Universal**: Works with all credential types
+### 🔐 **VERIFICATION** (API - One-Time Identity Creation)
+- **Purpose**: Create new identity credentials via Stripe KYC
+- **Frequency**: Once per user (or when credentials expire)
+- **Location**: Server-side API calls
+- **Performance**: ~500ms (includes KYC validation)
+- **Endpoints**: `/api/sdk/start-identity-verification`, `/api/sdk/complete-identity-verification`
+
+### ⚡ **AUTHENTICATION** (SDK - Ongoing Access Control)
+- **Purpose**: Validate existing credentials for instant access
+- **Frequency**: Every page load, background checks, cross-site access
+- **Location**: Client-side Rust/WASM SDK
+- **Performance**: ~1-50µs (offline cryptographic validation)
+- **Benefits**: Zero network calls, microsecond response times
+
+## 🎯 **SDK Features**
+
+- **⚡ Ultra-fast Authentication**: 1-50µs credential validation
+- **🔒 Offline-first**: Zero network calls during authentication
+- **📱 Universal**: Works with all credential types and devices
 - **🎨 Zero-config**: Single script tag integration
 - **🔧 TypeScript**: Full type support and IntelliSense
 - **📊 Monitoring**: Built-in performance metrics
@@ -85,14 +101,49 @@ interface LemmaConfig {
 }
 ```
 
-### Methods
+## 🔐 **VERIFICATION Methods** (Identity Creation)
 
-#### `verify(credentialData: string): Promise<VerificationResult>`
-Verify a credential with cryptographic proof.
+### `startVerification(options): Promise<VerificationSession>`
+Start Stripe Identity KYC verification process.
 
 ```javascript
-const result = await lemma.verify(credentialData);
+const session = await lemma.startVerification({
+  returnUrl: 'https://yoursite.com/verified'
+});
+// Redirect user to session.url for KYC
 ```
+
+### `completeVerification(sessionId): Promise<IdentityCredential>`
+Complete verification and receive identity credential.
+
+```javascript
+const credential = await lemma.completeVerification(sessionId);
+// credential now contains signed identity lemma
+```
+
+## ⚡ **AUTHENTICATION Methods** (Offline Validation)
+
+#### `authenticate(credentialData: string): Promise<AuthenticationResult>`
+Authenticate existing credentials offline using WebAssembly.
+
+```javascript
+const result = await lemma.authenticate(credentialJSON);
+console.log('Authenticated:', result.verified);
+console.log('Time:', result.timing.authentication + 'µs');
+```
+
+### `checkCredentials(): Promise<AuthenticationResult>`
+Check locally stored credentials for current user.
+
+```javascript
+const result = await lemma.checkCredentials();
+if (result.hasValidCredentials) {
+  console.log('User is authenticated');
+}
+```
+
+### `verify(credentialData: string): Promise<VerificationResult>`
+Legacy method - now aliased to `authenticate()` for backward compatibility.
 
 #### `scanQR(options?: QRScanOptions): Promise<QRScanResult>`
 Scan and verify a QR code.

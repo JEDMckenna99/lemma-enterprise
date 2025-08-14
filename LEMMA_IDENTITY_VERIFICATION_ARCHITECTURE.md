@@ -94,9 +94,23 @@ graph TD
 
 ## 📋 SYSTEM OVERVIEW
 
-The Lemma identity verification system is a **federated, cryptographically-secured identity network** that enables:
-- **Verify Once, Access Everywhere**: Users complete Stripe KYC once and gain access to all network sites
-- **Microsecond Verification**: Rust-powered cryptographic engine with ~1-50µs verification times  
+The Lemma identity verification system is a **federated, cryptographically-secured identity network** with **two distinct processes**:
+
+### 🔐 **1. VERIFICATION** (Initial Identity Creation)
+- **What**: Creates new identity credentials via API calls
+- **When**: First-time users complete Stripe KYC verification
+- **Where**: Server-side API endpoints (`/api/sdk/start-identity-verification`)
+- **Result**: Issues cryptographically-signed identity lemma
+
+### ⚡ **2. AUTHENTICATION** (Ongoing Access Control)  
+- **What**: Validates existing credentials via offline SDK
+- **When**: Every page load, background checks, cross-site access
+- **Where**: Client-side Rust/WASM engine (1-50µs performance)
+- **Result**: Instant access decisions without network calls
+
+### 🌐 **System Benefits**:
+- **Verify Once, Access Everywhere**: Users complete verification once, authenticate everywhere
+- **Microsecond Authentication**: Rust-powered offline checking with ~1-50µs response times  
 - **True Decentralization**: No central authority; works across independent deployments
 - **Privacy-Preserving**: Zero-knowledge proofs and minimal data storage
 
@@ -127,34 +141,72 @@ The Lemma identity verification system is a **federated, cryptographically-secur
 - **Configurable security levels** (low/medium/high/critical/realtime)
 - **SDK integration** for customer sites
 
-## ⚡ VERIFICATION FLOW
+## ⚡ DUAL-PROCESS FLOW
 
-### First-Time Verification (lemma.id):
-1. **User visits site** → Bot Shield checks federated wallet
-2. **No credentials found** → Redirect to Stripe Identity KYC
-3. **Stripe KYC completion** → Document upload + liveness check
-4. **Rust engine creates identity lemma** with 3 essential claims:
+### 🔐 **VERIFICATION PROCESS** (One-Time Identity Creation)
+
+**Purpose**: Create new cryptographically-signed identity credentials  
+**Frequency**: Once per user (or when credentials expire/revoked)  
+**Location**: Server-side API endpoints  
+**Performance**: ~500ms (includes Stripe KYC validation)
+
+#### First-Time Verification Flow:
+1. **User visits site** → Bot Shield checks for existing credentials
+2. **No credentials found** → Redirect to **VERIFICATION API**
+3. **API Call**: `POST /api/sdk/start-identity-verification`
+4. **Stripe KYC completion** → Document upload + liveness check  
+5. **API Call**: `POST /api/sdk/complete-identity-verification`
+6. **Rust engine creates identity lemma** with 3 essential claims:
    - `packageType: 'identity'` (routing)
    - `isHuman: true` (bot protection)  
    - `verificationMethod: 'stripe_identity'` (proof method)
-5. **Network sharing** → Identity lemma added to shared registry
-6. **Local storage** → Credential stored in federated wallet
-7. **Instant access** → User passes bot shield protection
+7. **Network sharing** → Identity lemma added to shared registry
+8. **Credential returned** → Stored in federated wallet for authentication
 
-### Cross-Site Recognition (lemma-identity-network):
-1. **User visits partner site** → Bot Shield initializes
-2. **Wallet checks local storage** → If found, use cached credential
-3. **If not found locally** → Query network sync: `POST /check-shared-identity`
-4. **Network lookup** → Find identity lemma by user_id
-5. **Rust verification** → ~5 microsecond cryptographic verification
-6. **Automatic access** → User passes shield WITHOUT re-verification
+---
 
-### Network-Wide Revocation:
+### ⚡ **AUTHENTICATION PROCESS** (Ongoing Access Control)
+
+**Purpose**: Validate existing credentials for instant access decisions  
+**Frequency**: Every page load, background checks, cross-site access  
+**Location**: Client-side Rust/WASM SDK  
+**Performance**: ~1-50µs (offline cryptographic validation)
+
+#### Same-Site Authentication:
+1. **User visits site** → Bot Shield initializes
+2. **SDK checks local wallet** → Federated wallet (IndexedDB/localStorage)
+3. **Rust/WASM authentication** → ~5µs cryptographic validation
+4. **Instant access** → User passes shield protection
+
+#### Cross-Site Authentication:
+1. **User visits partner site** → Bot Shield initializes  
+2. **SDK checks local wallet** → If found, validate locally (~5µs)
+3. **If not cached locally** → Query network: `POST /check-shared-identity`
+4. **Network lookup** → Find identity lemma by PPID
+5. **SDK validates credential** → ~5µs cryptographic authentication
+6. **Cache locally** → Store for future offline authentication
+7. **Instant access** → User passes shield WITHOUT re-verification
+
+#### Background Authentication:
+1. **Periodic checks** → SDK validates cached credentials (1-30 min intervals)
+2. **Revocation checking** → OPRF+Bloom filter validation (~0.1µs)
+3. **Network sync** → Update local cache with latest network state
+4. **Seamless operation** → No user interruption, continuous protection
+
+---
+
+### 🚨 **REVOCATION PROCESS** (Security Enforcement)
+
+**Purpose**: Network-wide credential invalidation  
+**Frequency**: As needed for security incidents  
+**Location**: Any federation node  
+**Performance**: ~1ms propagation, instant authentication updates
+
 1. **Revocation triggered** → Any site can revoke credentials
 2. **OPRF+Bloom filter update** → Add to shared network filter
-3. **Instant propagation** → Broadcast to all network nodes
-4. **Next verification** → Rust engine checks bloom filter
-5. **Access denied** → Revoked credentials fail verification
+3. **Instant propagation** → Broadcast to all network nodes  
+4. **Next authentication** → SDK checks bloom filter (~0.1µs)
+5. **Access denied** → Revoked credentials fail authentication
 
 ## 🔐 CRYPTOGRAPHIC SECURITY
 
