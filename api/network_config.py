@@ -17,6 +17,9 @@ def get_network_config():
     # Detect environment based on HEROKU_APP_NAME or domain
     heroku_app = os.environ.get('HEROKU_APP_NAME', '')
     
+    # Also check for Heroku deployment indicators
+    is_heroku = bool(os.environ.get('DYNO')) or bool(os.environ.get('PORT'))
+    
     # Default configuration
     config = {
         "network_did": "did:lemma:network",
@@ -54,16 +57,31 @@ def get_network_config():
         logger.info("🌐 Configured as Lemma Identity Network (Federated Node)")
         
     else:
-        # Development/unknown environment
-        config.update({
-            "node_id": "lemma-local",
-            "node_name": "Lemma Local Development",
-            "node_endpoint": "http://localhost:5000",
-            "is_primary_node": True,
-            "federation_endpoints": [],
-            "network_registry_url": "http://localhost:5000/api/network/sync"
-        })
-        logger.info("💻 Configured as Local Development")
+        # Check if we're on Heroku but app name detection failed
+        if is_heroku:
+            # Default to lemma-enterprise configuration for unknown Heroku deployments
+            config.update({
+                "node_id": "lemma-enterprise",
+                "node_name": "Lemma Enterprise (lemma.id)",
+                "node_endpoint": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com",
+                "is_primary_node": True,
+                "federation_endpoints": [
+                    "https://lemma-identity-network-2d96786d6ffb.herokuapp.com"
+                ],
+                "network_registry_url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync"
+            })
+            logger.info("🏢 Configured as Lemma Enterprise (Heroku Fallback)")
+        else:
+            # True local development
+            config.update({
+                "node_id": "lemma-local",
+                "node_name": "Lemma Local Development",
+                "node_endpoint": "http://localhost:5000",
+                "is_primary_node": True,
+                "federation_endpoints": [],
+                "network_registry_url": "http://localhost:5000/api/network/sync"
+            })
+            logger.info("💻 Configured as Local Development")
     
     # Add all known endpoints for the network bundle
     config["all_network_endpoints"] = [
