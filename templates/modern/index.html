@@ -162,6 +162,60 @@
             }
         }
     </style>
+    
+    <!-- SEO Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Lemma Identity Verification",
+        "applicationCategory": "SecurityApplication",
+        "operatingSystem": "Web",
+        "description": "Professional identity verification platform. Instantly verify legitimate users while blocking bots and fake accounts with cryptographic verification.",
+        "url": "https://lemma.id",
+        "provider": {
+            "@type": "Organization",
+            "name": "Lemma",
+            "url": "https://lemma.id"
+        },
+        "offers": {
+            "@type": "Offer",
+            "price": "0.10",
+            "priceCurrency": "USD",
+            "priceSpecification": {
+                "@type": "UnitPriceSpecification",
+                "price": "0.10",
+                "priceCurrency": "USD",
+                "unitText": "per verified user per month"
+            }
+        },
+        "audience": {
+            "@type": "Audience",
+            "audienceType": "Platform Developers, Security Teams, Business Owners"
+        },
+        "keywords": "identity verification, bot protection, user verification, cryptographic verification, platform security"
+    }
+    </script>
+    
+    <!-- OpenGraph Meta Tags -->
+    <meta property="og:title" content="Lemma - Stop Bots, Verify Real Users | Identity Verification Platform">
+    <meta property="og:description" content="Professional identity verification platform. Secure your platform with cryptographic verification that's private, instant, and impossible to forge.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://lemma.id">
+    <meta property="og:image" content="{{ url_for('static', filename='img/lemma_logo.svg') }}">
+    <meta property="og:site_name" content="Lemma">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Lemma - Identity Verification Platform">
+    <meta name="twitter:description" content="Professional identity verification platform. Secure your platform with cryptographic verification that's private, instant, and impossible to forge.">
+    <meta name="twitter:image" content="{{ url_for('static', filename='img/lemma_logo.svg') }}">
+    
+    <!-- Additional SEO Meta Tags -->
+    <meta name="keywords" content="identity verification, bot protection, user verification, cryptographic verification, platform security, fake account detection, user authentication">
+    <meta name="author" content="Lemma">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://lemma.id">
 {% endblock %}
 
 {% block content %}
@@ -411,61 +465,4 @@
         </div>
     </div>
 </section>
-{% endblock %}
-
-{% block head %}
-    {{ super() }}
-    <!-- SEO Structured Data -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "Lemma Identity Verification",
-        "applicationCategory": "SecurityApplication",
-        "operatingSystem": "Web",
-        "description": "Professional identity verification platform. Instantly verify legitimate users while blocking bots and fake accounts with cryptographic verification.",
-        "url": "https://lemma.id",
-        "provider": {
-            "@type": "Organization",
-            "name": "Lemma",
-            "url": "https://lemma.id"
-        },
-        "offers": {
-            "@type": "Offer",
-            "price": "0.10",
-            "priceCurrency": "USD",
-            "priceSpecification": {
-                "@type": "UnitPriceSpecification",
-                "price": "0.10",
-                "priceCurrency": "USD",
-                "unitText": "per verified user per month"
-            }
-        },
-        "audience": {
-            "@type": "Audience",
-            "audienceType": "Platform Developers, Security Teams, Business Owners"
-        },
-        "keywords": "identity verification, bot protection, user verification, cryptographic verification, platform security"
-    }
-    </script>
-    
-    <!-- OpenGraph Meta Tags -->
-    <meta property="og:title" content="Lemma - Stop Bots, Verify Real Users | Identity Verification Platform">
-    <meta property="og:description" content="Professional identity verification platform. Secure your platform with cryptographic verification that's private, instant, and impossible to forge.">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://lemma.id">
-    <meta property="og:image" content="{{ url_for('static', filename='img/lemma_logo.svg') }}">
-    <meta property="og:site_name" content="Lemma">
-    
-    <!-- Twitter Card Meta Tags -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Lemma - Identity Verification Platform">
-    <meta name="twitter:description" content="Professional identity verification platform. Secure your platform with cryptographic verification that's private, instant, and impossible to forge.">
-    <meta name="twitter:image" content="{{ url_for('static', filename='img/lemma_logo.svg') }}">
-    
-    <!-- Additional SEO Meta Tags -->
-    <meta name="keywords" content="identity verification, bot protection, user verification, cryptographic verification, platform security, fake account detection, user authentication">
-    <meta name="author" content="Lemma">
-    <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://lemma.id">
 {% endblock %} 
