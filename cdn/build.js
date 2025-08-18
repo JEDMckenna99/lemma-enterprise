@@ -37,14 +37,8 @@ const BUILD_CONFIG = {
     }
   },
   css: {
-    'lemma-styles': {
-      input: 'frontend/css/modern-saas-enhancements.css',
-      minified: true,
-      gzip: true,
-      brotli: true
-    },
-    'stripe-design': {
-      input: 'frontend/css/stripe-design-system.css',
+    'lemma-design-system': {
+      input: 'static/css/lemma-design-system.css',
       minified: true,
       gzip: true,
       brotli: true
