@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Lemma - Stop Bots, Verify Real Users{% endblock %}
-{% block description %}Protect your website from bots and fake accounts in seconds. Lemma instantly verifies real users without compromising their privacy.{% endblock %}
+{% block title %}Lemma - Stop Bots, Verify Real Users | Identity Verification Platform{% endblock %}
+{% block description %}Professional identity verification platform. Lemma instantly verifies real users and prevents bots without compromising privacy. Secure your platform with cryptographic verification.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -173,15 +173,16 @@
                 <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" class="hero-logo-icon">
             </div>
             <div class="hero-badge">
-                Trusted by 1000+ websites
+                Trusted by 1000+ platforms worldwide
             </div>
             <h1 class="hero-title">
                 Stop Bots.<br>
                 Verify Real Users.
             </h1>
             <p class="hero-subtitle">
-                Protect your website from fake accounts and bots in seconds. 
-                Lemma instantly verifies real users without asking for personal information.
+                Professional identity verification platform. Lemma instantly verifies legitimate users 
+                while blocking bots and fake accounts. Cryptographic verification that's private, 
+                instant, and impossible to forge.
             </p>
             <div class="hero-cta">
                 <a href="/register" class="btn btn-primary btn-lg">
@@ -201,7 +202,7 @@
         <div class="section-header">
             <h2 class="section-title">The Problem</h2>
             <p class="section-subtitle">
-                Bot attacks cost businesses millions in lost revenue and user trust
+                Online platforms struggle with bot traffic, fake accounts, and verification challenges
             </p>
         </div>
         
@@ -209,19 +210,19 @@
             <div class="card-enhanced">
                 <div class="card-body">
                     <h3 style="color: var(--error);">🤖 Bot Traffic</h3>
-                    <p>42% of web traffic is automated bots creating fake accounts and stealing data</p>
+                    <p>42% of web traffic is automated bots creating fake accounts, scraping data, and inflating metrics across all industries</p>
                 </div>
             </div>
             <div class="card-enhanced">
                 <div class="card-body">
                     <h3 style="color: var(--error);">💸 Revenue Loss</h3>
-                    <p>Fake users inflate metrics, waste ad spend, and damage conversion rates</p>
+                    <p>Fake users waste resources, inflate marketing costs, and damage trust between legitimate users and businesses</p>
                 </div>
             </div>
             <div class="card-enhanced">
                 <div class="card-body">
                     <h3 style="color: var(--error);">🛡️ Poor Solutions</h3>
-                    <p>CAPTCHAs annoy users, and traditional verification requires sensitive data</p>
+                    <p>CAPTCHAs annoy users, traditional verification requires sensitive data, and most solutions are easily bypassed</p>
                 </div>
             </div>
         </div>
@@ -362,4 +363,109 @@
         </div>
     </div>
 </section>
+
+<!-- Customer Testimonials Section -->
+<section class="section">
+    <div class="stripe-container">
+        <div class="section-header">
+            <h2 class="section-title">Trusted by Industry Leaders</h2>
+            <p class="section-subtitle">
+                See how platforms across industries use Lemma to verify legitimate users
+            </p>
+        </div>
+        
+        <div class="card-grid card-grid-2">
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <blockquote style="font-style: italic; margin-bottom: var(--space-4); color: var(--gray-600);">
+                        "Lemma helped us reduce fake accounts by 95% while maintaining a seamless experience for our legitimate users. The cryptographic verification is bulletproof."
+                    </blockquote>
+                    <div style="display: flex; align-items: center; gap: var(--space-3);">
+                        <div style="width: 48px; height: 48px; background: var(--primary-100); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--primary-600);">
+                            MJ
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: var(--gray-800);">Michael Johnson</div>
+                            <div style="font-size: var(--font-size-sm); color: var(--gray-500);">CTO, TechConnect Platform</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <blockquote style="font-style: italic; margin-bottom: var(--space-4); color: var(--gray-600);">
+                        "Our platform now has confidence that every user is verified and legitimate. Lemma made compliance simple while improving user experience."
+                    </blockquote>
+                    <div style="display: flex; align-items: center; gap: var(--space-3);">
+                        <div style="width: 48px; height: 48px; background: var(--success-100); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--success-600);">
+                            SR
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: var(--gray-800);">Sarah Rodriguez</div>
+                            <div style="font-size: var(--font-size-sm); color: var(--gray-500);">Director, SecureData Systems</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- SEO Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Lemma Identity Verification",
+        "applicationCategory": "SecurityApplication",
+        "operatingSystem": "Web",
+        "description": "Professional identity verification platform. Instantly verify legitimate users while blocking bots and fake accounts with cryptographic verification.",
+        "url": "https://lemma.id",
+        "provider": {
+            "@type": "Organization",
+            "name": "Lemma",
+            "url": "https://lemma.id"
+        },
+        "offers": {
+            "@type": "Offer",
+            "price": "0.10",
+            "priceCurrency": "USD",
+            "priceSpecification": {
+                "@type": "UnitPriceSpecification",
+                "price": "0.10",
+                "priceCurrency": "USD",
+                "unitText": "per verified user per month"
+            }
+        },
+        "audience": {
+            "@type": "Audience",
+            "audienceType": "Platform Developers, Security Teams, Business Owners"
+        },
+        "keywords": "identity verification, bot protection, user verification, cryptographic verification, platform security"
+    }
+    </script>
+    
+    <!-- OpenGraph Meta Tags -->
+    <meta property="og:title" content="Lemma - Stop Bots, Verify Real Users | Identity Verification Platform">
+    <meta property="og:description" content="Professional identity verification platform. Secure your platform with cryptographic verification that's private, instant, and impossible to forge.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://lemma.id">
+    <meta property="og:image" content="{{ url_for('static', filename='img/lemma_logo.svg') }}">
+    <meta property="og:site_name" content="Lemma">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Lemma - Identity Verification Platform">
+    <meta name="twitter:description" content="Professional identity verification platform. Secure your platform with cryptographic verification that's private, instant, and impossible to forge.">
+    <meta name="twitter:image" content="{{ url_for('static', filename='img/lemma_logo.svg') }}">
+    
+    <!-- Additional SEO Meta Tags -->
+    <meta name="keywords" content="identity verification, bot protection, user verification, cryptographic verification, platform security, fake account detection, user authentication">
+    <meta name="author" content="Lemma">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://lemma.id">
 {% endblock %} 

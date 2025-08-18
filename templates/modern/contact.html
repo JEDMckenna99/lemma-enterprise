@@ -1,0 +1,397 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Contact Lemma - Get Identity Verification Support{% endblock %}
+{% block description %}Contact Lemma for identity verification support, sales inquiries, and technical assistance. Get help securing your platform with cryptographic verification.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .contact-hero {
+            background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+            color: var(--white);
+            padding: var(--space-12) 0;
+            text-align: center;
+        }
+        
+        .contact-title {
+            font-size: var(--font-size-3xl);
+            font-weight: 800;
+            margin-bottom: var(--space-4);
+        }
+        
+        .contact-subtitle {
+            font-size: var(--font-size-lg);
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .contact-section {
+            padding: var(--space-16) 0;
+        }
+        
+        .contact-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-12);
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .contact-info {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-8);
+        }
+        
+        .contact-method {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-4);
+            padding: var(--space-6);
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        
+        .contact-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--primary-100);
+            color: var(--primary-600);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+        
+        .contact-form {
+            background: var(--white);
+            padding: var(--space-8);
+            border-radius: 16px;
+            border: 2px solid var(--gray-200);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        }
+        
+        .form-group {
+            margin-bottom: var(--space-6);
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: var(--space-2);
+            font-weight: 600;
+            color: var(--gray-700);
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: var(--space-3);
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: var(--font-size-base);
+            transition: border-color 0.2s ease;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%23666' d='m2 0-2 2h4zm0 5 2-2h-4z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 12px;
+            padding-right: var(--space-10);
+        }
+        
+        .contact-cta {
+            background: var(--gray-50);
+            padding: var(--space-12) 0;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            .contact-grid {
+                grid-template-columns: 1fr;
+                gap: var(--space-8);
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<!-- Contact Hero -->
+<section class="contact-hero">
+    <div class="stripe-container">
+        <h1 class="contact-title">Get in Touch</h1>
+        <p class="contact-subtitle">
+            Ready to secure your platform? Our team is here to help with 
+            implementation, support, and custom verification solutions for your business.
+        </p>
+    </div>
+</section>
+
+<!-- Contact Section -->
+<section class="contact-section">
+    <div class="stripe-container">
+        <div class="contact-grid">
+            <!-- Contact Information -->
+            <div class="contact-info">
+                <div class="contact-method">
+                    <div class="contact-icon">📧</div>
+                    <div>
+                        <h3 style="margin-bottom: var(--space-2); color: var(--gray-800);">Email Support</h3>
+                        <p style="color: var(--gray-600); margin-bottom: var(--space-2);">
+                            Get technical support or sales assistance
+                        </p>
+                        <a href="mailto:support@lemma.id" style="color: var(--primary-600); font-weight: 600;">
+                            support@lemma.id
+                        </a>
+                        <br>
+                        <a href="mailto:sales@lemma.id" style="color: var(--primary-600); font-weight: 600;">
+                            sales@lemma.id
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="contact-method">
+                    <div class="contact-icon">💬</div>
+                    <div>
+                        <h3 style="margin-bottom: var(--space-2); color: var(--gray-800);">Live Chat</h3>
+                        <p style="color: var(--gray-600); margin-bottom: var(--space-2);">
+                            Chat with our team during business hours
+                        </p>
+                        <p style="color: var(--gray-500); font-size: var(--font-size-sm);">
+                            Monday - Friday: 9 AM - 6 PM PST
+                        </p>
+                        <button class="btn btn-primary" style="margin-top: var(--space-3);" onclick="openChat()">
+                            Start Chat
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="contact-method">
+                    <div class="contact-icon">📚</div>
+                    <div>
+                        <h3 style="margin-bottom: var(--space-2); color: var(--gray-800);">Documentation</h3>
+                        <p style="color: var(--gray-600); margin-bottom: var(--space-2);">
+                            Find answers in our comprehensive docs
+                        </p>
+                        <a href="/docs" class="btn btn-secondary">View Docs</a>
+                    </div>
+                </div>
+                
+                <div class="contact-method">
+                    <div class="contact-icon">🚀</div>
+                    <div>
+                        <h3 style="margin-bottom: var(--space-2); color: var(--gray-800);">Quick Start</h3>
+                        <p style="color: var(--gray-600); margin-bottom: var(--space-2);">
+                            Get started with your free account
+                        </p>
+                        <a href="/register" class="btn btn-primary">Create Account</a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Contact Form -->
+            <div class="contact-form">
+                <h2 style="margin-bottom: var(--space-6); color: var(--gray-800);">Send us a Message</h2>
+                
+                <form id="contactForm" onsubmit="submitContactForm(event)">
+                    <div class="form-group">
+                        <label for="name" class="form-label">Full Name *</label>
+                        <input type="text" id="name" name="name" class="form-input" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email" class="form-label">Email Address *</label>
+                        <input type="email" id="email" name="email" class="form-input" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="company" class="form-label">Company</label>
+                        <input type="text" id="company" name="company" class="form-input">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="inquiry_type" class="form-label">Inquiry Type *</label>
+                        <select id="inquiry_type" name="inquiry_type" class="form-input form-select" required>
+                            <option value="">Select an option</option>
+                            <option value="sales">Sales Inquiry</option>
+                            <option value="technical">Technical Support</option>
+                            <option value="integration">Integration Help</option>
+                            <option value="billing">Billing Question</option>
+                            <option value="partnership">Partnership Opportunity</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="platform_type" class="form-label">Platform Type</label>
+                        <select id="platform_type" name="platform_type" class="form-input form-select">
+                            <option value="">Select your platform type</option>
+                            <option value="saas">SaaS Platform</option>
+                            <option value="ecommerce">E-commerce</option>
+                            <option value="marketplace">Marketplace</option>
+                            <option value="social">Social Platform</option>
+                            <option value="fintech">Fintech</option>
+                            <option value="healthcare">Healthcare</option>
+                            <option value="education">Education</option>
+                            <option value="real_estate">Real Estate</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="message" class="form-label">Message *</label>
+                        <textarea id="message" name="message" class="form-input form-textarea" 
+                                  placeholder="Tell us about your verification needs, integration requirements, or any questions you have..." required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
+                        Send Message
+                    </button>
+                    
+                    <p style="margin-top: var(--space-4); font-size: var(--font-size-sm); color: var(--gray-500); text-align: center;">
+                        We typically respond within 4 hours during business days
+                    </p>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ Section -->
+<section class="section">
+    <div class="stripe-container">
+        <div class="section-header">
+            <h2 class="section-title">Frequently Asked Questions</h2>
+            <p class="section-subtitle">
+                Common questions about Lemma identity verification
+            </p>
+        </div>
+        
+        <div class="card-enhanced" style="max-width: 800px; margin: 0 auto;">
+            <div class="card-body">
+                <div style="display: flex; flex-direction: column; gap: var(--space-6);">
+                    <div>
+                        <h3 style="color: var(--gray-800); margin-bottom: var(--space-2);">
+                            How quickly can I integrate Lemma verification?
+                        </h3>
+                        <p style="color: var(--gray-600);">
+                            Most platforms integrate Lemma in under 30 minutes. Our simple JavaScript SDK 
+                            requires just a few lines of code, and we provide comprehensive documentation 
+                            and support throughout the process.
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <h3 style="color: var(--gray-800); margin-bottom: var(--space-2);">
+                            What makes Lemma different from other verification solutions?
+                        </h3>
+                        <p style="color: var(--gray-600);">
+                            Lemma uses cryptographic proofs that are mathematically impossible to forge. 
+                            Unlike traditional solutions, we don't collect personal data, verification 
+                            happens instantly, and the system works offline.
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <h3 style="color: var(--gray-800); margin-bottom: var(--space-2);">
+                            Is Lemma compliant with industry regulations?
+                        </h3>
+                        <p style="color: var(--gray-600);">
+                            Yes, Lemma is designed to meet compliance requirements across multiple industries. 
+                            We support various verification standards and can be configured to meet 
+                            regulatory requirements for identity verification in your specific industry.
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <h3 style="color: var(--gray-800); margin-bottom: var(--space-2);">
+                            What's your pricing model?
+                        </h3>
+                        <p style="color: var(--gray-600);">
+                            We charge $0.10 per monthly active verified user with no setup fees or 
+                            monthly minimums. You only pay for successful verifications, and there's 
+                            no charge for blocked bots or failed verification attempts.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Contact CTA -->
+<section class="contact-cta">
+    <div class="stripe-container">
+        <h2 style="margin-bottom: var(--space-4); color: var(--gray-800);">Ready to Get Started?</h2>
+        <p style="margin-bottom: var(--space-8); color: var(--gray-600); font-size: var(--font-size-lg);">
+            Join thousands of platforms using Lemma for secure identity verification
+        </p>
+        <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
+            <a href="/register" class="btn btn-primary btn-lg">Start Free Trial</a>
+            <a href="/pricing" class="btn btn-secondary btn-lg">View Pricing</a>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openChat() {
+    // In production, this would open your chat widget
+    alert('Chat feature coming soon! Please email support@lemma.id for immediate assistance.');
+}
+
+function submitContactForm(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const data = Object.fromEntries(formData);
+    
+    // Show loading state
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Sending...';
+    submitBtn.disabled = true;
+    
+    // Simulate form submission (replace with actual API call)
+    setTimeout(() => {
+        alert('Thank you for your message! We\'ll get back to you within 4 hours.');
+        event.target.reset();
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    }, 1000);
+    
+    // In production, you would send this to your contact form API:
+    // fetch('/api/contact', {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify(data)
+    // });
+}
+</script>
+{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- SEO for Contact Page -->
+    <meta property="og:title" content="Contact Lemma - Get Identity Verification Support">
+    <meta property="og:description" content="Contact Lemma for identity verification support, sales inquiries, and technical assistance. Get help securing your platform with cryptographic verification.">
+    <meta name="keywords" content="lemma contact, identity verification support, platform security help, verification sales, cryptographic verification integration support">
+    <link rel="canonical" href="https://lemma.id/contact">
+{% endblock %}

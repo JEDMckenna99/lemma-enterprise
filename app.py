@@ -199,6 +199,15 @@ def create_app():
         
     except Exception as e:
         logger.error(f"❌ Failed to register Simple Join API blueprint: {e}")
+    
+    # Register Admin API blueprint for platform administration
+    try:
+        from api.admin import admin_bp
+        app.register_blueprint(admin_bp)
+        logger.info("✅ Admin API blueprint registered")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register Admin API blueprint: {e}")
         
     # Initialize optimized engine
     try:
@@ -248,7 +257,17 @@ def create_app():
                              user_id=user_id,
                              verified=False)  # Bot shield will handle verification
     
-    # Missing route placeholders
+    # Public marketing pages
+    @app.route('/about')
+    def about():
+        """About page"""
+        return render_template('modern/about.html')
+    
+    @app.route('/contact')
+    def contact():
+        """Contact page"""
+        return render_template('modern/contact.html')
+    
     @app.route('/pricing')
     def pricing():
         """Pricing page"""
@@ -381,6 +400,38 @@ def create_app():
         
         logger.info(f"🧪 Created mock credential for user {user_id}")
         return redirect(url_for('join_network'))
+    
+    # Test endpoint to create admin user
+    @app.route('/create-admin-user')
+    def create_admin_user():
+        """Create test admin user - REMOVE IN PRODUCTION"""
+        try:
+            from api.customer_accounts import customer_manager
+            
+            result = customer_manager.create_admin_user(
+                email="admin@lemma.id",
+                name="Lemma Administrator",
+                company="Lemma Platform"
+            )
+            
+            if result['success']:
+                logger.info("✅ Admin user created successfully")
+                return jsonify({
+                    'success': True,
+                    'message': result['message'],
+                    'admin_email': 'admin@lemma.id',
+                    'login_url': '/login',
+                    'admin_dashboard': '/admin'
+                })
+            else:
+                return jsonify(result), 400
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to create admin user: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
     
     # ========================
     # QR CODE API ENDPOINTS

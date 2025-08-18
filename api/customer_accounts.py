@@ -10,7 +10,7 @@ import hashlib
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
 import stripe
 
@@ -36,6 +36,10 @@ class Customer:
     subscription_status: str  # 'none', 'active', 'past_due', 'canceled'
     monthly_usage: Dict[str, int]  # month -> user_count
     billing_email: Optional[str]
+    role: str = 'customer'  # 'customer' or 'admin'
+    permissions: List[str] = field(default_factory=list)
+    last_login: Optional[datetime] = None
+    login_count: int = 0
 
 class CustomerAccountManager:
     """Manages customer accounts and API keys"""
@@ -225,6 +229,49 @@ class CustomerAccountManager:
                 }
         
         return {'valid': False, 'error': 'API key revoked or inactive'}
+    
+    def create_admin_user(self, email: str, name: str, company: str = "Lemma Admin") -> Dict[str, Any]:
+        """Create an admin user account"""
+        try:
+            # Check if user already exists
+            if email in self.email_to_customer:
+                existing_customer = self.get_customer_by_email(email)
+                if existing_customer:
+                    # Upgrade existing user to admin
+                    existing_customer.role = 'admin'
+                    existing_customer.permissions = ['admin_access', 'user_management', 'system_config']
+                    logger.info(f"Upgraded existing user to admin: {email}")
+                    return {
+                        'success': True,
+                        'message': 'User upgraded to admin',
+                        'customer_id': existing_customer.customer_id
+                    }
+            
+            # Create new admin user
+            result = self.create_customer(email, name, company)
+            if result['success']:
+                # Upgrade to admin role
+                customer = self.get_customer(result['customer_id'])
+                if customer:
+                    customer.role = 'admin'
+                    customer.permissions = ['admin_access', 'user_management', 'system_config', 'analytics_access']
+                    logger.info(f"Created new admin user: {email}")
+                    
+                return {
+                    'success': True,
+                    'message': 'Admin user created successfully',
+                    'customer_id': result['customer_id'],
+                    'api_key': result['api_key']
+                }
+            else:
+                return result
+                
+        except Exception as e:
+            logger.error(f"Error creating admin user: {e}")
+            return {
+                'success': False,
+                'error': 'Failed to create admin user'
+            }
 
 # Global customer manager instance
 customer_manager = CustomerAccountManager()
@@ -310,8 +357,13 @@ def login():
                 'error': 'Customer not found'
             }), 404
         
-        # Store customer ID in session
+        # Update login tracking
+        customer.last_login = datetime.utcnow()
+        customer.login_count += 1
+        
+        # Store customer ID and role in session
         session['customer_id'] = customer.customer_id
+        session['user_role'] = customer.role
         
         return jsonify({
             'success': True,
@@ -328,16 +380,24 @@ def login():
 
 @customer_accounts_bp.route('/dashboard')
 def dashboard():
-    """Customer dashboard"""
-    customer_id = session.get('customer_id')
-    if not customer_id:
-        return redirect('/login')
+    """Customer dashboard - redirect to proper route"""
+    from auth.decorators import require_authenticated
     
-    customer = customer_manager.get_customer(customer_id)
-    if not customer:
-        return redirect('/login')
+    @require_authenticated()
+    def _dashboard():
+        customer_id = session.get('customer_id')
+        customer = customer_manager.get_customer(customer_id)
+        if not customer:
+            return redirect('/login')
+        
+        # Add current month for template
+        current_month = datetime.now().strftime('%Y-%m')
+        customer_data = asdict(customer)
+        customer_data['current_month'] = current_month
+        
+        return render_template('modern/dashboard.html', customer=customer_data)
     
-    return render_template('modern/dashboard.html', customer=asdict(customer))
+    return _dashboard()
 
 @customer_accounts_bp.route('/api/customer/info')
 def get_customer_info():

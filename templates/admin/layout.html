@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin Dashboard - Lemma{% endblock %}</title>
+    <meta name="description" content="{% block description %}Lemma platform administration dashboard{% endblock %}">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" type="image/svg+xml">
+    
+    <!-- Professional Font System -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;425;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Design System -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma-design-system.css') }}">
+    
+    <!-- Admin-specific styles -->
+    <style>
+        :root {
+            --admin-primary: #dc2626;  /* Red for admin */
+            --admin-secondary: #991b1b;
+            --admin-accent: #fef2f2;
+        }
+        
+        .admin-header {
+            background: var(--admin-primary);
+            color: var(--white);
+            padding: var(--space-4) 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .admin-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 var(--space-6);
+        }
+        
+        .admin-brand {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+            color: var(--white);
+            text-decoration: none;
+        }
+        
+        .admin-brand:hover {
+            color: var(--white);
+            opacity: 0.9;
+        }
+        
+        .admin-nav-links {
+            display: flex;
+            gap: var(--space-6);
+            align-items: center;
+        }
+        
+        .admin-nav-link {
+            color: var(--white);
+            text-decoration: none;
+            font-weight: 500;
+            padding: var(--space-2) var(--space-3);
+            border-radius: 6px;
+            transition: background-color 0.2s ease;
+        }
+        
+        .admin-nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--white);
+        }
+        
+        .admin-nav-link.active {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .admin-user-menu {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            color: var(--white);
+            font-size: var(--font-size-sm);
+        }
+        
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--space-8) var(--space-6);
+        }
+        
+        .admin-page-header {
+            margin-bottom: var(--space-8);
+            padding-bottom: var(--space-4);
+            border-bottom: 2px solid var(--gray-200);
+        }
+        
+        .admin-page-title {
+            font-size: var(--font-size-3xl);
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: var(--space-2);
+        }
+        
+        .admin-page-subtitle {
+            color: var(--gray-600);
+            font-size: var(--font-size-lg);
+        }
+        
+        .admin-alert {
+            background: var(--admin-accent);
+            border: 1px solid var(--admin-primary);
+            border-radius: 8px;
+            padding: var(--space-4);
+            margin-bottom: var(--space-6);
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+        
+        .admin-alert-icon {
+            color: var(--admin-primary);
+            font-size: var(--font-size-lg);
+        }
+        
+        .admin-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--space-6);
+            margin-bottom: var(--space-8);
+        }
+        
+        .admin-metric-card {
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            padding: var(--space-6);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        
+        .admin-metric-value {
+            font-size: var(--font-size-3xl);
+            font-weight: 800;
+            color: var(--admin-primary);
+            margin-bottom: var(--space-2);
+        }
+        
+        .admin-metric-label {
+            color: var(--gray-600);
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+        }
+        
+        .admin-table {
+            width: 100%;
+            background: var(--white);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            border: 2px solid var(--gray-200);
+        }
+        
+        .admin-table th {
+            background: var(--gray-50);
+            padding: var(--space-4);
+            text-align: left;
+            font-weight: 600;
+            color: var(--gray-700);
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        .admin-table td {
+            padding: var(--space-4);
+            border-bottom: 1px solid var(--gray-100);
+        }
+        
+        .admin-table tr:hover {
+            background: var(--gray-50);
+        }
+        
+        .admin-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-4);
+            border-radius: 6px;
+            font-weight: 500;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .admin-btn-primary {
+            background: var(--admin-primary);
+            color: var(--white);
+        }
+        
+        .admin-btn-primary:hover {
+            background: var(--admin-secondary);
+            color: var(--white);
+        }
+        
+        .admin-btn-secondary {
+            background: var(--gray-200);
+            color: var(--gray-700);
+        }
+        
+        .admin-btn-secondary:hover {
+            background: var(--gray-300);
+            color: var(--gray-800);
+        }
+        
+        .admin-status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: var(--space-1) var(--space-3);
+            border-radius: 20px;
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+        }
+        
+        .admin-status-active {
+            background: var(--success-100);
+            color: var(--success-800);
+        }
+        
+        .admin-status-suspended {
+            background: var(--error-100);
+            color: var(--error-800);
+        }
+        
+        .admin-status-pending {
+            background: var(--warning-100);
+            color: var(--warning-800);
+        }
+    </style>
+    
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- Admin Header -->
+    <header class="admin-header">
+        <nav class="admin-nav">
+            <a href="/admin" class="admin-brand">
+                <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" width="28" height="28" style="filter: brightness(0) invert(1);">
+                Admin Dashboard
+            </a>
+            
+            <div class="admin-nav-links">
+                <a href="/admin" class="admin-nav-link">Overview</a>
+                <a href="/admin/users" class="admin-nav-link">Users</a>
+                <a href="/admin/analytics" class="admin-nav-link">Analytics</a>
+                <a href="/admin/network" class="admin-nav-link">Network</a>
+                <a href="/admin/system" class="admin-nav-link">System</a>
+            </div>
+            
+            <div class="admin-user-menu">
+                <span>Admin</span>
+                <a href="/dashboard" class="admin-nav-link">My Account</a>
+                <a href="/logout" class="admin-nav-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="admin-container">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Admin JavaScript -->
+    <script>
+        // Highlight active navigation link
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            const navLinks = document.querySelectorAll('.admin-nav-link');
+            
+            navLinks.forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

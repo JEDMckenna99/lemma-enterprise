@@ -46,36 +46,105 @@
             
             <!-- Navigation Links -->
             <div class="nav-links">
+                <!-- Public Navigation (always visible) -->
                 <a href="/docs" class="nav-link">Documentation</a>
-                <a href="/playground" class="nav-link">API Playground</a>
                 <a href="/pricing" class="nav-link">Pricing</a>
                 
-                <!-- Try Now Dropdown -->
-                <div class="dropdown nav-dropdown">
-                    <button class="nav-link dropdown-trigger" aria-haspopup="true" aria-expanded="false">
-                        Try Now
-                        <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="6,9 12,15 18,9"></polyline>
-                        </svg>
-                    </button>
-                    <div class="dropdown-menu" role="menu">
-                        <a href="/join-network" class="dropdown-item" role="menuitem">
-                            <div class="dropdown-item-content">
-                                <div class="dropdown-item-title">Join the Network</div>
-                                <div class="dropdown-item-desc">Try out the shield & join the network</div>
-                            </div>
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="/qr-demo" class="dropdown-item" role="menuitem">
-                            <div class="dropdown-item-content">
-                                <div class="dropdown-item-title">QR Code Demo</div>
-                                <div class="dropdown-item-desc">Test offline QR verification</div>
-                            </div>
-                        </a>
+                {% if session.get('customer_id') %}
+                    <!-- Authenticated User Navigation -->
+                    {% if session.get('user_role') == 'admin' %}
+                        <!-- Admin Navigation -->
+                        <a href="/admin" class="nav-link">Admin Dashboard</a>
+                        <a href="/dashboard" class="nav-link">My Account</a>
+                    {% else %}
+                        <!-- FIL Customer Navigation -->
+                        <a href="/dashboard" class="nav-link">Dashboard</a>
+                        <a href="/playground" class="nav-link">API Playground</a>
+                    {% endif %}
+                    
+                    <!-- User Menu Dropdown -->
+                    <div class="dropdown nav-dropdown">
+                        <button class="nav-link dropdown-trigger" aria-haspopup="true" aria-expanded="false">
+                            {% if session.get('user_role') == 'admin' %}
+                                Admin Menu
+                            {% else %}
+                                Account
+                            {% endif %}
+                            <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6,9 12,15 18,9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="dropdown-menu" role="menu">
+                            {% if session.get('user_role') == 'admin' %}
+                                <a href="/admin/users" class="dropdown-item" role="menuitem">
+                                    <div class="dropdown-item-content">
+                                        <div class="dropdown-item-title">Manage Users</div>
+                                        <div class="dropdown-item-desc">User account management</div>
+                                    </div>
+                                </a>
+                                <a href="/admin/analytics" class="dropdown-item" role="menuitem">
+                                    <div class="dropdown-item-content">
+                                        <div class="dropdown-item-title">Analytics</div>
+                                        <div class="dropdown-item-desc">Business metrics & insights</div>
+                                    </div>
+                                </a>
+                                <a href="/admin/network" class="dropdown-item" role="menuitem">
+                                    <div class="dropdown-item-content">
+                                        <div class="dropdown-item-title">Network Monitor</div>
+                                        <div class="dropdown-item-desc">Network health & performance</div>
+                                    </div>
+                                </a>
+                                <div class="dropdown-divider"></div>
+                            {% endif %}
+                            <a href="/dashboard/api-keys" class="dropdown-item" role="menuitem">
+                                <div class="dropdown-item-content">
+                                    <div class="dropdown-item-title">API Keys</div>
+                                    <div class="dropdown-item-desc">Manage your API keys</div>
+                                </div>
+                            </a>
+                            <a href="/dashboard/billing" class="dropdown-item" role="menuitem">
+                                <div class="dropdown-item-content">
+                                    <div class="dropdown-item-title">Billing</div>
+                                    <div class="dropdown-item-desc">Usage & payment info</div>
+                                </div>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="/logout" class="dropdown-item" role="menuitem">
+                                <div class="dropdown-item-content">
+                                    <div class="dropdown-item-title">Sign Out</div>
+                                </div>
+                            </a>
+                        </div>
                     </div>
-                </div>
-                
-                <a href="/login" class="btn btn-primary">Sign In</a>
+                {% else %}
+                    <!-- Unauthenticated User Navigation -->
+                    <!-- Try Now Dropdown -->
+                    <div class="dropdown nav-dropdown">
+                        <button class="nav-link dropdown-trigger" aria-haspopup="true" aria-expanded="false">
+                            Try Now
+                            <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6,9 12,15 18,9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="dropdown-menu" role="menu">
+                            <a href="/join-network" class="dropdown-item" role="menuitem">
+                                <div class="dropdown-item-content">
+                                    <div class="dropdown-item-title">Join the Network</div>
+                                    <div class="dropdown-item-desc">Try out the shield & join the network</div>
+                                </div>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="/qr-demo" class="dropdown-item" role="menuitem">
+                                <div class="dropdown-item-content">
+                                    <div class="dropdown-item-title">QR Code Demo</div>
+                                    <div class="dropdown-item-desc">Test offline QR verification</div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <a href="/login" class="btn btn-primary">Sign In</a>
+                {% endif %}
             </div>
         </nav>
     </header>

@@ -7,7 +7,7 @@ Enhanced security decorators for CSRF protection, rate limiting, and API key aut
 import time
 import logging
 from functools import wraps
-from flask import request, jsonify, session, current_app, g
+from flask import request, jsonify, session, current_app, g, redirect, url_for
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -307,4 +307,141 @@ def validate_json_input(required_fields: list = None, optional_fields: list = No
             
             return f(*args, **kwargs)
         return decorated_function
-    return decorator 
+    return decorator
+
+# ============================================================================
+# ROLE-BASED AUTHORIZATION DECORATORS
+# ============================================================================
+
+def require_authenticated(redirect_to_login=True):
+    """
+    Decorator to require authenticated user
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            customer_id = session.get('customer_id')
+            if not customer_id:
+                if redirect_to_login and request.endpoint and not request.is_json:
+                    return redirect(url_for('customer_accounts.login'))
+                return jsonify({
+                    'success': False,
+                    'error': 'authentication_required',
+                    'message': 'Authentication required',
+                    'redirect_url': '/login'
+                }), 401
+            
+            # Store customer info in g for use in request
+            g.customer_id = customer_id
+            g.user_role = session.get('user_role', 'customer')
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def require_role(required_role: str, redirect_to_login=True):
+    """
+    Decorator to require specific user role
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            customer_id = session.get('customer_id')
+            user_role = session.get('user_role', 'customer')
+            
+            if not customer_id:
+                if redirect_to_login and request.endpoint and not request.is_json:
+                    return redirect(url_for('customer_accounts.login'))
+                return jsonify({
+                    'success': False,
+                    'error': 'authentication_required',
+                    'message': 'Authentication required',
+                    'redirect_url': '/login'
+                }), 401
+            
+            if user_role != required_role:
+                log_security_event('unauthorized_role_access', {
+                    'required_role': required_role,
+                    'user_role': user_role,
+                    'customer_id': customer_id,
+                    'endpoint': request.endpoint
+                }, 'WARNING')
+                
+                if redirect_to_login and request.endpoint and not request.is_json:
+                    return redirect(url_for('index'))  # Redirect to home instead of error
+                return jsonify({
+                    'success': False,
+                    'error': 'insufficient_permissions',
+                    'message': f'Role "{required_role}" required for this action',
+                    'user_role': user_role
+                }), 403
+            
+            # Store user info in g for use in request
+            g.customer_id = customer_id
+            g.user_role = user_role
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def require_admin(redirect_to_login=True):
+    """
+    Decorator to require admin role
+    """
+    return require_role('admin', redirect_to_login)
+
+def require_customer(redirect_to_login=True):
+    """
+    Decorator to require customer role (or higher)
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            customer_id = session.get('customer_id')
+            user_role = session.get('user_role', 'customer')
+            
+            if not customer_id:
+                if redirect_to_login and request.endpoint and not request.is_json:
+                    return redirect(url_for('customer_accounts.login'))
+                return jsonify({
+                    'success': False,
+                    'error': 'authentication_required',
+                    'message': 'Authentication required',
+                    'redirect_url': '/login'
+                }), 401
+            
+            # Allow both customer and admin roles
+            if user_role not in ['customer', 'admin']:
+                log_security_event('unauthorized_role_access', {
+                    'required_role': 'customer_or_admin',
+                    'user_role': user_role,
+                    'customer_id': customer_id,
+                    'endpoint': request.endpoint
+                }, 'WARNING')
+                
+                return jsonify({
+                    'success': False,
+                    'error': 'insufficient_permissions',
+                    'message': 'Customer account required for this action',
+                    'user_role': user_role
+                }), 403
+            
+            # Store user info in g for use in request
+            g.customer_id = customer_id
+            g.user_role = user_role
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def get_current_user():
+    """
+    Helper function to get current user info from session
+    """
+    return {
+        'customer_id': session.get('customer_id'),
+        'user_role': session.get('user_role', 'customer'),
+        'is_authenticated': bool(session.get('customer_id')),
+        'is_admin': session.get('user_role') == 'admin',
+        'is_customer': session.get('user_role') in ['customer', 'admin']
+    } 

@@ -1,0 +1,296 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}About Lemma - Identity Verification Platform{% endblock %}
+{% block description %}Learn about Lemma's mission to provide professional identity verification for online platforms, protecting against bots and ensuring user authenticity.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .about-hero {
+            background: linear-gradient(135deg, var(--gray-900) 0%, var(--gray-800) 100%);
+            color: var(--white);
+            padding: var(--space-16) 0;
+            text-align: center;
+        }
+        
+        .about-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .about-title {
+            font-size: var(--font-size-4xl);
+            font-weight: 800;
+            margin-bottom: var(--space-6);
+            background: linear-gradient(135deg, #ffffff 0%, #d4af37 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .about-subtitle {
+            font-size: var(--font-size-xl);
+            color: var(--gray-300);
+            line-height: 1.6;
+        }
+        
+        .mission-section {
+            padding: var(--space-16) 0;
+            background: var(--white);
+        }
+        
+        .values-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--space-8);
+            margin-top: var(--space-12);
+        }
+        
+        .value-card {
+            text-align: center;
+            padding: var(--space-8);
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 16px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s ease;
+        }
+        
+        .value-card:hover {
+            transform: translateY(-4px);
+        }
+        
+        .value-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-6);
+            font-size: 2rem;
+            color: var(--white);
+        }
+        
+        .team-section {
+            padding: var(--space-16) 0;
+            background: var(--gray-50);
+        }
+        
+        .stats-section {
+            padding: var(--space-16) 0;
+            background: var(--primary-500);
+            color: var(--white);
+            text-align: center;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--space-8);
+            margin-top: var(--space-8);
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: var(--font-size-4xl);
+            font-weight: 800;
+            margin-bottom: var(--space-2);
+        }
+        
+        .stat-label {
+            font-size: var(--font-size-lg);
+            opacity: 0.9;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<!-- About Hero -->
+<section class="about-hero">
+    <div class="stripe-container">
+        <div class="about-content">
+            <h1 class="about-title">About Lemma</h1>
+            <p class="about-subtitle">
+                We're building the future of identity verification for online platforms. 
+                Our mission is to create trust between legitimate users and businesses 
+                while eliminating bots and fraud from digital interactions.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- Mission Section -->
+<section class="mission-section">
+    <div class="stripe-container">
+        <div class="section-header">
+            <h2 class="section-title">Our Mission</h2>
+            <p class="section-subtitle">
+                Enabling trust and security in digital interactions through advanced identity verification
+            </p>
+        </div>
+        
+        <div class="about-content" style="margin-top: var(--space-8);">
+            <p style="font-size: var(--font-size-lg); line-height: 1.8; color: var(--gray-600); margin-bottom: var(--space-6);">
+                Digital platforms are built on trust. When users interact online, businesses need confidence 
+                that they're dealing with legitimate people, not bots or fake accounts. Traditional verification 
+                methods are either too intrusive, too slow, or easily bypassed by sophisticated automation.
+            </p>
+            
+            <p style="font-size: var(--font-size-lg); line-height: 1.8; color: var(--gray-600); margin-bottom: var(--space-6);">
+                Lemma solves this with cryptographic identity verification that's instant, private, and impossible to fake. 
+                We protect platforms from fraud while ensuring legitimate users have a seamless experience.
+            </p>
+            
+            <p style="font-size: var(--font-size-lg); line-height: 1.8; color: var(--gray-600);">
+                Our technology powers verification across industries - from SaaS platforms and marketplaces 
+                to fintech applications and specialized sectors like real estate - protecting billions in digital transactions.
+            </p>
+        </div>
+        
+        <div class="values-grid">
+            <div class="value-card">
+                <div class="value-icon">🔒</div>
+                <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
+                    Privacy First
+                </h3>
+                <p style="color: var(--gray-600); line-height: 1.6;">
+                    We verify identity without collecting personal data. Users maintain complete privacy 
+                    while platforms get definitive verification results.
+                </p>
+            </div>
+            
+            <div class="value-card">
+                <div class="value-icon">⚡</div>
+                <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
+                    Instant Results
+                </h3>
+                <p style="color: var(--gray-600); line-height: 1.6;">
+                    Verification happens in milliseconds, not minutes. Real users get immediate access 
+                    while bots are blocked automatically.
+                </p>
+            </div>
+            
+            <div class="value-card">
+                <div class="value-icon">🛡️</div>
+                <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
+                    Unbreakable Security
+                </h3>
+                <p style="color: var(--gray-600); line-line-height: 1.6;">
+                    Built on cryptographic proofs that can't be forged, spoofed, or bypassed. 
+                    Military-grade security with consumer-grade simplicity.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Stats Section -->
+<section class="stats-section">
+    <div class="stripe-container">
+        <h2 style="font-size: var(--font-size-3xl); font-weight: 800; margin-bottom: var(--space-4);">
+            Trusted by Industry Leaders
+        </h2>
+        <p style="font-size: var(--font-size-lg); opacity: 0.9;">
+            Real numbers from platforms across industries using Lemma verification
+        </p>
+        
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-number">1,000+</div>
+                <div class="stat-label">Platforms Worldwide</div>
+            </div>
+            
+            <div class="stat-item">
+                <div class="stat-number">2.5M</div>
+                <div class="stat-label">Verified Users</div>
+            </div>
+            
+            <div class="stat-item">
+                <div class="stat-number">95%</div>
+                <div class="stat-label">Bot Reduction</div>
+            </div>
+            
+            <div class="stat-item">
+                <div class="stat-number">$2.1B</div>
+                <div class="stat-label">Protected Transactions</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Technology Section -->
+<section class="section">
+    <div class="stripe-container">
+        <div class="section-header">
+            <h2 class="section-title">How We're Different</h2>
+            <p class="section-subtitle">
+                Advanced cryptography meets industry compliance requirements
+            </p>
+        </div>
+        
+        <div class="card-grid card-grid-2">
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h3 style="color: var(--primary-600); margin-bottom: var(--space-4);">🔬 Cryptographic Verification</h3>
+                    <p style="margin-bottom: var(--space-4);">
+                        Our verification system uses zero-knowledge proofs and cryptographic signatures 
+                        that are mathematically impossible to forge or replicate.
+                    </p>
+                    <ul style="color: var(--gray-600); line-height: 1.8;">
+                        <li>Ed25519 digital signatures</li>
+                        <li>Zero-knowledge proof systems</li>
+                        <li>Blockchain-anchored verification</li>
+                        <li>Offline verification capability</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h3 style="color: var(--primary-600); margin-bottom: var(--space-4);">🌐 Industry Versatile</h3>
+                    <p style="margin-bottom: var(--space-4);">
+                        Flexible platform that adapts to various industries with configurable 
+                        compliance and verification requirements.
+                    </p>
+                    <ul style="color: var(--gray-600); line-height: 1.8;">
+                        <li>SaaS and marketplace integration</li>
+                        <li>Financial services compatibility</li>
+                        <li>Healthcare and education support</li>
+                        <li>Real estate and specialized sectors</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Contact CTA -->
+<section class="section">
+    <div class="stripe-container">
+        <div class="card-enhanced" style="text-align: center; padding: var(--space-12);">
+            <h2 style="margin-bottom: var(--space-4); color: var(--gray-800);">Ready to Secure Your Platform?</h2>
+            <p style="margin-bottom: var(--space-8); color: var(--gray-600); font-size: var(--font-size-lg);">
+                Join thousands of platforms who trust Lemma for identity verification
+            </p>
+            <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
+                <a href="/register" class="btn btn-primary btn-lg">Start Free Trial</a>
+                <a href="/contact" class="btn btn-secondary btn-lg">Contact Sales</a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- SEO for About Page -->
+    <meta property="og:title" content="About Lemma - Identity Verification Platform">
+    <meta property="og:description" content="Learn about Lemma's mission to provide professional identity verification for online platforms, protecting against bots and ensuring user authenticity.">
+    <meta name="keywords" content="about lemma, identity verification company, platform security, bot protection, cryptographic verification technology">
+    <link rel="canonical" href="https://lemma.id/about">
+{% endblock %}

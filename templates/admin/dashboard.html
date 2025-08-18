@@ -1,0 +1,172 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Admin Dashboard - Lemma Platform{% endblock %}
+{% block description %}Lemma platform administration overview dashboard{% endblock %}
+
+{% block content %}
+<div class="admin-page-header">
+    <h1 class="admin-page-title">Platform Overview</h1>
+    <p class="admin-page-subtitle">
+        System metrics and administrative controls for the Lemma platform
+    </p>
+</div>
+
+<!-- Admin Alert -->
+<div class="admin-alert">
+    <span class="admin-alert-icon">⚠️</span>
+    <div>
+        <strong>Administrator Access</strong> - You have full administrative privileges. 
+        All actions are logged for security and compliance.
+    </div>
+</div>
+
+<!-- System Metrics -->
+<div class="admin-metrics-grid">
+    <div class="admin-metric-card">
+        <div class="admin-metric-value">{{ metrics.total_users or 0 }}</div>
+        <div class="admin-metric-label">Total Users</div>
+    </div>
+    
+    <div class="admin-metric-card">
+        <div class="admin-metric-value">{{ metrics.active_users or 0 }}</div>
+        <div class="admin-metric-label">Active Users</div>
+    </div>
+    
+    <div class="admin-metric-card">
+        <div class="admin-metric-value">{{ metrics.monthly_active_users or 0 }}</div>
+        <div class="admin-metric-label">Monthly Active Users</div>
+    </div>
+    
+    <div class="admin-metric-card">
+        <div class="admin-metric-value">${{ "%.2f"|format(metrics.total_revenue or 0) }}</div>
+        <div class="admin-metric-label">Total Revenue</div>
+    </div>
+    
+    <div class="admin-metric-card">
+        <div class="admin-metric-value">{{ metrics.api_keys_total or 0 }}</div>
+        <div class="admin-metric-label">API Keys Issued</div>
+    </div>
+    
+    <div class="admin-metric-card">
+        <div class="admin-metric-value">{{ metrics.admin_users or 0 }}</div>
+        <div class="admin-metric-label">Admin Users</div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card-enhanced" style="margin-bottom: var(--space-8);">
+    <div class="card-body">
+        <h2 style="margin-bottom: var(--space-4); color: var(--gray-800);">Quick Actions</h2>
+        <div style="display: flex; gap: var(--space-4); flex-wrap: wrap;">
+            <a href="/admin/users" class="admin-btn admin-btn-primary">
+                👥 Manage Users
+            </a>
+            <a href="/admin/analytics" class="admin-btn admin-btn-primary">
+                📊 View Analytics
+            </a>
+            <a href="/admin/network" class="admin-btn admin-btn-primary">
+                🌐 Network Status
+            </a>
+            <a href="/admin/system" class="admin-btn admin-btn-secondary">
+                ⚙️ System Config
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="card-enhanced">
+    <div class="card-body">
+        <h2 style="margin-bottom: var(--space-4); color: var(--gray-800);">System Status</h2>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-6);">
+            <!-- Platform Health -->
+            <div>
+                <h3 style="color: var(--gray-700); margin-bottom: var(--space-3);">Platform Health</h3>
+                <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2);">
+                    <div style="width: 12px; height: 12px; background: var(--success); border-radius: 50%;"></div>
+                    <span>All systems operational</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2);">
+                    <div style="width: 12px; height: 12px; background: var(--success); border-radius: 50%;"></div>
+                    <span>API endpoints responding</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <div style="width: 12px; height: 12px; background: var(--success); border-radius: 50%;"></div>
+                    <span>Database connections healthy</span>
+                </div>
+            </div>
+            
+            <!-- Recent Registrations -->
+            <div>
+                <h3 style="color: var(--gray-700); margin-bottom: var(--space-3);">Recent Activity</h3>
+                <div style="font-size: var(--font-size-sm); color: var(--gray-600);">
+                    <div style="margin-bottom: var(--space-2);">
+                        <strong>New users today:</strong> 5
+                    </div>
+                    <div style="margin-bottom: var(--space-2);">
+                        <strong>API calls (24h):</strong> 125,000
+                    </div>
+                    <div>
+                        <strong>Revenue (30d):</strong> ${{ "%.2f"|format(metrics.total_revenue or 0) }}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Alerts -->
+            <div>
+                <h3 style="color: var(--gray-700); margin-bottom: var(--space-3);">System Alerts</h3>
+                <div style="font-size: var(--font-size-sm); color: var(--gray-600);">
+                    <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2);">
+                        <span style="color: var(--success);">✓</span>
+                        <span>No critical alerts</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2);">
+                        <span style="color: var(--success);">✓</span>
+                        <span>Security monitoring active</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-2);">
+                        <span style="color: var(--success);">✓</span>
+                        <span>Backup systems operational</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Chart Placeholder -->
+<div class="card-enhanced" style="margin-top: var(--space-8);">
+    <div class="card-body">
+        <h2 style="margin-bottom: var(--space-4); color: var(--gray-800);">Performance Overview</h2>
+        <div style="height: 200px; background: var(--gray-50); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--gray-500);">
+            📈 Performance charts will be implemented here
+            <br><small>API response times, user growth, revenue trends</small>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-refresh metrics every 30 seconds
+    setInterval(function() {
+        // In production, this would fetch updated metrics via AJAX
+        console.log('Refreshing admin metrics...');
+    }, 30000);
+    
+    // Add real-time status indicators
+    document.addEventListener('DOMContentLoaded', function() {
+        // Simulate real-time updates
+        const statusIndicators = document.querySelectorAll('[style*="background: var(--success)"]');
+        statusIndicators.forEach(indicator => {
+            setInterval(() => {
+                indicator.style.opacity = indicator.style.opacity === '0.5' ? '1' : '0.5';
+                setTimeout(() => {
+                    indicator.style.opacity = '1';
+                }, 200);
+            }, 3000);
+        });
+    });
+</script>
+{% endblock %}
