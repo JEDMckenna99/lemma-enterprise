@@ -607,7 +607,7 @@ a:hover {
 
 .nav-center {
   display: flex;
-  gap: var(--space-8);
+  gap: var(--space-12);
   align-items: center;
   position: absolute;
   left: 50%;
