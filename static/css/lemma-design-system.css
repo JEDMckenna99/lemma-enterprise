@@ -587,6 +587,7 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
 }
 
 .nav-logo {
@@ -594,6 +595,29 @@ a:hover {
   font-weight: 700;
   color: var(--gray-800);
   text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.nav-logo-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.nav-center {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.nav-right {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
 }
 
 .nav-links {
@@ -611,6 +635,22 @@ a:hover {
 
 .nav-link:hover {
   color: var(--primary-500);
+}
+
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--gray-600);
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--space-1);
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.mobile-menu-btn:hover {
+  color: var(--primary-500);
+  background-color: var(--gray-100);
 }
 
 /* 16. Grid Systems */
@@ -664,6 +704,19 @@ a:hover {
   
   .card-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .nav-center {
+    display: none;
+  }
+  
+  .nav-right .dropdown,
+  .nav-right .btn {
+    display: none;
+  }
+  
+  .mobile-menu-btn {
+    display: block;
   }
   
   .nav-links {

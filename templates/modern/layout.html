@@ -44,24 +44,35 @@
                 <span class="nav-logo-text">Lemma</span>
             </a>
             
-            <!-- Navigation Links -->
-            <div class="nav-links">
-                <!-- Public Navigation (always visible) -->
-                <a href="/docs" class="nav-link">Documentation</a>
-                <a href="/pricing" class="nav-link">Pricing</a>
-                
+            <!-- Centered Navigation Links -->
+            <div class="nav-center">
                 {% if session.get('customer_id') %}
                     <!-- Authenticated User Navigation -->
                     {% if session.get('user_role') == 'admin' %}
                         <!-- Admin Navigation -->
                         <a href="/admin" class="nav-link">Admin Dashboard</a>
                         <a href="/dashboard" class="nav-link">My Account</a>
+                        <a href="/docs" class="nav-link">Documentation</a>
+                        <a href="/pricing" class="nav-link">Pricing</a>
                     {% else %}
                         <!-- FIL Customer Navigation -->
                         <a href="/dashboard" class="nav-link">Dashboard</a>
                         <a href="/playground" class="nav-link">API Playground</a>
+                        <a href="/docs" class="nav-link">Documentation</a>
+                        <a href="/pricing" class="nav-link">Pricing</a>
                     {% endif %}
-                    
+                {% else %}
+                    <!-- Unregistered User Navigation -->
+                    <a href="/join-network" class="nav-link">Join Network</a>
+                    <a href="/about" class="nav-link">Solutions</a>
+                    <a href="/docs" class="nav-link">Documentation</a>
+                    <a href="/pricing" class="nav-link">Pricing</a>
+                {% endif %}
+            </div>
+            
+            <!-- Right Side Navigation -->
+            <div class="nav-right">
+                {% if session.get('customer_id') %}
                     <!-- User Menu Dropdown -->
                     <div class="dropdown nav-dropdown">
                         <button class="nav-link dropdown-trigger" aria-haspopup="true" aria-expanded="false">
@@ -117,34 +128,18 @@
                         </div>
                     </div>
                 {% else %}
-                    <!-- Unauthenticated User Navigation -->
-                    <!-- Try Now Dropdown -->
-                    <div class="dropdown nav-dropdown">
-                        <button class="nav-link dropdown-trigger" aria-haspopup="true" aria-expanded="false">
-                            Try Now
-                            <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="6,9 12,15 18,9"></polyline>
-                            </svg>
-                        </button>
-                        <div class="dropdown-menu" role="menu">
-                            <a href="/join-network" class="dropdown-item" role="menuitem">
-                                <div class="dropdown-item-content">
-                                    <div class="dropdown-item-title">Join the Network</div>
-                                    <div class="dropdown-item-desc">Try out the shield & join the network</div>
-                                </div>
-                            </a>
-                            <div class="dropdown-divider"></div>
-                            <a href="/qr-demo" class="dropdown-item" role="menuitem">
-                                <div class="dropdown-item-content">
-                                    <div class="dropdown-item-title">QR Code Demo</div>
-                                    <div class="dropdown-item-desc">Test offline QR verification</div>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                    
+                    <!-- Sign In Button for Unregistered Users -->
                     <a href="/login" class="btn btn-primary">Sign In</a>
                 {% endif %}
+                
+                <!-- Mobile Menu Button -->
+                <button class="mobile-menu-btn" aria-label="Toggle mobile menu" aria-expanded="false">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
             </div>
         </nav>
     </header>
