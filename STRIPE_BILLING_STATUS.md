@@ -67,7 +67,7 @@ stripe>=8.0.0
 1. Visit pricing page at `/pricing`
 2. Use calculator to estimate monthly costs
 3. Click "Start Protecting Your Site" 
-4. Get redirected to join-network with billing parameters
+4. Get redirected to wallet with billing parameters
 5. **Manual billing setup required** (not fully automated yet)
 
 **For You:**

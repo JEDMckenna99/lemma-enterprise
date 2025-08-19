@@ -243,8 +243,8 @@ def create_app():
         logger.info("🏠 Serving homepage with client-side FIL detection")
         return render_template('modern/index.html', show_fil_widget=True, enable_auto_redirect=True)
     
-    @app.route('/join')  
-    @app.route('/join-network')
+    @app.route('/wallet')
+    @app.route('/join-network')  # Keep old route for compatibility
     def wallet():
         """
         Lemma Federated Wallet - FIL Network Access

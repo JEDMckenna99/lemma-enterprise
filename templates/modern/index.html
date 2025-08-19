@@ -10,7 +10,7 @@
         <h1>Identity Verification That Actually Works</h1>
         <p>Lemma uses cryptographic proofs to verify real users and block bots. Privacy-preserving, lightning-fast, and built for production scale.</p>
         <div style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-            <a href="/join-network" class="btn btn-primary">Start Building</a>
+            <a href="/wallet" class="btn btn-primary">Start Building</a>
             <a href="/docs" class="btn btn-secondary">View Documentation</a>
         </div>
     </div>
@@ -95,7 +95,7 @@
             <div class="card">
                 <h4 class="card-title">Try It Now</h4>
                 <p>Experience Lemma verification in action. Click below to see how fast and seamless it is.</p>
-                <a href="/join-network" class="btn btn-primary">Join Federated Network</a>
+                <a href="/wallet" class="btn btn-primary">Join Federated Network</a>
             </div>
         </div>
     </div>
@@ -169,7 +169,7 @@
         <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Ready to Secure Your Platform?</h2>
         <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 480px; margin-left: auto; margin-right: auto;">Join the federated identity network and start verifying users in minutes.</p>
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-            <a href="/join-network" class="btn btn-primary">Join the Network</a>
+            <a href="/wallet" class="btn btn-primary">Join the Network</a>
             <a href="/contact" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Talk to Us</a>
         </div>
     </div>
@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const credentials = await tempWallet.getCredentials();
         if (credentials && credentials.length > 0) {
             console.log('🏠 User has lemmas, redirecting to wallet...');
-            window.location.href = '/join-network';
+            window.location.href = '/wallet';
             return;
         }
     } catch (error) {
@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             onVerified: function(result) {
                 console.log('✅ Homepage shield verification successful:', result);
                 // Redirect to wallet after successful verification
-                window.location.href = '/join-network';
+                window.location.href = '/wallet';
             },
             onError: function(error) {
                 console.error('❌ Homepage shield verification failed:', error);

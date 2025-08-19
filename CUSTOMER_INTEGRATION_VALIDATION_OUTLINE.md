@@ -1,7 +1,7 @@
 # 🛡️ Lemma Shield Customer Integration Validation Outline
 
 ## 🎯 **Objective**
-Make the `/join-network` page demonstrate **exactly** how customers integrate Lemma Shield into their sites, using the same few-line integration that customers would use. This validates both service functionality and integration simplicity.
+Make the `/wallet` page demonstrate **exactly** how customers integrate Lemma Shield into their sites, using the same few-line integration that customers would use. This validates both service functionality and integration simplicity.
 
 ---
 
@@ -200,7 +200,7 @@ Create comprehensive guide based on join network validation:
 3. Protect: `lemma.protectElement('#your-content');`
 
 ## Live Demo
-See working example: https://your-app.herokuapp.com/join-network
+See working example: https://your-app.herokuapp.com/wallet
 
 ## Configuration Options
 - Demo mode vs Production mode
