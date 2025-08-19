@@ -5,6 +5,11 @@
 
 {% block head %}
     {{ super() }}
+    <!-- SEO for Solutions Page -->
+    <meta property="og:title" content="Lemma Solutions - Federated Identity Verification">
+    <meta property="og:description" content="Discover how Lemma's verification engine powers federated identity networks, enabling seamless authentication across platforms without compromising user privacy.">
+    <meta name="keywords" content="lemma solutions, federated identity, verification engine, cross-platform authentication, privacy-first verification, bot protection">
+    <link rel="canonical" href="https://lemma.id/about">
     <style>
         .about-hero {
             background: linear-gradient(135deg, var(--gray-900) 0%, var(--gray-800) 100%);
@@ -374,13 +379,4 @@
         </div>
     </div>
 </section>
-{% endblock %}
-
-{% block head %}
-    {{ super() }}
-    <!-- SEO for Solutions Page -->
-    <meta property="og:title" content="Lemma Solutions - Federated Identity Verification">
-    <meta property="og:description" content="Discover how Lemma's verification engine powers federated identity networks, enabling seamless authentication across platforms without compromising user privacy.">
-    <meta name="keywords" content="lemma solutions, federated identity, verification engine, cross-platform authentication, privacy-first verification, bot protection">
-    <link rel="canonical" href="https://lemma.id/about">
 {% endblock %}
