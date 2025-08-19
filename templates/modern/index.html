@@ -6,12 +6,12 @@
 {% block content %}
 <!-- Hero Section -->
 <section class="hero">
-    <div class="container">
-        <h1>Stop Bots, Verify Real Users</h1>
-        <p>Professional identity verification platform. Secure your platform with cryptographic verification that's private, instant, and impossible to forge.</p>
-        <div style="margin-top: var(--space-8);">
-            <a href="/join-network" class="btn btn-primary" style="margin-right: var(--space-4);">Try Now</a>
-            <a href="/docs" class="btn btn-secondary">Documentation</a>
+    <div class="container" style="position: relative; z-index: 1;">
+        <h1>Identity Verification That Actually Works</h1>
+        <p>Lemma uses cryptographic proofs to verify real users and block bots. Privacy-preserving, lightning-fast, and built for production scale.</p>
+        <div style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+            <a href="/join-network" class="btn btn-primary">Start Building</a>
+            <a href="/docs" class="btn btn-secondary">View Documentation</a>
         </div>
     </div>
 </section>
@@ -24,25 +24,25 @@
             <p class="text-gray">The most advanced identity verification platform for modern applications.</p>
         </div>
         
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-8);">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; margin-top: 64px;">
             <div class="card">
-                <h3 class="card-title">🛡️ Bot Protection</h3>
-                <p>Advanced cryptographic verification that stops bots while allowing real users through instantly.</p>
+                <h3 class="card-title">Bot Protection</h3>
+                <p>Cryptographic verification that identifies and blocks automated traffic while real users pass through seamlessly.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">🔒 Privacy First</h3>
-                <p>Zero-knowledge proofs ensure user privacy while maintaining security. No personal data stored.</p>
+                <h3 class="card-title">Privacy Preserved</h3>
+                <p>Zero-knowledge architecture means we verify identity without collecting or storing personal information.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">⚡ Lightning Fast</h3>
-                <p>Microsecond verification times with our optimized Rust engine. No user friction.</p>
+                <h3 class="card-title">Fast Integration</h3>
+                <p>Production-ready verification in minutes with our optimized Rust engine and simple API.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">🌐 Federated Network</h3>
-                <p>Join a network of verified platforms. One verification works everywhere in the network.</p>
+                <h3 class="card-title">Network Effects</h3>
+                <p>Users verified on one platform are trusted across the entire federated network.</p>
             </div>
         </div>
     </div>
@@ -56,18 +56,18 @@
             <p class="text-gray">Bots and fake accounts are destroying online platforms.</p>
         </div>
         
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-6); text-align: center;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 48px; text-align: center; margin-top: 48px;">
             <div>
-                <h3 class="text-gold">87%</h3>
-                <p>Of web traffic is now automated bots</p>
+                <h3 style="font-size: 48px; font-weight: 700; color: var(--primary); margin-bottom: 12px;">87%</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">of web traffic is automated</p>
             </div>
             <div>
-                <h3 class="text-gold">$52B</h3>
-                <p>Annual cost of bot fraud globally</p>
+                <h3 style="font-size: 48px; font-weight: 700; color: var(--secondary); margin-bottom: 12px;">$52B</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">lost to bot fraud annually</p>
             </div>
             <div>
-                <h3 class="text-gold">40%</h3>
-                <p>Of user accounts are fake or duplicate</p>
+                <h3 style="font-size: 48px; font-weight: 700; color: var(--primary); margin-bottom: 12px;">40%</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">of accounts are fake</p>
             </div>
         </div>
     </div>
@@ -101,33 +101,34 @@
     </div>
 </section>
 
-<!-- Testimonials Section -->
-<section class="section" style="background: var(--gray-100);">
+<!-- Social Proof Section -->
+<section class="section" style="background: var(--gray-100); padding: 80px 0;">
     <div class="container">
-        <div style="text-align: center; margin-bottom: var(--space-16);">
-            <h2>Trusted by Industry Leaders</h2>
-            <p class="text-gray">Companies worldwide rely on Lemma for identity verification.</p>
+        <div style="text-align: center; margin-bottom: 64px;">
+            <h2 style="font-size: var(--font-size-3xl); margin-bottom: 16px;">Trusted by Development Teams</h2>
+            <p style="color: var(--gray-600); font-size: var(--font-size-lg); max-width: 500px; margin: 0 auto;">Real results from companies using Lemma in production.</p>
         </div>
         
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-8);">
-            <div class="card">
-                <p>"Lemma reduced our bot traffic by 94% while improving user experience. The integration was seamless."</p>
-                <div style="margin-top: var(--space-4); font-weight: 600; color: var(--gray-700);">
-                    - Sarah Chen, CTO at TechFlow
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 32px; max-width: 1000px; margin: 0 auto;">
+            <div style="background: var(--white); padding: 40px; border-radius: 16px; border: 1px solid var(--gray-200);">
+                <p style="font-size: var(--font-size-lg); line-height: 1.6; margin-bottom: 24px; color: var(--gray-700);">"Bot traffic dropped 94% in the first week. Our user experience actually improved because real users get through faster."</p>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 50%;"></div>
+                    <div>
+                        <div style="font-weight: 600; color: var(--gray-900);">Sarah Chen</div>
+                        <div style="color: var(--gray-500); font-size: var(--font-size-sm);">CTO, TechFlow</div>
+                    </div>
                 </div>
             </div>
             
-            <div class="card">
-                <p>"Finally, a verification system that respects user privacy while actually stopping fake accounts."</p>
-                <div style="margin-top: var(--space-4); font-weight: 600; color: var(--gray-700);">
-                    - Marcus Rodriguez, Security Lead at DataVault
-                </div>
-            </div>
-            
-            <div class="card">
-                <p>"Implementation took 30 minutes. Results were immediate. This is the future of identity verification."</p>
-                <div style="margin-top: var(--space-4); font-weight: 600; color: var(--gray-700);">
-                    - Alex Thompson, Founder at CloudBase
+            <div style="background: var(--white); padding: 40px; border-radius: 16px; border: 1px solid var(--gray-200);">
+                <p style="font-size: var(--font-size-lg); line-height: 1.6; margin-bottom: 24px; color: var(--gray-700);">"The privacy-first approach was exactly what we needed. Users trust us more because we don't store their data."</p>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, var(--secondary), var(--primary)); border-radius: 50%;"></div>
+                    <div>
+                        <div style="font-weight: 600; color: var(--gray-900);">Marcus Rodriguez</div>
+                        <div style="color: var(--gray-500); font-size: var(--font-size-sm);">Security Lead, DataVault</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -135,13 +136,13 @@
 </section>
 
 <!-- CTA Section -->
-<section class="section">
+<section class="section" style="background: linear-gradient(135deg, var(--gray-900) 0%, var(--black) 100%); color: var(--white); padding: 100px 0;">
     <div class="container" style="text-align: center;">
-        <h2>Ready to Stop Bots?</h2>
-        <p class="text-gray mb-8">Join thousands of platforms using Lemma for identity verification.</p>
-        <div>
-            <a href="/join-network" class="btn btn-primary" style="margin-right: var(--space-4);">Get Started Free</a>
-            <a href="/contact" class="btn btn-secondary">Contact Sales</a>
+        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Ready to Secure Your Platform?</h2>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 480px; margin-left: auto; margin-right: auto;">Join the federated identity network and start verifying users in minutes.</p>
+        <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+            <a href="/join-network" class="btn btn-primary">Join the Network</a>
+            <a href="/contact" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Talk to Us</a>
         </div>
     </div>
 </section>
