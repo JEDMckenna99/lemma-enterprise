@@ -1,10 +1,12 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}My Wallet - Lemma{% endblock %}
-{% block description %}Manage your Lemma credentials, view wallet balance, and access revocation controls.{% endblock %}
+{% block title %}Lemma Federated Wallet{% endblock %}
+{% block description %}Access your Lemma credentials and manage your federated identity across the network.{% endblock %}
 
 {% block head %}
     {{ super() }}
+    <!-- Load the existing Lemma Federated Wallet -->
+    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}"></script>
     <style>
         .wallet-container {
             max-width: 1000px;
@@ -17,7 +19,7 @@
             margin-bottom: 48px;
         }
 
-        .wallet-balance {
+        .wallet-status {
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: var(--white);
             padding: 48px;
@@ -27,14 +29,14 @@
             box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
         }
 
-        .balance-amount {
+        .credential-count {
             font-size: 64px;
             font-weight: 700;
             margin-bottom: 8px;
             letter-spacing: -0.02em;
         }
 
-        .balance-label {
+        .credential-label {
             font-size: var(--font-size-lg);
             opacity: 0.9;
             font-weight: 500;
@@ -94,65 +96,39 @@
             border: 1px solid var(--gray-200);
             border-radius: 8px;
             margin-top: 16px;
+            min-height: 120px;
         }
 
-        .credential-item {
-            padding: 16px 20px;
-            border-bottom: 1px solid var(--gray-200);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .credential-item:last-child {
-            border-bottom: none;
-        }
-
-        .credential-info {
-            flex: 1;
-        }
-
-        .credential-id {
-            font-family: var(--font-mono);
-            font-size: var(--font-size-sm);
-            color: var(--gray-600);
-            margin-bottom: 4px;
-        }
-
-        .credential-status {
-            font-size: var(--font-size-sm);
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: var(--white);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
             font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
 
-        .status-active { color: var(--success); }
-        .status-revoked { color: var(--error); }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+        }
 
-        .revoke-btn {
+        .btn-danger {
             background: var(--error);
             color: var(--white);
             border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: var(--font-size-sm);
+            padding: 12px 24px;
+            border-radius: 8px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: all 0.2s ease;
         }
 
-        .revoke-btn:hover {
+        .btn-danger:hover {
             background: #dc2626;
             transform: translateY(-1px);
-        }
-
-        .revoke-btn:disabled {
-            background: var(--gray-400);
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .loading {
-            opacity: 0.6;
-            pointer-events: none;
         }
     </style>
 {% endblock %}
@@ -162,13 +138,16 @@
     <!-- Wallet Header -->
     <div class="wallet-header">
         <h1>Lemma Federated Identity Network</h1>
-        <p class="text-muted">Your decentralized identity wallet - manage credentials across the entire federated network</p>
+        <p class="text-muted">Your decentralized identity wallet - powered by the Lemma API/SDK</p>
     </div>
 
-    <!-- Wallet Balance -->
-    <div class="wallet-balance">
-        <div class="balance-amount" id="lemma-count">--</div>
-        <div class="balance-label">Lemma Credentials</div>
+    <!-- Wallet Status -->
+    <div class="wallet-status">
+        <div class="credential-count" id="lemma-credential-count">--</div>
+        <div class="credential-label">Lemma Credentials</div>
+        <div style="margin-top: 16px; font-size: var(--font-size-sm); opacity: 0.8;">
+            <span id="wallet-status">Connecting to federated network...</span>
+        </div>
     </div>
 
     <!-- Wallet Features Grid -->
@@ -178,18 +157,17 @@
             <h3>Federated Credentials</h3>
             <p class="text-muted">Your cryptographic identity credentials work across all sites in the Lemma federated network.</p>
             <div style="margin-top: 16px;">
-                <span id="active-count" style="font-size: var(--font-size-2xl); font-weight: 600; color: var(--primary);">--</span>
-                <span class="text-muted"> active credentials</span>
+                <span id="active-credential-count" style="font-size: var(--font-size-2xl); font-weight: 600; color: var(--primary);">--</span>
+                <span class="text-muted"> active</span>
             </div>
         </div>
 
         <div class="wallet-card">
             <div class="card-icon">🌐</div>
-            <h3>Network Sync</h3>
-            <p class="text-muted">Real-time synchronization with the federated identity network. Changes propagate instantly.</p>
+            <h3>Network Status</h3>
+            <p class="text-muted">Real-time synchronization with the federated identity network.</p>
             <div style="margin-top: 16px;">
-                <span style="color: var(--success); font-weight: 600;">Synchronized</span>
-                <span class="text-muted"> with network</span>
+                <span id="network-status" style="color: var(--success); font-weight: 600;">--</span>
             </div>
         </div>
 
@@ -198,254 +176,162 @@
             <h3>Verification Speed</h3>
             <p class="text-muted">Your credentials verify in microseconds across all network platforms.</p>
             <div style="margin-top: 16px;">
-                <span style="color: var(--primary); font-weight: 600;">&lt;5μs</span>
-                <span class="text-muted"> average</span>
+                <span id="verification-speed" style="color: var(--primary); font-weight: 600;">--</span>
             </div>
         </div>
     </div>
 
     <!-- Credential Management -->
     <div class="wallet-card">
-        <h3>Federated Identity Management</h3>
-        <p class="text-muted">Real-time view of your cryptographic credentials stored in the federated network</p>
+        <h3>Credential Management</h3>
+        <p class="text-muted">Manage your cryptographic credentials stored in the federated network</p>
         
-        <div id="credentials-list" class="credential-list">
-            {% if fil_access %}
-                <div style="padding: 40px; text-align: center; color: var(--gray-500);">
-                    Loading your FIL credentials from wallet...
+        <div id="credential-list" class="credential-list">
+            <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                <div>Connecting to Lemma API/SDK...</div>
+                <div style="margin-top: 16px;">
+                    <button class="btn-primary" onclick="lemmaWallet.refreshCredentials()">Refresh Wallet</button>
                 </div>
-            {% else %}
-                <div style="padding: 40px; text-align: center; color: var(--gray-500);">
-                    No credentials found. 
-                    <a href="/lemma/start-verification" style="color: var(--primary);">Get verified</a> 
-                    to join the federated network.
-                </div>
-            {% endif %}
+            </div>
         </div>
     </div>
 
-    <!-- Revocation Section -->
+    <!-- Revocation Controls -->
     <div class="revocation-section">
         <h3 style="color: var(--error); margin-bottom: 16px;">Network-Wide Revocation</h3>
         
         <div class="revocation-warning">
-            <strong>⚠️ Federated Network Warning:</strong> Revoking credentials will immediately invalidate them across the entire Lemma federated network. All connected sites will be notified within seconds. This action cannot be undone.
+            <strong>⚠️ Federated Network Warning:</strong> Revoking credentials will immediately invalidate them across the entire Lemma federated network. All connected sites will be notified within seconds.
         </div>
 
-        <p class="text-muted">Use the revocation flow to clear your Lemma credentials from your wallet and the federated network if they have been compromised or you need to reset your identity.</p>
+        <p class="text-muted">Use the revocation flow to clear your Lemma credentials if they have been compromised.</p>
         
-        <button id="revoke-all-btn" class="revoke-btn" style="margin-top: 16px;" onclick="initiateRevocation()">
+        <button id="revoke-all-btn" class="btn-danger" onclick="lemmaWallet.revokeAllCredentials()">
             Clear All Lemma Credentials
         </button>
     </div>
 </div>
 
 <script>
-// Wallet functionality using existing API endpoints
-let userCredentials = [];
+// Initialize the Lemma Federated Wallet
+let lemmaWallet;
+
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        // Initialize the existing Lemma Federated Wallet
+        lemmaWallet = new LemmaFederatedWallet({
+            debug: true,
+            backgroundChecks: true,
+            securityLevel: 'medium'
+        });
+
+        // Wait for wallet to be ready
+        await lemmaWallet.init();
+        
+        // Load and display wallet data
+        await loadWalletData();
+        
+        // Set up periodic refresh
+        setInterval(loadWalletData, 30000); // Refresh every 30 seconds
+        
+    } catch (error) {
+        console.error('Failed to initialize Lemma Federated Wallet:', error);
+        document.getElementById('wallet-status').textContent = 'Failed to connect to federated network';
+        document.getElementById('wallet-status').style.color = 'var(--error)';
+    }
+});
 
 async function loadWalletData() {
     try {
-        // Check if we have FIL credential data from server
-        {% if credential_check and fil_access %}
-        const filCredentialCheck = {{ credential_check | tojson }};
-        
-        if (filCredentialCheck.has_credential) {
-            // FIL user with valid proof-of-personhood credentials
-            const credentialCount = filCredentialCheck.credentials_checked || 1;
-            document.getElementById('lemma-count').textContent = credentialCount.toString();
-            document.getElementById('active-count').textContent = credentialCount.toString();
-            
-            // Create FIL credential object
-            userCredentials = [{
-                credential_id: filCredentialCheck.credential?.credential_id || 'fil-credential',
-                type: 'proof-of-personhood',
-                verified_at: filCredentialCheck.credential?.verified_at || new Date().toISOString(),
-                network_status: 'federated',
-                verification_time_us: Math.round(filCredentialCheck.verification_time_ns / 1000),
-                rust_engine_used: filCredentialCheck.rust_engine_used
-            }];
-            
-            updateCredentialsList(userCredentials);
+        if (!lemmaWallet || !lemmaWallet.isReady) {
+            document.getElementById('wallet-status').textContent = 'Wallet not ready...';
             return;
         }
-        {% endif %}
+
+        // Get credentials from the federated wallet
+        const credentials = await lemmaWallet.getStoredCredentials();
+        const activeCredentials = credentials.filter(cred => !cred.revoked);
         
-        // Fallback: Check via API for additional credentials
-        const response = await fetch('/api/shield/check', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({})
-        });
+        // Update display
+        document.getElementById('lemma-credential-count').textContent = credentials.length.toString();
+        document.getElementById('active-credential-count').textContent = activeCredentials.length.toString();
+        document.getElementById('wallet-status').textContent = 'Connected to federated network';
+        document.getElementById('wallet-status').style.color = 'var(--success)';
         
-        const data = await response.json();
+        // Update network status
+        const networkStatus = await lemmaWallet.getNetworkStatus();
+        document.getElementById('network-status').textContent = networkStatus.connected ? 'Connected' : 'Disconnected';
+        document.getElementById('network-status').style.color = networkStatus.connected ? 'var(--success)' : 'var(--error)';
         
-        if (data.success && data.credentials) {
-            userCredentials = Array.isArray(data.credentials) ? data.credentials : [data.credentials];
-            updateWalletDisplay();
-        } else {
-            // No credentials found
-            document.getElementById('lemma-count').textContent = '0';
-            document.getElementById('active-count').textContent = '0';
-            updateCredentialsList([]);
-        }
+        // Update verification speed
+        const lastVerificationTime = lemmaWallet.getLastVerificationTime();
+        document.getElementById('verification-speed').textContent = lastVerificationTime ? `${lastVerificationTime}μs` : '<5μs average';
+        
+        // Update credential list
+        updateCredentialList(credentials);
+        
     } catch (error) {
         console.error('Failed to load wallet data:', error);
-        document.getElementById('lemma-count').textContent = '0';
-        document.getElementById('active-count').textContent = '0';
+        document.getElementById('wallet-status').textContent = 'Error loading wallet data';
+        document.getElementById('wallet-status').style.color = 'var(--error)';
     }
 }
 
-function updateWalletDisplay() {
-    const totalCredentials = userCredentials.length;
-    const activeCredentials = userCredentials.filter(cred => !cred.revoked).length;
-    
-    document.getElementById('lemma-count').textContent = totalCredentials.toString();
-    document.getElementById('active-count').textContent = activeCredentials.toString();
-    
-    updateCredentialsList(userCredentials);
-}
-
-function updateCredentialsList(credentials) {
-    const listContainer = document.getElementById('credentials-list');
+function updateCredentialList(credentials) {
+    const listContainer = document.getElementById('credential-list');
     
     if (credentials.length === 0) {
         listContainer.innerHTML = `
             <div style="padding: 40px; text-align: center; color: var(--gray-500);">
-                <p>No credentials found</p>
-                <p style="font-size: var(--font-size-sm); margin-top: 8px;">
-                    <a href="/login" style="color: var(--primary);">Sign in</a> to view your credentials
-                </p>
+                <div>No Lemma credentials found</div>
+                <div style="margin-top: 16px;">
+                    <button class="btn-primary" onclick="lemmaWallet.requestVerification()">
+                        Get Verified to Join FIL
+                    </button>
+                </div>
             </div>
         `;
         return;
     }
     
     listContainer.innerHTML = credentials.map(cred => {
-        const credId = cred.id || cred.credential_id || 'unknown';
-        const isRevoked = cred.revoked || false;
-        const statusClass = isRevoked ? 'status-revoked' : 'status-active';
-        const statusText = isRevoked ? 'Revoked' : 'Active';
-        const credType = cred.type || 'identity';
-        const verificationTime = cred.verification_time_us ? `${cred.verification_time_us}μs` : 'N/A';
+        const isActive = !cred.revoked;
+        const statusClass = isActive ? 'success' : 'error';
+        const statusText = isActive ? 'Active' : 'Revoked';
         
         return `
-            <div class="credential-item">
-                <div class="credential-info">
-                    <div class="credential-id">
-                        <strong>${credType === 'proof-of-personhood' ? 'FIL Proof-of-Personhood' : 'Identity Credential'}</strong>
-                        <div style="font-size: var(--font-size-xs); color: var(--gray-500);">
-                            ID: ${credId.length > 20 ? credId.substring(0, 16) + '...' + credId.substring(credId.length - 8) : credId}
-                        </div>
-                        <div style="font-size: var(--font-size-xs); color: var(--gray-400);">
-                            Verification: ${verificationTime} • Network: ${cred.network_status || 'connected'}
-                        </div>
+            <div style="padding: 20px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; margin-bottom: 4px;">FIL Proof-of-Personhood</div>
+                    <div style="font-size: var(--font-size-sm); color: var(--gray-500); font-family: var(--font-mono);">
+                        ID: ${cred.id?.substring(0, 16)}...${cred.id?.substring(cred.id.length - 8)}
                     </div>
-                    <div class="credential-status ${statusClass}">${statusText}</div>
+                    <div style="font-size: var(--font-size-xs); color: var(--gray-400); margin-top: 4px;">
+                        Verified: ${new Date(cred.verified_at || Date.now()).toLocaleDateString()}
+                    </div>
                 </div>
-                ${!isRevoked ? `<button class="revoke-btn" onclick="revokeCredential('${credId}')">Revoke</button>` : ''}
+                <div style="text-align: right;">
+                    <div style="color: var(--${statusClass}); font-weight: 500; margin-bottom: 8px;">${statusText}</div>
+                    ${isActive ? `<button class="btn-danger" style="padding: 6px 12px; font-size: var(--font-size-sm);" onclick="revokeCredential('${cred.id}')">Revoke</button>` : ''}
+                </div>
             </div>
         `;
     }).join('');
 }
 
 async function revokeCredential(credentialId) {
-    if (!confirm('Are you sure you want to revoke this credential? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to revoke this credential? This action cannot be undone and will affect your access across the entire federated network.')) {
         return;
     }
     
     try {
-        const response = await fetch('/api/sdk/revoke-credential', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                credentials: [{ id: credentialId }],
-                reason: 'user_requested'
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            // Update local state
-            const cred = userCredentials.find(c => (c.id || c.credential_id) === credentialId);
-            if (cred) {
-                cred.revoked = true;
-            }
-            updateWalletDisplay();
-            
-            alert('Credential revoked successfully. Changes will propagate across the network within seconds.');
-        } else {
-            alert('Failed to revoke credential: ' + (result.error || 'Unknown error'));
-        }
+        await lemmaWallet.revokeCredential(credentialId);
+        await loadWalletData(); // Refresh display
+        alert('Credential revoked successfully. Changes are propagating across the network.');
     } catch (error) {
-        console.error('Revocation failed:', error);
+        console.error('Failed to revoke credential:', error);
         alert('Failed to revoke credential. Please try again.');
     }
 }
-
-async function initiateRevocation() {
-    const activeCredentials = userCredentials.filter(cred => !cred.revoked);
-    
-    if (activeCredentials.length === 0) {
-        alert('No active credentials to revoke.');
-        return;
-    }
-    
-    if (!confirm(`Are you sure you want to revoke ALL ${activeCredentials.length} credentials? This will immediately invalidate your access across the entire federated network.`)) {
-        return;
-    }
-    
-    try {
-        document.getElementById('revoke-all-btn').disabled = true;
-        document.getElementById('revoke-all-btn').textContent = 'Revoking...';
-        
-        const response = await fetch('/api/sdk/revoke-credential', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                credentials: activeCredentials.map(cred => ({ id: cred.id || cred.credential_id })),
-                reason: 'user_requested_bulk'
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            // Mark all as revoked
-            userCredentials.forEach(cred => cred.revoked = true);
-            updateWalletDisplay();
-            
-            alert('All credentials revoked successfully. You have been signed out of the network.');
-            
-            // Redirect to login after revocation
-            setTimeout(() => {
-                window.location.href = '/login';
-            }, 2000);
-        } else {
-            alert('Failed to revoke credentials: ' + (result.error || 'Unknown error'));
-        }
-    } catch (error) {
-        console.error('Bulk revocation failed:', error);
-        alert('Failed to revoke credentials. Please try again.');
-    } finally {
-        document.getElementById('revoke-all-btn').disabled = false;
-        document.getElementById('revoke-all-btn').textContent = 'Revoke All Credentials';
-    }
-}
-
-// Load wallet data when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    loadWalletData();
-    
-    // Refresh wallet data every 30 seconds
-    setInterval(loadWalletData, 30000);
-});
 </script>
 {% endblock %}

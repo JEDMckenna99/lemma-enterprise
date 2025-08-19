@@ -243,44 +243,13 @@ def create_app():
         """
         Lemma Federated Wallet - FIL Network Access
         
-        This route serves the federated identity wallet for anyone with proof-of-personhood
-        lemmas in their wallet. This is NOT for business customers (who use email login),
-        but for FIL users who have cryptographic credentials.
-        
-        FIL users can:
-        - View their lemma credential count from their cryptographic wallet
-        - Manage individual credentials across the federated network
-        - Trigger network-wide revocation flow for security
+        Simple wallet interface that connects directly to the existing 
+        Lemma API/SDK. The federated wallet JS handles all the proof-of-personhood
+        verification, credential management, and revocation flow automatically.
         """
-        # Import the shield functionality for cryptographic verification
-        from api.lemma_shield import has_valid_lemma_credential
+        logger.info("🌐 Serving FIL wallet - connecting to existing Lemma API/SDK")
         
-        logger.info("🌐 Checking FIL user credentials for wallet access")
-        
-        # Check for proof-of-personhood credentials (not email authentication)
-        credential_check = has_valid_lemma_credential()
-        
-        if not credential_check['has_credential']:
-            logger.info("🔒 No valid lemma credentials found - redirecting to verification")
-            # Store the wallet URL they were trying to access
-            session['return_url'] = request.url
-            return redirect('/lemma/start-verification')
-        
-        logger.info("💼 Serving federated wallet for FIL user with valid credentials")
-        
-        # Get FIL user info from their credentials
-        user_credential = credential_check.get('credential', {})
-        user_info = {
-            'fil_user': True,
-            'credential_id': user_credential.get('credential_id', 'unknown'),
-            'verified_at': user_credential.get('verified_at'),
-            'network_status': 'connected'
-        }
-        
-        return render_template('modern/wallet.html', 
-                             user_info=user_info,
-                             credential_check=credential_check,
-                             fil_access=True)
+        return render_template('modern/wallet.html')
     
     # Public marketing pages
     @app.route('/about')
