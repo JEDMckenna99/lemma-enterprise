@@ -7,6 +7,8 @@
     {{ super() }}
     <!-- Load the existing Lemma Federated Wallet -->
     <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}"></script>
+    <!-- Load the Lemma Shield Widget for verification -->
+    <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}"></script>
     <style>
         .wallet-container {
             max-width: 1000px;
@@ -181,9 +183,25 @@
         </div>
     </div>
 
+    <!-- Join FIL Network - Protected by Shield Widget -->
+    <div class="wallet-card">
+        <h3>🌐 Join Federated Identity Network</h3>
+        <p class="text-muted">Verify your identity to join the FIL and get your first Lemma credential</p>
+        
+        <!-- This card is protected by the Lemma Shield Widget -->
+        <div id="fil-join-section" class="credential-list" style="min-height: 200px;">
+            <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                <div>🔐 Protected by Lemma Shield</div>
+                <div style="margin-top: 16px; font-size: var(--font-size-sm);">
+                    Complete verification to access the federated identity network
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Credential Management -->
     <div class="wallet-card">
-        <h3>Credential Management</h3>
+        <h3>My Credentials</h3>
         <p class="text-muted">Manage your cryptographic credentials stored in the federated network</p>
         
         <div id="credential-list" class="credential-list">
@@ -213,8 +231,9 @@
 </div>
 
 <script>
-// Initialize the Lemma Federated Wallet
+// Initialize the Lemma Federated Wallet and Shield Widget
 let lemmaWallet;
+let lemmaShield;
 
 document.addEventListener('DOMContentLoaded', async function() {
     try {
@@ -227,6 +246,22 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Wait for wallet to be ready
         await lemmaWallet.init();
+        
+        // Initialize the Lemma Shield Widget to protect the FIL join section
+        lemmaShield = new LemmaBotShield({
+            debug: true,
+            apiBase: window.location.origin,
+            onVerified: function(result) {
+                console.log('✅ Shield verification successful:', result);
+                showFILJoinInterface();
+            },
+            onError: function(error) {
+                console.error('❌ Shield verification failed:', error);
+            }
+        });
+        
+        // Protect the FIL join section with the shield
+        lemmaShield.protect('#fil-join-section');
         
         // Load and display wallet data
         await loadWalletData();
@@ -345,6 +380,36 @@ async function revokeAllCredentials() {
         console.error('Failed to clear credentials:', error);
         alert('Failed to clear credentials. Please try again.');
     }
+}
+
+function showFILJoinInterface() {
+    // Called after successful shield verification
+    const filJoinSection = document.getElementById('fil-join-section');
+    
+    filJoinSection.innerHTML = `
+        <div style="padding: 32px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🎉</div>
+            <h4 style="color: var(--success); margin-bottom: 16px;">Welcome to the Federated Identity Network!</h4>
+            <p style="color: var(--gray-600); margin-bottom: 24px;">
+                Your identity has been verified and your first Lemma credential has been created.
+                You can now access any site in the federated network with this credential.
+            </p>
+            <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                <button class="btn-primary" onclick="loadWalletData()">
+                    View My Credentials
+                </button>
+                <button class="btn-primary" onclick="window.open('/docs', '_blank')">
+                    Learn More About FIL
+                </button>
+            </div>
+            <div style="margin-top: 24px; padding: 16px; background: var(--gray-100); border-radius: 8px;">
+                <div style="font-size: var(--font-size-sm); color: var(--gray-600);">
+                    <strong>Next Steps:</strong> Your Lemma credential is now stored in your browser wallet.
+                    You can use it to access any site in the federated network without re-verification.
+                </div>
+            </div>
+        </div>
+    `;
 }
 </script>
 {% endblock %}
