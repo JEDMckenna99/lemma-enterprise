@@ -441,8 +441,8 @@
 
 
 
-    <!-- Join FIL Network Section -->
-    <section style="margin-bottom: 32px;">
+    <!-- Join FIL Network Section - Only show for users without credentials -->
+    <section id="join-network-section" style="margin-bottom: 32px; display: none;">
         <h2 class="section-title">Join the Network</h2>
         <div class="wallet-card" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.02), rgba(255, 255, 255, 1)); border: 1px solid rgba(102, 126, 234, 0.15); padding: 24px;">
             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
@@ -468,28 +468,7 @@
 
 
 
-    <!-- Security Controls -->
-    <section class="revocation-section">
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <div style="width: 36px; height: 36px; background: linear-gradient(135deg, #ef4444, #dc2626); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px;">⚠️</div>
-            <h2 style="color: var(--error); margin: 0; font-size: 1.3rem; font-weight: 600;">Security Controls</h2>
-        </div>
-        
-        <div class="revocation-warning">
-            <div style="font-size: 18px;">⚠️</div>
-            <div>
-                <strong>Network-Wide Impact:</strong> Revoking credentials immediately invalidates them across the entire Lemma federated network.
-            </div>
-        </div>
 
-        <p style="color: var(--gray-600); margin-bottom: 20px; line-height: 1.5; font-size: 0.9rem;">
-            Use these controls if your credentials have been compromised.
-        </p>
-        
-        <button id="revoke-all-btn" class="btn-danger" onclick="revokeAllCredentials()">
-            Revoke All Credentials
-        </button>
-    </section>
 </div>
 
 <script>
@@ -566,6 +545,18 @@ async function loadWalletData() {
         // Get credentials from the federated wallet
         const credentials = await lemmaWallet.getCredentials();
         const activeCredentials = credentials.filter(cred => !cred.revoked);
+        
+        // Show/hide "Join the Network" section based on credential status
+        const joinNetworkSection = document.getElementById('join-network-section');
+        if (joinNetworkSection) {
+            if (activeCredentials.length === 0) {
+                // User has no credentials - show join section
+                joinNetworkSection.style.display = 'block';
+            } else {
+                // User already has credentials - hide join section
+                joinNetworkSection.style.display = 'none';
+            }
+        }
         
         // Update network status if element exists
         const networkStatus = document.getElementById('network-status');
@@ -676,20 +667,7 @@ async function revokeCredential(credentialId) {
     }
 }
 
-async function revokeAllCredentials() {
-    if (!confirm('Are you sure you want to clear ALL your Lemma credentials? This will immediately invalidate your access across the entire federated network.')) {
-        return;
-    }
-    
-    try {
-        await lemmaWallet.clearAll();
-        await loadWalletData(); // Refresh display
-        alert('All credentials cleared successfully. You have been signed out of the federated network.');
-    } catch (error) {
-        console.error('Failed to clear credentials:', error);
-        alert('Failed to clear credentials. Please try again.');
-    }
-}
+
 
 function showFILJoinInterface() {
     // Called after successful shield verification
