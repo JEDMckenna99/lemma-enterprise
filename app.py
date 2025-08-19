@@ -239,7 +239,6 @@ def create_app():
     
     @app.route('/join')  
     @app.route('/join-network')
-    @require_authenticated
     def wallet():
         """
         Lemma Wallet - Protected page showing user's credentials and revocation controls
@@ -249,11 +248,20 @@ def create_app():
         - Manage individual credentials  
         - Trigger revocation flow for security
         """
+        # Check if user is authenticated
+        if not session.get('customer_id'):
+            logger.info("🔒 Redirecting unauthenticated user to login")
+            return redirect('/login')
+        
         logger.info("💼 Serving wallet page for authenticated user")
         
         # Get user's credential info
-        user_info = get_current_user()
-        user_id = user_info.get('customer_id') if user_info else session.get('user_id')
+        user_id = session.get('customer_id')
+        user_info = {
+            'customer_id': user_id,
+            'name': session.get('customer_name', 'User'),
+            'role': session.get('user_role', 'customer')
+        }
         
         return render_template('modern/wallet.html', 
                              user_info=user_info,
