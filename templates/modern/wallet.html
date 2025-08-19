@@ -161,8 +161,8 @@
 <div class="wallet-container">
     <!-- Wallet Header -->
     <div class="wallet-header">
-        <h1>My Lemma Wallet</h1>
-        <p class="text-muted">Manage your identity credentials and network access</p>
+        <h1>Lemma Federated Identity Network</h1>
+        <p class="text-muted">Your decentralized identity wallet - manage credentials across the entire federated network</p>
     </div>
 
     <!-- Wallet Balance -->
@@ -175,21 +175,21 @@
     <div class="wallet-grid">
         <div class="wallet-card">
             <div class="card-icon">🔐</div>
-            <h3>Active Credentials</h3>
-            <p class="text-muted">View and manage your verified identity credentials across the federated network.</p>
+            <h3>Federated Credentials</h3>
+            <p class="text-muted">Your cryptographic identity credentials work across all sites in the Lemma federated network.</p>
             <div style="margin-top: 16px;">
                 <span id="active-count" style="font-size: var(--font-size-2xl); font-weight: 600; color: var(--primary);">--</span>
-                <span class="text-muted"> active</span>
+                <span class="text-muted"> active credentials</span>
             </div>
         </div>
 
         <div class="wallet-card">
             <div class="card-icon">🌐</div>
-            <h3>Network Status</h3>
-            <p class="text-muted">Your credentials are recognized across all federated network sites.</p>
+            <h3>Network Sync</h3>
+            <p class="text-muted">Real-time synchronization with the federated identity network. Changes propagate instantly.</p>
             <div style="margin-top: 16px;">
-                <span style="color: var(--success); font-weight: 600;">Connected</span>
-                <span class="text-muted"> to network</span>
+                <span style="color: var(--success); font-weight: 600;">Synchronized</span>
+                <span class="text-muted"> with network</span>
             </div>
         </div>
 
@@ -206,28 +206,28 @@
 
     <!-- Credential Management -->
     <div class="wallet-card">
-        <h3>Credential Management</h3>
-        <p class="text-muted">View and manage your individual credentials</p>
+        <h3>Federated Identity Management</h3>
+        <p class="text-muted">Real-time view of your cryptographic credentials stored in the federated network</p>
         
         <div id="credentials-list" class="credential-list">
             <div style="padding: 40px; text-align: center; color: var(--gray-500);">
-                Loading credentials...
+                Loading federated credentials...
             </div>
         </div>
     </div>
 
     <!-- Revocation Section -->
     <div class="revocation-section">
-        <h3 style="color: var(--error); margin-bottom: 16px;">Credential Revocation</h3>
+        <h3 style="color: var(--error); margin-bottom: 16px;">Network-Wide Revocation</h3>
         
         <div class="revocation-warning">
-            <strong>⚠️ Warning:</strong> Revoking credentials will immediately invalidate them across the entire federated network. This action cannot be undone.
+            <strong>⚠️ Federated Network Warning:</strong> Revoking credentials will immediately invalidate them across the entire Lemma federated network. All connected sites will be notified within seconds. This action cannot be undone.
         </div>
 
-        <p class="text-muted">Use revocation if your credentials have been compromised or you need to invalidate access for security reasons.</p>
+        <p class="text-muted">Use the revocation flow to clear your Lemma credentials from your wallet and the federated network if they have been compromised or you need to reset your identity.</p>
         
         <button id="revoke-all-btn" class="revoke-btn" style="margin-top: 16px;" onclick="initiateRevocation()">
-            Revoke All Credentials
+            Clear All Lemma Credentials
         </button>
     </div>
 </div>
