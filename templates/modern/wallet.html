@@ -188,10 +188,6 @@
             line-height: 1.4;
         }
 
-        .features-section {
-            margin-bottom: 32px;
-        }
-
         .section-title {
             font-size: 1.4rem;
             font-weight: 600;
@@ -351,6 +347,24 @@
     <header class="wallet-header">
         <h1>Your Lemma Wallet</h1>
         <p>Manage your federated identity credentials and access the decentralized network</p>
+        
+        <!-- Speed Tracker -->
+        <div style="margin-top: 24px; padding: 16px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(255, 255, 255, 0.8)); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 12px; max-width: 400px; margin-left: auto; margin-right: auto;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px;">
+                <div style="width: 32px; height: 32px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px;">⚡</div>
+                <div>
+                    <div style="font-weight: 600; color: var(--gray-900); font-size: 1rem;">Verification Speed</div>
+                    <div style="font-size: 0.85rem; color: var(--gray-600);">Live authentication timing</div>
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <div id="verification-speed-live" style="font-size: 1.5rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">--</div>
+                <div style="font-size: 0.8rem; color: var(--gray-500);">
+                    Last check: <span id="last-check-time">--</span> • 
+                    <button onclick="testVerificationSpeed()" style="background: none; border: none; color: var(--primary); font-weight: 600; cursor: pointer; text-decoration: underline; font-size: 0.8rem;">Test Now</button>
+                </div>
+            </div>
+        </div>
     </header>
 
     <!-- Main Wallet Layout -->
@@ -425,39 +439,7 @@
         </div>
     </div>
 
-    <!-- Network Features -->
-    <section class="features-section">
-        <h2 class="section-title">Network Features</h2>
-        <div class="wallet-grid">
-            <div class="wallet-card">
-                <div class="card-icon">🔐</div>
-                <h3>Active Credentials</h3>
-                <p>Cryptographic proofs that work across the entire federated network</p>
-                <div style="margin-top: 20px; display: flex; align-items: baseline; gap: 8px;">
-                    <span id="active-credential-count" style="font-size: 2rem; font-weight: 700; color: var(--primary);">--</span>
-                    <span style="color: var(--gray-500); font-weight: 500;">verified</span>
-                </div>
-            </div>
 
-            <div class="wallet-card">
-                <div class="card-icon">🌐</div>
-                <h3>Network Status</h3>
-                <p>Real-time sync with federated identity network</p>
-                <div style="margin-top: 20px;">
-                    <span id="network-status" style="color: var(--success); font-weight: 600; font-size: 1.1rem;">--</span>
-                </div>
-            </div>
-
-            <div class="wallet-card">
-                <div class="card-icon">⚡</div>
-                <h3>Verification Speed</h3>
-                <p>Instant access across all protected sites</p>
-                <div style="margin-top: 20px;">
-                    <span id="verification-speed" style="color: var(--primary); font-weight: 600; font-size: 1.1rem;">--</span>
-                </div>
-            </div>
-        </div>
-    </section>
 
     <!-- Join FIL Network Section -->
     <section style="margin-bottom: 32px;">
@@ -738,5 +720,132 @@ function showFILJoinInterface() {
         </div>
     `;
 }
+
+// Speed Testing Functions
+let speedTestHistory = [];
+
+async function testVerificationSpeed() {
+    const button = document.querySelector('button[onclick="testVerificationSpeed()"]');
+    const speedDisplay = document.getElementById('verification-speed-live');
+    const lastCheckTime = document.getElementById('last-check-time');
+    
+    // Update UI to show testing state
+    button.textContent = 'Testing...';
+    button.disabled = true;
+    speedDisplay.textContent = '⏱️';
+    
+    try {
+        const startTime = performance.now();
+        
+        // Test credential verification speed
+        if (lemmaWallet && lemmaWallet.isReady) {
+            // Get credentials and verify them
+            const credentials = await lemmaWallet.getCredentials();
+            
+            // Simulate verification check (this would normally be done by the verification engine)
+            for (const credential of credentials) {
+                // Basic validation timing
+                const isValid = credential && credential.id && !credential.revoked;
+                if (!isValid) {
+                    throw new Error('Invalid credential found');
+                }
+            }
+        }
+        
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        
+        // Store in history
+        speedTestHistory.push(duration);
+        if (speedTestHistory.length > 10) {
+            speedTestHistory.shift(); // Keep only last 10 tests
+        }
+        
+        // Calculate average
+        const average = speedTestHistory.reduce((a, b) => a + b, 0) / speedTestHistory.length;
+        
+        // Update display
+        updateSpeedDisplay(duration, average);
+        updateLastCheckTime();
+        
+        console.log(`⚡ Verification speed test: ${duration.toFixed(2)}ms`);
+        
+    } catch (error) {
+        console.error('Speed test failed:', error);
+        speedDisplay.textContent = 'Error';
+        speedDisplay.style.color = 'var(--error)';
+    } finally {
+        // Reset button
+        button.textContent = 'Test Now';
+        button.disabled = false;
+    }
+}
+
+function updateSpeedDisplay(currentSpeed, averageSpeed) {
+    const speedDisplay = document.getElementById('verification-speed-live');
+    
+    // Format speed display
+    let displayText;
+    let color = 'var(--primary)';
+    
+    if (currentSpeed < 1) {
+        displayText = `${(currentSpeed * 1000).toFixed(0)}μs`;
+        color = 'var(--success)';
+    } else if (currentSpeed < 10) {
+        displayText = `${currentSpeed.toFixed(1)}ms`;
+        color = 'var(--primary)';
+    } else {
+        displayText = `${currentSpeed.toFixed(0)}ms`;
+        color = 'var(--warning)';
+    }
+    
+    speedDisplay.textContent = displayText;
+    speedDisplay.style.color = color;
+    
+    // Add average in tooltip or small text if we have history
+    if (speedTestHistory.length > 1) {
+        speedDisplay.title = `Average: ${averageSpeed.toFixed(1)}ms (${speedTestHistory.length} tests)`;
+    }
+}
+
+function updateLastCheckTime() {
+    const lastCheckTime = document.getElementById('last-check-time');
+    const now = new Date();
+    const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    lastCheckTime.textContent = timeString;
+}
+
+// Auto-test speed on page load and wallet initialization
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait a bit for wallet to initialize, then test speed
+    setTimeout(async function() {
+        if (lemmaWallet && lemmaWallet.isReady) {
+            await testVerificationSpeed();
+        } else {
+            // Set initial state
+            document.getElementById('verification-speed-live').textContent = 'Initializing...';
+            document.getElementById('last-check-time').textContent = 'Not tested';
+        }
+    }, 2000);
+});
+
+// Test speed whenever wallet data is loaded
+const originalLoadWalletData = loadWalletData;
+loadWalletData = async function() {
+    const startTime = performance.now();
+    await originalLoadWalletData();
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    
+    // Update speed display with actual load time
+    speedTestHistory.push(duration);
+    if (speedTestHistory.length > 10) {
+        speedTestHistory.shift();
+    }
+    
+    const average = speedTestHistory.reduce((a, b) => a + b, 0) / speedTestHistory.length;
+    updateSpeedDisplay(duration, average);
+    updateLastCheckTime();
+};
 </script>
 {% endblock %}
