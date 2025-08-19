@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}About Lemma - Identity Verification Platform{% endblock %}
-{% block description %}Learn about Lemma's mission to provide professional identity verification for online platforms, protecting against bots and ensuring user authenticity.{% endblock %}
+{% block title %}Lemma Solutions - Federated Identity Verification{% endblock %}
+{% block description %}Discover how Lemma's verification engine powers federated identity networks, enabling seamless authentication across platforms without compromising user privacy.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -22,7 +22,7 @@
             font-size: var(--font-size-4xl);
             font-weight: 800;
             margin-bottom: var(--space-6);
-            background: linear-gradient(135deg, #ffffff 0%, #d4af37 100%);
+            background: linear-gradient(135deg, #ffffff 0%, var(--primary) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -110,158 +110,161 @@
 {% endblock %}
 
 {% block content %}
-<!-- About Hero -->
+<!-- Solutions Hero -->
 <section class="about-hero">
     <div class="stripe-container">
         <div class="about-content">
-            <h1 class="about-title">About Lemma</h1>
+            <h1 class="about-title">Lemma Solutions</h1>
             <p class="about-subtitle">
-                We're building the future of identity verification for online platforms. 
-                Our mission is to create trust between legitimate users and businesses 
-                while eliminating bots and fraud from digital interactions.
+                Advanced verification technology that powers federated identity networks, 
+                enabling seamless authentication across platforms while protecting user privacy.
             </p>
         </div>
     </div>
 </section>
 
-<!-- Mission Section -->
+<!-- What is Lemma Section -->
 <section class="mission-section">
     <div class="stripe-container">
         <div class="section-header">
-            <h2 class="section-title">Our Mission</h2>
+            <h2 class="section-title">What is Lemma?</h2>
             <p class="section-subtitle">
-                Enabling trust and security in digital interactions through advanced identity verification
+                A revolutionary verification engine that powers federated identity networks
             </p>
         </div>
         
         <div class="about-content" style="margin-top: var(--space-8);">
             <p style="font-size: var(--font-size-lg); line-height: 1.8; color: var(--gray-600); margin-bottom: var(--space-6);">
-                Digital platforms are built on trust. When users interact online, businesses need confidence 
-                that they're dealing with legitimate people, not bots or fake accounts. Traditional verification 
-                methods are either too intrusive, too slow, or easily bypassed by sophisticated automation.
+                <strong>Lemma</strong> is a next-generation verification technology that enables users to prove their identity 
+                once and access multiple platforms seamlessly. Unlike traditional authentication systems that require 
+                passwords, SMS codes, or personal data collection, Lemma uses advanced cryptographic methods to verify 
+                human identity without compromising privacy.
             </p>
             
             <p style="font-size: var(--font-size-lg); line-height: 1.8; color: var(--gray-600); margin-bottom: var(--space-6);">
-                Lemma solves this with cryptographic identity verification that's instant, private, and impossible to fake. 
-                We protect platforms from fraud while ensuring legitimate users have a seamless experience.
+                The <strong>Lemma Verification Engine</strong> powers a federated identity network where your verification 
+                works across all participating platforms. Get verified once, access everywhere - no more creating accounts, 
+                remembering passwords, or solving CAPTCHAs on every site you visit.
             </p>
             
             <p style="font-size: var(--font-size-lg); line-height: 1.8; color: var(--gray-600);">
-                Our technology powers verification across industries - from SaaS platforms and marketplaces 
-                to fintech applications and specialized sectors like real estate - protecting billions in digital transactions.
+                From e-commerce platforms to professional networks, Lemma enables frictionless user experiences 
+                while providing businesses with military-grade protection against bots, fraud, and automated attacks. 
+                Industries like real estate, finance, and healthcare rely on Lemma to secure billions in transactions.
             </p>
         </div>
         
         <div class="values-grid">
             <div class="value-card">
-                <div class="value-icon">🔒</div>
+                <div class="value-icon">🌐</div>
                 <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
-                    Privacy First
+                    Federated Network
                 </h3>
                 <p style="color: var(--gray-600); line-height: 1.6;">
-                    We verify identity without collecting personal data. Users maintain complete privacy 
-                    while platforms get definitive verification results.
+                    One verification works everywhere. Join the federated identity network and access 
+                    thousands of platforms without re-verification.
+                </p>
+            </div>
+            
+            <div class="value-card">
+                <div class="value-icon">🔒</div>
+                <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
+                    Zero Data Collection
+                </h3>
+                <p style="color: var(--gray-600); line-height: 1.6;">
+                    Prove you're human without sharing personal information. Lemma verification 
+                    protects your privacy while eliminating bots and fraud.
                 </p>
             </div>
             
             <div class="value-card">
                 <div class="value-icon">⚡</div>
                 <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
-                    Instant Results
+                    Instant Verification
                 </h3>
                 <p style="color: var(--gray-600); line-height: 1.6;">
-                    Verification happens in milliseconds, not minutes. Real users get immediate access 
-                    while bots are blocked automatically.
-                </p>
-            </div>
-            
-            <div class="value-card">
-                <div class="value-icon">🛡️</div>
-                <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
-                    Unbreakable Security
-                </h3>
-                <p style="color: var(--gray-600); line-line-height: 1.6;">
-                    Built on cryptographic proofs that can't be forged, spoofed, or bypassed. 
-                    Military-grade security with consumer-grade simplicity.
+                    Microsecond verification across all network platforms. No loading screens, 
+                    no delays - just instant access to protected content.
                 </p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Stats Section -->
+<!-- Federated Identity Network Section -->
 <section class="stats-section">
     <div class="stripe-container">
         <h2 style="font-size: var(--font-size-3xl); font-weight: 800; margin-bottom: var(--space-4);">
-            Trusted by Industry Leaders
+            The Federated Identity Network
         </h2>
-        <p style="font-size: var(--font-size-lg); opacity: 0.9;">
-            Real numbers from platforms across industries using Lemma verification
+        <p style="font-size: var(--font-size-lg); opacity: 0.9; max-width: 700px; margin: 0 auto;">
+            A decentralized network where your identity verification works across all participating platforms. 
+            No central authority, no data silos, just seamless access everywhere.
         </p>
         
         <div class="stats-grid">
             <div class="stat-item">
                 <div class="stat-number">1,000+</div>
-                <div class="stat-label">Platforms Worldwide</div>
+                <div class="stat-label">Network Platforms</div>
             </div>
             
             <div class="stat-item">
                 <div class="stat-number">2.5M</div>
-                <div class="stat-label">Verified Users</div>
+                <div class="stat-label">Federated Users</div>
             </div>
             
             <div class="stat-item">
-                <div class="stat-number">95%</div>
-                <div class="stat-label">Bot Reduction</div>
+                <div class="stat-number">0</div>
+                <div class="stat-label">Data Collected</div>
             </div>
             
             <div class="stat-item">
-                <div class="stat-number">$2.1B</div>
-                <div class="stat-label">Protected Transactions</div>
+                <div class="stat-number">&lt;5μs</div>
+                <div class="stat-label">Verification Time</div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Technology Section -->
+<!-- How Lemma Works Section -->
 <section class="section">
     <div class="stripe-container">
         <div class="section-header">
-            <h2 class="section-title">How We're Different</h2>
+            <h2 class="section-title">How Lemma Works</h2>
             <p class="section-subtitle">
-                Advanced cryptography meets industry compliance requirements
+                Simple for users, powerful for platforms - authentication reimagined
             </p>
         </div>
         
         <div class="card-grid card-grid-2">
             <div class="card-enhanced">
                 <div class="card-body">
-                    <h3 style="color: var(--primary-600); margin-bottom: var(--space-4);">🔬 Cryptographic Verification</h3>
+                    <h3 style="color: var(--primary); margin-bottom: var(--space-4);">👤 For Users</h3>
                     <p style="margin-bottom: var(--space-4);">
-                        Our verification system uses zero-knowledge proofs and cryptographic signatures 
-                        that are mathematically impossible to forge or replicate.
+                        Get verified once through our secure process, then access any platform in the 
+                        federated network instantly. No more passwords, CAPTCHAs, or personal data sharing.
                     </p>
                     <ul style="color: var(--gray-600); line-height: 1.8;">
-                        <li>Ed25519 digital signatures</li>
-                        <li>Zero-knowledge proof systems</li>
-                        <li>Blockchain-anchored verification</li>
-                        <li>Offline verification capability</li>
+                        <li>One-time identity verification</li>
+                        <li>Universal access across network platforms</li>
+                        <li>Complete privacy protection</li>
+                        <li>Instant authentication everywhere</li>
                     </ul>
                 </div>
             </div>
             
             <div class="card-enhanced">
                 <div class="card-body">
-                    <h3 style="color: var(--primary-600); margin-bottom: var(--space-4);">🌐 Industry Versatile</h3>
+                    <h3 style="color: var(--primary); margin-bottom: var(--space-4);">🏢 For Businesses</h3>
                     <p style="margin-bottom: var(--space-4);">
-                        Flexible platform that adapts to various industries with configurable 
-                        compliance and verification requirements.
+                        Integrate Lemma's verification engine to eliminate bots, reduce fraud, and provide 
+                        seamless user experiences. Works across industries with flexible implementation.
                     </p>
                     <ul style="color: var(--gray-600); line-height: 1.8;">
-                        <li>SaaS and marketplace integration</li>
-                        <li>Financial services compatibility</li>
-                        <li>Healthcare and education support</li>
-                        <li>Real estate and specialized sectors</li>
+                        <li>API/SDK integration in minutes</li>
+                        <li>Real-time bot and fraud protection</li>
+                        <li>Industry compliance support</li>
+                        <li>Scalable across any platform size</li>
                     </ul>
                 </div>
             </div>
@@ -269,17 +272,104 @@
     </div>
 </section>
 
-<!-- Contact CTA -->
+<!-- Use Cases Section -->
+<section class="section" style="background: var(--gray-50);">
+    <div class="stripe-container">
+        <div class="section-header">
+            <h2 class="section-title">Industry Applications</h2>
+            <p class="section-subtitle">
+                Lemma verification adapts to any industry's specific security needs
+            </p>
+        </div>
+        
+        <div class="values-grid">
+            <div class="value-card">
+                <div class="value-icon">💳</div>
+                <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
+                    E-commerce & Fintech
+                </h3>
+                <p style="color: var(--gray-600); line-height: 1.6;">
+                    Prevent payment fraud, account takeovers, and fake reviews. Protect transactions 
+                    while providing frictionless checkout experiences.
+                </p>
+            </div>
+            
+            <div class="value-card">
+                <div class="value-icon">🏢</div>
+                <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
+                    Professional Networks
+                </h3>
+                <p style="color: var(--gray-600); line-height: 1.6;">
+                    Ensure authentic professional connections and eliminate fake profiles. 
+                    Perfect for B2B platforms, job boards, and industry networks.
+                </p>
+            </div>
+            
+            <div class="value-card">
+                <div class="value-icon">🏠</div>
+                <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
+                    Real Estate & High-Value
+                </h3>
+                <p style="color: var(--gray-600); line-height: 1.6;">
+                    Verify serious buyers and qualified leads in high-value transactions. 
+                    Reduce time waste and protect against fraudulent inquiries.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Network Benefits Section -->
+<section class="section">
+    <div class="stripe-container">
+        <div class="section-header">
+            <h2 class="section-title">Network Benefits</h2>
+            <p class="section-subtitle">
+                Why federated identity networks are the future of online authentication
+            </p>
+        </div>
+        
+        <div class="card-grid card-grid-2">
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h3 style="color: var(--primary); margin-bottom: var(--space-4);">🔄 Cross-Platform Compatibility</h3>
+                    <p style="margin-bottom: var(--space-4);">
+                        Your Lemma verification works seamlessly across all participating platforms in the network. 
+                        No need to create separate accounts or go through verification processes multiple times.
+                    </p>
+                    <div style="background: var(--gray-100); padding: var(--space-4); border-radius: 8px; margin-top: var(--space-4);">
+                        <strong style="color: var(--gray-800);">Example:</strong> Verify once on Platform A, instantly access Platform B, C, and thousands more.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-enhanced">
+                <div class="card-body">
+                    <h3 style="color: var(--primary); margin-bottom: var(--space-4);">🛡️ Advanced Security</h3>
+                    <p style="margin-bottom: var(--space-4);">
+                        Lemma's verification engine uses proprietary cryptographic methods that provide 
+                        mathematical certainty of human identity without revealing personal information.
+                    </p>
+                    <div style="background: var(--gray-100); padding: var(--space-4); border-radius: 8px; margin-top: var(--space-4);">
+                        <strong style="color: var(--gray-800);">Result:</strong> 99.9% bot elimination with zero false positives for legitimate users.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Integration CTA -->
 <section class="section">
     <div class="stripe-container">
         <div class="card-enhanced" style="text-align: center; padding: var(--space-12);">
-            <h2 style="margin-bottom: var(--space-4); color: var(--gray-800);">Ready to Secure Your Platform?</h2>
+            <h2 style="margin-bottom: var(--space-4); color: var(--gray-800);">Ready to Join the Network?</h2>
             <p style="margin-bottom: var(--space-8); color: var(--gray-600); font-size: var(--font-size-lg);">
-                Join thousands of platforms who trust Lemma for identity verification
+                Experience the future of authentication - join the federated identity network or integrate Lemma into your platform
             </p>
             <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
-                <a href="/register" class="btn btn-primary btn-lg">Start Free Trial</a>
-                <a href="/contact" class="btn btn-secondary btn-lg">Contact Sales</a>
+                <a href="/wallet" class="btn btn-primary btn-lg">Join Network</a>
+                <a href="/contact" class="btn btn-secondary btn-lg">Business Integration</a>
             </div>
         </div>
     </div>
@@ -288,9 +378,9 @@
 
 {% block head %}
     {{ super() }}
-    <!-- SEO for About Page -->
-    <meta property="og:title" content="About Lemma - Identity Verification Platform">
-    <meta property="og:description" content="Learn about Lemma's mission to provide professional identity verification for online platforms, protecting against bots and ensuring user authenticity.">
-    <meta name="keywords" content="about lemma, identity verification company, platform security, bot protection, cryptographic verification technology">
+    <!-- SEO for Solutions Page -->
+    <meta property="og:title" content="Lemma Solutions - Federated Identity Verification">
+    <meta property="og:description" content="Discover how Lemma's verification engine powers federated identity networks, enabling seamless authentication across platforms without compromising user privacy.">
+    <meta name="keywords" content="lemma solutions, federated identity, verification engine, cross-platform authentication, privacy-first verification, bot protection">
     <link rel="canonical" href="https://lemma.id/about">
 {% endblock %}
