@@ -369,20 +369,32 @@ function submitContactForm(event) {
     submitBtn.textContent = 'Sending...';
     submitBtn.disabled = true;
     
-    // Simulate form submission (replace with actual API call)
-    setTimeout(() => {
-        alert('Thank you for your message! We\'ll get back to you within 4 hours.');
-        event.target.reset();
+    // Submit to backend
+    fetch('/contact', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert(result.message);
+            event.target.reset();
+        } else {
+            alert(result.message || 'There was an error sending your message. Please try again.');
+        }
+    })
+    .catch(error => {
+        console.error('Contact form error:', error);
+        alert('There was an error sending your message. Please try again.');
+    })
+    .finally(() => {
         submitBtn.textContent = originalText;
         submitBtn.disabled = false;
-    }, 1000);
-    
-    // In production, you would send this to your contact form API:
-    // fetch('/api/contact', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify(data)
-    // });
+    });
 }
 </script>
 {% endblock %}

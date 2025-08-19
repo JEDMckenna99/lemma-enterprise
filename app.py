@@ -268,6 +268,39 @@ def create_app():
         """Contact page"""
         return render_template('modern/contact.html')
     
+    @app.route('/contact', methods=['POST'])
+    def contact_submit():
+        """Handle contact form submissions"""
+        try:
+            data = request.get_json()
+            
+            # Log the contact form submission
+            logger.info(f"📧 Contact form submission from {data.get('email', 'unknown')}")
+            logger.info(f"   Name: {data.get('name', 'N/A')}")
+            logger.info(f"   Company: {data.get('company', 'N/A')}")
+            logger.info(f"   Inquiry Type: {data.get('inquiry_type', 'N/A')}")
+            logger.info(f"   Platform Type: {data.get('platform_type', 'N/A')}")
+            logger.info(f"   Message: {data.get('message', 'N/A')[:100]}...")
+            
+            # In production, you would:
+            # 1. Save to database
+            # 2. Send email notification
+            # 3. Add to CRM system
+            # 4. Send auto-response email
+            
+            # For now, just return success
+            return jsonify({
+                'success': True,
+                'message': 'Thank you for your message! We\'ll get back to you within 4 hours.'
+            })
+            
+        except Exception as e:
+            logger.error(f"❌ Contact form error: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Sorry, there was an error sending your message. Please try again.'
+            }), 500
+    
     @app.route('/pricing')
     def pricing():
         """Pricing page"""
