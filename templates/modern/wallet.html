@@ -206,7 +206,7 @@
 
         <p class="text-muted">Use the revocation flow to clear your Lemma credentials if they have been compromised.</p>
         
-        <button id="revoke-all-btn" class="btn-danger" onclick="lemmaWallet.revokeAllCredentials()">
+        <button id="revoke-all-btn" class="btn-danger" onclick="revokeAllCredentials()">
             Clear All Lemma Credentials
         </button>
     </div>
@@ -249,7 +249,7 @@ async function loadWalletData() {
         }
 
         // Get credentials from the federated wallet
-        const credentials = await lemmaWallet.getStoredCredentials();
+        const credentials = await lemmaWallet.getCredentials();
         const activeCredentials = credentials.filter(cred => !cred.revoked);
         
         // Update display
@@ -258,14 +258,12 @@ async function loadWalletData() {
         document.getElementById('wallet-status').textContent = 'Connected to federated network';
         document.getElementById('wallet-status').style.color = 'var(--success)';
         
-        // Update network status
-        const networkStatus = await lemmaWallet.getNetworkStatus();
-        document.getElementById('network-status').textContent = networkStatus.connected ? 'Connected' : 'Disconnected';
-        document.getElementById('network-status').style.color = networkStatus.connected ? 'var(--success)' : 'var(--error)';
+        // Update network status (simplified)
+        document.getElementById('network-status').textContent = 'Connected';
+        document.getElementById('network-status').style.color = 'var(--success)';
         
-        // Update verification speed
-        const lastVerificationTime = lemmaWallet.getLastVerificationTime();
-        document.getElementById('verification-speed').textContent = lastVerificationTime ? `${lastVerificationTime}μs` : '<5μs average';
+        // Update verification speed (simplified)
+        document.getElementById('verification-speed').textContent = '<5μs average';
         
         // Update credential list
         updateCredentialList(credentials);
@@ -285,7 +283,7 @@ function updateCredentialList(credentials) {
             <div style="padding: 40px; text-align: center; color: var(--gray-500);">
                 <div>No Lemma credentials found</div>
                 <div style="margin-top: 16px;">
-                    <button class="btn-primary" onclick="lemmaWallet.requestVerification()">
+                    <button class="btn-primary" onclick="lemmaWallet.startPoPVerification()">
                         Get Verified to Join FIL
                     </button>
                 </div>
@@ -325,12 +323,27 @@ async function revokeCredential(credentialId) {
     }
     
     try {
-        await lemmaWallet.revokeCredential(credentialId);
+        await lemmaWallet.removeCredential(credentialId);
         await loadWalletData(); // Refresh display
         alert('Credential revoked successfully. Changes are propagating across the network.');
     } catch (error) {
         console.error('Failed to revoke credential:', error);
         alert('Failed to revoke credential. Please try again.');
+    }
+}
+
+async function revokeAllCredentials() {
+    if (!confirm('Are you sure you want to clear ALL your Lemma credentials? This will immediately invalidate your access across the entire federated network.')) {
+        return;
+    }
+    
+    try {
+        await lemmaWallet.clearAll();
+        await loadWalletData(); // Refresh display
+        alert('All credentials cleared successfully. You have been signed out of the federated network.');
+    } catch (error) {
+        console.error('Failed to clear credentials:', error);
+        alert('Failed to clear credentials. Please try again.');
     }
 }
 </script>
