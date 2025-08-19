@@ -176,10 +176,29 @@
 </section>
 
 {% if show_fil_widget %}
+<script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}"></script>
 <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}"></script>
 <script>
-// Initialize the shield widget for the homepage FIL join card
-document.addEventListener('DOMContentLoaded', function() {
+// Smart homepage with client-side FIL detection
+document.addEventListener('DOMContentLoaded', async function() {
+    {% if enable_auto_redirect %}
+    // Check if user already has lemmas and should be redirected to wallet
+    try {
+        const tempWallet = new LemmaFederatedWallet({ debug: true });
+        await tempWallet.init();
+        
+        const credentials = await tempWallet.getCredentials();
+        if (credentials && credentials.length > 0) {
+            console.log('🏠 User has lemmas, redirecting to wallet...');
+            window.location.href = '/join-network';
+            return;
+        }
+    } catch (error) {
+        console.log('🏠 No existing credentials, showing homepage');
+    }
+    {% endif %}
+    
+    // Initialize shield widget for new users
     if (window.LemmaBotShield) {
         const homeShield = new LemmaBotShield({
             debug: true,

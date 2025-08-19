@@ -235,29 +235,13 @@ def create_app():
     @app.route('/')
     def index():
         """
-        Dynamic Homepage - Routes based on user's FIL status
+        Smart Homepage - Client-side routing based on FIL wallet status
         
-        - Users with lemmas in wallet: Redirected to their wallet (/join-network)
-        - New users: See marketing page with shield widget to join FIL
+        Always serves the marketing page, but JavaScript checks for lemmas
+        and redirects to wallet if user already has credentials
         """
-        # Import shield functionality to check for lemmas
-        from api.lemma_shield import has_valid_lemma_credential
-        
-        try:
-            # Check if user has valid lemma credentials in their wallet
-            has_lemmas = has_valid_lemma_credential(request)
-            
-            if has_lemmas:
-                logger.info("🏠 User has lemmas - redirecting to wallet")
-                return redirect('/join-network')
-            else:
-                logger.info("🏠 New user - showing marketing page with shield widget")
-                return render_template('modern/index.html', show_fil_widget=True)
-                
-        except Exception as e:
-            logger.warning(f"⚠️ Error checking lemma credentials: {e}")
-            # Fallback to marketing page
-            return render_template('modern/index.html', show_fil_widget=True)
+        logger.info("🏠 Serving homepage with client-side FIL detection")
+        return render_template('modern/index.html', show_fil_widget=True, enable_auto_redirect=True)
     
     @app.route('/join')  
     @app.route('/join-network')
