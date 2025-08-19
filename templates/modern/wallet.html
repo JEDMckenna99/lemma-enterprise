@@ -645,7 +645,7 @@ function updateCredentialList(credentials) {
                     <div style="color: var(--${statusClass}); font-weight: 600; margin-bottom: 12px; font-size: 0.9rem;">
                         ${isActive ? '✅' : '❌'} ${statusText}
                     </div>
-                    ${isActive ? `<button class="btn-danger" style="padding: 8px 16px; font-size: 0.85rem;" onclick="revokeCredential('${cred.id}')">Revoke</button>` : ''}
+                    ${isActive ? `<button class="btn-danger" style="padding: 8px 16px; font-size: 0.85rem;" onclick="revokeCredential('${cred.id}')">Delete</button>` : ''}
                 </div>
             </div>
         `;
