@@ -101,6 +101,34 @@
     </div>
 </section>
 
+{% if show_fil_widget %}
+<!-- FIL Join Widget - For New Users -->
+<section class="section" style="background: var(--white); padding: 80px 0;">
+    <div class="container" style="text-align: center;">
+        <h2 style="margin-bottom: 24px;">Join the Federated Identity Network</h2>
+        <p style="color: var(--gray-600); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">
+            Get verified once, access everywhere. Join thousands of users in the federated identity network.
+        </p>
+        
+        <!-- Shield Protected Card -->
+        <div style="max-width: 500px; margin: 0 auto;">
+            <div class="card" style="padding: 40px;">
+                <div id="fil-join-widget" style="min-height: 200px;">
+                    <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🛡️</div>
+                        <h3>Protected by Lemma Shield</h3>
+                        <p style="margin-bottom: 24px;">Verify your identity to join the federated network</p>
+                        <div style="font-size: var(--font-size-sm); color: var(--gray-400);">
+                            One-time verification • Works across all network sites
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
 <!-- Social Proof Section -->
 <section class="section" style="background: var(--gray-100); padding: 80px 0;">
     <div class="container">
@@ -146,4 +174,30 @@
         </div>
     </div>
 </section>
+
+{% if show_fil_widget %}
+<script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}"></script>
+<script>
+// Initialize the shield widget for the homepage FIL join card
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.LemmaBotShield) {
+        const homeShield = new LemmaBotShield({
+            debug: true,
+            apiBase: window.location.origin,
+            onVerified: function(result) {
+                console.log('✅ Homepage shield verification successful:', result);
+                // Redirect to wallet after successful verification
+                window.location.href = '/join-network';
+            },
+            onError: function(error) {
+                console.error('❌ Homepage shield verification failed:', error);
+            }
+        });
+        
+        // Protect the FIL join widget
+        homeShield.protect('#fil-join-widget');
+    }
+});
+</script>
+{% endif %}
 {% endblock %}
