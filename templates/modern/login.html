@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Sign In - Lemma Shield{% endblock %}
-{% block description %}Sign in to your Lemma Shield account to manage API keys and view usage analytics.{% endblock %}
+{% block title %}Business Login - Lemma Shield{% endblock %}
+{% block description %}Business customer login to manage API keys, billing, and integration analytics.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -157,14 +157,14 @@
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
-                <h1 class="login-title">Welcome Back</h1>
+                <h1 class="login-title">Business Customer Login</h1>
                 <p class="login-subtitle">
-                    Sign in to access your Lemma Shield dashboard
+                    Sign in to manage your Lemma integration, API keys, and billing
                 </p>
             </div>
 
             <div class="login-note">
-                <strong>Note:</strong> We use a simplified login system. Just enter your email address to access your account and API keys.
+                <strong>Business Customers:</strong> This login is for businesses integrating Lemma on their sites. FIL users with proof-of-personhood credentials can access the federated network directly via "Join Network".
             </div>
 
             <form id="loginForm">

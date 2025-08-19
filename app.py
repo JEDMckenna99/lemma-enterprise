@@ -241,31 +241,46 @@ def create_app():
     @app.route('/join-network')
     def wallet():
         """
-        Lemma Wallet - Protected page showing user's credentials and revocation controls
+        Lemma Federated Wallet - FIL Network Access
         
-        This route serves the wallet interface where authenticated users can:
-        - View their lemma credential count
-        - Manage individual credentials  
-        - Trigger revocation flow for security
+        This route serves the federated identity wallet for anyone with proof-of-personhood
+        lemmas in their wallet. This is NOT for business customers (who use email login),
+        but for FIL users who have cryptographic credentials.
+        
+        FIL users can:
+        - View their lemma credential count from their cryptographic wallet
+        - Manage individual credentials across the federated network
+        - Trigger network-wide revocation flow for security
         """
-        # Check if user is authenticated
-        if not session.get('customer_id'):
-            logger.info("🔒 Redirecting unauthenticated user to login")
-            return redirect('/login')
+        # Import the shield functionality for cryptographic verification
+        from api.lemma_shield import has_valid_lemma_credential
         
-        logger.info("💼 Serving wallet page for authenticated user")
+        logger.info("🌐 Checking FIL user credentials for wallet access")
         
-        # Get user's credential info
-        user_id = session.get('customer_id')
+        # Check for proof-of-personhood credentials (not email authentication)
+        credential_check = has_valid_lemma_credential()
+        
+        if not credential_check['has_credential']:
+            logger.info("🔒 No valid lemma credentials found - redirecting to verification")
+            # Store the wallet URL they were trying to access
+            session['return_url'] = request.url
+            return redirect('/api/lemma-shield/start-verification')
+        
+        logger.info("💼 Serving federated wallet for FIL user with valid credentials")
+        
+        # Get FIL user info from their credentials
+        user_credential = credential_check.get('credential', {})
         user_info = {
-            'customer_id': user_id,
-            'name': session.get('customer_name', 'User'),
-            'role': session.get('user_role', 'customer')
+            'fil_user': True,
+            'credential_id': user_credential.get('credential_id', 'unknown'),
+            'verified_at': user_credential.get('verified_at'),
+            'network_status': 'connected'
         }
         
         return render_template('modern/wallet.html', 
                              user_info=user_info,
-                             user_id=user_id)
+                             credential_check=credential_check,
+                             fil_access=True)
     
     # Public marketing pages
     @app.route('/about')

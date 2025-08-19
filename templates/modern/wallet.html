@@ -210,9 +210,17 @@
         <p class="text-muted">Real-time view of your cryptographic credentials stored in the federated network</p>
         
         <div id="credentials-list" class="credential-list">
-            <div style="padding: 40px; text-align: center; color: var(--gray-500);">
-                Loading federated credentials...
-            </div>
+            {% if fil_access %}
+                <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                    Loading your FIL credentials from wallet...
+                </div>
+            {% else %}
+                <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                    No credentials found. 
+                    <a href="/api/lemma-shield/start-verification" style="color: var(--primary);">Get verified</a> 
+                    to join the federated network.
+                </div>
+            {% endif %}
         </div>
     </div>
 
@@ -238,7 +246,32 @@ let userCredentials = [];
 
 async function loadWalletData() {
     try {
-        // Check for existing credentials in session/local storage
+        // Check if we have FIL credential data from server
+        {% if credential_check and fil_access %}
+        const filCredentialCheck = {{ credential_check | tojson }};
+        
+        if (filCredentialCheck.has_credential) {
+            // FIL user with valid proof-of-personhood credentials
+            const credentialCount = filCredentialCheck.credentials_checked || 1;
+            document.getElementById('lemma-count').textContent = credentialCount.toString();
+            document.getElementById('active-count').textContent = credentialCount.toString();
+            
+            // Create FIL credential object
+            userCredentials = [{
+                credential_id: filCredentialCheck.credential?.credential_id || 'fil-credential',
+                type: 'proof-of-personhood',
+                verified_at: filCredentialCheck.credential?.verified_at || new Date().toISOString(),
+                network_status: 'federated',
+                verification_time_us: Math.round(filCredentialCheck.verification_time_ns / 1000),
+                rust_engine_used: filCredentialCheck.rust_engine_used
+            }];
+            
+            updateCredentialsList(userCredentials);
+            return;
+        }
+        {% endif %}
+        
+        // Fallback: Check via API for additional credentials
         const response = await fetch('/api/shield/check', {
             method: 'POST',
             headers: {
@@ -295,11 +328,21 @@ function updateCredentialsList(credentials) {
         const isRevoked = cred.revoked || false;
         const statusClass = isRevoked ? 'status-revoked' : 'status-active';
         const statusText = isRevoked ? 'Revoked' : 'Active';
+        const credType = cred.type || 'identity';
+        const verificationTime = cred.verification_time_us ? `${cred.verification_time_us}μs` : 'N/A';
         
         return `
             <div class="credential-item">
                 <div class="credential-info">
-                    <div class="credential-id">${credId.substring(0, 16)}...${credId.substring(credId.length - 8)}</div>
+                    <div class="credential-id">
+                        <strong>${credType === 'proof-of-personhood' ? 'FIL Proof-of-Personhood' : 'Identity Credential'}</strong>
+                        <div style="font-size: var(--font-size-xs); color: var(--gray-500);">
+                            ID: ${credId.length > 20 ? credId.substring(0, 16) + '...' + credId.substring(credId.length - 8) : credId}
+                        </div>
+                        <div style="font-size: var(--font-size-xs); color: var(--gray-400);">
+                            Verification: ${verificationTime} • Network: ${cred.network_status || 'connected'}
+                        </div>
+                    </div>
                     <div class="credential-status ${statusClass}">${statusText}</div>
                 </div>
                 ${!isRevoked ? `<button class="revoke-btn" onclick="revokeCredential('${credId}')">Revoke</button>` : ''}
