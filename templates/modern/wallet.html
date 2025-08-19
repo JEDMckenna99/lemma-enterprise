@@ -39,7 +39,7 @@
 
         .wallet-main {
             display: grid;
-            grid-template-columns: 1.5fr 1fr;
+            grid-template-columns: 1fr;
             gap: 32px;
             margin-bottom: 32px;
         }
@@ -333,12 +333,8 @@
                 padding: 32px 16px;
             }
             
-            .wallet-status {
-                padding: 24px;
-            }
-            
-            .credential-count {
-                font-size: 2rem;
+            .credential-management {
+                padding: 20px;
             }
 
             .wallet-grid {
@@ -359,19 +355,28 @@
 
     <!-- Main Wallet Layout -->
     <div class="wallet-main">
-        <!-- Left Column: Status & Explainer -->
-        <div>
-            <!-- Wallet Status -->
-            <div class="wallet-status">
-                <div class="credential-count" id="lemma-credential-count">--</div>
-                <div class="credential-label">Active Credentials</div>
-                <div class="wallet-status-meta">
-                    <span id="wallet-status">Connecting to federated network...</span>
+        <!-- Credential Management (moved to primary position) -->
+        <section class="credential-management">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                <div>
+                    <h2 style="font-size: 1.3rem; font-weight: 600; color: var(--gray-900); margin: 0;">Your Credentials</h2>
+                    <p style="color: var(--gray-600); margin: 2px 0 0 0; font-size: 0.9rem;">Manage your federated identity proofs</p>
+                </div>
+                <button class="btn-primary" onclick="lemmaWallet.refreshCredentials()" style="padding: 8px 16px; font-size: 0.85rem;">
+                    Refresh
+                </button>
+            </div>
+            
+            <div id="credential-list" class="credential-list">
+                <div style="padding: 48px; text-align: center; color: var(--gray-500);">
+                    <div style="font-size: 20px; margin-bottom: 12px;">🔄</div>
+                    <div style="font-weight: 500; margin-bottom: 8px;">Loading credentials...</div>
+                    <div style="font-size: 0.9rem;">Connecting to Lemma network</div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Right Column: Explainer -->
+        <!-- Explainer Card -->
         <div class="explainer-card">
             <div class="explainer-header">
                 <div class="explainer-icon">🛡️</div>
@@ -479,26 +484,7 @@
         </div>
     </section>
 
-    <!-- Credential Management -->
-    <section class="credential-management">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-            <div>
-                <h2 style="font-size: 1.3rem; font-weight: 600; color: var(--gray-900); margin: 0;">Your Credentials</h2>
-                <p style="color: var(--gray-600); margin: 2px 0 0 0; font-size: 0.9rem;">Manage your federated identity proofs</p>
-            </div>
-            <button class="btn-primary" onclick="lemmaWallet.refreshCredentials()" style="padding: 8px 16px; font-size: 0.85rem;">
-                Refresh
-            </button>
-        </div>
-        
-        <div id="credential-list" class="credential-list">
-            <div style="padding: 48px; text-align: center; color: var(--gray-500);">
-                <div style="font-size: 20px; margin-bottom: 12px;">🔄</div>
-                <div style="font-weight: 500; margin-bottom: 8px;">Loading credentials...</div>
-                <div style="font-size: 0.9rem;">Connecting to Lemma network</div>
-            </div>
-        </div>
-    </section>
+
 
     <!-- Security Controls -->
     <section class="revocation-section">
@@ -565,15 +551,33 @@ document.addEventListener('DOMContentLoaded', async function() {
         
     } catch (error) {
         console.error('Failed to initialize Lemma Federated Wallet:', error);
-        document.getElementById('wallet-status').textContent = 'Failed to connect to federated network';
-        document.getElementById('wallet-status').style.color = 'var(--error)';
+        // Update credential list to show error state
+        const listContainer = document.getElementById('credential-list');
+        if (listContainer) {
+            listContainer.innerHTML = `
+                <div style="padding: 48px; text-align: center; color: var(--error);">
+                    <div style="font-size: 20px; margin-bottom: 12px;">⚠️</div>
+                    <div style="font-weight: 500; margin-bottom: 8px;">Failed to connect</div>
+                    <div style="font-size: 0.9rem;">Could not initialize federated wallet</div>
+                </div>
+            `;
+        }
     }
 });
 
 async function loadWalletData() {
     try {
         if (!lemmaWallet || !lemmaWallet.isReady) {
-            document.getElementById('wallet-status').textContent = 'Wallet not ready...';
+            const listContainer = document.getElementById('credential-list');
+            if (listContainer) {
+                listContainer.innerHTML = `
+                    <div style="padding: 48px; text-align: center; color: var(--gray-500);">
+                        <div style="font-size: 20px; margin-bottom: 12px;">⏳</div>
+                        <div style="font-weight: 500; margin-bottom: 8px;">Wallet not ready</div>
+                        <div style="font-size: 0.9rem;">Initializing connection...</div>
+                    </div>
+                `;
+            }
             return;
         }
 
@@ -581,26 +585,34 @@ async function loadWalletData() {
         const credentials = await lemmaWallet.getCredentials();
         const activeCredentials = credentials.filter(cred => !cred.revoked);
         
-        // Update display
-        document.getElementById('lemma-credential-count').textContent = credentials.length.toString();
-        document.getElementById('active-credential-count').textContent = activeCredentials.length.toString();
-        document.getElementById('wallet-status').textContent = 'Connected to federated network';
-        document.getElementById('wallet-status').style.color = 'var(--success)';
+        // Update network status if element exists
+        const networkStatus = document.getElementById('network-status');
+        if (networkStatus) {
+            networkStatus.textContent = 'Connected';
+            networkStatus.style.color = 'var(--success)';
+        }
         
-        // Update network status (simplified)
-        document.getElementById('network-status').textContent = 'Connected';
-        document.getElementById('network-status').style.color = 'var(--success)';
-        
-        // Update verification speed (simplified)
-        document.getElementById('verification-speed').textContent = '<5μs average';
+        // Update verification speed if element exists
+        const verificationSpeed = document.getElementById('verification-speed');
+        if (verificationSpeed) {
+            verificationSpeed.textContent = '<5μs average';
+        }
         
         // Update credential list
         updateCredentialList(credentials);
         
     } catch (error) {
         console.error('Failed to load wallet data:', error);
-        document.getElementById('wallet-status').textContent = 'Error loading wallet data';
-        document.getElementById('wallet-status').style.color = 'var(--error)';
+        const listContainer = document.getElementById('credential-list');
+        if (listContainer) {
+            listContainer.innerHTML = `
+                <div style="padding: 48px; text-align: center; color: var(--error);">
+                    <div style="font-size: 20px; margin-bottom: 12px;">⚠️</div>
+                    <div style="font-weight: 500; margin-bottom: 8px;">Error loading data</div>
+                    <div style="font-size: 0.9rem;">Failed to load wallet credentials</div>
+                </div>
+            `;
+        }
     }
 }
 
