@@ -264,7 +264,7 @@ def create_app():
             logger.info("🔒 No valid lemma credentials found - redirecting to verification")
             # Store the wallet URL they were trying to access
             session['return_url'] = request.url
-            return redirect('/api/lemma-shield/lemma/start-verification')
+            return redirect('/lemma/start-verification')
         
         logger.info("💼 Serving federated wallet for FIL user with valid credentials")
         
