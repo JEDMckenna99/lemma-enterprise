@@ -298,9 +298,9 @@ app.post('/api/verify-user', async (req, res) => {
                     </ul>
                 </div>
 
-                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h3 class="text-lg font-medium text-yellow-800 mb-2">🐛 Common Issues</h3>
-                    <ul class="space-y-2 text-sm text-yellow-700">
+                <div style="background: #fef3cd; border: 1px solid #fbbf24; border-radius: 8px; padding: 16px;">
+                    <h3 style="font-size: var(--font-size-lg); font-weight: 500; color: #92400e; margin-bottom: 8px;">🐛 Common Issues</h3>
+                    <ul style="margin: 0; padding-left: 20px; font-size: var(--font-size-sm); color: #92400e;">
                         <li><strong>CORS errors:</strong> Make sure your domain {{ customer.domain }} is correctly configured</li>
                         <li><strong>API key issues:</strong> Verify the key is included in requests as X-API-Key header</li>
                         <li><strong>Network errors:</strong> Check that {{ base_url }} is accessible from your domain</li>
