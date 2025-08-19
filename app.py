@@ -32,7 +32,7 @@ def create_app():
     # Initialize components
     try:
         # Initialize CSRF protection
-        from auth.decorators import init_csrf_protection
+        from auth.decorators import init_csrf_protection, require_authenticated, get_current_user
         init_csrf_protection(app)
         
         # Initialize Stripe manager
@@ -239,23 +239,25 @@ def create_app():
     
     @app.route('/join')  
     @app.route('/join-network')
-    def join_network():
+    @require_authenticated
+    def wallet():
         """
-        Join the Lemma Network page - Bot Shield Integration Demo
+        Lemma Wallet - Protected page showing user's credentials and revocation controls
         
-        This route serves the page that demonstrates the JavaScript bot shield.
-        The bot shield will check for credentials and handle verification flow.
+        This route serves the wallet interface where authenticated users can:
+        - View their lemma credential count
+        - Manage individual credentials  
+        - Trigger revocation flow for security
         """
-        logger.info("📄 Serving join network page with bot shield integration")
+        logger.info("💼 Serving wallet page for authenticated user")
         
-        # Get user's credential info for the page
-        credential = session.get('lemma_credential', {})
-        user_id = session.get('user_id', 'Anonymous')
+        # Get user's credential info
+        user_info = get_current_user()
+        user_id = user_info.get('customer_id') if user_info else session.get('user_id')
         
-        return render_template('modern/join_network.html', 
-                             credential=credential,
-                             user_id=user_id,
-                             verified=False)  # Bot shield will handle verification
+        return render_template('modern/wallet.html', 
+                             user_info=user_info,
+                             user_id=user_id)
     
     # Public marketing pages
     @app.route('/about')

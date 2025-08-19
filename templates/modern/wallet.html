@@ -1,0 +1,408 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}My Wallet - Lemma{% endblock %}
+{% block description %}Manage your Lemma credentials, view wallet balance, and access revocation controls.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .wallet-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .wallet-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .wallet-balance {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: var(--white);
+            padding: 48px;
+            border-radius: 16px;
+            text-align: center;
+            margin-bottom: 32px;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+        }
+
+        .balance-amount {
+            font-size: 64px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .balance-label {
+            font-size: var(--font-size-lg);
+            opacity: 0.9;
+            font-weight: 500;
+        }
+
+        .wallet-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .wallet-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 32px;
+            transition: all 0.2s ease;
+        }
+
+        .wallet-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.1);
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            color: var(--white);
+            font-size: 24px;
+        }
+
+        .revocation-section {
+            background: var(--gray-100);
+            border-radius: 12px;
+            padding: 32px;
+            margin-top: 32px;
+        }
+
+        .revocation-warning {
+            background: #fef3cd;
+            border: 1px solid #fbbf24;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+            color: #92400e;
+        }
+
+        .credential-list {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+
+        .credential-item {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .credential-item:last-child {
+            border-bottom: none;
+        }
+
+        .credential-info {
+            flex: 1;
+        }
+
+        .credential-id {
+            font-family: var(--font-mono);
+            font-size: var(--font-size-sm);
+            color: var(--gray-600);
+            margin-bottom: 4px;
+        }
+
+        .credential-status {
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+        }
+
+        .status-active { color: var(--success); }
+        .status-revoked { color: var(--error); }
+
+        .revoke-btn {
+            background: var(--error);
+            color: var(--white);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .revoke-btn:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        .revoke-btn:disabled {
+            background: var(--gray-400);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="wallet-container">
+    <!-- Wallet Header -->
+    <div class="wallet-header">
+        <h1>My Lemma Wallet</h1>
+        <p class="text-muted">Manage your identity credentials and network access</p>
+    </div>
+
+    <!-- Wallet Balance -->
+    <div class="wallet-balance">
+        <div class="balance-amount" id="lemma-count">--</div>
+        <div class="balance-label">Lemma Credentials</div>
+    </div>
+
+    <!-- Wallet Features Grid -->
+    <div class="wallet-grid">
+        <div class="wallet-card">
+            <div class="card-icon">🔐</div>
+            <h3>Active Credentials</h3>
+            <p class="text-muted">View and manage your verified identity credentials across the federated network.</p>
+            <div style="margin-top: 16px;">
+                <span id="active-count" style="font-size: var(--font-size-2xl); font-weight: 600; color: var(--primary);">--</span>
+                <span class="text-muted"> active</span>
+            </div>
+        </div>
+
+        <div class="wallet-card">
+            <div class="card-icon">🌐</div>
+            <h3>Network Status</h3>
+            <p class="text-muted">Your credentials are recognized across all federated network sites.</p>
+            <div style="margin-top: 16px;">
+                <span style="color: var(--success); font-weight: 600;">Connected</span>
+                <span class="text-muted"> to network</span>
+            </div>
+        </div>
+
+        <div class="wallet-card">
+            <div class="card-icon">⚡</div>
+            <h3>Verification Speed</h3>
+            <p class="text-muted">Your credentials verify in microseconds across all network platforms.</p>
+            <div style="margin-top: 16px;">
+                <span style="color: var(--primary); font-weight: 600;">&lt;5μs</span>
+                <span class="text-muted"> average</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Credential Management -->
+    <div class="wallet-card">
+        <h3>Credential Management</h3>
+        <p class="text-muted">View and manage your individual credentials</p>
+        
+        <div id="credentials-list" class="credential-list">
+            <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                Loading credentials...
+            </div>
+        </div>
+    </div>
+
+    <!-- Revocation Section -->
+    <div class="revocation-section">
+        <h3 style="color: var(--error); margin-bottom: 16px;">Credential Revocation</h3>
+        
+        <div class="revocation-warning">
+            <strong>⚠️ Warning:</strong> Revoking credentials will immediately invalidate them across the entire federated network. This action cannot be undone.
+        </div>
+
+        <p class="text-muted">Use revocation if your credentials have been compromised or you need to invalidate access for security reasons.</p>
+        
+        <button id="revoke-all-btn" class="revoke-btn" style="margin-top: 16px;" onclick="initiateRevocation()">
+            Revoke All Credentials
+        </button>
+    </div>
+</div>
+
+<script>
+// Wallet functionality using existing API endpoints
+let userCredentials = [];
+
+async function loadWalletData() {
+    try {
+        // Check for existing credentials in session/local storage
+        const response = await fetch('/api/shield/check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.credentials) {
+            userCredentials = Array.isArray(data.credentials) ? data.credentials : [data.credentials];
+            updateWalletDisplay();
+        } else {
+            // No credentials found
+            document.getElementById('lemma-count').textContent = '0';
+            document.getElementById('active-count').textContent = '0';
+            updateCredentialsList([]);
+        }
+    } catch (error) {
+        console.error('Failed to load wallet data:', error);
+        document.getElementById('lemma-count').textContent = '0';
+        document.getElementById('active-count').textContent = '0';
+    }
+}
+
+function updateWalletDisplay() {
+    const totalCredentials = userCredentials.length;
+    const activeCredentials = userCredentials.filter(cred => !cred.revoked).length;
+    
+    document.getElementById('lemma-count').textContent = totalCredentials.toString();
+    document.getElementById('active-count').textContent = activeCredentials.toString();
+    
+    updateCredentialsList(userCredentials);
+}
+
+function updateCredentialsList(credentials) {
+    const listContainer = document.getElementById('credentials-list');
+    
+    if (credentials.length === 0) {
+        listContainer.innerHTML = `
+            <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                <p>No credentials found</p>
+                <p style="font-size: var(--font-size-sm); margin-top: 8px;">
+                    <a href="/login" style="color: var(--primary);">Sign in</a> to view your credentials
+                </p>
+            </div>
+        `;
+        return;
+    }
+    
+    listContainer.innerHTML = credentials.map(cred => {
+        const credId = cred.id || cred.credential_id || 'unknown';
+        const isRevoked = cred.revoked || false;
+        const statusClass = isRevoked ? 'status-revoked' : 'status-active';
+        const statusText = isRevoked ? 'Revoked' : 'Active';
+        
+        return `
+            <div class="credential-item">
+                <div class="credential-info">
+                    <div class="credential-id">${credId.substring(0, 16)}...${credId.substring(credId.length - 8)}</div>
+                    <div class="credential-status ${statusClass}">${statusText}</div>
+                </div>
+                ${!isRevoked ? `<button class="revoke-btn" onclick="revokeCredential('${credId}')">Revoke</button>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+async function revokeCredential(credentialId) {
+    if (!confirm('Are you sure you want to revoke this credential? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/sdk/revoke-credential', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                credentials: [{ id: credentialId }],
+                reason: 'user_requested'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Update local state
+            const cred = userCredentials.find(c => (c.id || c.credential_id) === credentialId);
+            if (cred) {
+                cred.revoked = true;
+            }
+            updateWalletDisplay();
+            
+            alert('Credential revoked successfully. Changes will propagate across the network within seconds.');
+        } else {
+            alert('Failed to revoke credential: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Revocation failed:', error);
+        alert('Failed to revoke credential. Please try again.');
+    }
+}
+
+async function initiateRevocation() {
+    const activeCredentials = userCredentials.filter(cred => !cred.revoked);
+    
+    if (activeCredentials.length === 0) {
+        alert('No active credentials to revoke.');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to revoke ALL ${activeCredentials.length} credentials? This will immediately invalidate your access across the entire federated network.`)) {
+        return;
+    }
+    
+    try {
+        document.getElementById('revoke-all-btn').disabled = true;
+        document.getElementById('revoke-all-btn').textContent = 'Revoking...';
+        
+        const response = await fetch('/api/sdk/revoke-credential', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                credentials: activeCredentials.map(cred => ({ id: cred.id || cred.credential_id })),
+                reason: 'user_requested_bulk'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Mark all as revoked
+            userCredentials.forEach(cred => cred.revoked = true);
+            updateWalletDisplay();
+            
+            alert('All credentials revoked successfully. You have been signed out of the network.');
+            
+            // Redirect to login after revocation
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 2000);
+        } else {
+            alert('Failed to revoke credentials: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Bulk revocation failed:', error);
+        alert('Failed to revoke credentials. Please try again.');
+    } finally {
+        document.getElementById('revoke-all-btn').disabled = false;
+        document.getElementById('revoke-all-btn').textContent = 'Revoke All Credentials';
+    }
+}
+
+// Load wallet data when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadWalletData();
+    
+    // Refresh wallet data every 30 seconds
+    setInterval(loadWalletData, 30000);
+});
+</script>
+{% endblock %}
