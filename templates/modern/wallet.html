@@ -344,7 +344,7 @@
 {% block content %}
 <div class="wallet-container">
     <!-- Wallet Header -->
-    <header class="wallet-header">
+    <header class="wallet-header" style="display: none;">
         <h1>Your Lemma Wallet</h1>
         <p>Manage your federated identity credentials and access the decentralized network</p>
         
@@ -368,7 +368,7 @@
     </header>
 
     <!-- Main Wallet Layout -->
-    <div class="wallet-main">
+    <div class="wallet-main" style="display: none;">
         <!-- Credential Management (moved to primary position) -->
         <section class="credential-management">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
@@ -442,7 +442,7 @@
 
 
     <!-- Join FIL Network Section - Only show for users without credentials -->
-    <section id="join-network-section" style="margin-bottom: 32px; display: none;">
+    <section id="join-network-section" style="margin-bottom: 32px; display: block;">
         <h2 class="section-title">Join the Network</h2>
         <div class="wallet-card" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.02), rgba(255, 255, 255, 1)); border: 1px solid rgba(102, 126, 234, 0.15); padding: 24px;">
             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
@@ -546,16 +546,21 @@ async function loadWalletData() {
         const credentials = await lemmaWallet.getCredentials();
         const activeCredentials = credentials.filter(cred => !cred.revoked);
         
-        // Show/hide "Join the Network" section based on credential status
+        // Show/hide sections based on credential status
         const joinNetworkSection = document.getElementById('join-network-section');
-        if (joinNetworkSection) {
-            if (activeCredentials.length === 0) {
-                // User has no credentials - show join section
-                joinNetworkSection.style.display = 'block';
-            } else {
-                // User already has credentials - hide join section
-                joinNetworkSection.style.display = 'none';
-            }
+        const walletMainSection = document.querySelector('.wallet-main');
+        const walletHeaderSection = document.querySelector('.wallet-header');
+        
+        if (activeCredentials.length === 0) {
+            // User has no credentials - show only join section, hide everything else
+            if (joinNetworkSection) joinNetworkSection.style.display = 'block';
+            if (walletMainSection) walletMainSection.style.display = 'none';
+            if (walletHeaderSection) walletHeaderSection.style.display = 'none';
+        } else {
+            // User has credentials - show main wallet and header, hide join section
+            if (joinNetworkSection) joinNetworkSection.style.display = 'none';
+            if (walletMainSection) walletMainSection.style.display = 'block';
+            if (walletHeaderSection) walletHeaderSection.style.display = 'block';
         }
         
         // Update network status if element exists
