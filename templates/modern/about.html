@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Lemma Solutions - Federated Identity Verification{% endblock %}
-{% block description %}Discover how Lemma's verification engine powers federated identity networks, enabling seamless authentication across platforms without compromising user privacy.{% endblock %}
+{% block title %}About Lemma - Authenticated Networks & Secure Communication Platform{% endblock %}
+{% block description %}Learn how Lemma's cryptographic verification engine enables better authenticated networks and secure communication. Mathematical lemmas power federated identity networks with zero-knowledge privacy and microsecond verification.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -119,10 +119,10 @@
 <section class="about-hero">
     <div class="container">
         <div class="about-content">
-            <h1 class="about-title">Lemma Solutions</h1>
+            <h1 class="about-title">About Lemma</h1>
             <p class="about-subtitle">
-                Advanced verification technology that powers federated identity networks, 
-                enabling seamless authentication across platforms while protecting user privacy.
+                Building better authenticated networks through cryptographic innovation. 
+                Mathematical lemmas enable secure communication and privacy-preserving identity verification across federated networks.
             </p>
         </div>
     </div>
@@ -134,62 +134,55 @@
         <div style="text-align: center; margin-bottom: var(--space-8);">
             <h2 style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--gray-900); margin-bottom: var(--space-4);">What is Lemma?</h2>
             <p style="font-size: var(--font-size-lg); color: var(--gray-600); max-width: 600px; margin: 0 auto;">
-                A revolutionary verification engine that powers federated identity networks
+                A next-generation verification engine inspired by mathematical lemmas—compact, proven statements that serve as building blocks for larger proofs
             </p>
         </div>
         
-        <div class="about-content" style="margin-top: var(--space-8);">
-            <p style="font-size: var(--font-size-lg); line-height: 1.8; color: var(--gray-600); margin-bottom: var(--space-6);">
-                <strong>Lemma</strong> is a next-generation verification technology that enables users to prove their identity 
-                once and access multiple platforms seamlessly. Unlike traditional authentication systems that require 
-                passwords, SMS codes, or personal data collection, Lemma uses advanced cryptographic methods to verify 
-                human identity without compromising privacy.
+        <div style="max-width: 900px; margin: 0 auto 48px; padding: 40px; background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%); border-radius: 16px; border: 2px solid var(--primary-100);">
+            <h3 style="color: var(--primary-600); margin-bottom: 24px; font-size: var(--font-size-xl);">🧮 Mathematical Foundation</h3>
+            <p style="font-size: var(--font-size-lg); line-height: 1.8; color: var(--gray-700); margin-bottom: var(--space-6);">
+                <strong>In the digital world, a lemma is a privacy-preserving cryptographic proof</strong> (e.g., "this user is a verified human" or "this device is authentic") that can be generated once and verified instantly anywhere in the network. Just like mathematical lemmas serve as proven building blocks for complex theorems, digital lemmas serve as verified building blocks for authenticated networks.
             </p>
             
             <p style="font-size: var(--font-size-lg); line-height: 1.8; color: var(--gray-600); margin-bottom: var(--space-6);">
-                The <strong>Lemma Verification Engine</strong> powers a federated identity network where your verification 
-                works across all participating platforms. Get verified once, access everywhere - no more creating accounts, 
-                remembering passwords, or solving CAPTCHAs on every site you visit.
+                Using advanced techniques like <strong>zero-knowledge proofs (ZKPs)</strong> and <strong>Ed25519 signatures</strong>, lemmas allow selective disclosure—proving specific claims (e.g., "over 18", "verified professional") without revealing underlying data. This creates <strong>better authenticated networks</strong> where communication is secure, unlinkable, and resistant to bots or fraud.
             </p>
             
-            <p style="font-size: var(--font-size-lg); line-height: 1.8; color: var(--gray-600);">
-                From e-commerce platforms to professional networks, Lemma enables frictionless user experiences 
-                while providing businesses with military-grade protection against bots, fraud, and automated attacks. 
-                Industries like real estate, finance, and healthcare rely on Lemma to secure billions in transactions.
-            </p>
+            <div style="background: var(--primary-50); padding: 24px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                <p style="color: var(--gray-700); line-height: 1.6; margin: 0;">
+                    <strong>🚀 Performance:</strong> >99.9% offline operation with 4.176µs verification in production—1000x faster than traditional solutions requiring network calls. This enables real-time authenticated communication at internet scale.
+                </p>
+            </div>
         </div>
         
         <div class="values-grid">
             <div class="value-card">
-                <div class="value-icon">🌐</div>
+                <div class="value-icon">🔄</div>
                 <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
-                    Federated Network
+                    Revocable & Resilient
                 </h3>
                 <p style="color: var(--gray-600); line-height: 1.6;">
-                    One verification works everywhere. Join the federated identity network and access 
-                    thousands of platforms without re-verification.
+                    Built-in kill switches via status lists allow instant network-wide revocation of compromised credentials, without disrupting real-time communication across the federated network.
                 </p>
             </div>
             
             <div class="value-card">
-                <div class="value-icon">🔒</div>
+                <div class="value-icon">📡</div>
                 <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
-                    Zero Data Collection
+                    Offline-First Networks
                 </h3>
                 <p style="color: var(--gray-600); line-height: 1.6;">
-                    Prove you're human without sharing personal information. Lemma verification 
-                    protects your privacy while eliminating bots and fraud.
+                    Verifications require zero network calls in the hot path, supporting internet-independent mesh networks for IoT devices, autonomous systems, or remote operations.
                 </p>
             </div>
             
             <div class="value-card">
-                <div class="value-icon">⚡</div>
+                <div class="value-icon">🎭</div>
                 <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
-                    Instant Verification
+                    Privacy-Enhanced Communication
                 </h3>
                 <p style="color: var(--gray-600); line-height: 1.6;">
-                    Microsecond verification across all network platforms. No loading screens, 
-                    no delays - just instant access to protected content.
+                    Zero-knowledge proofs ensure unlinkability and selective disclosure, fostering trust in authenticated communication without data leaks or cross-platform tracking.
                 </p>
             </div>
         </div>
@@ -289,35 +282,32 @@
         
         <div class="values-grid">
             <div class="value-card">
-                <div class="value-icon">💳</div>
+                <div class="value-icon">🏪</div>
                 <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
                     E-commerce & Fintech
                 </h3>
                 <p style="color: var(--gray-600); line-height: 1.6;">
-                    Prevent payment fraud, account takeovers, and fake reviews. Protect transactions 
-                    while providing frictionless checkout experiences.
+                    Lemmas secure transactions by verifying human intent in microseconds, preventing fraud while enabling seamless, <strong>authenticated communication between buyers, sellers, and payment systems</strong>—no more fake reviews or account takeovers.
                 </p>
             </div>
             
             <div class="value-card">
-                <div class="value-icon">🏢</div>
+                <div class="value-icon">💼</div>
                 <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
                     Professional Networks
                 </h3>
                 <p style="color: var(--gray-600); line-height: 1.6;">
-                    Ensure authentic professional connections and eliminate fake profiles. 
-                    Perfect for B2B platforms, job boards, and industry networks.
+                    Enable authentic professional connections and <strong>secure business communication</strong>. Lemmas verify credentials and reputation without exposing sensitive information, creating trusted professional ecosystems.
                 </p>
             </div>
             
             <div class="value-card">
-                <div class="value-icon">🏠</div>
+                <div class="value-icon">🏥</div>
                 <h3 style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--gray-800);">
-                    Real Estate & High-Value
+                    Healthcare & Compliance
                 </h3>
                 <p style="color: var(--gray-600); line-height: 1.6;">
-                    Verify serious buyers and qualified leads in high-value transactions. 
-                    Reduce time waste and protect against fraudulent inquiries.
+                    Protect sensitive patient data and ensure regulatory compliance with cryptographic verification. Lemmas enable <strong>secure healthcare communication</strong> while maintaining strict privacy standards and HIPAA compliance.
                 </p>
             </div>
         </div>
@@ -328,36 +318,108 @@
 <section class="section">
     <div class="container">
         <div style="text-align: center; margin-bottom: var(--space-8);">
-            <h2 style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--gray-900); margin-bottom: var(--space-4);">Network Benefits</h2>
-            <p style="font-size: var(--font-size-lg); color: var(--gray-600); max-width: 600px; margin: 0 auto;">
-                Why federated identity networks are the future of online authentication
+            <h2 style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--gray-900); margin-bottom: var(--space-4);">Authenticated Networks Transformation</h2>
+            <p style="font-size: var(--font-size-lg); color: var(--gray-600); max-width: 700px; margin: 0 auto;">
+                How lemmas enable superior networks with secure communication, revocability, and economic advantages
             </p>
         </div>
         
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--space-8);">
-            <div class="card">
-                <div style="padding: var(--space-8);">
-                    <h3 style="color: var(--primary); margin-bottom: var(--space-4);">🔄 Cross-Platform Compatibility</h3>
-                    <p style="margin-bottom: var(--space-4);">
-                        Your Lemma verification works seamlessly across all participating platforms in the network. 
-                        No need to create separate accounts or go through verification processes multiple times.
+        <!-- Comparison Table -->
+        <div style="background: var(--white); border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); overflow: hidden; margin-bottom: 48px;">
+            <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 32px; text-align: center;">
+                <h3 style="margin: 0; font-size: var(--font-size-2xl);">Traditional vs Lemma-Powered Networks</h3>
+                <p style="margin: 12px 0 0; opacity: 0.95;">The future of authenticated communication</p>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: var(--gray-50);">
+                            <th style="padding: 20px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--gray-200);">Network Aspect</th>
+                            <th style="padding: 20px; text-align: center; font-weight: 600; border-bottom: 2px solid var(--gray-200);">Traditional Solutions<br><span style="font-size: var(--font-size-sm); font-weight: 400; color: var(--gray-600);">(CAPTCHAs, MFA, Auth0)</span></th>
+                            <th style="padding: 20px; text-align: center; font-weight: 600; border-bottom: 2px solid var(--gray-200); color: var(--primary);">Lemma-Powered Networks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 20px; font-weight: 500; border-bottom: 1px solid var(--gray-200);">Verification Speed</td>
+                            <td style="padding: 20px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--danger-600);">Seconds (network-dependent)</td>
+                            <td style="padding: 20px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--success-600);"><strong>4.176µs (offline)</strong></td>
+                        </tr>
+                        <tr style="background: var(--gray-25);">
+                            <td style="padding: 20px; font-weight: 500; border-bottom: 1px solid var(--gray-200);">Privacy & Communication</td>
+                            <td style="padding: 20px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--danger-600);">Data collection, tracking, fingerprinting</td>
+                            <td style="padding: 20px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--success-600);"><strong>Zero-knowledge, unlinkable communication</strong></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 20px; font-weight: 500; border-bottom: 1px solid var(--gray-200);">Network Effects</td>
+                            <td style="padding: 20px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--danger-600);">Per-site silos, repeated verification</td>
+                            <td style="padding: 20px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--success-600);"><strong>Verify once, communicate everywhere</strong></td>
+                        </tr>
+                        <tr style="background: var(--gray-25);">
+                            <td style="padding: 20px; font-weight: 500; border-bottom: 1px solid var(--gray-200);">Bot Resistance</td>
+                            <td style="padding: 20px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--danger-600);">Challenge-based (solver-vulnerable)</td>
+                            <td style="padding: 20px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--success-600);"><strong>Cryptographic proof-of-humanity</strong></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 20px; font-weight: 500; border-bottom: 1px solid var(--gray-200);">Revocation & Security</td>
+                            <td style="padding: 20px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--danger-600);">Manual account suspension per platform</td>
+                            <td style="padding: 20px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--success-600);"><strong>Instant network-wide revocation</strong></td>
+                        </tr>
+                        <tr style="background: var(--gray-25);">
+                            <td style="padding: 20px; font-weight: 500;">Economic Model</td>
+                            <td style="padding: 20px; text-align: center; color: var(--danger-600);">$0.10-1.00 per challenge/interaction</td>
+                            <td style="padding: 20px; text-align: center; color: var(--success-600);"><strong>$0.10/active user/month</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 48px; padding: 32px; background: var(--gray-50); border-radius: 16px;">
+            <h3 style="margin-bottom: 16px; color: var(--gray-900);">🚀 Network Transformation Result</h3>
+            <p style="color: var(--gray-600); font-size: var(--font-size-lg); line-height: 1.6;">
+                <strong>Networks that are not just faster and safer, but more scalable</strong>—handling millions of users with 99.9% bot elimination, zero false positives for legitimate interactions, and enabling secure, privacy-preserving communication across decentralized ecosystems.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- Emerging Applications Section -->
+<section class="section" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: var(--space-8);">
+            <h2 style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--gray-900); margin-bottom: var(--space-4);">Emerging Applications</h2>
+            <p style="font-size: var(--font-size-lg); color: var(--gray-600); max-width: 600px; margin: 0 auto;">
+                Lemmas are pioneering new frontiers in authenticated communication and secure networks
+            </p>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px;">
+            <div class="card" style="border-top: 4px solid var(--primary);">
+                <div style="padding: var(--space-6);">
+                    <h3 style="color: var(--primary); margin-bottom: var(--space-3);">🤖 IoT & Autonomous Devices</h3>
+                    <p style="color: var(--gray-600); line-height: 1.6;">
+                        Internet-independent mesh networks with device authentication. Lemmas enable secure communication between autonomous systems, drones, and IoT devices without relying on centralized infrastructure.
                     </p>
-                    <div style="background: var(--gray-100); padding: var(--space-4); border-radius: 8px; margin-top: var(--space-4);">
-                        <strong style="color: var(--gray-800);">Example:</strong> Verify once on Platform A, instantly access Platform B, C, and thousands more.
-                    </div>
                 </div>
             </div>
             
-            <div class="card">
-                <div style="padding: var(--space-8);">
-                    <h3 style="color: var(--primary); margin-bottom: var(--space-4);">🛡️ Advanced Security</h3>
-                    <p style="margin-bottom: var(--space-4);">
-                        Lemma's verification engine uses proprietary cryptographic methods that provide 
-                        mathematical certainty of human identity without revealing personal information.
+            <div class="card" style="border-top: 4px solid var(--secondary);">
+                <div style="padding: var(--space-6);">
+                    <h3 style="color: var(--secondary); margin-bottom: var(--space-3);">🏢 Enterprise Licensing</h3>
+                    <p style="color: var(--gray-600); line-height: 1.6;">
+                        Cryptographic software licensing and access control. Replace traditional license keys with revocable, privacy-preserving lemmas that enable secure enterprise communication and resource access.
                     </p>
-                    <div style="background: var(--gray-100); padding: var(--space-4); border-radius: 8px; margin-top: var(--space-4);">
-                        <strong style="color: var(--gray-800);">Result:</strong> 99.9% bot elimination with zero false positives for legitimate users.
-                    </div>
+                </div>
+            </div>
+            
+            <div class="card" style="border-top: 4px solid var(--warning-600);">
+                <div style="padding: var(--space-6);">
+                    <h3 style="color: var(--warning-600); margin-bottom: var(--space-3);">🌍 Decentralized Social</h3>
+                    <p style="color: var(--gray-600); line-height: 1.6;">
+                        Bot-resistant social networks with verified humans. Create authentic communities where every participant is cryptographically proven to be human, eliminating fake accounts and manipulation.
+                    </p>
                 </div>
             </div>
         </div>
@@ -365,16 +427,16 @@
 </section>
 
 <!-- Integration CTA -->
-<section class="section">
+<section class="section" style="background: linear-gradient(135deg, var(--gray-900) 0%, var(--black) 100%); color: var(--white); padding: 80px 0;">
     <div class="container">
-        <div class="card" style="text-align: center; padding: var(--space-12);">
-            <h2 style="margin-bottom: var(--space-4); color: var(--gray-800);">Ready to Join the Network?</h2>
-            <p style="margin-bottom: var(--space-8); color: var(--gray-600); font-size: var(--font-size-lg);">
-                Experience the future of authentication - join the federated identity network or integrate Lemma into your platform
+        <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+            <h2 style="margin-bottom: var(--space-4); color: var(--white); font-size: var(--font-size-3xl);">Ready to Transform Your Network?</h2>
+            <p style="margin-bottom: var(--space-8); color: var(--gray-300); font-size: var(--font-size-lg); line-height: 1.6;">
+                Join the authenticated communication revolution. Build better networks with cryptographic verification, privacy-preserving identity, and federated trust.
             </p>
             <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
-                <a href="/wallet" class="btn btn-primary">Join Network</a>
-                <a href="/contact" class="btn btn-secondary">Business Integration</a>
+                <a href="/register" class="btn btn-primary">Start Building</a>
+                <a href="/docs" class="btn btn-secondary">Technical Documentation</a>
             </div>
         </div>
     </div>
