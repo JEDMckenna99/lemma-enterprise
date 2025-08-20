@@ -140,6 +140,7 @@ a:hover {
     margin: 0 auto;
     padding: 0 24px;
     width: 100%;
+    gap: 40px;
 }
 
 .nav-logo {
@@ -167,9 +168,10 @@ a:hover {
     display: flex;
     gap: 40px;
     align-items: center;
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
+    flex: 1;
+    justify-content: flex-start;
+    margin-left: 60px;
+    max-width: 600px;
 }
 
 .nav-right {
@@ -195,6 +197,10 @@ a:hover {
 
 /* Mobile Navigation */
 @media (max-width: 768px) {
+    .nav-container {
+        gap: 20px;
+    }
+    
     .nav-center {
         display: none;
     }
