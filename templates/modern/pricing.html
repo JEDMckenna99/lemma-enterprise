@@ -6,23 +6,41 @@
 {% block head %}
     {{ super() }}
     <style>
-        /* Modern Pricing Page Styles */
+        /* Modern SaaS Pricing Page Styles */
         .pricing-container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 0 var(--space-6);
         }
 
         /* Hero Section */
         .pricing-hero {
-            background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);
+            background: linear-gradient(135deg, var(--gray-900) 0%, var(--black) 100%);
+            color: var(--white);
             padding: var(--space-20) 0 var(--space-16);
             text-align: center;
-            border-bottom: 1px solid var(--gray-100);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .pricing-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent 30%, rgba(99, 102, 241, 0.1) 50%, transparent 70%);
+            animation: shimmer 3s ease-in-out infinite;
+        }
+        
+        @keyframes shimmer {
+            0%, 100% { transform: translateX(-100%); }
+            50% { transform: translateX(100%); }
         }
 
         .hero-badge {
-            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            background: rgba(255, 255, 255, 0.2);
             color: var(--white);
             padding: var(--space-2) var(--space-4);
             border-radius: 50px;
@@ -30,50 +48,148 @@
             font-weight: 600;
             display: inline-block;
             margin-bottom: var(--space-4);
-            box-shadow: 0 4px 12px rgba(99, 91, 255, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            position: relative;
+            z-index: 1;
         }
 
         .hero-title {
             font-size: 3.5rem;
             font-weight: 800;
-            color: var(--gray-900);
+            color: var(--white);
             margin-bottom: var(--space-4);
             line-height: 1.1;
+            position: relative;
+            z-index: 1;
         }
 
         .hero-subtitle {
             font-size: var(--font-size-xl);
-            color: var(--gray-600);
+            color: rgba(255, 255, 255, 0.9);
             margin-bottom: var(--space-8);
             max-width: 600px;
             margin-left: auto;
             margin-right: auto;
             line-height: 1.6;
+            position: relative;
+            z-index: 1;
         }
-
-        /* Main Pricing Card */
-        .pricing-main {
-            padding: var(--space-16) 0;
+        
+        /* Modern SaaS Layout */
+        .pricing-content {
             background: var(--white);
+            padding: var(--space-16) 0;
+        }
+        
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: var(--space-12);
+            align-items: start;
+        }
+        
+        .pricing-plans {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-8);
+        }
+        
+        .pricing-sidebar {
+            position: sticky;
+            top: var(--space-8);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
         }
 
+        /* Pricing Cards */
         .pricing-card {
             background: var(--white);
             border: 2px solid var(--gray-200);
-            border-radius: 24px;
-            padding: var(--space-12);
+            border-radius: 20px;
+            padding: var(--space-8);
             text-align: center;
             position: relative;
-            max-width: 600px;
-            margin: 0 auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
             transition: all 0.3s ease;
         }
 
         .pricing-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.12);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
             border-color: var(--primary-300);
+        }
+        
+        .pricing-card.featured {
+            border-color: var(--primary-500);
+            box-shadow: 0 20px 60px rgba(99, 102, 241, 0.15);
+        }
+        
+        /* Sidebar Components */
+        .calculator-widget {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 16px;
+            padding: var(--space-6);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        }
+        
+        .cost-reduction-table {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 16px;
+            padding: var(--space-6);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        }
+        
+        .widget-title {
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: var(--space-4);
+            text-align: center;
+        }
+        
+        .calculator-input {
+            width: 100%;
+            padding: var(--space-3);
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: var(--font-size-base);
+            text-align: center;
+            margin-bottom: var(--space-4);
+            transition: border-color 0.2s ease;
+        }
+        
+        .calculator-input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+        }
+        
+        .cost-result {
+            background: var(--primary-50);
+            border: 1px solid var(--primary-200);
+            border-radius: 8px;
+            padding: var(--space-4);
+            text-align: center;
+            margin-top: var(--space-4);
+        }
+        
+        .cost-amount {
+            font-size: var(--font-size-xl);
+            font-weight: 700;
+            color: var(--primary-600);
+        }
+        
+        .savings-highlight {
+            background: var(--success);
+            color: var(--white);
+            padding: var(--space-1) var(--space-2);
+            border-radius: 4px;
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            margin-left: var(--space-2);
         }
 
         .pricing-badge {
@@ -243,92 +359,7 @@
             font-weight: 500;
         }
 
-        /* Calculator Section */
-        .calculator-section {
-            background: var(--white);
-            padding: var(--space-16) 0;
-            border-top: 1px solid var(--gray-100);
-        }
 
-        .calculator-card {
-            background: linear-gradient(135deg, var(--gray-50), var(--white));
-            border: 2px solid var(--gray-200);
-            border-radius: 20px;
-            padding: var(--space-10);
-            max-width: 500px;
-            margin: 0 auto;
-            text-align: center;
-        }
-
-        .calculator-title {
-            font-size: var(--font-size-2xl);
-            font-weight: 700;
-            color: var(--gray-900);
-            margin-bottom: var(--space-6);
-        }
-
-        .input-group {
-            margin-bottom: var(--space-6);
-        }
-
-        .input-label {
-            display: block;
-            font-size: var(--font-size-base);
-            font-weight: 600;
-            color: var(--gray-700);
-            margin-bottom: var(--space-2);
-        }
-
-        .user-input {
-            width: 100%;
-            padding: var(--space-4);
-            border: 2px solid var(--gray-200);
-            border-radius: 12px;
-            font-size: var(--font-size-lg);
-            font-weight: 600;
-            text-align: center;
-            transition: all 0.2s ease;
-            background: var(--white);
-        }
-
-        .user-input:focus {
-            outline: none;
-            border-color: var(--primary-500);
-            box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.1);
-        }
-
-        .cost-breakdown {
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: 16px;
-            padding: var(--space-6);
-            margin: var(--space-6) 0;
-        }
-
-        .cost-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: var(--space-3) 0;
-            border-bottom: 1px solid var(--gray-100);
-        }
-
-        .cost-row:last-child {
-            border-bottom: none;
-            font-weight: 700;
-            font-size: var(--font-size-lg);
-            color: var(--primary-600);
-        }
-
-        .cost-label {
-            color: var(--gray-600);
-            font-weight: 500;
-        }
-
-        .cost-value {
-            font-weight: 600;
-            color: var(--gray-800);
-        }
 
         /* FAQ Section */
         .faq-section {
@@ -449,15 +480,65 @@
             color: var(--primary-600);
         }
 
+        /* Cost Reduction Table Styles */
+        .comparison-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            align-items: center;
+            padding: var(--space-3);
+            border-bottom: 1px solid var(--gray-100);
+        }
+        
+        .comparison-row:last-child {
+            border-bottom: none;
+        }
+        
+        .comparison-row:nth-child(even) {
+            background: var(--gray-25);
+        }
+        
+        .comparison-row.lemma-row {
+            background: var(--primary-50);
+            font-weight: 600;
+            color: var(--primary-700);
+        }
+        
+        .provider-name {
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+        
+        .cost-cell {
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .savings-cell {
+            text-align: center;
+            font-weight: 600;
+        }
+
         /* Responsive Design */
+        @media (max-width: 1024px) {
+            .pricing-grid {
+                grid-template-columns: 1fr;
+                gap: var(--space-8);
+            }
+            
+            .pricing-sidebar {
+                position: static;
+                order: -1;
+            }
+        }
+        
         @media (max-width: 768px) {
             .hero-title {
                 font-size: 2.5rem;
             }
 
             .pricing-card {
-                margin: 0 var(--space-4);
-                padding: var(--space-8);
+                margin: 0;
+                padding: var(--space-6);
             }
 
             .price-amount {
@@ -481,6 +562,12 @@
             .table-header {
                 display: none;
             }
+            
+            .comparison-row {
+                grid-template-columns: 1fr;
+                gap: var(--space-2);
+                text-align: left;
+            }
         }
     </style>
 {% endblock %}
@@ -497,130 +584,176 @@
         </div>
     </section>
 
-    <!-- Main Pricing Section -->
-    <section class="pricing-main">
+    <!-- Main Pricing Content -->
+    <section class="pricing-content">
         <div class="pricing-container">
-            <div class="pricing-card">
-                <div class="pricing-badge">Most Popular</div>
+            <div class="pricing-grid">
+                <!-- Pricing Plans (Left Side) -->
+                <div class="pricing-plans">
+                    <!-- Standard Plan -->
+                    <div class="pricing-card featured">
+                        <div class="pricing-badge">Most Popular</div>
+                        
+                        <div class="pricing-header">
+                            <h2 class="pricing-title">Standard Plan</h2>
+                            <p class="pricing-description">
+                                Pay only for <strong>active users</strong> who visit your site each month. Perfect for any size business.
+                            </p>
+                        </div>
+
+                        <div class="price-display">
+                            <div class="price-main">
+                                <span class="price-currency">$</span>
+                                <span class="price-amount">0.10</span>
+                                <span class="price-unit">per active user per month</span>
+                            </div>
+                            <div class="price-secondary">
+                                + <span class="price-highlight">$2.00</span> per Stripe Identity verification<br>
+                                <small>(only for users who require enhanced identity verification)</small>
+                            </div>
+                            <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--primary-50); border-radius: 8px; border-left: 4px solid var(--primary-500);">
+                                <small style="color: var(--primary-700); font-weight: 600;">
+                                    💡 You only pay for users who actually visit your site each month
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="cta-section">
+                            <button onclick="window.location.href='/register'" class="cta-button">
+                                Create Account & Get API Keys
+                            </button>
+                            <p class="cta-tagline">
+                                No monthly minimums • Cancel anytime • 30-day money-back guarantee
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Enterprise Plan -->
+                    <div class="pricing-card">
+                        <div class="pricing-badge" style="background: linear-gradient(135deg, var(--gray-700), var(--gray-800));">Enterprise</div>
+                        
+                        <div class="pricing-header">
+                            <h2 class="pricing-title">White Label Solutions</h2>
+                            <p class="pricing-description">
+                                Custom offline verification engines tailored to your business needs. Full control and branding.
+                            </p>
+                        </div>
+
+                        <div class="price-display">
+                            <div class="price-main">
+                                <span class="price-amount" style="font-size: var(--font-size-2xl);">Custom Pricing</span>
+                            </div>
+                            <div class="price-secondary">
+                                Lemma-powered verification engine with your branding<br>
+                                <small>On-premise deployment available</small>
+                            </div>
+                        </div>
+
+                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--gray-50); border-radius: 12px;">
+                            <h4 style="margin-bottom: var(--space-3); color: var(--gray-800); font-weight: 600;">Enterprise Features:</h4>
+                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-600); line-height: 1.8;">
+                                <li>White-labeled Lemma verification engine</li>
+                                <li>Custom branding and domain</li>
+                                <li>On-premise or private cloud deployment</li>
+                                <li>Dedicated support team</li>
+                                <li>Custom SLA agreements</li>
+                                <li>Advanced analytics and reporting</li>
+                            </ul>
+                        </div>
+
+                        <div class="cta-section">
+                            <button onclick="contactEnterpriseSales()" class="cta-button" style="background: linear-gradient(135deg, var(--gray-700), var(--gray-800));">
+                                Contact Sales
+                            </button>
+                            <p class="cta-tagline">
+                                Custom solutions for enterprise needs • Dedicated account management
+                            </p>
+                        </div>
+                    </div>
+                </div>
                 
-                <div class="pricing-header">
-                    <h2 class="pricing-title">Standard Plan</h2>
-                    <p class="pricing-description">
-                        Pay only for <strong>active users</strong> who visit your site each month. Perfect for any size business.
-                    </p>
-                </div>
-
-                <div class="price-display">
-                    <div class="price-main">
-                        <span class="price-currency">$</span>
-                        <span class="price-amount">0.10</span>
-                        <span class="price-unit">per active user per month</span>
+                <!-- Sidebar (Right Side) -->
+                <div class="pricing-sidebar">
+                    <!-- Pricing Calculator -->
+                    <div class="calculator-widget">
+                        <h3 class="widget-title">💰 Pricing Calculator</h3>
+                        
+                        <label style="display: block; margin-bottom: var(--space-2); font-weight: 600; color: var(--gray-700);">
+                            Monthly Active Users
+                        </label>
+                        <input type="number" id="userCount" class="calculator-input" value="1000" min="1" onchange="calculateCost()" placeholder="Enter user count">
+                        
+                        <div class="cost-result">
+                            <div style="margin-bottom: var(--space-2);">
+                                <span style="color: var(--gray-600);">Monthly Cost:</span>
+                                <div class="cost-amount" id="monthlyCost">$100.00</div>
+                            </div>
+                            <div style="font-size: var(--font-size-sm); color: var(--gray-600);">
+                                First month: <span id="totalCost" style="font-weight: 600;">$2,100.00</span>
+                                <br><small>Includes identity verifications</small>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--success-50); border-radius: 8px; text-align: center;">
+                            <div style="font-size: var(--font-size-sm); color: var(--success-700); font-weight: 600;">
+                                Save <span id="savingsAmount">$1,900/month</span>
+                            </div>
+                            <div style="font-size: var(--font-size-xs); color: var(--success-600);">
+                                vs Auth0 pricing
+                            </div>
+                        </div>
                     </div>
-                    <div class="price-secondary">
-                        + <span class="price-highlight">$2.00</span> per Stripe Identity verification<br>
-                        <small>(only for users who require enhanced identity verification)</small>
+                    
+                    <!-- Cost Reduction Table -->
+                    <div class="cost-reduction-table">
+                        <h3 class="widget-title">📊 Cost Comparison</h3>
+                        <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: var(--space-4); text-align: center;">
+                            Cost per 1,000 users/month
+                        </div>
+                        
+                        <div class="comparison-row lemma-row">
+                            <div class="provider-name">🚀 Lemma</div>
+                            <div class="cost-cell" style="color: var(--primary-600);">$100</div>
+                            <div class="savings-cell" style="color: var(--success-600);">Baseline</div>
+                        </div>
+                        
+                        <div class="comparison-row">
+                            <div class="provider-name">Auth0</div>
+                            <div class="cost-cell">$2,000</div>
+                            <div class="savings-cell" style="color: var(--danger-600);">+1,900%</div>
+                        </div>
+                        
+                        <div class="comparison-row">
+                            <div class="provider-name">Okta</div>
+                            <div class="cost-cell">$2,000</div>
+                            <div class="savings-cell" style="color: var(--danger-600);">+1,900%</div>
+                        </div>
+                        
+                        <div class="comparison-row">
+                            <div class="provider-name">Cloudflare</div>
+                            <div class="cost-cell">$200</div>
+                            <div class="savings-cell" style="color: var(--warning-600);">+100%</div>
+                        </div>
+                        
+                        <div class="comparison-row">
+                            <div class="provider-name">reCAPTCHA</div>
+                            <div class="cost-cell">$100</div>
+                            <div class="savings-cell" style="color: var(--gray-600);">Same</div>
+                        </div>
+                        
+                        <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--gray-50); border-radius: 8px; text-align: center;">
+                            <div style="font-size: var(--font-size-xs); color: var(--gray-600);">
+                                <strong>⚡ Performance Bonus:</strong><br>
+                                1000x faster verification (4µs vs 4ms)
+                            </div>
+                        </div>
                     </div>
-                    <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--primary-50); border-radius: 8px; border-left: 4px solid var(--primary-500);">
-                        <small style="color: var(--primary-700); font-weight: 600;">
-                            💡 You only pay for users who actually visit your site each month
-                        </small>
-                    </div>
-                </div>
-
-                <div class="cta-section">
-                    <button onclick="window.location.href='/register'" class="cta-button">
-                        Create Account & Get API Keys
-                    </button>
-                    <p class="cta-tagline">
-                        No monthly minimums • Cancel anytime • 30-day money-back guarantee
-                    </p>
-                </div>
-            </div>
-
-            <!-- Enterprise Option -->
-            <div class="pricing-card" style="margin-top: var(--space-12); border: 2px solid var(--primary-200);">
-                <div class="pricing-badge" style="background: linear-gradient(135deg, var(--gray-700), var(--gray-800));">Enterprise</div>
-                
-                <div class="pricing-header">
-                    <h2 class="pricing-title">White Label Solutions</h2>
-                    <p class="pricing-description">
-                        Custom offline verification engines tailored to your business needs. Full control and branding.
-                    </p>
-                </div>
-
-                <div class="price-display">
-                    <div class="price-main">
-                        <span class="price-amount" style="font-size: var(--font-size-2xl);">Custom Pricing</span>
-                    </div>
-                    <div class="price-secondary">
-                        Lemma-powered verification engine with your branding<br>
-                        <small>On-premise deployment available</small>
-                    </div>
-                </div>
-
-                <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--gray-50); border-radius: 12px;">
-                    <h4 style="margin-bottom: var(--space-3); color: var(--gray-800); font-weight: 600;">Enterprise Features:</h4>
-                    <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-600); line-height: 1.8;">
-                        <li>White-labeled Lemma verification engine</li>
-                        <li>Custom branding and domain</li>
-                        <li>On-premise or private cloud deployment</li>
-                        <li>Dedicated support team</li>
-                        <li>Custom SLA agreements</li>
-                        <li>Advanced analytics and reporting</li>
-                    </ul>
-                </div>
-
-                <div class="cta-section">
-                    <button onclick="contactEnterpriseSales()" class="cta-button" style="background: linear-gradient(135deg, var(--gray-700), var(--gray-800));">
-                        Contact Sales
-                    </button>
-                    <p class="cta-tagline">
-                        Custom solutions for enterprise needs • Dedicated account management
-                    </p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Pricing Calculator -->
-    <section class="calculator-section">
-        <div class="pricing-container">
-            <div class="calculator-card">
-                <h3 class="calculator-title">Pricing Calculator</h3>
-                
-                <div class="input-group">
-                    <label class="input-label" for="userCount">Expected Monthly Active Users</label>
-                    <input type="number" id="userCount" class="user-input" value="1000" min="1" onchange="calculateCost()">
-                    <small style="color: var(--gray-500); margin-top: var(--space-1); display: block;">
-                        Only users who actually visit your site each month
-                    </small>
-                </div>
 
-                <div class="cost-breakdown">
-                    <div class="cost-row">
-                        <span class="cost-label">Monthly Active Users:</span>
-                        <span class="cost-value" id="monthlyUsers">1,000</span>
-                    </div>
-                    <div class="cost-row">
-                        <span class="cost-label">Monthly Cost (MAU):</span>
-                        <span class="cost-value" id="monthlyCost">$100.00</span>
-                    </div>
-                    <div class="cost-row">
-                        <span class="cost-label">Identity Verifications:</span>
-                        <span class="cost-value" id="setupCost">$2,000.00</span>
-                    </div>
-                    <div class="cost-row">
-                        <span class="cost-label">Total First Month:</span>
-                        <span class="cost-value" id="totalCost">$2,100.00</span>
-                    </div>
-                </div>
-
-                <p style="font-size: var(--font-size-sm); color: var(--gray-500); margin-top: var(--space-4);">
-                    <strong>$0.10/month</strong> per active user + <strong>$2.00</strong> only when users complete Stripe Identity verification. Most sites have very few Identity verifications.
-                </p>
-            </div>
-        </div>
-    </section>
 
     <!-- FAQ Section -->
     <section class="faq-section">
@@ -735,7 +868,7 @@
     </section>
 
     <script>
-        // Enhanced pricing calculator
+        // Enhanced pricing calculator for sidebar
         function calculateCost() {
             const userCount = parseInt(document.getElementById('userCount').value) || 0;
             const monthlyRate = 0.10;
@@ -745,10 +878,14 @@
             const setupTotal = userCount * setupFeePerUser;
             const totalFirstMonth = monthlyTotal + setupTotal;
             
-            document.getElementById('monthlyUsers').textContent = userCount.toLocaleString();
+            // Update calculator display
             document.getElementById('monthlyCost').textContent = '$' + monthlyTotal.toFixed(2);
-            document.getElementById('setupCost').textContent = '$' + setupTotal.toFixed(2);
             document.getElementById('totalCost').textContent = '$' + totalFirstMonth.toFixed(2);
+            
+            // Calculate savings vs Auth0 ($2/user/month)
+            const auth0Cost = userCount * 2;
+            const savings = auth0Cost - monthlyTotal;
+            document.getElementById('savingsAmount').textContent = '$' + Math.max(0, savings).toFixed(0) + '/month';
         }
         
         // Initialize calculator
