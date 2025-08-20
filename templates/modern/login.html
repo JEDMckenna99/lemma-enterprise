@@ -1,45 +1,103 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Business Login - Lemma Shield{% endblock %}
+{% block title %}Sign In - Lemma Shield{% endblock %}
 {% block description %}Business customer login to manage API keys, billing, and integration analytics.{% endblock %}
 
 {% block head %}
     {{ super() }}
     <style>
         .login-container {
-            max-width: 400px;
-            margin: var(--space-20) auto;
+            max-width: 580px;
+            margin: var(--space-12) auto;
             padding: 0 var(--space-6);
         }
 
         .login-card {
             background: var(--white);
-            border: 2px solid var(--gray-200);
-            border-radius: 20px;
-            padding: var(--space-10);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--gray-200);
+            border-radius: 24px;
+            padding: var(--space-12);
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 2px 4px -1px rgba(0, 0, 0, 0.06),
+                0 0 0 1px rgba(255, 255, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899);
         }
 
         .login-header {
             text-align: center;
-            margin-bottom: var(--space-8);
+            margin-bottom: var(--space-10);
+            position: relative;
+        }
+
+        .login-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-4);
+            font-size: 28px;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
         }
 
         .login-title {
             font-size: var(--font-size-3xl);
             font-weight: 800;
             color: var(--gray-900);
-            margin-bottom: var(--space-2);
+            margin-bottom: var(--space-3);
+            background: linear-gradient(135deg, #1f2937, #4b5563);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .login-subtitle {
             color: var(--gray-600);
             font-size: var(--font-size-lg);
             line-height: 1.6;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .form-section {
+            background: var(--gray-50);
+            border-radius: 16px;
+            padding: var(--space-6);
+            margin-bottom: var(--space-6);
+            border: 1px solid var(--gray-100);
+        }
+
+        .section-title {
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+            color: var(--gray-800);
+            margin-bottom: var(--space-4);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .section-icon {
+            font-size: 20px;
         }
 
         .form-group {
-            margin-bottom: var(--space-6);
+            margin-bottom: var(--space-5);
+            position: relative;
         }
 
         .form-label {
@@ -48,60 +106,145 @@
             color: var(--gray-700);
             margin-bottom: var(--space-2);
             font-size: var(--font-size-base);
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .required-indicator {
+            color: #ef4444;
+            font-weight: 700;
         }
 
         .form-input {
             width: 100%;
-            padding: var(--space-4);
+            padding: var(--space-4) var(--space-4) var(--space-4) var(--space-12);
             border: 2px solid var(--gray-200);
             border-radius: 12px;
             font-size: var(--font-size-base);
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
             background: var(--white);
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: var(--space-4);
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray-400);
+            font-size: 18px;
+            z-index: 1;
+            pointer-events: none;
         }
 
         .form-input:focus {
             outline: none;
             border-color: var(--primary-500);
-            box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.1);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+            background: var(--white);
+        }
+
+        .form-input:focus + .input-icon {
+            color: var(--primary-500);
         }
 
         .form-input.error {
             border-color: var(--error);
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+        }
+
+        .form-input.success {
+            border-color: #10b981;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+        }
+
+        .form-help {
+            font-size: var(--font-size-sm);
+            color: var(--gray-500);
+            margin-top: var(--space-2);
+            padding-left: var(--space-1);
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .help-icon {
+            font-size: 14px;
+            color: var(--gray-400);
         }
 
         .error-message {
             color: var(--error);
             font-size: var(--font-size-sm);
-            margin-top: var(--space-1);
+            margin-top: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 8px;
+            border-left: 3px solid var(--error);
             display: none;
+            font-weight: 500;
         }
 
         .login-button {
             width: 100%;
-            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
             color: var(--white);
             border: none;
-            padding: var(--space-4);
-            border-radius: 12px;
+            padding: var(--space-5);
+            border-radius: 16px;
             font-size: var(--font-size-lg);
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin-top: var(--space-4);
+            margin-top: var(--space-6);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+        }
+
+        .login-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .login-button:hover::before {
+            left: 100%;
         }
 
         .login-button:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 12px 30px rgba(99, 91, 255, 0.4);
-            background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+            box-shadow: 0 16px 40px rgba(99, 102, 241, 0.4);
+            background: linear-gradient(135deg, #5b5bf6, #7c3aed);
+        }
+
+        .login-button:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
         }
 
         .login-button:disabled {
             opacity: 0.7;
             cursor: not-allowed;
             transform: none;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        }
+
+        .button-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+        }
+
+        .button-icon {
+            font-size: 20px;
         }
 
         .register-link {
@@ -157,26 +300,40 @@
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
-                <h1 class="login-title">Business Customer Login</h1>
+                <div class="login-icon">🔐</div>
+                <h1 class="login-title">Welcome Back</h1>
                 <p class="login-subtitle">
-                    Sign in to manage your Lemma integration, API keys, and billing
+                    Sign in to manage your Lemma integration, API keys, and analytics
                 </p>
             </div>
 
-            <div class="login-note">
-                <strong>Business Customers:</strong> This login is for businesses integrating Lemma on their sites. FIL users with proof-of-personhood credentials can access the federated network directly via "Join Network".
-            </div>
-
             <form id="loginForm">
-                <div class="form-group">
-                    <label class="form-label" for="email">Email Address</label>
-                    <input type="email" id="email" name="email" class="form-input" required 
-                           placeholder="Enter your registered email">
-                    <div class="error-message" id="emailError"></div>
+                <div class="form-section">
+                    <div class="section-title">
+                        <span class="section-icon">👤</span>
+                        Account Access
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="email">
+                            Email Address <span class="required-indicator">*</span>
+                        </label>
+                        <div class="input-icon">📧</div>
+                        <input type="email" id="email" name="email" class="form-input" required 
+                               placeholder="you@company.com">
+                        <div class="form-help">
+                            <span class="help-icon">💡</span>
+                            Enter your registered business email address
+                        </div>
+                        <div class="error-message" id="emailError"></div>
+                    </div>
                 </div>
 
                 <button type="submit" class="login-button" id="loginButton">
-                    Sign In to Dashboard
+                    <div class="button-content">
+                        <span class="button-icon">🚀</span>
+                        Sign In to Dashboard
+                    </div>
                 </button>
             </form>
 
@@ -198,7 +355,12 @@
             
             // Show loading state
             button.disabled = true;
-            button.innerHTML = '<span class="loading-spinner"></span>Signing in...';
+            button.innerHTML = `
+                <div class="button-content">
+                    <span class="loading-spinner"></span>
+                    Signing in...
+                </div>
+            `;
             
             try {
                 const formData = new FormData(this);
@@ -215,8 +377,18 @@
                 const result = await response.json();
                 
                 if (result.success) {
+                    // Success state
+                    button.innerHTML = `
+                        <div class="button-content">
+                            <span class="button-icon">✅</span>
+                            Welcome back!
+                        </div>
+                    `;
+                    
                     // Redirect to dashboard
-                    window.location.href = result.redirect_url || '/dashboard';
+                    setTimeout(() => {
+                        window.location.href = result.redirect_url || '/dashboard';
+                    }, 1000);
                 } else {
                     // Show error
                     showError('email', result.error || 'Login failed');

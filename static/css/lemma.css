@@ -14,6 +14,9 @@
     --primary: #667eea;
     --primary-dark: #5a67d8;
     --primary-light: #7c3aed;
+    --primary-500: #6366f1;
+    --primary-600: #5b5bf6;
+    --primary-700: #4f46e5;
     --secondary: #764ba2;
     --accent: #6366f1;
     
@@ -40,10 +43,13 @@
     --space-2: 8px;
     --space-3: 12px;
     --space-4: 16px;
+    --space-5: 20px;
     --space-6: 24px;
     --space-8: 32px;
+    --space-10: 40px;
     --space-12: 48px;
     --space-16: 64px;
+    --space-20: 80px;
     --space-24: 96px;
     
     /* Typography - Human-centered scale */
@@ -205,6 +211,7 @@ a:hover {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     padding: 12px 24px;
     border-radius: 8px;
     font-family: var(--font-family);
@@ -215,6 +222,11 @@ a:hover {
     cursor: pointer;
     transition: all 0.15s ease;
     letter-spacing: -0.01em;
+}
+
+.btn-icon {
+    font-size: 16px;
+    line-height: 1;
 }
 
 .btn-primary {
