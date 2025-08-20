@@ -5,6 +5,8 @@
 
 {% block head %}
     {{ super() }}
+    <!-- Disable Cloudflare Rocket Loader for our scripts -->
+    <meta name="cloudflare-no-rocket-loader" content="true">
     <style>
         @media (max-width: 768px) {
             .hero-grid {
@@ -358,13 +360,25 @@
 </section>
 
 {% if show_fil_widget %}
-<script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}"></script>
-<script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}"></script>
-<script>
+<script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}" data-cfasync="false"></script>
+<script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}" data-cfasync="false"></script>
+<script data-cfasync="false">
         // Smart homepage with dynamic hero card and shield widget
         document.addEventListener('DOMContentLoaded', async function() {
+            // Add delay to ensure all scripts are loaded
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
             // Check if user has lemmas and update hero card accordingly
             try {
+                // Ensure classes are available
+                if (typeof LemmaFederatedWallet === 'undefined') {
+                    console.warn('🏠 LemmaFederatedWallet not available, showing shield widget');
+                    document.getElementById('shield-api-card').style.display = 'block';
+                    document.getElementById('user-dashboard-card').style.display = 'none';
+                    await initializeHeroShieldWidget();
+                    return;
+                }
+                
                 const tempWallet = new LemmaFederatedWallet({ debug: true });
                 await tempWallet.init();
                 
@@ -399,6 +413,13 @@
         async function initializeHeroShieldWidget() {
             try {
                 console.log('🛡️ Initializing Hero Shield Widget...');
+                
+                // Check if LemmaBotShield is available
+                if (typeof LemmaBotShield === 'undefined') {
+                    console.warn('🛡️ LemmaBotShield not available, showing fallback');
+                    showShieldFallback();
+                    return;
+                }
                 
                 // Update status to show initialization
                 const statusElement = document.getElementById('shield-status');
@@ -454,24 +475,27 @@
                     }
                 });
                 
-                // Protect the shield card element
-                await heroShield.protect(document.getElementById('shield-api-card'));
+                // Protect the shield card element using CSS selector
+                await heroShield.protect('#shield-api-card');
                 
                 console.log('🛡️ Hero Shield Widget initialized successfully');
                 
             } catch (error) {
                 console.error('🏠 Failed to initialize hero shield widget:', error);
-                
-                // Fallback to registration flow
-                const statusElement = document.getElementById('shield-status');
-                if (statusElement) {
-                    statusElement.innerHTML = `
-                        <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: 12px;">
-                            Shield initialization failed. Create an account to access the network.
-                        </div>
-                        <a href="/register" class="btn btn-primary" style="width: 100%;">Create Account</a>
-                    `;
-                }
+                showShieldFallback();
+            }
+        }
+        
+        // Fallback function for when shield initialization fails
+        function showShieldFallback() {
+            const statusElement = document.getElementById('shield-status');
+            if (statusElement) {
+                statusElement.innerHTML = `
+                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: 12px;">
+                        Join the Lemma network to access authenticated platforms.
+                    </div>
+                    <a href="/register" class="btn btn-primary" style="width: 100%;">Create Account</a>
+                `;
             }
         }
     
