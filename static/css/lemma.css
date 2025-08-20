@@ -139,6 +139,7 @@ a:hover {
     max-width: var(--container-max-width);
     margin: 0 auto;
     padding: 0 24px;
+    width: 100%;
 }
 
 .nav-logo {
@@ -175,6 +176,8 @@ a:hover {
     display: flex;
     gap: 16px;
     align-items: center;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 .nav-link {
@@ -196,8 +199,13 @@ a:hover {
         display: none;
     }
     
+    .nav-right {
+        gap: 12px;
+    }
+    
     .nav-right .btn {
-        display: none;
+        padding: 8px 16px;
+        font-size: var(--font-size-sm);
     }
     
     .nav-logo-icon {

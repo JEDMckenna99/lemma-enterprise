@@ -10,7 +10,7 @@
     <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" type="image/svg+xml">
     
     <!-- Clean Design System - Single Source of Truth -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250120-buttons">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250120-nav-right">
     
     {% block head %}{% endblock %}
 </head>
@@ -55,13 +55,11 @@
             <!-- Right Side Navigation -->
             <div class="nav-right">
                 {% if session.get('customer_id') %}
+                    <a href="/dashboard" class="btn btn-primary">Dashboard</a>
                     <a href="/logout" class="btn btn-secondary">Sign Out</a>
                 {% else %}
                     <a href="/login" class="btn btn-secondary">Sign In</a>
-                    <a href="/register" class="btn btn-primary">
-                        <span class="btn-icon">🚀</span>
-                        Create Account
-                    </a>
+                    <a href="/register" class="btn btn-primary">Create Account</a>
                 {% endif %}
             </div>
         </nav>
