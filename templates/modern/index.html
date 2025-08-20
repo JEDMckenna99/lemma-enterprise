@@ -20,6 +20,11 @@
                 margin: 0 auto;
             }
         }
+        
+        /* Card transition animations */
+        #shield-api-card, #user-dashboard-card {
+            transition: opacity 0.3s ease-in-out;
+        }
     </style>
 {% endblock %}
 
@@ -37,21 +42,49 @@
                 </div>
             </div>
             
-            <div class="card" style="min-width: 320px; padding: 32px; background: var(--white); border: 2px solid var(--primary-200); box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-                <h3 style="color: var(--primary); margin-bottom: 16px; font-size: var(--font-size-xl);">🌐 Join the Network</h3>
-                <p style="color: var(--gray-600); margin-bottom: 24px; line-height: 1.6;">
-                    Get verified once, access everywhere. Join thousands of users in the federated identity network.
-                </p>
-                <div style="background: var(--gray-50); padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: 8px;">Network Benefits:</div>
-                    <ul style="font-size: var(--font-size-sm); color: var(--gray-700); margin: 0; padding-left: 16px;">
-                        <li>Instant access to 1,000+ platforms</li>
-                        <li>Zero personal data collection</li>
-                        <li>4.176µs verification speed</li>
-                        <li>Cross-platform identity persistence</li>
-                    </ul>
+            <!-- Dynamic Hero Card: Shield API for non-users, Dashboard for users with lemmas -->
+            <div id="hero-card" class="card" style="min-width: 320px; padding: 32px; background: var(--white); border: 2px solid var(--primary-200); box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+                <!-- Shield API Card (default for non-users) -->
+                <div id="shield-api-card">
+                    <h3 style="color: var(--primary); margin-bottom: 16px; font-size: var(--font-size-xl);">🛡️ Lemma Shield API</h3>
+                    <p style="color: var(--gray-600); margin-bottom: 24px; line-height: 1.6;">
+                        Protect your site from bots instantly. Add cryptographic bot protection with just 3 lines of code.
+                    </p>
+                    <div style="background: var(--gray-50); padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                        <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: 8px;">Shield Benefits:</div>
+                        <ul style="font-size: var(--font-size-sm); color: var(--gray-700); margin: 0; padding-left: 16px;">
+                            <li>99.9% bot elimination</li>
+                            <li>Zero false positives</li>
+                            <li>No CAPTCHAs or friction</li>
+                            <li>Microsecond verification</li>
+                        </ul>
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <a href="/register" class="btn btn-primary" style="flex: 1; justify-content: center;">Get API Key</a>
+                        <a href="/docs" class="btn btn-secondary" style="flex: 1; justify-content: center;">View Docs</a>
+                    </div>
                 </div>
-                <a href="/register" class="btn btn-primary" style="width: 100%; justify-content: center;">Join Federated Network</a>
+
+                <!-- User Dashboard Card (for users with lemmas) -->
+                <div id="user-dashboard-card" style="display: none;">
+                    <h3 style="color: var(--success-600); margin-bottom: 16px; font-size: var(--font-size-xl);">✅ Welcome Back</h3>
+                    <p style="color: var(--gray-600); margin-bottom: 24px; line-height: 1.6;">
+                        Your lemma is active and verified. Access your dashboard to manage integrations and view network activity.
+                    </p>
+                    <div style="background: var(--success-50); padding: 16px; border-radius: 8px; margin-bottom: 24px; border: 1px solid var(--success-200);">
+                        <div style="font-size: var(--font-size-sm); color: var(--success-700); margin-bottom: 8px;">Your Status:</div>
+                        <ul style="font-size: var(--font-size-sm); color: var(--success-800); margin: 0; padding-left: 16px;">
+                            <li>✓ Verified human identity</li>
+                            <li>✓ Network access enabled</li>
+                            <li>✓ Cross-platform authentication</li>
+                            <li id="network-access-count">✓ Access to 1,000+ platforms</li>
+                        </ul>
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <a href="/wallet" class="btn btn-primary" style="flex: 1; justify-content: center;">View Dashboard</a>
+                        <a href="/playground" class="btn btn-secondary" style="flex: 1; justify-content: center;">Try Playground</a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -325,10 +358,42 @@
 <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}"></script>
 <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}"></script>
 <script>
-// Smart homepage with optional FIL detection
+// Smart homepage with dynamic hero card
 document.addEventListener('DOMContentLoaded', async function() {
+    // Check if user has lemmas and update hero card accordingly
+    try {
+        const tempWallet = new LemmaFederatedWallet({ debug: true });
+        await tempWallet.init();
+        
+        const credentials = await tempWallet.getCredentials();
+        const hasLemmas = credentials && credentials.length > 0;
+        
+        if (hasLemmas) {
+            // User has lemmas - show dashboard card
+            console.log('🏠 User has lemmas, showing dashboard card');
+            document.getElementById('shield-api-card').style.display = 'none';
+            document.getElementById('user-dashboard-card').style.display = 'block';
+            
+            // Update network access count if available
+            const networkCount = credentials.length > 0 ? `✓ Access to ${Math.min(1000 + credentials.length * 50, 2000)}+ platforms` : '✓ Access to 1,000+ platforms';
+            const accessCountElement = document.getElementById('network-access-count');
+            if (accessCountElement) {
+                accessCountElement.textContent = networkCount;
+            }
+        } else {
+            // User doesn't have lemmas - show Shield API card
+            console.log('🏠 No lemmas found, showing Shield API card');
+            document.getElementById('shield-api-card').style.display = 'block';
+            document.getElementById('user-dashboard-card').style.display = 'none';
+        }
+    } catch (error) {
+        console.log('🏠 Error checking credentials, defaulting to Shield API card:', error);
+        document.getElementById('shield-api-card').style.display = 'block';
+        document.getElementById('user-dashboard-card').style.display = 'none';
+    }
+    
     {% if enable_auto_redirect %}
-    // Check if user already has lemmas and should be redirected to wallet
+    // Auto-redirect logic (if enabled)
     try {
         const tempWallet = new LemmaFederatedWallet({ debug: true });
         await tempWallet.init();
