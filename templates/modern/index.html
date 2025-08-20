@@ -67,21 +67,12 @@
 
                 <!-- User Dashboard Card (for users with lemmas) -->
                 <div id="user-dashboard-card" style="display: none;">
-                    <div style="text-align: center; margin-bottom: 16px;">
-                        <h3 style="color: var(--success-600); margin: 0 0 4px 0; font-size: var(--font-size-lg);">Welcome Back</h3>
-                        <p style="color: var(--gray-600); margin: 0; line-height: 1.4; font-size: var(--font-size-sm);">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h3 style="color: var(--success-600); margin: 0 0 8px 0; font-size: var(--font-size-lg);">Welcome Back</h3>
+                        <p style="color: var(--gray-600); margin: 0 0 20px 0; line-height: 1.4; font-size: var(--font-size-sm);">
                             Your lemma is active and verified.
                         </p>
-                    </div>
-                    <div style="text-align: center; margin-bottom: 16px;">
-                        <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" style="width: 80px; height: 80px;">
-                    </div>
-                    <div style="background: var(--success-50); padding: 10px; border-radius: 6px; margin-bottom: 16px; border: 1px solid var(--success-200);">
-                        <ul style="font-size: var(--font-size-sm); color: var(--success-800); margin: 0; padding-left: 16px;">
-                            <li>✓ Verified human identity</li>
-                            <li>✓ Network access enabled</li>
-                            <li id="network-access-count">✓ Access to 1,000+ platforms</li>
-                        </ul>
+                        <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" style="width: 120px; height: 120px; margin-bottom: 20px;">
                     </div>
                     <a href="/wallet" class="btn btn-primary" style="width: 100%; justify-content: center;">Open Wallet</a>
                 </div>
