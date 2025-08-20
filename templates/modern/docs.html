@@ -292,7 +292,26 @@
         .section-anchor:hover .anchor-link {
             opacity: 1;
         }
+        
+        /* Swagger UI Customization */
+        #swagger-ui .swagger-ui {
+            font-family: var(--font-sans);
+        }
+        
+        #swagger-ui .topbar {
+            display: none; /* Hide Swagger UI top bar */
+        }
+        
+        #swagger-ui .scheme-container {
+            background: var(--gray-50);
+            border-radius: 8px;
+            padding: var(--space-4);
+            margin-bottom: var(--space-4);
+        }
     </style>
+    
+    <!-- Swagger UI CSS -->
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
 {% endblock %}
 
 {% block content %}
@@ -642,7 +661,42 @@ const shield = new LemmaBotShield(config);
         <!-- REST API Reference -->
         <section id="rest-api" class="section-anchor" style="margin-top: var(--space-16);">
             <a href="#rest-api" class="anchor-link">#</a>
-            <h2 style="margin-bottom: var(--space-6);">🔗 REST API Reference</h2>
+            <h2 style="margin-bottom: var(--space-6);">🔗 Interactive API Reference</h2>
+            
+            <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: 8px; padding: var(--space-4); margin-bottom: var(--space-6);">
+                <p style="margin: 0; color: var(--primary-700);">
+                    <strong>🚀 Try the APIs live!</strong> Use the interactive API explorer below to test endpoints directly in your browser.
+                </p>
+            </div>
+            
+            <!-- Swagger UI Container -->
+            <div id="swagger-ui" style="margin: var(--space-6) 0;"></div>
+            
+            <!-- Quick API Examples -->
+            <h3 style="margin: var(--space-8) 0 var(--space-4);">Quick Examples</h3>
+            
+            <div class="api-endpoint">
+                <div style="margin-bottom: var(--space-3);">
+                    <span class="endpoint-method post">POST</span>
+                    <code>/api/sdk/check-credentials</code>
+                    <span class="response-time">~1-50µs</span>
+                </div>
+                <p style="margin-bottom: var(--space-3); color: var(--gray-700);">Check existing credentials for offline authentication</p>
+                
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">curl</span>
+                        <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                    </div>
+curl -X POST https://lemma.id/api/sdk/check-credentials \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "credentials": ["eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."],
+    "enableRustEngine": true
+  }'
+                </div>
+            </div>
             
             <div class="api-endpoint">
                 <div style="margin-bottom: var(--space-3);">
@@ -654,69 +708,15 @@ const shield = new LemmaBotShield(config);
                 
                 <div class="code-block">
                     <div class="code-header">
-                        <span class="code-language">JavaScript</span>
+                        <span class="code-language">curl</span>
                         <button class="copy-button" onclick="copyCode(this)">Copy</button>
                     </div>
-const response = await fetch('/api/sdk/start-identity-verification', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    returnUrl: 'https://yoursite.com/verified'
-  })
-});
-
-const { sessionUrl } = await response.json();
-window.location.href = sessionUrl; // Redirect to Stripe Identity
-                </div>
-            </div>
-            
-            <div class="api-endpoint">
-                <div style="margin-bottom: var(--space-3);">
-                    <span class="endpoint-method post">POST</span>
-                    <code>/api/sdk/complete-identity-verification</code>
-                    <span class="response-time">~50µs</span>
-                </div>
-                <p style="margin-bottom: var(--space-3); color: var(--gray-700);">Complete verification and receive identity credential</p>
-                
-                <div class="code-block">
-                    <div class="code-header">
-                        <span class="code-language">JavaScript</span>
-                        <button class="copy-button" onclick="copyCode(this)">Copy</button>
-                    </div>
-const response = await fetch('/api/sdk/complete-identity-verification', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    sessionId: 'stripe_session_id_from_callback'
-  })
-});
-
-const { credential } = await response.json();
-// Store credential in federated wallet
-await wallet.storeCredential(credential);
-                </div>
-            </div>
-            
-            <div class="api-endpoint">
-                <div style="margin-bottom: var(--space-3);">
-                    <span class="endpoint-method get">GET</span>
-                    <code>/api/network/client-config</code>
-                    <span class="response-time">~10ms</span>
-                </div>
-                <p style="margin-bottom: var(--space-3); color: var(--gray-700);">Get dynamic network configuration for client-side SDK</p>
-                
-                <div class="code-block">
-                    <div class="code-header">
-                        <span class="code-language">JavaScript</span>
-                        <button class="copy-button" onclick="copyCode(this)">Copy</button>
-                    </div>
-const config = await fetch('/api/network/client-config').then(r => r.json());
-
-// Use config to initialize wallet
-const wallet = new LemmaFederatedWallet({
-  networkRegistryUrl: config.networkRegistryUrl,
-  nodeId: config.nodeId
-});
+curl -X POST https://lemma.id/api/sdk/start-identity-verification \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "returnUrl": "https://yoursite.com/verified"
+  }'
                 </div>
             </div>
         </section>
@@ -993,6 +993,96 @@ document.addEventListener('DOMContentLoaded', function() {
     if (mobileToggle && sidebar) {
         mobileToggle.addEventListener('click', () => {
             sidebar.style.display = sidebar.style.display === 'block' ? 'none' : 'block';
+        });
+    }
+});
+</script>
+
+<!-- Swagger UI JavaScript -->
+<script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+<script>
+// Initialize Swagger UI
+document.addEventListener('DOMContentLoaded', function() {
+    // Only initialize Swagger UI if the container exists
+    const swaggerContainer = document.getElementById('swagger-ui');
+    if (swaggerContainer) {
+        SwaggerUIBundle({
+            url: '/static/openapi.yaml',
+            dom_id: '#swagger-ui',
+            deepLinking: true,
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIBundle.presets.standalone
+            ],
+            plugins: [
+                SwaggerUIBundle.plugins.DownloadUrl
+            ],
+            layout: "BaseLayout",
+            defaultModelsExpandDepth: 1,
+            defaultModelExpandDepth: 1,
+            docExpansion: "list",
+            tryItOutEnabled: true,
+            filter: true,
+            supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+            onComplete: function() {
+                console.log('✅ Swagger UI loaded successfully');
+            },
+            onFailure: function(error) {
+                console.error('❌ Swagger UI failed to load:', error);
+                swaggerContainer.innerHTML = `
+                    <div style="background: var(--danger-50); border: 1px solid var(--danger-200); border-radius: 8px; padding: var(--space-4); text-align: center;">
+                        <p style="color: var(--danger-700); margin: 0;">
+                            <strong>⚠️ API Explorer temporarily unavailable</strong><br>
+                            Please refer to the code examples above or contact support.
+                        </p>
+                    </div>
+                `;
+            }
+        });
+    }
+});
+</script>
+
+<!-- Swagger UI JavaScript -->
+<script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+<script>
+// Initialize Swagger UI
+document.addEventListener('DOMContentLoaded', function() {
+    // Only initialize Swagger UI if the container exists
+    const swaggerContainer = document.getElementById('swagger-ui');
+    if (swaggerContainer) {
+        SwaggerUIBundle({
+            url: '/static/openapi.yaml',
+            dom_id: '#swagger-ui',
+            deepLinking: true,
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIBundle.presets.standalone
+            ],
+            plugins: [
+                SwaggerUIBundle.plugins.DownloadUrl
+            ],
+            layout: "BaseLayout",
+            defaultModelsExpandDepth: 1,
+            defaultModelExpandDepth: 1,
+            docExpansion: "list",
+            tryItOutEnabled: true,
+            filter: true,
+            supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+            onComplete: function() {
+                console.log('✅ Swagger UI loaded successfully');
+            },
+            onFailure: function(error) {
+                console.error('❌ Swagger UI failed to load:', error);
+                swaggerContainer.innerHTML = `
+                    <div style="background: var(--danger-50); border: 1px solid var(--danger-200); border-radius: 8px; padding: var(--space-4); text-align: center;">
+                        <p style="color: var(--danger-700); margin: 0;">
+                            <strong>⚠️ API Explorer temporarily unavailable</strong><br>
+                            Please refer to the code examples above or contact support.
+                        </p>
+                    </div>
+                `;
+            }
         });
     }
 });
