@@ -59,9 +59,9 @@
             </div>
             
                             <!-- Dynamic Hero Card: Shield Widget for non-users, Dashboard for users with lemmas -->
-                <div id="hero-card" class="card" style="min-width: 320px; padding: 32px; background: var(--white); border: 2px solid var(--primary-200); box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-                    <!-- Shield Widget (default for non-users) -->
-                    <div id="shield-api-card">
+                <div id="hero-card" class="card" style="min-width: 320px; padding: 0; background: transparent; border: none; box-shadow: none;">
+                    <!-- Shield Widget (default for non-users) - this will be hidden and replaced by verification widget -->
+                    <div id="shield-api-card" style="padding: 32px; background: var(--white); border: 2px solid var(--primary-200); box-shadow: 0 8px 32px rgba(0,0,0,0.1); border-radius: 16px;">
                         <div style="text-align: center; margin-bottom: 20px;">
                             <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" style="width: 80px; height: 80px; margin-bottom: 12px;">
                             <h3 style="color: var(--primary); margin: 0; font-size: var(--font-size-xl);">🛡️ Lemma Network Access</h3>
@@ -100,7 +100,7 @@
                     </div>
 
                 <!-- User Dashboard Card (for users with lemmas) -->
-                <div id="user-dashboard-card" style="display: none;">
+                <div id="user-dashboard-card" style="display: none; padding: 32px; background: var(--white); border: 2px solid var(--success-200); box-shadow: 0 8px 32px rgba(0,0,0,0.1); border-radius: 16px;">
                     <div style="text-align: center; margin-bottom: 12px;">
                         <p style="color: var(--success-600); margin: 0 0 16px 0; line-height: 1.3; font-size: var(--font-size-lg); font-weight: bold;">
                             Your lemma is active and verified.
@@ -417,62 +417,34 @@
                     return;
                 }
                 
-                // Update status to show shield is ready
-                const statusElement = document.getElementById('shield-status');
-                if (statusElement) {
-                    statusElement.innerHTML = `
-                        <div style="font-size: var(--font-size-sm); color: var(--success-600); padding: 12px; background: var(--success-50); border-radius: 6px; border: 1px solid var(--success-200);">
-                            🛡️ Lemma Shield Ready - Click to Join Network
-                        </div>
-                    `;
-                }
-                
-                // Create a custom hero shield that works with our card design
+                // Create the shield instance
                 const heroShield = new LemmaBotShield({
                     debug: true,
                     apiBase: window.location.origin
                 });
                 
-                // Instead of using protect() which hides the element, manually add click handler
-                const joinButton = document.getElementById('join-network-btn');
-                if (joinButton) {
-                    joinButton.addEventListener('click', async function(e) {
-                        e.preventDefault();
-                        
-                        // Update button to show loading
-                        const originalText = joinButton.textContent;
-                        joinButton.textContent = 'Starting verification...';
-                        joinButton.disabled = true;
-                        
-                        try {
-                            // Use the shield's verification flow
-                            await heroShield.startVerification(
-                                document.getElementById('shield-api-card'),
-                                document.getElementById('hero-card')
-                            );
-                        } catch (error) {
-                            console.error('❌ Manual verification failed:', error);
-                            
-                            // Reset button and show error
-                            joinButton.textContent = 'Verification Failed - Try Again';
-                            joinButton.disabled = false;
-                            
-                            setTimeout(() => {
-                                joinButton.textContent = originalText;
-                            }, 3000);
-                        }
-                    });
-                    
-                    if (statusElement) {
-                        statusElement.innerHTML = `
-                            <div style="font-size: var(--font-size-sm); color: var(--success-600); padding: 12px; background: var(--success-50); border-radius: 6px; border: 1px solid var(--success-200);">
-                                ✅ Shield Active - Click "Join Network" to verify
-                            </div>
-                        `;
-                    }
+                // Wait for shield to be fully initialized
+                await heroShield.initializeFederatedWallet();
+                
+                // Check if user already has credentials
+                const hasCredentials = await heroShield.backgroundWallet.hasValidCredentials('identity');
+                
+                if (hasCredentials) {
+                    // User has lemmas - this shouldn't happen in this flow, but handle it
+                    console.log('🏠 User has credentials, switching to dashboard card');
+                    document.getElementById('shield-api-card').style.display = 'none';
+                    document.getElementById('user-dashboard-card').style.display = 'block';
+                    return;
                 }
                 
-                console.log('✅ Hero Shield Widget initialized successfully (manual mode)');
+                // User needs verification - use the proper shield widget
+                console.log('🛡️ User needs verification, showing shield widget');
+                
+                // Use the standard shield protect method to show the verification widget
+                // This will hide the shield-api-card and show the verification widget in its place
+                await heroShield.protect('#shield-api-card');
+                
+                console.log('✅ Hero Shield Widget initialized successfully (standard mode)');
                 
             } catch (error) {
                 console.error('🏠 Failed to initialize hero shield widget:', error);
