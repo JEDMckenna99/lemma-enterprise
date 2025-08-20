@@ -488,7 +488,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Initialize direct verification widget (no button overlay)
         async function initializeDirectVerificationWidget() {
             try {
-                console.log('🛡️ Creating direct verification widget...');
+                console.log('🛡️ Creating direct verification widget via LemmaBotShield...');
                 
                 // Check if required classes are available
                 if (typeof LemmaBotShield === 'undefined') {
@@ -503,91 +503,18 @@ document.addEventListener('DOMContentLoaded', async function() {
                     apiBase: window.location.origin
                 });
                 
+                // Store globally for other functions
+                window.heroShield = heroShield;
+                
                 // Wait for shield to be fully initialized
                 await heroShield.initializeFederatedWallet();
                 
-                // Create the verification widget directly in the hero card container
-                const heroCard = document.getElementById('hero-card');
-                if (!heroCard) {
-                    console.error('🛡️ Hero card container not found');
-                    return;
-                }
+                // Use the shield's protect method directly on the hero-card
+                // This will automatically show the verification widget immediately
+                console.log('🛡️ Calling shield.protect() to show verification widget immediately...');
+                await heroShield.protect('#hero-card');
                 
-                // Create verification widget HTML
-                const verificationWidget = document.createElement('div');
-                verificationWidget.innerHTML = `
-                    <div style="
-                        max-width: 400px;
-                        margin: 0 auto;
-                        padding: 32px;
-                        background: white;
-                        border-radius: 16px;
-                        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-                        text-align: center;
-                        border: 2px solid #e5e7eb;
-                    ">
-                        <div style="
-                            width: 60px;
-                            height: 60px;
-                            margin: 0 auto 1rem;
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                            border-radius: 50%;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            color: white;
-                            font-size: 24px;
-                            font-weight: bold;
-                        ">🛡️</div>
-                        
-                        <h3 style="
-                            margin-bottom: 0.5rem;
-                            color: #1f2937;
-                            font-size: 1.25rem;
-                            font-weight: 600;
-                        ">Protected by Lemma Shield</h3>
-                        
-                        <p style="
-                            margin-bottom: 1.5rem;
-                            color: #6b7280;
-                            font-size: 0.875rem;
-                        ">Verify your identity to access this content</p>
-                        
-                        <button id="direct-verify-lemma-btn" style="
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                            color: white;
-                            border: none;
-                            padding: 0.75rem 1.5rem;
-                            border-radius: 8px;
-                            font-size: 1rem;
-                            font-weight: 500;
-                            cursor: pointer;
-                            transition: all 0.2s;
-                            width: 100%;
-                        " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.4)'" 
-                           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                            Verify a Lemma
-                        </button>
-                        
-                        <p style="
-                            margin-top: 1rem;
-                            color: #9ca3af;
-                            font-size: 0.75rem;
-                        ">One-time verification • Never see CAPTCHAs again</p>
-                    </div>
-                `;
-                
-                // Replace hero card content with verification widget
-                heroCard.innerHTML = '';
-                heroCard.appendChild(verificationWidget);
-                
-                // Add click handler to verification button
-                const verifyBtn = verificationWidget.querySelector('#direct-verify-lemma-btn');
-                verifyBtn.addEventListener('click', async () => {
-                    await startDirectVerification(heroShield, verifyBtn);
-                });
-                
-                console.log('✅ Direct verification widget created successfully');
+                console.log('✅ Direct verification widget displayed via LemmaBotShield.protect()');
                 
             } catch (error) {
                 console.error('🏠 Failed to create direct verification widget:', error);
