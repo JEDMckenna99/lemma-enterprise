@@ -5,8 +5,22 @@
 
 {% block head %}
     {{ super() }}
-    <!-- Disable Cloudflare Rocket Loader for our scripts -->
+    <!-- Disable Cloudflare Rocket Loader and service worker interference -->
     <meta name="cloudflare-no-rocket-loader" content="true">
+    <meta name="cf-2fa-verify" content="false">
+    
+    <!-- Disable service worker to prevent resource blocking -->
+    <script data-cfasync="false">
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for (let registration of registrations) {
+                    console.log('🔧 Unregistering service worker:', registration.scope);
+                    registration.unregister();
+                }
+            });
+        }
+    </script>
+    
     <style>
         @media (max-width: 768px) {
             .hero-grid {
@@ -47,7 +61,7 @@
                             <!-- Dynamic Hero Card: Shield Widget for non-users, Dashboard for users with lemmas -->
                 <div id="hero-card" class="card" style="min-width: 320px; padding: 32px; background: var(--white); border: 2px solid var(--primary-200); box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
                     <!-- Shield Widget (default for non-users) -->
-                    <div id="shield-api-card" data-lemma-protect="true">
+                    <div id="shield-api-card">
                         <div style="text-align: center; margin-bottom: 20px;">
                             <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" style="width: 80px; height: 80px; margin-bottom: 12px;">
                             <h3 style="color: var(--primary); margin: 0; font-size: var(--font-size-xl);">🛡️ Lemma Network Access</h3>
@@ -373,8 +387,10 @@
                     document.getElementById('shield-api-card').style.display = 'block';
                     document.getElementById('user-dashboard-card').style.display = 'none';
                     
-                    // Initialize the actual Lemma Shield widget
-                    await initializeHeroShieldWidget();
+                    // Initialize the actual Lemma Shield widget with modern federated system
+                    setTimeout(async () => {
+                        await initializeHeroShieldWidget();
+                    }, 100);
                 }
             } catch (error) {
                 console.log('🏠 Error checking credentials, defaulting to Shield Widget:', error);
@@ -475,46 +491,28 @@
                 `;
             }
         }
-    
-    {% if enable_auto_redirect %}
-    // Auto-redirect logic (if enabled)
-    try {
-        const tempWallet = new LemmaFederatedWallet({ debug: true });
-        await tempWallet.init();
         
-        const credentials = await tempWallet.getCredentials();
-        if (credentials && credentials.length > 0) {
-            console.log('🏠 User has lemmas, redirecting to wallet...');
-            window.location.href = '/wallet';
-            return;
-        }
-    } catch (error) {
-        console.log('🏠 No existing credentials, showing homepage');
-    }
-    {% else %}
-    // Auto-redirect disabled - users can freely navigate between homepage and wallet
-    console.log('🏠 Auto-redirect disabled - homepage accessible to all users');
-    {% endif %}
-    
-    // Initialize shield widget for new users
-    if (window.LemmaBotShield) {
-        const homeShield = new LemmaBotShield({
-            debug: true,
-            apiBase: window.location.origin,
-            onVerified: function(result) {
-                console.log('✅ Homepage shield verification successful:', result);
-                // Redirect to wallet after successful verification
+        // Auto-redirect logic (disabled for homepage access)
+        {% if enable_auto_redirect %}
+        try {
+            const autoRedirectWallet = new LemmaFederatedWallet({ debug: true });
+            await autoRedirectWallet.init();
+            
+            const autoRedirectCredentials = await autoRedirectWallet.getCredentials();
+            if (autoRedirectCredentials && autoRedirectCredentials.length > 0) {
+                console.log('🏠 User has lemmas, redirecting to wallet...');
                 window.location.href = '/wallet';
-            },
-            onError: function(error) {
-                console.error('❌ Homepage shield verification failed:', error);
+                return;
             }
-        });
+        } catch (error) {
+            console.log('🏠 No existing credentials, showing homepage');
+        }
+        {% else %}
+        // Auto-redirect disabled - users can freely navigate between homepage and wallet
+        console.log('🏠 Auto-redirect disabled - homepage accessible to all users');
+        {% endif %}
         
-        // Protect the FIL join widget
-        homeShield.protect('#fil-join-widget');
-    }
-});
+    }); // Close DOMContentLoaded event listener
 </script>
 {% endif %}
 {% endblock %}

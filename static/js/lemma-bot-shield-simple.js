@@ -597,11 +597,13 @@ class LemmaBotShield {
 // Global initialization for easy customer integration
 window.LemmaBotShield = LemmaBotShield;
 
-// Auto-initialize if data attributes are present
+// Auto-initialize if data attributes are present (disabled for homepage hero widget)
 document.addEventListener('DOMContentLoaded', () => {
     const autoProtect = document.querySelector('[data-lemma-protect]');
-    if (autoProtect) {
+    if (autoProtect && !autoProtect.closest('#hero-card')) {
         const selector = autoProtect.getAttribute('data-lemma-protect');
-        new LemmaBotShield({ debug: true }).protect(selector);
+        if (selector && selector !== 'true') {
+            new LemmaBotShield({ debug: true }).protect(selector);
+        }
     }
 });
