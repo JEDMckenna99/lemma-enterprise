@@ -77,6 +77,11 @@
                             </div>
                         </div>
                         
+                        <!-- Join Network Button -->
+                        <button id="join-network-btn" class="btn btn-primary" style="width: 100%; justify-content: center; margin-bottom: 16px;">
+                            Join Network
+                        </button>
+                        
                         <!-- Protected Content (hidden until verified) -->
                         <div id="protected-content" style="display: none; text-align: center;">
                             <div style="background: var(--success-50); padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--success-200);">
@@ -302,38 +307,7 @@
 </section>
 
 <!-- Social Proof Section -->
-<section class="section" style="background: var(--gray-100); padding: 80px 0;">
-    <div class="container">
-        <div style="text-align: center; margin-bottom: 64px;">
-            <h2 style="font-size: var(--font-size-3xl); margin-bottom: 16px;">Early Feedback</h2>
-            <p style="color: var(--gray-600); font-size: var(--font-size-lg); max-width: 500px; margin: 0 auto;">Initial feedback from developers testing Lemma's identity verification platform.</p>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 32px; max-width: 1000px; margin: 0 auto;">
-            <div style="background: var(--white); padding: 40px; border-radius: 16px; border: 1px solid var(--gray-200);">
-                <p style="font-size: var(--font-size-lg); line-height: 1.6; margin-bottom: 24px; color: var(--gray-700);">"Lemma's cryptographic verification approach provides strong bot protection while maintaining user privacy. The integration was straightforward and the performance is excellent."</p>
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">S</div>
-                    <div>
-                        <div style="font-weight: 600; color: var(--gray-900);">Development Team</div>
-                        <div style="color: var(--gray-500); font-size: var(--font-size-sm);">Early Adopter</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div style="background: var(--white); padding: 40px; border-radius: 16px; border: 1px solid var(--gray-200);">
-                <p style="font-size: var(--font-size-lg); line-height: 1.6; margin-bottom: 24px; color: var(--gray-700);">"The federated identity network concept is innovative. Being able to verify users across multiple platforms without storing personal data addresses key privacy concerns."</p>
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, var(--secondary), var(--primary)); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">T</div>
-                    <div>
-                        <div style="font-weight: 600; color: var(--gray-900);">Technical Review</div>
-                        <div style="color: var(--gray-500); font-size: var(--font-size-sm);">Beta Tester</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
+
 
 <!-- CTA Section -->
 <section class="section" style="background: linear-gradient(135deg, var(--gray-900) 0%, var(--black) 100%); color: var(--white); padding: 100px 0;">
@@ -384,21 +358,44 @@
                 } else {
                     // User doesn't have lemmas - show Shield Widget
                     console.log('🏠 No lemmas found, initializing Shield Widget');
-                    document.getElementById('shield-api-card').style.display = 'block';
-                    document.getElementById('user-dashboard-card').style.display = 'none';
+                    const shieldCard = document.getElementById('shield-api-card');
+                    const dashboardCard = document.getElementById('user-dashboard-card');
                     
-                    // Initialize the actual Lemma Shield widget with modern federated system
-                    setTimeout(async () => {
-                        await initializeHeroShieldWidget();
-                    }, 100);
+                    if (shieldCard && dashboardCard) {
+                        shieldCard.style.display = 'block';
+                        dashboardCard.style.display = 'none';
+                        console.log('🏠 Shield card made visible, dashboard card hidden');
+                        
+                        // Initialize the actual Lemma Shield widget with modern federated system
+                        setTimeout(async () => {
+                            console.log('🏠 Starting shield widget initialization...');
+                            await initializeHeroShieldWidget();
+                        }, 100);
+                    } else {
+                        console.error('🏠 Hero card elements not found!', {
+                            shieldCard: !!shieldCard,
+                            dashboardCard: !!dashboardCard
+                        });
+                    }
                 }
             } catch (error) {
                 console.log('🏠 Error checking credentials, defaulting to Shield Widget:', error);
-                document.getElementById('shield-api-card').style.display = 'block';
-                document.getElementById('user-dashboard-card').style.display = 'none';
+                const shieldCard = document.getElementById('shield-api-card');
+                const dashboardCard = document.getElementById('user-dashboard-card');
                 
-                // Initialize shield widget even on error
-                await initializeHeroShieldWidget();
+                if (shieldCard && dashboardCard) {
+                    shieldCard.style.display = 'block';
+                    dashboardCard.style.display = 'none';
+                    console.log('🏠 Error fallback: Shield card made visible');
+                    
+                    // Initialize shield widget even on error
+                    setTimeout(async () => {
+                        console.log('🏠 Error fallback: Starting shield widget initialization...');
+                        await initializeHeroShieldWidget();
+                    }, 200);
+                } else {
+                    console.error('🏠 Error fallback: Hero card elements not found!');
+                }
             }
         });
         
@@ -407,71 +404,75 @@
             try {
                 console.log('🛡️ Initializing Hero Shield Widget...');
                 
-                // Check if LemmaBotShield is available
+                // Check if required classes are available
                 if (typeof LemmaBotShield === 'undefined') {
                     console.warn('🛡️ LemmaBotShield not available, showing fallback');
                     showShieldFallback();
                     return;
                 }
                 
-                // Update status to show initialization
+                if (typeof LemmaFederatedWallet === 'undefined') {
+                    console.warn('🛡️ LemmaFederatedWallet not available, showing fallback');
+                    showShieldFallback();
+                    return;
+                }
+                
+                // Update status to show shield is ready
                 const statusElement = document.getElementById('shield-status');
                 if (statusElement) {
                     statusElement.innerHTML = `
-                        <div style="font-size: var(--font-size-sm); color: var(--primary);">
-                            🛡️ Lemma Shield Active - Click to Verify Identity
+                        <div style="font-size: var(--font-size-sm); color: var(--success-600); padding: 12px; background: var(--success-50); border-radius: 6px; border: 1px solid var(--success-200);">
+                            🛡️ Lemma Shield Ready - Click to Join Network
                         </div>
                     `;
                 }
                 
-                // Initialize the shield for this element
+                // Create a custom hero shield that works with our card design
                 const heroShield = new LemmaBotShield({
                     debug: true,
-                    onVerificationComplete: function(result) {
-                        console.log('🏠 Hero shield verification complete:', result);
-                        
-                        if (result.success) {
-                            // Show protected content
-                            const protectedContent = document.getElementById('protected-content');
-                            const statusElement = document.getElementById('shield-status');
-                            
-                            if (protectedContent && statusElement) {
-                                statusElement.style.display = 'none';
-                                protectedContent.style.display = 'block';
-                            }
-                            
-                            // Refresh page after short delay to show dashboard card
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 2000);
-                        } else {
-                            // Show verification failed state
-                            if (statusElement) {
-                                statusElement.innerHTML = `
-                                    <div style="font-size: var(--font-size-sm); color: var(--error-600);">
-                                        ❌ Verification failed. <a href="#" onclick="initializeHeroShieldWidget()" style="color: var(--primary);">Try again</a>
-                                    </div>
-                                `;
-                            }
-                        }
-                    },
-                    onError: function(error) {
-                        console.error('🏠 Hero shield error:', error);
-                        const statusElement = document.getElementById('shield-status');
-                        if (statusElement) {
-                            statusElement.innerHTML = `
-                                <div style="font-size: var(--font-size-sm); color: var(--error-600);">
-                                    ⚠️ Shield initialization failed. <a href="#" onclick="initializeHeroShieldWidget()" style="color: var(--primary);">Retry</a>
-                                </div>
-                            `;
-                        }
-                    }
+                    apiBase: window.location.origin
                 });
                 
-                // Protect the shield card element using CSS selector
-                await heroShield.protect('#shield-api-card');
+                // Instead of using protect() which hides the element, manually add click handler
+                const joinButton = document.getElementById('join-network-btn');
+                if (joinButton) {
+                    joinButton.addEventListener('click', async function(e) {
+                        e.preventDefault();
+                        
+                        // Update button to show loading
+                        const originalText = joinButton.textContent;
+                        joinButton.textContent = 'Starting verification...';
+                        joinButton.disabled = true;
+                        
+                        try {
+                            // Use the shield's verification flow
+                            await heroShield.startVerification(
+                                document.getElementById('shield-api-card'),
+                                document.getElementById('hero-card')
+                            );
+                        } catch (error) {
+                            console.error('❌ Manual verification failed:', error);
+                            
+                            // Reset button and show error
+                            joinButton.textContent = 'Verification Failed - Try Again';
+                            joinButton.disabled = false;
+                            
+                            setTimeout(() => {
+                                joinButton.textContent = originalText;
+                            }, 3000);
+                        }
+                    });
+                    
+                    if (statusElement) {
+                        statusElement.innerHTML = `
+                            <div style="font-size: var(--font-size-sm); color: var(--success-600); padding: 12px; background: var(--success-50); border-radius: 6px; border: 1px solid var(--success-200);">
+                                ✅ Shield Active - Click "Join Network" to verify
+                            </div>
+                        `;
+                    }
+                }
                 
-                console.log('🛡️ Hero Shield Widget initialized successfully');
+                console.log('✅ Hero Shield Widget initialized successfully (manual mode)');
                 
             } catch (error) {
                 console.error('🏠 Failed to initialize hero shield widget:', error);
