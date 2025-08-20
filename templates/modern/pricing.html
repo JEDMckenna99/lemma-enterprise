@@ -707,38 +707,38 @@
                     <!-- Cost Reduction Table -->
                     <div class="cost-reduction-table">
                         <h3 class="widget-title">📊 Cost Comparison</h3>
-                        <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: var(--space-4); text-align: center;">
-                            Cost per 1,000 users/month
+                        <div id="comparison-subtitle" style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: var(--space-4); text-align: center;">
+                            Cost for <span id="user-count-display">1,000</span> users/month
                         </div>
                         
                         <div class="comparison-row lemma-row">
                             <div class="provider-name">🚀 Lemma</div>
-                            <div class="cost-cell" style="color: var(--primary-600);">$100</div>
+                            <div class="cost-cell" id="lemma-cost" style="color: var(--primary-600);">$100</div>
                             <div class="savings-cell" style="color: var(--success-600);">Baseline</div>
                         </div>
                         
                         <div class="comparison-row">
                             <div class="provider-name">Auth0</div>
-                            <div class="cost-cell">$2,000</div>
-                            <div class="savings-cell" style="color: var(--danger-600);">+1,900%</div>
+                            <div class="cost-cell" id="auth0-cost">$23</div>
+                            <div class="savings-cell" id="auth0-savings" style="color: var(--danger-600);">-77%</div>
                         </div>
                         
                         <div class="comparison-row">
                             <div class="provider-name">Okta</div>
-                            <div class="cost-cell">$2,000</div>
-                            <div class="savings-cell" style="color: var(--danger-600);">+1,900%</div>
+                            <div class="cost-cell" id="okta-cost">$2,000</div>
+                            <div class="savings-cell" id="okta-savings" style="color: var(--danger-600);">+1,900%</div>
                         </div>
                         
                         <div class="comparison-row">
                             <div class="provider-name">Cloudflare</div>
-                            <div class="cost-cell">$200</div>
-                            <div class="savings-cell" style="color: var(--warning-600);">+100%</div>
+                            <div class="cost-cell" id="cloudflare-cost">$20</div>
+                            <div class="savings-cell" id="cloudflare-savings" style="color: var(--warning-600);">-80%</div>
                         </div>
                         
                         <div class="comparison-row">
                             <div class="provider-name">reCAPTCHA</div>
-                            <div class="cost-cell">$100</div>
-                            <div class="savings-cell" style="color: var(--gray-600);">Same</div>
+                            <div class="cost-cell" id="recaptcha-cost">$10</div>
+                            <div class="savings-cell" id="recaptcha-savings" style="color: var(--warning-600);">-90%</div>
                         </div>
                         
                         <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--gray-50); border-radius: 8px; text-align: center;">
@@ -868,24 +868,118 @@
     </section>
 
     <script>
-        // Enhanced pricing calculator for sidebar
+        // Enhanced pricing calculator with accurate competitor pricing
         function calculateCost() {
             const userCount = parseInt(document.getElementById('userCount').value) || 0;
-            const monthlyRate = 0.10;
-            const setupFeePerUser = 2.00;
             
-            const monthlyTotal = userCount * monthlyRate;
-            const setupTotal = userCount * setupFeePerUser;
-            const totalFirstMonth = monthlyTotal + setupTotal;
+            // Lemma pricing
+            const lemmaMonthlyRate = 0.10;
+            const lemmaSetupFeePerUser = 2.00;
+            const lemmaMonthlyTotal = userCount * lemmaMonthlyRate;
+            const lemmaSetupTotal = userCount * lemmaSetupFeePerUser;
+            const lemmaTotalFirstMonth = lemmaMonthlyTotal + lemmaSetupTotal;
+            
+            // Competitor pricing (based on 2025 market rates)
+            const auth0Monthly = calculateAuth0Cost(userCount);
+            const oktaMonthly = calculateOktaCost(userCount);
+            const cloudflareMonthly = calculateCloudflareCost(userCount);
+            const recaptchaMonthly = calculateRecaptchaCost(userCount);
             
             // Update calculator display
-            document.getElementById('monthlyCost').textContent = '$' + monthlyTotal.toFixed(2);
-            document.getElementById('totalCost').textContent = '$' + totalFirstMonth.toFixed(2);
+            document.getElementById('monthlyCost').textContent = '$' + lemmaMonthlyTotal.toLocaleString();
+            document.getElementById('totalCost').textContent = '$' + lemmaTotalFirstMonth.toLocaleString();
             
-            // Calculate savings vs Auth0 ($2/user/month)
-            const auth0Cost = userCount * 2;
-            const savings = auth0Cost - monthlyTotal;
-            document.getElementById('savingsAmount').textContent = '$' + Math.max(0, savings).toFixed(0) + '/month';
+            // Update user count display
+            document.getElementById('user-count-display').textContent = userCount.toLocaleString();
+            
+            // Calculate savings vs Auth0
+            const auth0Savings = auth0Monthly - lemmaMonthlyTotal;
+            document.getElementById('savingsAmount').textContent = '$' + Math.max(0, auth0Savings).toLocaleString() + '/month';
+            
+            // Update comparison table dynamically
+            updateComparisonTable(userCount, lemmaMonthlyTotal, auth0Monthly, oktaMonthly, cloudflareMonthly, recaptchaMonthly);
+        }
+        
+        // Auth0 pricing: $23/month per 1000 MAU (B2C Essential plan)
+        function calculateAuth0Cost(userCount) {
+            if (userCount <= 1000) return 23;
+            return Math.ceil(userCount / 1000) * 23;
+        }
+        
+        // Okta pricing: $2/user/month (Workforce Identity Cloud)
+        function calculateOktaCost(userCount) {
+            return userCount * 2;
+        }
+        
+        // Cloudflare Bot Management: $0.10 per 10,000 requests
+        function calculateCloudflareCost(userCount) {
+            // Assuming 200 page views per user per month (typical for most sites)
+            const requestsPerMonth = userCount * 200;
+            return Math.max(20, Math.ceil(requestsPerMonth / 10000) * 1); // $20 minimum
+        }
+        
+        // reCAPTCHA Enterprise: $1 per 1000 assessments  
+        function calculateRecaptchaCost(userCount) {
+            // Assuming 5 assessments per user per month (login, checkout, etc.)
+            const assessmentsPerMonth = userCount * 5;
+            return Math.max(1, Math.ceil(assessmentsPerMonth / 1000) * 1);
+        }
+        
+        // Update comparison table with dynamic pricing
+        function updateComparisonTable(userCount, lemma, auth0, okta, cloudflare, recaptcha) {
+            // Update cost cells
+            document.getElementById('lemma-cost').textContent = '$' + lemma.toLocaleString();
+            document.getElementById('auth0-cost').textContent = '$' + auth0.toLocaleString();
+            document.getElementById('okta-cost').textContent = '$' + okta.toLocaleString();
+            document.getElementById('cloudflare-cost').textContent = '$' + cloudflare.toLocaleString();
+            document.getElementById('recaptcha-cost').textContent = '$' + recaptcha.toLocaleString();
+            
+            // Calculate and update savings percentages (showing how much MORE competitors cost)
+            function formatSavings(competitorCost, lemmaCost) {
+                if (Math.abs(competitorCost - lemmaCost) < 1) return 'Same';
+                
+                const difference = competitorCost - lemmaCost;
+                const percentage = Math.abs((difference / lemmaCost) * 100).toFixed(0);
+                
+                if (difference > 0) {
+                    return '+' + percentage + '%';
+                } else {
+                    return '-' + percentage + '%';
+                }
+            }
+            
+            document.getElementById('auth0-savings').textContent = formatSavings(auth0, lemma);
+            document.getElementById('okta-savings').textContent = formatSavings(okta, lemma);
+            document.getElementById('cloudflare-savings').textContent = formatSavings(cloudflare, lemma);
+            document.getElementById('recaptcha-savings').textContent = formatSavings(recaptcha, lemma);
+            
+            // Update savings colors
+            updateSavingsColor('auth0-savings', auth0, lemma);
+            updateSavingsColor('okta-savings', okta, lemma);
+            updateSavingsColor('cloudflare-savings', cloudflare, lemma);
+            updateSavingsColor('recaptcha-savings', recaptcha, lemma);
+        }
+        
+        function updateSavingsColor(elementId, competitorCost, lemmaCost) {
+            const element = document.getElementById(elementId);
+            const difference = competitorCost - lemmaCost;
+            
+            if (Math.abs(difference) < 1) {
+                // Costs are similar
+                element.style.color = 'var(--gray-600)';
+            } else if (difference > lemmaCost * 0.5) {
+                // Competitor is significantly more expensive (good for Lemma)
+                element.style.color = 'var(--danger-600)';
+            } else if (difference > lemmaCost * 0.1) {
+                // Competitor is moderately more expensive
+                element.style.color = 'var(--warning-600)';
+            } else if (difference < -lemmaCost * 0.1) {
+                // Competitor is less expensive (bad for Lemma)
+                element.style.color = 'var(--success-600)';
+            } else {
+                // Similar pricing
+                element.style.color = 'var(--gray-600)';
+            }
         }
         
         // Initialize calculator
