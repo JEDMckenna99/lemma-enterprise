@@ -67,13 +67,13 @@
 
                 <!-- User Dashboard Card (for users with lemmas) -->
                 <div id="user-dashboard-card" style="display: none;">
-                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                        <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" style="width: 32px; height: 32px;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" style="width: 64px; height: 64px; margin-bottom: 12px;">
                         <h3 style="color: var(--success-600); margin: 0; font-size: var(--font-size-lg);">Welcome Back</h3>
+                        <p style="color: var(--gray-600); margin: 8px 0 0; line-height: 1.5; font-size: var(--font-size-sm);">
+                            Your lemma is active and verified.
+                        </p>
                     </div>
-                    <p style="color: var(--gray-600); margin-bottom: 16px; line-height: 1.5; font-size: var(--font-size-sm);">
-                        Your lemma is active and verified.
-                    </p>
                     <div style="background: var(--success-50); padding: 12px; border-radius: 6px; margin-bottom: 20px; border: 1px solid var(--success-200);">
                         <ul style="font-size: var(--font-size-sm); color: var(--success-800); margin: 0; padding-left: 16px;">
                             <li>✓ Verified human identity</li>
