@@ -67,7 +67,10 @@
 
                 <!-- User Dashboard Card (for users with lemmas) -->
                 <div id="user-dashboard-card" style="display: none;">
-                    <h3 style="color: var(--success-600); margin-bottom: 12px; font-size: var(--font-size-lg);">✅ Welcome Back</h3>
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                        <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" style="width: 32px; height: 32px;">
+                        <h3 style="color: var(--success-600); margin: 0; font-size: var(--font-size-lg);">Welcome Back</h3>
+                    </div>
                     <p style="color: var(--gray-600); margin-bottom: 16px; line-height: 1.5; font-size: var(--font-size-sm);">
                         Your lemma is active and verified.
                     </p>
