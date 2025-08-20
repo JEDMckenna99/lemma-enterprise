@@ -20,7 +20,54 @@
             });
         }
         
-        // Global function for hero verification (called by onclick)
+        // Direct verification function for immediate widget display
+        window.startDirectVerification = async function(heroShield, verifyBtn) {
+            try {
+                console.log('🚀 Starting direct Stripe verification...');
+                
+                // Update button state
+                const originalText = verifyBtn.textContent;
+                verifyBtn.textContent = 'Starting verification...';
+                verifyBtn.disabled = true;
+                
+                // Start identity verification (creates Stripe session)
+                const response = await fetch(`${window.location.origin}/api/sdk/start-identity-verification`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer demo-integration-key-12345'
+                    },
+                    body: JSON.stringify({
+                        provider: 'stripe_identity',
+                        inline_mode: false,
+                        return_url: window.location.origin + window.location.pathname + '?verification_return=true'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.url) {
+                    console.log('✅ Stripe session created, redirecting...');
+                    // Redirect to Stripe Identity
+                    window.location.href = result.url;
+                } else {
+                    throw new Error(result.message || 'Failed to start verification');
+                }
+                
+            } catch (error) {
+                console.error('❌ Direct verification failed:', error);
+                
+                // Reset button
+                verifyBtn.textContent = 'Verification failed - Try again';
+                verifyBtn.disabled = false;
+                
+                setTimeout(() => {
+                    verifyBtn.textContent = 'Verify a Lemma';
+                }, 3000);
+            }
+        };
+        
+        // Legacy function for button-triggered verification
         window.startHeroVerification = async function() {
             try {
                 console.log('🚀 Starting hero verification...');
@@ -92,7 +139,7 @@
                 <p>Lemma enables secure communication and privacy-preserving identity verification using cryptographic proofs. Create federated networks where users verify once and communicate everywhere—no data collection, no friction, microsecond verification.</p>
                 <div style="margin-top: 48px; display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap;">
                     <a href="/register" class="btn btn-primary">Start Building</a>
-                    <a href="/docs" class="btn btn-secondary">View Documentation</a>
+            <a href="/docs" class="btn btn-secondary">View Documentation</a>
                 </div>
             </div>
             
@@ -244,8 +291,8 @@
             <div class="card">
                 <h3 class="card-title">📡 Offline-First Communication</h3>
                 <p>Verifications require zero network calls in the hot path, supporting internet-independent mesh networks for IoT devices or remote operations.</p>
-            </div>
-            
+        </div>
+        
             <div class="card">
                 <h3 class="card-title">🎭 Privacy-Enhanced Networks</h3>
                 <p>ZKPs ensure unlinkability and selective disclosure, fostering trust in communication without data leaks or tracking across platforms.</p>
@@ -300,8 +347,8 @@
                     <li>Secure document sharing and collaboration</li>
                     <li>Authenticated business communications</li>
                 </ul>
-            </div>
-            
+        </div>
+        
             <div class="card" style="border-left: 4px solid var(--warning-600);">
                 <h3 class="card-title">🏥 Healthcare & Compliance</h3>
                 <p>Protect sensitive patient data and ensure regulatory compliance with cryptographic verification. Lemmas enable <strong>secure healthcare communication</strong> while maintaining strict privacy standards.</p>
@@ -310,7 +357,7 @@
                     <li>Secure telemedicine platforms</li>
                     <li>Authenticated medical record access</li>
                 </ul>
-            </div>
+                    </div>
             
             <div class="card" style="border-left: 4px solid var(--success-600);">
                 <h3 class="card-title">🏛️ Government & Civic</h3>
@@ -320,9 +367,9 @@
                     <li>Authenticated public service access</li>
                     <li>Privacy-preserving civic engagement</li>
                 </ul>
+                </div>
             </div>
-        </div>
-        
+            
         <div style="text-align: center; margin-top: 48px; padding: 32px; background: var(--gray-50); border-radius: 12px;">
             <h3 style="margin-bottom: 16px; color: var(--gray-900);">🚀 Emerging Applications</h3>
             <p style="color: var(--gray-600); margin-bottom: 20px;">Lemmas are pioneering new frontiers in authenticated communication:</p>
@@ -331,10 +378,10 @@
                     <strong style="color: var(--primary);">IoT & Autonomous Devices</strong>
                     <p style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 8px;">Mesh networks with device authentication</p>
                 </div>
-                <div>
+                    <div>
                     <strong style="color: var(--secondary);">Enterprise Licensing</strong>
                     <p style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 8px;">Cryptographic software licensing and access control</p>
-                </div>
+                    </div>
                 <div>
                     <strong style="color: var(--warning-600);">Decentralized Social</strong>
                     <p style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 8px;">Bot-resistant social networks with verified humans</p>
@@ -367,7 +414,7 @@
 <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}" data-cfasync="false"></script>
 <script data-cfasync="false">
         // Smart homepage with dynamic hero card and shield widget
-        document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function() {
             // Add delay to ensure all scripts are loaded
             await new Promise(resolve => setTimeout(resolve, 500));
             
@@ -382,10 +429,10 @@
                     return;
                 }
                 
-                const tempWallet = new LemmaFederatedWallet({ debug: true });
-                await tempWallet.init();
-                
-                const credentials = await tempWallet.getCredentials();
+        const tempWallet = new LemmaFederatedWallet({ debug: true });
+        await tempWallet.init();
+        
+        const credentials = await tempWallet.getCredentials();
                 const hasLemmas = credentials && credentials.length > 0;
                 
                 if (hasLemmas) {
@@ -394,20 +441,21 @@
                     document.getElementById('shield-api-card').style.display = 'none';
                     document.getElementById('user-dashboard-card').style.display = 'block';
                 } else {
-                    // User doesn't have lemmas - show Shield Widget
-                    console.log('🏠 No lemmas found, initializing Shield Widget');
+                    // User doesn't have lemmas - show verification widget immediately
+                    console.log('🏠 No lemmas found, showing verification widget directly');
                     const shieldCard = document.getElementById('shield-api-card');
                     const dashboardCard = document.getElementById('user-dashboard-card');
                     
                     if (shieldCard && dashboardCard) {
-                        shieldCard.style.display = 'block';
+                        // Hide both cards initially
+                        shieldCard.style.display = 'none';
                         dashboardCard.style.display = 'none';
-                        console.log('🏠 Shield card made visible, dashboard card hidden');
+                        console.log('🏠 Cards hidden, creating direct verification widget...');
                         
-                        // Initialize the actual Lemma Shield widget with modern federated system
+                        // Create verification widget directly without button overlay
                         setTimeout(async () => {
-                            console.log('🏠 Starting shield widget initialization...');
-                            await initializeHeroShieldWidget();
+                            console.log('🏠 Creating direct verification widget...');
+                            await initializeDirectVerificationWidget();
                         }, 100);
                     } else {
                         console.error('🏠 Hero card elements not found!', {
@@ -415,8 +463,8 @@
                             dashboardCard: !!dashboardCard
                         });
                     }
-                }
-            } catch (error) {
+        }
+    } catch (error) {
                 console.log('🏠 Error checking credentials, defaulting to Shield Widget:', error);
                 const shieldCard = document.getElementById('shield-api-card');
                 const dashboardCard = document.getElementById('user-dashboard-card');
@@ -437,7 +485,117 @@
             }
         });
         
-        // Initialize the hero shield widget for network access
+        // Initialize direct verification widget (no button overlay)
+        async function initializeDirectVerificationWidget() {
+            try {
+                console.log('🛡️ Creating direct verification widget...');
+                
+                // Check if required classes are available
+                if (typeof LemmaBotShield === 'undefined') {
+                    console.warn('🛡️ LemmaBotShield not available, showing fallback');
+                    showShieldFallback();
+                    return;
+                }
+                
+                // Create shield instance
+                const heroShield = new LemmaBotShield({
+                    debug: true,
+                    apiBase: window.location.origin
+                });
+                
+                // Wait for shield to be fully initialized
+                await heroShield.initializeFederatedWallet();
+                
+                // Create the verification widget directly in the hero card container
+                const heroCard = document.getElementById('hero-card');
+                if (!heroCard) {
+                    console.error('🛡️ Hero card container not found');
+                    return;
+                }
+                
+                // Create verification widget HTML
+                const verificationWidget = document.createElement('div');
+                verificationWidget.innerHTML = `
+                    <div style="
+                        max-width: 400px;
+                        margin: 0 auto;
+                        padding: 32px;
+                        background: white;
+                        border-radius: 16px;
+                        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+                        text-align: center;
+                        border: 2px solid #e5e7eb;
+                    ">
+                        <div style="
+                            width: 60px;
+                            height: 60px;
+                            margin: 0 auto 1rem;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-size: 24px;
+                            font-weight: bold;
+                        ">🛡️</div>
+                        
+                        <h3 style="
+                            margin-bottom: 0.5rem;
+                            color: #1f2937;
+                            font-size: 1.25rem;
+                            font-weight: 600;
+                        ">Protected by Lemma Shield</h3>
+                        
+                        <p style="
+                            margin-bottom: 1.5rem;
+                            color: #6b7280;
+                            font-size: 0.875rem;
+                        ">Verify your identity to access this content</p>
+                        
+                        <button id="direct-verify-lemma-btn" style="
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
+                            border: none;
+                            padding: 0.75rem 1.5rem;
+                            border-radius: 8px;
+                            font-size: 1rem;
+                            font-weight: 500;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                            width: 100%;
+                        " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.4)'" 
+                           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                            Verify a Lemma
+                        </button>
+                        
+                        <p style="
+                            margin-top: 1rem;
+                            color: #9ca3af;
+                            font-size: 0.75rem;
+                        ">One-time verification • Never see CAPTCHAs again</p>
+                    </div>
+                `;
+                
+                // Replace hero card content with verification widget
+                heroCard.innerHTML = '';
+                heroCard.appendChild(verificationWidget);
+                
+                // Add click handler to verification button
+                const verifyBtn = verificationWidget.querySelector('#direct-verify-lemma-btn');
+                verifyBtn.addEventListener('click', async () => {
+                    await startDirectVerification(heroShield, verifyBtn);
+                });
+                
+                console.log('✅ Direct verification widget created successfully');
+                
+            } catch (error) {
+                console.error('🏠 Failed to create direct verification widget:', error);
+                showShieldFallback();
+            }
+        }
+        
+        // Initialize the hero shield widget for network access (legacy)
         async function initializeHeroShieldWidget() {
             try {
                 console.log('🛡️ Initializing Hero Shield Widget...');
