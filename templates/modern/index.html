@@ -19,6 +19,44 @@
                 }
             });
         }
+        
+        // Global function for hero verification (called by onclick)
+        window.startHeroVerification = async function() {
+            try {
+                console.log('🚀 Starting hero verification...');
+                
+                const joinButton = document.getElementById('join-network-btn');
+                if (joinButton) {
+                    joinButton.textContent = 'Starting verification...';
+                    joinButton.disabled = true;
+                }
+                
+                // Create shield instance if not exists
+                if (!window.heroShield) {
+                    window.heroShield = new LemmaBotShield({
+                        debug: true,
+                        apiBase: window.location.origin
+                    });
+                    await window.heroShield.initializeFederatedWallet();
+                }
+                
+                // Use the shield's protect method to show verification widget
+                await window.heroShield.protect('#shield-api-card');
+                
+            } catch (error) {
+                console.error('❌ Hero verification failed:', error);
+                
+                const joinButton = document.getElementById('join-network-btn');
+                if (joinButton) {
+                    joinButton.textContent = 'Verification Failed - Try Again';
+                    joinButton.disabled = false;
+                    
+                    setTimeout(() => {
+                        joinButton.textContent = 'Join Network';
+                    }, 3000);
+                }
+            }
+        };
     </script>
     
     <style>
@@ -78,7 +116,7 @@
                         </div>
                         
                         <!-- Join Network Button -->
-                        <button id="join-network-btn" class="btn btn-primary" style="width: 100%; justify-content: center; margin-bottom: 16px;">
+                        <button id="join-network-btn" class="btn btn-primary" style="width: 100%; justify-content: center; margin-bottom: 16px;" onclick="startHeroVerification()">
                             Join Network
                         </button>
                         
@@ -470,5 +508,4 @@
         
     }); // Close DOMContentLoaded event listener
 </script>
-{% endif %}
 {% endblock %}
