@@ -1,133 +1,374 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Documentation - Lemma Verification Platform{% endblock %}
-{% block description %}Complete documentation for integrating Lemma verification into your application with examples and guides.{% endblock %}
+{% block title %}Documentation - Lemma Identity Verification{% endblock %}
+{% block description %}Developer-friendly documentation for integrating Lemma's federated identity verification with interactive examples and comprehensive API reference.{% endblock %}
 
 {% block head %}
     {{ super() }}
     <style>
-        .docs-hero {
+        /* Modern Developer Documentation Styles */
+        .docs-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 0;
+            min-height: 100vh;
+            background: var(--white);
+        }
+        
+        .docs-sidebar {
             background: var(--gray-50);
-            padding: var(--space-16) 0;
+            border-right: 1px solid var(--gray-200);
+            padding: var(--space-6) 0;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        
+        .docs-content {
+            padding: var(--space-8);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .docs-hero {
+            background: linear-gradient(135deg, var(--gray-900) 0%, var(--black) 100%);
+            color: var(--white);
+            padding: var(--space-12) 0;
+            margin: calc(-1 * var(--space-8)) calc(-1 * var(--space-8)) var(--space-12);
             text-align: center;
         }
         
-        .docs-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: var(--space-8);
-            margin: var(--space-12) 0;
+        .sidebar-nav {
+            padding: 0 var(--space-6);
         }
         
-        .docs-card {
-            background: var(--white);
-            border: 1px solid var(--gray-200);
+        .nav-section {
+            margin-bottom: var(--space-6);
+        }
+        
+        .nav-title {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: var(--space-3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .nav-link {
+            display: block;
+            padding: var(--space-2) var(--space-3);
+            color: var(--gray-600);
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: var(--font-size-sm);
+            transition: all 0.2s ease;
+            margin-bottom: 2px;
+        }
+        
+        .nav-link:hover {
+            background: var(--primary-50);
+            color: var(--primary-600);
+        }
+        
+        .nav-link.active {
+            background: var(--primary-500);
+            color: var(--white);
+            font-weight: 500;
+        }
+        
+        .code-block {
+            background: var(--gray-900);
+            color: var(--white);
             border-radius: 8px;
-            padding: var(--space-6);
+            padding: var(--space-4);
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            overflow-x: auto;
+            margin: var(--space-4) 0;
+            position: relative;
+            border: 1px solid var(--gray-700);
+        }
+        
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--gray-800);
+            padding: var(--space-2) var(--space-4);
+            border-radius: 8px 8px 0 0;
+            border-bottom: 1px solid var(--gray-700);
+            margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) var(--space-3);
+        }
+        
+        .code-language {
+            font-size: var(--font-size-xs);
+            color: var(--gray-400);
+            font-weight: 500;
+        }
+        
+        .copy-button {
+            background: var(--gray-700);
+            color: var(--gray-300);
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: var(--font-size-xs);
+            cursor: pointer;
             transition: all 0.2s ease;
         }
         
-        .docs-card:hover {
-            border-color: var(--primary-500);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(99, 91, 255, 0.1);
-        }
-        
-        .docs-icon {
-            width: 48px;
-            height: 48px;
-            background: var(--primary-500);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            margin-bottom: var(--space-4);
-        }
-        
-        .code-snippet {
-            background: var(--gray-800);
+        .copy-button:hover {
+            background: var(--gray-600);
             color: var(--white);
-            border-radius: 6px;
+        }
+        
+        .copy-button.copied {
+            background: var(--success);
+            color: var(--white);
+        }
+        
+        .api-endpoint {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
             padding: var(--space-4);
-            font-family: var(--font-mono);
-            font-size: var(--font-size-sm);
-            overflow-x: auto;
             margin: var(--space-4) 0;
         }
         
-        .integration-time {
+        .endpoint-method {
+            display: inline-block;
+            background: var(--primary-500);
+            color: var(--white);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            margin-right: var(--space-2);
+        }
+        
+        .endpoint-method.post { background: var(--success); }
+        .endpoint-method.get { background: var(--primary-500); }
+        .endpoint-method.put { background: var(--warning); }
+        .endpoint-method.delete { background: var(--danger); }
+        
+        .response-time {
             background: var(--success);
             color: var(--white);
-            padding: var(--space-1) var(--space-2);
+            padding: 2px 6px;
             border-radius: 4px;
             font-size: var(--font-size-xs);
             font-weight: 600;
             margin-left: var(--space-2);
         }
         
-        .performance-highlight {
-            background: linear-gradient(135deg, var(--primary-500), #764ba2);
-            color: var(--white);
-            padding: var(--space-6);
-            border-radius: 12px;
-            text-align: center;
-            margin: var(--space-12) 0;
-        }
-        
-        .feature-list {
+        .quick-start-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: var(--space-4);
-            margin: var(--space-6) 0;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: var(--space-6);
+            margin: var(--space-8) 0;
         }
         
-        .feature-item {
+        .docs-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            padding: var(--space-6);
+            transition: all 0.2s ease;
+            height: fit-content;
+        }
+        
+        .docs-card:hover {
+            border-color: var(--primary-300);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.1);
+        }
+        
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary-500);
+            border-radius: 8px;
             display: flex;
-            align-items: flex-start;
-            padding: var(--space-3);
-            background: var(--gray-50);
-            border-radius: 6px;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-bottom: var(--space-4);
         }
         
-        .feature-check {
-            color: var(--success);
-            font-weight: bold;
-            margin-right: var(--space-3);
-            margin-top: 2px;
+        .integration-badge {
+            background: var(--success);
+            color: var(--white);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            margin-left: var(--space-2);
+        }
+        
+        .table-responsive {
+            overflow-x: auto;
+            margin: var(--space-4) 0;
+        }
+        
+        .docs-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--font-size-sm);
+        }
+        
+        .docs-table th {
+            background: var(--gray-50);
+            padding: var(--space-3);
+            text-align: left;
+            border-bottom: 1px solid var(--gray-200);
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+        
+        .docs-table td {
+            padding: var(--space-3);
+            border-bottom: 1px solid var(--gray-100);
+            color: var(--gray-700);
+        }
+        
+        .docs-table tr:hover {
+            background: var(--gray-25);
+        }
+        
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+        }
+        
+        .status-stable { background: var(--success); color: var(--white); }
+        .status-beta { background: var(--warning); color: var(--white); }
+        .status-experimental { background: var(--gray-500); color: var(--white); }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 1024px) {
+            .docs-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .docs-sidebar {
+                display: none;
+            }
+            
+            .mobile-nav-toggle {
+                display: block;
+            }
+        }
+        
+        .mobile-nav-toggle {
+            display: none;
+            background: var(--primary-500);
+            color: var(--white);
+            border: none;
+            padding: var(--space-2) var(--space-4);
+            border-radius: 6px;
+            margin-bottom: var(--space-4);
+            cursor: pointer;
+        }
+        
+        .section-anchor {
+            position: relative;
+            scroll-margin-top: 80px;
+        }
+        
+        .anchor-link {
+            position: absolute;
+            left: -24px;
+            top: 0;
+            color: var(--gray-400);
+            text-decoration: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .section-anchor:hover .anchor-link {
+            opacity: 1;
         }
     </style>
 {% endblock %}
 
 {% block content %}
-<!-- Docs Hero -->
-<section class="docs-hero">
-    <div class="stripe-container">
-        <h1 class="hero-title">Documentation</h1>
-        <p class="hero-subtitle">
-            Everything you need to integrate Lemma verification in under 5 minutes.
-        </p>
-    </div>
-</section>
-
-<!-- Quick Start -->
-<section class="section">
-    <div class="stripe-container">
-        <div class="performance-highlight">
-            <h2 style="margin-bottom: var(--space-4);">⚡ 3-Line Integration</h2>
-            <p style="font-size: var(--font-size-lg); opacity: 0.9;">
-                From zero to production-ready identity network in under 5 minutes.
-            </p>
+<div class="docs-layout">
+    <!-- Sidebar Navigation -->
+    <nav class="docs-sidebar">
+        <div class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-title">Getting Started</div>
+                <a href="#quick-start" class="nav-link active">Quick Start</a>
+                <a href="#installation" class="nav-link">Installation</a>
+                <a href="#authentication" class="nav-link">Authentication</a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-title">Integration</div>
+                <a href="#3-line-setup" class="nav-link">3-Line Setup</a>
+                <a href="#federated-network" class="nav-link">Federated Network</a>
+                <a href="#security-config" class="nav-link">Security Config</a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-title">API Reference</div>
+                <a href="#javascript-sdk" class="nav-link">JavaScript SDK</a>
+                <a href="#rest-api" class="nav-link">REST API</a>
+                <a href="#webhooks" class="nav-link">Webhooks</a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-title">Examples</div>
+                <a href="#ecommerce" class="nav-link">E-commerce</a>
+                <a href="#gaming" class="nav-link">Gaming</a>
+                <a href="#fintech" class="nav-link">Financial</a>
+                <a href="#social" class="nav-link">Social Media</a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-title">Advanced</div>
+                <a href="#performance" class="nav-link">Performance</a>
+                <a href="#security" class="nav-link">Security</a>
+                <a href="#troubleshooting" class="nav-link">Troubleshooting</a>
+            </div>
         </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <main class="docs-content">
+        <button class="mobile-nav-toggle">📚 Navigation</button>
         
-        <div class="docs-grid">
-            <!-- Quick Start -->
-            <div class="docs-card">
-                <div class="docs-icon">🚀</div>
-                <h3>Quick Start <span class="integration-time">< 3 min</span></h3>
-                <p>Join the Lemma Identity Network with 3 lines of code - production ready immediately.</p>
-                
-                <div class="code-snippet">&lt;!-- 1. Load the Lemma Identity Network --&gt;
+        <!-- Hero Section -->
+        <div class="docs-hero">
+            <h1 style="font-size: 2.5rem; margin-bottom: var(--space-4);">Developer Documentation</h1>
+            <p style="font-size: var(--font-size-lg); opacity: 0.9; max-width: 600px; margin: 0 auto;">
+                Complete guide to integrating Lemma's federated identity verification. From 3-line setup to enterprise deployment.
+            </p>
+            <div style="margin-top: var(--space-6); display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
+                <a href="#quick-start" class="btn btn-primary">Start Building</a>
+                <a href="/playground" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-400);">Try Live Demo</a>
+            </div>
+        </div>
+
+        <!-- Quick Start Section -->
+        <section id="quick-start" class="section-anchor">
+            <a href="#quick-start" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">🚀 Quick Start</h2>
+            
+            <div style="background: var(--success); color: var(--white); padding: var(--space-4); border-radius: 8px; margin-bottom: var(--space-6); text-align: center;">
+                <strong>⚡ 3-Line Integration</strong> - From zero to production in under 5 minutes
+            </div>
+            
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">HTML</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+<!-- 1. Load Lemma Identity Network -->
 &lt;script src="https://lemma.id/js/lemma-federated-wallet.js"&gt;&lt;/script&gt;
 &lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
 
@@ -140,200 +381,362 @@
   
   // 3. Protect any element instantly
   shield.protect('#protected-content');
-&lt;/script&gt;</div>
-                
-                <a href="#integration-guide" class="btn btn-primary btn-sm">Full Integration Guide</a>
+&lt;/script&gt;
             </div>
-
-            <!-- Identity Network -->
-            <div class="docs-card">
-                <div class="docs-icon">🌐</div>
-                <h3>Identity Network <span class="integration-time">Cross-site</span></h3>
-                <p>Users verify once, access everywhere. Real federated identity with zero-knowledge privacy.</p>
-                
-                <div class="code-snippet">// Check if user is already verified in network
-const wallet = new LemmaFederatedWallet({ debug: true });
-await wallet.init();
-
-if (await wallet.hasValidCredentials()) {
-  // User already verified - instant access
-  showProtectedContent();
-} else {
-  // User needs verification - redirect to Stripe Identity
-  initiateVerification();
-}
-
-// 99.9% offline operation - no server calls needed</div>
-                
-                <a href="#network-integration" class="btn btn-primary btn-sm">Network Docs</a>
+            
+            <div style="background: var(--gray-50); padding: var(--space-4); border-radius: 8px; margin: var(--space-6) 0;">
+                <p style="margin: 0; color: var(--gray-700);">
+                    <strong>💡 That's it!</strong> Your site is now part of the federated identity network. Users verified anywhere in the network can access your protected content instantly.
+                </p>
             </div>
+        </section>
 
-            <!-- Production APIs -->
-            <div class="docs-card">
-                <div class="docs-icon">📚</div>
-                <h3>Production APIs</h3>
-                <p>Real-time verification with Rust backend - 4.176µs performance with production cryptography.</p>
-                
-                <div class="code-snippet">// Client-side verification (preferred)
-const result = await shield.verifyUser();
-if (result.verified) {
-  console.log('Human verified:', result.confidence);
-}
-
-// Server-side API (fallback)
-POST https://lemma.id/api/verify
-{
-  "credential": "base64_encoded_credential",
-  "context": { "action": "checkout" }
-}
-
-// Response: 4.176µs verification time</div>
-                
-                <a href="/playground" class="btn btn-primary btn-sm">Try Live API</a>
-            </div>
-
-            <!-- Real-time Security -->
-            <div class="docs-card">
-                <div class="docs-icon">⚡</div>
-                <h3>Real-time Security</h3>
-                <p>Continuous background verification with configurable security levels and threat detection.</p>
-                
-                <div class="code-snippet">// Configure security monitoring
-const shield = new LemmaBotShield({
-  apiKey: 'your-key',
-  securityLevel: 'high', // 'low', 'medium', 'high', 'critical'
-  backgroundChecks: true,
-  checkOnEvents: ['entry', 'checkout', 'sensitive_action'],
-  maxFailures: 3,
-  gracePeriod: 24 * 60 * 60 * 1000 // 24 hours
-});
-
-// Real-time threat detection active</div>
-                
-                <a href="#security-config" class="btn btn-primary btn-sm">Security Guide</a>
-            </div>
-
-            <!-- Bot Shield -->
-            <div class="docs-card">
-                <div class="docs-icon">🛡️</div>
-                <h3>Production Bot Shield</h3>
-                <p>Enterprise-grade bot protection with federated network integration and real-time threat detection.</p>
-                
-                <div class="code-snippet">// Complete Bot Shield Setup
+        <!-- Installation Section -->
+        <section id="installation" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#installation" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">📦 Installation</h2>
+            
+            <h3 style="margin-bottom: var(--space-4);">Option 1: CDN (Recommended)</h3>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">HTML</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
 &lt;script src="https://lemma.id/js/lemma-federated-wallet.js"&gt;&lt;/script&gt;
 &lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
+            </div>
+            
+            <h3 style="margin-bottom: var(--space-4); margin-top: var(--space-8);">Option 2: NPM Package</h3>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">bash</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+npm install @lemma/verification-sdk
+            </div>
+            
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">JavaScript</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+import { Lemma, LemmaBotShield } from '@lemma/verification-sdk';
 
-&lt;script&gt;
-// Initialize federated wallet for network access
-const wallet = new LemmaFederatedWallet({ 
-  debug: false,
-  networkRegistryUrl: 'https://lemma.id/api/network'
+const shield = new LemmaBotShield({
+  apiKey: 'your-api-key',
+  apiBase: 'https://lemma.id'
 });
+            </div>
+        </section>
 
-// Initialize shield with network integration
+        <!-- Authentication vs Verification -->
+        <section id="authentication" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#authentication" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">🔐 Authentication vs Verification</h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-bottom: var(--space-8);">
+                <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: 8px; padding: var(--space-4);">
+                    <h4 style="color: var(--primary-700); margin-bottom: var(--space-3);">🔐 VERIFICATION (One-Time)</h4>
+                    <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-700);">
+                        <li>Creates new identity credentials</li>
+                        <li>Uses Stripe KYC verification</li>
+                        <li>~500ms (includes document checks)</li>
+                        <li>Server-side API calls</li>
+                    </ul>
+                </div>
+                
+                <div style="background: var(--success-50); border: 1px solid var(--success-200); border-radius: 8px; padding: var(--space-4);">
+                    <h4 style="color: var(--success-700); margin-bottom: var(--space-3);">⚡ AUTHENTICATION (Ongoing)</h4>
+                    <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-700);">
+                        <li>Validates existing credentials</li>
+                        <li>Rust/WASM cryptographic validation</li>
+                        <li>~1-50µs (offline operation)</li>
+                        <li>Client-side SDK</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3-Line Setup -->
+        <section id="3-line-setup" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#3-line-setup" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">⚡ 3-Line Setup</h2>
+            
+            <p style="margin-bottom: var(--space-6); color: var(--gray-700);">
+                The fastest way to add federated identity verification to any website:
+            </p>
+            
+            <div class="quick-start-grid">
+                <div class="docs-card">
+                    <div class="card-icon">1️⃣</div>
+                    <h3>Load Scripts</h3>
+                    <p style="color: var(--gray-600); margin-bottom: var(--space-4);">Include the Lemma federated wallet and bot shield</p>
+                    
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">HTML</span>
+                            <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                        </div>
+&lt;script src="https://lemma.id/js/lemma-federated-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
+                    </div>
+                </div>
+                
+                <div class="docs-card">
+                    <div class="card-icon">2️⃣</div>
+                    <h3>Initialize Shield</h3>
+                    <p style="color: var(--gray-600); margin-bottom: var(--space-4);">Configure with your API key and security settings</p>
+                    
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">JavaScript</span>
+                            <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                        </div>
 const shield = new LemmaBotShield({ 
   apiKey: 'your-production-api-key',
   apiBase: 'https://lemma.id',
   securityLevel: 'medium'
 });
-
-// Protect any content instantly
-shield.protect('#checkout-form');
-shield.protect('#user-dashboard');
-&lt;/script&gt;</div>
+                    </div>
+                </div>
                 
-                <a href="/wallet" class="btn btn-primary btn-sm">See Live Demo</a>
-            </div>
+                <div class="docs-card">
+                    <div class="card-icon">3️⃣</div>
+                    <h3>Protect Content</h3>
+                    <p style="color: var(--gray-600); margin-bottom: var(--space-4);">Shield any element with one line of code</p>
+                    
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">JavaScript</span>
+                            <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                        </div>
+// Protect any element instantly
+shield.protect('#protected-content');
 
-            <!-- Enterprise -->
-            <div class="docs-card">
-                <div class="docs-icon">🏢</div>
-                <h3>Enterprise Integration</h3>
-                <p>White-label the verification engine for banking, healthcare, gaming, and more.</p>
+// Or protect multiple elements
+shield.protect('.premium-content');
+                    </div>
+                    
+                    <div style="background: var(--success); color: var(--white); padding: var(--space-2); border-radius: 4px; text-align: center; font-size: var(--font-size-sm); font-weight: 600; margin-top: var(--space-4);">
+                        ⚡ ~1-50µs verification
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Federated Network -->
+        <section id="federated-network" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#federated-network" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">🌐 Federated Network Integration</h2>
+            
+            <p style="margin-bottom: var(--space-6); color: var(--gray-700);">
+                Users verify once with Stripe Identity, then access all network sites instantly. No re-verification needed.
+            </p>
+            
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">JavaScript</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+// Initialize federated wallet
+const wallet = new LemmaFederatedWallet({ 
+  debug: false,
+  networkRegistryUrl: 'https://lemma.id/api/network'
+});
+
+await wallet.init();
+
+// Check if user is already verified in the network
+if (await wallet.hasValidCredentials()) {
+  // User already verified - instant access (offline)
+  showProtectedContent();
+  console.log('✅ Network verification: ~5µs');
+} else {
+  // User needs verification - redirect to Stripe Identity
+  window.location.href = '/verify';
+}
+            </div>
+            
+            <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: 8px; padding: var(--space-4); margin: var(--space-6) 0;">
+                <h4 style="color: var(--primary-700); margin-bottom: var(--space-2);">🔗 Network Benefits</h4>
+                <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-700);">
+                    <li><strong>Cross-site access:</strong> Users verified on any Lemma site can access your content</li>
+                    <li><strong>Zero re-verification:</strong> No need to verify users who are already in the network</li>
+                    <li><strong>Offline operation:</strong> 99.9% of authentications happen offline (~1-50µs)</li>
+                    <li><strong>Privacy-preserving:</strong> Zero personal data storage with cryptographic proofs</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- JavaScript SDK Reference -->
+        <section id="javascript-sdk" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#javascript-sdk" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">📚 JavaScript SDK Reference</h2>
+            
+            <h3 style="margin-bottom: var(--space-4);">LemmaBotShield</h3>
+            <p style="margin-bottom: var(--space-4); color: var(--gray-700);">
+                Main class for bot protection and user verification.
+            </p>
+            
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">TypeScript</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+interface ShieldConfig {
+  apiKey: string;                    // Your production API key
+  apiBase?: string;                  // API base URL (default: 'https://lemma.id')
+  securityLevel?: SecurityLevel;     // 'low' | 'medium' | 'high' | 'critical'
+  backgroundChecks?: boolean;        // Enable background monitoring
+  checkOnEvents?: string[];          // Events that trigger verification
+  maxFailures?: number;              // Max failures before lockout
+  gracePeriod?: number;              // Grace period in milliseconds
+  debug?: boolean;                   // Enable debug logging
+}
+
+const shield = new LemmaBotShield(config);
+            </div>
+            
+            <h4 style="margin: var(--space-6) 0 var(--space-4);">Methods</h4>
+            
+            <div class="table-responsive">
+                <table class="docs-table">
+                    <thead>
+                        <tr>
+                            <th>Method</th>
+                            <th>Description</th>
+                            <th>Returns</th>
+                            <th>Performance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>protect(selector)</code></td>
+                            <td>Protect DOM elements with verification</td>
+                            <td><code>Promise&lt;void&gt;</code></td>
+                            <td><span class="response-time">~1µs</span></td>
+                        </tr>
+                        <tr>
+                            <td><code>verifyUser()</code></td>
+                            <td>Manually trigger user verification</td>
+                            <td><code>Promise&lt;VerificationResult&gt;</code></td>
+                            <td><span class="response-time">~5µs</span></td>
+                        </tr>
+                        <tr>
+                            <td><code>startBackgroundMonitoring()</code></td>
+                            <td>Enable continuous security monitoring</td>
+                            <td><code>void</code></td>
+                            <td><span class="response-time">~0.1µs</span></td>
+                        </tr>
+                        <tr>
+                            <td><code>getSecurityStatus()</code></td>
+                            <td>Get current security and verification status</td>
+                            <td><code>SecurityStatus</code></td>
+                            <td><span class="response-time">~0.5µs</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- REST API Reference -->
+        <section id="rest-api" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#rest-api" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">🔗 REST API Reference</h2>
+            
+            <div class="api-endpoint">
+                <div style="margin-bottom: var(--space-3);">
+                    <span class="endpoint-method post">POST</span>
+                    <code>/api/sdk/start-identity-verification</code>
+                    <span class="response-time">~500ms</span>
+                </div>
+                <p style="margin-bottom: var(--space-3); color: var(--gray-700);">Start Stripe Identity KYC verification process</p>
                 
-                <div class="code-snippet">// Industry-specific packages
-lemma.register_package(BankingKYCPackage);
-lemma.register_package(HealthcareHIPAAPackage);
-lemma.register_package(GamingAgePackage);
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">JavaScript</span>
+                        <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                    </div>
+const response = await fetch('/api/sdk/start-identity-verification', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    returnUrl: 'https://yoursite.com/verified'
+  })
+});
 
-// Custom implementations available</div>
+const { sessionUrl } = await response.json();
+window.location.href = sessionUrl; // Redirect to Stripe Identity
+                </div>
+            </div>
+            
+            <div class="api-endpoint">
+                <div style="margin-bottom: var(--space-3);">
+                    <span class="endpoint-method post">POST</span>
+                    <code>/api/sdk/complete-identity-verification</code>
+                    <span class="response-time">~50µs</span>
+                </div>
+                <p style="margin-bottom: var(--space-3); color: var(--gray-700);">Complete verification and receive identity credential</p>
                 
-                <a href="/pricing" class="btn btn-primary btn-sm">Enterprise Pricing</a>
-            </div>
-        </div>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">JavaScript</span>
+                        <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                    </div>
+const response = await fetch('/api/sdk/complete-identity-verification', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    sessionId: 'stripe_session_id_from_callback'
+  })
+});
 
-        <!-- Key Features -->
-        <div class="section-header" style="margin-top: var(--space-20);">
-            <h2>Key Features & Benefits</h2>
-            <p>Why developers choose Lemma for verification</p>
-        </div>
-        
-        <div class="feature-list">
-            <div class="feature-item">
-                <span class="feature-check">✓</span>
-                <div>
-                    <strong>Microsecond Performance</strong><br>
-                    4.176µs verification time with 99.9% offline operation
+const { credential } = await response.json();
+// Store credential in federated wallet
+await wallet.storeCredential(credential);
                 </div>
             </div>
             
-            <div class="feature-item">
-                <span class="feature-check">✓</span>
-                <div>
-                    <strong>Zero-Knowledge Privacy</strong><br>
-                    Perfect privacy with selective disclosure and unlinkability
+            <div class="api-endpoint">
+                <div style="margin-bottom: var(--space-3);">
+                    <span class="endpoint-method get">GET</span>
+                    <code>/api/network/client-config</code>
+                    <span class="response-time">~10ms</span>
                 </div>
-            </div>
-            
-            <div class="feature-item">
-                <span class="feature-check">✓</span>
-                <div>
-                    <strong>Universal Integration</strong><br>
-                    Single script tag to production-ready verification
-                </div>
-            </div>
-            
-            <div class="feature-item">
-                <span class="feature-check">✓</span>
-                <div>
-                    <strong>Enterprise Grade</strong><br>
-                    99.9% uptime SLA with 24/7 support
-                </div>
-            </div>
-            
-            <div class="feature-item">
-                <span class="feature-check">✓</span>
-                <div>
-                    <strong>Federated Network</strong><br>
-                    Verify once with Stripe Identity, access everywhere in the network
-                </div>
-            </div>
-            
-            <div class="feature-item">
-                <span class="feature-check">✓</span>
-                <div>
-                    <strong>Predictable Pricing</strong><br>
-                    $0.10/user/month vs $0.10-$0.50 per verification
-                </div>
-            </div>
-        </div>
+                <p style="margin-bottom: var(--space-3); color: var(--gray-700);">Get dynamic network configuration for client-side SDK</p>
+                
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">JavaScript</span>
+                        <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                    </div>
+const config = await fetch('/api/network/client-config').then(r => r.json());
 
-        <!-- Complete Integration Examples -->
-        <div class="section-header" style="margin-top: var(--space-20);" id="network-integration">
-            <h2>Real Integration Examples</h2>
-            <p>Copy-paste examples for common use cases</p>
-        </div>
-        
-        <div class="card-grid-2">
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>🛒 E-commerce Checkout Protection</h4>
-                    <p>Protect checkout flows and prevent bot purchases</p>
-                    <div class="code-snippet" style="font-size: 11px;">// E-commerce Integration
-&lt;script src="https://lemma.id/js/lemma-federated-wallet.js"&gt;&lt;/script&gt;
-&lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
+// Use config to initialize wallet
+const wallet = new LemmaFederatedWallet({
+  networkRegistryUrl: config.networkRegistryUrl,
+  nodeId: config.nodeId
+});
+                </div>
+            </div>
+        </section>
 
-&lt;script&gt;
+        <!-- Integration Examples -->
+        <section id="ecommerce" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#ecommerce" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">💡 Integration Examples</h2>
+            
+            <h3 style="margin-bottom: var(--space-4);">🛒 E-commerce Checkout Protection</h3>
+            <p style="margin-bottom: var(--space-4); color: var(--gray-700);">
+                Protect checkout flows and prevent bot purchases while maintaining smooth UX for real users.
+            </p>
+            
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">JavaScript</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+// E-commerce Integration
 const shield = new LemmaBotShield({
   apiKey: 'your-api-key',
   apiBase: 'https://lemma.id',
@@ -355,128 +758,63 @@ document.getElementById('checkout-btn').addEventListener('click', async (e) => {
     showHumanVerification();
   }
 });
-&lt;/script&gt;</div>
-                </div>
             </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>🎮 Gaming Platform Integration</h4>
-                    <p>Prevent bot farming and ensure fair play</p>
-                    <div class="code-snippet" style="font-size: 11px;">// Gaming Platform Integration
-const wallet = new LemmaFederatedWallet({
-  debug: false,
-  networkRegistryUrl: 'https://lemma.id/api/network'
-});
-
-const shield = new LemmaBotShield({
-  apiKey: 'gaming-platform-key',
-  apiBase: 'https://lemma.id',
-  securityLevel: 'critical', // Max security for gaming
-  backgroundChecks: true,
-  checkOnEvents: ['match_start', 'reward_claim', 'trade']
-});
-
-await wallet.init();
-
-// Check if player is verified in network
-if (await wallet.hasValidCredentials()) {
-  allowGameplay();
-} else {
-  requireVerification();
-}
-
-// Continuous monitoring during gameplay
-shield.protect('#game-container');
-shield.startBackgroundMonitoring();
-</div>
-                </div>
-            </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>💰 Financial Services</h4>
-                    <p>KYC compliance with federated identity</p>
-                    <div class="code-snippet" style="font-size: 11px;">// Financial Services Integration
-const wallet = new LemmaFederatedWallet({
-  debug: false,
-  securityLevel: 'critical',
-  gracePeriod: 0 // No grace period for finance
-});
-
-const shield = new LemmaBotShield({
-  apiKey: 'fintech-api-key',
-  apiBase: 'https://lemma.id',
-  securityLevel: 'critical',
-  maxFailures: 1, // Zero tolerance
-  checkOnEvents: ['login', 'transfer', 'withdrawal']
-});
-
-// Check existing KYC status across network
-await wallet.init();
-const credentials = await wallet.getValidCredentials();
-
-if (credentials && credentials.kyc_verified) {
-  // User already KYC verified in network
-  allowFinancialServices();
-} else {
-  // Redirect to Stripe Identity for KYC
-  window.location.href = '/verify?return_url=' + encodeURIComponent(window.location.href);
-}
-</div>
-                </div>
-            </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>📱 Social Platform</h4>
-                    <p>Prevent fake accounts and bot interactions</p>
-                    <div class="code-snippet" style="font-size: 11px;">// Social Platform Integration
-const shield = new LemmaBotShield({
-  apiKey: 'social-platform-key',
-  apiBase: 'https://lemma.id',
-  securityLevel: 'medium',
-  backgroundChecks: true,
-  checkOnEvents: ['post', 'comment', 'like', 'follow']
-});
-
-// Protect user actions
-shield.protect('#post-form');
-shield.protect('#comment-form');
-shield.protect('.follow-button');
-
-// Verify before high-impact actions
-async function handleUserAction(action) {
-  const result = await shield.verifyUser();
-  
-  if (result.verified) {
-    executeAction(action);
-  } else {
-    showCaptchaOrVerification();
-  }
-}
-
-// Background monitoring for suspicious patterns
-shield.onSecurityEvent = (event) => {
-  if (event.type === 'suspicious_activity') {
-    temporarilyLimitActions();
-  }
-};
-</div>
-                </div>
-            </div>
-        </div>
+        </section>
 
         <!-- Security Configuration -->
-        <div class="section-header" style="margin-top: var(--space-20);" id="security-config">
-            <h2>Security Configuration Guide</h2>
-            <p>Configure security levels and monitoring for your use case</p>
-        </div>
-        
-        <div class="card-enhanced">
-            <div class="card-body">
-                <h4>Security Level Configuration</h4>
-                <div class="code-snippet">// Security Levels and Their Use Cases
+        <section id="security-config" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#security-config" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">🔒 Security Configuration</h2>
+            
+            <p style="margin-bottom: var(--space-6); color: var(--gray-700);">
+                Configure security levels based on your application's risk profile:
+            </p>
+            
+            <div class="table-responsive">
+                <table class="docs-table">
+                    <thead>
+                        <tr>
+                            <th>Security Level</th>
+                            <th>Use Case</th>
+                            <th>Background Checks</th>
+                            <th>Grace Period</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="status-badge status-stable">Low</span></td>
+                            <td>Content sites, blogs</td>
+                            <td>Disabled</td>
+                            <td>7 days</td>
+                        </tr>
+                        <tr>
+                            <td><span class="status-badge status-beta">Medium</span></td>
+                            <td>E-commerce, SaaS</td>
+                            <td>Enabled</td>
+                            <td>24 hours</td>
+                        </tr>
+                        <tr>
+                            <td><span class="status-badge status-experimental">High</span></td>
+                            <td>Financial, healthcare</td>
+                            <td>Continuous</td>
+                            <td>1 hour</td>
+                        </tr>
+                        <tr>
+                            <td><span class="status-badge status-experimental">Critical</span></td>
+                            <td>Gaming, high-value</td>
+                            <td>Real-time</td>
+                            <td>None</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">JavaScript</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+// Security level examples
 
 // LOW SECURITY - Content sites, blogs
 const shield = new LemmaBotShield({
@@ -502,116 +840,161 @@ const shield = new LemmaBotShield({
   maxFailures: 2,
   gracePeriod: 60 * 60 * 1000 // 1 hour
 });
+            </div>
+        </section>
 
-// CRITICAL SECURITY - Gaming, high-value transactions
+        <!-- Performance -->
+        <section id="performance" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#performance" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">⚡ Performance</h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin: var(--space-6) 0; text-align: center;">
+                <div style="background: var(--success-50); border: 1px solid var(--success-200); border-radius: 8px; padding: var(--space-4);">
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--success-700); margin-bottom: var(--space-2);">~1-50µs</div>
+                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">Authentication Time</div>
+                </div>
+                
+                <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: 8px; padding: var(--space-4);">
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--primary-700); margin-bottom: var(--space-2);">99.9%</div>
+                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">Offline Operation</div>
+                </div>
+                
+                <div style="background: var(--secondary-50); border: 1px solid var(--secondary-200); border-radius: 8px; padding: var(--space-4);">
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--secondary-700); margin-bottom: var(--space-2);">30K+</div>
+                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">Verifications/sec</div>
+                </div>
+                
+                <div style="background: var(--warning-50); border: 1px solid var(--warning-200); border-radius: 8px; padding: var(--space-4);">
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--warning-700); margin-bottom: var(--space-2);">~2MB</div>
+                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">Bundle Size</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Troubleshooting -->
+        <section id="troubleshooting" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#troubleshooting" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">🔧 Troubleshooting</h2>
+            
+            <div style="background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; padding: var(--space-4); margin-bottom: var(--space-6);">
+                <h4 style="margin-bottom: var(--space-3);">Common Issues</h4>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <strong>❌ WebAssembly failed to load</strong>
+                    <div class="code-block" style="margin-top: var(--space-2);">
+                        <div class="code-header">
+                            <span class="code-language">Solution</span>
+                            <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                        </div>
+// Ensure you're using HTTPS or localhost
+// Check browser console for detailed errors
+// Verify Content-Security-Policy allows WASM
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <strong>❌ API key not working</strong>
+                    <div class="code-block" style="margin-top: var(--space-2);">
+                        <div class="code-header">
+                            <span class="code-language">Solution</span>
+                            <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                        </div>
+// Check API key is correct
+// Ensure domain is registered for the API key
+// Verify network connectivity to lemma.id
+                    </div>
+                </div>
+                
+                <div>
+                    <strong>❌ Verification timeout</strong>
+                    <div class="code-block" style="margin-top: var(--space-2);">
+                        <div class="code-header">
+                            <span class="code-language">JavaScript</span>
+                            <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                        </div>
+// Increase timeout in configuration
 const shield = new LemmaBotShield({
-  securityLevel: 'critical',
-  backgroundChecks: true,
-  checkOnEvents: ['any_action'],
-  maxFailures: 1,
-  gracePeriod: 0 // No grace period
+  apiKey: 'your-key',
+  timeout: 20000 // 20 seconds
 });
-
-// CUSTOM INTERVALS - Fine-grained control
-const shield = new LemmaBotShield({
-  securityLevel: 'custom',
-  customCheckInterval: 30 * 1000, // 30 seconds
-  backgroundChecks: true
-});</div>
-            </div>
-        </div>
-
-        <!-- Getting Started Steps -->
-        <div class="section-header" style="margin-top: var(--space-20);" id="integration-guide">
-            <h2>Complete Integration Guide</h2>
-            <p>Step-by-step guide to join the Lemma Identity Network</p>
-        </div>
-        
-        <div class="card-grid-3">
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <div style="background: var(--primary-500); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: var(--space-4);">1</div>
-                    <h4>Load Identity Network</h4>
-                    <p>Include both the federated wallet and bot shield for complete network access</p>
-                    <div class="code-snippet" style="font-size: 11px;">&lt;!-- Load Lemma Identity Network --&gt;
-&lt;script src="https://lemma.id/js/lemma-federated-wallet.js"&gt;&lt;/script&gt;
-&lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;</div>
+                    </div>
                 </div>
             </div>
+        </section>
+
+        <!-- Support -->
+        <section style="margin-top: var(--space-16); padding: var(--space-8); background: var(--gray-50); border-radius: 12px; text-align: center;">
+            <h2 style="margin-bottom: var(--space-4);">Need Help?</h2>
+            <p style="color: var(--gray-700); margin-bottom: var(--space-6);">
+                Get support from our team or join the developer community
+            </p>
             
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <div style="background: var(--primary-500); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: var(--space-4);">2</div>
-                    <h4>Initialize & Configure</h4>
-                    <p>Set up the federated wallet and shield with your API key and security preferences</p>
-                    <div class="code-snippet" style="font-size: 11px;">const wallet = new LemmaFederatedWallet({
-  debug: false,
-  networkRegistryUrl: 'https://lemma.id/api/network'
+            <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
+                <a href="/contact" class="btn btn-primary">Contact Support</a>
+                <a href="/playground" class="btn btn-secondary">Try Live Demo</a>
+                <a href="https://github.com/lemma-verification" class="btn btn-outline">GitHub</a>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- Copy Code Functionality -->
+<script>
+function copyCode(button) {
+    const codeBlock = button.closest('.code-block');
+    const code = codeBlock.textContent.replace(/Copy\s*/, '').replace(/^\s*\w+\s*/, '').trim();
+    
+    navigator.clipboard.writeText(code).then(() => {
+        button.textContent = 'Copied!';
+        button.classList.add('copied');
+        
+        setTimeout(() => {
+            button.textContent = 'Copy';
+            button.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy code:', err);
+        button.textContent = 'Failed';
+        setTimeout(() => {
+            button.textContent = 'Copy';
+        }, 2000);
+    });
+}
+
+// Sidebar navigation highlighting
+document.addEventListener('DOMContentLoaded', function() {
+    const navLinks = document.querySelectorAll('.nav-link');
+    const sections = document.querySelectorAll('.section-anchor');
+    
+    function updateActiveNav() {
+        let current = '';
+        sections.forEach(section => {
+            const rect = section.getBoundingClientRect();
+            if (rect.top <= 100) {
+                current = section.id;
+            }
+        });
+        
+        navLinks.forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('href') === '#' + current) {
+                link.classList.add('active');
+            }
+        });
+    }
+    
+    window.addEventListener('scroll', updateActiveNav);
+    updateActiveNav();
+    
+    // Mobile navigation toggle
+    const mobileToggle = document.querySelector('.mobile-nav-toggle');
+    const sidebar = document.querySelector('.docs-sidebar');
+    
+    if (mobileToggle && sidebar) {
+        mobileToggle.addEventListener('click', () => {
+            sidebar.style.display = sidebar.style.display === 'block' ? 'none' : 'block';
+        });
+    }
 });
-
-const shield = new LemmaBotShield({
-  apiKey: 'your-production-api-key',
-  apiBase: 'https://lemma.id',
-  securityLevel: 'medium'
-});</div>
-                </div>
-            </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <div style="background: var(--success); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: var(--space-4);">✓</div>
-                    <h4>Protect & Verify</h4>
-                    <p>Instantly protect content and verify users across the entire network</p>
-                    <div class="code-snippet" style="font-size: 11px;">// Protect any element
-shield.protect('#protected-content');
-
-// Check network verification status
-if (await wallet.hasValidCredentials()) {
-  showProtectedContent();
-}</div>
-                    <div style="background: var(--success); color: white; padding: var(--space-2); border-radius: 4px; text-align: center; font-size: var(--font-size-sm); font-weight: 600;">⚡ 4.176µs verification</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Support & Resources -->
-        <div class="section-header" style="margin-top: var(--space-20);">
-            <h2>Support & Resources</h2>
-        </div>
-        
-        <div class="card-grid-2">
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>📞 Enterprise Support</h4>
-                    <p>24/7 technical support with guaranteed response times for enterprise customers.</p>
-                    <a href="mailto:support@lemma.id" class="btn btn-outline btn-sm">Contact Support</a>
-                </div>
-            </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>💬 Developer Community</h4>
-                    <p>Join our active community of developers building with Lemma verification.</p>
-                    <a href="#" class="btn btn-outline btn-sm">Join Discord</a>
-                </div>
-            </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>📖 Complete Guide</h4>
-                    <p>Comprehensive integration guide with advanced examples and best practices.</p>
-                    <a href="/components-demo" class="btn btn-outline btn-sm">View Examples</a>
-                </div>
-            </div>
-            
-            <div class="card-enhanced">
-                <div class="card-body">
-                    <h4>🔬 Technical Specs</h4>
-                    <p>Deep dive into the cryptographic architecture and performance characteristics.</p>
-                    <a href="https://github.com/lemma-verification" class="btn btn-outline btn-sm">View on GitHub</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
+</script>
 {% endblock %} 
