@@ -3,15 +3,56 @@
 {% block title %}Lemma - Authenticated Networks & Secure Communication | Privacy-Preserving Identity Verification{% endblock %}
 {% block description %}Build better authenticated networks with Lemma's cryptographic identity verification. Enable secure communication, eliminate bots, and preserve privacy with zero-knowledge proofs. Microsecond verification for federated networks.{% endblock %}
 
+{% block head %}
+    {{ super() }}
+    <style>
+        @media (max-width: 768px) {
+            .hero-grid {
+                grid-template-columns: 1fr !important;
+                gap: 32px !important;
+                text-align: center;
+            }
+            .hero-grid > div:first-child {
+                order: 2;
+            }
+            .hero-grid > div:last-child {
+                order: 1;
+                margin: 0 auto;
+            }
+        }
+    </style>
+{% endblock %}
+
 {% block content %}
 <!-- Hero Section -->
 <section class="hero">
     <div class="container" style="position: relative; z-index: 1;">
-        <h1>Build Better Authenticated Networks</h1>
-        <p>Lemma enables secure communication and privacy-preserving identity verification using cryptographic proofs. Create federated networks where users verify once and communicate everywhere—no data collection, no friction, microsecond verification.</p>
-        <div style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-            <a href="/register" class="btn btn-primary">Start Building</a>
-            <a href="/docs" class="btn btn-secondary">View Documentation</a>
+        <div style="display: grid; grid-template-columns: 1fr auto; gap: 48px; align-items: center; max-width: 1200px; margin: 0 auto;" class="hero-grid">
+            <div>
+                <h1>Build Better Authenticated Networks</h1>
+                <p>Lemma enables secure communication and privacy-preserving identity verification using cryptographic proofs. Create federated networks where users verify once and communicate everywhere—no data collection, no friction, microsecond verification.</p>
+                <div style="margin-top: 48px; display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap;">
+                    <a href="/register" class="btn btn-primary">Start Building</a>
+                    <a href="/docs" class="btn btn-secondary">View Documentation</a>
+                </div>
+            </div>
+            
+            <div class="card" style="min-width: 320px; padding: 32px; background: var(--white); border: 2px solid var(--primary-200); box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+                <h3 style="color: var(--primary); margin-bottom: 16px; font-size: var(--font-size-xl);">🌐 Join the Network</h3>
+                <p style="color: var(--gray-600); margin-bottom: 24px; line-height: 1.6;">
+                    Get verified once, access everywhere. Join thousands of users in the federated identity network.
+                </p>
+                <div style="background: var(--gray-50); padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: 8px;">Network Benefits:</div>
+                    <ul style="font-size: var(--font-size-sm); color: var(--gray-700); margin: 0; padding-left: 16px;">
+                        <li>Instant access to 1,000+ platforms</li>
+                        <li>Zero personal data collection</li>
+                        <li>4.176µs verification speed</li>
+                        <li>Cross-platform identity persistence</li>
+                    </ul>
+                </div>
+                <a href="/register" class="btn btn-primary" style="width: 100%; justify-content: center;">Join Federated Network</a>
+            </div>
         </div>
     </div>
 </section>
@@ -121,52 +162,7 @@
             </div>
         </div>
 
-        <!-- Comparison Table -->
-        <div style="background: var(--white); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden; margin-top: 48px;">
-            <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 24px; text-align: center;">
-                <h3 style="margin: 0; font-size: var(--font-size-xl);">Lemma vs Traditional Solutions</h3>
-                <p style="margin: 8px 0 0; opacity: 0.9;">Building better authenticated networks and secure communication</p>
-            </div>
-            
-            <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background: var(--gray-50);">
-                            <th style="padding: 16px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--gray-200);">Aspect</th>
-                            <th style="padding: 16px; text-align: center; font-weight: 600; border-bottom: 2px solid var(--gray-200);">Traditional Solutions<br><span style="font-size: var(--font-size-sm); font-weight: 400; color: var(--gray-600);">(CAPTCHAs, MFA, Auth0)</span></th>
-                            <th style="padding: 16px; text-align: center; font-weight: 600; border-bottom: 2px solid var(--gray-200); color: var(--primary);">Lemma-Powered Networks</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="padding: 16px; font-weight: 500; border-bottom: 1px solid var(--gray-200);">Verification Speed</td>
-                            <td style="padding: 16px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--danger-600);">Seconds (network-dependent)</td>
-                            <td style="padding: 16px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--success-600);"><strong>Microseconds (offline)</strong></td>
-                        </tr>
-                        <tr style="background: var(--gray-25);">
-                            <td style="padding: 16px; font-weight: 500; border-bottom: 1px solid var(--gray-200);">Privacy</td>
-                            <td style="padding: 16px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--danger-600);">Data collection/fingerprinting</td>
-                            <td style="padding: 16px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--success-600);"><strong>Zero-knowledge, selective disclosure</strong></td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 16px; font-weight: 500; border-bottom: 1px solid var(--gray-200);">Network Effects</td>
-                            <td style="padding: 16px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--danger-600);">Per-site silos</td>
-                            <td style="padding: 16px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--success-600);"><strong>Verify once, communicate everywhere</strong></td>
-                        </tr>
-                        <tr style="background: var(--gray-25);">
-                            <td style="padding: 16px; font-weight: 500; border-bottom: 1px solid var(--gray-200);">Bot Resistance</td>
-                            <td style="padding: 16px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--danger-600);">Challenge-based (solver-vulnerable)</td>
-                            <td style="padding: 16px; text-align: center; border-bottom: 1px solid var(--gray-200); color: var(--success-600);"><strong>Cryptographic proof-of-humanity</strong></td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 16px; font-weight: 500;">Cost</td>
-                            <td style="padding: 16px; text-align: center; color: var(--danger-600);">$0.10-1.00 per challenge/user</td>
-                            <td style="padding: 16px; text-align: center; color: var(--success-600);"><strong>$0.10/active user/month</strong></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+
         
         <div style="text-align: center; margin-top: 48px;">
             <p style="color: var(--gray-600); margin-bottom: 24px; font-size: var(--font-size-lg);">
