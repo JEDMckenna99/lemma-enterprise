@@ -42,28 +42,41 @@
                 </div>
             </div>
             
-            <!-- Dynamic Hero Card: Shield API for non-users, Dashboard for users with lemmas -->
-            <div id="hero-card" class="card" style="min-width: 320px; padding: 32px; background: var(--white); border: 2px solid var(--primary-200); box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-                <!-- Shield API Card (default for non-users) -->
-                <div id="shield-api-card">
-                    <h3 style="color: var(--primary); margin-bottom: 16px; font-size: var(--font-size-xl);">🛡️ Lemma Shield API</h3>
-                    <p style="color: var(--gray-600); margin-bottom: 24px; line-height: 1.6;">
-                        Protect your site from bots instantly. Add cryptographic bot protection with just 3 lines of code.
-                    </p>
-                    <div style="background: var(--gray-50); padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                        <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: 8px;">Shield Benefits:</div>
-                        <ul style="font-size: var(--font-size-sm); color: var(--gray-700); margin: 0; padding-left: 16px;">
-                            <li>99.9% bot elimination</li>
-                            <li>Zero false positives</li>
-                            <li>No CAPTCHAs or friction</li>
-                            <li>Microsecond verification</li>
-                        </ul>
+                            <!-- Dynamic Hero Card: Shield Widget for non-users, Dashboard for users with lemmas -->
+                <div id="hero-card" class="card" style="min-width: 320px; padding: 32px; background: var(--white); border: 2px solid var(--primary-200); box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+                    <!-- Shield Widget (default for non-users) -->
+                    <div id="shield-api-card" data-lemma-protect="true">
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" style="width: 80px; height: 80px; margin-bottom: 12px;">
+                            <h3 style="color: var(--primary); margin: 0; font-size: var(--font-size-xl);">🛡️ Lemma Network Access</h3>
+                            <p style="color: var(--gray-600); margin: 8px 0 0; line-height: 1.5; font-size: var(--font-size-sm);">
+                                Verify your identity to access the federated network
+                            </p>
+                        </div>
+                        
+                        <!-- Shield Status Display -->
+                        <div id="shield-status" style="background: var(--gray-50); padding: 16px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                            <div style="font-size: var(--font-size-sm); color: var(--gray-600);">
+                                🔄 Initializing Lemma Shield...
+                            </div>
+                        </div>
+                        
+                        <!-- Protected Content (hidden until verified) -->
+                        <div id="protected-content" style="display: none; text-align: center;">
+                            <div style="background: var(--success-50); padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--success-200);">
+                                <div style="font-size: var(--font-size-sm); color: var(--success-700); margin-bottom: 8px;">✅ Network Access Granted</div>
+                                <ul style="font-size: var(--font-size-sm); color: var(--success-800); margin: 0; padding-left: 16px; text-align: left;">
+                                    <li>✓ Human identity verified</li>
+                                    <li>✓ Federated network access enabled</li>
+                                    <li>✓ Cross-platform authentication ready</li>
+                                </ul>
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <a href="/wallet" class="btn btn-primary" style="flex: 1; justify-content: center;">Open Wallet</a>
+                                <a href="/docs" class="btn btn-secondary" style="flex: 1; justify-content: center;">View Docs</a>
+                            </div>
+                        </div>
                     </div>
-                    <div style="display: flex; gap: 12px;">
-                        <a href="/register" class="btn btn-primary" style="flex: 1; justify-content: center;">Get API Key</a>
-                        <a href="/docs" class="btn btn-secondary" style="flex: 1; justify-content: center;">View Docs</a>
-                    </div>
-                </div>
 
                 <!-- User Dashboard Card (for users with lemmas) -->
                 <div id="user-dashboard-card" style="display: none;">
@@ -348,39 +361,119 @@
 <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}"></script>
 <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}"></script>
 <script>
-// Smart homepage with dynamic hero card
-document.addEventListener('DOMContentLoaded', async function() {
-    // Check if user has lemmas and update hero card accordingly
-    try {
-        const tempWallet = new LemmaFederatedWallet({ debug: true });
-        await tempWallet.init();
-        
-        const credentials = await tempWallet.getCredentials();
-        const hasLemmas = credentials && credentials.length > 0;
-        
-        if (hasLemmas) {
-            // User has lemmas - show dashboard card
-            console.log('🏠 User has lemmas, showing dashboard card');
-            document.getElementById('shield-api-card').style.display = 'none';
-            document.getElementById('user-dashboard-card').style.display = 'block';
-            
-            // Update network access count if available
-            const networkCount = credentials.length > 0 ? `✓ Access to ${Math.min(1000 + credentials.length * 50, 2000)}+ platforms` : '✓ Access to 1,000+ platforms';
-            const accessCountElement = document.getElementById('network-access-count');
-            if (accessCountElement) {
-                accessCountElement.textContent = networkCount;
+        // Smart homepage with dynamic hero card and shield widget
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Check if user has lemmas and update hero card accordingly
+            try {
+                const tempWallet = new LemmaFederatedWallet({ debug: true });
+                await tempWallet.init();
+                
+                const credentials = await tempWallet.getCredentials();
+                const hasLemmas = credentials && credentials.length > 0;
+                
+                if (hasLemmas) {
+                    // User has lemmas - show dashboard card
+                    console.log('🏠 User has lemmas, showing dashboard card');
+                    document.getElementById('shield-api-card').style.display = 'none';
+                    document.getElementById('user-dashboard-card').style.display = 'block';
+                } else {
+                    // User doesn't have lemmas - show Shield Widget
+                    console.log('🏠 No lemmas found, initializing Shield Widget');
+                    document.getElementById('shield-api-card').style.display = 'block';
+                    document.getElementById('user-dashboard-card').style.display = 'none';
+                    
+                    // Initialize the actual Lemma Shield widget
+                    await initializeHeroShieldWidget();
+                }
+            } catch (error) {
+                console.log('🏠 Error checking credentials, defaulting to Shield Widget:', error);
+                document.getElementById('shield-api-card').style.display = 'block';
+                document.getElementById('user-dashboard-card').style.display = 'none';
+                
+                // Initialize shield widget even on error
+                await initializeHeroShieldWidget();
             }
-        } else {
-            // User doesn't have lemmas - show Shield API card
-            console.log('🏠 No lemmas found, showing Shield API card');
-            document.getElementById('shield-api-card').style.display = 'block';
-            document.getElementById('user-dashboard-card').style.display = 'none';
+        });
+        
+        // Initialize the hero shield widget for network access
+        async function initializeHeroShieldWidget() {
+            try {
+                console.log('🛡️ Initializing Hero Shield Widget...');
+                
+                // Update status to show initialization
+                const statusElement = document.getElementById('shield-status');
+                if (statusElement) {
+                    statusElement.innerHTML = `
+                        <div style="font-size: var(--font-size-sm); color: var(--primary);">
+                            🛡️ Lemma Shield Active - Click to Verify Identity
+                        </div>
+                    `;
+                }
+                
+                // Initialize the shield for this element
+                const heroShield = new LemmaBotShield({
+                    debug: true,
+                    onVerificationComplete: function(result) {
+                        console.log('🏠 Hero shield verification complete:', result);
+                        
+                        if (result.success) {
+                            // Show protected content
+                            const protectedContent = document.getElementById('protected-content');
+                            const statusElement = document.getElementById('shield-status');
+                            
+                            if (protectedContent && statusElement) {
+                                statusElement.style.display = 'none';
+                                protectedContent.style.display = 'block';
+                            }
+                            
+                            // Refresh page after short delay to show dashboard card
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000);
+                        } else {
+                            // Show verification failed state
+                            if (statusElement) {
+                                statusElement.innerHTML = `
+                                    <div style="font-size: var(--font-size-sm); color: var(--error-600);">
+                                        ❌ Verification failed. <a href="#" onclick="initializeHeroShieldWidget()" style="color: var(--primary);">Try again</a>
+                                    </div>
+                                `;
+                            }
+                        }
+                    },
+                    onError: function(error) {
+                        console.error('🏠 Hero shield error:', error);
+                        const statusElement = document.getElementById('shield-status');
+                        if (statusElement) {
+                            statusElement.innerHTML = `
+                                <div style="font-size: var(--font-size-sm); color: var(--error-600);">
+                                    ⚠️ Shield initialization failed. <a href="#" onclick="initializeHeroShieldWidget()" style="color: var(--primary);">Retry</a>
+                                </div>
+                            `;
+                        }
+                    }
+                });
+                
+                // Protect the shield card element
+                await heroShield.protect(document.getElementById('shield-api-card'));
+                
+                console.log('🛡️ Hero Shield Widget initialized successfully');
+                
+            } catch (error) {
+                console.error('🏠 Failed to initialize hero shield widget:', error);
+                
+                // Fallback to registration flow
+                const statusElement = document.getElementById('shield-status');
+                if (statusElement) {
+                    statusElement.innerHTML = `
+                        <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: 12px;">
+                            Shield initialization failed. Create an account to access the network.
+                        </div>
+                        <a href="/register" class="btn btn-primary" style="width: 100%;">Create Account</a>
+                    `;
+                }
+            }
         }
-    } catch (error) {
-        console.log('🏠 Error checking credentials, defaulting to Shield API card:', error);
-        document.getElementById('shield-api-card').style.display = 'block';
-        document.getElementById('user-dashboard-card').style.display = 'none';
-    }
     
     {% if enable_auto_redirect %}
     // Auto-redirect logic (if enabled)
