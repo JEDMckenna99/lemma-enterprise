@@ -182,7 +182,7 @@
 <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}"></script>
 <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}"></script>
 <script>
-// Smart homepage with client-side FIL detection
+// Smart homepage with optional FIL detection
 document.addEventListener('DOMContentLoaded', async function() {
     {% if enable_auto_redirect %}
     // Check if user already has lemmas and should be redirected to wallet
@@ -199,6 +199,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     } catch (error) {
         console.log('🏠 No existing credentials, showing homepage');
     }
+    {% else %}
+    // Auto-redirect disabled - users can freely navigate between homepage and wallet
+    console.log('🏠 Auto-redirect disabled - homepage accessible to all users');
     {% endif %}
     
     // Initialize shield widget for new users

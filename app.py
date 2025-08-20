@@ -235,13 +235,13 @@ def create_app():
     @app.route('/')
     def index():
         """
-        Smart Homepage - Client-side routing based on FIL wallet status
+        Homepage - Marketing page accessible to all users
         
-        Always serves the marketing page, but JavaScript checks for lemmas
-        and redirects to wallet if user already has credentials
+        Serves the marketing page to all users, including those with lemmas.
+        Users can freely navigate between homepage and wallet as desired.
         """
-        logger.info("🏠 Serving homepage with client-side FIL detection")
-        return render_template('modern/index.html', show_fil_widget=True, enable_auto_redirect=True)
+        logger.info("🏠 Serving homepage - accessible to all users")
+        return render_template('modern/index.html', show_fil_widget=True, enable_auto_redirect=False)
     
     @app.route('/wallet')
     @app.route('/join-network')  # Keep old route for compatibility
