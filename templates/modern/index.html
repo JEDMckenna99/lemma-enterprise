@@ -494,24 +494,7 @@
         }
         
         // Auto-redirect logic (disabled for homepage access)
-        {% if enable_auto_redirect %}
-        try {
-            const autoRedirectWallet = new LemmaFederatedWallet({ debug: true });
-            await autoRedirectWallet.init();
-            
-            const autoRedirectCredentials = await autoRedirectWallet.getCredentials();
-            if (autoRedirectCredentials && autoRedirectCredentials.length > 0) {
-                console.log('🏠 User has lemmas, redirecting to wallet...');
-                window.location.href = '/wallet';
-                return;
-            }
-        } catch (error) {
-            console.log('🏠 No existing credentials, showing homepage');
-        }
-        {% else %}
-        // Auto-redirect disabled - users can freely navigate between homepage and wallet
         console.log('🏠 Auto-redirect disabled - homepage accessible to all users');
-        {% endif %}
         
     }); // Close DOMContentLoaded event listener
 </script>
