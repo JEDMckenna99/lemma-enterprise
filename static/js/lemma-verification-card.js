@@ -197,8 +197,8 @@ class LemmaVerificationCard {
         return `
             <div class="lemma-verification-card ${sizeClass}" style="${theme.container}">
                 ${this.config.showLogo ? `
-                    <div style="${theme.icon}">
-                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 28px; height: 28px; filter: brightness(0) invert(1);">
+                    <div style="${theme.icon.replace('background: linear-gradient', 'background: transparent; background-image: linear-gradient')}">
+                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 36px; height: 36px; filter: brightness(0) invert(1); position: relative; z-index: 2;">
                     </div>
                 ` : ''}
                 
@@ -231,8 +231,8 @@ class LemmaVerificationCard {
     createVerifiedCard(theme) {
         return `
             <div class="lemma-verification-card verified" style="${theme.container.replace('#667eea', '#10b981')}">
-                <div style="${theme.icon.replace('#667eea 0%, #764ba2 100%', '#10b981 0%, #059669 100%')}">
-                    <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 28px; height: 28px; filter: brightness(0) invert(1);">
+                <div style="${theme.icon.replace('#667eea 0%, #764ba2 100%', '#10b981 0%, #059669 100%').replace('background: linear-gradient', 'background: transparent; background-image: linear-gradient')}">
+                    <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 36px; height: 36px; filter: brightness(0) invert(1); position: relative; z-index: 2;">
                 </div>
                 
                 <div style="${theme.content}">
@@ -270,8 +270,8 @@ class LemmaVerificationCard {
         return `
             <div class="lemma-verification-card status" style="${theme.container}">
                 ${this.config.showLogo ? `
-                    <div style="${theme.icon}">
-                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 28px; height: 28px; filter: brightness(0) invert(1);">
+                    <div style="${theme.icon.replace('background: linear-gradient', 'background: transparent; background-image: linear-gradient')}">
+                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 36px; height: 36px; filter: brightness(0) invert(1); position: relative; z-index: 2;">
                     </div>
                 ` : ''}
                 
