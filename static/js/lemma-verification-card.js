@@ -198,7 +198,7 @@ class LemmaVerificationCard {
             <div class="lemma-verification-card ${sizeClass}" style="${theme.container}">
                 ${this.config.showLogo ? `
                     <div style="margin: 0 auto 1rem; text-align: center;">
-                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 80px; height: 80px;">
+                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 160px; height: 160px;">
                     </div>
                 ` : ''}
                 
@@ -264,7 +264,7 @@ class LemmaVerificationCard {
             <div class="lemma-verification-card status" style="${theme.container}">
                 ${this.config.showLogo ? `
                     <div style="margin: 0 auto 1rem; text-align: center;">
-                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 80px; height: 80px;">
+                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 160px; height: 160px;">
                     </div>
                 ` : ''}
                 
