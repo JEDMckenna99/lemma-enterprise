@@ -197,7 +197,9 @@ class LemmaVerificationCard {
         return `
             <div class="lemma-verification-card ${sizeClass}" style="${theme.container}">
                 ${this.config.showLogo ? `
-                    <div style="${theme.icon}"></div>
+                    <div style="${theme.icon}">
+                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 28px; height: 28px; filter: brightness(0) invert(1);">
+                    </div>
                 ` : ''}
                 
                 <div style="${theme.content}">
@@ -229,7 +231,9 @@ class LemmaVerificationCard {
     createVerifiedCard(theme) {
         return `
             <div class="lemma-verification-card verified" style="${theme.container.replace('#667eea', '#10b981')}">
-                <div style="${theme.icon.replace('#667eea 0%, #764ba2 100%', '#10b981 0%, #059669 100%')}">✅</div>
+                <div style="${theme.icon.replace('#667eea 0%, #764ba2 100%', '#10b981 0%, #059669 100%')}">
+                    <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 28px; height: 28px; filter: brightness(0) invert(1);">
+                </div>
                 
                 <div style="${theme.content}">
                     <h3 style="${theme.title}">Verified Human</h3>
@@ -266,7 +270,9 @@ class LemmaVerificationCard {
         return `
             <div class="lemma-verification-card status" style="${theme.container}">
                 ${this.config.showLogo ? `
-                    <div style="${theme.icon}"></div>
+                    <div style="${theme.icon}">
+                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 28px; height: 28px; filter: brightness(0) invert(1);">
+                    </div>
                 ` : ''}
                 
                 <div style="${theme.content}">
@@ -326,10 +332,6 @@ class LemmaVerificationCard {
                 color: white;
                 font-size: 20px;
                 font-weight: bold;
-                background-image: url('/static/img/lemma_logo.svg');
-                background-size: 28px 28px;
-                background-repeat: no-repeat;
-                background-position: center;
             `,
             content: `
                 display: flex;
