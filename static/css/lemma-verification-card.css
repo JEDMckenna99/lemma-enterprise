@@ -1,0 +1,253 @@
+/**
+ * Lemma Verification Card Styles
+ * ==============================
+ * 
+ * Professional styling for standalone verification cards
+ * Supports multiple themes and responsive design
+ */
+
+/* Base card styles */
+.lemma-verification-card {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+}
+
+.lemma-verification-card * {
+    box-sizing: border-box;
+}
+
+/* Size variants */
+.lemma-verification-card.compact {
+    max-width: 240px !important;
+    padding: 1rem !important;
+}
+
+.lemma-verification-card.compact .lemma-card-icon {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 14px !important;
+    margin-bottom: 0.5rem !important;
+}
+
+.lemma-verification-card.compact .lemma-card-title {
+    font-size: 0.95rem !important;
+}
+
+.lemma-verification-card.compact .lemma-card-description {
+    font-size: 0.75rem !important;
+}
+
+.lemma-verification-card.compact .lemma-card-button {
+    padding: 0.5rem 1rem !important;
+    font-size: 0.8rem !important;
+}
+
+.lemma-verification-card.large {
+    max-width: 420px !important;
+    padding: 2.5rem !important;
+}
+
+.lemma-verification-card.large .lemma-card-icon {
+    width: 72px !important;
+    height: 72px !important;
+    font-size: 28px !important;
+    margin-bottom: 1.5rem !important;
+}
+
+.lemma-verification-card.large .lemma-card-title {
+    font-size: 1.5rem !important;
+}
+
+.lemma-verification-card.large .lemma-card-description {
+    font-size: 1rem !important;
+}
+
+.lemma-verification-card.large .lemma-card-button {
+    padding: 1rem 2rem !important;
+    font-size: 1.1rem !important;
+}
+
+/* Animation states */
+.lemma-verification-card.loading {
+    opacity: 0.8;
+}
+
+.lemma-verification-card.loading .lemma-card-button {
+    background: #9ca3af !important;
+    cursor: not-allowed !important;
+}
+
+.lemma-verification-card.verified {
+    border-color: #10b981 !important;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%) !important;
+}
+
+.lemma-verification-card.error {
+    border-color: #ef4444 !important;
+    background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%) !important;
+}
+
+/* Hover effects */
+.lemma-verification-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15) !important;
+}
+
+.lemma-verification-card.compact:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Button hover animations */
+.lemma-card-button:hover {
+    transform: translateY(-1px) !important;
+}
+
+.lemma-card-button:active {
+    transform: translateY(0) !important;
+}
+
+/* Status indicator animations */
+.lemma-card-status {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+.lemma-verification-card.verified .lemma-card-status {
+    animation: none;
+}
+
+/* Loading spinner for verification button */
+.lemma-card-button.loading::after {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-left: 8px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+    .lemma-verification-card {
+        max-width: 100% !important;
+        margin: 1rem 0 !important;
+    }
+    
+    .lemma-verification-card.compact {
+        max-width: 100% !important;
+    }
+    
+    .lemma-verification-card.large {
+        max-width: 100% !important;
+        padding: 2rem !important;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .lemma-verification-card {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #f9fafb;
+    }
+    
+    .lemma-verification-card .lemma-card-title {
+        color: #f9fafb !important;
+    }
+    
+    .lemma-verification-card .lemma-card-description {
+        color: #d1d5db !important;
+    }
+    
+    .lemma-verification-card .lemma-card-footer {
+        color: #9ca3af !important;
+    }
+    
+    .lemma-verification-card .lemma-card-status {
+        background: #374151 !important;
+    }
+    
+    .lemma-verification-card.verified {
+        background: linear-gradient(135deg, #064e3b 0%, #1f2937 100%) !important;
+        border-color: #10b981 !important;
+    }
+    
+    .lemma-verification-card.error {
+        background: linear-gradient(135deg, #7f1d1d 0%, #1f2937 100%) !important;
+        border-color: #ef4444 !important;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .lemma-verification-card {
+        border-width: 3px !important;
+    }
+    
+    .lemma-verification-card .lemma-card-button {
+        border: 2px solid transparent !important;
+        font-weight: 700 !important;
+    }
+    
+    .lemma-verification-card .lemma-card-button:focus {
+        outline: 3px solid #2563eb !important;
+        outline-offset: 2px !important;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .lemma-verification-card,
+    .lemma-verification-card *,
+    .lemma-card-button {
+        transition: none !important;
+        animation: none !important;
+    }
+    
+    .lemma-verification-card:hover {
+        transform: none !important;
+    }
+    
+    .lemma-card-button:hover {
+        transform: none !important;
+    }
+}
+
+/* Focus states for accessibility */
+.lemma-card-button:focus {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+
+.lemma-verification-card:focus-within {
+    ring: 2px solid #2563eb;
+    ring-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+    .lemma-verification-card {
+        break-inside: avoid;
+        border: 1px solid #000 !important;
+        background: white !important;
+        box-shadow: none !important;
+    }
+    
+    .lemma-card-button {
+        display: none !important;
+    }
+}
