@@ -197,7 +197,7 @@ class LemmaVerificationCard {
         return `
             <div class="lemma-verification-card ${sizeClass}" style="${theme.container}">
                 ${this.config.showLogo ? `
-                    <div style="${theme.icon}">🛡️</div>
+                    <div style="${theme.icon}"></div>
                 ` : ''}
                 
                 <div style="${theme.content}">
@@ -228,7 +228,7 @@ class LemmaVerificationCard {
      */
     createVerifiedCard(theme) {
         return `
-            <div class="lemma-verification-card verified" style="${theme.container.replace('#e5e7eb', '#10b981')}">
+            <div class="lemma-verification-card verified" style="${theme.container.replace('#667eea', '#10b981')}">
                 <div style="${theme.icon.replace('#667eea 0%, #764ba2 100%', '#10b981 0%, #059669 100%')}">✅</div>
                 
                 <div style="${theme.content}">
@@ -266,7 +266,7 @@ class LemmaVerificationCard {
         return `
             <div class="lemma-verification-card status" style="${theme.container}">
                 ${this.config.showLogo ? `
-                    <div style="${theme.icon}">🛡️</div>
+                    <div style="${theme.icon}"></div>
                 ` : ''}
                 
                 <div style="${theme.content}">
@@ -311,7 +311,7 @@ class LemmaVerificationCard {
                 border-radius: 12px;
                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
                 text-align: center;
-                border: 2px solid #e5e7eb;
+                border: 2px solid #667eea;
                 transition: all 0.3s ease;
             `,
             icon: `
@@ -326,6 +326,10 @@ class LemmaVerificationCard {
                 color: white;
                 font-size: 20px;
                 font-weight: bold;
+                background-image: url('/static/img/lemma_logo.svg');
+                background-size: 28px 28px;
+                background-repeat: no-repeat;
+                background-position: center;
             `,
             content: `
                 display: flex;
@@ -364,6 +368,7 @@ class LemmaVerificationCard {
                 cursor: pointer;
                 transition: all 0.2s;
                 width: 100%;
+                box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
             `,
             buttonShadow: 'none',
             footer: `
@@ -394,14 +399,14 @@ class LemmaVerificationCard {
                     border-radius: 16px;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
                     text-align: center;
-                    border: 2px solid #d4af37;
+                    border: 2px solid #667eea;
                     transition: all 0.3s ease;
                 `,
                 icon: `
                     width: 60px;
                     height: 60px;
                     margin: 0 auto 1.5rem;
-                    background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
@@ -411,7 +416,7 @@ class LemmaVerificationCard {
                     font-weight: bold;
                 `,
                 button: `
-                    background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     color: white;
                     border: none;
                     padding: 1rem 2rem;
@@ -424,7 +429,7 @@ class LemmaVerificationCard {
                     letter-spacing: 0.5px;
                 `,
                 title: baseStyles.title.replace('1.125rem', '1.25rem').replace('#1f2937', '#1a1a1a'),
-                buttonShadow: '0 4px 12px rgba(212, 175, 55, 0.3)'
+                buttonShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
             },
             
             compact: {
