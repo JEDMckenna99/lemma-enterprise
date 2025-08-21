@@ -197,8 +197,8 @@ class LemmaVerificationCard {
         return `
             <div class="lemma-verification-card ${sizeClass}" style="${theme.container}">
                 ${this.config.showLogo ? `
-                    <div style="${theme.icon}">
-                        <span style="font-size: 24px; font-weight: 700; color: white; letter-spacing: -1px;">L</span>
+                    <div style="margin: 0 auto 1rem; text-align: center;">
+                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 48px; height: 48px;">
                     </div>
                 ` : ''}
                 
@@ -231,8 +231,8 @@ class LemmaVerificationCard {
     createVerifiedCard(theme) {
         return `
             <div class="lemma-verification-card verified" style="${theme.container.replace('#667eea', '#10b981')}">
-                <div style="${theme.icon.replace('#667eea 0%, #764ba2 100%', '#10b981 0%, #059669 100%')}">
-                    <span style="font-size: 24px; font-weight: 700; color: white; letter-spacing: -1px;">L</span>
+                <div style="margin: 0 auto 1rem; text-align: center;">
+                    <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 48px; height: 48px;">
                 </div>
                 
                 <div style="${theme.content}">
@@ -270,8 +270,8 @@ class LemmaVerificationCard {
         return `
             <div class="lemma-verification-card status" style="${theme.container}">
                 ${this.config.showLogo ? `
-                    <div style="${theme.icon}">
-                        <span style="font-size: 24px; font-weight: 700; color: white; letter-spacing: -1px;">L</span>
+                    <div style="margin: 0 auto 1rem; text-align: center;">
+                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 48px; height: 48px;">
                     </div>
                 ` : ''}
                 
