@@ -203,13 +203,12 @@ class LemmaVerificationCard {
                 ` : ''}
                 
                 <div style="${theme.content}">
-                    <h3 style="${theme.title}">Verify with Lemma</h3>
                     <p style="${theme.description}">One-time verification • Works across the network</p>
                     
                     <button id="lemma-verify-btn" style="${theme.button}" 
                             onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" 
                             onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='${theme.buttonShadow}'">
-                        Verify Identity
+                        Verify with Lemma
                     </button>
                     
                     <p style="${theme.footer}">Powered by Lemma • Microsecond verification</p>
