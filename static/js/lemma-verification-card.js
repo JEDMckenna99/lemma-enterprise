@@ -198,20 +198,13 @@ class LemmaVerificationCard {
             <div class="lemma-verification-card ${sizeClass}" style="${theme.container}">
                 ${this.config.showLogo ? `
                     <div style="margin: 0 auto 1rem; text-align: center;">
-                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 48px; height: 48px;">
+                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 80px; height: 80px;">
                     </div>
                 ` : ''}
                 
                 <div style="${theme.content}">
                     <h3 style="${theme.title}">Verify with Lemma</h3>
                     <p style="${theme.description}">One-time verification • Works across the network</p>
-                    
-                    ${this.config.showStatus ? `
-                        <div style="${theme.status}">
-                            <span style="color: #f59e0b;">⚡</span>
-                            <span style="font-size: 0.875rem; color: #6b7280;">Ready to verify</span>
-                        </div>
-                    ` : ''}
                     
                     <button id="lemma-verify-btn" style="${theme.button}" 
                             onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" 
@@ -232,7 +225,7 @@ class LemmaVerificationCard {
         return `
             <div class="lemma-verification-card verified" style="${theme.container.replace('#667eea', '#10b981')}">
                 <div style="margin: 0 auto 1rem; text-align: center;">
-                    <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 48px; height: 48px;">
+                    <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 80px; height: 80px;">
                 </div>
                 
                 <div style="${theme.content}">
@@ -271,7 +264,7 @@ class LemmaVerificationCard {
             <div class="lemma-verification-card status" style="${theme.container}">
                 ${this.config.showLogo ? `
                     <div style="margin: 0 auto 1rem; text-align: center;">
-                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 48px; height: 48px;">
+                        <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 80px; height: 80px;">
                     </div>
                 ` : ''}
                 
@@ -351,13 +344,7 @@ class LemmaVerificationCard {
                 line-height: 1.4;
             `,
             status: `
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0.5rem;
-                padding: 0.5rem;
-                background: #f9fafb;
-                border-radius: 6px;
+                display: none;
             `,
             button: `
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
