@@ -24,7 +24,7 @@ import hashlib
 
 # Import existing shield functionality
 from .shield import create_credential_from_stripe_verification
-from auth.decorators import rate_limit
+from auth.decorators import rate_limit, cors_headers
 
 logger = logging.getLogger(__name__)
 
@@ -299,7 +299,8 @@ def check_credentials():
             'message': str(e)
         }), 500
 
-@sdk_api_bp.route('/api/sdk/start-identity-verification', methods=['POST'])
+@sdk_api_bp.route('/api/sdk/start-identity-verification', methods=['POST', 'OPTIONS'])
+@cors_headers
 @validate_api_key
 @rate_limit(max_requests=20, window=60)
 def start_identity_verification():
@@ -308,6 +309,10 @@ def start_identity_verification():
     
     This creates the full identity claims including isHuman from KYC data.
     """
+    # Handle CORS preflight requests
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+    
     try:
         data = request.get_json() or {}
         provider = data.get('provider', 'stripe_identity')
