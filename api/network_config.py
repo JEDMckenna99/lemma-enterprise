@@ -36,7 +36,8 @@ def get_network_config():
             "node_endpoint": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com",
             "is_primary_node": True,
             "federation_endpoints": [
-                "https://lemma-identity-network-2d96786d6ffb.herokuapp.com"
+                "https://lemma-identity-network-2d96786d6ffb.herokuapp.com",
+                "https://lemma-demo-network-6e372c0643c8.herokuapp.com"
             ],
             "network_registry_url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync"
         })
@@ -50,7 +51,8 @@ def get_network_config():
             "node_endpoint": "https://lemma-identity-network-2d96786d6ffb.herokuapp.com",
             "is_primary_node": False,
             "federation_endpoints": [
-                "https://lemma-enterprise-0f6ba17076c1.herokuapp.com"
+                "https://lemma-enterprise-0f6ba17076c1.herokuapp.com",
+                "https://lemma-demo-network-6e372c0643c8.herokuapp.com"
             ],
             "network_registry_url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync"
         })
@@ -66,7 +68,8 @@ def get_network_config():
                 "node_endpoint": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com",
                 "is_primary_node": True,
                 "federation_endpoints": [
-                    "https://lemma-identity-network-2d96786d6ffb.herokuapp.com"
+                    "https://lemma-identity-network-2d96786d6ffb.herokuapp.com",
+                    "https://lemma-demo-network-6e372c0643c8.herokuapp.com"
                 ],
                 "network_registry_url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync"
             })
@@ -86,7 +89,8 @@ def get_network_config():
     # Add all known endpoints for the network bundle
     config["all_network_endpoints"] = [
         "https://lemma-enterprise-0f6ba17076c1.herokuapp.com",
-        "https://lemma-identity-network-2d96786d6ffb.herokuapp.com"
+        "https://lemma-identity-network-2d96786d6ffb.herokuapp.com",
+        "https://lemma-demo-network-6e372c0643c8.herokuapp.com"
     ]
     
     return config
