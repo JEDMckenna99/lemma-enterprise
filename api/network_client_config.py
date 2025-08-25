@@ -10,14 +10,23 @@ from flask import Blueprint, jsonify, request
 from .network_config import NETWORK_CONFIG, get_federation_endpoints, get_network_registry_url
 import logging
 
+# Import CORS decorator
+from auth.decorators import cors_headers
+
 logger = logging.getLogger(__name__)
 
 # Client config blueprint
 client_config_bp = Blueprint('client_config', __name__)
 
-@client_config_bp.route('/api/network/client-config', methods=['GET'])
+@client_config_bp.route('/api/network/client-config', methods=['GET', 'OPTIONS'])
+@cors_headers
 def get_client_network_config():
     """Get network configuration for JavaScript clients"""
+    
+    # Handle CORS preflight requests
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+    
     try:
         config = {
             "success": True,
