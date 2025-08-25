@@ -387,7 +387,8 @@ def start_identity_verification():
             'message': str(e)
         }), 500
 
-@sdk_api_bp.route('/api/sdk/complete-identity-verification', methods=['POST'])
+@sdk_api_bp.route('/api/sdk/complete-identity-verification', methods=['POST', 'OPTIONS'])
+@cors_headers
 @validate_api_key
 @rate_limit(max_requests=20, window=60)
 def complete_identity_verification():
@@ -396,6 +397,10 @@ def complete_identity_verification():
     
     This extracts full identity from Stripe KYC and creates isHuman + other claims.
     """
+    # Handle CORS preflight requests
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+    
     try:
         start_time = time.time()
         data = request.get_json() or {}

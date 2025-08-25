@@ -689,14 +689,114 @@ window.addEventListener('load', () => {
     if (verificationReturn === 'true' && source === 'card') {
         // Handle verification completion for card-initiated verification
         setTimeout(async () => {
-            // Trigger card refresh for all cards on the page
-            window.dispatchEvent(new CustomEvent('lemma-card-refresh'));
-            
-            // Clean up URL
-            const url = new URL(window.location);
-            url.searchParams.delete('verification_return');
-            url.searchParams.delete('source');
-            window.history.replaceState({}, document.title, url);
+            await handleVerificationReturn();
         }, 1000);
     }
 });
+
+/**
+ * Handle return from Stripe Identity verification and complete the process
+ */
+async function handleVerificationReturn() {
+    try {
+        // Find the first verification card to get API configuration
+        const cardElement = document.querySelector('[data-lemma-card]');
+        if (!cardElement || !cardElement.lemmaCard) {
+            console.warn('⚠️ No verification card found to complete verification');
+            return;
+        }
+        
+        const card = cardElement.lemmaCard;
+        const config = card.config;
+        
+        if (config.debug) {
+            console.log('🎯 Completing verification return from Stripe...');
+        }
+        
+        // Complete the verification process
+        const response = await fetch(`${config.apiBase}/api/sdk/complete-identity-verification`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.apiKey}`
+            },
+            body: JSON.stringify({
+                verification_return: true
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.verified && result.credential) {
+            // Store credential in federated wallet
+            const storeResult = await card.federatedWallet.storeCredential({
+                ...result.credential,
+                packageType: 'identity',
+                networkShared: true,
+                expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
+            });
+            
+            if (storeResult.success) {
+                if (config.debug) {
+                    console.log('✅ Lemma credential created and stored in federated wallet!', {
+                        credential_id: result.credential?.id,
+                        verification_time_us: result.verification_time_us,
+                        network_shared: storeResult.networkShared,
+                        storage_layers: storeResult.layers
+                    });
+                }
+                
+                // Call verification callback
+                if (config.onVerified) {
+                    config.onVerified({
+                        verified: true,
+                        source: 'stripe_verification',
+                        credential: result.credential,
+                        verificationTimeUs: result.verification_time_us
+                    });
+                }
+                
+                // Trigger card refresh for all cards on the page
+                window.dispatchEvent(new CustomEvent('lemma-card-refresh'));
+                
+                // Notify other components of successful verification
+                window.dispatchEvent(new CustomEvent('lemma-credentials-updated', {
+                    detail: {
+                        action: 'added',
+                        credentialId: result.credential?.id,
+                        source: 'verification_card'
+                    }
+                }));
+                
+            } else {
+                throw new Error('Failed to store credential in federated wallet');
+            }
+            
+        } else {
+            throw new Error(result.message || 'Credential creation failed');
+        }
+        
+        // Clean up URL parameters
+        const url = new URL(window.location);
+        url.searchParams.delete('verification_return');
+        url.searchParams.delete('source');
+        window.history.replaceState({}, document.title, url);
+        
+    } catch (error) {
+        console.error('❌ Failed to complete verification:', error);
+        
+        // Find cards and call error callback
+        const cardElements = document.querySelectorAll('[data-lemma-card]');
+        cardElements.forEach(element => {
+            if (element.lemmaCard && element.lemmaCard.config.onError) {
+                element.lemmaCard.config.onError(error);
+            }
+        });
+        
+        // Still clean up URL even on error
+        const url = new URL(window.location);
+        url.searchParams.delete('verification_return');
+        url.searchParams.delete('source');
+        window.history.replaceState({}, document.title, url);
+    }
+}
