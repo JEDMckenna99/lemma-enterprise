@@ -491,8 +491,11 @@ class LemmaVerificationCard {
         
         this.state.verifying = true;
         
-        // Update UI to show loading state
-        this.updateButtonState('loading');
+        // Update button to show loading state (using shield's exact logic)
+        const verifyBtn = this.state.cardElement.querySelector('#lemma-verify-btn');
+        const originalText = verifyBtn.textContent;
+        verifyBtn.textContent = 'Starting verification...';
+        verifyBtn.disabled = true;
         
         // Call verification start callback
         if (this.config.onVerificationStart) {
@@ -501,10 +504,10 @@ class LemmaVerificationCard {
         
         try {
             if (this.config.debug) {
-                console.log('🎯 Starting verification from card widget...');
+                console.log('🚀 Starting Stripe Identity verification...');
             }
             
-            // Start identity verification
+            // Start identity verification (using shield's exact API call)
             const response = await fetch(`${this.config.apiBase}/api/sdk/start-identity-verification`, {
                 method: 'POST',
                 headers: {
@@ -513,8 +516,8 @@ class LemmaVerificationCard {
                 },
                 body: JSON.stringify({
                     provider: 'stripe_identity',
-                    inline_mode: false,
-                    return_url: window.location.origin + window.location.pathname + '?verification_return=true&source=card'
+                    inline_mode: false, // Use redirect mode (which works!)
+                    return_url: window.location.origin + window.location.pathname + '?verification_return=true'
                 })
             });
             
@@ -522,10 +525,10 @@ class LemmaVerificationCard {
             
             if (result.success && result.url) {
                 if (this.config.debug) {
-                    console.log('✅ Redirecting to verification...');
+                    console.log('✅ Stripe session created, redirecting...');
                 }
                 
-                // Redirect to verification
+                // Redirect to Stripe Identity (the working flow!)
                 window.location.href = result.url;
             } else {
                 throw new Error(result.message || 'Failed to start verification');
@@ -534,8 +537,9 @@ class LemmaVerificationCard {
         } catch (error) {
             console.error('❌ Verification failed:', error);
             
-            // Update UI to show error state
-            this.updateButtonState('error');
+            // Reset button (using shield's exact error handling)
+            verifyBtn.textContent = 'Verification failed - Try again';
+            verifyBtn.disabled = false;
             
             // Call error callback
             if (this.config.onError) {
@@ -544,7 +548,7 @@ class LemmaVerificationCard {
             
             // Reset after 3 seconds
             setTimeout(() => {
-                this.updateButtonState('ready');
+                verifyBtn.textContent = originalText;
             }, 3000);
             
         } finally {
@@ -680,14 +684,13 @@ window.createLemmaCard = function(targetSelector, options = {}) {
     return card;
 };
 
-// Handle returns from verification
+// Handle returns from verification (using shield's exact logic)
 window.addEventListener('load', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const verificationReturn = urlParams.get('verification_return');
-    const source = urlParams.get('source');
     
-    if (verificationReturn === 'true' && source === 'card') {
-        // Handle verification completion for card-initiated verification
+    if (verificationReturn === 'true') {
+        // Handle verification completion (same as shield)
         setTimeout(async () => {
             await handleVerificationReturn();
         }, 1000);
@@ -695,7 +698,7 @@ window.addEventListener('load', () => {
 });
 
 /**
- * Handle return from Stripe Identity verification and complete the process
+ * Handle return from Stripe Identity verification (using shield's exact logic)
  */
 async function handleVerificationReturn() {
     try {
@@ -710,10 +713,10 @@ async function handleVerificationReturn() {
         const config = card.config;
         
         if (config.debug) {
-            console.log('🎯 Completing verification return from Stripe...');
+            console.log('🎉 Processing Stripe verification completion...');
         }
         
-        // Complete the verification process
+        // Complete the identity verification (using shield's exact API call)
         const response = await fetch(`${config.apiBase}/api/sdk/complete-identity-verification`, {
             method: 'POST',
             headers: {
@@ -721,14 +724,15 @@ async function handleVerificationReturn() {
                 'Authorization': `Bearer ${config.apiKey}`
             },
             body: JSON.stringify({
-                verification_return: true
+                verification_return: true,
+                enable_rust_engine: true
             })
         });
         
         const result = await response.json();
         
         if (result.success && result.verified && result.credential) {
-            // Store credential in federated wallet
+            // Store credential in background wallet (using shield's exact logic)
             const storeResult = await card.federatedWallet.storeCredential({
                 ...result.credential,
                 packageType: 'identity',
@@ -738,13 +742,18 @@ async function handleVerificationReturn() {
             
             if (storeResult.success) {
                 if (config.debug) {
-                    console.log('✅ Lemma credential created and stored in federated wallet!', {
+                    console.log('✅ Lemma credential created and stored in background wallet!', {
                         credential_id: result.credential?.id,
                         verification_time_us: result.verification_time_us,
                         network_shared: storeResult.networkShared,
                         storage_layers: storeResult.layers
                     });
                 }
+                
+                // Clean up URL parameters (shield's exact logic)
+                const url = new URL(window.location);
+                url.searchParams.delete('verification_return');
+                window.history.replaceState({}, document.title, url);
                 
                 // Call verification callback
                 if (config.onVerified) {
@@ -769,18 +778,12 @@ async function handleVerificationReturn() {
                 }));
                 
             } else {
-                throw new Error('Failed to store credential in federated wallet');
+                throw new Error('Failed to store credential in background wallet');
             }
             
         } else {
             throw new Error(result.message || 'Credential creation failed');
         }
-        
-        // Clean up URL parameters
-        const url = new URL(window.location);
-        url.searchParams.delete('verification_return');
-        url.searchParams.delete('source');
-        window.history.replaceState({}, document.title, url);
         
     } catch (error) {
         console.error('❌ Failed to complete verification:', error);
@@ -796,7 +799,6 @@ async function handleVerificationReturn() {
         // Still clean up URL even on error
         const url = new URL(window.location);
         url.searchParams.delete('verification_return');
-        url.searchParams.delete('source');
         window.history.replaceState({}, document.title, url);
     }
 }
