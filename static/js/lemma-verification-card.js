@@ -644,13 +644,20 @@ document.addEventListener('DOMContentLoaded', () => {
     cardElements.forEach((element, index) => {
         // Get configuration from data attributes
         const config = {
+            // Core API configuration
+            apiKey: element.getAttribute('data-api-key') || 'demo-integration-key-12345',
+            apiBase: element.getAttribute('data-api-base') || window.location.origin,
+            debug: element.getAttribute('data-debug') !== 'false',
+            
+            // Visual configuration
             theme: element.getAttribute('data-theme') || 'default',
             size: element.getAttribute('data-size') || 'normal',
             showStatus: element.getAttribute('data-show-status') !== 'false',
             showLogo: element.getAttribute('data-show-logo') !== 'false',
+            
+            // Behavior configuration
             autoVerify: element.getAttribute('data-auto-verify') === 'true',
-            showAlways: element.getAttribute('data-show-always') === 'true',
-            debug: element.getAttribute('data-debug') !== 'false'
+            showAlways: element.getAttribute('data-show-always') === 'true'
         };
         
         // Create and render the card
