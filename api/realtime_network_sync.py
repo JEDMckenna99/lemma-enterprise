@@ -26,6 +26,9 @@ import hashlib
 import hmac
 from datetime import datetime, timedelta
 
+# Import CORS decorator
+from auth.decorators import cors_headers
+
 logger = logging.getLogger(__name__)
 
 # Network sync blueprint
@@ -447,9 +450,15 @@ def initialize_network_sync():
     except Exception as e:
         logger.error(f"❌ Failed to initialize network sync: {e}")
 
-@network_sync_bp.route('/api/network/sync/check-shared-identity', methods=['POST'])
+@network_sync_bp.route('/api/network/sync/check-shared-identity', methods=['POST', 'OPTIONS'])
+@cors_headers
 def check_shared_identity():
     """Check if user has valid identity lemma in shared network"""
+    
+    # Handle CORS preflight requests
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+    
     try:
         # Verify network authorization
         auth_header = request.headers.get('Authorization')
@@ -521,9 +530,15 @@ def check_shared_identity():
         logger.error(f"❌ Failed to check shared identity: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@network_sync_bp.route('/api/network/sync/add-identity-lemma', methods=['POST'])
+@network_sync_bp.route('/api/network/sync/add-identity-lemma', methods=['POST', 'OPTIONS'])
+@cors_headers
 def add_identity_lemma():
     """Add identity lemma to shared network storage"""
+    
+    # Handle CORS preflight requests
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+    
     try:
         # Verify network authorization
         auth_header = request.headers.get('Authorization')

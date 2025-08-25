@@ -21,6 +21,9 @@ from flask import Blueprint, request, jsonify, current_app
 from functools import wraps
 import logging
 
+# Import CORS decorator
+from auth.decorators import cors_headers
+
 # Initialize logger
 logger = logging.getLogger(__name__)
 
@@ -99,7 +102,8 @@ def require_network_auth(f):
         return f(*args, **kwargs)
     return decorated_function
 
-@network_registry_bp.route('/api/network/did-registry', methods=['GET'])
+@network_registry_bp.route('/api/network/did-registry', methods=['GET', 'OPTIONS'])
+@cors_headers
 @require_network_auth
 def get_did_registry():
     """
@@ -108,6 +112,11 @@ def get_did_registry():
     Returns all trusted issuer DIDs, public keys, and trust scores
     used by sites for credential verification.
     """
+    
+    # Handle CORS preflight requests
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+    
     try:
         site_id = request.args.get('site_id', 'unknown')
         version = request.args.get('version', '0')

@@ -19,6 +19,9 @@ from flask import Blueprint, request, jsonify
 import logging
 from datetime import datetime, timedelta
 
+# Import CORS decorator
+from auth.decorators import cors_headers
+
 logger = logging.getLogger(__name__)
 
 # Privacy enhancements blueprint
@@ -208,9 +211,15 @@ class PrivacyManager:
 # Global privacy manager
 privacy_manager = PrivacyManager()
 
-@privacy_bp.route('/api/privacy/generate-ppid', methods=['POST'])
+@privacy_bp.route('/api/privacy/generate-ppid', methods=['POST', 'OPTIONS'])
+@cors_headers
 def generate_ppid():
     """Generate PPID for user at specific origin"""
+    
+    # Handle CORS preflight requests
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+    
     try:
         # Verify network authentication
         auth_header = request.headers.get('Authorization', '')
@@ -367,9 +376,15 @@ def get_privacy_stats():
             "error": "internal_error"
         }), 500
 
-@privacy_bp.route('/api/privacy/validate-ppid', methods=['POST'])
+@privacy_bp.route('/api/privacy/validate-ppid', methods=['POST', 'OPTIONS'])
+@cors_headers
 def validate_ppid():
     """Validate PPID for user and origin"""
+    
+    # Handle CORS preflight requests
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+    
     try:
         # Verify network authentication
         auth_header = request.headers.get('Authorization', '')
