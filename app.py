@@ -6,7 +6,7 @@ A simple Flask app to showcase cross-site authentication capabilities
 from flask import Flask, render_template_string, request, redirect, url_for
 import os
 
-    app = Flask(__name__)
+app = Flask(__name__)
     
 # Simple HTML template for serving our index.html
 @app.route('/')
@@ -29,7 +29,7 @@ def verified():
     return redirect('/?verified=true')
 
 @app.route('/health')
-    def health():
+def health():
     """Health check endpoint for Heroku"""
     return {'status': 'healthy', 'site': 'lemma-demo'}
 
