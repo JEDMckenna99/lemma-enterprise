@@ -1,1 +1,1 @@
-web: gunicorn app:app --workers 4 --worker-class sync --timeout 120 --max-requests 10000 --max-requests-jitter 1000 --preload --bind 0.0.0.0:$PORT --access-logfile - --error-logfile - --log-level info 
+web: gunicorn app:app

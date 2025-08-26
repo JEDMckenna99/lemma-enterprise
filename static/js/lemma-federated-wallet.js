@@ -1316,15 +1316,19 @@ class LemmaFederatedWallet {
         if (!this.networkConfig.registryUrl) return false;
         
         try {
-            const response = await fetch('/api/network/revocation-lists', {
+            // Fix: Use query parameters instead of body for GET request
+            const params = new URLSearchParams({
+                last_sync: this.networkConfig.lastRevocationSync || 0,
+                node_id: this.networkConfig.nodeId || 'unknown'
+            });
+            
+            const response = await fetch(`/api/network/revocation-lists?${params}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Network ${this.networkConfig.authKey}`,
                     'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    last_sync: this.networkConfig.lastRevocationSync
-                })
+                }
+                // No body for GET request - this was causing the error
             });
             
             if (response.ok) {

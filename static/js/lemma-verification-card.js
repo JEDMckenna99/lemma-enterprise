@@ -47,6 +47,13 @@ class LemmaVerificationCard {
             showAlways: options.showAlways === true, // Show card even when verified
             target: options.target || null, // Target element selector
             
+            // Security configuration (SAME AS SHIELD)
+            securityLevel: options.securityLevel || 'medium', // 'low', 'medium', 'high', 'critical', 'realtime'
+            customCheckInterval: options.customCheckInterval || null, // Custom interval in milliseconds
+            checkOnEvents: options.checkOnEvents || ['entry', 'checkout', 'sensitive_action'],
+            backgroundChecks: options.backgroundChecks !== false, // Default enabled
+            onSecurityEvent: options.onSecurityEvent || null, // Custom security event handler
+            
             // Callbacks
             onVerified: options.onVerified || null,
             onVerificationStart: options.onVerificationStart || null,
@@ -57,6 +64,7 @@ class LemmaVerificationCard {
             initialized: false,
             hasCredentials: false,
             verifying: false,
+            checking: false,
             cardElement: null
         };
         
@@ -81,22 +89,50 @@ class LemmaVerificationCard {
     }
     
     /**
-     * Initialize federated wallet for network access
+     * Initialize federated wallet for network access (EXACT SAME as shield)
      */
     async initializeFederatedWallet() {
         try {
-            // Use the same federated wallet system as the bot shield
+            // Fetch network configuration from server (same as shield)
+            const configResponse = await fetch(`${this.config.apiBase}/api/network/client-config`);
+            let networkConfig = {
+                networkRegistryUrl: this.config.apiBase + '/api/network/sync',
+                networkAuthKey: 'lemma_network_federated_sync_2024'
+            };
+            
+            if (configResponse.ok) {
+                const serverConfig = await configResponse.json();
+                if (serverConfig.success) {
+                    networkConfig = {
+                        networkRegistryUrl: serverConfig.network_registry_url,
+                        networkAuthKey: serverConfig.network_auth_key,
+                        syncInterval: serverConfig.sync_interval,
+                        federationEndpoints: serverConfig.federation_endpoints,
+                        nodeId: serverConfig.node_id
+                    };
+                    
+                    if (this.config.debug) {
+                        console.log(`🌐 Verification Card: Loaded network config for ${serverConfig.node_name}:`, networkConfig);
+                    }
+                }
+            }
+            
+            // Initialize federated wallet with network configuration (same as shield)
             if (typeof LemmaFederatedWallet !== 'undefined') {
                 this.backgroundWallet = new LemmaFederatedWallet({
                     debug: this.config.debug,
-                    networkRegistryUrl: this.config.apiBase + '/api/network/sync',
-                    networkAuthKey: 'lemma_network_federated_sync_2024'
+                    securityLevel: this.config.securityLevel || 'medium',
+                    customCheckInterval: this.config.customCheckInterval || null,
+                    checkOnEvents: this.config.checkOnEvents || ['entry', 'checkout', 'sensitive_action'],
+                    backgroundChecks: this.config.backgroundChecks !== false,
+                    onSecurityEvent: this.config.onSecurityEvent || null,
+                    ...networkConfig
                 });
                 
                 await this.backgroundWallet.init();
                 
                 if (this.config.debug) {
-                    console.log('🌐 Verification card connected to federated network');
+                    console.log('🌐 Verification Card: Connected to federated network with same config as shield');
                 }
             } else {
                 if (this.config.debug) {
@@ -105,7 +141,7 @@ class LemmaVerificationCard {
             }
         } catch (error) {
             if (this.config.debug) {
-                console.warn('⚠️ Failed to initialize federated wallet:', error.message);
+                console.warn('⚠️ Verification Card: Failed to initialize federated wallet:', error.message);
             }
         }
     }
@@ -145,21 +181,83 @@ class LemmaVerificationCard {
     }
     
     /**
-     * Check for existing credentials
+     * Check for existing credentials using EXACT SAME FLOW as shield
+     * This performs full cryptographic verification, not just existence check
      */
     async checkCredentials() {
+        if (this.state.checking) return false;
+        
+        this.state.checking = true;
+        
         try {
-            if (this.backgroundWallet) {
-                const hasCredentials = await this.backgroundWallet.hasValidCredentials('identity');
-                this.state.hasCredentials = hasCredentials;
-                return hasCredentials;
-            }
-            return false;
-        } catch (error) {
             if (this.config.debug) {
-                console.warn('⚠️ Error checking credentials:', error);
+                console.log('🔍 Verification Card: Checking background wallet for existing lemma...');
             }
+            
+            // EXACT SAME LOGIC as shield: Check background wallet (client-side, works across all sites)
+            const hasCredentials = await this.backgroundWallet.hasValidCredentials('identity');
+            
+            if (hasCredentials) {
+                // Get stored credentials for verification
+                const credentials = await this.backgroundWallet.getCredentials('identity');
+                if (credentials.length > 0) {
+                    const credential = credentials[0];
+                    
+                    if (this.config.debug) {
+                        console.log('🔐 Verification Card: Found credential, performing full verification...', {
+                            credentialId: credential.id,
+                            packageType: credential.packageType,
+                            isHuman: credential.claims?.isHuman,
+                            storedAt: new Date(credential.storedAt).toLocaleString()
+                        });
+                    }
+                    
+                    // CRITICAL: Perform FULL VERIFICATION using same engine as shield
+                    const verificationResult = await this.backgroundWallet.verifyCredential(credential);
+                    
+                    if (verificationResult.verified) {
+                        this.state.hasCredentials = true;
+                        
+                        if (this.config.debug) {
+                            console.log('✅ Verification Card: Credential verified successfully', {
+                                credentialId: credential.id,
+                                confidence: verificationResult.confidence,
+                                verificationTimeUs: verificationResult.verification_time_us,
+                                engine: verificationResult.engine,
+                                offline: verificationResult.offline
+                            });
+                        }
+                        
+                        return true;
+                    } else {
+                        if (this.config.debug) {
+                            console.log('❌ Verification Card: Credential verification failed', {
+                                credentialId: credential.id,
+                                reason: verificationResult.reason || 'verification_failed'
+                            });
+                        }
+                        
+                        // Remove invalid credential from wallet
+                        await this.backgroundWallet.removeCredential(credential.id);
+                        this.state.hasCredentials = false;
+                        return false;
+                    }
+                }
+            }
+            
+            if (this.config.debug) {
+                console.log('ℹ️ Verification Card: No valid lemma found in background wallet');
+            }
+            
+            this.state.hasCredentials = false;
             return false;
+            
+        } catch (error) {
+            console.error('❌ Verification Card: Error checking background wallet:', error);
+            this.state.hasCredentials = false;
+            return false;
+        } finally {
+            this.state.checking = false;
         }
     }
     
@@ -448,7 +546,20 @@ class LemmaVerificationCard {
         // Listen for verification button clicks
         const verifyBtn = this.state.cardElement.querySelector('#lemma-verify-btn');
         if (verifyBtn) {
-            verifyBtn.addEventListener('click', () => this.startVerification());
+            if (this.config.debug) {
+                console.log('🎯 Verification Card: Setting up click listener for verify button');
+            }
+            verifyBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                if (this.config.debug) {
+                    console.log('🎯 Verification Card: Verify button clicked - starting verification...');
+                }
+                this.startVerification();
+            });
+        } else {
+            if (this.config.debug) {
+                console.warn('⚠️ Verification Card: Verify button not found for event listener');
+            }
         }
         
         // Listen for credential updates from other tabs/widgets
@@ -487,15 +598,30 @@ class LemmaVerificationCard {
      * Start the verification process
      */
     async startVerification() {
-        if (this.state.verifying) return;
+        if (this.config.debug) {
+            console.log('🚀 Verification Card: startVerification() called');
+        }
+        
+        if (this.state.verifying) {
+            if (this.config.debug) {
+                console.log('⚠️ Verification Card: Already verifying, skipping...');
+            }
+            return;
+        }
         
         this.state.verifying = true;
         
         // Update button to show loading state (using shield's exact logic)
         const verifyBtn = this.state.cardElement.querySelector('#lemma-verify-btn');
-        const originalText = verifyBtn.textContent;
-        verifyBtn.textContent = 'Starting verification...';
-        verifyBtn.disabled = true;
+        if (verifyBtn) {
+            const originalText = verifyBtn.textContent;
+            verifyBtn.textContent = 'Starting verification...';
+            verifyBtn.disabled = true;
+            
+            if (this.config.debug) {
+                console.log('🎯 Verification Card: Button updated to loading state');
+            }
+        }
         
         // Call verification start callback
         if (this.config.onVerificationStart) {
@@ -504,7 +630,9 @@ class LemmaVerificationCard {
         
         try {
             if (this.config.debug) {
-                console.log('🚀 Starting Stripe Identity verification...');
+                console.log('🚀 Verification Card: Starting Stripe Identity verification...');
+                console.log('🚀 Verification Card: API Base:', this.config.apiBase);
+                console.log('🚀 Verification Card: API Key:', this.config.apiKey);
             }
             
             // Start identity verification (using shield's exact API call)
@@ -600,8 +728,38 @@ class LemmaVerificationCard {
             verified: hasCredentials,
             cardInitialized: this.state.initialized,
             verifying: this.state.verifying,
+            checking: this.state.checking,
             networkConnected: !!this.backgroundWallet
         };
+    }
+    
+    /**
+     * Perform background security check (same as shield)
+     */
+    async performBackgroundCheck() {
+        if (this.config.debug) {
+            console.log('🛡️ Verification Card: Performing background security check...');
+        }
+        
+        return await this.backgroundWallet.performBackgroundCheck();
+    }
+    
+    /**
+     * Check on specific event (same as shield)
+     */
+    async checkOnEvent(eventType = 'unknown') {
+        if (this.config.debug) {
+            console.log(`🛡️ Verification Card: Event-triggered security check: ${eventType}`);
+        }
+        
+        return await this.backgroundWallet.checkOnEvent(eventType);
+    }
+    
+    /**
+     * Get security status (same as shield)
+     */
+    getSecurityStatus() {
+        return this.backgroundWallet.getSecurityStatus();
     }
     
     /**

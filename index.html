@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma Demo Site - Federated Identity Network</title>
+    <style>
+        :root {
+            --primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --primary-solid: #667eea;
+            --white: #ffffff;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-900: #111827;
+            --success: #10b981;
+            --space-4: 1rem;
+            --space-6: 1.5rem;
+            --space-8: 2rem;
+            --space-12: 3rem;
+            --space-16: 4rem;
+            --border-radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: var(--gray-700);
+            background: var(--gray-50);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 var(--space-4);
+        }
+
+        header {
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+            padding: var(--space-4) 0;
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: var(--space-6);
+            list-style: none;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--gray-600);
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary-solid);
+        }
+
+        .hero {
+            background: var(--white);
+            padding: var(--space-16) 0;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: var(--space-4);
+            background: var(--primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--gray-600);
+            margin-bottom: var(--space-8);
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .verification-section {
+            background: var(--white);
+            border-radius: var(--border-radius);
+            padding: var(--space-8);
+            margin: var(--space-8) 0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .protected-content {
+            background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);
+            border: 2px dashed var(--gray-300);
+            border-radius: var(--border-radius);
+            padding: var(--space-8);
+            margin: var(--space-8) 0;
+            text-align: center;
+        }
+
+        .protected-content.verified {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-color: var(--success);
+            border-style: solid;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: var(--border-radius);
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--primary-solid);
+            border: 2px solid var(--primary-solid);
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary-solid);
+            color: var(--white);
+        }
+
+        .network-info {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 1px solid #bae6fd;
+            border-radius: var(--border-radius);
+            padding: var(--space-6);
+            margin: var(--space-8) 0;
+        }
+
+        .network-info h3 {
+            color: #0369a1;
+            margin-bottom: var(--space-4);
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin: var(--space-4) 0;
+        }
+
+        .status-verified {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-unverified {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .footer {
+            background: var(--gray-900);
+            color: var(--white);
+            padding: var(--space-8) 0;
+            text-align: center;
+            margin-top: var(--space-16);
+        }
+
+        .demo-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--space-6);
+            margin: var(--space-8) 0;
+        }
+
+        .feature-card {
+            background: var(--white);
+            border-radius: var(--border-radius);
+            padding: var(--space-6);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-card h3 {
+            color: var(--gray-900);
+            margin-bottom: var(--space-4);
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: var(--space-4);
+            }
+            
+            .nav-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+    
+    <!-- Lemma Federated Identity Network Scripts -->
+    <script src="https://lemma.id/js/lemma-federated-wallet.js"></script>
+    <script src="https://lemma.id/js/lemma-bot-shield-simple.js"></script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">Lemma Demo Site</div>
+                <nav>
+                    <ul class="nav-links">
+                        <li><a href="#home">Home</a></li>
+                        <li><a href="#protected">Protected Content</a></li>
+                        <li><a href="#network">Network Status</a></li>
+                        <li><a href="https://lemma.id" target="_blank">Main Site</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                <h1>Federated Identity Demo</h1>
+                <p>Experience seamless cross-site authentication with the Lemma federated identity network. Verify once, access everywhere.</p>
+                
+                <!-- Lemma Verification Card -->
+                <div id="hero-verification-card" 
+                     data-lemma-card 
+                     data-theme="professional" 
+                     data-size="normal" 
+                     data-show-status="true" 
+                     data-show-always="true"
+                     style="max-width: 400px; margin: var(--space-8) auto;">
+                </div>
+            </div>
+        </section>
+
+        <section class="container">
+            <div class="network-info">
+                <h3>🌐 Federated Network Status</h3>
+                <p>This demo site is part of the Lemma federated identity network. If you've already verified your identity on any network site, you'll have instant access here.</p>
+                <div id="network-status">
+                    <div class="status-indicator status-unverified">
+                        <span>⏳</span> Checking network credentials...
+                    </div>
+                </div>
+            </div>
+
+            <div class="verification-section">
+                <h2>🔐 Try the Network Effect</h2>
+                <p>This demonstrates how the federated identity network works across different sites:</p>
+                
+                <div class="demo-features">
+                    <div class="feature-card">
+                        <h3>1️⃣ Verify Once</h3>
+                        <p>Complete identity verification on any site in the network using Stripe Identity (one-time process).</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>2️⃣ Access Everywhere</h3>
+                        <p>Your cryptographic credentials work across all network sites - no re-verification needed.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>3️⃣ Privacy Preserved</h3>
+                        <p>Zero personal data storage. Only cryptographic proofs are shared between sites.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="protected-content" class="protected-content">
+                <h2>🛡️ Protected Content Area</h2>
+                <p>This content requires verification through the Lemma federated identity network.</p>
+                <p><strong>Status:</strong> <span id="protection-status">Checking credentials...</span></p>
+                
+                <div id="protected-inner" style="display: none; margin-top: var(--space-6);">
+                    <h3>🎉 Welcome to the Network!</h3>
+                    <p>Congratulations! You have successfully accessed protected content through the federated identity network.</p>
+                    <p><strong>Verification Time:</strong> <span id="verification-time">~1-50µs</span></p>
+                    <p><strong>Network Sites:</strong> You can now access protected content on all network sites without re-verification.</p>
+                    
+                    <div style="margin-top: var(--space-6);">
+                        <a href="https://lemma.id" class="btn btn-primary" target="_blank">Visit Main Site</a>
+                        <button onclick="testNetworkAccess()" class="btn btn-secondary">Test Network Access</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 Lemma Identity Verification. Part of the federated identity network.</p>
+            <p style="margin-top: var(--space-4); opacity: 0.8;">
+                Demo site showcasing cross-site authentication with cryptographic proofs
+            </p>
+        </div>
+    </footer>
+
+    <!-- Include Lemma Verification Card -->
+    <link rel="stylesheet" href="https://lemma.id/css/lemma-verification-card.css?v=8">
+    <script src="https://lemma.id/js/lemma-verification-card.js?v=8"></script>
+
+    <script>
+        // Initialize Lemma components when page loads
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('🚀 Initializing Lemma Demo Site...');
+            
+            try {
+                // Initialize Lemma Verification Card
+                if (typeof LemmaVerificationCard !== 'undefined') {
+                    const card = new LemmaVerificationCard('hero-verification-card', {
+                        apiKey: 'demo-site-key',
+                        apiBase: 'https://lemma.id',
+                        theme: 'professional',
+                        size: 'normal',
+                        showStatus: true,
+                        onVerified: function(result) {
+                            console.log('✅ User verified:', result);
+                            showProtectedContent();
+                            updateNetworkStatus(true);
+                        },
+                        onError: function(error) {
+                            console.error('❌ Verification error:', error);
+                            updateNetworkStatus(false);
+                        }
+                    });
+                    
+                    await card.init();
+                } else {
+                    console.warn('⚠️ LemmaVerificationCard not available');
+                }
+
+                // Initialize Federated Wallet
+                if (typeof LemmaFederatedWallet !== 'undefined') {
+                    const wallet = new LemmaFederatedWallet({ 
+                        debug: true,
+                        networkRegistryUrl: 'https://lemma.id/api/network'
+                    });
+                    
+                    await wallet.init();
+                    
+                    // Check for existing network credentials
+                    const hasCredentials = await wallet.hasValidCredentials();
+                    if (hasCredentials) {
+                        console.log('✅ Network credentials found - instant access');
+                        showProtectedContent();
+                        updateNetworkStatus(true);
+                    } else {
+                        console.log('⏳ No network credentials found');
+                        updateNetworkStatus(false);
+                    }
+                } else {
+                    console.warn('⚠️ LemmaFederatedWallet not available');
+                }
+
+                // Initialize Bot Shield for protected content
+                if (typeof LemmaBotShield !== 'undefined') {
+                    const shield = new LemmaBotShield({ 
+                        apiKey: 'demo-site-key',
+                        apiBase: 'https://lemma.id',
+                        securityLevel: 'medium'
+                    });
+                    
+                    // Don't automatically protect - let the verification card handle it
+                    console.log('🛡️ Bot Shield initialized');
+                } else {
+                    console.warn('⚠️ LemmaBotShield not available');
+                }
+
+            } catch (error) {
+                console.error('❌ Initialization error:', error);
+                updateNetworkStatus(false);
+            }
+        });
+
+        function showProtectedContent() {
+            const protectedArea = document.getElementById('protected-content');
+            const protectedInner = document.getElementById('protected-inner');
+            const statusElement = document.getElementById('protection-status');
+            
+            protectedArea.classList.add('verified');
+            protectedInner.style.display = 'block';
+            statusElement.textContent = 'Verified ✅';
+            statusElement.style.color = 'var(--success)';
+            
+            console.log('🎉 Protected content unlocked');
+        }
+
+        function updateNetworkStatus(isVerified) {
+            const statusElement = document.getElementById('network-status');
+            
+            if (isVerified) {
+                statusElement.innerHTML = `
+                    <div class="status-indicator status-verified">
+                        <span>✅</span> Connected to federated network
+                    </div>
+                    <p style="margin-top: var(--space-4); font-size: 0.875rem; color: var(--gray-600);">
+                        Your credentials are valid across all network sites. Authentication time: ~1-50µs
+                    </p>
+                `;
+            } else {
+                statusElement.innerHTML = `
+                    <div class="status-indicator status-unverified">
+                        <span>⚠️</span> Not verified in network
+                    </div>
+                    <p style="margin-top: var(--space-4); font-size: 0.875rem; color: var(--gray-600);">
+                        Complete verification to join the federated identity network
+                    </p>
+                `;
+            }
+        }
+
+        function testNetworkAccess() {
+            alert('🌐 Network Access Test\n\nIn a real implementation, this would:\n• Test connectivity to other network sites\n• Verify credential validity across the federation\n• Show performance metrics (~1-50µs authentication)\n\nTry visiting the main Lemma site to see your credentials work there too!');
+        }
+
+        // Handle verification completion from Stripe redirect
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('verified') === 'true') {
+            setTimeout(() => {
+                showProtectedContent();
+                updateNetworkStatus(true);
+                
+                // Show success message
+                const successBanner = document.createElement('div');
+                successBanner.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: var(--success);
+                    color: white;
+                    padding: var(--space-4);
+                    border-radius: var(--border-radius);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                    z-index: 1000;
+                    font-weight: 600;
+                `;
+                successBanner.textContent = '🎉 Verification successful! Welcome to the network.';
+                document.body.appendChild(successBanner);
+                
+                setTimeout(() => {
+                    successBanner.remove();
+                }, 5000);
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
+
+
