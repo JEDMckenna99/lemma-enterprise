@@ -36,6 +36,7 @@ class Customer:
     subscription_status: str  # 'none', 'active', 'past_due', 'canceled'
     monthly_usage: Dict[str, int]  # month -> user_count
     billing_email: Optional[str]
+    password_hash: Optional[str] = None  # Hashed password for authentication
     role: str = 'customer'  # 'customer' or 'admin'
     permissions: List[str] = field(default_factory=list)
     last_login: Optional[datetime] = None
@@ -59,8 +60,23 @@ class CustomerAccountManager:
         # Format as API key
         return f"{prefix}_{''.join(secrets.choice('abcdefghijklmnopqrstuvwxyz0123456789') for _ in range(32))}"
     
+    def hash_password(self, password: str) -> str:
+        """Hash a password using SHA-256 with salt"""
+        salt = secrets.token_hex(16)
+        password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+        return f"{salt}:{password_hash}"
+    
+    def verify_password(self, password: str, password_hash: str) -> bool:
+        """Verify a password against its hash"""
+        try:
+            salt, stored_hash = password_hash.split(':')
+            computed_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+            return computed_hash == stored_hash
+        except ValueError:
+            return False
+    
     def create_customer(self, email: str, name: str, company: str, 
-                       billing_email: Optional[str] = None) -> Dict[str, Any]:
+                       billing_email: Optional[str] = None, password: Optional[str] = None) -> Dict[str, Any]:
         """Create a new customer account"""
         try:
             # Check if customer already exists
@@ -94,6 +110,11 @@ class CustomerAccountManager:
                 'status': 'active'
             }
             
+            # Hash password if provided
+            password_hash = None
+            if password:
+                password_hash = self.hash_password(password)
+            
             # Create customer record
             customer = Customer(
                 customer_id=customer_id,
@@ -106,7 +127,8 @@ class CustomerAccountManager:
                 status='active',
                 subscription_status='none',
                 monthly_usage={},
-                billing_email=billing_email or email
+                billing_email=billing_email or email,
+                password_hash=password_hash
             )
             
             # Store customer
@@ -240,6 +262,9 @@ class CustomerAccountManager:
                     # Upgrade existing user to admin
                     existing_customer.role = 'admin'
                     existing_customer.permissions = ['admin_access', 'user_management', 'system_config']
+                    # Set password if not already set
+                    if not existing_customer.password_hash:
+                        existing_customer.password_hash = self.hash_password("admin123")
                     logger.info(f"Upgraded existing user to admin: {email}")
                     return {
                         'success': True,
@@ -247,8 +272,8 @@ class CustomerAccountManager:
                         'customer_id': existing_customer.customer_id
                     }
             
-            # Create new admin user
-            result = self.create_customer(email, name, company)
+            # Create new admin user with default password
+            result = self.create_customer(email, name, company, password="admin123")
             if result['success']:
                 # Upgrade to admin role
                 customer = self.get_customer(result['customer_id'])
@@ -342,11 +367,18 @@ def login():
     try:
         data = request.get_json() if request.is_json else request.form
         email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
         
         if not email:
             return jsonify({
                 'success': False,
                 'error': 'Email is required'
+            }), 400
+            
+        if not password:
+            return jsonify({
+                'success': False,
+                'error': 'Password is required'
             }), 400
         
         # Find customer
@@ -354,8 +386,15 @@ def login():
         if not customer:
             return jsonify({
                 'success': False,
-                'error': 'Customer not found'
-            }), 404
+                'error': 'Invalid email or password'
+            }), 401
+            
+        # Verify password
+        if not customer.password_hash or not customer_manager.verify_password(password, customer.password_hash):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid email or password'
+            }), 401
         
         # Update login tracking
         customer.last_login = datetime.utcnow()
@@ -487,7 +526,8 @@ def create_test_accounts():
             email="customer@test.com",
             name="Test Customer",
             company="Test Company Inc",
-            billing_email="billing@test.com"
+            billing_email="billing@test.com",
+            password="customer123"
         )
         results.append({
             'type': 'customer', 
@@ -502,11 +542,13 @@ def create_test_accounts():
             'login_info': {
                 'admin': {
                     'email': 'admin@lemma.id',
+                    'password': 'admin123',
                     'login_url': '/login',
                     'dashboard_url': '/admin'
                 },
                 'customer': {
-                    'email': 'customer@test.com', 
+                    'email': 'customer@test.com',
+                    'password': 'customer123',
                     'login_url': '/login',
                     'dashboard_url': '/dashboard',
                     'api_key': customer_result.get('api_key') if customer_result.get('success') else None
