@@ -299,6 +299,11 @@ def check_credentials():
             'message': str(e)
         }), 500
 
+@sdk_api_bp.route('/api/sdk/test-endpoint', methods=['GET'])
+def test_endpoint():
+    """Simple test endpoint to verify blueprint registration"""
+    return jsonify({'status': 'working', 'message': 'SDK API blueprint is registered'})
+
 @sdk_api_bp.route('/api/sdk/start-identity-verification', methods=['POST', 'OPTIONS'])
 @cors_headers
 @validate_api_key
