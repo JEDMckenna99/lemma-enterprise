@@ -464,6 +464,63 @@ def validate_api_key():
     result = customer_manager.validate_api_key(api_key)
     return jsonify(result)
 
+@customer_accounts_bp.route('/create-test-accounts')
+def create_test_accounts():
+    """Create basic test accounts for development - REMOVE IN PRODUCTION"""
+    try:
+        results = []
+        
+        # Create admin account
+        admin_result = customer_manager.create_admin_user(
+            email="admin@lemma.id",
+            name="Lemma Administrator", 
+            company="Lemma Platform"
+        )
+        results.append({
+            'type': 'admin',
+            'email': 'admin@lemma.id',
+            'result': admin_result
+        })
+        
+        # Create test customer account
+        customer_result = customer_manager.create_customer(
+            email="customer@test.com",
+            name="Test Customer",
+            company="Test Company Inc",
+            billing_email="billing@test.com"
+        )
+        results.append({
+            'type': 'customer', 
+            'email': 'customer@test.com',
+            'result': customer_result
+        })
+        
+        return jsonify({
+            'success': True,
+            'message': 'Test accounts created successfully',
+            'accounts': results,
+            'login_info': {
+                'admin': {
+                    'email': 'admin@lemma.id',
+                    'login_url': '/login',
+                    'dashboard_url': '/admin'
+                },
+                'customer': {
+                    'email': 'customer@test.com', 
+                    'login_url': '/login',
+                    'dashboard_url': '/dashboard',
+                    'api_key': customer_result.get('api_key') if customer_result.get('success') else None
+                }
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create test accounts: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @customer_accounts_bp.route('/logout')
 def logout():
     """Customer logout"""
