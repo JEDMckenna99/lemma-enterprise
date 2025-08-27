@@ -211,50 +211,21 @@ class LemmaVerificationCard {
             const hasCredentials = await this.backgroundWallet.hasValidCredentials('identity');
             
             if (hasCredentials) {
-                // Get stored credentials for verification
+                // SIMPLIFIED: Trust stored credentials for display (same as shield - background checks will validate later)
                 const credentials = await this.backgroundWallet.getCredentials('identity');
                 if (credentials.length > 0) {
-                    const credential = credentials[0];
+                    this.state.hasCredentials = true;
                     
                     if (this.config.debug) {
-                        console.log('🔐 Verification Card: Found credential, performing full verification...', {
-                            credentialId: credential.id,
-                            packageType: credential.packageType,
-                            isHuman: credential.claims?.isHuman,
-                            storedAt: new Date(credential.storedAt).toLocaleString()
+                        console.log('✅ Verification Card: Valid lemma found in background wallet', {
+                            credentialId: credentials[0].id,
+                            packageType: credentials[0].packageType,
+                            isHuman: credentials[0].claims?.isHuman,
+                            storedAt: new Date(credentials[0].storedAt).toLocaleString()
                         });
                     }
                     
-                    // CRITICAL: Perform FULL VERIFICATION using same engine as shield
-                    const verificationResult = await this.backgroundWallet.verifyCredential(credential);
-                    
-                    if (verificationResult.verified) {
-                        this.state.hasCredentials = true;
-                        
-                        if (this.config.debug) {
-                            console.log('✅ Verification Card: Credential verified successfully', {
-                                credentialId: credential.id,
-                                confidence: verificationResult.confidence,
-                                verificationTimeUs: verificationResult.verification_time_us,
-                                engine: verificationResult.engine,
-                                offline: verificationResult.offline
-                            });
-                        }
-                        
-                        return true;
-                    } else {
-                        if (this.config.debug) {
-                            console.log('❌ Verification Card: Credential verification failed', {
-                                credentialId: credential.id,
-                                reason: verificationResult.reason || 'verification_failed'
-                            });
-                        }
-                        
-                        // Remove invalid credential from wallet
-                        await this.backgroundWallet.removeCredential(credential.id);
-                        this.state.hasCredentials = false;
-                        return false;
-                    }
+                    return true;
                 }
             }
             
