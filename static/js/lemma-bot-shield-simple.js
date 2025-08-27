@@ -254,6 +254,12 @@ class LemmaBotShield {
             const storedSession = localStorage.getItem('lemma_verification_session');
             let sessionData = null;
             
+            if (this.config.debug) {
+                console.log('🔍 Checking localStorage for verification session...');
+                console.log('📋 Raw stored session:', storedSession);
+                console.log('📋 All localStorage keys:', Object.keys(localStorage));
+            }
+            
             if (storedSession) {
                 try {
                     sessionData = JSON.parse(storedSession);
@@ -267,9 +273,20 @@ class LemmaBotShield {
                 } catch (e) {
                     console.warn('⚠️ Failed to parse stored session data:', e);
                 }
+            } else {
+                if (this.config.debug) {
+                    console.warn('⚠️ No verification session found in localStorage');
+                }
             }
             
             if (!sessionData?.session_id) {
+                if (this.config.debug) {
+                    console.error('❌ Session validation failed:', {
+                        sessionData,
+                        hasSessionId: sessionData?.session_id,
+                        localStorageKeys: Object.keys(localStorage)
+                    });
+                }
                 throw new Error('No verification session found. Please restart the verification process.');
             }
             
@@ -537,11 +554,18 @@ class LemmaBotShield {
                 }
                 
                 // Store session info for completion
-                localStorage.setItem('lemma_verification_session', JSON.stringify({
+                const sessionData = {
                     session_id: result.session_id,
                     user_id: result.user_id,
                     started_at: Date.now()
-                }));
+                };
+                
+                localStorage.setItem('lemma_verification_session', JSON.stringify(sessionData));
+                
+                if (this.config.debug) {
+                    console.log('💾 Stored verification session in localStorage:', sessionData);
+                    console.log('💾 Verification after storage:', localStorage.getItem('lemma_verification_session'));
+                }
                 
                 // Redirect to Stripe Identity (the working flow!)
                 window.location.href = result.url;
