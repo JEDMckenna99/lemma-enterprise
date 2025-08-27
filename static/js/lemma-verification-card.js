@@ -353,7 +353,7 @@ class LemmaVerificationCard {
                             onclick="window.open('/wallet', '_blank')"
                             onmouseover="this.style.transform='translateY(-1px)'" 
                             onmouseout="this.style.transform='translateY(0)'">
-                        Open Wallet
+                        View in Wallet
                     </button>
                     
                     <p style="${theme.footer}">Protected by Lemma • Active verification</p>
@@ -397,7 +397,7 @@ class LemmaVerificationCard {
                                 onclick="window.open('/wallet', '_blank')"
                                 onmouseover="this.style.transform='translateY(-1px)'" 
                                 onmouseout="this.style.transform='translateY(0)'">
-                            Manage Credentials
+                            View in Wallet
                         </button>
                     `}
                     
