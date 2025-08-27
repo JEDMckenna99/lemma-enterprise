@@ -653,7 +653,24 @@ class LemmaVerificationCard {
             
             if (result.success && result.url) {
                 if (this.config.debug) {
-                    console.log('✅ Stripe session created, redirecting...');
+                    console.log('✅ Stripe session created, redirecting...', {
+                        session_id: result.session_id,
+                        user_id: result.user_id
+                    });
+                }
+                
+                // Store session info for completion (SAME AS SHIELD)
+                const sessionData = {
+                    session_id: result.session_id,
+                    user_id: result.user_id,
+                    started_at: Date.now()
+                };
+                
+                localStorage.setItem('lemma_verification_session', JSON.stringify(sessionData));
+                
+                if (this.config.debug) {
+                    console.log('💾 Stored verification session in localStorage:', sessionData);
+                    console.log('💾 Verification after storage:', localStorage.getItem('lemma_verification_session'));
                 }
                 
                 // Redirect to Stripe Identity (the working flow!)
@@ -874,6 +891,46 @@ async function handleVerificationReturn() {
             console.log('🎉 Processing Stripe verification completion...');
         }
         
+        // Get stored session info (SAME AS SHIELD)
+        const storedSession = localStorage.getItem('lemma_verification_session');
+        let sessionData = null;
+        
+        if (config.debug) {
+            console.log('🔍 Checking localStorage for verification session...');
+            console.log('📋 Raw stored session:', storedSession);
+            console.log('📋 All localStorage keys:', Object.keys(localStorage));
+        }
+        
+        if (storedSession) {
+            try {
+                sessionData = JSON.parse(storedSession);
+                if (config.debug) {
+                    console.log('📋 Retrieved verification session:', {
+                        session_id: sessionData.session_id,
+                        user_id: sessionData.user_id,
+                        age_minutes: Math.round((Date.now() - sessionData.started_at) / 60000)
+                    });
+                }
+            } catch (e) {
+                console.warn('⚠️ Failed to parse stored session data:', e);
+            }
+        } else {
+            if (config.debug) {
+                console.warn('⚠️ No verification session found in localStorage');
+            }
+        }
+        
+        if (!sessionData?.session_id) {
+            if (config.debug) {
+                console.error('❌ Session validation failed:', {
+                    sessionData,
+                    hasSessionId: sessionData?.session_id,
+                    localStorageKeys: Object.keys(localStorage)
+                });
+            }
+            throw new Error('No verification session found. Please restart the verification process.');
+        }
+        
         // Complete the identity verification (using shield's exact API call)
         const response = await fetch(`${config.apiBase}/api/sdk/complete-identity-verification`, {
             method: 'POST',
@@ -882,6 +939,7 @@ async function handleVerificationReturn() {
                 'Authorization': `Bearer ${config.apiKey}`
             },
             body: JSON.stringify({
+                session_id: sessionData?.session_id,
                 verification_return: true,
                 enable_rust_engine: true
             })
@@ -890,6 +948,9 @@ async function handleVerificationReturn() {
         const result = await response.json();
         
         if (result.success && result.verified && result.credential) {
+            // Clean up stored session data (SAME AS SHIELD)
+            localStorage.removeItem('lemma_verification_session');
+            
             // Store credential in background wallet (using shield's exact logic)
             const storeResult = await card.federatedWallet.storeCredential({
                 ...result.credential,
