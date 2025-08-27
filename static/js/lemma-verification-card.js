@@ -952,7 +952,7 @@ async function handleVerificationReturn() {
             localStorage.removeItem('lemma_verification_session');
             
             // Store credential in background wallet (using shield's exact logic)
-            const storeResult = await card.federatedWallet.storeCredential({
+            const storeResult = await card.backgroundWallet.storeCredential({
                 ...result.credential,
                 packageType: 'identity',
                 networkShared: true,
