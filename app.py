@@ -708,8 +708,22 @@ def create_app():
                 'message': str(e)
             }), 500
 
-    # CORS is handled by individual @cors_headers decorators on API endpoints
-    # No global CORS handlers to avoid header duplication
+    # Global OPTIONS handler for CORS preflight requests
+    # Individual @cors_headers decorators handle actual responses
+    @app.before_request
+    def handle_cors_preflight():
+        if request.method == "OPTIONS":
+            # Only handle API endpoints to avoid conflicts
+            if request.path.startswith('/api/'):
+                from flask import make_response
+                response = make_response()
+                origin = request.headers.get('Origin', '*')
+                response.headers['Access-Control-Allow-Origin'] = origin
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key, X-CSRF-Token'
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
+                response.headers['Access-Control-Max-Age'] = '3600'
+                return response
 
     @app.errorhandler(404)
     def not_found(error):
