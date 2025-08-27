@@ -134,6 +134,9 @@ class LemmaVerificationCard {
                 if (this.config.debug) {
                     console.log('🌐 Verification Card: Connected to federated network with same config as shield');
                 }
+                
+                // Re-render card after wallet is fully initialized
+                this.refreshAfterWalletInit();
             } else {
                 if (this.config.debug) {
                     console.warn('⚠️ Federated wallet not available, using standalone mode');
@@ -142,6 +145,30 @@ class LemmaVerificationCard {
         } catch (error) {
             if (this.config.debug) {
                 console.warn('⚠️ Verification Card: Failed to initialize federated wallet:', error.message);
+            }
+        }
+    }
+    
+    /**
+     * Refresh card after wallet initialization
+     */
+    async refreshAfterWalletInit() {
+        if (this.state.initialized && this.state.cardElement) {
+            if (this.config.debug) {
+                console.log('🔄 Verification Card: Refreshing after wallet initialization...');
+            }
+            
+            // Re-check credentials now that wallet is ready
+            const hasCredentials = await this.checkCredentials();
+            
+            // Re-create card with updated status
+            this.createCard(this.state.cardElement, hasCredentials);
+            
+            // Re-setup event listeners
+            this.setupEventListeners();
+            
+            if (this.config.debug) {
+                console.log('✅ Verification Card: Refreshed with wallet status', { hasCredentials });
             }
         }
     }
