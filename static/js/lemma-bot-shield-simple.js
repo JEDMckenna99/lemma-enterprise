@@ -250,6 +250,29 @@ class LemmaBotShield {
                 console.log('🎉 Processing Stripe verification completion...');
             }
             
+            // Get stored session info
+            const storedSession = localStorage.getItem('lemma_verification_session');
+            let sessionData = null;
+            
+            if (storedSession) {
+                try {
+                    sessionData = JSON.parse(storedSession);
+                    if (this.config.debug) {
+                        console.log('📋 Retrieved verification session:', {
+                            session_id: sessionData.session_id,
+                            user_id: sessionData.user_id,
+                            age_minutes: Math.round((Date.now() - sessionData.started_at) / 60000)
+                        });
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Failed to parse stored session data:', e);
+                }
+            }
+            
+            if (!sessionData?.session_id) {
+                throw new Error('No verification session found. Please restart the verification process.');
+            }
+            
             // Complete the identity verification (this creates and stores the lemma)
             const response = await fetch(`${this.config.apiBase}/api/sdk/complete-identity-verification`, {
                 method: 'POST',
@@ -258,6 +281,7 @@ class LemmaBotShield {
                     'Authorization': `Bearer ${this.config.apiKey}`
                 },
                 body: JSON.stringify({
+                    session_id: sessionData?.session_id,
                     verification_return: true,
                     enable_rust_engine: true
                 })
@@ -266,6 +290,9 @@ class LemmaBotShield {
             const result = await response.json();
             
             if (result.success && result.verified && result.credential) {
+                // Clean up stored session data
+                localStorage.removeItem('lemma_verification_session');
+                
                 // Store credential in background wallet (FEDERATED NETWORK)
                 const storeResult = await this.backgroundWallet.storeCredential({
                     ...result.credential,
@@ -503,8 +530,18 @@ class LemmaBotShield {
             
             if (result.success && result.url) {
                 if (this.config.debug) {
-                    console.log('✅ Stripe session created, redirecting...');
+                    console.log('✅ Stripe session created, redirecting...', {
+                        session_id: result.session_id,
+                        user_id: result.user_id
+                    });
                 }
+                
+                // Store session info for completion
+                localStorage.setItem('lemma_verification_session', JSON.stringify({
+                    session_id: result.session_id,
+                    user_id: result.user_id,
+                    started_at: Date.now()
+                }));
                 
                 // Redirect to Stripe Identity (the working flow!)
                 window.location.href = result.url;
