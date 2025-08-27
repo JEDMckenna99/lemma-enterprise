@@ -190,6 +190,19 @@ class LemmaVerificationCard {
         this.state.checking = true;
         
         try {
+            // Ensure wallet is initialized before proceeding (SAME AS SHIELD)
+            if (!this.backgroundWallet) {
+                if (this.config.debug) {
+                    console.log('⏳ Verification Card: Waiting for federated wallet initialization...');
+                }
+                // Wait a bit and try again
+                setTimeout(() => this.render(), 1000);
+                return false;
+            }
+            
+            // CRITICAL: Ensure background wallet is initialized before checking (SAME AS SHIELD)
+            await this.backgroundWallet.init();
+            
             if (this.config.debug) {
                 console.log('🔍 Verification Card: Checking background wallet for existing lemma...');
             }
@@ -950,6 +963,11 @@ async function handleVerificationReturn() {
         if (result.success && result.verified && result.credential) {
             // Clean up stored session data (SAME AS SHIELD)
             localStorage.removeItem('lemma_verification_session');
+            
+            // Ensure wallet is initialized before storing credential (SAME AS SHIELD)
+            if (!card.backgroundWallet) {
+                throw new Error('Background wallet not initialized');
+            }
             
             // Store credential in background wallet (using shield's exact logic)
             const storeResult = await card.backgroundWallet.storeCredential({
