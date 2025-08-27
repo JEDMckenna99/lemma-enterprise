@@ -86,7 +86,7 @@
                 if (!window.heroShield) {
                     window.heroShield = new LemmaBotShield({
                         debug: true,
-                        apiBase: window.location.origin
+                        apiBase: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com'
                     });
                     await window.heroShield.initializeFederatedWallet();
                 }

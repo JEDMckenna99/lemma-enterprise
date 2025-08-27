@@ -491,7 +491,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Initialize the Lemma Shield Widget to protect the FIL join section
         lemmaShield = new LemmaBotShield({
             debug: true,
-            apiBase: window.location.origin,
+            apiBase: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com',
             onVerified: function(result) {
                 console.log('✅ Shield verification successful:', result);
                 showFILJoinInterface();

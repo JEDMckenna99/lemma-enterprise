@@ -708,6 +708,30 @@ def create_app():
                 'message': str(e)
             }), 500
 
+    # Global CORS handler for all OPTIONS requests
+    @app.before_request
+    def handle_preflight():
+        if request.method == "OPTIONS":
+            from flask import make_response
+            response = make_response()
+            origin = request.headers.get('Origin', '*')
+            response.headers.add("Access-Control-Allow-Origin", origin)
+            response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization,X-API-Key,X-CSRF-Token")
+            response.headers.add('Access-Control-Allow-Methods', "GET,PUT,POST,DELETE,OPTIONS")
+            response.headers.add('Access-Control-Allow-Credentials', 'true')
+            response.headers.add('Access-Control-Max-Age', '3600')
+            return response
+
+    # Global CORS handler for all responses
+    @app.after_request
+    def after_request(response):
+        origin = request.headers.get('Origin', '*')
+        response.headers.add('Access-Control-Allow-Origin', origin)
+        response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization,X-API-Key,X-CSRF-Token")
+        response.headers.add('Access-Control-Allow-Methods', "GET,PUT,POST,DELETE,OPTIONS")
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+
     @app.errorhandler(404)
     def not_found(error):
         return jsonify({
