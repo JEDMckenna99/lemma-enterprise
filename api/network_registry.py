@@ -152,7 +152,8 @@ def get_did_registry():
             'message': str(e)
         }), 500
 
-@network_registry_bp.route('/api/network/revocation-lists', methods=['GET'])
+@network_registry_bp.route('/api/network/revocation-lists', methods=['GET', 'OPTIONS'])
+@cors_headers
 @require_network_auth
 def get_revocation_lists():
     """
