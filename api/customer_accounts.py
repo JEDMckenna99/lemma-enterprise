@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict, field
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
+from flask_cors import cross_origin
 import stripe
 
 # Configure Stripe
