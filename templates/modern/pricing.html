@@ -595,52 +595,95 @@
                         <div class="pricing-header">
                             <h2 class="pricing-title">Federated Identity Network</h2>
                             <p class="pricing-description">
-                                Universal Proof of Humanity (PoH) verification. Users verify once, access everywhere in the network.
+                                <strong>Bot protection, lite KYC, and user verification.</strong> Universal Proof of Humanity across all network sites.
                             </p>
                         </div>
 
                         <div class="price-display">
                             <div class="price-main">
                                 <span class="price-currency">$</span>
-                                <span class="price-amount">0.05</span>
+                                <span class="price-amount">0.06</span>
                                 <span class="price-unit">per active user per month</span>
                             </div>
                             <div class="price-secondary">
-                                + <span class="price-highlight">$2.00</span> per Stripe Identity verification<br>
+                                + <span class="price-highlight">$2.00</span> per new Federated ID user<br>
                                 <small>(one-time fee for enhanced identity verification)</small>
                             </div>
                         </div>
 
-                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--gray-50); border-radius: 12px;">
-                            <h4 style="margin-bottom: var(--space-3); color: var(--gray-800); font-weight: 600;">PoH Network Features:</h4>
-                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-600); line-height: 1.8;">
-                                <li>Universal human verification across all sites</li>
-                                <li>Cryptographic proof of humanity</li>
-                                <li>2.38µs verification time (210,084x faster than Auth0)</li>
-                                <li>99.9% offline operation</li>
-                                <li>Zero-knowledge privacy protection</li>
-                                <li>Cross-site identity without tracking</li>
+                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--success-50); border-radius: 12px;">
+                            <h4 style="margin-bottom: var(--space-3); color: var(--success-800); font-weight: 600;">Fed ID Network Features:</h4>
+                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--success-700); line-height: 1.8;">
+                                <li><strong>Advanced bot protection</strong> - 99.9% bot elimination</li>
+                                <li><strong>Lite KYC verification</strong> - identity without full compliance</li>
+                                <li><strong>Universal user verification</strong> - works across all sites</li>
+                                <li><strong>2.38µs verification time</strong> - 210,084x faster than Auth0</li>
+                                <li><strong>99.9% offline operation</strong> - no network dependency</li>
+                                <li><strong>Zero-knowledge privacy</strong> - no data collection or tracking</li>
                             </ul>
                         </div>
 
                         <div class="cta-section">
                             <button onclick="window.location.href='/register'" class="cta-button" style="background: linear-gradient(135deg, var(--success-500), var(--success-600));">
-                                Join PoH Network
+                                Start Fed ID Network
                             </button>
                             <p class="cta-tagline">
-                                Foundation for all Lemma services • Universal identity
+                                Perfect for bot protection • Lite KYC • Universal verification
                             </p>
                         </div>
                     </div>
 
                     <!-- Lemma IAM System Plan -->
-                    <div class="pricing-card featured">
-                        <div class="pricing-badge">🔥 Complete IAM Solution</div>
-                        
+                    <div class="pricing-card">
                         <div class="pricing-header">
                             <h2 class="pricing-title">Lemma IAM System</h2>
                             <p class="pricing-description">
-                                <strong>Complete Auth0/Duo replacement</strong> with site-specific permissions, OAuth 2.0, and complete user management control.
+                                <strong>Complete Auth0/Duo replacement</strong> with site-specific permissions, OAuth 2.0, and full user management control.
+                            </p>
+                        </div>
+
+                        <div class="price-display">
+                            <div class="price-main">
+                                <span class="price-currency">$</span>
+                                <span class="price-amount">0.16</span>
+                                <span class="price-unit">per active user per month</span>
+                            </div>
+                            <div class="price-secondary">
+                                <strong>IAM-only service</strong> - no Fed ID Network included<br>
+                                <small>97% savings vs Auth0 + Duo ($5-13/MAU)</small>
+                            </div>
+                        </div>
+
+                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--primary-50); border-radius: 12px;">
+                            <h4 style="margin-bottom: var(--space-3); color: var(--primary-800); font-weight: 600;">Pure IAM Features:</h4>
+                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--primary-700); line-height: 1.8;">
+                                <li><strong>"Sign in with Lemma"</strong> OAuth 2.0 integration</li>
+                                <li><strong>Complete user management</strong> - add, remove, update users</li>
+                                <li><strong>Custom permissions & roles</strong> - define your own access control</li>
+                                <li><strong>Site configuration control</strong> - branding, webhooks, security</li>
+                                <li><strong>Real-time analytics</strong> - user activity and permissions</li>
+                                <li><strong>API-first architecture</strong> - full REST API control</li>
+                            </ul>
+                        </div>
+
+                        <div class="cta-section">
+                            <button onclick="window.location.href='/register'" class="cta-button" style="background: linear-gradient(135deg, var(--primary-500), var(--primary-600));">
+                                Start IAM System
+                            </button>
+                            <p class="cta-tagline">
+                                Pure IAM solution • Complete Auth0/Duo replacement
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Complete Solution Plan -->
+                    <div class="pricing-card featured">
+                        <div class="pricing-badge">🔥 Complete Solution</div>
+                        
+                        <div class="pricing-header">
+                            <h2 class="pricing-title">Fed ID + IAM Combined</h2>
+                            <p class="pricing-description">
+                                <strong>Best value:</strong> Complete bot protection, lite KYC, user verification PLUS full IAM system with permissions and OAuth.
                             </p>
                         </div>
 
@@ -651,35 +694,46 @@
                                 <span class="price-unit">per active user per month</span>
                             </div>
                             <div class="price-secondary">
-                                <span class="price-highlight">$0.05 PoH Network + $0.15 IAM Service</span><br>
-                                <small>Complete two-tier pricing - 96% savings vs Auth0 + Duo</small>
+                                <span class="price-highlight">$0.06 Fed ID + $0.16 IAM = $0.22, but only $0.20!</span><br>
+                                <small>Save $0.02/MAU when you get both services</small>
                             </div>
-                            <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--success-50); border-radius: 8px; border-left: 4px solid var(--success-500);">
-                                <small style="color: var(--success-700); font-weight: 600;">
-                                    💰 Save $4.80-12.80 per user vs traditional IAM (Auth0: $2-5/MAU + Duo: $3-8/MAU)
+                            <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--warning-50); border-radius: 8px; border-left: 4px solid var(--warning-500);">
+                                <small style="color: var(--warning-700); font-weight: 600;">
+                                    🎯 Best Value: Get both services for less than buying separately!
                                 </small>
                             </div>
                         </div>
 
-                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--primary-50); border-radius: 12px;">
-                            <h4 style="margin-bottom: var(--space-3); color: var(--primary-800); font-weight: 600;">Complete IAM Features:</h4>
-                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--primary-700); line-height: 1.8;">
-                                <li><strong>"Sign in with Lemma"</strong> OAuth 2.0 integration</li>
-                                <li><strong>Complete user management</strong> - add, remove, update users</li>
-                                <li><strong>Custom permissions & roles</strong> - define your own access control</li>
-                                <li><strong>Site configuration control</strong> - branding, webhooks, security</li>
-                                <li><strong>Real-time analytics</strong> - user activity and permissions</li>
-                                <li><strong>API-first architecture</strong> - full REST API control</li>
-                                <li><strong>Microsecond verification</strong> - 2.38µs vs 500ms+ traditional</li>
-                            </ul>
+                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--gray-900); color: var(--white); border-radius: 12px;">
+                            <h4 style="margin-bottom: var(--space-3); color: var(--white); font-weight: 600;">Everything Included:</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                                <div>
+                                    <h5 style="color: var(--success-300); margin-bottom: var(--space-2);">Fed ID Network:</h5>
+                                    <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-300); line-height: 1.6; font-size: var(--font-size-sm);">
+                                        <li>Advanced bot protection</li>
+                                        <li>Lite KYC verification</li>
+                                        <li>Universal user verification</li>
+                                        <li>2.38µs verification speed</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h5 style="color: var(--primary-300); margin-bottom: var(--space-2);">IAM System:</h5>
+                                    <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-300); line-height: 1.6; font-size: var(--font-size-sm);">
+                                        <li>OAuth 2.0 integration</li>
+                                        <li>Complete user management</li>
+                                        <li>Custom permissions & roles</li>
+                                        <li>Full API control</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="cta-section">
                             <button onclick="window.location.href='/register'" class="cta-button">
-                                Start Complete IAM Solution
+                                Get Complete Solution
                             </button>
                             <p class="cta-tagline">
-                                Replace Auth0 + Duo • Complete control • 96% cost savings
+                                Fed ID + IAM • Best value • Complete platform protection
                             </p>
                         </div>
                     </div>
@@ -730,7 +784,7 @@
 
                 <!-- Sidebar (Right Side) -->
                 <div class="pricing-sidebar">
-    <!-- Pricing Calculator -->
+                        <!-- Pricing Calculator -->
                     <div class="calculator-widget">
                         <h3 class="widget-title">💰 Pricing Calculator</h3>
                         
@@ -739,23 +793,30 @@
                         </label>
                         <input type="number" id="userCount" class="calculator-input" value="1000" min="1" onchange="calculateCost()" placeholder="Enter user count">
                         
-                        <div class="cost-result">
-                            <div style="margin-bottom: var(--space-2);">
-                                <span style="color: var(--gray-600);">Monthly Cost:</span>
-                                <div class="cost-amount" id="monthlyCost">$100.00</div>
+                        <!-- Three pricing options -->
+                        <div style="margin: var(--space-4) 0;">
+                            <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+                                <div style="display: flex; justify-content: space-between; padding: var(--space-2); background: var(--success-50); border-radius: 6px;">
+                                    <span style="font-size: var(--font-size-sm); color: var(--success-700);">Fed ID Network:</span>
+                                    <span id="fedIdCost" style="font-weight: 600; color: var(--success-700);">$60/month</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: var(--space-2); background: var(--primary-50); border-radius: 6px;">
+                                    <span style="font-size: var(--font-size-sm); color: var(--primary-700);">IAM System:</span>
+                                    <span id="iamCost" style="font-weight: 600; color: var(--primary-700);">$160/month</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: var(--space-2); background: var(--warning-50); border-radius: 6px; border: 2px solid var(--warning-300);">
+                                    <span style="font-size: var(--font-size-sm); color: var(--warning-700); font-weight: 600;">Combined (Best Value):</span>
+                                    <span id="combinedCost" style="font-weight: 700; color: var(--warning-700);">$200/month</span>
+                                </div>
                             </div>
-                            <div style="font-size: var(--font-size-sm); color: var(--gray-600);">
-                                First month: <span id="totalCost" style="font-weight: 600;">$2,100.00</span>
-                                <br><small>Includes identity verifications</small>
-                            </div>
-                </div>
+                        </div>
 
                         <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--success-50); border-radius: 8px; text-align: center;">
                             <div style="font-size: var(--font-size-sm); color: var(--success-700); font-weight: 600;">
-                                Save <span id="savingsAmount">$1,900/month</span>
+                                Save <span id="savingsAmount">$4,800/month</span>
                     </div>
                             <div style="font-size: var(--font-size-xs); color: var(--success-600);">
-                                vs Auth0 pricing
+                                vs Auth0 + Duo pricing
                     </div>
                     </div>
                     </div>
@@ -818,16 +879,23 @@
             
             <div class="faq-grid">
                 <div class="faq-item">
-                    <h3 class="faq-question">What's the difference between PoH Network and IAM System?</h3>
+                    <h3 class="faq-question">What are the three pricing options?</h3>
                     <p class="faq-answer">
-                        <strong>PoH Network ($0.05/MAU)</strong> provides universal human verification across all sites. <strong>IAM System ($0.20/MAU total)</strong> includes PoH plus complete user management, custom permissions, OAuth 2.0, and site-specific access control - a complete Auth0/Duo replacement.
+                        <strong>Fed ID Network ($0.06/MAU):</strong> Bot protection, lite KYC, user verification. <strong>IAM System ($0.16/MAU):</strong> Complete Auth0/Duo replacement with permissions and OAuth. <strong>Combined ($0.20/MAU):</strong> Both services together with $0.02/MAU discount.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">How does Lemma IAM compare to Auth0 and Duo?</h3>
+                    <h3 class="faq-question">Can I use just one service or do I need both?</h3>
                     <p class="faq-answer">
-                        Lemma IAM costs $0.20/MAU vs Auth0 ($2-5/MAU) + Duo ($3-8/MAU) = $5-13/MAU total. That's <strong>96% cost savings</strong> with <strong>210,084x faster verification</strong> (2.38µs vs 500ms+) and complete client control over users and permissions.
+                        You can choose any option! <strong>Fed ID Network</strong> is perfect for bot protection and basic verification. <strong>IAM System</strong> replaces Auth0/Duo for user management. <strong>Combined</strong> gives you everything at the best value - save $0.02/MAU vs buying separately.
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">How does this compare to Auth0 and Duo?</h3>
+                    <p class="faq-answer">
+                        Even our <strong>Combined solution ($0.20/MAU)</strong> costs 96% less than Auth0 ($2-5/MAU) + Duo ($3-8/MAU) = $5-13/MAU total. Plus you get <strong>210,084x faster verification</strong> (2.38µs vs 500ms+) and complete control vs vendor lock-in.
                     </p>
                 </div>
 
@@ -887,15 +955,18 @@
 
 
     <script>
-        // Enhanced pricing calculator with IAM system pricing
+        // Enhanced pricing calculator with flexible pricing options
         function calculateCost() {
             const userCount = parseInt(document.getElementById('userCount').value) || 0;
             
-            // Lemma IAM pricing (PoH + IAM)
-            const pohRate = 0.05; // PoH Network
-            const iamRate = 0.15; // IAM Service
-            const lemmaMonthlyRate = pohRate + iamRate; // $0.20 total
-            const lemmaSetupFeePerUser = 2.00; // One-time Stripe Identity
+            // Lemma pricing options
+            const fedIdRate = 0.06; // Fed ID Network only
+            const iamRate = 0.16; // IAM System only
+            const combinedRate = 0.20; // Both services (discounted from $0.22)
+            
+            // Use combined pricing as default for calculator
+            const lemmaMonthlyRate = combinedRate;
+            const lemmaSetupFeePerUser = 2.00; // One-time for new Fed ID users
             const lemmaMonthlyTotal = userCount * lemmaMonthlyRate;
             const lemmaSetupTotal = userCount * lemmaSetupFeePerUser;
             const lemmaTotalFirstMonth = lemmaMonthlyTotal + lemmaSetupTotal;
@@ -906,19 +977,26 @@
             const cloudflareMonthly = calculateCloudflareCost(userCount);
             const recaptchaMonthly = calculateRecaptchaCost(userCount);
             
-            // Update calculator display
-            document.getElementById('monthlyCost').textContent = '$' + lemmaMonthlyTotal.toLocaleString();
-            document.getElementById('totalCost').textContent = '$' + lemmaTotalFirstMonth.toLocaleString();
+            // Calculate all three pricing options
+            const fedIdMonthly = userCount * fedIdRate;
+            const iamMonthly = userCount * iamRate;
+            const combinedMonthly = userCount * combinedRate;
+            
+            // Update calculator display for all three options
+            document.getElementById('fedIdCost').textContent = '$' + fedIdMonthly.toLocaleString() + '/month';
+            document.getElementById('iamCost').textContent = '$' + iamMonthly.toLocaleString() + '/month';
+            document.getElementById('combinedCost').textContent = '$' + combinedMonthly.toLocaleString() + '/month';
             
             // Update user count display
             document.getElementById('user-count-display').textContent = userCount.toLocaleString();
             
-            // Calculate savings vs Auth0
-            const auth0Savings = auth0Monthly - lemmaMonthlyTotal;
-            document.getElementById('savingsAmount').textContent = '$' + Math.max(0, auth0Savings).toLocaleString() + '/month';
+            // Calculate savings vs Auth0 + Duo (using combined pricing)
+            const auth0DuoTotal = auth0Monthly + (userCount * 3); // Assuming $3/user for Duo minimum
+            const totalSavings = auth0DuoTotal - combinedMonthly;
+            document.getElementById('savingsAmount').textContent = '$' + Math.max(0, totalSavings).toLocaleString() + '/month';
             
-            // Update comparison table dynamically
-            updateComparisonTable(userCount, lemmaMonthlyTotal, auth0Monthly, oktaMonthly, cloudflareMonthly, recaptchaMonthly);
+            // Update comparison table dynamically (using combined pricing)
+            updateComparisonTable(userCount, combinedMonthly, auth0Monthly, oktaMonthly, cloudflareMonthly, recaptchaMonthly);
         }
         
         // Auth0 pricing: Enterprise plan starts at $1,330/month for up to 1000 users
