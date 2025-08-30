@@ -159,7 +159,8 @@ class CustomerAccountManager:
         """Create a new customer account"""
         try:
             # Check if customer already exists
-            if email in self.email_to_customer:
+            existing_customer = self.get_customer_by_email(email)
+            if existing_customer:
                 return {
                     'success': False,
                     'error': 'Customer with this email already exists'
@@ -271,12 +272,7 @@ class CustomerAccountManager:
         """Get customer by ID"""
         return self.customers.get(customer_id)
     
-    def get_customer_by_email(self, email: str) -> Optional[Customer]:
-        """Get customer by email"""
-        customer_id = self.email_to_customer.get(email)
-        if customer_id:
-            return self.customers.get(customer_id)
-        return None
+
     
     def get_customer_by_api_key(self, api_key: str) -> Optional[Customer]:
         """Get customer by API key"""
@@ -364,37 +360,37 @@ class CustomerAccountManager:
         """Create an admin user account"""
         try:
             # Check if user already exists
-            if email in self.email_to_customer:
-                existing_customer = self.get_customer_by_email(email)
-                if existing_customer:
-                    # Upgrade existing user to admin
-                    existing_customer.role = 'admin'
-                    existing_customer.permissions = ['admin_access', 'user_management', 'system_config']
-                    # Set password if not already set
-                    if not existing_customer.password_hash:
-                        existing_customer.password_hash = self.hash_password("admin123")
-                    
-                    # Update in database
-                    try:
-                        db = get_db()
-                        db_customer = db.query(DBCustomer).filter(DBCustomer.email == email).first()
-                        if db_customer:
-                            db_customer.role = 'admin'
-                            db_customer.permissions = ['admin_access', 'user_management', 'system_config']
-                            if not db_customer.password_hash:
-                                db_customer.password_hash = self.hash_password("admin123")
-                            db.commit()
-                        db.close()
-                    except Exception as e:
-                        logger.error(f"Failed to update admin in database: {e}")
-                        db.rollback()
-                        db.close()
-                    logger.info(f"Upgraded existing user to admin: {email}")
-                    return {
-                        'success': True,
-                        'message': 'User upgraded to admin',
-                        'customer_id': existing_customer.customer_id
-                    }
+            existing_customer = self.get_customer_by_email(email)
+            if existing_customer:
+                # Upgrade existing user to admin
+                existing_customer.role = 'admin'
+                existing_customer.permissions = ['admin_access', 'user_management', 'system_config']
+                # Set password if not already set
+                if not existing_customer.password_hash:
+                    existing_customer.password_hash = self.hash_password("admin123")
+                
+                # Update in database
+                try:
+                    db = get_db()
+                    db_customer = db.query(DBCustomer).filter(DBCustomer.email == email).first()
+                    if db_customer:
+                        db_customer.role = 'admin'
+                        db_customer.permissions = ['admin_access', 'user_management', 'system_config']
+                        if not db_customer.password_hash:
+                            db_customer.password_hash = self.hash_password("admin123")
+                        db.commit()
+                    db.close()
+                except Exception as e:
+                    logger.error(f"Failed to update admin in database: {e}")
+                    db.rollback()
+                    db.close()
+                
+                logger.info(f"Upgraded existing user to admin: {email}")
+                return {
+                    'success': True,
+                    'message': 'User upgraded to admin',
+                    'customer_id': existing_customer.customer_id
+                }
             
             # Create new admin user with default password
             result = self.create_customer(email, name, company, password="admin123")
