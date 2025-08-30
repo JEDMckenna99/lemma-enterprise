@@ -735,8 +735,8 @@ def create_app():
     @app.before_request
     def handle_cors_preflight():
         if request.method == "OPTIONS":
-            # Only handle API endpoints to avoid conflicts
-            if request.path.startswith('/api/'):
+            # Handle API endpoints AND auth endpoints for cross-domain access
+            if request.path.startswith('/api/') or request.path in ['/login', '/register', '/dashboard']:
                 from flask import make_response
                 response = make_response()
                 origin = request.headers.get('Origin', '*')

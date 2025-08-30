@@ -304,6 +304,7 @@ customer_manager = CustomerAccountManager()
 # API Routes
 
 @customer_accounts_bp.route('/register', methods=['GET', 'POST'])
+@cross_origin(origins=['https://lemma.id', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com'], supports_credentials=True)
 def register():
     """Customer registration page and handler"""
     if request.method == 'GET':
@@ -359,6 +360,7 @@ def register():
         }), 500
 
 @customer_accounts_bp.route('/login', methods=['GET', 'POST'])
+@cross_origin(origins=['https://lemma.id', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com'], supports_credentials=True)
 def login():
     """Customer login page and handler"""
     if request.method == 'GET':
