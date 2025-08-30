@@ -10,6 +10,10 @@ use crate::{
     Result, LemmaError
 };
 
+// Re-export permission package
+pub mod permission_package;
+pub use permission_package::{PermissionPackage, PermissionInfo, SubnetConfig, AccessRequest, IAMSubnetManager};
+
 /// Trait for pluggable verification packages
 pub trait VerificationPackage: Send + Sync {
     /// Get the package type identifier

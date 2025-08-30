@@ -48,10 +48,10 @@ pub use crate::oprf::{OPRFClient, OPRFServer, OPRFResult, RealisticOPRFClient};
 pub use crate::bloom::{BloomFilter, CascadedBloomFilter};
 pub use crate::credentials::{VerifiableCredential, CredentialIssuer, Ed25519PublicKey, Ed25519PrivateKey};
 pub use crate::core::{LemmaCore, VerificationResult};
-pub use crate::packages::{VerificationPackage, IdentityPackage, TicketPackage, PackageAuthenticityPackage};
+pub use crate::packages::{VerificationPackage, IdentityPackage, TicketPackage, PackageAuthenticityPackage, PermissionPackage};
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::zkp_claims::{ZKPClaim, ZKPClaimProof, ZKPClaimType, ZKPCredential, ZKPVerifier};
-pub use crate::wallet::{BackgroundWallet, WalletConfig, WalletStats, WalletStorage, PrivacyLevel};
+pub use crate::wallet::{BackgroundWallet, WalletConfig, WalletStats, WalletStorage, PrivacyLevel, CompleteAccessResult, CompleteWalletStats};
 
 /// Main error type for the library
 #[derive(Error, Debug, Clone)]
@@ -76,6 +76,8 @@ pub enum LemmaError {
     Crypto(String),
     #[error("ZKP error: {0}")]
     ZKP(String),
+    #[error("Wallet error: {0}")]
+    Wallet(String),
 }
 
 // Implement From traits for error conversion

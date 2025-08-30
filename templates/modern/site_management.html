@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Management - Lemma.id Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma-design-system.css') }}">
+    <style>
+        .site-management {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .site-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 2px solid #f0f0f0;
+        }
+        
+        .site-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .site-info h3 {
+            color: #d4af37;
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        
+        .site-info p {
+            color: #666;
+            margin: 0.5rem 0 0 0;
+        }
+        
+        .site-status {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+        
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .permission-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        
+        .permission-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            border-left: 4px solid #d4af37;
+        }
+        
+        .permission-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .permission-name {
+            font-weight: bold;
+            color: #333;
+            font-size: 1.1rem;
+        }
+        
+        .permission-scope {
+            background: #e9ecef;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin: 0.25rem 0.25rem 0.25rem 0;
+            display: inline-block;
+        }
+        
+        .user-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+        
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .user-item:last-child {
+            border-bottom: none;
+        }
+        
+        .user-info {
+            flex: 1;
+        }
+        
+        .user-did {
+            font-family: monospace;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .user-permissions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .permission-badge {
+            background: #d4af37;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #d4af37, #f4e4a6);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .integration-code {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        .tab-container {
+            margin-top: 2rem;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 1.5rem;
+        }
+        
+        .tab-button {
+            padding: 1rem 2rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-button.active {
+            color: #d4af37;
+            border-bottom-color: #d4af37;
+            font-weight: bold;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #d4af37;
+        }
+        
+        .scope-builder {
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 0.5rem;
+        }
+        
+        .scope-item {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+            align-items: center;
+        }
+        
+        .scope-item input {
+            flex: 1;
+            margin: 0;
+        }
+        
+        .performance-indicator {
+            display: inline-flex;
+            align-items: center;
+            background: #d4edda;
+            color: #155724;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 1rem;
+        }
+        
+        .performance-indicator::before {
+            content: "⚡";
+            margin-right: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="site-management">
+        <header class="site-header">
+            <div class="site-info">
+                <h1>Site Management Dashboard</h1>
+                <p>Manage your Lemma.id IAM integration and permissions</p>
+            </div>
+            <div class="performance-indicator">4.176µs verification</div>
+        </header>
+
+        <!-- Statistics Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="monthly-users">1,247</div>
+                <div class="stat-label">Monthly Active Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="total-permissions">23</div>
+                <div class="stat-label">Permission Types</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="verifications-today">15,892</div>
+                <div class="stat-label">Verifications Today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="monthly-cost">$24.94</div>
+                <div class="stat-label">Monthly Cost</div>
+            </div>
+        </div>
+
+        <!-- Site Configuration -->
+        <div class="site-card">
+            <div class="site-header">
+                <div class="site-info">
+                    <h3 id="site-domain">yoursite.com</h3>
+                    <p>Site ID: <code id="site-id">site_abc123def456</code></p>
+                </div>
+                <div class="site-status status-active" id="site-status">Active</div>
+            </div>
+
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-button active" onclick="showTab('overview')">Overview</button>
+                    <button class="tab-button" onclick="showTab('permissions')">Permissions</button>
+                    <button class="tab-button" onclick="showTab('users')">Users</button>
+                    <button class="tab-button" onclick="showTab('integration')">Integration</button>
+                    <button class="tab-button" onclick="showTab('analytics')">Analytics</button>
+                </div>
+
+                <!-- Overview Tab -->
+                <div id="overview-tab" class="tab-content active">
+                    <h4>Quick Integration</h4>
+                    <p>Replace Auth0/Okta in minutes with Lemma's complete IAM solution:</p>
+                    
+                    <div class="integration-code">
+// 1. Install SDK
+npm install @lemma/iam-sdk
+
+// 2. Initialize (replace Auth0 config)
+const lemmaIAM = new LemmaIAM({
+    apiKey: 'your-site-api-key',
+    siteId: 'site_abc123def456',
+    clientId: 'lemma_oauth_site_abc123def456'
+});
+
+// 3. Sign in with Lemma (replaces Auth0 login)
+lemmaIAM.signInWithLemma();
+
+// 4. Check permissions (4.176µs vs Auth0's 500ms-2s)
+const hasAccess = await lemmaIAM.verifyAccess('/admin', 'read');
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="copyIntegrationCode()">Copy Integration Code</button>
+                        <button class="btn btn-secondary" onclick="downloadSDK()">Download SDK</button>
+                        <button class="btn btn-secondary" onclick="viewDocs()">View Documentation</button>
+                    </div>
+                </div>
+
+                <!-- Permissions Tab -->
+                <div id="permissions-tab" class="tab-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h4>Permission Management</h4>
+                        <button class="btn btn-primary" onclick="showCreatePermissionModal()">Create Permission</button>
+                    </div>
+
+                    <div class="permission-grid" id="permissions-grid">
+                        <!-- Permissions will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Users Tab -->
+                <div id="users-tab" class="tab-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h4>User Management</h4>
+                        <button class="btn btn-primary" onclick="showGrantPermissionModal()">Grant Permission</button>
+                    </div>
+
+                    <div class="user-list" id="users-list">
+                        <!-- Users will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Integration Tab -->
+                <div id="integration-tab" class="tab-content">
+                    <h4>Integration Guide</h4>
+                    
+                    <div style="margin-bottom: 2rem;">
+                        <h5>OAuth Configuration</h5>
+                        <div class="form-group">
+                            <label>Client ID</label>
+                            <input type="text" id="oauth-client-id" readonly value="lemma_oauth_site_abc123def456">
+                        </div>
+                        <div class="form-group">
+                            <label>Redirect URI</label>
+                            <input type="text" id="redirect-uri" placeholder="https://yoursite.com/auth/callback">
+                        </div>
+                        <div class="form-group">
+                            <label>Authorization URL</label>
+                            <input type="text" readonly value="https://lemma.id/api/v1/oauth/authorize">
+                        </div>
+                        <div class="form-group">
+                            <label>Token URL</label>
+                            <input type="text" readonly value="https://lemma.id/api/v1/oauth/token">
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 2rem;">
+                        <h5>API Endpoints</h5>
+                        <div class="integration-code">
+// Verify Access (4.176µs performance)
+POST https://lemma.id/api/v1/auth/verify
+{
+  "site_id": "site_abc123def456",
+  "user_did": "did:lemma:user123",
+  "resource": "/admin/users",
+  "action": "read",
+  "user_lemmas": [...]
+}
+
+// Grant Permission
+POST https://lemma.id/api/v1/sites/site_abc123def456/users/{user_did}/permissions
+{
+  "permission_id": "admin",
+  "expiry_days": 30
+}
+
+// Revoke Permission  
+DELETE https://lemma.id/api/v1/sites/site_abc123def456/users/{user_did}/permissions/{permission_id}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analytics Tab -->
+                <div id="analytics-tab" class="tab-content">
+                    <h4>Usage Analytics</h4>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                        <div>
+                            <h5>Verification Performance</h5>
+                            <canvas id="performance-chart" width="400" height="200"></canvas>
+                        </div>
+                        <div>
+                            <h5>Monthly Active Users</h5>
+                            <canvas id="mau-chart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        <div>
+                            <h5>Permission Usage</h5>
+                            <div id="permission-usage-list">
+                                <!-- Permission usage stats -->
+                            </div>
+                        </div>
+                        <div>
+                            <h5>Cost Breakdown</h5>
+                            <div id="cost-breakdown">
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #eee;">
+                                    <span>PoH Network (1,247 MAU × $0.05)</span>
+                                    <span>$6.24</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #eee;">
+                                    <span>Permission IAM (1,247 MAU × $0.15)</span>
+                                    <span>$18.71</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; font-weight: bold; border-top: 2px solid #d4af37; margin-top: 0.5rem;">
+                                    <span>Total Monthly Cost</span>
+                                    <span>$24.95</span>
+                                </div>
+                                <div style="color: #28a745; font-size: 0.9rem; margin-top: 0.5rem;">
+                                    💰 Saving $1,247 vs Auth0+Duo ($100/user/month)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Permission Modal -->
+    <div id="create-permission-modal" class="modal">
+        <div class="modal-content">
+            <h3>Create New Permission</h3>
+            <form id="create-permission-form">
+                <div class="form-group">
+                    <label>Permission ID</label>
+                    <input type="text" id="permission-id" placeholder="admin" required>
+                </div>
+                <div class="form-group">
+                    <label>Display Name</label>
+                    <input type="text" id="permission-name" placeholder="Administrator" required>
+                </div>
+                <div class="form-group">
+                    <label>Scope</label>
+                    <div class="scope-builder">
+                        <div class="scope-item">
+                            <input type="text" placeholder="Resource (e.g., users, posts)" id="scope-resource-0">
+                            <select id="scope-action-0">
+                                <option value="*">All Actions</option>
+                                <option value="read">Read</option>
+                                <option value="write">Write</option>
+                                <option value="delete">Delete</option>
+                            </select>
+                            <button type="button" onclick="removeScopeItem(0)">Remove</button>
+                        </div>
+                        <button type="button" onclick="addScopeItem()">Add Scope</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Expiry (days)</label>
+                    <input type="number" id="permission-expiry" placeholder="365">
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">Create Permission</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('create-permission-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Grant Permission Modal -->
+    <div id="grant-permission-modal" class="modal">
+        <div class="modal-content">
+            <h3>Grant Permission to User</h3>
+            <form id="grant-permission-form">
+                <div class="form-group">
+                    <label>User DID</label>
+                    <input type="text" id="grant-user-did" placeholder="did:lemma:user123" required>
+                </div>
+                <div class="form-group">
+                    <label>Permission</label>
+                    <select id="grant-permission-id" required>
+                        <!-- Options loaded dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Expiry (days)</label>
+                    <input type="number" id="grant-expiry" placeholder="30">
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">Grant Permission</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('grant-permission-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Tab management
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+            
+            // Load tab-specific data
+            if (tabName === 'permissions') {
+                loadPermissions();
+            } else if (tabName === 'users') {
+                loadUsers();
+            } else if (tabName === 'analytics') {
+                loadAnalytics();
+            }
+        }
+
+        // Modal management
+        function showCreatePermissionModal() {
+            document.getElementById('create-permission-modal').style.display = 'block';
+        }
+
+        function showGrantPermissionModal() {
+            loadPermissionOptions();
+            document.getElementById('grant-permission-modal').style.display = 'block';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // Load permissions
+        async function loadPermissions() {
+            try {
+                const response = await fetch('/api/v1/sites/site_abc123def456/permissions');
+                const permissions = await response.json();
+                
+                const grid = document.getElementById('permissions-grid');
+                grid.innerHTML = permissions.map(permission => `
+                    <div class="permission-card">
+                        <div class="permission-header">
+                            <div class="permission-name">${permission.display_name}</div>
+                            <button class="btn btn-sm btn-danger" onclick="deletePermission('${permission.permission_id}')">Delete</button>
+                        </div>
+                        <div class="permission-scopes">
+                            ${permission.scope.map(scope => `<span class="permission-scope">${scope}</span>`).join('')}
+                        </div>
+                        <div style="margin-top: 1rem; color: #666; font-size: 0.9rem;">
+                            Created: ${new Date(permission.created_at).toLocaleDateString()}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load permissions:', error);
+            }
+        }
+
+        // Load users
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/v1/sites/site_abc123def456/users');
+                const users = await response.json();
+                
+                const list = document.getElementById('users-list');
+                list.innerHTML = users.map(user => `
+                    <div class="user-item">
+                        <div class="user-info">
+                            <div class="user-did">${user.user_did}</div>
+                            <div class="user-permissions">
+                                ${user.permissions.map(p => `<span class="permission-badge">${p}</span>`).join('')}
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-primary" onclick="manageUserPermissions('${user.user_did}')">Manage</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load users:', error);
+            }
+        }
+
+        // Create permission
+        document.getElementById('create-permission-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const permissionData = {
+                permission_id: document.getElementById('permission-id').value,
+                display_name: document.getElementById('permission-name').value,
+                scope: getScopeFromBuilder(),
+                expiry_days: document.getElementById('permission-expiry').value || null
+            };
+            
+            try {
+                const response = await fetch('/api/v1/sites/site_abc123def456/permissions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(permissionData)
+                });
+                
+                if (response.ok) {
+                    closeModal('create-permission-modal');
+                    loadPermissions();
+                    alert('Permission created successfully!');
+                }
+            } catch (error) {
+                alert('Failed to create permission: ' + error.message);
+            }
+        });
+
+        // Grant permission
+        document.getElementById('grant-permission-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const userDid = document.getElementById('grant-user-did').value;
+            const permissionId = document.getElementById('grant-permission-id').value;
+            const expiryDays = document.getElementById('grant-expiry').value;
+            
+            try {
+                const response = await fetch(`/api/v1/sites/site_abc123def456/users/${userDid}/permissions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        permission_id: permissionId,
+                        expiry_days: expiryDays || null
+                    })
+                });
+                
+                if (response.ok) {
+                    closeModal('grant-permission-modal');
+                    loadUsers();
+                    alert('Permission granted successfully!');
+                }
+            } catch (error) {
+                alert('Failed to grant permission: ' + error.message);
+            }
+        });
+
+        // Utility functions
+        function getScopeFromBuilder() {
+            const scopes = [];
+            document.querySelectorAll('.scope-item').forEach(item => {
+                const resource = item.querySelector('input').value;
+                const action = item.querySelector('select').value;
+                if (resource) {
+                    scopes.push(`${resource}:${action}`);
+                }
+            });
+            return scopes;
+        }
+
+        let scopeItemCount = 1;
+        function addScopeItem() {
+            const builder = document.querySelector('.scope-builder');
+            const newItem = document.createElement('div');
+            newItem.className = 'scope-item';
+            newItem.innerHTML = `
+                <input type="text" placeholder="Resource" id="scope-resource-${scopeItemCount}">
+                <select id="scope-action-${scopeItemCount}">
+                    <option value="*">All Actions</option>
+                    <option value="read">Read</option>
+                    <option value="write">Write</option>
+                    <option value="delete">Delete</option>
+                </select>
+                <button type="button" onclick="removeScopeItem(${scopeItemCount})">Remove</button>
+            `;
+            builder.insertBefore(newItem, builder.lastElementChild);
+            scopeItemCount++;
+        }
+
+        function removeScopeItem(index) {
+            const item = document.querySelector(`#scope-resource-${index}`).parentElement;
+            item.remove();
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPermissions();
+        });
+    </script>
+</body>
+</html>

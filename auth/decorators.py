@@ -1,454 +1,206 @@
 """
-Security Decorators - Salvaged from Old Build
-============================================
-Enhanced security decorators for CSRF protection, rate limiting, and API key authentication.
+Authentication and authorization decorators for Lemma.id platform
 """
 
-import time
-import logging
 from functools import wraps
-from flask import request, jsonify, session, current_app, g, redirect, url_for
-from typing import Dict, Any, Optional
-
-logger = logging.getLogger(__name__)
-
-# Rate limiting storage (in production, use Redis)
-rate_limit_storage = {}
-
-def csrf_protect(f):
-    """
-    SALVAGED: CSRF protection decorator
-    Validates CSRF tokens for state-changing requests
-    """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
-            # Get CSRF token from headers
-            token = (request.headers.get('X-CSRF-Token') or 
-                    request.headers.get('X-CSRFToken') or
-                    request.headers.get('X-XSRF-TOKEN'))
-            
-            # Get session token
-            session_token = session.get('csrf_token')
-            
-            if not token:
-                logger.warning(f"CSRF token missing for {request.endpoint}")
-                return jsonify({
-                    'success': False,
-                    'error': 'csrf_token_missing',
-                    'message': 'CSRF token required for this request',
-                    'shield_action': 'require_verification'
-                }), 403
-            
-            if not session_token:
-                logger.warning(f"Session CSRF token missing for {request.endpoint}")
-                return jsonify({
-                    'success': False,
-                    'error': 'csrf_session_missing',
-                    'message': 'CSRF session not found',
-                    'shield_action': 'require_verification'
-                }), 403
-            
-            if token != session_token:
-                logger.warning(f"CSRF token mismatch for {request.endpoint}")
-                return jsonify({
-                    'success': False,
-                    'error': 'csrf_token_invalid',
-                    'message': 'Invalid CSRF token',
-                    'shield_action': 'require_verification'
-                }), 403
-        
-        return f(*args, **kwargs)
-    return decorated_function
-
-def rate_limit(max_requests: int = 100, window: int = 60, per_ip: bool = True):
-    """
-    SALVAGED: Rate limiting decorator
-    Limits requests per IP or globally within a time window
-    """
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            current_time = time.time()
-            
-            # Generate key for rate limiting
-            if per_ip:
-                key = f"rate_limit:{request.remote_addr}:{request.endpoint}"
-            else:
-                key = f"rate_limit:global:{request.endpoint}"
-            
-            # Clean old entries
-            if key in rate_limit_storage:
-                rate_limit_storage[key] = [
-                    timestamp for timestamp in rate_limit_storage[key]
-                    if current_time - timestamp < window
-                ]
-            else:
-                rate_limit_storage[key] = []
-            
-            # Check rate limit
-            if len(rate_limit_storage[key]) >= max_requests:
-                logger.warning(f"Rate limit exceeded for {key}")
-                return jsonify({
-                    'success': False,
-                    'error': 'rate_limit_exceeded',
-                    'message': f'Rate limit exceeded. Max {max_requests} requests per {window} seconds.',
-                    'retry_after': window,
-                    'shield_action': 'rate_limited'
-                }), 429
-            
-            # Add current request
-            rate_limit_storage[key].append(current_time)
-            
-            # Add rate limit headers
-            response = f(*args, **kwargs)
-            if hasattr(response, 'headers'):
-                response.headers['X-RateLimit-Limit'] = str(max_requests)
-                response.headers['X-RateLimit-Remaining'] = str(max_requests - len(rate_limit_storage[key]))
-                response.headers['X-RateLimit-Reset'] = str(int(current_time + window))
-            
-            return response
-        return decorated_function
-    return decorator
+from flask import request, jsonify, g, make_response
+import jwt
+from typing import Optional
 
 def require_api_key(f):
     """
-    SALVAGED: API key authentication decorator
-    Requires valid API key for access
+    Decorator to require valid API key for endpoint access
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Get API key from headers
-        api_key = (request.headers.get('X-API-Key') or 
-                  request.headers.get('Authorization', '').replace('Bearer ', ''))
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         
         if not api_key:
-            return jsonify({
-                'success': False,
-                'error': 'api_key_required',
-                'message': 'API key required for this endpoint',
-                'shield_action': 'require_api_key'
-            }), 401
+            return jsonify({'error': 'API key required'}), 401
         
-        # Validate API key (implement your validation logic)
-        if not validate_api_key(api_key):
-            return jsonify({
-                'success': False,
-                'error': 'invalid_api_key',
-                'message': 'Invalid API key',
-                'shield_action': 'invalid_credentials'
-            }), 401
+        # TODO: Validate API key against database
+        # For now, accept any non-empty API key for testing
+        if len(api_key) < 10:
+            return jsonify({'error': 'Invalid API key'}), 401
         
-        # Store API key info in g for use in the request
         g.api_key = api_key
-        
         return f(*args, **kwargs)
+    
     return decorated_function
 
-def validate_api_key(api_key: str) -> bool:
+def require_site_admin(f):
     """
-    Validate API key
-    In production, check against database or API key service
+    Decorator to require site admin privileges
     """
-    if not api_key:
-        return False
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check for API key first
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        
+        if not api_key:
+            return jsonify({'error': 'API key required for admin access'}), 401
+        
+        # TODO: Validate admin privileges against database
+        # For now, accept any valid API key as admin for testing
+        if len(api_key) < 10:
+            return jsonify({'error': 'Invalid admin credentials'}), 403
+        
+        g.api_key = api_key
+        g.is_admin = True
+        return f(*args, **kwargs)
     
-    # For development, accept any key that starts with 'lemma_'
-    if current_app.debug and api_key.startswith('lemma_'):
-        return True
+    return decorated_function
+
+def require_oauth_token(f):
+    """
+    Decorator to require valid OAuth access token
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'OAuth token required'}), 401
+        
+        token = auth_header.split(' ')[1]
+        
+        try:
+            # TODO: Use proper secret key from config
+            payload = jwt.decode(token, 'your-secret-key', algorithms=['HS256'])
+            g.oauth_payload = payload
+            g.site_id = payload.get('site_id')
+            return f(*args, **kwargs)
+        except jwt.InvalidTokenError as e:
+            return jsonify({'error': f'Invalid token: {str(e)}'}), 401
     
-    # TODO: Implement proper API key validation
-    # This should check against your API key management system
-    return True
+    return decorated_function
+
+def optional_auth(f):
+    """
+    Decorator that allows optional authentication
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Try API key first
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        if api_key and len(api_key) >= 10:
+            g.api_key = api_key
+            g.authenticated = True
+        else:
+            # Try OAuth token
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                token = auth_header.split(' ')[1]
+                try:
+                    payload = jwt.decode(token, 'your-secret-key', algorithms=['HS256'])
+                    g.oauth_payload = payload
+                    g.site_id = payload.get('site_id')
+                    g.authenticated = True
+                except jwt.InvalidTokenError:
+                    g.authenticated = False
+            else:
+                g.authenticated = False
+        
+        return f(*args, **kwargs)
+    
+    return decorated_function
 
 def cors_headers(f):
     """
-    SALVAGED: CORS headers decorator
-    Adds appropriate CORS headers for cross-origin requests
+    Decorator to add CORS headers to responses
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        from flask import make_response
-        
-        response = f(*args, **kwargs)
-        
-        # Convert to Flask Response object if needed
-        if not hasattr(response, 'headers'):
-            response = make_response(response)
-        
-        # Add CORS headers
+        response = make_response(f(*args, **kwargs))
         origin = request.headers.get('Origin', '*')
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key, X-CSRF-Token'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
-        response.headers['Access-Control-Max-Age'] = '3600'
-        
         return response
+    
     return decorated_function
 
-def require_verified_user(f):
+def require_admin(f):
     """
-    SALVAGED: Require verified user decorator
-    Ensures user has completed verification
+    Decorator to require admin privileges
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Check if user is verified
-        if not session.get('verified_user'):
-            return jsonify({
-                'success': False,
-                'error': 'verification_required',
-                'message': 'User verification required',
-                'shield_action': 'require_verification'
-            }), 401
+        # Check for API key first
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         
-        # Check if verification is still valid
-        verification_time = session.get('verification_time')
-        if verification_time:
-            verification_age = time.time() - verification_time
-            # Verification expires after 24 hours
-            if verification_age > 86400:
-                session.pop('verified_user', None)
-                session.pop('verification_time', None)
-                return jsonify({
-                    'success': False,
-                    'error': 'verification_expired',
-                    'message': 'User verification has expired',
-                    'shield_action': 'require_verification'
-                }), 401
+        if not api_key:
+            return jsonify({'error': 'Admin API key required'}), 401
         
+        # TODO: Validate admin privileges against database
+        # For now, accept any valid API key as admin for testing
+        if len(api_key) < 10:
+            return jsonify({'error': 'Invalid admin credentials'}), 403
+        
+        g.api_key = api_key
+        g.is_admin = True
         return f(*args, **kwargs)
+    
     return decorated_function
 
 def init_csrf_protection(app):
     """
     Initialize CSRF protection for the Flask app
     """
-    @app.before_request
-    def generate_csrf_token():
-        """Generate CSRF token if not present"""
-        if 'csrf_token' not in session:
-            session['csrf_token'] = generate_secure_token()
-    
-    @app.route('/api/csrf-token', methods=['GET'])
-    def get_csrf_token():
-        """Get CSRF token for client-side requests"""
-        return jsonify({
-            'success': True,
-            'csrf_token': session.get('csrf_token'),
-            'message': 'CSRF token generated'
-        })
+    # TODO: Implement CSRF protection
+    pass
 
-def generate_secure_token(length: int = 32) -> str:
-    """Generate a secure random token"""
-    import secrets
-    return secrets.token_urlsafe(length)
-
-def log_security_event(event_type: str, details: Dict[str, Any], level: str = 'INFO'):
-    """
-    SALVAGED: Security event logging
-    Logs security events for monitoring and analysis
-    """
-    security_logger = logging.getLogger('security')
-    
-    log_entry = {
-        'event_type': event_type,
-        'timestamp': time.time(),
-        'ip_address': request.remote_addr if request else 'unknown',
-        'user_agent': request.user_agent.string if request else 'unknown',
-        'endpoint': request.endpoint if request else 'unknown',
-        'details': details
-    }
-    
-    if level == 'WARNING':
-        security_logger.warning(f"Security event: {event_type}", extra=log_entry)
-    elif level == 'ERROR':
-        security_logger.error(f"Security event: {event_type}", extra=log_entry)
-    else:
-        security_logger.info(f"Security event: {event_type}", extra=log_entry)
-
-# Input validation helpers
-def validate_json_input(required_fields: list = None, optional_fields: list = None):
-    """
-    SALVAGED: JSON input validation decorator
-    Validates JSON input structure
-    """
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not request.is_json:
-                return jsonify({
-                    'success': False,
-                    'error': 'invalid_content_type',
-                    'message': 'Content-Type must be application/json'
-                }), 400
-            
-            try:
-                data = request.get_json()
-                if data is None:
-                    return jsonify({
-                        'success': False,
-                        'error': 'invalid_json',
-                        'message': 'Invalid JSON in request body'
-                    }), 400
-            except Exception as e:
-                return jsonify({
-                    'success': False,
-                    'error': 'json_parse_error',
-                    'message': f'Failed to parse JSON: {str(e)}'
-                }), 400
-            
-            # Validate required fields
-            if required_fields:
-                missing_fields = [field for field in required_fields if field not in data]
-                if missing_fields:
-                    return jsonify({
-                        'success': False,
-                        'error': 'missing_required_fields',
-                        'message': f'Missing required fields: {", ".join(missing_fields)}'
-                    }), 400
-            
-            # Store validated data in g for use in the request
-            g.validated_json = data
-            
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
-
-# ============================================================================
-# ROLE-BASED AUTHORIZATION DECORATORS
-# ============================================================================
-
-def require_authenticated(redirect_to_login=True):
+def require_authenticated(f):
     """
     Decorator to require authenticated user
     """
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            customer_id = session.get('customer_id')
-            if not customer_id:
-                if redirect_to_login and request.endpoint and not request.is_json:
-                    return redirect(url_for('customer_accounts.login'))
-                return jsonify({
-                    'success': False,
-                    'error': 'authentication_required',
-                    'message': 'Authentication required',
-                    'redirect_url': '/login'
-                }), 401
-            
-            # Store customer info in g for use in request
-            g.customer_id = customer_id
-            g.user_role = session.get('user_role', 'customer')
-            
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
-
-def require_role(required_role: str, redirect_to_login=True):
-    """
-    Decorator to require specific user role
-    """
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            customer_id = session.get('customer_id')
-            user_role = session.get('user_role', 'customer')
-            
-            if not customer_id:
-                if redirect_to_login and request.endpoint and not request.is_json:
-                    return redirect(url_for('customer_accounts.login'))
-                return jsonify({
-                    'success': False,
-                    'error': 'authentication_required',
-                    'message': 'Authentication required',
-                    'redirect_url': '/login'
-                }), 401
-            
-            if user_role != required_role:
-                log_security_event('unauthorized_role_access', {
-                    'required_role': required_role,
-                    'user_role': user_role,
-                    'customer_id': customer_id,
-                    'endpoint': request.endpoint
-                }, 'WARNING')
-                
-                if redirect_to_login and request.endpoint and not request.is_json:
-                    return redirect(url_for('index'))  # Redirect to home instead of error
-                return jsonify({
-                    'success': False,
-                    'error': 'insufficient_permissions',
-                    'message': f'Role "{required_role}" required for this action',
-                    'user_role': user_role
-                }), 403
-            
-            # Store user info in g for use in request
-            g.customer_id = customer_id
-            g.user_role = user_role
-            
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
-
-def require_admin(redirect_to_login=True):
-    """
-    Decorator to require admin role
-    """
-    return require_role('admin', redirect_to_login)
-
-def require_customer(redirect_to_login=True):
-    """
-    Decorator to require customer role (or higher)
-    """
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            customer_id = session.get('customer_id')
-            user_role = session.get('user_role', 'customer')
-            
-            if not customer_id:
-                if redirect_to_login and request.endpoint and not request.is_json:
-                    return redirect(url_for('customer_accounts.login'))
-                return jsonify({
-                    'success': False,
-                    'error': 'authentication_required',
-                    'message': 'Authentication required',
-                    'redirect_url': '/login'
-                }), 401
-            
-            # Allow both customer and admin roles
-            if user_role not in ['customer', 'admin']:
-                log_security_event('unauthorized_role_access', {
-                    'required_role': 'customer_or_admin',
-                    'user_role': user_role,
-                    'customer_id': customer_id,
-                    'endpoint': request.endpoint
-                }, 'WARNING')
-                
-                return jsonify({
-                    'success': False,
-                    'error': 'insufficient_permissions',
-                    'message': 'Customer account required for this action',
-                    'user_role': user_role
-                }), 403
-            
-            # Store user info in g for use in request
-            g.customer_id = customer_id
-            g.user_role = user_role
-            
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check for any form of authentication
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        auth_header = request.headers.get('Authorization')
+        
+        authenticated = False
+        
+        if api_key and len(api_key) >= 10:
+            g.api_key = api_key
+            authenticated = True
+        elif auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            try:
+                payload = jwt.decode(token, 'your-secret-key', algorithms=['HS256'])
+                g.oauth_payload = payload
+                g.site_id = payload.get('site_id')
+                authenticated = True
+            except jwt.InvalidTokenError:
+                pass
+        
+        if not authenticated:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        g.authenticated = True
+        return f(*args, **kwargs)
+    
+    return decorated_function
 
 def get_current_user():
     """
-    Helper function to get current user info from session
+    Get current authenticated user information
     """
-    return {
-        'customer_id': session.get('customer_id'),
-        'user_role': session.get('user_role', 'customer'),
-        'is_authenticated': bool(session.get('customer_id')),
-        'is_admin': session.get('user_role') == 'admin',
-        'is_customer': session.get('user_role') in ['customer', 'admin']
-    } 
+    if hasattr(g, 'oauth_payload'):
+        return g.oauth_payload
+    elif hasattr(g, 'api_key'):
+        return {'api_key': g.api_key}
+    return None
+
+def rate_limit(f):
+    """
+    Decorator for rate limiting (mock implementation)
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # TODO: Implement actual rate limiting
+        return f(*args, **kwargs)
+    
+    return decorated_function

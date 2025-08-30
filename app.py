@@ -209,6 +209,28 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Admin API blueprint: {e}")
 
+    # Register Permission Lemmas IAM APIs
+    try:
+        from api.permission_management_api import permission_api
+        app.register_blueprint(permission_api)
+        logger.info("✅ Permission Management API registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Permission Management API registration failed: {e}")
+
+    try:
+        from api.billing_integration import billing_api
+        app.register_blueprint(billing_api)
+        logger.info("✅ Billing Integration API registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Billing Integration API registration failed: {e}")
+
+    try:
+        from api.oauth_server import oauth_api
+        app.register_blueprint(oauth_api)
+        logger.info("✅ OAuth Server API registered")
+    except Exception as e:
+        logger.warning(f"⚠️ OAuth Server API registration failed: {e}")
+
     # Initialize optimized engine
     try:
         from api.optimized_shield import get_optimized_engine

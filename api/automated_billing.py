@@ -329,10 +329,15 @@ def billing_success():
     return "Billing setup completed successfully!"
 
 # Initialize when blueprint is loaded
-@automated_billing_bp.before_app_first_request
 def initialize_billing():
     """Initialize billing system on first request"""
     billing_manager.initialize_stripe_resources()
+
+# Initialize immediately when module is imported
+try:
+    initialize_billing()
+except Exception as e:
+    logger.warning(f"Failed to initialize billing on import: {e}")
 
 # Export the blueprint
 __all__ = ['automated_billing_bp', 'billing_manager']
