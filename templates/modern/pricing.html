@@ -650,7 +650,7 @@
                             </div>
                             <div class="price-secondary">
                                 <strong>IAM-only service</strong> - no Fed ID Network included<br>
-                                <small>97% savings vs Auth0 + Duo ($5-13/MAU)</small>
+                                <small>88% savings vs Auth0 ($1.33-5/MAU)</small>
                             </div>
                         </div>
 
@@ -816,7 +816,7 @@
                                 Save <span id="savingsAmount">$4,800/month</span>
                     </div>
                             <div style="font-size: var(--font-size-xs); color: var(--success-600);">
-                                vs Auth0 + Duo pricing
+                                vs Auth0 pricing
                     </div>
                     </div>
                     </div>
@@ -893,9 +893,9 @@
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">How does this compare to Auth0 and Duo?</h3>
+                    <h3 class="faq-question">How does this compare to Auth0 or Duo?</h3>
                     <p class="faq-answer">
-                        Even our <strong>Combined solution ($0.20/MAU)</strong> costs 96% less than Auth0 ($2-5/MAU) + Duo ($3-8/MAU) = $5-13/MAU total. Plus you get <strong>210,084x faster verification</strong> (2.38µs vs 500ms+) and complete control vs vendor lock-in.
+                        Our <strong>Combined solution ($0.20/MAU)</strong> costs 85-95% less than Auth0 ($1.33-5/MAU) or Duo ($3-8/MAU). Plus you get <strong>210,084x faster verification</strong> (2.38µs vs 500ms+), complete control vs vendor lock-in, and both bot protection AND IAM in one solution.
                     </p>
                 </div>
 
@@ -990,9 +990,8 @@
             // Update user count display
             document.getElementById('user-count-display').textContent = userCount.toLocaleString();
             
-            // Calculate savings vs Auth0 + Duo (using combined pricing)
-            const auth0DuoTotal = auth0Monthly + (userCount * 3); // Assuming $3/user for Duo minimum
-            const totalSavings = auth0DuoTotal - combinedMonthly;
+            // Calculate savings vs Auth0 (using combined pricing)
+            const totalSavings = auth0Monthly - combinedMonthly;
             document.getElementById('savingsAmount').textContent = '$' + Math.max(0, totalSavings).toLocaleString() + '/month';
             
             // Update comparison table dynamically (using combined pricing)
