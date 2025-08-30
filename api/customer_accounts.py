@@ -8,6 +8,7 @@ import os
 import secrets
 import hashlib
 import logging
+import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict, field
@@ -22,6 +23,13 @@ logger = logging.getLogger(__name__)
 
 # Create blueprint
 customer_accounts_bp = Blueprint('customer_accounts', __name__)
+
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder for datetime objects"""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 @dataclass
 class Customer:
@@ -47,10 +55,57 @@ class CustomerAccountManager:
     """Manages customer accounts and API keys"""
     
     def __init__(self):
-        # In production, this should be a proper database
+        # Use file-based storage for persistence
+        self.storage_file = '/tmp/lemma_customers.json'
         self.customers = {}  # customer_id -> Customer
         self.email_to_customer = {}  # email -> customer_id
         self.api_key_to_customer = {}  # api_key -> customer_id
+        self._load_from_storage()
+    
+    def _load_from_storage(self):
+        """Load customers from file storage"""
+        try:
+            if os.path.exists(self.storage_file):
+                with open(self.storage_file, 'r') as f:
+                    data = json.load(f)
+                    
+                # Convert back to Customer objects
+                for customer_data in data.get('customers', []):
+                    # Convert datetime strings back to datetime objects
+                    if customer_data.get('created_at'):
+                        customer_data['created_at'] = datetime.fromisoformat(customer_data['created_at'])
+                    if customer_data.get('last_login'):
+                        customer_data['last_login'] = datetime.fromisoformat(customer_data['last_login'])
+                    
+                    customer = Customer(**customer_data)
+                    self.customers[customer.customer_id] = customer
+                    self.email_to_customer[customer.email] = customer.customer_id
+                    
+                    # Rebuild API key mapping
+                    for api_key_data in customer.api_keys:
+                        self.api_key_to_customer[api_key_data['key']] = customer.customer_id
+                        
+                logger.info(f"Loaded {len(self.customers)} customers from storage")
+        except Exception as e:
+            logger.warning(f"Failed to load customer storage: {e}")
+    
+    def _save_to_storage(self):
+        """Save customers to file storage"""
+        try:
+            # Convert customers to serializable format
+            customers_data = []
+            for customer in self.customers.values():
+                customer_dict = asdict(customer)
+                customers_data.append(customer_dict)
+            
+            data = {'customers': customers_data}
+            
+            with open(self.storage_file, 'w') as f:
+                json.dump(data, f, cls=DateTimeEncoder, indent=2)
+                
+            logger.info(f"Saved {len(self.customers)} customers to storage")
+        except Exception as e:
+            logger.error(f"Failed to save customer storage: {e}")
         
     def generate_api_key(self, prefix: str = "lemma") -> str:
         """Generate a secure API key"""
@@ -136,6 +191,7 @@ class CustomerAccountManager:
             self.customers[customer_id] = customer
             self.email_to_customer[email] = customer_id
             self.api_key_to_customer[api_key] = customer_id
+            self._save_to_storage()
             
             logger.info(f"Created customer account: {customer_id} ({email})")
             
@@ -266,6 +322,7 @@ class CustomerAccountManager:
                     # Set password if not already set
                     if not existing_customer.password_hash:
                         existing_customer.password_hash = self.hash_password("admin123")
+                    self._save_to_storage()
                     logger.info(f"Upgraded existing user to admin: {email}")
                     return {
                         'success': True,
@@ -281,6 +338,7 @@ class CustomerAccountManager:
                 if customer:
                     customer.role = 'admin'
                     customer.permissions = ['admin_access', 'user_management', 'system_config', 'analytics_access']
+                    self._save_to_storage()
                     logger.info(f"Created new admin user: {email}")
                     
                 return {
