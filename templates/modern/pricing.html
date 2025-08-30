@@ -590,43 +590,99 @@
             <div class="pricing-grid">
                 <!-- Pricing Plans (Left Side) -->
                 <div class="pricing-plans">
-                    <!-- Standard Plan -->
+                    <!-- Federated Identity Network Plan -->
+                    <div class="pricing-card">
+                        <div class="pricing-header">
+                            <h2 class="pricing-title">Federated Identity Network</h2>
+                            <p class="pricing-description">
+                                Universal Proof of Humanity (PoH) verification. Users verify once, access everywhere in the network.
+                            </p>
+                        </div>
+
+                        <div class="price-display">
+                            <div class="price-main">
+                                <span class="price-currency">$</span>
+                                <span class="price-amount">0.05</span>
+                                <span class="price-unit">per active user per month</span>
+                            </div>
+                            <div class="price-secondary">
+                                + <span class="price-highlight">$2.00</span> per Stripe Identity verification<br>
+                                <small>(one-time fee for enhanced identity verification)</small>
+                            </div>
+                        </div>
+
+                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--gray-50); border-radius: 12px;">
+                            <h4 style="margin-bottom: var(--space-3); color: var(--gray-800); font-weight: 600;">PoH Network Features:</h4>
+                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-600); line-height: 1.8;">
+                                <li>Universal human verification across all sites</li>
+                                <li>Cryptographic proof of humanity</li>
+                                <li>2.38µs verification time (210,084x faster than Auth0)</li>
+                                <li>99.9% offline operation</li>
+                                <li>Zero-knowledge privacy protection</li>
+                                <li>Cross-site identity without tracking</li>
+                            </ul>
+                        </div>
+
+                        <div class="cta-section">
+                            <button onclick="window.location.href='/register'" class="cta-button" style="background: linear-gradient(135deg, var(--success-500), var(--success-600));">
+                                Join PoH Network
+                            </button>
+                            <p class="cta-tagline">
+                                Foundation for all Lemma services • Universal identity
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Lemma IAM System Plan -->
                     <div class="pricing-card featured">
-                <div class="pricing-badge">Most Popular</div>
-                
-                <div class="pricing-header">
-                    <h2 class="pricing-title">Standard Plan</h2>
-                    <p class="pricing-description">
-                        Pay only for <strong>active users</strong> who visit your site each month. Perfect for any size business.
-                    </p>
-                </div>
+                        <div class="pricing-badge">🔥 Complete IAM Solution</div>
+                        
+                        <div class="pricing-header">
+                            <h2 class="pricing-title">Lemma IAM System</h2>
+                            <p class="pricing-description">
+                                <strong>Complete Auth0/Duo replacement</strong> with site-specific permissions, OAuth 2.0, and complete user management control.
+                            </p>
+                        </div>
 
-                <div class="price-display">
-                    <div class="price-main">
-                        <span class="price-currency">$</span>
-                        <span class="price-amount">0.10</span>
-                        <span class="price-unit">per active user per month</span>
-                    </div>
-                    <div class="price-secondary">
-                        + <span class="price-highlight">$2.00</span> per Stripe Identity verification<br>
-                        <small>(only for users who require enhanced identity verification)</small>
-                    </div>
-                    <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--primary-50); border-radius: 8px; border-left: 4px solid var(--primary-500);">
-                        <small style="color: var(--primary-700); font-weight: 600;">
-                            💡 You only pay for users who actually visit your site each month
-                        </small>
-                    </div>
-                </div>
+                        <div class="price-display">
+                            <div class="price-main">
+                                <span class="price-currency">$</span>
+                                <span class="price-amount">0.20</span>
+                                <span class="price-unit">per active user per month</span>
+                            </div>
+                            <div class="price-secondary">
+                                <span class="price-highlight">$0.05 PoH Network + $0.15 IAM Service</span><br>
+                                <small>Complete two-tier pricing - 96% savings vs Auth0 + Duo</small>
+                            </div>
+                            <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--success-50); border-radius: 8px; border-left: 4px solid var(--success-500);">
+                                <small style="color: var(--success-700); font-weight: 600;">
+                                    💰 Save $4.80-12.80 per user vs traditional IAM (Auth0: $2-5/MAU + Duo: $3-8/MAU)
+                                </small>
+                            </div>
+                        </div>
 
-                <div class="cta-section">
-                    <button onclick="window.location.href='/register'" class="cta-button">
-                        Create Account & Get API Keys
-                    </button>
-                    <p class="cta-tagline">
-                        No monthly minimums • Cancel anytime • 30-day money-back guarantee
-                    </p>
-                </div>
-            </div>
+                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--primary-50); border-radius: 12px;">
+                            <h4 style="margin-bottom: var(--space-3); color: var(--primary-800); font-weight: 600;">Complete IAM Features:</h4>
+                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--primary-700); line-height: 1.8;">
+                                <li><strong>"Sign in with Lemma"</strong> OAuth 2.0 integration</li>
+                                <li><strong>Complete user management</strong> - add, remove, update users</li>
+                                <li><strong>Custom permissions & roles</strong> - define your own access control</li>
+                                <li><strong>Site configuration control</strong> - branding, webhooks, security</li>
+                                <li><strong>Real-time analytics</strong> - user activity and permissions</li>
+                                <li><strong>API-first architecture</strong> - full REST API control</li>
+                                <li><strong>Microsecond verification</strong> - 2.38µs vs 500ms+ traditional</li>
+                            </ul>
+                        </div>
+
+                        <div class="cta-section">
+                            <button onclick="window.location.href='/register'" class="cta-button">
+                                Start Complete IAM Solution
+                            </button>
+                            <p class="cta-tagline">
+                                Replace Auth0 + Duo • Complete control • 96% cost savings
+                            </p>
+                        </div>
+                    </div>
 
                     <!-- Enterprise Plan -->
                     <div class="pricing-card">
@@ -762,16 +818,23 @@
             
             <div class="faq-grid">
                 <div class="faq-item">
-                    <h3 class="faq-question">How does active user billing work?</h3>
+                    <h3 class="faq-question">What's the difference between PoH Network and IAM System?</h3>
                     <p class="faq-answer">
-                        You're billed $0.10 for each unique user who visits your site and gets verified through Lemma Shield each month. Only users who are actually active (visiting your site) in a given month are counted for billing.
+                        <strong>PoH Network ($0.05/MAU)</strong> provides universal human verification across all sites. <strong>IAM System ($0.20/MAU total)</strong> includes PoH plus complete user management, custom permissions, OAuth 2.0, and site-specific access control - a complete Auth0/Duo replacement.
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">How does Lemma IAM compare to Auth0 and Duo?</h3>
+                    <p class="faq-answer">
+                        Lemma IAM costs $0.20/MAU vs Auth0 ($2-5/MAU) + Duo ($3-8/MAU) = $5-13/MAU total. That's <strong>96% cost savings</strong> with <strong>210,084x faster verification</strong> (2.38µs vs 500ms+) and complete client control over users and permissions.
                     </p>
                 </div>
 
                 <div class="faq-item">
                     <h3 class="faq-question">Do users need to verify every time they visit?</h3>
                     <p class="faq-answer">
-                        No! Users only need to verify once through Lemma Shield. After initial verification, all subsequent identity checks happen automatically in the background without any user interaction. The system remembers verified users across visits.
+                        No! Users verify once and get a cryptographic lemma in their wallet. All subsequent verifications happen in microseconds (2.38µs) without user interaction. Works across all sites in the network with "Sign in with Lemma" OAuth.
                     </p>
                 </div>
 
@@ -804,9 +867,16 @@
                 </div>
 
                 <div class="faq-item">
+                    <h3 class="faq-question">What IAM features do I get complete control over?</h3>
+                    <p class="faq-answer">
+                        <strong>Everything:</strong> Add/remove users, create custom permissions and roles, configure OAuth settings, set up webhooks, customize branding, manage sessions, view analytics, and control all security policies. You have the same control as running your own IAM system.
+                    </p>
+                </div>
+
+                <div class="faq-item">
                     <h3 class="faq-question">How does this compare to competitors?</h3>
                     <p class="faq-answer">
-                        Lemma Shield costs 90% less than alternatives like Auth0 ($23/month per 1000 users) or Okta ($2/user/month), while providing faster, more secure verification.
+                        Lemma IAM costs 96% less than Auth0 + Duo ($5-13/MAU vs $0.20/MAU) with 210,084x faster verification (2.38µs vs 500ms+). Plus you get complete control vs vendor lock-in, cryptographic security vs passwords, and universal identity vs siloed accounts.
                     </p>
                 </div>
             </div>
@@ -817,13 +887,15 @@
 
 
     <script>
-        // Enhanced pricing calculator with accurate competitor pricing
+        // Enhanced pricing calculator with IAM system pricing
         function calculateCost() {
             const userCount = parseInt(document.getElementById('userCount').value) || 0;
             
-            // Lemma pricing
-            const lemmaMonthlyRate = 0.10;
-            const lemmaSetupFeePerUser = 2.00;
+            // Lemma IAM pricing (PoH + IAM)
+            const pohRate = 0.05; // PoH Network
+            const iamRate = 0.15; // IAM Service
+            const lemmaMonthlyRate = pohRate + iamRate; // $0.20 total
+            const lemmaSetupFeePerUser = 2.00; // One-time Stripe Identity
             const lemmaMonthlyTotal = userCount * lemmaMonthlyRate;
             const lemmaSetupTotal = userCount * lemmaSetupFeePerUser;
             const lemmaTotalFirstMonth = lemmaMonthlyTotal + lemmaSetupTotal;
