@@ -171,6 +171,109 @@ class RevocationList(Base):
     reason = Column(String)  # Reason for revocation
     bloom_filter_updated = Column(Boolean, default=False)  # For efficient offline checking
 
+class SiteUser(Base):
+    """Site-specific user registry for IAM subnet management"""
+    __tablename__ = 'site_users'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_id = Column(String, nullable=False)
+    user_did = Column(String, nullable=False)  # User's DID (can be site-specific or universal)
+    user_email = Column(String)  # Optional: site-specific email
+    display_name = Column(String)  # Site-specific display name
+    user_status = Column(String, default='active')  # 'active', 'suspended', 'pending', 'banned'
+    user_role = Column(String, default='user')  # Site-defined role (admin, moderator, user, etc.)
+    user_metadata = Column(JSON, default=dict)  # Site-specific user data
+    added_by = Column(String, nullable=False)  # Admin who added user
+    added_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime)
+    login_count = Column(Integer, default=0)
+    # Unique constraint: one user per site
+    __table_args__ = (
+        {'extend_existing': True}
+    )
+
+class SiteAdmin(Base):
+    """Site administrators for IAM subnet management"""
+    __tablename__ = 'site_admins'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_id = Column(String, nullable=False)
+    admin_did = Column(String, nullable=False)  # Admin's DID
+    admin_email = Column(String, nullable=False)  # Admin email
+    admin_role = Column(String, default='admin')  # 'owner', 'admin', 'moderator'
+    permissions = Column(JSON, default=list)  # What they can manage ['users', 'permissions', 'billing']
+    added_by = Column(String)  # Who granted admin access (NULL for site owner)
+    added_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+    last_activity = Column(DateTime)
+
+class PermissionRole(Base):
+    """Role-based permission bundles for easier management"""
+    __tablename__ = 'permission_roles'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_id = Column(String, nullable=False)
+    role_id = Column(String, nullable=False)  # 'admin', 'moderator', 'editor', etc.
+    role_name = Column(String, nullable=False)  # Display name
+    description = Column(Text)
+    permissions = Column(JSON, nullable=False)  # List of permission_ids
+    is_default = Column(Boolean, default=False)  # Default role for new users
+    created_by = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+class UserSession(Base):
+    """Active user sessions for IAM sites"""
+    __tablename__ = 'user_sessions'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_id = Column(String, nullable=False)
+    user_did = Column(String, nullable=False)
+    session_token = Column(String, unique=True, nullable=False)
+    oauth_access_token = Column(String)  # For "Sign in with Lemma"
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    last_activity = Column(DateTime, default=datetime.utcnow)
+    ip_address = Column(String)
+    user_agent = Column(String)
+    is_active = Column(Boolean, default=True)
+
+class SiteConfiguration(Base):
+    """Site-specific IAM configuration"""
+    __tablename__ = 'site_configurations'
+    
+    site_id = Column(String, primary_key=True)
+    # User Management Settings
+    allow_self_registration = Column(Boolean, default=False)
+    require_email_verification = Column(Boolean, default=True)
+    default_user_role = Column(String, default='user')
+    session_timeout_minutes = Column(Integer, default=480)  # 8 hours
+    
+    # Permission Settings
+    permission_inheritance = Column(Boolean, default=True)  # Roles inherit permissions
+    require_2fa_for_admin = Column(Boolean, default=False)
+    
+    # OAuth Settings
+    oauth_enabled = Column(Boolean, default=True)
+    oauth_scopes = Column(JSON, default=list)  # Available OAuth scopes
+    oauth_redirect_uris = Column(JSON, default=list)  # Allowed redirect URIs
+    
+    # Branding & UI
+    site_name = Column(String)
+    site_logo_url = Column(String)
+    custom_css = Column(Text)
+    
+    # Webhook Settings
+    webhook_url = Column(String)  # For user events
+    webhook_events = Column(JSON, default=list)  # ['user.created', 'permission.granted', etc.]
+    
+    # Security Settings
+    ip_whitelist = Column(JSON, default=list)
+    rate_limit_per_minute = Column(Integer, default=60)
+    
+    updated_at = Column(DateTime, default=datetime.utcnow)
+    updated_by = Column(String)
+
 def create_tables():
     """Create all database tables"""
     try:

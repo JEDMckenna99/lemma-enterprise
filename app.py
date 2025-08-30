@@ -226,10 +226,13 @@ def create_app():
 
     try:
         from api.oauth_server import oauth_api
+        from api.iam_client_api import iam_client_api
         app.register_blueprint(oauth_api)
+        app.register_blueprint(iam_client_api)
         logger.info("✅ OAuth Server API registered")
+        logger.info("✅ IAM Client API registered")
     except Exception as e:
-        logger.warning(f"⚠️ OAuth Server API registration failed: {e}")
+        logger.warning(f"⚠️ OAuth/IAM API registration failed: {e}")
 
     # Initialize optimized engine
     try:
