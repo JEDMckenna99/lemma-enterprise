@@ -650,7 +650,7 @@
                             </div>
                             <div class="price-secondary">
                                 <strong>IAM-only service</strong> - no Fed ID Network included<br>
-                                <small>88% savings vs Auth0 ($1.33-5/MAU)</small>
+                                <small>33% savings vs Auth0 ($0.24/MAU)</small>
                             </div>
                         </div>
 
@@ -836,8 +836,8 @@
                         
                         <div class="comparison-row">
                             <div class="provider-name">Auth0</div>
-                            <div class="cost-cell" id="auth0-cost">$1,330</div>
-                            <div class="savings-cell" id="auth0-savings" style="color: var(--danger-600);">+1,230%</div>
+                            <div class="cost-cell" id="auth0-cost">$240</div>
+                            <div class="savings-cell" id="auth0-savings" style="color: var(--danger-600);">+20%</div>
                         </div>
                         
                         <div class="comparison-row">
@@ -895,7 +895,7 @@
                 <div class="faq-item">
                     <h3 class="faq-question">How does this compare to Auth0 or Duo?</h3>
                     <p class="faq-answer">
-                        Our <strong>Combined solution ($0.20/MAU)</strong> costs 85-95% less than Auth0 ($1.33-5/MAU) or Duo ($3-8/MAU). Plus you get <strong>210,084x faster verification</strong> (2.38µs vs 500ms+), complete control vs vendor lock-in, and both bot protection AND IAM in one solution.
+                        Our <strong>Combined solution ($0.20/MAU)</strong> costs 17% less than Auth0 ($0.24/MAU) but includes bot protection + lite KYC that Auth0 doesn't provide. Vs Duo ($3-9/user/month), we're 93-97% cheaper. Plus you get <strong>210,084x faster verification</strong> (2.38µs vs 500ms+) and complete control vs vendor lock-in.
                     </p>
                 </div>
 
@@ -998,12 +998,9 @@
             updateComparisonTable(userCount, combinedMonthly, auth0Monthly, oktaMonthly, cloudflareMonthly, recaptchaMonthly);
         }
         
-        // Auth0 pricing: Enterprise plan starts at $1,330/month for up to 1000 users
+        // Auth0 pricing: B2C Professional plan $0.24/MAU
         function calculateAuth0Cost(userCount) {
-            if (userCount <= 1000) return 1330;
-            // Additional users at $1.33 per user per month
-            const additionalUsers = userCount - 1000;
-            return 1330 + (additionalUsers * 1.33);
+            return userCount * 0.24; // $0.24 per MAU for Professional plan
         }
         
         // Okta pricing: $2/user/month with $500 minimum (Workforce Identity)
