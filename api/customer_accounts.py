@@ -15,6 +15,8 @@ from dataclasses import dataclass, asdict, field
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
 from flask_cors import cross_origin
 import stripe
+from sqlalchemy.orm import Session
+from .database import get_db, Customer as DBCustomer, init_database
 
 # Configure Stripe
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -52,60 +54,81 @@ class Customer:
     login_count: int = 0
 
 class CustomerAccountManager:
-    """Manages customer accounts and API keys"""
+    """Manages customer accounts and API keys with PostgreSQL backend"""
     
     def __init__(self):
-        # Use file-based storage for persistence
-        self.storage_file = '/tmp/lemma_customers.json'
-        self.customers = {}  # customer_id -> Customer
-        self.email_to_customer = {}  # email -> customer_id
-        self.api_key_to_customer = {}  # api_key -> customer_id
-        self._load_from_storage()
-    
-    def _load_from_storage(self):
-        """Load customers from file storage"""
+        # Initialize database
         try:
-            if os.path.exists(self.storage_file):
-                with open(self.storage_file, 'r') as f:
-                    data = json.load(f)
-                    
-                # Convert back to Customer objects
-                for customer_data in data.get('customers', []):
-                    # Convert datetime strings back to datetime objects
-                    if customer_data.get('created_at'):
-                        customer_data['created_at'] = datetime.fromisoformat(customer_data['created_at'])
-                    if customer_data.get('last_login'):
-                        customer_data['last_login'] = datetime.fromisoformat(customer_data['last_login'])
-                    
-                    customer = Customer(**customer_data)
-                    self.customers[customer.customer_id] = customer
-                    self.email_to_customer[customer.email] = customer.customer_id
-                    
-                    # Rebuild API key mapping
-                    for api_key_data in customer.api_keys:
-                        self.api_key_to_customer[api_key_data['key']] = customer.customer_id
-                        
-                logger.info(f"Loaded {len(self.customers)} customers from storage")
+            init_database()
+            logger.info("✅ CustomerAccountManager initialized with PostgreSQL")
         except Exception as e:
-            logger.warning(f"Failed to load customer storage: {e}")
+            logger.error(f"❌ Failed to initialize database: {e}")
+            # Fallback to in-memory for development
+            self.customers = {}
+            self.email_to_customer = {}
+            self.api_key_to_customer = {}
     
-    def _save_to_storage(self):
-        """Save customers to file storage"""
+    def get_customer_by_email(self, email: str) -> Optional[Customer]:
+        """Get customer by email from database"""
         try:
-            # Convert customers to serializable format
-            customers_data = []
-            for customer in self.customers.values():
-                customer_dict = asdict(customer)
-                customers_data.append(customer_dict)
+            db = get_db()
+            db_customer = db.query(DBCustomer).filter(DBCustomer.email == email).first()
+            db.close()
             
-            data = {'customers': customers_data}
-            
-            with open(self.storage_file, 'w') as f:
-                json.dump(data, f, cls=DateTimeEncoder, indent=2)
-                
-            logger.info(f"Saved {len(self.customers)} customers to storage")
+            if db_customer:
+                return Customer(
+                    customer_id=db_customer.customer_id,
+                    email=db_customer.email,
+                    name=db_customer.name,
+                    company=db_customer.company,
+                    stripe_customer_id=db_customer.stripe_customer_id,
+                    api_keys=db_customer.api_keys or [],
+                    created_at=db_customer.created_at,
+                    status=db_customer.status,
+                    subscription_status=db_customer.subscription_status,
+                    monthly_usage=db_customer.monthly_usage or {},
+                    billing_email=db_customer.billing_email,
+                    password_hash=db_customer.password_hash,
+                    role=db_customer.role,
+                    permissions=db_customer.permissions or [],
+                    last_login=db_customer.last_login,
+                    login_count=db_customer.login_count
+                )
+            return None
         except Exception as e:
-            logger.error(f"Failed to save customer storage: {e}")
+            logger.error(f"Error getting customer by email: {e}")
+            return None
+    
+    def get_customer(self, customer_id: str) -> Optional[Customer]:
+        """Get customer by ID from database"""
+        try:
+            db = get_db()
+            db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == customer_id).first()
+            db.close()
+            
+            if db_customer:
+                return Customer(
+                    customer_id=db_customer.customer_id,
+                    email=db_customer.email,
+                    name=db_customer.name,
+                    company=db_customer.company,
+                    stripe_customer_id=db_customer.stripe_customer_id,
+                    api_keys=db_customer.api_keys or [],
+                    created_at=db_customer.created_at,
+                    status=db_customer.status,
+                    subscription_status=db_customer.subscription_status,
+                    monthly_usage=db_customer.monthly_usage or {},
+                    billing_email=db_customer.billing_email,
+                    password_hash=db_customer.password_hash,
+                    role=db_customer.role,
+                    permissions=db_customer.permissions or [],
+                    last_login=db_customer.last_login,
+                    login_count=db_customer.login_count
+                )
+            return None
+        except Exception as e:
+            logger.error(f"Error getting customer by ID: {e}")
+            return None
         
     def generate_api_key(self, prefix: str = "lemma") -> str:
         """Generate a secure API key"""
@@ -187,11 +210,39 @@ class CustomerAccountManager:
                 password_hash=password_hash
             )
             
-            # Store customer
-            self.customers[customer_id] = customer
-            self.email_to_customer[email] = customer_id
-            self.api_key_to_customer[api_key] = customer_id
-            self._save_to_storage()
+            # Store customer in database
+            try:
+                db = get_db()
+                db_customer = DBCustomer(
+                    customer_id=customer_id,
+                    email=email,
+                    name=name,
+                    company=company,
+                    stripe_customer_id=stripe_customer.id,
+                    api_keys=[{
+                        'key': api_key,
+                        'name': 'Default API Key',
+                        'created_at': datetime.utcnow().isoformat(),
+                        'last_used': None
+                    }],
+                    created_at=datetime.utcnow(),
+                    status='active',
+                    subscription_status='none',
+                    monthly_usage={},
+                    billing_email=billing_email or email,
+                    password_hash=password_hash,
+                    role='customer',
+                    permissions=[],
+                    login_count=0
+                )
+                db.add(db_customer)
+                db.commit()
+                db.close()
+            except Exception as e:
+                logger.error(f"Failed to save customer to database: {e}")
+                db.rollback()
+                db.close()
+                raise e
             
             logger.info(f"Created customer account: {customer_id} ({email})")
             
@@ -322,7 +373,22 @@ class CustomerAccountManager:
                     # Set password if not already set
                     if not existing_customer.password_hash:
                         existing_customer.password_hash = self.hash_password("admin123")
-                    self._save_to_storage()
+                    
+                    # Update in database
+                    try:
+                        db = get_db()
+                        db_customer = db.query(DBCustomer).filter(DBCustomer.email == email).first()
+                        if db_customer:
+                            db_customer.role = 'admin'
+                            db_customer.permissions = ['admin_access', 'user_management', 'system_config']
+                            if not db_customer.password_hash:
+                                db_customer.password_hash = self.hash_password("admin123")
+                            db.commit()
+                        db.close()
+                    except Exception as e:
+                        logger.error(f"Failed to update admin in database: {e}")
+                        db.rollback()
+                        db.close()
                     logger.info(f"Upgraded existing user to admin: {email}")
                     return {
                         'success': True,
@@ -338,7 +404,20 @@ class CustomerAccountManager:
                 if customer:
                     customer.role = 'admin'
                     customer.permissions = ['admin_access', 'user_management', 'system_config', 'analytics_access']
-                    self._save_to_storage()
+                    
+                    # Update in database
+                    try:
+                        db = get_db()
+                        db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == result['customer_id']).first()
+                        if db_customer:
+                            db_customer.role = 'admin'
+                            db_customer.permissions = ['admin_access', 'user_management', 'system_config', 'analytics_access']
+                            db.commit()
+                        db.close()
+                    except Exception as e:
+                        logger.error(f"Failed to update new admin in database: {e}")
+                        db.rollback()
+                        db.close()
                     logger.info(f"Created new admin user: {email}")
                     
                 return {
