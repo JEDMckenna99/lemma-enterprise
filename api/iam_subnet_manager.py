@@ -357,7 +357,7 @@ class IAMSubnetManager:
     
     def revoke_permission(self, admin_did: str, user_did: str, permission_id: str, 
                          reason: str = None) -> Dict[str, Any]:
-        """Revoke permission from user (client has complete control)"""
+        """Revoke permission from user (INDEPENDENT of PoH lemma - client has complete control)"""
         try:
             db = get_db()
             
@@ -382,33 +382,105 @@ class IAMSubnetManager:
             grant.is_active = False
             grant.revoked_at = datetime.utcnow()
             
-            # Revoke associated lemma
+            # Revoke associated permission lemma (ONLY this permission, NOT PoH)
             lemma = db.query(UserLemma).filter(
                 UserLemma.site_id == self.site_id,
                 UserLemma.user_did == user_did,
                 UserLemma.permission_id == permission_id,
+                UserLemma.lemma_type == 'permission',  # Only permission lemmas
                 UserLemma.is_active == True
             ).first()
             
             if lemma:
                 lemma.is_active = False
                 lemma.revoked_at = datetime.utcnow()
+                
+                # Add to revocation list (permission-specific)
+                from api.database import RevocationList
+                revocation = RevocationList(
+                    lemma_id=f"perm_{self.site_id}_{user_did}_{permission_id}",
+                    lemma_type='permission',
+                    site_id=self.site_id,
+                    user_did=user_did,
+                    revoked_by=admin_did,
+                    reason=reason or f"Permission {permission_id} revoked by admin"
+                )
+                db.add(revocation)
             
             db.commit()
             db.close()
             
-            logger.info(f"✅ Revoked permission {permission_id} from user {user_did} on site {self.site_id}")
+            logger.info(f"✅ Revoked permission {permission_id} from user {user_did} on site {self.site_id} (PoH lemma unaffected)")
             
             return {
                 'success': True,
                 'user_did': user_did,
                 'permission_id': permission_id,
                 'revoked_at': datetime.utcnow().isoformat(),
-                'reason': reason
+                'reason': reason,
+                'note': 'Permission lemma revoked independently - PoH lemma unaffected'
             }
             
         except Exception as e:
             logger.error(f"❌ Revoke permission failed: {e}")
+            db.rollback()
+            db.close()
+            return {'success': False, 'error': str(e)}
+    
+    def revoke_poh_only(self, admin_did: str, user_did: str, reason: str = None) -> Dict[str, Any]:
+        """Revoke PoH lemma ONLY - permission lemmas remain valid and functional"""
+        try:
+            db = get_db()
+            
+            # Verify admin has user management rights (or is network admin)
+            if not self._verify_admin_permission(admin_did, 'users'):
+                db.close()
+                return {'success': False, 'error': 'Insufficient permissions to revoke PoH'}
+            
+            # Revoke PoH lemma ONLY (lemma_type='poh', site_id=NULL for universal)
+            poh_lemma = db.query(UserLemma).filter(
+                UserLemma.user_did == user_did,
+                UserLemma.lemma_type == 'poh',
+                UserLemma.site_id.is_(None),  # Universal PoH lemmas have NULL site_id
+                UserLemma.is_active == True
+            ).first()
+            
+            if not poh_lemma:
+                db.close()
+                return {'success': False, 'error': 'PoH lemma not found or already revoked'}
+            
+            # Revoke the PoH lemma
+            poh_lemma.is_active = False
+            poh_lemma.revoked_at = datetime.utcnow()
+            
+            # Add to revocation list (PoH-specific)
+            from api.database import RevocationList
+            revocation = RevocationList(
+                lemma_id=f"poh_{user_did}",
+                lemma_type='poh',
+                site_id=None,  # Universal PoH revocation
+                user_did=user_did,
+                revoked_by=admin_did,
+                reason=reason or "PoH lemma revoked by admin"
+            )
+            db.add(revocation)
+            
+            db.commit()
+            db.close()
+            
+            logger.info(f"✅ Revoked PoH lemma for user {user_did} (Permission lemmas remain valid)")
+            
+            return {
+                'success': True,
+                'user_did': user_did,
+                'lemma_type': 'poh',
+                'revoked_at': datetime.utcnow().isoformat(),
+                'reason': reason,
+                'note': 'PoH lemma revoked - all permission lemmas remain valid and functional'
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Revoke PoH failed: {e}")
             db.rollback()
             db.close()
             return {'success': False, 'error': str(e)}

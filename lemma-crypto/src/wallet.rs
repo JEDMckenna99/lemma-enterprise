@@ -704,10 +704,11 @@ impl BackgroundWallet {
     }
 
     /// Verify complete access (PoH + Permissions) - 4.176µs performance!
+    /// CRITICAL: Permission lemmas are INDEPENDENT of PoH lemmas - they persist even if PoH is revoked
     pub fn verify_complete_access(&self, site_id: &str, resource: &str, action: &str) -> Result<CompleteAccessResult> {
         let start_time = Instant::now();
 
-        // 1. Verify PoH lemma (universal)
+        // 1. Verify PoH lemma (universal) - but don't fail if missing/revoked
         let poh_verified = if let Some(poh_credential) = self.get_poh_lemma() {
             let mut core = self.core.lock().unwrap();
             let poh_result = core.verify(&poh_credential)?;
@@ -716,30 +717,25 @@ impl BackgroundWallet {
             false
         };
 
-        if !poh_verified {
-            return Ok(CompleteAccessResult {
-                has_access: false,
-                poh_verified: false,
-                permission_verified: false,
-                verification_time_us: start_time.elapsed().as_micros() as u64,
-                matched_permissions: Vec::new(),
-                error_message: Some("PoH verification failed".to_string()),
-            });
-        }
-
-        // 2. Verify site permissions
+        // 2. Verify site permissions (INDEPENDENT of PoH status)
         let site_permissions = self.get_site_permissions(site_id);
         let mut permission_verified = false;
         let mut matched_permissions = Vec::new();
 
         for permission_credential in &site_permissions {
-            // Check if this permission grants access to the resource/action
-            if let Some(scope) = permission_credential.get_claim("scope").and_then(|v| v.as_array()) {
-                for scope_item in scope {
-                    if let Some(scope_str) = scope_item.as_str() {
-                        if self.permission_grants_access(scope_str, resource, action) {
-                            permission_verified = true;
-                            matched_permissions.push(scope_str.to_string());
+            // Verify the permission lemma itself (independent of PoH)
+            let mut core = self.core.lock().unwrap();
+            if let Ok(perm_result) = core.verify(&permission_credential) {
+                if perm_result.verified {
+                    // Check if this permission grants access to the resource/action
+                    if let Some(scope) = permission_credential.get_claim("scope").and_then(|v| v.as_array()) {
+                        for scope_item in scope {
+                            if let Some(scope_str) = scope_item.as_str() {
+                                if self.permission_grants_access(scope_str, resource, action) {
+                                    permission_verified = true;
+                                    matched_permissions.push(scope_str.to_string());
+                                }
+                            }
                         }
                     }
                 }
@@ -751,13 +747,26 @@ impl BackgroundWallet {
         // Update statistics
         self.update_verification_stats(verification_time, 1 + site_permissions.len());
 
+        // CRITICAL CHANGE: Access is granted if EITHER PoH OR valid permissions exist
+        // This allows permission lemmas to persist independently of PoH status
+        let has_access = match (poh_verified, permission_verified) {
+            (true, true) => true,   // Full access: PoH + permissions
+            (false, true) => true,  // Site-only access: valid permissions without PoH
+            (true, false) => false, // PoH but no site permissions for this resource
+            (false, false) => false, // No access
+        };
+
         Ok(CompleteAccessResult {
-            has_access: poh_verified && permission_verified,
+            has_access,
             poh_verified,
             permission_verified,
             verification_time_us: verification_time,
             matched_permissions,
-            error_message: None,
+            error_message: if !has_access {
+                Some(format!("Access denied: PoH={}, Permissions={}", poh_verified, permission_verified))
+            } else {
+                None
+            },
         })
     }
 
@@ -786,7 +795,18 @@ impl BackgroundWallet {
         resource_match && action_match
     }
 
-    /// Revoke permission lemma for specific site
+    /// Revoke PoH lemma ONLY (does NOT affect permission lemmas)
+    pub fn revoke_poh_lemma(&self, reason: &str) -> Result<()> {
+        let mut poh_storage = self.poh_storage.lock().unwrap();
+        *poh_storage = None;
+        
+        // Log the revocation but keep permission lemmas intact
+        println!("🔴 PoH lemma revoked: {} (Permission lemmas remain valid)", reason);
+        
+        Ok(())
+    }
+
+    /// Revoke permission lemma for specific site (independent of PoH)
     pub fn revoke_permission_lemma(&self, site_id: &str, permission_id: &str) -> Result<()> {
         let mut permission_storage = self.permission_storage.lock().unwrap();
         
@@ -798,6 +818,21 @@ impl BackgroundWallet {
             });
         }
 
+        Ok(())
+    }
+
+    /// Revoke ALL lemmas for a user (both PoH and all permissions)
+    pub fn revoke_all_lemmas(&self, reason: &str) -> Result<()> {
+        // Revoke PoH lemma
+        let mut poh_storage = self.poh_storage.lock().unwrap();
+        *poh_storage = None;
+        
+        // Revoke all permission lemmas
+        let mut permission_storage = self.permission_storage.lock().unwrap();
+        permission_storage.clear();
+        
+        println!("🔴 ALL lemmas revoked: {} (PoH + all permissions)", reason);
+        
         Ok(())
     }
 
