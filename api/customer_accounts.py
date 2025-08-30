@@ -361,7 +361,7 @@ def register():
         }), 500
 
 @customer_accounts_bp.route('/login', methods=['GET', 'POST'])
-@cross_origin(origins=['https://lemma.id', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com'], supports_credentials=True)
+@cross_origin(origins=['https://lemma.id', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com', 'http://localhost:5000'], supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
 def login():
     """Customer login page and handler"""
     if request.method == 'GET':
