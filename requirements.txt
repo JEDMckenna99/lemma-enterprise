@@ -6,6 +6,9 @@ stripe>=8.0.0
 python-dotenv==1.0.0
 maturin==1.4.0
 setuptools-rust==1.7.0
+PyJWT>=2.8.0
+Flask-CORS>=4.0.0
+SQLAlchemy>=2.0.0
 
 # Install lemma-crypto directly from the subdirectory
 -e ./lemma-crypto
