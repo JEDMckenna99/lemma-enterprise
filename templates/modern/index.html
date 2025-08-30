@@ -14,7 +14,7 @@
     <script src="{{ url_for('static', filename='js/lemma-verification-card.js') }}?v=667" data-api-key="demo-integration-key-12345"></script>
     
     <!-- Bot Shield Assets (from Heroku app with session management fixes) -->
-    <script src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/static/js/lemma-bot-shield-simple.js?v=659"></script>
+    <script src="/static/js/lemma-bot-shield-simple.js?v=659"></script>
     
     <!-- Disable service worker to prevent resource blocking -->
     <script data-cfasync="false">
@@ -89,7 +89,7 @@
                 if (!window.heroShield) {
                     window.heroShield = new LemmaBotShield({
                         debug: true,
-                        apiBase: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com'
+                        apiBase: window.location.origin
                     });
                     await window.heroShield.initializeFederatedWallet();
                 }

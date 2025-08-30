@@ -8,7 +8,7 @@
     <!-- Load the existing Lemma Federated Wallet -->
     <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=668"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
-    <script src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/static/js/lemma-bot-shield-simple.js?v=659"></script>
+    <script src="/static/js/lemma-bot-shield-simple.js?v=659"></script>
     <style>
         .wallet-container {
             max-width: 1100px;
@@ -491,7 +491,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Initialize the Lemma Shield Widget to protect the FIL join section
         lemmaShield = new LemmaBotShield({
             debug: true,
-            apiBase: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com',
+            apiBase: window.location.origin,
             onVerified: function(result) {
                 console.log('✅ Shield verification successful:', result);
                 showFILJoinInterface();
