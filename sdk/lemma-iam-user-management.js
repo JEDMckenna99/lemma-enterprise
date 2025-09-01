@@ -589,11 +589,12 @@ class LemmaIAMUserManager {
         const permissionId = prompt('Enter permission ID to revoke:', 'user');
         if (!permissionId) return;
 
-        if (!confirm(`Are you sure you want to revoke "${permissionId}" permission from ${userEmail}? This will remove their access immediately.`)) {
+        if (!confirm(`Are you sure you want to revoke "${permissionId}" permission from ${userEmail} for ${this.config.siteId}?\n\nThis will ONLY remove their access to this specific site. Their PoH lemma and permissions for other sites will remain intact.`)) {
             return;
         }
 
         try {
+            // Call API to revoke permission (triggers client-side lemma removal)
             const response = await fetch(`${this.config.apiBase}/api/v1/sites/${this.config.siteId}/users/${userDid}/permissions/${permissionId}`, {
                 method: 'DELETE',
                 headers: {
@@ -605,7 +606,27 @@ class LemmaIAMUserManager {
             const result = await response.json();
             
             if (result.success) {
-                alert(`Permission "${permissionId}" revoked from ${userEmail}. Their access has been removed.`);
+                // Also remove from user's wallet if they're on this page
+                if (this.wallet) {
+                    try {
+                        // Get user's permission lemmas for this site
+                        const permissionLemmas = await this.wallet.getCredentials('permission');
+                        const targetLemma = permissionLemmas.find(lemma => 
+                            lemma.claims?.siteId === this.config.siteId &&
+                            lemma.claims?.permissionId === permissionId &&
+                            lemma.subject === userDid
+                        );
+                        
+                        if (targetLemma) {
+                            await this.wallet.removeCredential(targetLemma.id);
+                            console.log(`✅ Removed permission lemma ${targetLemma.id} for ${this.config.siteId}`);
+                        }
+                    } catch (walletError) {
+                        console.warn('Could not remove from local wallet (user may not be on this device):', walletError);
+                    }
+                }
+                
+                alert(`Permission "${permissionId}" revoked from ${userEmail} for ${this.config.siteId}.\n\nTheir access to this site has been removed. Their PoH lemma and other site permissions remain intact.`);
                 await this.loadUsers(); // Refresh
             } else {
                 alert('Failed to revoke permission: ' + result.error);

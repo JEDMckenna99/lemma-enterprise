@@ -985,12 +985,28 @@ async function loadLemmaDetails(lemmaId, lemmaType) {
     }
 }
 
-// Revoke lemma with confirmation
+// Revoke lemma with confirmation (site-specific for permissions)
 async function revokeLemma(lemmaId, lemmaType) {
     const lemmaTypeName = lemmaType === 'poh' ? 'PoH lemma' : 'permission lemma';
+    
+    // Get the specific lemma to show site information
+    let siteInfo = '';
+    try {
+        const credentials = lemmaType === 'poh' 
+            ? await lemmaWallet.getCredentials('identity')
+            : await lemmaWallet.getCredentials('permission');
+        
+        const lemma = credentials.find(cred => cred.id === lemmaId);
+        if (lemma && lemmaType === 'permission') {
+            siteInfo = ` for ${lemma.claims?.siteId || 'unknown site'}`;
+        }
+    } catch (error) {
+        console.warn('Could not get lemma details:', error);
+    }
+    
     const warningMessage = lemmaType === 'poh' 
-        ? 'This will remove your proof of humanity across ALL sites in the network. You will need to re-verify with Stripe Identity.'
-        : 'This will remove your access permissions for this specific site. You may need to contact the site administrator to regain access.';
+        ? 'This will remove your proof of humanity across ALL sites in the federated network. You will need to re-verify with Stripe Identity to access any network sites.'
+        : `This will ONLY remove your access permissions${siteInfo}. Your PoH lemma and permissions for other sites will remain intact.`;
     
     if (!confirm(`Are you sure you want to revoke this ${lemmaTypeName}?\n\n${warningMessage}\n\nThis action cannot be undone.`)) {
         return;
@@ -1003,8 +1019,12 @@ async function revokeLemma(lemmaId, lemmaType) {
         // Refresh display
         await loadWalletData();
         
-        // Show success message
-        alert(`${lemmaTypeName} revoked successfully. ${lemmaType === 'poh' ? 'Network-wide revocation is propagating.' : 'Site access has been removed.'}`);
+        // Show success message with scope clarification
+        const successMessage = lemmaType === 'poh' 
+            ? 'PoH lemma revoked successfully. Network-wide revocation is propagating to all sites.'
+            : `Permission lemma revoked successfully${siteInfo}. Your PoH lemma and other site permissions remain active.`;
+            
+        alert(successMessage);
         
     } catch (error) {
         console.error('Failed to revoke lemma:', error);

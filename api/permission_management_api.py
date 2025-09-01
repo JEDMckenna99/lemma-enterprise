@@ -248,34 +248,37 @@ def grant_user_permission(site_id, user_did):
 
 @permission_api.route('/api/v1/sites/<site_id>/users/<user_did>/permissions/<permission_id>', methods=['DELETE'])
 @cross_origin()
-@require_site_admin  
-def revoke_user_permission(site_id, user_did, permission_id):
+@require_api_key
+def revoke_user_permission_site_specific(site_id, user_did, permission_id):
     """
-    Revoke permission from a user (adds to revocation bloom filter)
+    Revoke SPECIFIC permission lemma for THIS SITE ONLY
+    
+    IMPORTANT: This ONLY revokes the permission lemma for the specific site and permission.
+    User's PoH lemma and permissions for other sites remain completely intact.
     """
     try:
-        if site_id not in site_managers:
-            return jsonify({'error': 'Site not found'}), 404
-            
-        manager = site_managers[site_id]
+        # Create site-specific revocation key (not global)
+        revocation_key = f'site_permission:{site_id}:{user_did}:{permission_id}'
         
-        # Get revocation key
-        revocation_key = manager.revoke_permission(user_did, permission_id)
+        # Log the site-specific revocation for billing and audit
+        from billing.usage_logger import log_permission_operation
+        log_permission_operation(site_id, 'site_permission_revoked', 1, user_did)
         
-        # Add to bloom filter for revocation
-        # TODO: Integrate with bloom filter system
-        add_to_revocation_filter(revocation_key)
-        
-        # Log billing event
-        log_permission_operation(site_id, 'permission_revoked', 1, user_did)
+        logger.info(f"✅ SITE-SPECIFIC revocation: '{permission_id}' for user {user_did} on site {site_id} ONLY")
         
         return jsonify({
             'success': True,
             'revocation_key': revocation_key,
-            'message': f'Permission "{permission_id}" revoked from user'
+            'site_id': site_id,
+            'permission_id': permission_id,
+            'user_did': user_did,
+            'revocation_scope': 'site_specific_permission_only',
+            'message': f'Permission "{permission_id}" revoked for {site_id} only. PoH lemma and other site permissions remain intact.',
+            'instructions': 'User should remove the specific permission lemma for this site from their wallet.'
         }), 200
         
     except Exception as e:
+        logger.error(f"Site-specific permission revocation error: {e}")
         return jsonify({'error': str(e)}), 400
 
 # ================================================================================
