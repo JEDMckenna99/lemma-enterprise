@@ -12,6 +12,151 @@
     <!-- Clean Design System - Single Source of Truth -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250120-nav-spacing">
     
+    <!-- User Dropdown Styles -->
+    <style>
+        .user-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .user-dropdown-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--white);
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            color: var(--gray-700);
+        }
+
+        .user-dropdown-toggle:hover {
+            background: var(--gray-50);
+            border-color: var(--gray-400);
+        }
+
+        .user-avatar {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .dropdown-arrow {
+            font-size: 10px;
+            transition: transform 0.2s ease;
+        }
+
+        .user-dropdown.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .user-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            min-width: 220px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.2s ease;
+        }
+
+        .user-dropdown.open .user-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-header {
+            padding: 16px;
+            background: var(--gray-50);
+            border-radius: 12px 12px 0 0;
+        }
+
+        .dropdown-user-info {
+            text-align: center;
+        }
+
+        .dropdown-user-name {
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 2px;
+        }
+
+        .dropdown-user-role {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: var(--gray-200);
+            margin: 8px 0;
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: var(--gray-700);
+            text-decoration: none;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .dropdown-item:hover {
+            background: var(--gray-50);
+            color: var(--gray-900);
+        }
+
+        .dropdown-icon {
+            width: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .admin-item {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(99, 102, 241, 0.05));
+        }
+
+        .admin-item:hover {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(99, 102, 241, 0.1));
+            color: var(--primary);
+        }
+
+        .logout-item {
+            color: var(--error);
+        }
+
+        .logout-item:hover {
+            background: var(--error-50);
+            color: var(--error-600);
+        }
+
+        @media (max-width: 768px) {
+            .user-dropdown-menu {
+                right: -10px;
+                min-width: 200px;
+            }
+        }
+    </style>
+    
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -54,9 +199,57 @@
             <!-- Right Side Navigation -->
             <div class="nav-right">
                 {% if session.get('customer_id') %}
-                    <a href="/dashboard" class="btn btn-primary">Dashboard</a>
-                    <a href="/logout" class="btn btn-secondary">Sign Out</a>
+                    <!-- Authenticated User Dropdown -->
+                    <div class="user-dropdown">
+                        <button class="user-dropdown-toggle" onclick="toggleUserDropdown()">
+                            <span class="user-avatar">👤</span>
+                            <span class="user-name">Account</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="user-dropdown-menu" id="userDropdownMenu">
+                            <div class="dropdown-header">
+                                <div class="dropdown-user-info">
+                                    <div class="dropdown-user-name">Customer Account</div>
+                                    <div class="dropdown-user-role">{{ session.get('user_role', 'customer').title() }}</div>
+                                </div>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <a href="/wallet" class="dropdown-item">
+                                <span class="dropdown-icon">💼</span>
+                                Wallet
+                            </a>
+                            <a href="/dashboard" class="dropdown-item">
+                                <span class="dropdown-icon">📊</span>
+                                Dashboard
+                            </a>
+                            <a href="/api-keys" class="dropdown-item">
+                                <span class="dropdown-icon">🔑</span>
+                                API Keys
+                            </a>
+                            <a href="/billing" class="dropdown-item">
+                                <span class="dropdown-icon">💳</span>
+                                Billing
+                            </a>
+                            {% if session.get('user_role') == 'admin' %}
+                            <div class="dropdown-divider"></div>
+                            <a href="/admin" class="dropdown-item admin-item">
+                                <span class="dropdown-icon">⚙️</span>
+                                Admin Panel
+                            </a>
+                            <a href="/site-management" class="dropdown-item admin-item">
+                                <span class="dropdown-icon">👥</span>
+                                Site Management
+                            </a>
+                            {% endif %}
+                            <div class="dropdown-divider"></div>
+                            <a href="/logout" class="dropdown-item logout-item">
+                                <span class="dropdown-icon">🚪</span>
+                                Sign Out
+                            </a>
+                        </div>
+                    </div>
                 {% else %}
+                    <!-- Unauthenticated User Buttons -->
                     <a href="/login" class="btn btn-secondary">Sign In</a>
                     <a href="/register" class="btn btn-primary">Create Account</a>
                 {% endif %}
@@ -79,5 +272,31 @@
     </footer>
     
     {% block scripts %}{% endblock %}
+    
+    <!-- User Dropdown JavaScript -->
+    <script>
+        function toggleUserDropdown() {
+            const dropdown = document.querySelector('.user-dropdown');
+            dropdown.classList.toggle('open');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.querySelector('.user-dropdown');
+            if (dropdown && !dropdown.contains(event.target)) {
+                dropdown.classList.remove('open');
+            }
+        });
+
+        // Close dropdown on escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const dropdown = document.querySelector('.user-dropdown');
+                if (dropdown) {
+                    dropdown.classList.remove('open');
+                }
+            }
+        });
+    </script>
 </body>
 </html>

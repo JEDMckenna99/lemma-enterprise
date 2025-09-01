@@ -758,6 +758,16 @@ def create_app():
         """Site user management interface - works for any site with admin access"""
         return render_template('modern/site_management.html')
 
+    @app.route('/api-keys')
+    def api_keys_page():
+        """API key management page"""
+        return render_template('modern/api_keys.html')
+
+    @app.route('/billing')
+    def billing_page():
+        """Billing and usage page"""
+        return render_template('modern/billing.html')
+
     # Global OPTIONS handler for CORS preflight requests
     # Individual @cors_headers decorators handle actual responses
     @app.before_request
