@@ -685,26 +685,7 @@ def login():
             'error': 'Login failed'
         }), 500
 
-@customer_accounts_bp.route('/dashboard')
-def dashboard():
-    """Customer dashboard - redirect to proper route"""
-    from auth.decorators import require_authenticated
-    
-    @require_authenticated()
-    def _dashboard():
-        customer_id = session.get('customer_id')
-        customer = customer_manager.get_customer(customer_id)
-        if not customer:
-            return redirect('/login')
-        
-        # Add current month for template
-        current_month = datetime.now().strftime('%Y-%m')
-        customer_data = asdict(customer)
-        customer_data['current_month'] = current_month
-        
-        return render_template('modern/dashboard.html', customer=customer_data)
-    
-    return _dashboard()
+# Dashboard route moved to app.py - using new permission lemma-based access control
 
 @customer_accounts_bp.route('/api/customer/info')
 def get_customer_info():

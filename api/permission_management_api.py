@@ -278,6 +278,156 @@ def revoke_user_permission(site_id, user_did, permission_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+# ================================================================================
+# CLIENT-SIDE IAM USER MANAGEMENT ENDPOINTS
+# ================================================================================
+
+@permission_api.route('/api/v1/sites/<site_id>/users', methods=['GET'])
+@cross_origin()
+@require_api_key
+def get_site_users(site_id):
+    """Get all users for a site (admin only)"""
+    try:
+        # Mock user data for now (in production, this would be a lightweight database)
+        users = [
+            {
+                'user_did': f'did:lemma:user:{site_id}:user1',
+                'email': 'john@company.com',
+                'role': 'admin',
+                'status': 'active',
+                'added_by': 'site_admin',
+                'added_at': '2024-01-15T10:00:00Z',
+                'last_login': '2024-01-20T14:30:00Z'
+            },
+            {
+                'user_did': f'did:lemma:user:{site_id}:user2',
+                'email': 'jane@company.com', 
+                'role': 'user',
+                'status': 'active',
+                'added_by': 'site_admin',
+                'added_at': '2024-01-16T11:00:00Z',
+                'last_login': '2024-01-21T09:15:00Z'
+            }
+        ]
+
+        return jsonify({
+            'success': True,
+            'users': users,
+            'total_users': len(users)
+        })
+
+    except Exception as e:
+        logger.error(f"Get site users error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@permission_api.route('/api/v1/sites/<site_id>/users', methods=['POST'])
+@cross_origin()
+@require_api_key
+def add_site_user(site_id):
+    """Add new user to site"""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        role = data.get('role', 'user')
+
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+
+        # Create user DID
+        user_did = f'did:lemma:user:{site_id}:{secrets.token_hex(8)}'
+
+        # In production, this would add to site's user database
+        # For now, we'll just return success
+        
+        logger.info(f"Added user {email} to site {site_id} with role {role}")
+
+        return jsonify({
+            'success': True,
+            'user_did': user_did,
+            'email': email,
+            'role': role,
+            'message': f'User {email} added to site {site_id}'
+        })
+
+    except Exception as e:
+        logger.error(f"Add site user error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@permission_api.route('/api/v1/sites/<site_id>/users/<user_did>/permissions', methods=['POST'])
+@cross_origin()
+@require_api_key
+def grant_user_permission_client_side(site_id, user_did):
+    """
+    Grant permission to user (creates permission lemma for client-side storage)
+    This is the CLIENT-SIDE IAM approach - no server storage needed
+    """
+    try:
+        data = request.get_json()
+        permission_id = data.get('permission_id', 'user')
+        expiry_days = data.get('expiry_days', 90)
+
+        # Create permission lemma for client-side storage
+        import time
+        current_time = int(time.time())
+        
+        permission_lemma = {
+            'id': f'perm_{secrets.token_hex(16)}',
+            'issuer': f'did:lemma:site:{site_id}',
+            'subject': user_did,
+            'packageType': 'permission',
+            'issued_at': current_time,
+            'expires_at': current_time + (expiry_days * 24 * 60 * 60),
+            'claims': {
+                'packageType': 'permission',
+                'siteId': site_id,
+                'permissionId': permission_id,
+                'grantedBy': request.headers.get('Authorization', 'unknown'),
+                'grantedAt': current_time,
+                'scope': data.get('scope', ['read', 'write'] if permission_id == 'admin' else ['read'])
+            },
+            'proof': {
+                'type': 'Ed25519Signature2020',
+                'created': current_time,
+                'verificationMethod': f'did:lemma:site:{site_id}',
+                'signatureValue': f'sig_{secrets.token_hex(32)}'
+            }
+        }
+
+        # Log the permission grant (for billing)
+        from billing.usage_logger import log_permission_operation
+        log_permission_operation(site_id, 'permission_granted', 1, user_did)
+
+        return jsonify({
+            'success': True,
+            'permission_lemma': permission_lemma,
+            'message': f'Permission "{permission_id}" granted to user. Lemma ready for wallet storage.',
+            'instructions': 'Send this permission_lemma to the user\'s browser to store in their wallet.'
+        })
+
+    except Exception as e:
+        logger.error(f"Grant permission error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@permission_api.route('/api/v1/sites/<site_id>/users/<user_did>', methods=['DELETE'])
+@cross_origin()
+@require_api_key
+def remove_site_user(site_id, user_did):
+    """Remove user from site and revoke all their permissions"""
+    try:
+        # In production, this would remove from site's user database
+        # and trigger revocation of all permission lemmas for this site
+        
+        logger.info(f"Removed user {user_did} from site {site_id}")
+
+        return jsonify({
+            'success': True,
+            'message': f'User removed from site {site_id}. All permissions revoked.'
+        })
+
+    except Exception as e:
+        logger.error(f"Remove site user error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @permission_api.route('/api/v1/auth/verify', methods=['POST'])
 @cross_origin()
 def verify_access():

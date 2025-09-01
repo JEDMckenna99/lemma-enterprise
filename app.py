@@ -753,6 +753,11 @@ def create_app():
         """Admin dashboard - requires admin_access permission lemma"""
         return render_template('admin/admin_dashboard.html')
 
+    @app.route('/site-management')
+    def site_management():
+        """Site user management interface - works for any site with admin access"""
+        return render_template('modern/site_management.html')
+
     # Global OPTIONS handler for CORS preflight requests
     # Individual @cors_headers decorators handle actual responses
     @app.before_request
