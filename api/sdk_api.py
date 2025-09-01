@@ -413,6 +413,8 @@ def complete_identity_verification():
         verification_return = data.get('verification_return', False)
         enable_rust_engine = data.get('enable_rust_engine', True)
         
+        logger.info(f"📥 Completion request: session_id={session_id}, verification_return={verification_return}")
+        
         # Handle return from Stripe Identity without explicit session ID
         if verification_return and not session_id:
             # Use the most recent verification session from Flask session
@@ -469,13 +471,17 @@ def complete_identity_verification():
                 logger.info("🎭 Stripe not configured - using demo completion")
                 stripe_result = create_demo_stripe_result(session_id)
             else:
+                logger.info(f"🔍 Retrieving Stripe session: {session_id}")
                 stripe_result = stripe_manager.get_identity_verification_session(session_id)
                 
                 if not stripe_result.get('success'):
+                    error_msg = stripe_result.get('message', 'Unknown Stripe error')
+                    logger.error(f"❌ Stripe verification check failed: {error_msg}")
                     return jsonify({
                         'success': False,
                         'error': 'stripe_check_failed',
-                        'message': 'Failed to check Stripe verification status'
+                        'message': f'Failed to check Stripe verification status: {error_msg}',
+                        'session_id': session_id
                     }), 500
                 
                 if stripe_result.get('status') != 'verified':
