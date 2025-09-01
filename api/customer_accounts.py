@@ -508,12 +508,51 @@ def register():
             except Exception as e:
                 logger.warning(f"⚠️ Failed to issue permission lemma for {email}: {e}")
             
+            # Get the permission lemma data for wallet storage
+            permission_lemma_data = None
+            if permission_result.get('success'):
+                try:
+                    # Retrieve the newly created permission lemma
+                    from .database import get_db, UserLemma
+                    db = get_db()
+                    lemma = db.query(UserLemma).filter(
+                        UserLemma.user_did == user_did,
+                        UserLemma.site_id == 'lemma.id',
+                        UserLemma.lemma_type == 'permission',
+                        UserLemma.is_active == True
+                    ).first()
+                    
+                    if lemma:
+                        permission_lemma_data = {
+                            'id': f"lemma_{lemma.id}",
+                            'issuer': 'did:lemma:platform:lemma.id',
+                            'subject': user_did,
+                            'packageType': 'permission',
+                            'issued_at': int(lemma.issued_at.timestamp()),
+                            'expires_at': int(lemma.expires_at.timestamp()) if lemma.expires_at else None,
+                            'claims': {
+                                'packageType': 'permission',
+                                'siteId': 'lemma.id',
+                                'permissionId': 'customer_access',
+                                'accountType': 'customer',
+                                'email': email,
+                                'networkShared': False  # Site-specific permission
+                            },
+                            'lemma_data': lemma.lemma_data
+                        }
+                    
+                    db.close()
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to retrieve new permission lemma data: {e}")
+            
             return jsonify({
                 'success': True,
                 'customer_id': result['customer_id'],
                 'api_key': result['api_key'],
                 'user_did': user_did,
                 'permission_lemma_issued': permission_result.get('success', False),
+                'permission_lemma': permission_lemma_data,  # For wallet storage
                 'redirect_url': '/dashboard'
             })
         else:
@@ -615,11 +654,50 @@ def login():
         except Exception as e:
             logger.warning(f"⚠️ Permission lemma handling failed for {email}: {e}")
         
+        # Get the actual permission lemma data for wallet storage
+        permission_lemma_data = None
+        if permission_lemma_status:
+            try:
+                # Retrieve the permission lemma from database
+                from .database import get_db, UserLemma
+                db = get_db()
+                lemma = db.query(UserLemma).filter(
+                    UserLemma.user_did == user_did,
+                    UserLemma.site_id == 'lemma.id',
+                    UserLemma.lemma_type == 'permission',
+                    UserLemma.is_active == True
+                ).first()
+                
+                if lemma:
+                    permission_lemma_data = {
+                        'id': f"lemma_{lemma.id}",
+                        'issuer': 'did:lemma:platform:lemma.id',
+                        'subject': user_did,
+                        'packageType': 'permission',
+                        'issued_at': int(lemma.issued_at.timestamp()),
+                        'expires_at': int(lemma.expires_at.timestamp()) if lemma.expires_at else None,
+                        'claims': {
+                            'packageType': 'permission',
+                            'siteId': 'lemma.id',
+                            'permissionId': lemma.permission_id,
+                            'accountType': customer.role,
+                            'email': email,
+                            'networkShared': False  # Site-specific permission
+                        },
+                        'lemma_data': lemma.lemma_data
+                    }
+                
+                db.close()
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to retrieve permission lemma data: {e}")
+        
         return jsonify({
             'success': True,
             'customer_id': customer.customer_id,
             'user_did': user_did,
             'permission_lemma_active': permission_lemma_status,
+            'permission_lemma': permission_lemma_data,  # For wallet storage
             'role': customer.role,
             'redirect_url': '/dashboard'
         })
@@ -716,6 +794,115 @@ def validate_api_key():
     
     result = customer_manager.validate_api_key(api_key)
     return jsonify(result)
+
+@customer_accounts_bp.route('/issue-admin-lemma', methods=['POST'])
+@cross_origin()
+def issue_admin_lemma():
+    """Issue admin permission lemma for platform administration"""
+    try:
+        # Verify admin credentials
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Basic '):
+            return jsonify({
+                'success': False,
+                'error': 'Basic authentication required'
+            }), 401
+        
+        import base64
+        try:
+            credentials = base64.b64decode(auth_header[6:]).decode('utf-8')
+            username, password = credentials.split(':', 1)
+        except:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid authentication format'
+            }), 401
+        
+        # Check admin credentials
+        admin_user = os.getenv('LEMMA_ADMIN_USER', 'admin')
+        admin_pass = os.getenv('LEMMA_ADMIN_PASS', 'defaultpass')
+        
+        if username != admin_user or password != admin_pass:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid admin credentials'
+            }), 401
+        
+        # Issue admin permission lemma
+        try:
+            from .federated_network_manager import FederatedNetworkManager
+            network_manager = FederatedNetworkManager()
+            
+            # Create admin DID
+            admin_did = f"did:lemma:admin:{username}"
+            
+            # Issue admin permission lemma
+            permission_result = network_manager.issue_permission_lemma(
+                site_id='lemma.id',
+                user_did=admin_did,
+                permission_id='admin_access',
+                granted_by='did:lemma:platform:lemma.id',
+                conditions={'account_type': 'admin', 'username': username}
+            )
+            
+            if permission_result.get('success'):
+                # Get the permission lemma data for wallet storage
+                from .database import get_db, UserLemma
+                db = get_db()
+                lemma = db.query(UserLemma).filter(
+                    UserLemma.user_did == admin_did,
+                    UserLemma.site_id == 'lemma.id',
+                    UserLemma.lemma_type == 'permission',
+                    UserLemma.is_active == True
+                ).first()
+                
+                permission_lemma_data = None
+                if lemma:
+                    permission_lemma_data = {
+                        'id': f"lemma_{lemma.id}",
+                        'issuer': 'did:lemma:platform:lemma.id',
+                        'subject': admin_did,
+                        'packageType': 'permission',
+                        'issued_at': int(lemma.issued_at.timestamp()),
+                        'expires_at': int(lemma.expires_at.timestamp()) if lemma.expires_at else None,
+                        'claims': {
+                            'packageType': 'permission',
+                            'siteId': 'lemma.id',
+                            'permissionId': 'admin_access',
+                            'accountType': 'admin',
+                            'username': username,
+                            'networkShared': False
+                        },
+                        'lemma_data': lemma.lemma_data
+                    }
+                
+                db.close()
+                
+                return jsonify({
+                    'success': True,
+                    'admin_did': admin_did,
+                    'permission_lemma': permission_lemma_data,
+                    'message': 'Admin permission lemma issued successfully'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to issue admin permission lemma'
+                }), 500
+                
+        except Exception as e:
+            logger.error(f"Admin lemma issuance error: {e}")
+            return jsonify({
+                'success': False,
+                'error': 'Admin lemma issuance failed'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Admin lemma endpoint error: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Request processing failed'
+        }), 500
 
 @customer_accounts_bp.route('/create-test-accounts')
 def create_test_accounts():

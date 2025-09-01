@@ -399,15 +399,42 @@
                         </div>
                     `;
                     
+                    // NEW: Store permission lemma in browser wallet (same wallet as PoH lemma)
+                    if (result.permission_lemma) {
+                        try {
+                            // Initialize background wallet if not already done
+                            if (!window.lemmaWallet) {
+                                const { LemmaFederatedWallet } = await import('/static/js/lemma-federated-wallet.js');
+                                window.lemmaWallet = new LemmaFederatedWallet({
+                                    debug: true,
+                                    networkRegistryUrl: window.location.origin
+                                });
+                                await window.lemmaWallet.initialize();
+                            }
+                            
+                            // Store permission lemma in the same wallet as PoH lemmas
+                            const storeResult = await window.lemmaWallet.storeCredential(result.permission_lemma);
+                            
+                            if (storeResult.success) {
+                                console.log('✅ Permission lemma stored in browser wallet:', result.permission_lemma.claims.permissionId);
+                            } else {
+                                console.warn('⚠️ Failed to store permission lemma in wallet:', storeResult.error);
+                            }
+                            
+                        } catch (error) {
+                            console.warn('⚠️ Wallet integration error:', error);
+                        }
+                    }
+                    
                     // Redirect to dashboard
                     setTimeout(() => {
                         const dashboardUrl = result.redirect_url === '/dashboard' 
-                            ? 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/dashboard'
+                            ? '/dashboard'  // Use relative URL
                             : result.redirect_url === '/admin'
-                            ? 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/admin'
-                            : result.redirect_url || 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/dashboard';
+                            ? '/admin'      // Use relative URL
+                            : result.redirect_url || '/dashboard';
                         window.location.href = dashboardUrl;
-                    }, 1000);
+                    }, 1500);  // Slightly longer to allow wallet storage
                 } else {
                     // Show error
                     showError('email', result.error || 'Login failed');

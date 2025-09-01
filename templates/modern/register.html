@@ -615,6 +615,33 @@
                     // Complete progress
                     updateProgress(3);
                     
+                    // NEW: Store permission lemma in browser wallet (same wallet as PoH lemma)
+                    if (result.permission_lemma) {
+                        try {
+                            // Initialize background wallet if not already done
+                            if (!window.lemmaWallet) {
+                                const { LemmaFederatedWallet } = await import('/static/js/lemma-federated-wallet.js');
+                                window.lemmaWallet = new LemmaFederatedWallet({
+                                    debug: true,
+                                    networkRegistryUrl: window.location.origin
+                                });
+                                await window.lemmaWallet.initialize();
+                            }
+                            
+                            // Store permission lemma in the same wallet as PoH lemmas
+                            const storeResult = await window.lemmaWallet.storeCredential(result.permission_lemma);
+                            
+                            if (storeResult.success) {
+                                console.log('✅ Permission lemma stored in browser wallet for new customer:', result.permission_lemma.claims.permissionId);
+                            } else {
+                                console.warn('⚠️ Failed to store permission lemma in wallet:', storeResult.error);
+                            }
+                            
+                        } catch (error) {
+                            console.warn('⚠️ Wallet integration error during registration:', error);
+                        }
+                    }
+                    
                     // Show success message with animation
                     setTimeout(() => {
                         document.getElementById('successMessage').style.display = 'block';
