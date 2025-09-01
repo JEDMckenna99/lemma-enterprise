@@ -600,16 +600,19 @@ def store_credential():
 def create_demo_identity_session(user_id: str, return_url: str, inline_mode: bool) -> dict:
     """
     Create a demo identity verification session for development/testing
+    Only used when Stripe is not configured - should not be the primary flow
     """
-    session_id = f"vs_demo_{secrets.token_hex(16)}"
-    client_secret = f"vs_demo_{secrets.token_hex(24)}"
+    session_id = f"demo_{secrets.token_hex(16)}"
+    client_secret = f"demo_secret_{secrets.token_hex(24)}"
+    
+    logger.warning("⚠️ Using demo identity verification - Stripe not configured")
     
     return {
-        'success': True,
-        'session_id': session_id,
-        'client_secret': client_secret,
-        'url': f"https://verify.stripe.com/start/{session_id}",
-        'demo_mode': True
+        'success': False,
+        'error': 'stripe_not_configured',
+        'message': 'Stripe Identity verification not available - please configure Stripe keys',
+        'demo_mode': True,
+        'session_id': session_id
     }
 
 def create_demo_stripe_result(session_id: str) -> dict:
