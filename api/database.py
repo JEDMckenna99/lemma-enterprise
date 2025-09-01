@@ -134,7 +134,7 @@ class NetworkActivity(Base):
     service_type = Column(String, nullable=False)  # 'poh_network', 'iam'
     success = Column(Boolean, nullable=False)
     verification_time_us = Column(Integer)  # Microsecond timing
-    metadata = Column(JSON, default=dict)  # Additional context
+    activity_metadata = Column(JSON, default=dict)  # Additional context
     timestamp = Column(DateTime, default=datetime.utcnow)
     ip_address = Column(String)  # For security/analytics
     user_agent = Column(String)
@@ -182,7 +182,7 @@ class SiteUser(Base):
     display_name = Column(String)  # Site-specific display name
     user_status = Column(String, default='active')  # 'active', 'suspended', 'pending', 'banned'
     user_role = Column(String, default='user')  # Site-defined role (admin, moderator, user, etc.)
-    user_metadata = Column(JSON, default=dict)  # Site-specific user data
+    site_user_metadata = Column(JSON, default=dict)  # Site-specific user data
     added_by = Column(String, nullable=False)  # Admin who added user
     added_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime)
