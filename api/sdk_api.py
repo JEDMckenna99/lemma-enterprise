@@ -346,8 +346,13 @@ def start_identity_verification():
                     inline_mode=inline_mode
                 )
                 
-        except ImportError:
+        except ImportError as e:
+            logger.error(f"❌ Stripe manager import failed: {e}")
             logger.info("🎭 Stripe manager not available - using demo identity verification")
+            session_result = create_demo_identity_session(user_id, return_url, inline_mode)
+        except Exception as e:
+            logger.error(f"❌ Stripe manager initialization failed: {e}")
+            logger.info("🎭 Stripe manager error - using demo identity verification")
             session_result = create_demo_identity_session(user_id, return_url, inline_mode)
         
         if not session_result.get('success'):
@@ -481,8 +486,13 @@ def complete_identity_verification():
                         'message': 'Identity verification not yet complete'
                     })
             
-        except ImportError:
+        except ImportError as e:
+            logger.error(f"❌ Stripe manager import failed in completion: {e}")
             logger.info("🎭 Stripe manager not available - using demo completion")
+            stripe_result = create_demo_stripe_result(session_id)
+        except Exception as e:
+            logger.error(f"❌ Stripe manager error in completion: {e}")
+            logger.info("🎭 Stripe manager error - using demo completion")
             stripe_result = create_demo_stripe_result(session_id)
         
         # Create comprehensive identity credential with full KYC claims
