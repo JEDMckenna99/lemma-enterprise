@@ -624,8 +624,9 @@ class LemmaVerificationCard {
         
         // Update button to show loading state (using shield's exact logic)
         const verifyBtn = this.state.cardElement.querySelector('#lemma-verify-btn');
+        let originalText = 'Verify Identity'; // Default fallback
         if (verifyBtn) {
-            const originalText = verifyBtn.textContent;
+            originalText = verifyBtn.textContent;
             verifyBtn.textContent = 'Starting verification...';
             verifyBtn.disabled = true;
             
