@@ -194,13 +194,15 @@ def get_current_user():
         return {'api_key': g.api_key}
     return None
 
-def rate_limit(f):
+def rate_limit(max_requests=100, window=60):
     """
     Decorator for rate limiting (mock implementation)
     """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # TODO: Implement actual rate limiting
-        return f(*args, **kwargs)
-    
-    return decorated_function
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # TODO: Implement actual rate limiting with max_requests and window
+            return f(*args, **kwargs)
+        
+        return decorated_function
+    return decorator
