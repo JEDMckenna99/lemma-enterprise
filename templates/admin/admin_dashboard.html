@@ -1,0 +1,462 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Admin Dashboard - Lemma Platform{% endblock %}
+{% block description %}Lemma platform administration dashboard{% endblock %}
+
+{% block content %}
+<div class="admin-page-header">
+    <h1 class="admin-page-title">Platform Administration</h1>
+    <p class="admin-page-subtitle">
+        Manage the Lemma platform, customers, and system configuration
+    </p>
+</div>
+
+<!-- Permission Lemma Access Control -->
+<div id="admin-access-check" style="text-align: center; padding: 40px;">
+    <div>Checking admin permissions...</div>
+</div>
+
+<!-- Admin Dashboard Content (shown only with admin_access permission lemma) -->
+<div id="admin-dashboard" style="display: none;">
+    <!-- Admin Alert -->
+    <div class="admin-alert">
+        <span class="admin-alert-icon">⚠️</span>
+        <div>
+            <strong>Administrator Access</strong> - You have full administrative privileges. 
+            All actions are logged for security and compliance.
+        </div>
+    </div>
+
+    <!-- System Metrics -->
+    <div class="admin-metrics-grid" id="platformMetrics">
+        <div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--gray-500);">
+            Loading platform statistics...
+        </div>
+    </div>
+
+    <!-- Management Sections -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 32px;">
+        <!-- Customer Management -->
+        <div class="admin-section">
+            <div class="admin-section-header">
+                <h2>Customer Management</h2>
+                <button class="admin-btn" onclick="refreshCustomers()">Refresh</button>
+            </div>
+            <div id="customersList">
+                <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                    Loading customers...
+                </div>
+            </div>
+        </div>
+
+        <!-- Site Management -->
+        <div class="admin-section">
+            <div class="admin-section-header">
+                <h2>Registered Sites</h2>
+                <button class="admin-btn" onclick="refreshSites()">Refresh</button>
+            </div>
+            <div id="sitesList">
+                <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                    Loading sites...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Actions -->
+    <div class="admin-section" style="margin-top: 32px;">
+        <div class="admin-section-header">
+            <h2>Admin Actions</h2>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+            <button class="admin-action-btn" onclick="issueAdminLemma()">
+                🔑 Issue Admin Lemma
+            </button>
+            <button class="admin-action-btn" onclick="viewSystemLogs()">
+                📋 View System Logs
+            </button>
+            <button class="admin-action-btn" onclick="manageRevocations()">
+                🚫 Manage Revocations
+            </button>
+            <button class="admin-action-btn" onclick="window.location.href='/wallet'">
+                👤 View My Wallet
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.admin-section {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+.admin-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.admin-section-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.admin-btn {
+    background: var(--primary);
+    color: var(--white);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.admin-btn:hover {
+    background: var(--primary-600);
+}
+
+.admin-action-btn {
+    background: linear-gradient(135deg, var(--gray-100), var(--gray-50));
+    border: 1px solid var(--gray-300);
+    color: var(--gray-700);
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.admin-action-btn:hover {
+    background: linear-gradient(135deg, var(--primary-50), var(--primary-25));
+    border-color: var(--primary-200);
+    color: var(--primary-700);
+}
+
+.customer-item, .site-item {
+    padding: 12px;
+    background: var(--gray-50);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid var(--gray-200);
+}
+
+.customer-header, .site-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.customer-name, .site-name {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.customer-meta, .site-meta {
+    font-size: 0.8rem;
+    color: var(--gray-600);
+}
+</style>
+
+<script>
+// Admin Dashboard with Permission Lemma Access Control
+let adminData = null;
+let walletInstance = null;
+
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        // Initialize wallet to check permission lemmas
+        const { LemmaFederatedWallet } = await import('/static/js/lemma-federated-wallet.js');
+        walletInstance = new LemmaFederatedWallet({ debug: true });
+        await walletInstance.init();
+
+        // Check for admin_access permission lemma
+        const permissionLemmas = await walletInstance.getCredentials('permission');
+        const hasAdminAccess = permissionLemmas.some(lemma => 
+            lemma.claims?.siteId === 'lemma.id' && 
+            lemma.claims?.permissionId === 'admin_access'
+        );
+
+        if (hasAdminAccess) {
+            // User has admin permission, show dashboard
+            document.getElementById('admin-access-check').style.display = 'none';
+            document.getElementById('admin-dashboard').style.display = 'block';
+            await loadAdminDashboard();
+        } else {
+            // No admin permission, show access denied
+            document.getElementById('admin-access-check').innerHTML = `
+                <div style="color: var(--error);">
+                    <h2>Admin Access Required</h2>
+                    <p>You need an admin_access permission lemma for lemma.id to access this dashboard.</p>
+                    <p>Contact platform administrator or use admin credentials to get admin lemma.</p>
+                    <div style="margin-top: 20px;">
+                        <button onclick="requestAdminLemma()" style="background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer;">
+                            Request Admin Lemma
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+    } catch (error) {
+        console.error('Admin dashboard initialization error:', error);
+        document.getElementById('admin-access-check').innerHTML = `
+            <div style="color: var(--error);">
+                <h2>Error</h2>
+                <p>Failed to check admin permissions. Please try refreshing the page.</p>
+            </div>
+        `;
+    }
+});
+
+// Load admin dashboard data
+async function loadAdminDashboard() {
+    try {
+        // Load platform statistics
+        await loadPlatformStats();
+
+        // Load customers list
+        await loadCustomers();
+
+        // Load sites list
+        await loadSites();
+
+    } catch (error) {
+        console.error('Failed to load admin dashboard data:', error);
+    }
+}
+
+// Load platform statistics
+async function loadPlatformStats() {
+    try {
+        const response = await fetch('/api/admin/platform-stats');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayPlatformStats(data.stats);
+        } else {
+            document.getElementById('platformMetrics').innerHTML = 
+                '<div style="padding: 20px; color: var(--error);">Failed to load platform stats</div>';
+        }
+    } catch (error) {
+        console.error('Failed to load platform stats:', error);
+    }
+}
+
+// Display platform statistics
+function displayPlatformStats(stats) {
+    const container = document.getElementById('platformMetrics');
+    
+    container.innerHTML = `
+        <div class="admin-metric-card">
+            <div class="admin-metric-value">${stats.total_customers}</div>
+            <div class="admin-metric-label">Total Customers</div>
+        </div>
+        
+        <div class="admin-metric-card">
+            <div class="admin-metric-value">${stats.active_sites}</div>
+            <div class="admin-metric-label">Active Sites</div>
+        </div>
+        
+        <div class="admin-metric-card">
+            <div class="admin-metric-value">${stats.total_verifications_today.toLocaleString()}</div>
+            <div class="admin-metric-label">Verifications Today</div>
+        </div>
+        
+        <div class="admin-metric-card">
+            <div class="admin-metric-value">$${stats.revenue_this_month.toLocaleString()}</div>
+            <div class="admin-metric-label">Revenue This Month</div>
+        </div>
+        
+        <div class="admin-metric-card">
+            <div class="admin-metric-value">${stats.federated_network.total_poh_lemmas.toLocaleString()}</div>
+            <div class="admin-metric-label">PoH Lemmas</div>
+        </div>
+        
+        <div class="admin-metric-card">
+            <div class="admin-metric-value">${stats.iam_system.total_permission_lemmas.toLocaleString()}</div>
+            <div class="admin-metric-label">Permission Lemmas</div>
+        </div>
+    `;
+}
+
+// Load customers
+async function loadCustomers() {
+    try {
+        const response = await fetch('/api/admin/customers');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayCustomers(data.customers);
+        } else {
+            document.getElementById('customersList').innerHTML = 
+                '<div style="padding: 20px; color: var(--error);">Failed to load customers</div>';
+        }
+    } catch (error) {
+        console.error('Failed to load customers:', error);
+    }
+}
+
+// Display customers
+function displayCustomers(customers) {
+    const container = document.getElementById('customersList');
+    
+    if (customers.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--gray-500);">No customers yet</div>';
+        return;
+    }
+
+    container.innerHTML = customers.slice(0, 10).map(customer => `
+        <div class="customer-item">
+            <div class="customer-header">
+                <span class="customer-name">${customer.name}</span>
+                <span style="font-size: 0.8rem; color: var(--${customer.status === 'active' ? 'success' : 'error'});">
+                    ${customer.status}
+                </span>
+            </div>
+            <div class="customer-meta">
+                ${customer.company} • ${customer.email} • ${customer.role}
+            </div>
+        </div>
+    `).join('');
+    
+    if (customers.length > 10) {
+        container.innerHTML += `<div style="text-align: center; margin-top: 12px; color: var(--gray-500);">... and ${customers.length - 10} more</div>`;
+    }
+}
+
+// Load sites
+async function loadSites() {
+    try {
+        const response = await fetch('/api/admin/sites');
+        const data = await response.json();
+        
+        if (data.success) {
+            displaySites(data.sites);
+        } else {
+            document.getElementById('sitesList').innerHTML = 
+                '<div style="padding: 20px; color: var(--error);">Failed to load sites</div>';
+        }
+    } catch (error) {
+        console.error('Failed to load sites:', error);
+    }
+}
+
+// Display sites
+function displaySites(sites) {
+    const container = document.getElementById('sitesList');
+    
+    if (sites.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--gray-500);">No sites registered yet</div>';
+        return;
+    }
+
+    container.innerHTML = sites.map(site => `
+        <div class="site-item">
+            <div class="site-header">
+                <span class="site-name">${site.site_domain}</span>
+                <span style="font-size: 0.8rem; color: var(--${site.status === 'active' ? 'success' : 'error'});">
+                    ${site.status}
+                </span>
+            </div>
+            <div class="site-meta">
+                ${site.company_name} • ${site.service_type} • ${site.monthly_active_users} MAU
+            </div>
+        </div>
+    `).join('');
+}
+
+// Admin action functions
+async function requestAdminLemma() {
+    const username = prompt('Enter admin username:');
+    const password = prompt('Enter admin password:');
+    
+    if (!username || !password) return;
+
+    try {
+        const credentials = btoa(`${username}:${password}`);
+        const response = await fetch('/api/admin/issue-admin-lemma', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${credentials}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+        
+        if (result.success && result.permission_lemma) {
+            // Store admin lemma in wallet
+            await walletInstance.storeCredential(result.permission_lemma);
+            alert('Admin permission lemma issued and stored in wallet!');
+            location.reload(); // Refresh to show admin dashboard
+        } else {
+            alert('Failed to issue admin lemma: ' + result.error);
+        }
+
+    } catch (error) {
+        console.error('Failed to request admin lemma:', error);
+        alert('Failed to request admin lemma');
+    }
+}
+
+async function issueAdminLemma() {
+    const username = prompt('Enter username for new admin:');
+    if (!username) return;
+
+    const password = prompt('Enter admin password for authorization:');
+    if (!password) return;
+
+    try {
+        const credentials = btoa(`admin:${password}`);
+        const response = await fetch('/api/admin/issue-admin-lemma', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${credentials}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username: username })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`Admin lemma issued for ${username}. They can now access admin functions.`);
+        } else {
+            alert('Failed to issue admin lemma: ' + result.error);
+        }
+
+    } catch (error) {
+        console.error('Failed to issue admin lemma:', error);
+        alert('Failed to issue admin lemma');
+    }
+}
+
+function viewSystemLogs() {
+    window.open('https://dashboard.heroku.com/apps/lemma-enterprise/logs', '_blank');
+}
+
+function manageRevocations() {
+    alert('Revocation management interface coming soon. For now, revocations are handled automatically through the OPRF system.');
+}
+
+async function refreshCustomers() {
+    await loadCustomers();
+}
+
+async function refreshSites() {
+    await loadSites();
+}
+</script>
+{% endblock %}

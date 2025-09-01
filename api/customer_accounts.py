@@ -529,7 +529,8 @@ def register():
                         'email': email,
                         'networkShared': False,  # Site-specific permission
                         'grantedBy': 'did:lemma:platform:lemma.id',
-                        'grantedAt': current_time
+                        'grantedAt': current_time,
+                        'scope': ['customer_dashboard', 'api_management']
                     },
                     'proof': {
                         'type': 'Ed25519Signature2020',
@@ -656,7 +657,8 @@ def login():
                     'email': email,
                     'networkShared': False,  # Site-specific permission
                     'grantedBy': 'did:lemma:platform:lemma.id',
-                    'grantedAt': current_time
+                    'grantedAt': current_time,
+                    'scope': ['platform_admin', 'customer_management', 'site_management'] if customer.role == 'admin' else ['customer_dashboard', 'api_management']
                 },
                 'proof': {
                     'type': 'Ed25519Signature2020',

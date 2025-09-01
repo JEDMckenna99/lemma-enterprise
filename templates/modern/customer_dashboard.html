@@ -1,0 +1,682 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Customer Dashboard - Lemma{% endblock %}
+{% block description %}Manage your Lemma integration, API keys, and billing.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .dashboard-header {
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .dashboard-title {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 8px;
+        }
+
+        .dashboard-subtitle {
+            font-size: 1.1rem;
+            color: var(--gray-600);
+        }
+
+        .access-check {
+            text-align: center;
+            padding: 60px 20px;
+            background: var(--gray-50);
+            border-radius: 16px;
+            margin: 40px 0;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+            margin-top: 32px;
+        }
+
+        .dashboard-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin: 0;
+        }
+
+        .card-action {
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .card-action:hover {
+            background: var(--primary-600);
+            transform: translateY(-1px);
+        }
+
+        .usage-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .usage-item {
+            text-align: center;
+            padding: 16px;
+            background: var(--gray-50);
+            border-radius: 12px;
+        }
+
+        .usage-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .usage-label {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+        }
+
+        .api-key-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .api-key-item {
+            padding: 16px;
+            background: var(--gray-50);
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border: 1px solid var(--gray-200);
+        }
+
+        .api-key-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .api-key-name {
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .api-key-status {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background: var(--success-100);
+            color: var(--success-700);
+        }
+
+        .status-revoked {
+            background: var(--error-100);
+            color: var(--error-700);
+        }
+
+        .api-key-value {
+            font-family: monospace;
+            background: var(--gray-100);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            margin: 8px 0;
+            word-break: break-all;
+        }
+
+        .api-key-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 4px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-copy {
+            background: var(--gray-200);
+            color: var(--gray-700);
+        }
+
+        .btn-copy:hover {
+            background: var(--gray-300);
+        }
+
+        .btn-revoke {
+            background: var(--error);
+            color: var(--white);
+        }
+
+        .btn-revoke:hover {
+            background: var(--error-600);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--gray-900);
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 1rem;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .btn-cancel {
+            background: var(--gray-200);
+            color: var(--gray-700);
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .btn-confirm {
+            background: var(--primary);
+            color: var(--white);
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Permission Lemma Access Control -->
+    <div id="access-check" class="access-check">
+        <div>Checking customer access permissions...</div>
+    </div>
+
+    <!-- Customer Dashboard Content (shown only with customer_access permission lemma) -->
+    <div id="customer-dashboard" style="display: none;">
+        <div class="dashboard-header">
+            <h1 class="dashboard-title">Customer Dashboard</h1>
+            <p class="dashboard-subtitle" id="customer-welcome">
+                Manage your Lemma integration and view usage statistics
+            </p>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- API Keys Management -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2 class="card-title">API Keys</h2>
+                    <button class="card-action" onclick="showNewKeyModal()">
+                        + New Key
+                    </button>
+                </div>
+                <div id="apiKeysList">
+                    <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                        Loading API keys...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Usage Statistics -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2 class="card-title">Usage This Month</h2>
+                </div>
+                <div class="usage-grid" id="usageStats">
+                    <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                        Loading usage statistics...
+                    </div>
+                </div>
+                <p style="font-size: 0.9rem; color: var(--gray-600); text-align: center; margin-top: 16px;">
+                    Federated ID: $0.06/MAU • IAM System: $0.16/MAU
+                </p>
+            </div>
+
+            <!-- Account Information -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2 class="card-title">Account Information</h2>
+                </div>
+                <div id="accountInfo">
+                    <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                        Loading account information...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Permission Lemmas -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2 class="card-title">Your Permission Lemmas</h2>
+                    <button class="card-action" onclick="window.location.href='/wallet'">
+                        Manage in Wallet
+                    </button>
+                </div>
+                <div id="permissionLemmasPreview">
+                    <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                        Loading permission lemmas...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New API Key Modal -->
+<div id="newKeyModal" class="modal">
+    <div class="modal-content">
+        <h3 class="modal-title">Create New API Key</h3>
+        <input type="text" id="newKeyName" class="modal-input" placeholder="Enter key name (e.g., Production Key)">
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="hideNewKeyModal()">Cancel</button>
+            <button class="btn-confirm" onclick="createNewApiKey()">Create Key</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Customer Dashboard with Permission Lemma Access Control
+let customerData = null;
+let walletInstance = null;
+
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        // Initialize wallet to check permission lemmas
+        const { LemmaFederatedWallet } = await import('/static/js/lemma-federated-wallet.js');
+        walletInstance = new LemmaFederatedWallet({ debug: true });
+        await walletInstance.init();
+
+        // Check for customer_access permission lemma
+        const permissionLemmas = await walletInstance.getCredentials('permission');
+        const hasCustomerAccess = permissionLemmas.some(lemma => 
+            lemma.claims?.siteId === 'lemma.id' && 
+            lemma.claims?.permissionId === 'customer_access'
+        );
+
+        if (hasCustomerAccess) {
+            // User has permission, show dashboard
+            document.getElementById('access-check').style.display = 'none';
+            document.getElementById('customer-dashboard').style.display = 'block';
+            await loadCustomerDashboard();
+        } else {
+            // No permission, show access denied
+            document.getElementById('access-check').innerHTML = `
+                <div style="color: var(--error);">
+                    <h2>Access Denied</h2>
+                    <p>You need a customer_access permission lemma for lemma.id to access this dashboard.</p>
+                    <p><a href="/login" style="color: var(--primary);">Login</a> to get your permission lemma.</p>
+                </div>
+            `;
+        }
+
+    } catch (error) {
+        console.error('Dashboard initialization error:', error);
+        document.getElementById('access-check').innerHTML = `
+            <div style="color: var(--error);">
+                <h2>Error</h2>
+                <p>Failed to check permissions. Please try refreshing the page.</p>
+            </div>
+        `;
+    }
+});
+
+// Load customer dashboard data
+async function loadCustomerDashboard() {
+    try {
+        // Load customer profile
+        const profileResponse = await fetch('/api/customer/profile');
+        const profileData = await profileResponse.json();
+        
+        if (profileData.success) {
+            customerData = profileData.customer;
+            document.querySelector('.dashboard-title').textContent = `Welcome back, ${customerData.name}!`;
+            document.getElementById('customer-welcome').textContent = 
+                `Manage your Lemma integration for ${customerData.company}`;
+            
+            displayAccountInfo(customerData);
+        }
+
+        // Load API keys
+        await loadApiKeys();
+
+        // Load usage statistics  
+        await loadUsageStats();
+
+        // Load permission lemmas preview
+        await loadPermissionLemmasPreview();
+
+    } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+    }
+}
+
+// Display account information
+function displayAccountInfo(customer) {
+    const container = document.getElementById('accountInfo');
+    
+    container.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+                <div style="font-size: 0.8rem; color: var(--gray-500); margin-bottom: 4px;">Email</div>
+                <div style="font-weight: 600;">${customer.email}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.8rem; color: var(--gray-500); margin-bottom: 4px;">Company</div>
+                <div style="font-weight: 600;">${customer.company}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.8rem; color: var(--gray-500); margin-bottom: 4px;">Role</div>
+                <div style="font-weight: 600;">${customer.role}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.8rem; color: var(--gray-500); margin-bottom: 4px;">Status</div>
+                <div style="font-weight: 600; color: var(--success);">${customer.status}</div>
+            </div>
+        </div>
+        <div style="margin-top: 16px; padding: 12px; background: var(--primary-50); border-radius: 8px;">
+            <div style="font-size: 0.8rem; color: var(--primary-700);">
+                Member since: ${new Date(customer.created_at).toLocaleDateString()}
+            </div>
+        </div>
+    `;
+}
+
+// Load API keys
+async function loadApiKeys() {
+    try {
+        const response = await fetch('/api/customer/api-keys');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayApiKeys(data.api_keys);
+        } else {
+            document.getElementById('apiKeysList').innerHTML = 
+                '<div style="padding: 20px; color: var(--error);">Failed to load API keys</div>';
+        }
+    } catch (error) {
+        console.error('Failed to load API keys:', error);
+        document.getElementById('apiKeysList').innerHTML = 
+            '<div style="padding: 20px; color: var(--error);">Error loading API keys</div>';
+    }
+}
+
+// Display API keys
+function displayApiKeys(apiKeys) {
+    const container = document.getElementById('apiKeysList');
+    
+    if (apiKeys.length === 0) {
+        container.innerHTML = `
+            <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                <div style="margin-bottom: 8px;">No API keys yet</div>
+                <div style="font-size: 0.9rem;">Create your first API key to start integrating Lemma</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = apiKeys.map(apiKey => `
+        <div class="api-key-item">
+            <div class="api-key-header">
+                <span class="api-key-name">${apiKey.name}</span>
+                <span class="api-key-status status-${apiKey.status}">
+                    ${apiKey.status.charAt(0).toUpperCase() + apiKey.status.slice(1)}
+                </span>
+            </div>
+            
+            ${apiKey.status === 'active' ? `
+                <div class="api-key-value">${apiKey.key}</div>
+                <div class="api-key-actions">
+                    <button class="btn-small btn-copy" onclick="copyToClipboard('${apiKey.key}', this)">
+                        Copy
+                    </button>
+                    <button class="btn-small btn-revoke" onclick="revokeApiKey('${apiKey.key}')">
+                        Revoke
+                    </button>
+                </div>
+            ` : ''}
+            
+            <div style="font-size: 0.8rem; color: var(--gray-600); margin-top: 8px;">
+                Created: ${new Date(apiKey.created_at).toLocaleDateString()} • 
+                Used ${apiKey.usage_count} times
+                ${apiKey.last_used ? `• Last used: ${new Date(apiKey.last_used).toLocaleDateString()}` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+// Load usage statistics
+async function loadUsageStats() {
+    try {
+        const response = await fetch('/api/customer/usage');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayUsageStats(data.usage);
+        } else {
+            document.getElementById('usageStats').innerHTML = 
+                '<div style="padding: 20px; color: var(--error);">Failed to load usage stats</div>';
+        }
+    } catch (error) {
+        console.error('Failed to load usage stats:', error);
+    }
+}
+
+// Display usage statistics
+function displayUsageStats(usage) {
+    const container = document.getElementById('usageStats');
+    
+    container.innerHTML = `
+        <div class="usage-item">
+            <div class="usage-value">${usage.federated_id_network.monthly_active_users}</div>
+            <div class="usage-label">Fed ID MAU</div>
+        </div>
+        <div class="usage-item">
+            <div class="usage-value">${usage.iam_system.monthly_active_users}</div>
+            <div class="usage-label">IAM MAU</div>
+        </div>
+        <div class="usage-item">
+            <div class="usage-value">$${usage.total_cost.toFixed(2)}</div>
+            <div class="usage-label">Monthly Bill</div>
+        </div>
+    `;
+}
+
+// Load permission lemmas preview
+async function loadPermissionLemmasPreview() {
+    try {
+        if (!walletInstance) return;
+        
+        const permissionLemmas = await walletInstance.getCredentials('permission');
+        const container = document.getElementById('permissionLemmasPreview');
+        
+        if (permissionLemmas.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                    <div style="margin-bottom: 8px;">No permission lemmas</div>
+                    <div style="font-size: 0.9rem;">Login to sites with Lemma IAM to get permissions</div>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div style="max-height: 200px; overflow-y: auto;">
+                ${permissionLemmas.map(lemma => `
+                    <div style="padding: 12px; background: var(--gray-50); border-radius: 8px; margin-bottom: 8px;">
+                        <div style="font-weight: 600; margin-bottom: 4px;">${lemma.claims?.permissionId || 'Unknown'}</div>
+                        <div style="font-size: 0.8rem; color: var(--gray-600);">
+                            Site: ${lemma.claims?.siteId || 'Unknown'} • 
+                            Role: ${lemma.claims?.accountType || 'Unknown'}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            <div style="text-align: center; margin-top: 12px;">
+                <button onclick="window.location.href='/wallet'" style="background: none; border: 1px solid var(--primary); color: var(--primary); padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                    View All in Wallet
+                </button>
+            </div>
+        `;
+
+    } catch (error) {
+        console.error('Failed to load permission lemmas:', error);
+    }
+}
+
+// API Key Management Functions
+function showNewKeyModal() {
+    document.getElementById('newKeyModal').style.display = 'flex';
+    document.getElementById('newKeyName').focus();
+}
+
+function hideNewKeyModal() {
+    document.getElementById('newKeyModal').style.display = 'none';
+    document.getElementById('newKeyName').value = '';
+}
+
+async function createNewApiKey() {
+    const keyName = document.getElementById('newKeyName').value.trim();
+    if (!keyName) {
+        alert('Please enter a name for the API key');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/customer/api-keys', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name: keyName })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            hideNewKeyModal();
+            await loadApiKeys(); // Refresh list
+            alert('API key created successfully!');
+        } else {
+            alert('Failed to create API key: ' + result.error);
+        }
+
+    } catch (error) {
+        console.error('Failed to create API key:', error);
+        alert('Failed to create API key');
+    }
+}
+
+async function revokeApiKey(apiKey) {
+    if (!confirm('Are you sure you want to revoke this API key? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/customer/api-keys/${apiKey}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            await loadApiKeys(); // Refresh list
+            alert('API key revoked successfully');
+        } else {
+            alert('Failed to revoke API key: ' + result.error);
+        }
+
+    } catch (error) {
+        console.error('Failed to revoke API key:', error);
+        alert('Failed to revoke API key');
+    }
+}
+
+function copyToClipboard(text, button) {
+    navigator.clipboard.writeText(text).then(() => {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.style.background = 'var(--success)';
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.style.background = '';
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy to clipboard');
+    });
+}
+</script>
+{% endblock %}

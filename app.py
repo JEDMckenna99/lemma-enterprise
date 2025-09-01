@@ -93,6 +93,15 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register SDK API blueprint: {e}")
 
+    # Register the Dashboard API blueprint for customer and admin management
+    try:
+        from api.dashboard_api import dashboard_bp
+        app.register_blueprint(dashboard_bp)
+        logger.info("✅ Dashboard API blueprint registered")
+
+    except Exception as e:
+        logger.error(f"❌ Failed to register Dashboard API blueprint: {e}")
+
     # Register the Network Registry blueprint for DID and revocation distribution
     try:
         from api.network_registry import network_registry_bp
@@ -732,6 +741,17 @@ def create_app():
                 'error': 'health_summary_failed',
                 'message': str(e)
             }), 500
+
+    # Dashboard Routes
+    @app.route('/dashboard')
+    def customer_dashboard():
+        """Customer dashboard - requires customer_access permission lemma"""
+        return render_template('modern/customer_dashboard.html')
+
+    @app.route('/admin')
+    def admin_dashboard():
+        """Admin dashboard - requires admin_access permission lemma"""
+        return render_template('admin/admin_dashboard.html')
 
     # Global OPTIONS handler for CORS preflight requests
     # Individual @cors_headers decorators handle actual responses
