@@ -754,20 +754,15 @@ async function loadWalletData() {
             return;
         }
 
-        // Get all credentials from wallet
-        const allCredentials = await lemmaWallet.getAllCredentials();
-        console.log('📊 Wallet contents:', allCredentials);
-
-        // Separate PoH lemmas and permission lemmas
-        const pohLemmas = allCredentials.filter(cred => 
-            cred.packageType === 'identity' || 
-            (cred.claims && cred.claims.packageType === 'identity')
-        );
+        // Get credentials by type from wallet
+        const pohLemmas = await lemmaWallet.getCredentials('identity');
+        const permissionLemmas = await lemmaWallet.getCredentials('permission');
         
-        const permissionLemmas = allCredentials.filter(cred => 
-            cred.packageType === 'permission' || 
-            (cred.claims && cred.claims.packageType === 'permission')
-        );
+        console.log('📊 Wallet contents:', {
+            pohLemmas: pohLemmas.length,
+            permissionLemmas: permissionLemmas.length,
+            total: pohLemmas.length + permissionLemmas.length
+        });
 
         // Display PoH lemmas
         displayPohLemmas(pohLemmas);
@@ -948,8 +943,12 @@ function viewLemmaDetails(lemmaId, lemmaType) {
 // Load detailed lemma information
 async function loadLemmaDetails(lemmaId, lemmaType) {
     try {
-        const allCredentials = await lemmaWallet.getAllCredentials();
-        const lemma = allCredentials.find(cred => cred.id === lemmaId);
+        // Get credentials of the appropriate type
+        const credentials = lemmaType === 'poh' 
+            ? await lemmaWallet.getCredentials('identity')
+            : await lemmaWallet.getCredentials('permission');
+        
+        const lemma = credentials.find(cred => cred.id === lemmaId);
         
         if (lemma) {
             document.getElementById('lemma-details-content').innerHTML = `
