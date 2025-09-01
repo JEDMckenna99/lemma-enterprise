@@ -110,9 +110,7 @@
         }
 
         .dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
+            display: block;
             padding: 12px 16px;
             color: var(--gray-700);
             text-decoration: none;
@@ -123,12 +121,6 @@
         .dropdown-item:hover {
             background: var(--gray-50);
             color: var(--gray-900);
-        }
-
-        .dropdown-icon {
-            width: 20px;
-            text-align: center;
-            font-size: 14px;
         }
 
         .admin-item {
@@ -215,35 +207,28 @@
                             </div>
                             <div class="dropdown-divider"></div>
                             <a href="/wallet" class="dropdown-item">
-                                <span class="dropdown-icon">💼</span>
                                 Wallet
                             </a>
                             <a href="/dashboard" class="dropdown-item">
-                                <span class="dropdown-icon">📊</span>
                                 Dashboard
                             </a>
                             <a href="/api-keys" class="dropdown-item">
-                                <span class="dropdown-icon">🔑</span>
                                 API Keys
                             </a>
                             <a href="/billing" class="dropdown-item">
-                                <span class="dropdown-icon">💳</span>
                                 Billing
                             </a>
                             {% if session.get('user_role') == 'admin' %}
                             <div class="dropdown-divider"></div>
                             <a href="/admin" class="dropdown-item admin-item">
-                                <span class="dropdown-icon">⚙️</span>
                                 Admin Panel
                             </a>
                             <a href="/site-management" class="dropdown-item admin-item">
-                                <span class="dropdown-icon">👥</span>
                                 Site Management
                             </a>
                             {% endif %}
                             <div class="dropdown-divider"></div>
                             <a href="/logout" class="dropdown-item logout-item">
-                                <span class="dropdown-icon">🚪</span>
                                 Sign Out
                             </a>
                         </div>
