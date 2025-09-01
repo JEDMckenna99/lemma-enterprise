@@ -147,22 +147,32 @@ class StripeManager:
             }
             
             # Add verification details if available
-            if session.verified_outputs:
-                verification_result['verified_outputs'] = {
-                    'id_number': session.verified_outputs.get('id_number'),
-                    'dob': session.verified_outputs.get('dob'),
-                    'name': session.verified_outputs.get('name'),
-                    'address': session.verified_outputs.get('address')
-                }
+            if hasattr(session, 'verified_outputs') and session.verified_outputs:
+                try:
+                    verification_result['verified_outputs'] = {
+                        'id_number': getattr(session.verified_outputs, 'id_number', None),
+                        'dob': getattr(session.verified_outputs, 'dob', None),
+                        'name': getattr(session.verified_outputs, 'name', None),
+                        'address': getattr(session.verified_outputs, 'address', None)
+                    }
+                except AttributeError as e:
+                    logger.warning(f"⚠️ Could not access verified_outputs: {e}")
+                    verification_result['verified_outputs'] = None
             
             # Add document checks if available
             if hasattr(session, 'last_verification_report') and session.last_verification_report:
-                report = session.last_verification_report
-                verification_result['document_checks'] = {
-                    'document_type': getattr(report, 'document', {}).get('type'),
-                    'document_check': getattr(report, 'document', {}).get('status') == 'verified',
-                    'selfie_check': getattr(report, 'selfie', {}).get('status') == 'verified'
-                }
+                try:
+                    report = session.last_verification_report
+                    document = getattr(report, 'document', {}) or {}
+                    selfie = getattr(report, 'selfie', {}) or {}
+                    verification_result['document_checks'] = {
+                        'document_type': document.get('type') if isinstance(document, dict) else None,
+                        'document_check': document.get('status') == 'verified' if isinstance(document, dict) else False,
+                        'selfie_check': selfie.get('status') == 'verified' if isinstance(selfie, dict) else False
+                    }
+                except (AttributeError, TypeError) as e:
+                    logger.warning(f"⚠️ Could not access verification report: {e}")
+                    verification_result['document_checks'] = None
             
             return verification_result
             
