@@ -477,10 +477,43 @@ def register():
             # Store customer ID in session
             session['customer_id'] = result['customer_id']
             
+            # NEW: Issue permission lemma for lemma.id platform access
+            try:
+                from .federated_network_manager import FederatedNetworkManager
+                network_manager = FederatedNetworkManager()
+                
+                # Ensure lemma.id is registered as a site for IAM
+                lemma_site_result = network_manager.register_site(
+                    site_domain='lemma.id',
+                    company_name='Lemma Identity Platform',
+                    admin_email='admin@lemma.id',
+                    service_type='both',  # Both PoH and IAM
+                    plan='enterprise'
+                )
+                
+                # Create user DID for this customer
+                user_did = f"did:lemma:customer:{result['customer_id']}"
+                
+                # Issue customer permission lemma for lemma.id platform
+                permission_result = network_manager.issue_permission_lemma(
+                    site_id='lemma.id',
+                    user_did=user_did,
+                    permission_id='customer_access',
+                    granted_by='did:lemma:platform:lemma.id',
+                    conditions={'account_type': 'customer', 'email': email}
+                )
+                
+                logger.info(f"✅ Issued customer permission lemma for {email}: {permission_result.get('success', False)}")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to issue permission lemma for {email}: {e}")
+            
             return jsonify({
                 'success': True,
                 'customer_id': result['customer_id'],
                 'api_key': result['api_key'],
+                'user_did': user_did,
+                'permission_lemma_issued': permission_result.get('success', False),
                 'redirect_url': '/dashboard'
             })
         else:
@@ -540,9 +573,54 @@ def login():
         session['customer_id'] = customer.customer_id
         session['user_role'] = customer.role
         
+        # NEW: Check/Issue permission lemma for lemma.id platform access
+        user_did = f"did:lemma:customer:{customer.customer_id}"
+        permission_lemma_status = False
+        
+        try:
+            from .federated_network_manager import FederatedNetworkManager
+            network_manager = FederatedNetworkManager()
+            
+            # Ensure lemma.id is registered as a site for IAM
+            lemma_site_result = network_manager.register_site(
+                site_domain='lemma.id',
+                company_name='Lemma Identity Platform',
+                admin_email='admin@lemma.id',
+                service_type='both',  # Both PoH and IAM
+                plan='enterprise'
+            )
+            
+            # Check if user already has permission lemma
+            access_result = network_manager.verify_permission_access(
+                user_did=user_did,
+                site_id='lemma.id',
+                permission_id='customer_access'
+            )
+            
+            if access_result.get('success') and access_result.get('has_permission'):
+                permission_lemma_status = True
+                logger.info(f"✅ Customer {email} has valid permission lemma")
+            else:
+                # Issue new permission lemma for platform access
+                permission_result = network_manager.issue_permission_lemma(
+                    site_id='lemma.id',
+                    user_did=user_did,
+                    permission_id='customer_access' if customer.role == 'customer' else 'admin_access',
+                    granted_by='did:lemma:platform:lemma.id',
+                    conditions={'account_type': customer.role, 'email': email}
+                )
+                permission_lemma_status = permission_result.get('success', False)
+                logger.info(f"✅ Issued permission lemma for {email}: {permission_lemma_status}")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Permission lemma handling failed for {email}: {e}")
+        
         return jsonify({
             'success': True,
             'customer_id': customer.customer_id,
+            'user_did': user_did,
+            'permission_lemma_active': permission_lemma_status,
+            'role': customer.role,
             'redirect_url': '/dashboard'
         })
         
