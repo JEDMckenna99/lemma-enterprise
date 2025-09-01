@@ -441,15 +441,57 @@
 
 
 
-    <!-- Join FIL Network Section - Only show for users without credentials -->
-    <section id="join-network-section" style="margin-bottom: 32px; display: block;">
+    <!-- PoH Lemmas Section -->
+    <section id="poh-lemmas-section" style="margin-bottom: 32px;">
+        <h2 class="section-title">🌐 Federated Identity Network (PoH Lemmas)</h2>
+        <div class="wallet-card" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.02), rgba(255, 255, 255, 1)); border: 1px solid rgba(102, 126, 234, 0.15); padding: 24px;">
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">🌐</div>
+                <div>
+                    <h3 style="margin: 0; color: var(--gray-900); font-size: 1.1rem;">Universal Proof of Humanity</h3>
+                    <p style="margin: 2px 0 0 0; color: var(--gray-600); font-size: 0.85rem;">Works across all sites in the federated network</p>
+                </div>
+            </div>
+            
+            <div id="poh-credentials-list" class="credential-list" style="border-radius: 10px; background: var(--white); min-height: 100px;">
+                <div id="poh-loading" style="padding: 32px; text-align: center; color: var(--gray-500);">
+                    <div style="font-size: 20px; margin-bottom: 8px;">🔍</div>
+                    <div style="font-weight: 500; margin-bottom: 6px; font-size: 0.9rem;">Checking for PoH lemmas...</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Permission Lemmas Section -->
+    <section id="permission-lemmas-section" style="margin-bottom: 32px;">
+        <h2 class="section-title">🔑 Permission Lemmas (IAM Access)</h2>
+        <div class="wallet-card" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.02), rgba(255, 255, 255, 1)); border: 1px solid rgba(139, 92, 246, 0.15); padding: 24px;">
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--secondary), var(--primary)); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">🔑</div>
+                <div>
+                    <h3 style="margin: 0; color: var(--gray-900); font-size: 1.1rem;">Site-Specific Permissions</h3>
+                    <p style="margin: 2px 0 0 0; color: var(--gray-600); font-size: 0.85rem;">Your access permissions for different platforms</p>
+                </div>
+            </div>
+            
+            <div id="permission-credentials-list" class="credential-list" style="border-radius: 10px; background: var(--white); min-height: 100px;">
+                <div id="permission-loading" style="padding: 32px; text-align: center; color: var(--gray-500);">
+                    <div style="font-size: 20px; margin-bottom: 8px;">🔍</div>
+                    <div style="font-weight: 500; margin-bottom: 6px; font-size: 0.9rem;">Checking for permission lemmas...</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Join FIL Network Section - Only show for users without PoH credentials -->
+    <section id="join-network-section" style="margin-bottom: 32px; display: none;">
         <h2 class="section-title">Join the Network</h2>
         <div class="wallet-card" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.02), rgba(255, 255, 255, 1)); border: 1px solid rgba(102, 126, 234, 0.15); padding: 24px;">
             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
                 <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">🌐</div>
                 <div>
-                    <h3 style="margin: 0; color: var(--gray-900); font-size: 1.1rem;">Federated Identity Network</h3>
-                    <p style="margin: 2px 0 0 0; color: var(--gray-600); font-size: 0.85rem;">Get verified once, access everywhere</p>
+                    <h3 style="margin: 0; color: var(--gray-900); font-size: 1.1rem;">Get Started</h3>
+                    <p style="margin: 2px 0 0 0; color: var(--gray-600); font-size: 0.85rem;">Complete verification to join the federated network</p>
                 </div>
             </div>
             
@@ -504,7 +546,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Protect the FIL join section with the shield
         lemmaShield.protect('#fil-join-section');
         
-        // Load and display wallet data
+        // Load and display wallet data (both PoH and permission lemmas)
         await loadWalletData();
         
         // Set up periodic refresh
@@ -702,6 +744,273 @@ function showFILJoinInterface() {
             </div>
         </div>
     `;
+}
+
+// Enhanced Wallet Data Loading - Shows both PoH and Permission Lemmas
+async function loadWalletData() {
+    try {
+        if (!lemmaWallet) {
+            console.warn('Wallet not initialized yet');
+            return;
+        }
+
+        // Get all credentials from wallet
+        const allCredentials = await lemmaWallet.getAllCredentials();
+        console.log('📊 Wallet contents:', allCredentials);
+
+        // Separate PoH lemmas and permission lemmas
+        const pohLemmas = allCredentials.filter(cred => 
+            cred.packageType === 'identity' || 
+            (cred.claims && cred.claims.packageType === 'identity')
+        );
+        
+        const permissionLemmas = allCredentials.filter(cred => 
+            cred.packageType === 'permission' || 
+            (cred.claims && cred.claims.packageType === 'permission')
+        );
+
+        // Display PoH lemmas
+        displayPohLemmas(pohLemmas);
+        
+        // Display permission lemmas
+        displayPermissionLemmas(permissionLemmas);
+        
+        // Show/hide join network section based on PoH lemmas
+        const joinSection = document.getElementById('join-network-section');
+        if (joinSection) {
+            joinSection.style.display = pohLemmas.length === 0 ? 'block' : 'none';
+        }
+
+    } catch (error) {
+        console.error('❌ Failed to load wallet data:', error);
+        
+        // Show error states
+        document.getElementById('poh-credentials-list').innerHTML = `
+            <div style="padding: 32px; text-align: center; color: var(--error);">
+                <div style="font-size: 20px; margin-bottom: 8px;">⚠️</div>
+                <div style="font-weight: 500;">Failed to load PoH lemmas</div>
+            </div>
+        `;
+        
+        document.getElementById('permission-credentials-list').innerHTML = `
+            <div style="padding: 32px; text-align: center; color: var(--error);">
+                <div style="font-size: 20px; margin-bottom: 8px;">⚠️</div>
+                <div style="font-weight: 500;">Failed to load permission lemmas</div>
+            </div>
+        `;
+    }
+}
+
+// Display PoH Lemmas (Universal Identity)
+function displayPohLemmas(pohLemmas) {
+    const container = document.getElementById('poh-credentials-list');
+    
+    if (pohLemmas.length === 0) {
+        container.innerHTML = `
+            <div style="padding: 32px; text-align: center; color: var(--gray-500);">
+                <div style="font-size: 20px; margin-bottom: 8px;">🌐</div>
+                <div style="font-weight: 500; margin-bottom: 6px;">No PoH lemmas found</div>
+                <div style="font-size: 0.8rem;">Complete Stripe Identity verification to get your first PoH lemma</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = pohLemmas.map(lemma => {
+        const issuedDate = new Date(lemma.issued_at * 1000).toLocaleDateString();
+        const expiresDate = lemma.expires_at ? new Date(lemma.expires_at * 1000).toLocaleDateString() : 'Never';
+        const verificationMethod = lemma.claims?.verificationMethod || 'Unknown';
+        
+        return `
+            <div style="padding: 20px; border-bottom: 1px solid var(--gray-100); display: flex; justify-content: space-between; align-items: center;">
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                        <div style="width: 32px; height: 32px; background: linear-gradient(135deg, var(--success), var(--primary)); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px;">✅</div>
+                        <div>
+                            <h4 style="margin: 0; color: var(--gray-900); font-size: 1rem;">Universal PoH Lemma</h4>
+                            <p style="margin: 0; color: var(--gray-600); font-size: 0.8rem;">ID: ${lemma.id.substring(0, 16)}...</p>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; font-size: 0.8rem; color: var(--gray-600);">
+                        <div><strong>Verified:</strong> ${verificationMethod}</div>
+                        <div><strong>Issued:</strong> ${issuedDate}</div>
+                        <div><strong>Expires:</strong> ${expiresDate}</div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-secondary" onclick="viewLemmaDetails('${lemma.id}', 'poh')">View Details</button>
+                    <button class="btn-danger" onclick="revokeLemma('${lemma.id}', 'poh')">Revoke</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Display Permission Lemmas (Site-Specific Access)
+function displayPermissionLemmas(permissionLemmas) {
+    const container = document.getElementById('permission-credentials-list');
+    
+    if (permissionLemmas.length === 0) {
+        container.innerHTML = `
+            <div style="padding: 32px; text-align: center; color: var(--gray-500);">
+                <div style="font-size: 20px; margin-bottom: 8px;">🔑</div>
+                <div style="font-weight: 500; margin-bottom: 6px;">No permission lemmas found</div>
+                <div style="font-size: 0.8rem;">Login to sites that support Lemma IAM to get permission lemmas</div>
+            </div>
+        `;
+        return;
+    }
+
+    // Group by site for better organization
+    const lemmasBySite = {};
+    permissionLemmas.forEach(lemma => {
+        const siteId = lemma.claims?.siteId || 'unknown';
+        if (!lemmasBySite[siteId]) {
+            lemmasBySite[siteId] = [];
+        }
+        lemmasBySite[siteId].push(lemma);
+    });
+
+    container.innerHTML = Object.entries(lemmasBySite).map(([siteId, siteLemmas]) => {
+        const siteDisplay = siteId === 'lemma.id' ? 'Lemma Platform' : siteId;
+        
+        return `
+            <div style="margin-bottom: 24px;">
+                <h4 style="margin: 0 0 12px 0; color: var(--secondary); font-size: 1rem; padding: 12px 16px; background: var(--secondary-50); border-radius: 8px;">
+                    🏢 ${siteDisplay}
+                </h4>
+                ${siteLemmas.map(lemma => {
+                    const issuedDate = new Date(lemma.issued_at * 1000).toLocaleDateString();
+                    const expiresDate = lemma.expires_at ? new Date(lemma.expires_at * 1000).toLocaleDateString() : 'Never';
+                    const permissionId = lemma.claims?.permissionId || 'Unknown';
+                    const accountType = lemma.claims?.accountType || 'Unknown';
+                    
+                    return `
+                        <div style="padding: 16px; border: 1px solid var(--gray-200); border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                    <div style="width: 28px; height: 28px; background: linear-gradient(135deg, var(--secondary), var(--primary)); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px;">🔑</div>
+                                    <div>
+                                        <h5 style="margin: 0; color: var(--gray-900); font-size: 0.9rem;">${permissionId}</h5>
+                                        <p style="margin: 0; color: var(--gray-600); font-size: 0.75rem;">Role: ${accountType}</p>
+                                    </div>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.75rem; color: var(--gray-600);">
+                                    <div><strong>Issued:</strong> ${issuedDate}</div>
+                                    <div><strong>Expires:</strong> ${expiresDate}</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn-secondary" onclick="viewLemmaDetails('${lemma.id}', 'permission')" style="font-size: 0.8rem; padding: 6px 12px;">Details</button>
+                                <button class="btn-danger" onclick="revokeLemma('${lemma.id}', 'permission')" style="font-size: 0.8rem; padding: 6px 12px;">Revoke</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }).join('');
+}
+
+// View detailed lemma information
+function viewLemmaDetails(lemmaId, lemmaType) {
+    // Create modal to show detailed lemma information
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5); z-index: 1000;
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+    `;
+    
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 16px; padding: 32px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h3 style="margin: 0; color: var(--gray-900);">${lemmaType === 'poh' ? '🌐 PoH Lemma Details' : '🔑 Permission Lemma Details'}</h3>
+                <button onclick="this.closest('.modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray-400);">×</button>
+            </div>
+            <div id="lemma-details-content" style="font-family: monospace; font-size: 0.8rem; background: var(--gray-50); padding: 16px; border-radius: 8px; overflow-x: auto;">
+                Loading lemma details...
+            </div>
+            <div style="margin-top: 24px; text-align: center;">
+                <button onclick="this.closest('.modal').remove()" class="btn-primary">Close</button>
+            </div>
+        </div>
+    `;
+    
+    modal.className = 'modal';
+    document.body.appendChild(modal);
+    
+    // Load and display detailed lemma information
+    loadLemmaDetails(lemmaId, lemmaType);
+}
+
+// Load detailed lemma information
+async function loadLemmaDetails(lemmaId, lemmaType) {
+    try {
+        const allCredentials = await lemmaWallet.getAllCredentials();
+        const lemma = allCredentials.find(cred => cred.id === lemmaId);
+        
+        if (lemma) {
+            document.getElementById('lemma-details-content').innerHTML = `
+                <div style="margin-bottom: 16px;">
+                    <strong>Lemma ID:</strong> ${lemma.id}<br>
+                    <strong>Type:</strong> ${lemmaType === 'poh' ? 'Proof of Humanity (Universal)' : 'Permission (Site-Specific)'}<br>
+                    <strong>Issuer:</strong> ${lemma.issuer}<br>
+                    <strong>Subject:</strong> ${lemma.subject}
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <strong>Claims:</strong><br>
+                    <pre style="white-space: pre-wrap; margin: 8px 0;">${JSON.stringify(lemma.claims, null, 2)}</pre>
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <strong>Cryptographic Proof:</strong><br>
+                    <pre style="white-space: pre-wrap; margin: 8px 0;">${JSON.stringify(lemma.proof, null, 2)}</pre>
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <strong>Security:</strong><br>
+                    • Ed25519 signature prevents tampering<br>
+                    • ${lemmaType === 'poh' ? 'Universal network recognition' : 'Site-specific access control'}<br>
+                    • Stored in your browser wallet (you own the data)
+                </div>
+            `;
+        } else {
+            document.getElementById('lemma-details-content').innerHTML = 'Lemma not found in wallet.';
+        }
+    } catch (error) {
+        console.error('Failed to load lemma details:', error);
+        document.getElementById('lemma-details-content').innerHTML = 'Failed to load lemma details.';
+    }
+}
+
+// Revoke lemma with confirmation
+async function revokeLemma(lemmaId, lemmaType) {
+    const lemmaTypeName = lemmaType === 'poh' ? 'PoH lemma' : 'permission lemma';
+    const warningMessage = lemmaType === 'poh' 
+        ? 'This will remove your proof of humanity across ALL sites in the network. You will need to re-verify with Stripe Identity.'
+        : 'This will remove your access permissions for this specific site. You may need to contact the site administrator to regain access.';
+    
+    if (!confirm(`Are you sure you want to revoke this ${lemmaTypeName}?\n\n${warningMessage}\n\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        // Remove from wallet
+        await lemmaWallet.removeCredential(lemmaId);
+        
+        // Refresh display
+        await loadWalletData();
+        
+        // Show success message
+        alert(`${lemmaTypeName} revoked successfully. ${lemmaType === 'poh' ? 'Network-wide revocation is propagating.' : 'Site access has been removed.'}`);
+        
+    } catch (error) {
+        console.error('Failed to revoke lemma:', error);
+        alert(`Failed to revoke ${lemmaTypeName}. Please try again.`);
+    }
 }
 
 // Speed Testing Functions
