@@ -14,6 +14,10 @@ ed25519-dalek = { version = "2.0", features = ["rand_core", "batch"] }
 sha2 = "0.10"
 blake3 = "1.3"
 
+# Encryption for browser wallet
+aes-gcm = "0.10"
+pbkdf2 = "0.12"
+
 # Bloom filters
 bit-vec = "0.6"
 fnv = "1.0"

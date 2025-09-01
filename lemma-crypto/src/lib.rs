@@ -39,6 +39,9 @@ pub mod zkp_claims;
 // NEW: Background Wallet for microsecond credential storage
 pub mod wallet;
 
+// NEW: Encrypted Browser Wallet for enhanced security
+pub mod encrypted_wallet;
+
 // NEW: True federated/decentralized credentials
 pub mod federated_credentials;
 pub mod decentralized_revocation;

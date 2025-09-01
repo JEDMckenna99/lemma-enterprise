@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use crate::oprf::{OPRFClient, OPRFServer};
 use crate::bloom::{CascadedBloomFilter};
 use crate::credentials::{CredentialIssuer, VerifiableCredential};
+use crate::encrypted_wallet::{EncryptedBrowserWallet, WalletSecurityConfig, EncryptionLevel};
 
 /// Python wrapper for OPRFClient
 #[pyclass]
@@ -867,6 +868,97 @@ impl PyLemmaCore {
     }
 }
 
+/// Python wrapper for EncryptedBrowserWallet
+#[pyclass]
+pub struct PyEncryptedWallet {
+    inner: EncryptedBrowserWallet,
+}
+
+#[pymethods]
+impl PyEncryptedWallet {
+    #[new]
+    pub fn new() -> Self {
+        Self {
+            inner: EncryptedBrowserWallet::new(),
+        }
+    }
+
+    /// Initialize wallet with PIN
+    pub fn initialize_with_pin(&mut self, pin: String) -> PyResult<()> {
+        self.inner.initialize_with_pin(&pin)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Store credential with encryption
+    pub fn store_credential(&mut self, credential_json: String, lemma_type: String, site_id: Option<String>) -> PyResult<String> {
+        let credential = VerifiableCredential::from_json(&credential_json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        self.inner.store_encrypted_credential(&credential, &lemma_type, site_id)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Get PoH lemmas
+    pub fn get_poh_lemmas(&mut self) -> PyResult<Vec<String>> {
+        let lemmas = self.inner.get_poh_lemmas()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        let mut json_lemmas = Vec::new();
+        for lemma in lemmas {
+            let json = lemma.to_json()
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            json_lemmas.push(json);
+        }
+        
+        Ok(json_lemmas)
+    }
+
+    /// Get permission lemmas for site
+    pub fn get_permission_lemmas(&mut self, site_id: String) -> PyResult<Vec<String>> {
+        let lemmas = self.inner.get_permission_lemmas(&site_id)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        let mut json_lemmas = Vec::new();
+        for lemma in lemmas {
+            let json = lemma.to_json()
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            json_lemmas.push(json);
+        }
+        
+        Ok(json_lemmas)
+    }
+
+    /// Export encrypted storage
+    pub fn export_encrypted_storage(&self) -> PyResult<String> {
+        self.inner.export_encrypted_storage()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Import encrypted storage
+    pub fn import_encrypted_storage(&mut self, encrypted_data: String) -> PyResult<()> {
+        self.inner.import_encrypted_storage(&encrypted_data)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Get wallet statistics
+    pub fn get_stats(&self) -> PyResult<PyDict> {
+        let stats = self.inner.get_stats();
+        
+        Python::with_gil(|py| {
+            let dict = PyDict::new(py);
+            for (key, value) in stats {
+                dict.set_item(key, pythonize::pythonize(py, &value)?)?;
+            }
+            Ok(dict.into())
+        })
+    }
+
+    /// Check if wallet is locked
+    pub fn is_locked(&self) -> bool {
+        self.inner.is_locked
+    }
+}
+
 /// Python module
 #[pymodule]
 fn lemma_crypto(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -877,6 +969,7 @@ fn lemma_crypto(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyVerifiableCredential>()?;
     m.add_class::<PyLemmaCore>()?;
     m.add_class::<PyVerificationResult>()?;
+    m.add_class::<PyEncryptedWallet>()?;
     
     m.add_function(wrap_pyfunction!(generate_keypair, m)?)?;
     m.add_function(wrap_pyfunction!(generate_did, m)?)?;
