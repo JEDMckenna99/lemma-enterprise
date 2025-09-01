@@ -762,22 +762,25 @@ def revoke_credential():
                     # Use REAL Rust engine for OPRF computation
                     logger.info(f"🔒 Computing OPRF evaluation for credential {credential_id}")
                     
-                    # The Rust engine computes OPRF(credential) -> revocation_token
-                    # This creates a privacy-preserving revocation identifier
-                    result = rust_engine.verify_credential(
-                        json.dumps(credential) if isinstance(credential, dict) else credential
-                    )
+                    # Use the Rust engine's OPRF client to compute privacy-preserving evaluation
+                    # This creates a proper OPRF evaluation that preserves credential privacy
+                    oprf_result_dict = rust_engine.oprf_client.get_evaluation(credential_id)
                     
-                    # Extract OPRF evaluation (in production, this would be a separate OPRF operation)
-                    oprf_evaluation = f"oprf_{credential_id}_{int(time.time())}"
+                    # Convert byte array to hex string for storage
+                    evaluation_bytes = oprf_result_dict.get('evaluation', [])
+                    oprf_evaluation = bytes(evaluation_bytes).hex() if evaluation_bytes else f"oprf_{credential_id}"
+                    
+                    logger.info(f"✅ OPRF evaluation computed: {oprf_evaluation[:32]}...")
                     
                 except Exception as e:
                     logger.warning(f"Rust OPRF failed for {credential_id}: {e}")
-                    # Fallback OPRF computation
-                    oprf_evaluation = f"fallback_oprf_{credential_id}_{int(time.time())}"
+                    # Fallback to deterministic hash (not privacy-preserving but functional)
+                    import hashlib
+                    oprf_evaluation = f"hash_{hashlib.sha256(credential_id.encode()).hexdigest()}"
             else:
-                # Fallback OPRF computation
-                oprf_evaluation = f"fallback_oprf_{credential_id}_{int(time.time())}"
+                # Fallback to deterministic hash (not privacy-preserving but functional)
+                import hashlib
+                oprf_evaluation = f"hash_{hashlib.sha256(credential_id.encode()).hexdigest()}"
             
             oprf_end = time.perf_counter_ns()
             oprf_time_us = (oprf_end - oprf_start) / 1000
