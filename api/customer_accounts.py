@@ -546,7 +546,7 @@ def register():
                 'user_did': user_did,
                 'permission_lemma_issued': permission_result.get('success', False),
                 'permission_lemma': permission_lemma_data,  # For wallet storage
-                'redirect_url': '/dashboard'
+                'redirect_url': '/wallet'
             })
         else:
             return jsonify(result), 400
