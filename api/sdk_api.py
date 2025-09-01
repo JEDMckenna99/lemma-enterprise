@@ -762,12 +762,9 @@ def revoke_credential():
                     # Use REAL Rust engine for OPRF computation
                     logger.info(f"🔒 Computing OPRF evaluation for credential {credential_id}")
                     
-                    # TODO: Expose OPRF client from PyLemmaCore for direct access
-                    # The Rust engine HAS full OPRF implementation but it's not exposed through Python bindings
-                    # For now, we use a deterministic hash that provides functional revocation
-                    # Future: Add PyLemmaCore.compute_oprf_evaluation(credential_id) method
-                    import hashlib
-                    oprf_evaluation = f"rust_oprf_{hashlib.sha256(credential_id.encode()).hexdigest()[:32]}"
+                    # Use the Rust engine's OPRF implementation for privacy-preserving revocation
+                    # This computes a real OPRF evaluation using Ristretto255 cryptography
+                    oprf_evaluation = rust_engine.compute_oprf_evaluation(credential_id)
                     
                     logger.info(f"✅ OPRF evaluation computed: {oprf_evaluation[:32]}...")
                     
