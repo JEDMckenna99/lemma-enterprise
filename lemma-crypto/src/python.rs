@@ -681,23 +681,6 @@ impl PyLemmaCore {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 
-    /// Compute OPRF evaluation for credential revocation (PRIVACY-PRESERVING)
-    pub fn compute_oprf_evaluation(&mut self, credential_id: String) -> PyResult<String> {
-        // Use the internal OPRF client to compute privacy-preserving evaluation
-        // This is the same OPRF used in revoke_credentials_network_wide
-        let oprf_result = self.oprf_client.get_evaluation(&credential_id)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        
-        // Convert evaluation bytes to hex string for storage/transmission
-        Python::with_gil(|py| {
-            let evaluation_bytes: Vec<u8> = oprf_result.get_item("evaluation")
-                .and_then(|item| item.extract().ok())
-                .unwrap_or_default();
-            
-            Ok(hex::encode(evaluation_bytes))
-        })
-    }
-
     /// Revoke credentials across the TRULY federated network using decentralized consensus (CORE FEATURE - FIXED)
     pub fn revoke_credentials_network_wide(&mut self, credential_ids: Vec<String>) -> PyResult<PyDict> {
         // ❌ OLD WAY: Local Bloom filter that doesn't actually sync
@@ -852,6 +835,23 @@ impl PyLemmaCore {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
         Ok(is_revoked)
+    }
+
+    /// Compute OPRF evaluation for credential revocation (PRIVACY-PRESERVING)
+    pub fn compute_oprf_evaluation(&mut self, credential_id: String) -> PyResult<String> {
+        // Use the internal OPRF client to compute privacy-preserving evaluation
+        // This is the same OPRF used in revoke_credentials_network_wide
+        let oprf_result = self.oprf_client.get_evaluation(&credential_id)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        // Convert evaluation bytes to hex string for storage/transmission
+        Python::with_gil(|py| {
+            let evaluation_bytes: Vec<u8> = oprf_result.get_item("evaluation")
+                .and_then(|item| item.extract().ok())
+                .unwrap_or_default();
+            
+            Ok(hex::encode(evaluation_bytes))
+        })
     }
 
     /// Get engine statistics
