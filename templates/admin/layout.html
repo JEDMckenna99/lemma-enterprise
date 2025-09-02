@@ -12,25 +12,26 @@
     <!-- Professional Font System -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;425;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Design System -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma-design-system.css') }}">
+    <!-- Use the same design system as the rest of the platform -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}">
     
     <!-- Load the Lemma Federated Wallet for admin permission checking -->
     <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=672"></script>
     
-    <!-- Admin-specific styles -->
+    <!-- Admin-specific styles (using platform design tokens) -->
     <style>
+        /* Admin theme using platform design system */
         :root {
-            --admin-primary: #dc2626;  /* Red for admin */
-            --admin-secondary: #991b1b;
-            --admin-accent: #fef2f2;
+            --admin-primary: var(--primary);     /* Use platform purple */
+            --admin-secondary: var(--secondary); /* Use platform secondary */
+            --admin-accent: var(--gray-100);     /* Light background */
         }
         
         .admin-header {
-            background: var(--admin-primary);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: var(--white);
             padding: var(--space-4) 0;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
         }
         
         .admin-nav {
@@ -114,9 +115,9 @@
         }
         
         .admin-alert {
-            background: var(--admin-accent);
-            border: 1px solid var(--admin-primary);
-            border-radius: 8px;
+            background: rgba(102, 126, 234, 0.05);
+            border: 1px solid var(--primary);
+            border-radius: 12px;
             padding: var(--space-4);
             margin-bottom: var(--space-6);
             display: flex;
@@ -125,7 +126,7 @@
         }
         
         .admin-alert-icon {
-            color: var(--admin-primary);
+            color: var(--primary);
             font-size: var(--font-size-lg);
         }
         
@@ -147,7 +148,7 @@
         .admin-metric-value {
             font-size: var(--font-size-3xl);
             font-weight: 800;
-            color: var(--admin-primary);
+            color: var(--primary);
             margin-bottom: var(--space-2);
         }
         
@@ -198,12 +199,14 @@
         }
         
         .admin-btn-primary {
-            background: var(--admin-primary);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: var(--white);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
         }
         
         .admin-btn-primary:hover {
-            background: var(--admin-secondary);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
             color: var(--white);
         }
         
@@ -239,6 +242,59 @@
         .admin-status-pending {
             background: var(--warning-100);
             color: var(--warning-800);
+        }
+        
+        /* Admin section styling - consistent with platform cards */
+        .admin-section {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            padding: var(--space-6);
+            margin-bottom: var(--space-6);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.2s ease;
+        }
+        
+        .admin-section:hover {
+            border-color: var(--gray-300);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+            transform: translateY(-2px);
+        }
+        
+        .admin-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-4);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        .admin-section-header h2 {
+            color: var(--gray-900);
+            font-size: var(--font-size-xl);
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        /* Admin action buttons - consistent with platform buttons */
+        .admin-action-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: var(--white);
+            border: none;
+            padding: var(--space-4) var(--space-6);
+            border-radius: 8px;
+            font-size: var(--font-size-base);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
+            text-align: center;
+        }
+        
+        .admin-action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
         }
     </style>
     
