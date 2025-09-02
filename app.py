@@ -251,6 +251,14 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ Email Admin API registration failed: {e}")
 
+    # Email confirmation permission system
+    try:
+        from api.email_confirmation_permissions import email_confirmation_bp
+        app.register_blueprint(email_confirmation_bp)
+        logger.info("✅ Email Confirmation Permissions API registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Email Confirmation API registration failed: {e}")
+
     # Initialize optimized engine
     try:
         from api.optimized_shield import get_optimized_engine
