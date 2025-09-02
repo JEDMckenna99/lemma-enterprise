@@ -15,8 +15,112 @@
     <!-- Load the Lemma Federated Wallet for admin permission checking -->
     <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=672"></script>
     
-    <!-- Minimal admin-specific overrides -->
+    <!-- User Dropdown Styles (same as main platform) -->
     <style>
+        .user-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .user-dropdown-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--white);
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            color: var(--gray-700);
+        }
+
+        .user-dropdown-toggle:hover {
+            background: var(--gray-50);
+            border-color: var(--gray-400);
+        }
+
+        .user-avatar {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .dropdown-arrow {
+            font-size: 10px;
+            transition: transform 0.2s ease;
+        }
+
+        .user-dropdown.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .user-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            min-width: 220px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .dropdown-header {
+            padding: 16px;
+            background: var(--gray-50);
+            border-radius: 12px 12px 0 0;
+        }
+
+        .dropdown-user-info {
+            text-align: center;
+        }
+
+        .dropdown-user-name {
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 2px;
+        }
+
+        .dropdown-user-role {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: var(--gray-200);
+            margin: 8px 0;
+        }
+
+        .dropdown-item {
+            display: block;
+            padding: 12px 16px;
+            color: var(--gray-700);
+            text-decoration: none;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .dropdown-item:hover {
+            background: var(--gray-50);
+            color: var(--gray-900);
+        }
+
+        .admin-item {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(99, 102, 241, 0.05));
+        }
+        
         /* Admin badge for navigation */
         .admin-badge {
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
@@ -105,12 +209,20 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Same JavaScript as main platform for dropdown -->
+    <!-- Enhanced dropdown JavaScript (same as main platform) -->
     <script>
         function toggleUserDropdown() {
+            const dropdown = document.querySelector('.user-dropdown');
             const menu = document.getElementById('userDropdownMenu');
-            const isVisible = menu.style.display === 'block';
-            menu.style.display = isVisible ? 'none' : 'block';
+            const isOpen = dropdown.classList.contains('open');
+            
+            if (isOpen) {
+                dropdown.classList.remove('open');
+                menu.style.display = 'none';
+            } else {
+                dropdown.classList.add('open');
+                menu.style.display = 'block';
+            }
         }
 
         // Close dropdown when clicking outside
@@ -119,6 +231,17 @@
             const menu = document.getElementById('userDropdownMenu');
             
             if (dropdown && !dropdown.contains(event.target)) {
+                dropdown.classList.remove('open');
+                menu.style.display = 'none';
+            }
+        });
+
+        // Close dropdown on escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const dropdown = document.querySelector('.user-dropdown');
+                const menu = document.getElementById('userDropdownMenu');
+                dropdown.classList.remove('open');
                 menu.style.display = 'none';
             }
         });
