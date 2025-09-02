@@ -243,6 +243,14 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ OAuth/IAM API registration failed: {e}")
 
+    # Email-based admin endpoints
+    try:
+        from api.email_admin_endpoint import email_admin_bp
+        app.register_blueprint(email_admin_bp)
+        logger.info("✅ Email-based Admin API registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Email Admin API registration failed: {e}")
+
     # Initialize optimized engine
     try:
         from api.optimized_shield import get_optimized_engine
