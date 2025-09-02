@@ -4,9 +4,12 @@
 {% block description %}Lemma platform administration dashboard{% endblock %}
 
 {% block content %}
-<div class="admin-page-header">
-    <h1 class="admin-page-title">Platform Administration</h1>
-    <p class="admin-page-subtitle">
+<!-- Use same header styling as platform pages -->
+<div style="margin-bottom: var(--space-8); text-align: center;">
+    <h1 style="font-size: var(--font-size-4xl); font-weight: 700; color: var(--gray-900); margin-bottom: var(--space-2);">
+        Platform Administration
+    </h1>
+    <p style="font-size: var(--font-size-lg); color: var(--gray-600); max-width: 600px; margin: 0 auto;">
         Manage the Lemma platform, customers, and system configuration
     </p>
 </div>
@@ -34,51 +37,49 @@
         </div>
     </div>
 
-    <!-- Management Sections -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 32px;">
+    <!-- Management Sections using platform card styling -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-top: var(--space-8);">
         <!-- Customer Management -->
-        <div class="admin-section">
-            <div class="admin-section-header">
-                <h2>Customer Management</h2>
-                <button class="admin-btn" onclick="refreshCustomers()">Refresh</button>
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+                <h2 class="card-title" style="margin-bottom: 0;">Customer Management</h2>
+                <button class="btn btn-primary" onclick="refreshCustomers()">Refresh</button>
             </div>
             <div id="customersList">
-                <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                <div style="padding: var(--space-4); text-align: center; color: var(--gray-500);">
                     Loading customers...
                 </div>
             </div>
         </div>
 
         <!-- Site Management -->
-        <div class="admin-section">
-            <div class="admin-section-header">
-                <h2>Registered Sites</h2>
-                <button class="admin-btn" onclick="refreshSites()">Refresh</button>
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+                <h2 class="card-title" style="margin-bottom: 0;">Registered Sites</h2>
+                <button class="btn btn-primary" onclick="refreshSites()">Refresh</button>
             </div>
             <div id="sitesList">
-                <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                <div style="padding: var(--space-4); text-align: center; color: var(--gray-500);">
                     Loading sites...
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Admin Actions -->
-    <div class="admin-section" style="margin-top: 32px;">
-        <div class="admin-section-header">
-            <h2>Admin Actions</h2>
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
-            <button class="admin-action-btn" onclick="issueAdminLemma()">
+    <!-- Admin Actions using platform card styling -->
+    <div class="card" style="margin-top: var(--space-8);">
+        <h2 class="card-title">Admin Actions</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-4);">
+            <button class="btn btn-primary" onclick="issueAdminLemma()">
                 🔑 Issue Admin Lemma
             </button>
-            <button class="admin-action-btn" onclick="viewSystemLogs()">
+            <button class="btn btn-primary" onclick="viewSystemLogs()">
                 📋 View System Logs
             </button>
-            <button class="admin-action-btn" onclick="manageRevocations()">
+            <button class="btn btn-primary" onclick="manageRevocations()">
                 🚫 Manage Revocations
             </button>
-            <button class="admin-action-btn" onclick="window.location.href='/wallet'">
+            <button class="btn btn-primary" onclick="window.location.href='/wallet'">
                 👤 View My Wallet
             </button>
         </div>
