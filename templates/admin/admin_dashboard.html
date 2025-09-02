@@ -30,79 +30,57 @@
         </div>
     </div>
 
-    <!-- Platform Metrics - Compact & Professional -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-6);" id="platformMetrics">
+    <!-- Platform Metrics - Modern SaaS Style -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 32px;" id="platformMetrics">
         
-        <!-- Customers -->
-        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid var(--primary);">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="totalCustomers">-</div>
-                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Customers</div>
-                </div>
-                <div style="font-size: 1.5rem; opacity: 0.6;">👥</div>
+        <!-- Active Sites -->
+        <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 8px; padding: 20px; transition: all 0.2s ease; cursor: default;" onmouseover="this.style.borderColor='var(--gray-300)'; this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='var(--gray-200)'; this.style.transform='translateY(0)'">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 14px; font-weight: 500; color: var(--gray-600);">Active Sites</span>
+                <div style="width: 8px; height: 8px; background: var(--success); border-radius: 50%;"></div>
             </div>
-            <div style="font-size: 0.75rem; color: var(--success); margin-top: var(--space-2);" id="customersGrowth">Loading...</div>
+            <div style="font-size: 28px; font-weight: 600; color: var(--gray-900); line-height: 1; margin-bottom: 4px;" id="activeSites">-</div>
+            <div style="font-size: 13px; color: var(--gray-500);" id="sitesGrowth">Loading...</div>
         </div>
 
-        <!-- Sites -->
-        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid var(--success);">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="activeSites">-</div>
-                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Active Sites</div>
-                </div>
-                <div style="font-size: 1.5rem; opacity: 0.6;">🌐</div>
+        <!-- Monthly Verifications -->
+        <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 8px; padding: 20px; transition: all 0.2s ease; cursor: default;" onmouseover="this.style.borderColor='var(--gray-300)'; this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='var(--gray-200)'; this.style.transform='translateY(0)'">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 14px; font-weight: 500; color: var(--gray-600);">Verifications</span>
+                <div style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></div>
             </div>
-            <div style="font-size: 0.75rem; color: var(--success); margin-top: var(--space-2);" id="sitesGrowth">Loading...</div>
+            <div style="font-size: 28px; font-weight: 600; color: var(--gray-900); line-height: 1; margin-bottom: 4px;" id="monthlyVerifications">-</div>
+            <div style="font-size: 13px; color: var(--gray-500);">This month</div>
         </div>
 
-        <!-- Verifications -->
-        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid #f59e0b;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="monthlyVerifications">-</div>
-                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Verifications</div>
-                </div>
-                <div style="font-size: 1.5rem; opacity: 0.6;">⚡</div>
+        <!-- Platform Performance -->
+        <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 8px; padding: 20px; transition: all 0.2s ease; cursor: default;" onmouseover="this.style.borderColor='var(--gray-300)'; this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='var(--gray-200)'; this.style.transform='translateY(0)'">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 14px; font-weight: 500; color: var(--gray-600);">Avg Response</span>
+                <div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%;"></div>
             </div>
-            <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: var(--space-2);">This month</div>
+            <div style="font-size: 28px; font-weight: 600; color: var(--gray-900); line-height: 1; margin-bottom: 4px;" id="avgVerificationTime">4.2µs</div>
+            <div style="font-size: 13px; color: var(--gray-500);">Production verified</div>
         </div>
 
-        <!-- Performance -->
-        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid #8b5cf6;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="avgVerificationTime">4.2µs</div>
-                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Avg Response</div>
-                </div>
-                <div style="font-size: 1.5rem; opacity: 0.6;">🚀</div>
+        <!-- Monthly Revenue -->
+        <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 8px; padding: 20px; transition: all 0.2s ease; cursor: default;" onmouseover="this.style.borderColor='var(--gray-300)'; this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='var(--gray-200)'; this.style.transform='translateY(0)'">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 14px; font-weight: 500; color: var(--gray-600);">Revenue</span>
+                <div style="width: 8px; height: 8px; background: var(--success); border-radius: 50%;"></div>
             </div>
-            <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: var(--space-2);">Production verified</div>
+            <div style="font-size: 28px; font-weight: 600; color: var(--gray-900); line-height: 1; margin-bottom: 4px;" id="monthlyRevenue">$-</div>
+            <div style="font-size: 13px; color: var(--gray-500);" id="revenueGrowth">Loading...</div>
         </div>
 
-        <!-- Revenue -->
-        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid var(--success);">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="monthlyRevenue">$-</div>
-                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Revenue</div>
-                </div>
-                <div style="font-size: 1.5rem; opacity: 0.6;">💰</div>
+        <!-- System Uptime -->
+        <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 8px; padding: 20px; transition: all 0.2s ease; cursor: default;" onmouseover="this.style.borderColor='var(--gray-300)'; this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='var(--gray-200)'; this.style.transform='translateY(0)'">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 14px; font-weight: 500; color: var(--gray-600);">Uptime</span>
+                <div style="width: 8px; height: 8px; background: #10b981; border-radius: 50%;"></div>
             </div>
-            <div style="font-size: 0.75rem; color: var(--success); margin-top: var(--space-2);" id="revenueGrowth">Loading...</div>
-        </div>
-
-        <!-- Uptime -->
-        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid #6366f1;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="systemHealth">99.9%</div>
-                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Uptime</div>
-                </div>
-                <div style="font-size: 1.5rem; opacity: 0.6;">🛡️</div>
-            </div>
-            <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: var(--space-2);">Last 30 days</div>
+            <div style="font-size: 28px; font-weight: 600; color: var(--gray-900); line-height: 1; margin-bottom: 4px;" id="systemHealth">99.9%</div>
+            <div style="font-size: 13px; color: var(--gray-500);">Last 30 days</div>
         </div>
 
     </div>
@@ -356,8 +334,6 @@ async function loadPlatformStats() {
 // Load demo stats for visual demonstration
 function loadDemoStats() {
     const demoStats = {
-        total_customers: 247,
-        customer_growth: 23,
         active_sites: 42,
         sites_growth: 15,
         monthly_verifications: 1247500,
@@ -371,14 +347,9 @@ function loadDemoStats() {
     console.log('📊 Demo metrics loaded for visual demonstration');
 }
 
-// Display platform statistics in beautiful metric cards
+// Display platform statistics in modern SaaS metric cards
 function displayPlatformStats(stats) {
-    // Update Total Customers
-    document.getElementById('totalCustomers').textContent = stats.total_customers || '0';
-    document.getElementById('customersGrowth').textContent = 
-        stats.customer_growth ? `+${stats.customer_growth}% this month` : 'Steady growth';
-    
-    // Update Active Sites
+    // Update Active Sites (customers = sites in our model)
     document.getElementById('activeSites').textContent = stats.active_sites || '0';
     document.getElementById('sitesGrowth').textContent = 
         stats.sites_growth ? `+${stats.sites_growth}% this month` : 'Growing network';
@@ -581,3 +552,4 @@ async function refreshSites() {
 }
 </script>
 {% endblock %}
+
