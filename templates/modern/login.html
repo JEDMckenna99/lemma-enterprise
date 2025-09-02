@@ -5,6 +5,8 @@
 
 {% block head %}
     {{ super() }}
+    <!-- Load the Lemma Federated Wallet for permission lemma storage -->
+    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=672"></script>
     <style>
         .login-container {
             max-width: 580px;
@@ -404,12 +406,12 @@
                         try {
                             // Initialize background wallet if not already done
                             if (!window.lemmaWallet) {
-                                const { LemmaFederatedWallet } = await import('/static/js/lemma-federated-wallet.js');
                                 window.lemmaWallet = new LemmaFederatedWallet({
                                     debug: true,
-                                    networkRegistryUrl: window.location.origin
+                                    networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
+                                    networkAuthKey: 'lemma_network_federated_sync_2024'
                                 });
-                                await window.lemmaWallet.initialize();
+                                await window.lemmaWallet.init();
                             }
                             
                             // Store permission lemma in the same wallet as PoH lemmas
