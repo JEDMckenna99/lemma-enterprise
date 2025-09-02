@@ -259,6 +259,14 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ Email Confirmation API registration failed: {e}")
 
+    # Lemma wallet authentication
+    try:
+        from api.lemma_auth_endpoint import lemma_auth_bp
+        app.register_blueprint(lemma_auth_bp)
+        logger.info("✅ Lemma Wallet Authentication API registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Lemma Auth API registration failed: {e}")
+
     # Initialize optimized engine
     try:
         from api.optimized_shield import get_optimized_engine

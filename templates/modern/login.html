@@ -231,6 +231,38 @@
             box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
         }
 
+        .lemma-auth-button {
+            width: 100%;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            padding: 16px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 
+                0 4px 15px rgba(40, 167, 69, 0.2),
+                0 2px 8px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .lemma-auth-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                0 8px 25px rgba(40, 167, 69, 0.25),
+                0 4px 12px rgba(0, 0, 0, 0.15);
+            background: linear-gradient(135deg, #218838 0%, #1ea085 100%);
+        }
+
+        .lemma-auth-button:active {
+            transform: translateY(0);
+            box-shadow: 
+                0 4px 15px rgba(40, 167, 69, 0.2);
+        }
+
         .login-button:disabled {
             opacity: 0.7;
             cursor: not-allowed;
@@ -353,6 +385,28 @@
                 </button>
             </form>
 
+            <!-- Sign in with Lemma Option -->
+            <div style="margin: 24px 0; text-align: center;">
+                <div style="position: relative;">
+                    <div style="position: absolute; inset: 0; display: flex; align-items: center;">
+                        <div style="width: 100%; border-top: 1px solid var(--gray-200);"></div>
+                    </div>
+                    <div style="position: relative; display: flex; justify-content: center;">
+                        <span style="background: var(--white); padding: 0 16px; color: var(--gray-500); font-size: 0.9rem;">or</span>
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" class="lemma-auth-button" id="lemmaAuthButton" onclick="signInWithLemma()">
+                <div class="button-content">
+                    <span class="button-icon">🔐</span>
+                    Sign in with Lemma Wallet
+                </div>
+                <div style="font-size: 0.8rem; opacity: 0.8; margin-top: 4px;">
+                    Use your Lemma credentials (0.36µs verification)
+                </div>
+            </button>
+
             <div class="register-link">
                 Don't have an account? <a href="/register">Create one here</a>
             </div>
@@ -473,6 +527,169 @@
                 if (input) {
                     input.classList.add('error');
                 }
+            }
+        }
+        
+        // Sign in with Lemma wallet authentication
+        async function signInWithLemma() {
+            const button = document.getElementById('lemmaAuthButton');
+            const originalText = button.innerHTML;
+            
+            try {
+                // Clear previous errors
+                clearErrors();
+                
+                // Show loading state
+                button.disabled = true;
+                button.innerHTML = `
+                    <div class="button-content">
+                        <span class="button-icon">🔄</span>
+                        Checking Lemma Wallet...
+                    </div>
+                `;
+                
+                // Initialize wallet if not already done
+                if (!window.lemmaWallet) {
+                    window.lemmaWallet = new LemmaFederatedWallet({
+                        debug: true,
+                        networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
+                        networkAuthKey: 'lemma_network_federated_sync_2024'
+                    });
+                    await window.lemmaWallet.init();
+                }
+                
+                // Check for identity credentials (PoH)
+                const identityCredentials = await window.lemmaWallet.getCredentials('identity');
+                if (identityCredentials.length === 0) {
+                    showError('email', 'No Lemma identity credentials found. Please verify your identity first.');
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                    return;
+                }
+                
+                // Check for permission credentials
+                const permissionCredentials = await window.lemmaWallet.getCredentials('permission');
+                
+                button.innerHTML = `
+                    <div class="button-content">
+                        <span class="button-icon">🔐</span>
+                        Verifying Credentials...
+                    </div>
+                `;
+                
+                // Extract user information from credentials
+                let userEmail = null;
+                let userRole = 'customer';
+                
+                // Check permission credentials for user info
+                for (const cred of permissionCredentials) {
+                    if (cred.claims?.email && cred.claims?.siteId === 'lemma.id') {
+                        userEmail = cred.claims.email;
+                        userRole = cred.claims.accountType || 'customer';
+                        break;
+                    }
+                }
+                
+                // Fallback: try to extract from identity credentials
+                if (!userEmail) {
+                    for (const cred of identityCredentials) {
+                        if (cred.claims?.email) {
+                            userEmail = cred.claims.email;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!userEmail) {
+                    showError('email', 'Could not determine user email from Lemma credentials.');
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                    return;
+                }
+                
+                // Verify credentials using the Lemma API
+                button.innerHTML = `
+                    <div class="button-content">
+                        <span class="button-icon">⚡</span>
+                        Verifying (${identityCredentials.length + permissionCredentials.length} credentials)...
+                    </div>
+                `;
+                
+                const verifyResponse = await fetch('/api/sdk/check-credentials', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer demo-integration-key-12345'
+                    },
+                    body: JSON.stringify({
+                        credentials: [...identityCredentials, ...permissionCredentials],
+                        enableRustEngine: true,
+                        requireFullCrypto: true
+                    })
+                });
+                
+                if (!verifyResponse.ok) {
+                    throw new Error('Credential verification failed');
+                }
+                
+                const verifyResult = await verifyResponse.json();
+                
+                if (!verifyResult.verified) {
+                    showError('email', 'Lemma credential verification failed. Please check your credentials.');
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                    return;
+                }
+                
+                // Success! Authenticate with the platform using verified credentials
+                button.innerHTML = `
+                    <div class="button-content">
+                        <span class="button-icon">✅</span>
+                        Credentials Verified! Signing in...
+                    </div>
+                `;
+                
+                // Create authenticated session using Lemma credentials
+                const authResponse = await fetch('/api/auth/lemma-signin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_email: userEmail,
+                        user_role: userRole,
+                        identity_credentials: identityCredentials,
+                        permission_credentials: permissionCredentials,
+                        verification_result: verifyResult,
+                        auth_method: 'lemma_wallet'
+                    })
+                });
+                
+                const authResult = await authResponse.json();
+                
+                if (authResult.success) {
+                    button.innerHTML = `
+                        <div class="button-content">
+                            <span class="button-icon">🎉</span>
+                            Welcome back, ${userEmail}!
+                        </div>
+                    `;
+                    
+                    // Redirect to dashboard
+                    setTimeout(() => {
+                        window.location.href = authResult.redirect_url || '/dashboard';
+                    }, 1500);
+                } else {
+                    showError('email', authResult.error || 'Lemma authentication failed');
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                }
+                
+            } catch (error) {
+                console.error('Sign in with Lemma error:', error);
+                showError('email', 'Lemma authentication failed. Please try again or use email/password.');
+                button.disabled = false;
+                button.innerHTML = originalText;
             }
         }
         
