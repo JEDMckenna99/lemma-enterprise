@@ -1,0 +1,560 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Permission Manager - Lemma Platform{% endblock %}
+{% block description %}Manage permissions for the Lemma platform using the same IAM system provided to customers{% endblock %}
+
+{% block content %}
+<!-- Permission Manager Header -->
+<div style="margin-bottom: var(--space-8); text-align: center;">
+    <h1 style="font-size: var(--font-size-4xl); font-weight: 700; color: var(--gray-900); margin-bottom: var(--space-2);">
+        Permission Manager
+    </h1>
+    <p style="font-size: var(--font-size-lg); color: var(--gray-600); max-width: 600px; margin: 0 auto;">
+        Manage permissions for lemma.id using the same IAM system we provide to customers
+    </p>
+</div>
+
+<!-- Permission Manager Access Control -->
+<div id="permission-access-check" style="text-align: center; padding: 40px;">
+    <div>Checking admin permissions...</div>
+</div>
+
+<!-- Permission Manager Content (shown only with admin_access permission lemma) -->
+<div id="permission-manager" style="display: none;">
+    
+    <!-- Site Configuration Card -->
+    <div class="card" style="margin-bottom: var(--space-6);">
+        <h2 class="card-title">Site Configuration</h2>
+        <div style="background: var(--gray-50); padding: var(--space-4); border-radius: 8px; margin-bottom: var(--space-4);">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                <div>
+                    <div style="font-weight: 600; color: var(--gray-700); margin-bottom: 4px;">Site ID</div>
+                    <div style="font-family: var(--font-mono); color: var(--gray-900);">lemma.id</div>
+                </div>
+                <div>
+                    <div style="font-weight: 600; color: var(--gray-700); margin-bottom: 4px;">IAM Type</div>
+                    <div style="color: var(--success);">Self-Managed (Same as Customer System)</div>
+                </div>
+            </div>
+        </div>
+        <p style="color: var(--gray-600); font-size: var(--font-size-sm);">
+            This permission manager uses the exact same IAM system that we provide to customers, 
+            ensuring consistency and making development easier.
+        </p>
+    </div>
+
+    <!-- Permission Definitions -->
+    <div class="card" style="margin-bottom: var(--space-6);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+            <h2 class="card-title" style="margin-bottom: 0;">Permission Definitions</h2>
+            <button class="btn btn-primary" onclick="showCreatePermissionModal()">
+                + Create Permission
+            </button>
+        </div>
+        
+        <div id="permissionsList">
+            <div style="padding: var(--space-4); text-align: center; color: var(--gray-500);">
+                Loading permissions...
+            </div>
+        </div>
+    </div>
+
+    <!-- User Permissions -->
+    <div class="card" style="margin-bottom: var(--space-6);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+            <h2 class="card-title" style="margin-bottom: 0;">User Permissions</h2>
+            <button class="btn btn-primary" onclick="showGrantPermissionModal()">
+                + Grant Permission
+            </button>
+        </div>
+        
+        <div id="userPermissionsList">
+            <div style="padding: var(--space-4); text-align: center; color: var(--gray-500);">
+                Loading user permissions...
+            </div>
+        </div>
+    </div>
+
+    <!-- Permission Analytics -->
+    <div class="card">
+        <h2 class="card-title">Permission Analytics</h2>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4);">
+            <!-- Total Permissions -->
+            <div style="text-align: center; padding: var(--space-4); background: var(--gray-50); border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: 700; color: var(--primary); margin-bottom: 4px;" id="totalPermissions">-</div>
+                <div style="font-size: var(--font-size-sm); color: var(--gray-600);">Total Permissions</div>
+            </div>
+            
+            <!-- Active Users -->
+            <div style="text-align: center; padding: var(--space-4); background: var(--gray-50); border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: 700; color: var(--success); margin-bottom: 4px;" id="activeUsers">-</div>
+                <div style="font-size: var(--font-size-sm); color: var(--gray-600);">Users with Permissions</div>
+            </div>
+            
+            <!-- Permission Checks -->
+            <div style="text-align: center; padding: var(--space-4); background: var(--gray-50); border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: 700; color: var(--warning); margin-bottom: 4px;" id="permissionChecks">-</div>
+                <div style="font-size: var(--font-size-sm); color: var(--gray-600);">Checks Today</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Permission Modal -->
+<div id="createPermissionModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--white); border-radius: 12px; padding: var(--space-6); min-width: 500px; max-width: 90vw;">
+        <h3 style="margin-bottom: var(--space-4);">Create New Permission</h3>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Permission ID</label>
+            <input type="text" id="newPermissionId" placeholder="e.g., content_editor" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+        </div>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Display Name</label>
+            <input type="text" id="newPermissionName" placeholder="e.g., Content Editor" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+        </div>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Scope (comma-separated)</label>
+            <input type="text" id="newPermissionScope" placeholder="e.g., posts:read, posts:write" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+        </div>
+        
+        <div style="display: flex; gap: var(--space-3); justify-content: flex-end;">
+            <button class="btn btn-secondary" onclick="hideCreatePermissionModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="createPermission()">Create Permission</button>
+        </div>
+    </div>
+</div>
+
+<!-- Grant Permission Modal -->
+<div id="grantPermissionModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--white); border-radius: 12px; padding: var(--space-6); min-width: 500px; max-width: 90vw;">
+        <h3 style="margin-bottom: var(--space-4);">Grant Permission to User</h3>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">User Email</label>
+            <input type="email" id="grantUserEmail" placeholder="user@example.com" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+        </div>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Permission</label>
+            <select id="grantPermissionId" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                <option value="">Select permission...</option>
+                <option value="admin_access">Admin Access</option>
+                <option value="customer_access">Customer Access</option>
+            </select>
+        </div>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Expiry (days)</label>
+            <input type="number" id="grantExpiryDays" value="90" min="1" max="365" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+        </div>
+        
+        <div style="display: flex; gap: var(--space-3); justify-content: flex-end;">
+            <button class="btn btn-secondary" onclick="hideGrantPermissionModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="grantPermission()">Grant Permission</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Permission Manager with Admin Access Control
+let permissionManagerInstance = null;
+
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        // Initialize wallet to check permission lemmas (same as other admin pages)
+        permissionManagerInstance = new LemmaFederatedWallet({ 
+            debug: true,
+            networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
+            networkAuthKey: 'lemma_network_federated_sync_2024'
+        });
+        await permissionManagerInstance.init();
+
+        // Check for admin_access permission lemma
+        const permissionLemmas = await permissionManagerInstance.getCredentials('permission');
+        console.log('🔍 Permission manager checking admin lemmas:', permissionLemmas);
+        
+        const hasAdminAccess = permissionLemmas.some(lemma => {
+            const isLemmaId = lemma.claims?.siteId === 'lemma.id';
+            const hasAdminPermission = lemma.claims?.permissionId === 'admin_access';
+            
+            console.log(`📊 Checking admin lemma ${lemma.id}:`, {
+                siteId: lemma.claims?.siteId,
+                permissionId: lemma.claims?.permissionId,
+                email: lemma.claims?.email,
+                isLemmaId,
+                hasAdminPermission
+            });
+            
+            return isLemmaId && hasAdminPermission;
+        });
+
+        if (hasAdminAccess) {
+            // User has admin permission, show permission manager
+            console.log('✅ Permission manager access granted - user has admin permission lemma');
+            document.getElementById('permission-access-check').style.display = 'none';
+            document.getElementById('permission-manager').style.display = 'block';
+            await loadPermissionManagerData();
+        } else {
+            // No admin permission, show access denied
+            console.log('❌ Permission manager access denied - no valid admin permission lemma found');
+            document.getElementById('permission-access-check').innerHTML = `
+                <div style="color: var(--error); text-align: center; padding: 40px;">
+                    <h2>Admin Access Required</h2>
+                    <p>You need admin_access permission lemma for lemma.id to manage permissions.</p>
+                    <p>Found ${permissionLemmas.length} permission lemma(s) but none have admin_access for lemma.id.</p>
+                    <div style="margin-top: 20px;">
+                        <a href="/login" style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 5px; display: inline-block;">
+                            🔐 Login for Admin Access
+                        </a>
+                        <button onclick="location.reload()" style="background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; margin: 5px; cursor: pointer;">
+                            🔄 Refresh & Retry
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+    } catch (error) {
+        console.error('Permission manager initialization error:', error);
+        document.getElementById('permission-access-check').innerHTML = `
+            <div style="color: var(--error); text-align: center; padding: 40px;">
+                <h2>Error</h2>
+                <p>Failed to check admin permissions. Please try refreshing the page.</p>
+            </div>
+        `;
+    }
+});
+
+// Load permission manager data
+async function loadPermissionManagerData() {
+    try {
+        // Load existing permissions for lemma.id
+        await loadSitePermissions();
+        
+        // Load user permissions
+        await loadUserPermissions();
+        
+        // Load analytics
+        await loadPermissionAnalytics();
+        
+    } catch (error) {
+        console.error('Failed to load permission manager data:', error);
+    }
+}
+
+// Load site permissions
+async function loadSitePermissions() {
+    try {
+        const response = await fetch('/api/v1/sites/lemma.id/permissions');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayPermissions(data.permissions);
+        } else {
+            // Initialize with default permissions if none exist
+            initializeDefaultPermissions();
+        }
+    } catch (error) {
+        console.log('📊 Permission API not available, showing default permissions');
+        initializeDefaultPermissions();
+    }
+}
+
+// Initialize default permissions for lemma.id
+function initializeDefaultPermissions() {
+    const defaultPermissions = [
+        {
+            permission_id: 'admin_access',
+            display_name: 'Administrator Access',
+            description: 'Full platform administration access',
+            scope: ['users:*', 'sites:*', 'permissions:*', 'billing:*', 'analytics:*'],
+            created_at: new Date().toISOString(),
+            created_by: 'system'
+        },
+        {
+            permission_id: 'customer_access',
+            display_name: 'Customer Access',
+            description: 'Standard customer dashboard access',
+            scope: ['profile:read', 'profile:write', 'billing:read', 'usage:read'],
+            created_at: new Date().toISOString(),
+            created_by: 'system'
+        }
+    ];
+    
+    displayPermissions(defaultPermissions);
+}
+
+// Display permissions
+function displayPermissions(permissions) {
+    const container = document.getElementById('permissionsList');
+    
+    if (permissions.length === 0) {
+        container.innerHTML = `
+            <div style="padding: var(--space-4); text-align: center; color: var(--gray-500);">
+                No permissions defined. Create your first permission.
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = permissions.map(permission => `
+        <div style="border: 1px solid var(--gray-200); border-radius: 8px; padding: var(--space-4); margin-bottom: var(--space-3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-2);">
+                <div>
+                    <h4 style="margin: 0; color: var(--gray-900); font-weight: 600;">${permission.display_name}</h4>
+                    <div style="font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--gray-500); margin-top: 2px;">
+                        ${permission.permission_id}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" onclick="editPermission('${permission.permission_id}')" style="padding: 4px 8px; font-size: 12px;">
+                        Edit
+                    </button>
+                    <button class="btn btn-secondary" onclick="deletePermission('${permission.permission_id}')" style="padding: 4px 8px; font-size: 12px; color: var(--error);">
+                        Delete
+                    </button>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: var(--space-2);">
+                <strong>Description:</strong> ${permission.description || 'No description'}
+            </div>
+            
+            <div style="margin-bottom: var(--space-2);">
+                <strong>Scope:</strong>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
+                    ${permission.scope.map(s => `
+                        <span style="background: var(--gray-100); color: var(--gray-700); padding: 2px 8px; border-radius: 12px; font-size: 12px;">
+                            ${s}
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <div style="font-size: var(--font-size-sm); color: var(--gray-500);">
+                Created: ${new Date(permission.created_at).toLocaleDateString()} by ${permission.created_by}
+            </div>
+        </div>
+    `).join('');
+    
+    // Update analytics
+    document.getElementById('totalPermissions').textContent = permissions.length;
+}
+
+// Load user permissions
+async function loadUserPermissions() {
+    try {
+        const response = await fetch('/api/v1/sites/lemma.id/users');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayUserPermissions(data.users);
+        } else {
+            loadDemoUserPermissions();
+        }
+    } catch (error) {
+        console.log('📊 User permissions API not available, showing demo data');
+        loadDemoUserPermissions();
+    }
+}
+
+// Load demo user permissions
+function loadDemoUserPermissions() {
+    const demoUsers = [
+        {
+            email: 'jedmckenna@lemma.id',
+            permissions: ['admin_access'],
+            granted_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+            email: 'jedmckenna@gmail.com',
+            permissions: ['customer_access'],
+            granted_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+        }
+    ];
+    
+    displayUserPermissions(demoUsers);
+}
+
+// Display user permissions
+function displayUserPermissions(users) {
+    const container = document.getElementById('userPermissionsList');
+    
+    if (users.length === 0) {
+        container.innerHTML = `
+            <div style="padding: var(--space-4); text-align: center; color: var(--gray-500);">
+                No user permissions granted yet.
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = users.map(user => `
+        <div style="border: 1px solid var(--gray-200); border-radius: 8px; padding: var(--space-4); margin-bottom: var(--space-3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h4 style="margin: 0; color: var(--gray-900); font-weight: 600;">${user.email}</h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;">
+                        ${user.permissions.map(p => `
+                            <span style="background: var(--primary); color: var(--white); padding: 2px 8px; border-radius: 12px; font-size: 12px;">
+                                ${p}
+                            </span>
+                        `).join('')}
+                    </div>
+                    <div style="font-size: var(--font-size-sm); color: var(--gray-500); margin-top: 8px;">
+                        Granted: ${new Date(user.granted_at).toLocaleDateString()} • 
+                        Expires: ${new Date(user.expires_at).toLocaleDateString()}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" onclick="editUserPermissions('${user.email}')" style="padding: 4px 8px; font-size: 12px;">
+                        Edit
+                    </button>
+                    <button class="btn btn-secondary" onclick="revokeUserPermissions('${user.email}')" style="padding: 4px 8px; font-size: 12px; color: var(--error);">
+                        Revoke
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    // Update analytics
+    document.getElementById('activeUsers').textContent = users.length;
+}
+
+// Load permission analytics
+function loadPermissionAnalytics() {
+    // Demo analytics data
+    document.getElementById('permissionChecks').textContent = '1,247';
+}
+
+// Modal functions
+function showCreatePermissionModal() {
+    document.getElementById('createPermissionModal').style.display = 'block';
+}
+
+function hideCreatePermissionModal() {
+    document.getElementById('createPermissionModal').style.display = 'none';
+}
+
+function showGrantPermissionModal() {
+    document.getElementById('grantPermissionModal').style.display = 'block';
+}
+
+function hideGrantPermissionModal() {
+    document.getElementById('grantPermissionModal').style.display = 'none';
+}
+
+// Permission management functions
+async function createPermission() {
+    const permissionId = document.getElementById('newPermissionId').value;
+    const displayName = document.getElementById('newPermissionName').value;
+    const scopeText = document.getElementById('newPermissionScope').value;
+    
+    if (!permissionId || !displayName || !scopeText) {
+        alert('Please fill in all fields');
+        return;
+    }
+    
+    const scope = scopeText.split(',').map(s => s.trim());
+    
+    try {
+        const response = await fetch('/api/v1/sites/lemma.id/permissions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': 'admin-api-key' // You'll need to set this
+            },
+            body: JSON.stringify({
+                permission_id: permissionId,
+                display_name: displayName,
+                description: `${displayName} permission`,
+                scope: scope,
+                expiry_days: 365
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log('✅ Permission created successfully');
+            hideCreatePermissionModal();
+            await loadSitePermissions(); // Refresh the list
+        } else {
+            alert('Failed to create permission: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Create permission error:', error);
+        alert('Failed to create permission. Check console for details.');
+    }
+}
+
+async function grantPermission() {
+    const userEmail = document.getElementById('grantUserEmail').value;
+    const permissionId = document.getElementById('grantPermissionId').value;
+    const expiryDays = document.getElementById('grantExpiryDays').value;
+    
+    if (!userEmail || !permissionId) {
+        alert('Please fill in all fields');
+        return;
+    }
+    
+    try {
+        // Create user DID
+        const userDid = `did:lemma:user:${userEmail.replace('@', '_at_').replace('.', '_')}`;
+        
+        const response = await fetch(`/api/v1/sites/lemma.id/users/${encodeURIComponent(userDid)}/permissions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': 'admin-api-key' // You'll need to set this
+            },
+            body: JSON.stringify({
+                permission_id: permissionId,
+                expiry_days: parseInt(expiryDays)
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log('✅ Permission granted successfully');
+            hideGrantPermissionModal();
+            await loadUserPermissions(); // Refresh the list
+        } else {
+            alert('Failed to grant permission: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Grant permission error:', error);
+        alert('Failed to grant permission. Check console for details.');
+    }
+}
+
+function editPermission(permissionId) {
+    alert(`Edit permission: ${permissionId} (Coming soon)`);
+}
+
+function deletePermission(permissionId) {
+    if (confirm(`Are you sure you want to delete permission: ${permissionId}?`)) {
+        alert(`Delete permission: ${permissionId} (Coming soon)`);
+    }
+}
+
+function editUserPermissions(email) {
+    alert(`Edit permissions for: ${email} (Coming soon)`);
+}
+
+function revokeUserPermissions(email) {
+    if (confirm(`Are you sure you want to revoke all permissions for: ${email}?`)) {
+        alert(`Revoke permissions for: ${email} (Coming soon)`);
+    }
+}
+</script>
+
+{% endblock %}

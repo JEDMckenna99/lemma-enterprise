@@ -267,6 +267,25 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ Lemma Auth API registration failed: {e}")
 
+    # Lemma platform IAM setup
+    try:
+        from api.lemma_platform_iam import lemma_platform_iam_bp, initialize_lemma_platform_iam
+        app.register_blueprint(lemma_platform_iam_bp)
+        
+        # Auto-initialize platform IAM on startup
+        try:
+            result = initialize_lemma_platform_iam()
+            if result['success']:
+                logger.info("✅ Lemma Platform IAM auto-initialized")
+            else:
+                logger.warning(f"⚠️ Platform IAM auto-init failed: {result.get('error')}")
+        except Exception as init_error:
+            logger.warning(f"⚠️ Platform IAM auto-init error: {init_error}")
+        
+        logger.info("✅ Lemma Platform IAM API registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Platform IAM API registration failed: {e}")
+
     # Initialize optimized engine
     try:
         from api.optimized_shield import get_optimized_engine
@@ -776,6 +795,11 @@ def create_app():
     def admin_dashboard():
         """Admin dashboard - requires admin_access permission lemma"""
         return render_template('admin/admin_dashboard.html')
+
+    @app.route('/admin/permissions')
+    def admin_permissions():
+        """Permission manager - uses same IAM system as customers"""
+        return render_template('admin/permissions.html')
 
     @app.route('/site-management')
     def site_management():
