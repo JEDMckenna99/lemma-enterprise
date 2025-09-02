@@ -30,49 +30,79 @@
         </div>
     </div>
 
-    <!-- System Metrics - Beautiful Visual Cards -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-6); margin-bottom: var(--space-8);" id="platformMetrics">
+    <!-- Platform Metrics - Compact & Professional -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-6);" id="platformMetrics">
         
-        <!-- Total Customers Metric -->
-        <div class="card" style="text-align: center; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: var(--white); border: none;">
-            <div style="font-size: 3rem; font-weight: 800; margin-bottom: var(--space-2);" id="totalCustomers">-</div>
-            <div style="font-size: var(--font-size-lg); font-weight: 600; opacity: 0.9;">Total Customers</div>
-            <div style="font-size: var(--font-size-sm); opacity: 0.7; margin-top: var(--space-1);" id="customersGrowth">Loading...</div>
+        <!-- Customers -->
+        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid var(--primary);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="totalCustomers">-</div>
+                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Customers</div>
+                </div>
+                <div style="font-size: 1.5rem; opacity: 0.6;">👥</div>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--success); margin-top: var(--space-2);" id="customersGrowth">Loading...</div>
         </div>
 
-        <!-- Active Sites Metric -->
-        <div class="card" style="text-align: center; background: linear-gradient(135deg, var(--success) 0%, #059669 100%); color: var(--white); border: none;">
-            <div style="font-size: 3rem; font-weight: 800; margin-bottom: var(--space-2);" id="activeSites">-</div>
-            <div style="font-size: var(--font-size-lg); font-weight: 600; opacity: 0.9;">Active Sites</div>
-            <div style="font-size: var(--font-size-sm); opacity: 0.7; margin-top: var(--space-1);" id="sitesGrowth">Loading...</div>
+        <!-- Sites -->
+        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid var(--success);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="activeSites">-</div>
+                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Active Sites</div>
+                </div>
+                <div style="font-size: 1.5rem; opacity: 0.6;">🌐</div>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--success); margin-top: var(--space-2);" id="sitesGrowth">Loading...</div>
         </div>
 
-        <!-- Monthly Verifications -->
-        <div class="card" style="text-align: center; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: var(--white); border: none;">
-            <div style="font-size: 3rem; font-weight: 800; margin-bottom: var(--space-2);" id="monthlyVerifications">-</div>
-            <div style="font-size: var(--font-size-lg); font-weight: 600; opacity: 0.9;">Verifications</div>
-            <div style="font-size: var(--font-size-sm); opacity: 0.7; margin-top: var(--space-1);">This Month</div>
+        <!-- Verifications -->
+        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid #f59e0b;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="monthlyVerifications">-</div>
+                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Verifications</div>
+                </div>
+                <div style="font-size: 1.5rem; opacity: 0.6;">⚡</div>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: var(--space-2);">This month</div>
         </div>
 
-        <!-- Platform Performance -->
-        <div class="card" style="text-align: center; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: var(--white); border: none;">
-            <div style="font-size: 3rem; font-weight: 800; margin-bottom: var(--space-2);" id="avgVerificationTime">4.2µs</div>
-            <div style="font-size: var(--font-size-lg); font-weight: 600; opacity: 0.9;">Avg Verification</div>
-            <div style="font-size: var(--font-size-sm); opacity: 0.7; margin-top: var(--space-1);">Microsecond Performance</div>
+        <!-- Performance -->
+        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid #8b5cf6;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="avgVerificationTime">4.2µs</div>
+                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Avg Response</div>
+                </div>
+                <div style="font-size: 1.5rem; opacity: 0.6;">🚀</div>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: var(--space-2);">Production verified</div>
         </div>
 
-        <!-- Revenue Metric -->
-        <div class="card" style="text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: var(--white); border: none;">
-            <div style="font-size: 3rem; font-weight: 800; margin-bottom: var(--space-2);" id="monthlyRevenue">$-</div>
-            <div style="font-size: var(--font-size-lg); font-weight: 600; opacity: 0.9;">Monthly Revenue</div>
-            <div style="font-size: var(--font-size-sm); opacity: 0.7; margin-top: var(--space-1);" id="revenueGrowth">Loading...</div>
+        <!-- Revenue -->
+        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid var(--success);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="monthlyRevenue">$-</div>
+                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Revenue</div>
+                </div>
+                <div style="font-size: 1.5rem; opacity: 0.6;">💰</div>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--success); margin-top: var(--space-2);" id="revenueGrowth">Loading...</div>
         </div>
 
-        <!-- System Health -->
-        <div class="card" style="text-align: center; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: var(--white); border: none;">
-            <div style="font-size: 3rem; font-weight: 800; margin-bottom: var(--space-2);" id="systemHealth">99.9%</div>
-            <div style="font-size: var(--font-size-lg); font-weight: 600; opacity: 0.9;">System Uptime</div>
-            <div style="font-size: var(--font-size-sm); opacity: 0.7; margin-top: var(--space-1);">Last 30 Days</div>
+        <!-- Uptime -->
+        <div class="card" style="padding: var(--space-4); background: var(--white); border-left: 4px solid #6366f1;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--gray-900); line-height: 1;" id="systemHealth">99.9%</div>
+                    <div style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 2px;">Uptime</div>
+                </div>
+                <div style="font-size: 1.5rem; opacity: 0.6;">🛡️</div>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: var(--space-2);">Last 30 days</div>
         </div>
 
     </div>
