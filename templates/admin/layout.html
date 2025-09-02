@@ -15,6 +15,9 @@
     <!-- Design System -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma-design-system.css') }}">
     
+    <!-- Load the Lemma Federated Wallet for admin permission checking -->
+    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=672"></script>
+    
     <!-- Admin-specific styles -->
     <style>
         :root {
