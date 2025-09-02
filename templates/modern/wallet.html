@@ -520,11 +520,15 @@ let lemmaShield;
 
 document.addEventListener('DOMContentLoaded', async function() {
     try {
-        // Initialize the existing Lemma Federated Wallet
+        // Initialize the existing Lemma Federated Wallet with network sync
         lemmaWallet = new LemmaFederatedWallet({
             debug: true,
             backgroundChecks: true,
-            securityLevel: 'medium'
+            securityLevel: 'medium',
+            // CRITICAL: Add network registry configuration for credential sync
+            networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
+            networkAuthKey: 'lemma_network_federated_sync_2024',
+            syncInterval: 30000 // 30 seconds for frequent sync
         });
 
         // Wait for wallet to be ready

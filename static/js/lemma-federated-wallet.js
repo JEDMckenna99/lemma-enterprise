@@ -115,6 +115,18 @@ class LemmaFederatedWallet {
                     created_at: Date.now(),
                     capabilities: ['federated_identity_verification', 'stripe_identity_verification', 'cross_site_recognition']
                 }
+            },
+            {
+                did: 'did:lemma:platform:lemma.id',
+                publicKey: 'lemma_platform_key_2024',
+                issuerInfo: {
+                    name: 'Lemma Platform',
+                    issuer_type: 'platform_admin',
+                    trust_score: 1.0,
+                    verified: true,
+                    created_at: Date.now(),
+                    capabilities: ['admin_access', 'customer_access', 'permission_management', 'platform_administration']
+                }
             }
         ];
         
