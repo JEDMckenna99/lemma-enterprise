@@ -6,7 +6,7 @@
 {% block head %}
     {{ super() }}
     <!-- Load the existing Lemma Federated Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=668"></script>
+    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=672"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
     <script src="/static/js/lemma-bot-shield-simple.js?v=659"></script>
     <style>
@@ -376,9 +376,17 @@
                     <h2 style="font-size: 1.3rem; font-weight: 600; color: var(--gray-900); margin: 0;">Your Credentials</h2>
                     <p style="color: var(--gray-600); margin: 2px 0 0 0; font-size: 0.9rem;">Manage your federated identity proofs</p>
                 </div>
-                <button class="btn-primary" onclick="lemmaWallet.refreshCredentials()" style="padding: 8px 16px; font-size: 0.85rem;">
-                    Refresh
-                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-primary" onclick="refreshWalletCredentials()" style="padding: 8px 16px; font-size: 0.85rem;">
+                        Refresh
+                    </button>
+                    <button class="btn-secondary" onclick="forceReloadWallet()" style="padding: 8px 16px; font-size: 0.85rem;">
+                        Force Reload
+                    </button>
+                    <button class="btn-secondary" onclick="debugWalletStorage()" style="padding: 8px 16px; font-size: 0.85rem;">
+                        Debug
+                    </button>
+                </div>
             </div>
             
             <div id="credential-list" class="credential-list">
@@ -748,6 +756,115 @@ function showFILJoinInterface() {
             </div>
         </div>
     `;
+}
+
+// Wallet refresh functions
+async function refreshWalletCredentials() {
+    if (!lemmaWallet) {
+        console.warn('Wallet not initialized yet');
+        return;
+    }
+    
+    console.log('🔄 Refreshing wallet credentials...');
+    
+    try {
+        const result = await lemmaWallet.refreshCredentials();
+        console.log('✅ Refresh result:', result);
+        
+        // Reload the display
+        await loadWalletData();
+        
+        if (result.success) {
+            console.log(`✅ Refreshed: ${result.identityCount} PoH + ${result.permissionCount} permission lemmas`);
+        }
+    } catch (error) {
+        console.error('❌ Refresh failed:', error);
+    }
+}
+
+async function forceReloadWallet() {
+    console.log('🔄 Force reloading wallet...');
+    
+    try {
+        // Clear all caches
+        if (lemmaWallet) {
+            await lemmaWallet.clearAll();
+            console.log('🗑️ Cleared wallet cache');
+        }
+        
+        // Reinitialize wallet
+        lemmaWallet = new LemmaFederatedWallet({
+            debug: true,
+            backgroundChecks: true,
+            securityLevel: 'medium',
+            networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
+            networkAuthKey: 'lemma_network_federated_sync_2024',
+            syncInterval: 30000
+        });
+        
+        await lemmaWallet.init();
+        console.log('✅ Wallet reinitialized');
+        
+        // Reload display
+        await loadWalletData();
+        
+    } catch (error) {
+        console.error('❌ Force reload failed:', error);
+    }
+}
+
+async function debugWalletStorage() {
+    console.log('=== WALLET PAGE STORAGE DEBUG ===');
+    
+    if (!lemmaWallet) {
+        console.log('❌ Wallet not initialized');
+        return;
+    }
+    
+    console.log(`📊 Memory cache size: ${lemmaWallet.memoryCache.size}`);
+    console.log(`📊 Trusted DIDs: ${lemmaWallet.didRegistry.size}`);
+    
+    // List all trusted DIDs
+    for (const [did, info] of lemmaWallet.didRegistry) {
+        console.log(`  - ${did} (${info.issuerInfo?.name})`);
+    }
+    
+    // List all credentials in memory
+    console.log('\n📋 All credentials in memory:');
+    let count = 0;
+    for (const [id, cred] of lemmaWallet.memoryCache) {
+        count++;
+        console.log(`  ${count}. ${id}`);
+        console.log(`     Type: ${cred.packageType}`);
+        console.log(`     Email: ${cred.claims?.email || 'none'}`);
+        console.log(`     Permission: ${cred.claims?.permissionId || 'none'}`);
+        console.log(`     Is Human: ${cred.claims?.isHuman || 'none'}`);
+    }
+    
+    // Test credential retrieval
+    const identityCredentials = await lemmaWallet.getCredentials('identity');
+    const permissionCredentials = await lemmaWallet.getCredentials('permission');
+    
+    console.log(`\n📊 Retrieval test:`);
+    console.log(`  Identity: ${identityCredentials.length}`);
+    console.log(`  Permission: ${permissionCredentials.length}`);
+    
+    // Check localStorage directly
+    console.log('\n📊 Raw localStorage check:');
+    const rawStorage = localStorage.getItem('lemma_credentials');
+    if (rawStorage) {
+        try {
+            const parsed = JSON.parse(rawStorage);
+            console.log(`  localStorage has ${parsed.length} credentials`);
+            parsed.forEach((cred, i) => {
+                console.log(`    ${i + 1}. ${cred.packageType} - ${cred.id}`);
+            });
+        } catch (e) {
+            console.log('  localStorage data corrupted');
+        }
+    } else {
+        console.log('  No localStorage data found');
+    }
 }
 
 // Enhanced Wallet Data Loading - Shows both PoH and Permission Lemmas

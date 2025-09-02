@@ -1762,6 +1762,62 @@ class LemmaFederatedWallet {
             return false;
         }
     }
+    
+    /**
+     * Refresh credentials - reload from all storage layers and network
+     */
+    async refreshCredentials() {
+        if (this.debug) {
+            console.log('🔄 Refreshing credentials from all sources...');
+        }
+        
+        try {
+            // Clear memory cache
+            this.memoryCache.clear();
+            
+            // Reload from all storage layers
+            await this.loadExistingCredentials();
+            
+            // Force network sync
+            if (this.networkConfig.registryUrl) {
+                await this.syncDidRegistry();
+                await this.syncRevocationLists();
+            }
+            
+            // Trigger background check
+            await this.performBackgroundCheck();
+            
+            if (this.debug) {
+                console.log(`✅ Refresh complete - ${this.memoryCache.size} credentials loaded`);
+                this.logStorageStatus();
+            }
+            
+            // Broadcast refresh to other tabs
+            if (this.broadcastChannel) {
+                this.broadcastChannel.postMessage({
+                    type: 'credentials_refreshed',
+                    timestamp: Date.now(),
+                    credentialCount: this.memoryCache.size
+                });
+            }
+            
+            return {
+                success: true,
+                credentialCount: this.memoryCache.size,
+                identityCount: this.getCredentialsSync('identity').length,
+                permissionCount: this.getCredentialsSync('permission').length
+            };
+            
+        } catch (error) {
+            if (this.debug) {
+                console.error('❌ Refresh failed:', error);
+            }
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
 }
 
 // Global instance for cross-tab access
