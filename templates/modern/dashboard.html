@@ -5,6 +5,8 @@
 
 {% block head %}
     {{ super() }}
+    <!-- Load the Lemma Federated Wallet -->
+    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=672"></script>
     <style>
         .dashboard-container {
             max-width: 1200px;
@@ -329,12 +331,19 @@
 
 {% block content %}
     <div class="dashboard-container">
-        <div class="dashboard-header">
-            <h1 class="welcome-title">Welcome back, {{ customer.name }}!</h1>
-            <p class="welcome-subtitle">
-                Manage your Lemma Shield integration for {{ customer.company }}
-            </p>
+        <!-- Permission Lemma Access Control -->
+        <div id="access-check" style="text-align: center; padding: 40px;">
+            <div>Checking permission lemmas...</div>
         </div>
+
+        <!-- Customer Dashboard Content (hidden until permission verified) -->
+        <div id="customer-dashboard" style="display: none;">
+            <div class="dashboard-header">
+                <h1 class="welcome-title">Customer Dashboard</h1>
+                <p class="welcome-subtitle" id="customer-welcome">
+                    Manage your Lemma integration and view usage statistics
+                </p>
+            </div>
 
         <div class="dashboard-grid">
             <!-- API Keys Card -->
@@ -347,36 +356,9 @@
                 </div>
 
                 <div id="apiKeysList">
-                    {% for api_key in customer.api_keys %}
-                    <div class="api-key-item">
-                        <div class="api-key-header">
-                            <span class="api-key-name">{{ api_key.name }}</span>
-                            <span class="api-key-status status-{{ api_key.status }}">
-                                {{ api_key.status.title() }}
-                            </span>
-                        </div>
-                        
-                        {% if api_key.status == 'active' %}
-                        <div class="api-key-value">{{ api_key.key }}</div>
-                        <div class="api-key-actions">
-                            <button class="btn-small btn-copy" onclick="copyToClipboard('{{ api_key.key }}', this)">
-                                Copy
-                            </button>
-                            <button class="btn-small btn-revoke" onclick="revokeApiKey('{{ api_key.key }}')">
-                                Revoke
-                            </button>
-                        </div>
-                        {% endif %}
-                        
-                        <div class="api-key-meta">
-                            Created: {{ api_key.created_at[:10] }} • 
-                            Used {{ api_key.usage_count }} times
-                            {% if api_key.last_used %}
-                            • Last used: {{ api_key.last_used[:10] }}
-                            {% endif %}
-                        </div>
+                    <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                        Loading API keys...
                     </div>
-                    {% endfor %}
                 </div>
             </div>
 
@@ -386,18 +368,9 @@
                     <h2 class="card-title">Usage This Month</h2>
                 </div>
 
-                <div class="usage-stats">
-                    <div class="stat-item">
-                        <span class="stat-value">{{ customer.monthly_usage.get(current_month, 0) }}</span>
-                        <span class="stat-label">Active Users</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value">${{ "%.2f"|format((customer.monthly_usage.get(current_month, 0) * 0.10)) }}</span>
-                        <span class="stat-label">Est. Bill</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value">{{ customer.api_keys|length }}</span>
-                        <span class="stat-label">API Keys</span>
+                <div class="usage-stats" id="usageStats">
+                    <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                        Loading usage statistics...
                     </div>
                 </div>
 
@@ -486,7 +459,176 @@ lemmaShield.verifyUser();
     </div>
 
     <script>
+        // Permission-based access control and dashboard functionality
+        let customerData = null;
+        let walletInstance = null;
         const currentMonth = new Date().toISOString().slice(0, 7);
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                // Initialize wallet to check permission lemmas
+                walletInstance = new LemmaFederatedWallet({ 
+                    debug: true,
+                    networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
+                    networkAuthKey: 'lemma_network_federated_sync_2024'
+                });
+                await walletInstance.init();
+
+                // Check for customer_access permission lemma
+                const permissionLemmas = await walletInstance.getCredentials('permission');
+                const hasCustomerAccess = permissionLemmas.some(lemma => 
+                    lemma.claims?.siteId === 'lemma.id' && 
+                    lemma.claims?.permissionId === 'customer_access'
+                );
+
+                if (hasCustomerAccess) {
+                    // User has permission, load dashboard
+                    document.getElementById('access-check').style.display = 'none';
+                    document.getElementById('customer-dashboard').style.display = 'block';
+                    await loadDashboardData();
+                } else {
+                    // No permission, show access denied
+                    document.getElementById('access-check').innerHTML = `
+                        <div style="color: var(--error);">
+                            <h2>Access Denied</h2>
+                            <p>You need a customer_access permission lemma for lemma.id to access this dashboard.</p>
+                            <p><a href="/login">Login</a> to get your permission lemma.</p>
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Dashboard initialization error:', error);
+                document.getElementById('access-check').innerHTML = `
+                    <div style="color: var(--error);">
+                        <h2>Error</h2>
+                        <p>Failed to check permissions. Please try refreshing the page.</p>
+                    </div>
+                `;
+            }
+        });
+
+        // Load dashboard data from API
+        async function loadDashboardData() {
+            try {
+                // Load customer profile
+                const profileResponse = await fetch('/api/customer/profile');
+                const profileData = await profileResponse.json();
+                
+                if (profileData.success) {
+                    customerData = profileData.customer;
+                    document.querySelector('.welcome-title').textContent = `Welcome back, ${customerData.name}!`;
+                    document.getElementById('customer-welcome').textContent = 
+                        `Manage your Lemma integration for ${customerData.company}`;
+                }
+
+                // Load API keys
+                await loadApiKeys();
+
+                // Load usage statistics
+                await loadUsageStats();
+
+            } catch (error) {
+                console.error('Failed to load dashboard data:', error);
+            }
+        }
+
+        // Load API keys
+        async function loadApiKeys() {
+            try {
+                const response = await fetch('/api/customer/api-keys');
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayApiKeys(data.api_keys);
+                } else {
+                    document.getElementById('apiKeysList').innerHTML = 
+                        '<div style="padding: 20px; color: var(--error);">Failed to load API keys</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load API keys:', error);
+            }
+        }
+
+        // Display API keys
+        function displayApiKeys(apiKeys) {
+            const container = document.getElementById('apiKeysList');
+            
+            if (apiKeys.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: var(--gray-500);">
+                        No API keys yet. Create your first API key to get started.
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = apiKeys.map(apiKey => `
+                <div class="api-key-item">
+                    <div class="api-key-header">
+                        <span class="api-key-name">${apiKey.name}</span>
+                        <span class="api-key-status status-${apiKey.status}">
+                            ${apiKey.status.charAt(0).toUpperCase() + apiKey.status.slice(1)}
+                        </span>
+                    </div>
+                    
+                    ${apiKey.status === 'active' ? `
+                        <div class="api-key-value">${apiKey.key}</div>
+                        <div class="api-key-actions">
+                            <button class="btn-small btn-copy" onclick="copyToClipboard('${apiKey.key}', this)">
+                                Copy
+                            </button>
+                            <button class="btn-small btn-revoke" onclick="revokeApiKey('${apiKey.key}')">
+                                Revoke
+                            </button>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="api-key-meta">
+                        Created: ${new Date(apiKey.created_at).toLocaleDateString()} • 
+                        Used ${apiKey.usage_count} times
+                        ${apiKey.last_used ? `• Last used: ${new Date(apiKey.last_used).toLocaleDateString()}` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Load usage statistics
+        async function loadUsageStats() {
+            try {
+                const response = await fetch('/api/customer/usage');
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayUsageStats(data.usage);
+                } else {
+                    document.getElementById('usageStats').innerHTML = 
+                        '<div style="padding: 20px; color: var(--error);">Failed to load usage stats</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load usage stats:', error);
+            }
+        }
+
+        // Display usage statistics
+        function displayUsageStats(usage) {
+            const container = document.getElementById('usageStats');
+            
+            container.innerHTML = `
+                <div class="stat-item">
+                    <span class="stat-value">${usage.federated_id_network.monthly_active_users}</span>
+                    <span class="stat-label">Fed ID MAU</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${usage.iam_system.monthly_active_users}</span>
+                    <span class="stat-label">IAM MAU</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">$${usage.total_cost.toFixed(2)}</span>
+                    <span class="stat-label">Monthly Bill</span>
+                </div>
+            `;
+        }
 
         function showNewKeyModal() {
             document.getElementById('newKeyModal').style.display = 'block';
