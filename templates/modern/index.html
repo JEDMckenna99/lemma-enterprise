@@ -21,7 +21,7 @@
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for (let registration of registrations) {
-                    console.log('🔧 Unregistering service worker:', registration.scope);
+                    console.log('Unregistering service worker:', registration.scope);
                     registration.unregister();
                 }
             });
@@ -30,7 +30,7 @@
         // Direct verification function for immediate widget display
         window.startDirectVerification = async function(heroShield, verifyBtn) {
             try {
-                console.log('🚀 Starting direct Stripe verification...');
+                console.log('Starting direct Stripe verification...');
                 
                 // Update button state
                 const originalText = verifyBtn.textContent;
@@ -54,7 +54,7 @@
                 const result = await response.json();
                 
                 if (result.success && result.url) {
-                    console.log('✅ Stripe session created, redirecting...');
+                    console.log('Stripe session created, redirecting...');
                     // Redirect to Stripe Identity
                     window.location.href = result.url;
                 } else {
@@ -62,7 +62,7 @@
                 }
                 
             } catch (error) {
-                console.error('❌ Direct verification failed:', error);
+                console.error('Direct verification failed:', error);
                 
                 // Reset button
                 verifyBtn.textContent = 'Verification failed - Try again';
@@ -77,7 +77,7 @@
         // Legacy function for button-triggered verification
         window.startHeroVerification = async function() {
             try {
-                console.log('🚀 Starting hero verification...');
+                console.log('Starting hero verification...');
                 
                 const joinButton = document.getElementById('join-network-btn');
                 if (joinButton) {
@@ -98,7 +98,7 @@
                 await window.heroShield.protect('#shield-api-card');
                 
             } catch (error) {
-                console.error('❌ Hero verification failed:', error);
+                console.error('Hero verification failed:', error);
                 
                 const joinButton = document.getElementById('join-network-btn');
                 if (joinButton) {
@@ -146,18 +146,7 @@
                 <p><strong>Federated Identity Network:</strong> Users verify once with Stripe Identity, access everywhere with cryptographic proof of humanity.</p>
                 <p><strong>Client-Side IAM:</strong> Permission data stored in user's wallet, not your database. Zero infrastructure costs, infinite scalability, maximum privacy.</p>
                 
-                <div style="margin: 32px 0; padding: 24px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1)); border-radius: 16px; border-left: 4px solid var(--primary);">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; text-align: left;">
-                        <div>
-                            <h4 style="margin: 0 0 8px 0; color: var(--primary);">🌐 Federated Network</h4>
-                            <p style="margin: 0; font-size: 14px; color: var(--gray-600);">Bot protection & PoH<br><strong>$0.06/MAU</strong></p>
-                        </div>
-                        <div>
-                            <h4 style="margin: 0 0 8px 0; color: var(--secondary);">🔑 Client-Side IAM</h4>
-                            <p style="margin: 0; font-size: 14px; color: var(--gray-600);">User-owned permissions<br><strong>$0.16/MAU</strong></p>
-                        </div>
-                    </div>
-                </div>
+
                 
                 <div style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
                     <a href="/register" class="btn btn-primary">Start Building</a>
@@ -183,11 +172,11 @@
             <p class="text-gray">Revolutionary identity and access management that eliminates traditional IAM infrastructure costs through client-side storage and cryptographic verification.</p>
             
             <div style="margin: 48px 0; padding: 48px; background: linear-gradient(135deg, #f8fafc, #e2e8f0); border-radius: 24px; text-align: left;">
-                <h3 style="text-align: center; margin-bottom: 32px; color: var(--primary);">🔄 Two Revolutionary Systems</h3>
+                <h3 style="text-align: center; margin-bottom: 32px; color: var(--primary);">Two Revolutionary Systems</h3>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 48px;">
                     <div style="padding: 24px; background: white; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                        <h4 style="color: var(--primary); margin-bottom: 16px;">🌐 Federated Identity Network</h4>
+                        <h4 style="color: var(--primary); margin-bottom: 16px;">Federated Identity Network</h4>
                         <ul style="margin: 0; padding-left: 20px; color: var(--gray-600);">
                             <li><strong>Verify once, access everywhere</strong> - Stripe Identity KYC creates universal PoH lemma</li>
                             <li><strong>Cross-site recognition</strong> - Works across all network sites</li>
@@ -197,7 +186,7 @@
                     </div>
                     
                     <div style="padding: 24px; background: white; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                        <h4 style="color: var(--secondary); margin-bottom: 16px;">🔑 Client-Side IAM System</h4>
+                        <h4 style="color: var(--secondary); margin-bottom: 16px;">Client-Side IAM System</h4>
                         <ul style="margin: 0; padding-left: 20px; color: var(--gray-600);">
                             <li><strong>User owns permission data</strong> - Stored in browser wallet, not your database</li>
                             <li><strong>Zero infrastructure costs</strong> - No scaling database or storage fees</li>
@@ -209,7 +198,7 @@
                 
                 <div style="text-align: center; margin-top: 32px; padding: 24px; background: rgba(16, 185, 129, 0.1); border-radius: 12px;">
                     <p style="margin: 0; font-weight: 600; color: var(--gray-700);">
-                        🎯 <strong>Result:</strong> 95% cost reduction vs Auth0/Duo + infinite scalability + maximum privacy
+                        <strong>Result:</strong> 95% cost reduction vs Auth0/Duo + infinite scalability + maximum privacy
                     </p>
                 </div>
             </div>
@@ -226,22 +215,22 @@
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; margin-top: 64px;">
             <div class="card">
-                <h3 class="card-title">🛡️ Cryptographic Bot Protection</h3>
+                <h3 class="card-title">Cryptographic Bot Protection</h3>
                 <p>Advanced proof-of-humanity verification that eliminates bots while real users pass through seamlessly—no CAPTCHAs, no friction.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">🔒 Zero-Knowledge Privacy</h3>
+                <h3 class="card-title">Zero-Knowledge Privacy</h3>
                 <p>Verify identity claims without collecting personal data. Selective disclosure allows proving "over 18" without revealing age or birthdate.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">⚡ Microsecond Verification</h3>
+                <h3 class="card-title">Microsecond Verification</h3>
                 <p>4.176µs offline verification with our optimized Rust engine—1000x faster than traditional solutions that require network calls.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">🌐 Federated Network Effects</h3>
+                <h3 class="card-title">Federated Network Effects</h3>
                 <p>Verify once, communicate everywhere. Users proven on one platform are instantly trusted across the entire authenticated network.</p>
             </div>
         </div>
@@ -292,22 +281,22 @@
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; margin-bottom: 64px;">
             <div class="card">
-                <h3 class="card-title">🔄 Revocable and Resilient</h3>
+                <h3 class="card-title">Revocable and Resilient</h3>
                 <p>Built-in kill switches via status lists allow instant network-wide revocation of compromised credentials, without disrupting real-time communication.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">📡 Offline-First Communication</h3>
+                <h3 class="card-title">Offline-First Communication</h3>
                 <p>Verifications require zero network calls in the hot path, supporting internet-independent mesh networks for IoT devices or remote operations.</p>
         </div>
         
             <div class="card">
-                <h3 class="card-title">🎭 Privacy-Enhanced Networks</h3>
+                <h3 class="card-title">Privacy-Enhanced Networks</h3>
                 <p>ZKPs ensure unlinkability and selective disclosure, fostering trust in communication without data leaks or tracking across platforms.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">💰 Economic Edge</h3>
+                <h3 class="card-title">Economic Edge</h3>
                 <p>At $0.10 per active verified user/month, lemmas reduce costs by 25-98% vs. per-challenge models while boosting conversions by eliminating friction.</p>
             </div>
         </div>
@@ -338,7 +327,7 @@
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px;">
             <div class="card" style="border-left: 4px solid var(--primary);">
-                <h3 class="card-title">🏪 E-commerce & Fintech</h3>
+                <h3 class="card-title">E-commerce & Fintech</h3>
                 <p>Lemmas secure transactions by verifying human intent in microseconds, preventing fraud while enabling seamless, authenticated communication between buyers, sellers, and payment systems—<strong>no more fake reviews or account takeovers</strong>.</p>
                 <ul style="margin-top: 16px; color: var(--gray-600); padding-left: 20px;">
                     <li>Frictionless checkout with verified buyers</li>
@@ -348,7 +337,7 @@
             </div>
             
             <div class="card" style="border-left: 4px solid var(--secondary);">
-                <h3 class="card-title">💼 Professional Networks</h3>
+                <h3 class="card-title">Professional Networks</h3>
                 <p>Enable authentic professional connections and secure business communication. Lemmas verify credentials and reputation without exposing sensitive information, creating <strong>trusted professional ecosystems</strong>.</p>
                 <ul style="margin-top: 16px; color: var(--gray-600); padding-left: 20px;">
                     <li>Verified professional profiles and endorsements</li>
@@ -358,7 +347,7 @@
         </div>
         
             <div class="card" style="border-left: 4px solid var(--warning-600);">
-                <h3 class="card-title">🏥 Healthcare & Compliance</h3>
+                <h3 class="card-title">Healthcare & Compliance</h3>
                 <p>Protect sensitive patient data and ensure regulatory compliance with cryptographic verification. Lemmas enable <strong>secure healthcare communication</strong> while maintaining strict privacy standards.</p>
                 <ul style="margin-top: 16px; color: var(--gray-600); padding-left: 20px;">
                     <li>HIPAA-compliant patient verification</li>
@@ -368,7 +357,7 @@
                     </div>
             
             <div class="card" style="border-left: 4px solid var(--success-600);">
-                <h3 class="card-title">🏛️ Government & Civic</h3>
+                <h3 class="card-title">Government & Civic</h3>
                 <p>Enable secure digital governance and civic participation. Lemmas provide <strong>verifiable digital identity</strong> for voting, public services, and citizen engagement while preserving anonymity.</p>
                 <ul style="margin-top: 16px; color: var(--gray-600); padding-left: 20px;">
                     <li>Secure digital voting systems</li>
@@ -379,7 +368,7 @@
             </div>
             
         <div style="text-align: center; margin-top: 48px; padding: 32px; background: var(--gray-50); border-radius: 12px;">
-            <h3 style="margin-bottom: 16px; color: var(--gray-900);">🚀 Emerging Applications</h3>
+            <h3 style="margin-bottom: 16px; color: var(--gray-900);">Emerging Applications</h3>
             <p style="color: var(--gray-600); margin-bottom: 20px;">Lemmas are pioneering new frontiers in authenticated communication:</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; margin-top: 24px;">
                 <div>
@@ -409,7 +398,7 @@
         <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 480px; margin-left: auto; margin-right: auto;">Create your account and start protecting your platform with cryptographic verification.</p>
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
             <a href="/register" class="btn btn-primary">
-                <span class="btn-icon">🛡️</span>
+
                 Create Account
             </a>
             <a href="/contact" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Talk to Us</a>
@@ -422,7 +411,7 @@
 <script data-cfasync="false">
         // Simple homepage with verification card
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🏠 Homepage loaded with Lemma Verification Card');
+            console.log('Homepage loaded with Lemma Verification Card');
             // The verification card will auto-initialize via data attributes
         });
 </script>
