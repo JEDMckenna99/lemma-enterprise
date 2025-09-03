@@ -286,6 +286,14 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ Platform IAM API registration failed: {e}")
 
+    # Permission email automation
+    try:
+        from api.permission_email_automation import permission_email_bp
+        app.register_blueprint(permission_email_bp)
+        logger.info("✅ Permission Email Automation API registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Permission Email API registration failed: {e}")
+
     # Initialize optimized engine
     try:
         from api.optimized_shield import get_optimized_engine

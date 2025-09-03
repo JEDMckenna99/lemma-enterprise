@@ -63,9 +63,14 @@
     <div class="card" style="margin-bottom: var(--space-6);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
             <h2 class="card-title" style="margin-bottom: 0;">User Permissions</h2>
-            <button class="btn btn-primary" onclick="showGrantPermissionModal()">
-                + Grant Permission
-            </button>
+            <div style="display: flex; gap: var(--space-2);">
+                <button class="btn btn-secondary" onclick="showSendEmailModal()">
+                    📧 Send Permission Email
+                </button>
+                <button class="btn btn-primary" onclick="showGrantPermissionModal()">
+                    + Grant Permission
+                </button>
+            </div>
         </div>
         
         <div id="userPermissionsList">
@@ -124,6 +129,52 @@
         <div style="display: flex; gap: var(--space-3); justify-content: flex-end;">
             <button class="btn btn-secondary" onclick="hideCreatePermissionModal()">Cancel</button>
             <button class="btn btn-primary" onclick="createPermission()">Create Permission</button>
+        </div>
+    </div>
+</div>
+
+<!-- Send Permission Email Modal -->
+<div id="sendEmailModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--white); border-radius: 12px; padding: var(--space-6); min-width: 500px; max-width: 90vw;">
+        <h3 style="margin-bottom: var(--space-4);">Send Permission Email</h3>
+        
+        <div style="background: var(--gray-50); padding: var(--space-3); border-radius: 6px; margin-bottom: var(--space-4);">
+            <div style="font-weight: 600; color: var(--gray-700); margin-bottom: 4px;">Email Flow:</div>
+            <div style="font-size: var(--font-size-sm); color: var(--gray-600);">
+                User receives email → Clicks confirmation link → Permission lemma created → Stored in wallet
+            </div>
+        </div>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">User Email</label>
+            <input type="email" id="emailUserEmail" placeholder="user@example.com" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+        </div>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Permission Type</label>
+            <select id="emailPermissionType" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                <option value="customer_access" selected>Customer Access</option>
+                <option value="admin_access">Admin Access</option>
+                <option value="content_editor">Content Editor</option>
+                <option value="analytics_viewer">Analytics Viewer</option>
+            </select>
+        </div>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Site</label>
+            <select id="emailSiteId" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                <option value="lemma_platform" selected>lemma.id (Platform)</option>
+            </select>
+        </div>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Admin Password</label>
+            <input type="password" id="emailAdminPassword" placeholder="Enter admin password" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+        </div>
+        
+        <div style="display: flex; gap: var(--space-3); justify-content: flex-end;">
+            <button class="btn btn-secondary" onclick="hideSendEmailModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="sendPermissionEmail()">📧 Send Email</button>
         </div>
     </div>
 </div>
@@ -451,6 +502,14 @@ function hideGrantPermissionModal() {
     document.getElementById('grantPermissionModal').style.display = 'none';
 }
 
+function showSendEmailModal() {
+    document.getElementById('sendEmailModal').style.display = 'block';
+}
+
+function hideSendEmailModal() {
+    document.getElementById('sendEmailModal').style.display = 'none';
+}
+
 // Permission management functions
 async function createPermission() {
     const permissionId = document.getElementById('newPermissionId').value;
@@ -533,6 +592,50 @@ async function grantPermission() {
     } catch (error) {
         console.error('Grant permission error:', error);
         alert('Failed to grant permission. Check console for details.');
+    }
+}
+
+async function sendPermissionEmail() {
+    const email = document.getElementById('emailUserEmail').value;
+    const permissionType = document.getElementById('emailPermissionType').value;
+    const siteId = document.getElementById('emailSiteId').value;
+    const adminPassword = document.getElementById('emailAdminPassword').value;
+    
+    if (!email || !permissionType || !adminPassword) {
+        alert('Please fill in all fields');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/admin/send-permission-email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: email,
+                site_id: siteId,
+                permission_type: permissionType,
+                admin_password: adminPassword
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log('✅ Permission email sent successfully');
+            alert(`Permission email sent to ${email}! They will receive a confirmation link.`);
+            hideSendEmailModal();
+            
+            // Clear form
+            document.getElementById('emailUserEmail').value = '';
+            document.getElementById('emailAdminPassword').value = '';
+        } else {
+            alert('Failed to send permission email: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Send permission email error:', error);
+        alert('Failed to send permission email. Check console for details.');
     }
 }
 
