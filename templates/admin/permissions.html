@@ -64,6 +64,9 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
             <h2 class="card-title" style="margin-bottom: 0;">User Permissions</h2>
             <div style="display: flex; gap: var(--space-2);">
+                <button class="btn btn-secondary" onclick="showTestEmailModal()">
+                    🧪 Send Test Email
+                </button>
                 <button class="btn btn-secondary" onclick="showSendEmailModal()">
                     📧 Send Permission Email
                 </button>
@@ -129,6 +132,43 @@
         <div style="display: flex; gap: var(--space-3); justify-content: flex-end;">
             <button class="btn btn-secondary" onclick="hideCreatePermissionModal()">Cancel</button>
             <button class="btn btn-primary" onclick="createPermission()">Create Permission</button>
+        </div>
+    </div>
+</div>
+
+<!-- Send Test Permission Email Modal -->
+<div id="testEmailModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--white); border-radius: 12px; padding: var(--space-6); min-width: 500px; max-width: 90vw;">
+        <h3 style="margin-bottom: var(--space-4);">🧪 Send Test Permission Email</h3>
+        
+        <div style="background: #fff3cd; border: 2px solid #ffc107; color: #856404; padding: var(--space-4); border-radius: 8px; margin-bottom: var(--space-4);">
+            <div style="font-weight: 600; margin-bottom: 8px;">⚠️ SAFE TEST MODE</div>
+            <div style="font-size: var(--font-size-sm);">
+                This creates a test permission lemma that appears in your wallet but doesn't grant real access.
+                Perfect for testing the email flow without affecting your real permissions.
+            </div>
+        </div>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Test Email Address</label>
+            <input type="email" id="testUserEmail" placeholder="your-email@example.com" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+        </div>
+        
+        <div style="margin-bottom: var(--space-4);">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Admin Password</label>
+            <input type="password" id="testAdminPassword" placeholder="Enter admin password" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+        </div>
+        
+        <div style="background: var(--gray-50); padding: var(--space-3); border-radius: 6px; margin-bottom: var(--space-4);">
+            <div style="font-weight: 600; color: var(--gray-700); margin-bottom: 4px;">Test Flow:</div>
+            <div style="font-size: var(--font-size-sm); color: var(--gray-600);">
+                1. Email sent → 2. Click confirmation → 3. Test lemma created → 4. Stored in wallet → 5. Appears on wallet page
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: var(--space-3); justify-content: flex-end;">
+            <button class="btn btn-secondary" onclick="hideTestEmailModal()">Cancel</button>
+            <button class="btn" onclick="sendTestPermissionEmail()" style="background: #f59e0b; color: white;">🧪 Send Test Email</button>
         </div>
     </div>
 </div>
@@ -510,6 +550,14 @@ function hideSendEmailModal() {
     document.getElementById('sendEmailModal').style.display = 'none';
 }
 
+function showTestEmailModal() {
+    document.getElementById('testEmailModal').style.display = 'block';
+}
+
+function hideTestEmailModal() {
+    document.getElementById('testEmailModal').style.display = 'none';
+}
+
 // Permission management functions
 async function createPermission() {
     const permissionId = document.getElementById('newPermissionId').value;
@@ -636,6 +684,46 @@ async function sendPermissionEmail() {
     } catch (error) {
         console.error('Send permission email error:', error);
         alert('Failed to send permission email. Check console for details.');
+    }
+}
+
+async function sendTestPermissionEmail() {
+    const email = document.getElementById('testUserEmail').value;
+    const adminPassword = document.getElementById('testAdminPassword').value;
+    
+    if (!email || !adminPassword) {
+        alert('Please fill in both email and admin password');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/admin/send-test-permission-email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: email,
+                admin_password: adminPassword
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log('✅ Test permission email sent successfully');
+            alert(`🧪 TEST email sent to ${email}! Check your email for the test confirmation link. This is a safe test that won't affect your real permissions.`);
+            hideTestEmailModal();
+            
+            // Clear form
+            document.getElementById('testUserEmail').value = '';
+            document.getElementById('testAdminPassword').value = '';
+        } else {
+            alert('Failed to send test email: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Send test email error:', error);
+        alert('Failed to send test email. Check console for details.');
     }
 }
 
