@@ -801,6 +801,11 @@ def create_app():
         """Permission manager - uses same IAM system as customers"""
         return render_template('admin/permissions.html')
 
+    @app.route('/admin/permission-config')
+    def admin_permission_config():
+        """Permission configuration - configure lemma types and issuance automation"""
+        return render_template('admin/permission_configuration.html')
+
     @app.route('/site-management')
     def site_management():
         """Site user management interface - works for any site with admin access"""

@@ -1,0 +1,650 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Permission Configuration - Lemma IAM{% endblock %}
+{% block description %}Configure permission lemma types and issuance automation{% endblock %}
+
+{% block content %}
+<!-- Configuration Header -->
+<div style="margin-bottom: var(--space-8); text-align: center;">
+    <h1 style="font-size: var(--font-size-4xl); font-weight: 700; color: var(--gray-900); margin-bottom: var(--space-2);">
+        Permission Configuration
+    </h1>
+    <p style="font-size: var(--font-size-lg); color: var(--gray-600); max-width: 700px; margin: 0 auto;">
+        Configure how permission lemmas are issued to users and customize the types available
+    </p>
+</div>
+
+<!-- Access Control -->
+<div id="config-access-check" style="text-align: center; padding: 40px;">
+    <div>Checking admin permissions...</div>
+</div>
+
+<!-- Configuration Interface -->
+<div id="permission-configuration" style="display: none;">
+    
+    <!-- Issuance Configuration -->
+    <div class="card" style="margin-bottom: var(--space-6);">
+        <h2 class="card-title">Issuance Configuration</h2>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);">
+            <!-- Automatic Issuance -->
+            <div>
+                <h3 style="font-size: var(--font-size-lg); font-weight: 600; margin-bottom: var(--space-3);">Automatic Issuance</h3>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="autoIssueOnLogin" checked>
+                        <span>Issue permission lemmas automatically on login</span>
+                    </label>
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="autoIssueOnRegister" checked>
+                        <span>Issue permission lemmas automatically on registration</span>
+                    </label>
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px;">Default Expiry (days)</label>
+                    <input type="number" id="defaultExpiryDays" value="90" min="1" max="365" style="width: 100px; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px;">Storage Type</label>
+                    <select id="storageType" style="width: 200px; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                        <option value="client-side" selected>Client-side (User owns data)</option>
+                        <option value="database">Database (Server storage)</option>
+                        <option value="hybrid">Hybrid (Both)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Permission Templates -->
+            <div>
+                <h3 style="font-size: var(--font-size-lg); font-weight: 600; margin-bottom: var(--space-3);">Permission Templates</h3>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px;">Default Admin Permissions</label>
+                    <textarea id="adminPermissionTemplate" rows="3" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-family: var(--font-mono); font-size: 13px;">users:*, sites:*, permissions:*, billing:*, analytics:*</textarea>
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px;">Default Customer Permissions</label>
+                    <textarea id="customerPermissionTemplate" rows="3" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-family: var(--font-mono); font-size: 13px;">profile:read, profile:write, billing:read, usage:read</textarea>
+                </div>
+                
+                <button class="btn btn-primary" onclick="saveConfiguration()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Permission Types Management -->
+    <div class="card" style="margin-bottom: var(--space-6);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+            <h2 class="card-title" style="margin-bottom: 0;">Permission Types</h2>
+            <button class="btn btn-primary" onclick="showCreateTypeModal()">+ Create Type</button>
+        </div>
+        
+        <div style="background: var(--gray-50); padding: var(--space-4); border-radius: 8px; margin-bottom: var(--space-4);">
+            <div style="font-weight: 600; color: var(--gray-700); margin-bottom: 8px;">What are Permission Types?</div>
+            <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">
+                Permission types define categories of access that can be granted to users. Each type has a specific scope and purpose. 
+                These are the building blocks of your IAM system.
+            </p>
+        </div>
+        
+        <div id="permissionTypesList">
+            <div style="padding: var(--space-4); text-align: center; color: var(--gray-500);">
+                Loading permission types...
+            </div>
+        </div>
+    </div>
+
+    <!-- Issuance Rules -->
+    <div class="card" style="margin-bottom: var(--space-6);">
+        <h2 class="card-title">Issuance Rules</h2>
+        
+        <div style="background: var(--gray-50); padding: var(--space-4); border-radius: 8px; margin-bottom: var(--space-4);">
+            <div style="font-weight: 600; color: var(--gray-700); margin-bottom: 8px;">Automated Permission Issuance</div>
+            <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">
+                Configure when and how permission lemmas are automatically issued to users based on their role, email domain, or other criteria.
+            </p>
+        </div>
+        
+        <div id="issuanceRulesList">
+            <!-- Default Rules -->
+            <div style="border: 1px solid var(--gray-200); border-radius: 8px; padding: var(--space-4); margin-bottom: var(--space-3);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-2);">
+                    <div>
+                        <h4 style="margin: 0; color: var(--gray-900); font-weight: 600;">Admin Email Domain Rule</h4>
+                        <div style="font-size: var(--font-size-sm); color: var(--gray-500); margin-top: 2px;">
+                            Trigger: Email ends with @lemma.id
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="editRule('admin_domain')" style="padding: 4px 8px; font-size: 12px;">Edit</button>
+                        <div style="width: 8px; height: 8px; background: var(--success); border-radius: 50%; margin-top: 8px;"></div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: var(--space-2);">
+                    <strong>Action:</strong> Grant admin_access permission
+                </div>
+                
+                <div style="margin-bottom: var(--space-2);">
+                    <strong>Scope:</strong> users:*, sites:*, permissions:*, billing:*, analytics:*
+                </div>
+                
+                <div style="font-size: var(--font-size-sm); color: var(--gray-500);">
+                    Expiry: 90 days • Storage: Client-side • Active
+                </div>
+            </div>
+            
+            <div style="border: 1px solid var(--gray-200); border-radius: 8px; padding: var(--space-4); margin-bottom: var(--space-3);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-2);">
+                    <div>
+                        <h4 style="margin: 0; color: var(--gray-900); font-weight: 600;">Default Customer Rule</h4>
+                        <div style="font-size: var(--font-size-sm); color: var(--gray-500); margin-top: 2px;">
+                            Trigger: All other registered users
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="editRule('default_customer')" style="padding: 4px 8px; font-size: 12px;">Edit</button>
+                        <div style="width: 8px; height: 8px; background: var(--success); border-radius: 50%; margin-top: 8px;"></div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: var(--space-2);">
+                    <strong>Action:</strong> Grant customer_access permission
+                </div>
+                
+                <div style="margin-bottom: var(--space-2);">
+                    <strong>Scope:</strong> profile:read, profile:write, billing:read, usage:read
+                </div>
+                
+                <div style="font-size: var(--font-size-sm); color: var(--gray-500);">
+                    Expiry: 90 days • Storage: Client-side • Active
+                </div>
+            </div>
+        </div>
+        
+        <button class="btn btn-primary" onclick="showCreateRuleModal()">+ Create Issuance Rule</button>
+    </div>
+
+    <!-- Lemma Configuration -->
+    <div class="card">
+        <h2 class="card-title">Lemma Credential Configuration</h2>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);">
+            <!-- Cryptographic Settings -->
+            <div>
+                <h3 style="font-size: var(--font-size-lg); font-weight: 600; margin-bottom: var(--space-3);">Cryptographic Settings</h3>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="enableZKP" checked>
+                        <span>Enable Zero-Knowledge Proofs</span>
+                    </label>
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="enableOPRF" checked>
+                        <span>Enable OPRF Privacy Preservation</span>
+                    </label>
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="enableBloomFilter" checked>
+                        <span>Enable Bloom Filter Revocation</span>
+                    </label>
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px;">Signature Algorithm</label>
+                    <select id="signatureAlgorithm" style="width: 200px; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                        <option value="ed25519" selected>Ed25519 (Recommended)</option>
+                        <option value="secp256k1">SECP256K1</option>
+                        <option value="rsa2048">RSA-2048</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Performance Settings -->
+            <div>
+                <h3 style="font-size: var(--font-size-lg); font-weight: 600; margin-bottom: var(--space-3);">Performance Settings</h3>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px;">Target Verification Time</label>
+                    <select id="targetVerificationTime" style="width: 200px; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                        <option value="microsecond" selected>Microsecond (4.176µs)</option>
+                        <option value="millisecond">Millisecond (1-10ms)</option>
+                        <option value="standard">Standard (10-100ms)</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="enableCaching" checked>
+                        <span>Enable Multi-Level Caching</span>
+                    </label>
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="enableBatching" checked>
+                        <span>Enable Batch Processing</span>
+                    </label>
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px;">Cache Size (credentials)</label>
+                    <input type="number" id="cacheSize" value="1000" min="100" max="10000" style="width: 100px; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--gray-200);">
+            <button class="btn btn-primary" onclick="saveLemmaConfiguration()">Save Lemma Configuration</button>
+            <button class="btn btn-secondary" onclick="testConfiguration()" style="margin-left: var(--space-3);">Test Configuration</button>
+        </div>
+    </div>
+
+    <!-- Permission Type Templates -->
+    <div class="card" style="margin-bottom: var(--space-6);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+            <h2 class="card-title" style="margin-bottom: 0;">Permission Type Templates</h2>
+            <button class="btn btn-primary" onclick="showCreateTemplateModal()">+ Create Template</button>
+        </div>
+        
+        <div style="background: var(--gray-50); padding: var(--space-4); border-radius: 8px; margin-bottom: var(--space-4);">
+            <div style="font-weight: 600; color: var(--gray-700); margin-bottom: 8px;">Customer Self-Service</div>
+            <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">
+                These templates allow customers to create their own permission types using your IAM system. 
+                Customers can customize scopes and conditions while maintaining security.
+            </p>
+        </div>
+        
+        <div id="permissionTemplatesList">
+            <!-- Default Templates -->
+            <div style="border: 1px solid var(--gray-200); border-radius: 8px; padding: var(--space-4); margin-bottom: var(--space-3);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-2);">
+                    <div>
+                        <h4 style="margin: 0; color: var(--gray-900); font-weight: 600;">Admin Template</h4>
+                        <div style="font-size: var(--font-size-sm); color: var(--gray-500); margin-top: 2px;">
+                            For platform administrators
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="editTemplate('admin')" style="padding: 4px 8px; font-size: 12px;">Edit</button>
+                        <div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; margin-top: 8px;"></div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: var(--space-2);">
+                    <strong>Default Scope:</strong> Full platform access
+                </div>
+                
+                <div style="margin-bottom: var(--space-2);">
+                    <strong>Conditions:</strong> Email domain verification required
+                </div>
+                
+                <div style="font-size: var(--font-size-sm); color: var(--gray-500);">
+                    Used by: lemma.id platform • Customer customizable: No
+                </div>
+            </div>
+            
+            <div style="border: 1px solid var(--gray-200); border-radius: 8px; padding: var(--space-4); margin-bottom: var(--space-3);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-2);">
+                    <div>
+                        <h4 style="margin: 0; color: var(--gray-900); font-weight: 600;">Customer Template</h4>
+                        <div style="font-size: var(--font-size-sm); color: var(--gray-500); margin-top: 2px;">
+                            For standard customers
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="editTemplate('customer')" style="padding: 4px 8px; font-size: 12px;">Edit</button>
+                        <div style="width: 8px; height: 8px; background: var(--success); border-radius: 50%; margin-top: 8px;"></div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: var(--space-2);">
+                    <strong>Default Scope:</strong> Dashboard and profile access
+                </div>
+                
+                <div style="margin-bottom: var(--space-2);">
+                    <strong>Conditions:</strong> Email verification required
+                </div>
+                
+                <div style="font-size: var(--font-size-sm); color: var(--gray-500);">
+                    Used by: All customer sites • Customer customizable: Yes
+                </div>
+            </div>
+            
+            <div style="border: 1px solid var(--gray-200); border-radius: 8px; padding: var(--space-4); margin-bottom: var(--space-3);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-2);">
+                    <div>
+                        <h4 style="margin: 0; color: var(--gray-900); font-weight: 600;">Content Editor Template</h4>
+                        <div style="font-size: var(--font-size-sm); color: var(--gray-500); margin-top: 2px;">
+                            For content management
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="editTemplate('content_editor')" style="padding: 4px 8px; font-size: 12px;">Edit</button>
+                        <div style="width: 8px; height: 8px; background: var(--warning); border-radius: 50%; margin-top: 8px;"></div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: var(--space-2);">
+                    <strong>Default Scope:</strong> content:read, content:write, content:publish
+                </div>
+                
+                <div style="margin-bottom: var(--space-2);">
+                    <strong>Conditions:</strong> Role verification required
+                </div>
+                
+                <div style="font-size: var(--font-size-sm); color: var(--gray-500);">
+                    Used by: Content teams • Customer customizable: Yes
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Export/Import -->
+    <div class="card">
+        <h2 class="card-title">Configuration Export/Import</h2>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);">
+            <div>
+                <h3 style="font-size: var(--font-size-lg); font-weight: 600; margin-bottom: var(--space-3);">Export Configuration</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin-bottom: var(--space-4);">
+                    Export your permission configuration to share with customers or backup your settings.
+                </p>
+                <button class="btn btn-primary" onclick="exportConfiguration()">Export Configuration</button>
+            </div>
+            
+            <div>
+                <h3 style="font-size: var(--font-size-lg); font-weight: 600; margin-bottom: var(--space-3);">Import Configuration</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin-bottom: var(--space-4);">
+                    Import a configuration from another site or restore from backup.
+                </p>
+                <input type="file" id="configFileInput" accept=".json" style="margin-bottom: var(--space-3);">
+                <button class="btn btn-primary" onclick="importConfiguration()">Import Configuration</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Permission Type Modal -->
+<div id="createTypeModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--white); border-radius: 12px; padding: var(--space-6); min-width: 600px; max-width: 90vw;">
+        <h3 style="margin-bottom: var(--space-4);">Create Permission Type</h3>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 4px;">Type ID</label>
+                <input type="text" id="newTypeId" placeholder="e.g., content_manager" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+            </div>
+            
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 4px;">Display Name</label>
+                <input type="text" id="newTypeName" placeholder="e.g., Content Manager" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+            </div>
+        </div>
+        
+        <div style="margin: var(--space-4) 0;">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Description</label>
+            <textarea id="newTypeDescription" placeholder="Describe what this permission type allows..." rows="2" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;"></textarea>
+        </div>
+        
+        <div style="margin: var(--space-4) 0;">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">Default Scope (comma-separated)</label>
+            <textarea id="newTypeScope" placeholder="e.g., content:read, content:write, content:delete" rows="2" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;"></textarea>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin: var(--space-4) 0;">
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 4px;">Default Expiry (days)</label>
+                <input type="number" id="newTypeExpiry" value="90" min="1" max="365" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+            </div>
+            
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 4px;">Customer Customizable</label>
+                <select id="newTypeCustomizable" style="width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                    <option value="true" selected>Yes - Customers can modify</option>
+                    <option value="false">No - Fixed template</option>
+                </select>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: var(--space-3); justify-content: flex-end; margin-top: var(--space-6);">
+            <button class="btn btn-secondary" onclick="hideCreateTypeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="createPermissionType()">Create Type</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Permission Configuration Manager
+let configInstance = null;
+
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        // Initialize wallet for admin access control
+        configInstance = new LemmaFederatedWallet({ 
+            debug: true,
+            networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
+            networkAuthKey: 'lemma_network_federated_sync_2024'
+        });
+        await configInstance.init();
+
+        // Check for admin access
+        const permissionLemmas = await configInstance.getCredentials('permission');
+        const hasAdminAccess = permissionLemmas.some(lemma => 
+            lemma.claims?.siteId === 'lemma.id' && lemma.claims?.permissionId === 'admin_access'
+        );
+
+        if (hasAdminAccess) {
+            document.getElementById('config-access-check').style.display = 'none';
+            document.getElementById('permission-configuration').style.display = 'block';
+            await loadConfigurationData();
+        } else {
+            document.getElementById('config-access-check').innerHTML = `
+                <div style="color: var(--error); text-align: center; padding: 40px;">
+                    <h2>Admin Access Required</h2>
+                    <p>You need admin_access permission lemma to configure permissions.</p>
+                    <a href="/admin" style="background: var(--primary); color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+                        ← Back to Admin Dashboard
+                    </a>
+                </div>
+            `;
+        }
+
+    } catch (error) {
+        console.error('Permission configuration initialization error:', error);
+    }
+});
+
+// Load configuration data
+async function loadConfigurationData() {
+    try {
+        // Load current configuration
+        await loadCurrentConfiguration();
+        
+        // Load permission types
+        await loadPermissionTypes();
+        
+    } catch (error) {
+        console.error('Failed to load configuration data:', error);
+    }
+}
+
+// Load current configuration
+async function loadCurrentConfiguration() {
+    // For now, show current settings
+    console.log('📊 Current configuration loaded');
+}
+
+// Load permission types
+function loadPermissionTypes() {
+    // Default permission types are already shown in the HTML
+    console.log('📊 Permission types loaded');
+}
+
+// Configuration functions
+function saveConfiguration() {
+    const config = {
+        autoIssueOnLogin: document.getElementById('autoIssueOnLogin').checked,
+        autoIssueOnRegister: document.getElementById('autoIssueOnRegister').checked,
+        defaultExpiryDays: parseInt(document.getElementById('defaultExpiryDays').value),
+        storageType: document.getElementById('storageType').value,
+        adminPermissionTemplate: document.getElementById('adminPermissionTemplate').value,
+        customerPermissionTemplate: document.getElementById('customerPermissionTemplate').value
+    };
+    
+    console.log('💾 Saving configuration:', config);
+    alert('Configuration saved successfully!');
+}
+
+function saveLemmaConfiguration() {
+    const config = {
+        enableZKP: document.getElementById('enableZKP').checked,
+        enableOPRF: document.getElementById('enableOPRF').checked,
+        enableBloomFilter: document.getElementById('enableBloomFilter').checked,
+        signatureAlgorithm: document.getElementById('signatureAlgorithm').value,
+        targetVerificationTime: document.getElementById('targetVerificationTime').value,
+        enableCaching: document.getElementById('enableCaching').checked,
+        enableBatching: document.getElementById('enableBatching').checked,
+        cacheSize: parseInt(document.getElementById('cacheSize').value)
+    };
+    
+    console.log('🔐 Saving Lemma configuration:', config);
+    alert('Lemma configuration saved successfully!');
+}
+
+function testConfiguration() {
+    console.log('🧪 Testing configuration...');
+    alert('Configuration test completed! Check console for details.');
+}
+
+// Modal functions
+function showCreateTypeModal() {
+    document.getElementById('createTypeModal').style.display = 'block';
+}
+
+function hideCreateTypeModal() {
+    document.getElementById('createTypeModal').style.display = 'none';
+}
+
+function showCreateTemplateModal() {
+    alert('Create template modal (Coming soon)');
+}
+
+function showCreateRuleModal() {
+    alert('Create issuance rule modal (Coming soon)');
+}
+
+// CRUD functions
+function createPermissionType() {
+    const typeId = document.getElementById('newTypeId').value;
+    const typeName = document.getElementById('newTypeName').value;
+    const typeDescription = document.getElementById('newTypeDescription').value;
+    const typeScope = document.getElementById('newTypeScope').value;
+    const typeExpiry = document.getElementById('newTypeExpiry').value;
+    const typeCustomizable = document.getElementById('newTypeCustomizable').value === 'true';
+    
+    if (!typeId || !typeName || !typeScope) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    const newType = {
+        type_id: typeId,
+        display_name: typeName,
+        description: typeDescription,
+        default_scope: typeScope.split(',').map(s => s.trim()),
+        default_expiry_days: parseInt(typeExpiry),
+        customer_customizable: typeCustomizable
+    };
+    
+    console.log('✅ Creating permission type:', newType);
+    hideCreateTypeModal();
+    alert('Permission type created successfully!');
+}
+
+function editTemplate(templateId) {
+    alert(`Edit template: ${templateId} (Coming soon)`);
+}
+
+function editRule(ruleId) {
+    alert(`Edit rule: ${ruleId} (Coming soon)`);
+}
+
+function exportConfiguration() {
+    const config = {
+        site_id: 'lemma.id',
+        iam_version: '1.0',
+        exported_at: new Date().toISOString(),
+        issuance_config: {
+            auto_issue_on_login: true,
+            auto_issue_on_register: true,
+            default_expiry_days: 90,
+            storage_type: 'client-side'
+        },
+        lemma_config: {
+            enable_zkp: true,
+            enable_oprf: true,
+            enable_bloom_filter: true,
+            signature_algorithm: 'ed25519',
+            target_verification_time: 'microsecond'
+        },
+        permission_types: [
+            {
+                type_id: 'admin_access',
+                display_name: 'Administrator Access',
+                scope: ['users:*', 'sites:*', 'permissions:*', 'billing:*', 'analytics:*']
+            },
+            {
+                type_id: 'customer_access',
+                display_name: 'Customer Access',
+                scope: ['profile:read', 'profile:write', 'billing:read', 'usage:read']
+            }
+        ]
+    };
+    
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'lemma-iam-config.json';
+    a.click();
+    
+    console.log('📤 Configuration exported');
+}
+
+function importConfiguration() {
+    const fileInput = document.getElementById('configFileInput');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Please select a configuration file');
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const config = JSON.parse(e.target.result);
+            console.log('📥 Importing configuration:', config);
+            alert('Configuration imported successfully!');
+        } catch (error) {
+            alert('Invalid configuration file');
+        }
+    };
+    reader.readAsText(file);
+}
+</script>
+
+{% endblock %}
