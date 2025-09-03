@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin Dashboard - Lemma{% endblock %}</title>
+    <meta name="description" content="{% block description %}Lemma platform administration dashboard{% endblock %}">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" type="image/svg+xml">
+    
+    <!-- EXACT SAME CSS as main platform -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250120-nav-spacing">
+    
+    <!-- Load the Lemma Federated Wallet for admin permission checking -->
+    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=672"></script>
+    
+    <!-- Minimal admin-specific overrides -->
+    <style>
+        /* Admin badge for navigation */
+        .admin-badge {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: var(--white);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        /* Admin alert using platform styling */
+        .admin-alert {
+            background: rgba(102, 126, 234, 0.05);
+            border: 1px solid var(--primary);
+            border-radius: 12px;
+            padding: var(--space-4);
+            margin-bottom: var(--space-6);
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+        
+        .admin-alert-icon {
+            color: var(--primary);
+            font-size: var(--font-size-lg);
+        }
+    </style>
+    
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- EXACT SAME navigation structure as main platform -->
+    <header class="nav-header">
+        <nav class="nav-container">
+            <!-- Brand Link with Logo -->
+            <a href="/" class="nav-logo">
+                <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" class="nav-logo-icon">
+                <span>Lemma</span>
+                <span class="admin-badge">Admin</span>
+            </a>
+            
+            <!-- Admin Navigation Links -->
+            <div class="nav-center">
+                <a href="/admin" class="nav-link">Admin Dashboard</a>
+                <a href="/dashboard" class="nav-link">My Account</a>
+                <a href="/wallet" class="nav-link">My Wallet</a>
+                <a href="/docs" class="nav-link">Documentation</a>
+                <a href="/pricing" class="nav-link">Pricing</a>
+            </div>
+            
+            <!-- Right Side Navigation (same as platform) -->
+            <div class="nav-right">
+                {% if session.get('customer_id') %}
+                    <!-- User Dropdown -->
+                    <div class="user-dropdown">
+                        <button class="user-dropdown-toggle" onclick="toggleUserDropdown()">
+                            <span class="user-avatar">👤</span>
+                            <span>Admin</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="user-dropdown-menu" id="userDropdownMenu">
+                            <div class="dropdown-header">
+                                <div class="dropdown-user-info">
+                                    <div class="dropdown-user-name">{{ session.get('customer_email', 'Admin User') }}</div>
+                                    <div class="dropdown-user-role">Administrator</div>
+                                </div>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <a href="/dashboard" class="dropdown-item">My Account</a>
+                            <a href="/wallet" class="dropdown-item">My Wallet</a>
+                            <a href="/admin" class="dropdown-item admin-item">Admin Panel</a>
+                            <div class="dropdown-divider"></div>
+                            <a href="/logout" class="dropdown-item">Sign Out</a>
+                        </div>
+                    </div>
+                {% else %}
+                    <a href="/login" class="btn btn-secondary">Sign In</a>
+                {% endif %}
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main content using platform container -->
+    <main class="container" style="padding-top: var(--space-8);">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Same JavaScript as main platform for dropdown -->
+    <script>
+        function toggleUserDropdown() {
+            const menu = document.getElementById('userDropdownMenu');
+            const isVisible = menu.style.display === 'block';
+            menu.style.display = isVisible ? 'none' : 'block';
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.querySelector('.user-dropdown');
+            const menu = document.getElementById('userDropdownMenu');
+            
+            if (dropdown && !dropdown.contains(event.target)) {
+                menu.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

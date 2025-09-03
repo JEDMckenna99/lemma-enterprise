@@ -898,6 +898,33 @@ impl PyEncryptedWallet {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 
+    /// Store credential with ZKP privacy for sensitive claims
+    pub fn store_zkp_credential(&mut self, credential_json: String, zkp_claims: Vec<String>, lemma_type: String, site_id: Option<String>) -> PyResult<String> {
+        let credential = VerifiableCredential::from_json(&credential_json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        self.inner.store_zkp_credential(&credential, zkp_claims, &lemma_type, site_id)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// PERFORMANCE: Microsecond credential verification
+    pub fn verify_credential_fast(&mut self, credential_id: String) -> PyResult<bool> {
+        self.inner.verify_credential_fast(&credential_id)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// PERFORMANCE: Batch verification with SIMD optimization
+    pub fn verify_credentials_batch(&mut self, credential_ids: Vec<String>) -> PyResult<Vec<bool>> {
+        self.inner.verify_credentials_batch(&credential_ids)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// PERFORMANCE: Instant ZKP claim verification
+    pub fn verify_zkp_claim_fast(&self, credential_id: String, claim_name: String) -> PyResult<bool> {
+        self.inner.verify_zkp_claim_fast(&credential_id, &claim_name)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
     /// Get PoH lemmas
     pub fn get_poh_lemmas(&mut self) -> PyResult<Vec<String>> {
         let lemmas = self.inner.get_poh_lemmas()

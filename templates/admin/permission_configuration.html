@@ -172,85 +172,7 @@
         <button class="btn btn-primary" onclick="showCreateRuleModal()">+ Create Issuance Rule</button>
     </div>
 
-    <!-- Lemma Configuration -->
-    <div class="card">
-        <h2 class="card-title">Lemma Credential Configuration</h2>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);">
-            <!-- Cryptographic Settings -->
-            <div>
-                <h3 style="font-size: var(--font-size-lg); font-weight: 600; margin-bottom: var(--space-3);">Cryptographic Settings</h3>
-                
-                <div style="margin-bottom: var(--space-4);">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="enableZKP" checked>
-                        <span>Enable Zero-Knowledge Proofs</span>
-                    </label>
-                </div>
-                
-                <div style="margin-bottom: var(--space-4);">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="enableOPRF" checked>
-                        <span>Enable OPRF Privacy Preservation</span>
-                    </label>
-                </div>
-                
-                <div style="margin-bottom: var(--space-4);">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="enableBloomFilter" checked>
-                        <span>Enable Bloom Filter Revocation</span>
-                    </label>
-                </div>
-                
-                <div style="margin-bottom: var(--space-4);">
-                    <label style="display: block; font-weight: 600; margin-bottom: 4px;">Signature Algorithm</label>
-                    <select id="signatureAlgorithm" style="width: 200px; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
-                        <option value="ed25519" selected>Ed25519 (Recommended)</option>
-                        <option value="secp256k1">SECP256K1</option>
-                        <option value="rsa2048">RSA-2048</option>
-                    </select>
-                </div>
-            </div>
-            
-            <!-- Performance Settings -->
-            <div>
-                <h3 style="font-size: var(--font-size-lg); font-weight: 600; margin-bottom: var(--space-3);">Performance Settings</h3>
-                
-                <div style="margin-bottom: var(--space-4);">
-                    <label style="display: block; font-weight: 600; margin-bottom: 4px;">Target Verification Time</label>
-                    <select id="targetVerificationTime" style="width: 200px; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
-                        <option value="microsecond" selected>Microsecond (4.176µs)</option>
-                        <option value="millisecond">Millisecond (1-10ms)</option>
-                        <option value="standard">Standard (10-100ms)</option>
-                    </select>
-                </div>
-                
-                <div style="margin-bottom: var(--space-4);">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="enableCaching" checked>
-                        <span>Enable Multi-Level Caching</span>
-                    </label>
-                </div>
-                
-                <div style="margin-bottom: var(--space-4);">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="enableBatching" checked>
-                        <span>Enable Batch Processing</span>
-                    </label>
-                </div>
-                
-                <div style="margin-bottom: var(--space-4);">
-                    <label style="display: block; font-weight: 600; margin-bottom: 4px;">Cache Size (credentials)</label>
-                    <input type="number" id="cacheSize" value="1000" min="100" max="10000" style="width: 100px; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
-                </div>
-            </div>
-        </div>
-        
-        <div style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--gray-200);">
-            <button class="btn btn-primary" onclick="saveLemmaConfiguration()">Save Lemma Configuration</button>
-            <button class="btn btn-secondary" onclick="testConfiguration()" style="margin-left: var(--space-3);">Test Configuration</button>
-        </div>
-    </div>
+
 
     <!-- Permission Type Templates -->
     <div class="card" style="margin-bottom: var(--space-6);">
@@ -508,26 +430,9 @@ function saveConfiguration() {
     alert('Configuration saved successfully!');
 }
 
-function saveLemmaConfiguration() {
-    const config = {
-        enableZKP: document.getElementById('enableZKP').checked,
-        enableOPRF: document.getElementById('enableOPRF').checked,
-        enableBloomFilter: document.getElementById('enableBloomFilter').checked,
-        signatureAlgorithm: document.getElementById('signatureAlgorithm').value,
-        targetVerificationTime: document.getElementById('targetVerificationTime').value,
-        enableCaching: document.getElementById('enableCaching').checked,
-        enableBatching: document.getElementById('enableBatching').checked,
-        cacheSize: parseInt(document.getElementById('cacheSize').value)
-    };
-    
-    console.log('🔐 Saving Lemma configuration:', config);
-    alert('Lemma configuration saved successfully!');
-}
 
-function testConfiguration() {
-    console.log('🧪 Testing configuration...');
-    alert('Configuration test completed! Check console for details.');
-}
+
+
 
 // Modal functions
 function showCreateTypeModal() {
