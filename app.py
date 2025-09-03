@@ -294,6 +294,14 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ Permission Email API registration failed: {e}")
 
+    # Centralized wallet management
+    try:
+        from api.wallet_management import wallet_management_bp
+        app.register_blueprint(wallet_management_bp)
+        logger.info("✅ Wallet Management API registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Wallet Management API registration failed: {e}")
+
     # Initialize optimized engine
     try:
         from api.optimized_shield import get_optimized_engine

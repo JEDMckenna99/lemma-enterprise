@@ -406,6 +406,7 @@ def confirm_site_permission(confirmation_token):
                     .lemma-data {{ background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin: 20px 0; font-family: monospace; font-size: 12px; }}
                 </style>
                 <script src="https://lemma.id/static/js/lemma-federated-wallet.js?v=672"></script>
+                <script src="https://lemma.id/static/js/lemma-wallet-manager.js"></script>
             </head>
             <body>
                 <div class="container">
@@ -463,42 +464,72 @@ def confirm_site_permission(confirmation_token):
                 </div>
                 
                 <script>
-                    // Auto-store permission lemma in wallet
+                    // Centralized wallet integration using LemmaWalletManager
                     document.addEventListener('DOMContentLoaded', async function() {{
                         try {{
-                            // Initialize wallet
-                            const wallet = new LemmaFederatedWallet({{
-                                debug: true,
-                                networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-                                networkAuthKey: 'lemma_network_federated_sync_2024'
-                            }});
-                            await wallet.init();
+                            console.log('🔄 Using LemmaWalletManager for permission lemma storage...');
                             
-                            // Store the permission lemma
+                            // Use the centralized wallet manager (prevents multiple wallet issues)
                             const lemmaData = {json.dumps(permission_lemma)};
-                            const result = await wallet.storeCredential(lemmaData);
+                            
+                            console.log('📊 Permission lemma to store:', {{
+                                id: lemmaData.id,
+                                siteId: lemmaData.claims?.siteId,
+                                email: lemmaData.claims?.email,
+                                permissionId: lemmaData.claims?.permissionId
+                            }});
+                            
+                            // Store using centralized manager (handles duplicates and existing wallets)
+                            const result = await window.storeLemmaCredential(lemmaData, {{
+                                allowDuplicates: false,
+                                verifyStorage: true
+                            }});
                             
                             if (result.success) {{
-                                console.log('✅ Permission lemma stored in wallet successfully');
-                                
-                                // Show success message
-                                const successMsg = document.createElement('div');
-                                successMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 15px 20px; border-radius: 8px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
-                                successMsg.innerHTML = '✅ Permission lemma stored in your wallet!';
-                                document.body.appendChild(successMsg);
-                                
-                                // Remove message after 3 seconds
-                                setTimeout(() => {{
-                                    document.body.removeChild(successMsg);
-                                }}, 3000);
+                                if (result.duplicate) {{
+                                    console.log('ℹ️ Permission lemma already exists in wallet');
+                                    showMessage('ℹ️ Permission lemma already in your wallet', '#007bff');
+                                }} else {{
+                                    console.log('✅ Permission lemma stored in unified wallet');
+                                    showMessage('✅ Permission lemma stored in your wallet!', '#28a745');
+                                    
+                                    // Verify storage after a moment
+                                    setTimeout(async () => {{
+                                        const credentials = await window.getLemmaCredentials('permission');
+                                        const stored = credentials.find(cred => cred.id === lemmaData.id);
+                                        if (stored) {{
+                                            console.log('✅ Verification: Permission lemma confirmed in unified wallet');
+                                            showMessage('✅ Verified: Credential accessible across all browsers', '#28a745');
+                                        }} else {{
+                                            console.warn('⚠️ Verification: Permission lemma not found after storage');
+                                        }}
+                                    }}, 2000);
+                                }}
                             }} else {{
-                                console.warn('⚠️ Failed to store permission lemma in wallet:', result.error);
+                                console.warn('⚠️ Failed to store permission lemma:', result.error);
+                                showMessage('⚠️ Storage failed: ' + result.error, '#dc3545');
                             }}
                             
                         }} catch (error) {{
-                            console.error('❌ Wallet integration error:', error);
+                            console.error('❌ Centralized wallet error:', error);
+                            showMessage('❌ Wallet error: ' + error.message, '#dc3545');
                         }}
                     }});
+                    
+                    // Helper function to show messages
+                    function showMessage(message, color) {{
+                        const successMsg = document.createElement('div');
+                        successMsg.style.cssText = `position: fixed; top: 20px; right: 20px; background: ${{color}}; color: white; padding: 15px 20px; border-radius: 8px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.2); max-width: 400px;`;
+                        successMsg.innerHTML = message;
+                        document.body.appendChild(successMsg);
+                        
+                        // Remove message after 5 seconds
+                        setTimeout(() => {{
+                            if (document.body.contains(successMsg)) {{
+                                document.body.removeChild(successMsg);
+                            }}
+                        }}, 5000);
+                    }}
                     
                     // Auto-redirect after 10 seconds
                     let countdown = 10;
