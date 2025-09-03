@@ -310,6 +310,14 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ Wallet Management API registration failed: {e}")
 
+    # Debug email system
+    try:
+        from api.debug_email import debug_email_bp
+        app.register_blueprint(debug_email_bp)
+        logger.info("✅ Debug Email API registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Debug Email API registration failed: {e}")
+
     # Initialize optimized engine
     try:
         from api.optimized_shield import get_optimized_engine
