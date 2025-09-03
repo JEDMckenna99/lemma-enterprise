@@ -65,13 +65,13 @@
             <h2 class="card-title" style="margin-bottom: 0;">User Permissions</h2>
             <div style="display: flex; gap: var(--space-2);">
                 <button class="btn btn-secondary" onclick="showTestEmailModal()">
-                    🧪 Send Test Email
+                    Send Test Email
                 </button>
                 <button class="btn btn-secondary" onclick="showSendEmailModal()">
-                    📧 Send Permission Email
+                    Send Permission Email
                 </button>
                 <button class="btn btn-primary" onclick="showGrantPermissionModal()">
-                    + Grant Permission
+                    Grant Permission
                 </button>
             </div>
         </div>
@@ -139,11 +139,11 @@
 <!-- Send Test Permission Email Modal -->
 <div id="testEmailModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--white); border-radius: 12px; padding: var(--space-6); min-width: 500px; max-width: 90vw;">
-        <h3 style="margin-bottom: var(--space-4);">🧪 Send Test Permission Email</h3>
+        <h3 style="margin-bottom: var(--space-4);">Send Test Permission Email</h3>
         
-        <div style="background: #fff3cd; border: 2px solid #ffc107; color: #856404; padding: var(--space-4); border-radius: 8px; margin-bottom: var(--space-4);">
-            <div style="font-weight: 600; margin-bottom: 8px;">⚠️ SAFE TEST MODE</div>
-            <div style="font-size: var(--font-size-sm);">
+        <div style="background: var(--warning); color: var(--white); padding: var(--space-4); border-radius: 8px; margin-bottom: var(--space-4);">
+            <div style="font-weight: 600; margin-bottom: 8px; color: var(--white);">SAFE TEST MODE</div>
+            <div style="font-size: var(--font-size-sm); color: var(--white);">
                 This creates a test permission lemma that appears in your wallet but doesn't grant real access.
                 Perfect for testing the email flow without affecting your real permissions.
             </div>
@@ -168,7 +168,7 @@
         
         <div style="display: flex; gap: var(--space-3); justify-content: flex-end;">
             <button class="btn btn-secondary" onclick="hideTestEmailModal()">Cancel</button>
-            <button class="btn" onclick="sendTestPermissionEmail()" style="background: #f59e0b; color: white;">🧪 Send Test Email</button>
+            <button class="btn" onclick="sendTestPermissionEmail()" style="background: var(--warning); color: var(--white);">Send Test Email</button>
         </div>
     </div>
 </div>

@@ -294,13 +294,13 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ Permission Email API registration failed: {e}")
 
-    # Test permission system (safe for testing)
+    # Simple test permission system
     try:
-        from api.test_permission_system import test_permission_bp
-        app.register_blueprint(test_permission_bp)
-        logger.info("✅ Test Permission System API registered")
+        from api.simple_test_permission import simple_test_bp
+        app.register_blueprint(simple_test_bp)
+        logger.info("✅ Simple Test Permission API registered")
     except Exception as e:
-        logger.warning(f"⚠️ Test Permission API registration failed: {e}")
+        logger.warning(f"⚠️ Simple Test Permission API registration failed: {e}")
 
     # Centralized wallet management
     try:
