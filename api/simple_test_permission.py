@@ -10,6 +10,9 @@ import secrets
 import logging
 import os
 import json
+import smtplib
+from email.mime.text import MimeText
+from email.mime.multipart import MimeMultipart
 
 logger = logging.getLogger(__name__)
 
@@ -111,9 +114,6 @@ def send_test_email(email, confirmation_token):
         """
         
         # Create and send email
-        from email.mime.text import MimeText
-        from email.mime.multipart import MimeMultipart
-        import smtplib
         
         msg = MimeMultipart('alternative')
         msg['Subject'] = subject
@@ -437,8 +437,6 @@ def confirm_test_permission(confirmation_token):
 @cross_origin()
 def debug_smtp_connection():
     """Debug SMTP connection and configuration"""
-    import smtplib
-    from email.mime.text import MimeText
     
     try:
         smtp_server = os.getenv('SMTP_SERVER', 'smtp.mailgun.org')
