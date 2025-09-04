@@ -219,8 +219,8 @@ def confirm_test_permission(confirmation_token):
                     margin: 20px 0;
                 }}
             </style>
-            <script src="https://lemma.id/static/js/lemma-federated-wallet.js?v=672"></script>
-            <script src="https://lemma.id/static/js/lemma-wallet-manager.js"></script>
+            <script src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/static/js/lemma-federated-wallet.js?v=672"></script>
+            <script src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/static/js/lemma-wallet-manager.js"></script>
         </head>
         <body>
             <div class="test-container">
@@ -257,10 +257,10 @@ def confirm_test_permission(confirmation_token):
                     </ol>
                     
                     <div style="text-align: center; margin: 40px 0;">
-                        <a href="https://lemma.id/wallet" class="btn btn-primary" style="margin: 0 8px;">
+                        <a href="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/wallet" class="btn btn-primary" style="margin: 0 8px;">
                             Check Your Wallet
                         </a>
-                        <a href="https://lemma.id/admin/permissions" class="btn btn-secondary" style="margin: 0 8px;">
+                        <a href="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/admin/permissions" class="btn btn-secondary" style="margin: 0 8px;">
                             Back to Permission Manager
                         </a>
                     </div>
@@ -271,11 +271,24 @@ def confirm_test_permission(confirmation_token):
                 // Test wallet integration using centralized manager
                 document.addEventListener('DOMContentLoaded', async function() {{
                     try {{
-                        console.log('Test: Using LemmaWalletManager for test permission storage...');
+                        console.log('🧪 Test: Starting wallet integration for test permission...');
+                        
+                        // Check if required functions are available
+                        console.log('🔍 Checking wallet functions availability:', {{
+                            'window.storeLemmaCredential': typeof window.storeLemmaCredential,
+                            'window.lemmaWalletManager': typeof window.lemmaWalletManager,
+                            'window.LemmaFederatedWallet': typeof window.LemmaFederatedWallet
+                        }});
+                        
+                        if (typeof window.storeLemmaCredential === 'undefined') {{
+                            console.error('❌ storeLemmaCredential function not available');
+                            showMessage('Wallet function not available', 'var(--error)');
+                            return;
+                        }}
                         
                         const testLemmaData = {json.dumps(test_permission_lemma)};
                         
-                        console.log('Test permission to store:', {{
+                        console.log('📋 Test permission to store:', {{
                             id: testLemmaData.id,
                             siteId: testLemmaData.claims?.siteId,
                             email: testLemmaData.claims?.email,
@@ -283,27 +296,31 @@ def confirm_test_permission(confirmation_token):
                             testPermission: testLemmaData.claims?.testPermission
                         }});
                         
+                        console.log('💾 Attempting to store test permission...');
+                        
                         // Store test permission using centralized manager
                         const result = await window.storeLemmaCredential(testLemmaData, {{
                             allowDuplicates: false
                         }});
                         
+                        console.log('📊 Storage result:', result);
+                        
                         if (result.success) {{
                             if (result.duplicate) {{
-                                console.log('Test permission already exists in wallet');
-                                showMessage('Test permission already in your wallet', var(--primary));
+                                console.log('ℹ️ Test permission already exists in wallet');
+                                showMessage('Test permission already in your wallet', 'var(--primary)');
                             }} else {{
-                                console.log('Test permission stored in unified wallet');
-                                showMessage('Test permission stored successfully', var(--success));
+                                console.log('✅ Test permission stored in unified wallet');
+                                showMessage('Test permission stored successfully!', 'var(--success)');
                             }}
                         }} else {{
-                            console.warn('Failed to store test permission:', result.error);
-                            showMessage('Storage failed: ' + result.error, var(--error));
+                            console.warn('⚠️ Failed to store test permission:', result.error);
+                            showMessage('Storage failed: ' + result.error, 'var(--error)');
                         }}
                         
                     }} catch (error) {{
-                        console.error('Test wallet error:', error);
-                        showMessage('Wallet error: ' + error.message, var(--error));
+                        console.error('💥 Test wallet error:', error);
+                        showMessage('Wallet error: ' + error.message, 'var(--error)');
                     }}
                 }});
                 
