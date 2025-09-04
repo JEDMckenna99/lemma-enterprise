@@ -10,9 +10,6 @@ import secrets
 import logging
 import os
 import json
-import smtplib
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
 
 logger = logging.getLogger(__name__)
 
@@ -22,114 +19,20 @@ simple_test_bp = Blueprint('simple_test', __name__)
 test_confirmations = {}
 
 def send_test_email(email, confirmation_token):
-    """Send test permission confirmation email"""
+    """Send test permission confirmation email using Mailgun HTTP API"""
     try:
-        # Email configuration (using Mailgun)
-        smtp_server = os.getenv('SMTP_SERVER', 'smtp.mailgun.org')
-        smtp_port = int(os.getenv('SMTP_PORT', '587'))
-        smtp_username = os.getenv('SMTP_USERNAME', '')
-        smtp_password = os.getenv('SMTP_PASSWORD', '')
+        # Import here to avoid circular imports
+        from .mailgun_email_sender import send_test_permission_email_via_mailgun
         
-        if not smtp_username or not smtp_password:
-            logger.error("SMTP credentials not configured")
+        # Use the Mailgun HTTP API function
+        success = send_test_permission_email_via_mailgun(email, confirmation_token)
+        
+        if success:
+            logger.info(f"✅ Test permission email sent to {email} via Mailgun API")
+            return True
+        else:
+            logger.error(f"❌ Failed to send test email to {email} via Mailgun API")
             return False
-        
-        # Create confirmation link
-        confirmation_url = f"https://lemma.id/confirm-test-permission/{confirmation_token}"
-        
-        # Email content (consistent styling, no emojis)
-        subject = f"TEST: Permission Lemma Demo - Lemma IAM"
-        
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background: #f8f9fa; }}
-                .container {{ max-width: 600px; margin: 0 auto; background: white; }}
-                .header {{ background: #f59e0b; color: white; padding: 40px 30px; text-align: center; }}
-                .content {{ padding: 40px 30px; }}
-                .button {{ background: #f59e0b; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; margin: 20px 0; }}
-                .footer {{ background: #f8f9fa; padding: 30px; text-align: center; color: #6c757d; font-size: 14px; }}
-                .test-badge {{ background: #f59e0b; color: white; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; }}
-                .info-box {{ background: #e7f3ff; border: 1px solid #b3d7ff; border-radius: 8px; padding: 20px; margin: 20px 0; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>TEST Permission Lemma</h1>
-                    <p>Demo email confirmation flow</p>
-                </div>
-                
-                <div class="content">
-                    <div class="test-badge">
-                        <strong>THIS IS A TEST</strong><br>
-                        This is a demonstration permission lemma that won't grant real access.<br>
-                        It's safe to test with and will appear in your wallet for demo purposes.
-                    </div>
-                    
-                    <h2>Test Permission Lemma Confirmation</h2>
-                    
-                    <p>You've requested a <strong>test permission lemma</strong> to demonstrate the Lemma IAM email confirmation flow.</p>
-                    
-                    <div class="info-box">
-                        <h3>Test Lemma Details:</h3>
-                        <ul>
-                            <li><strong>Email:</strong> {email}</li>
-                            <li><strong>Type:</strong> Test Demo Permission</li>
-                            <li><strong>Site:</strong> lemma.id (test)</li>
-                            <li><strong>Access Level:</strong> Demo only (no real access)</li>
-                            <li><strong>Purpose:</strong> Test email flow and wallet storage</li>
-                        </ul>
-                    </div>
-                    
-                    <div style="text-align: center;">
-                        <a href="{confirmation_url}" class="button">
-                            Confirm Test Permission Lemma
-                        </a>
-                    </div>
-                    
-                    <h3>What this test demonstrates:</h3>
-                    <ol>
-                        <li>Email confirmation flow</li>
-                        <li>Permission lemma creation</li>
-                        <li>Automatic wallet storage</li>
-                        <li>Wallet page display</li>
-                        <li>Cross-browser synchronization</li>
-                    </ol>
-                    
-                    <p style="font-size: 14px; color: #6c757d; margin-top: 30px;">
-                        This test confirmation link will expire in 1 hour. This is a safe demo that won't affect your real permissions.
-                    </p>
-                </div>
-                
-                <div class="footer">
-                    <p><strong>Lemma IAM Test System</strong></p>
-                    <p>Testing email confirmation and wallet integration</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        # Create and send email
-        
-        msg = MimeMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = f"Lemma IAM Test <{smtp_username}>"
-        msg['To'] = email
-        
-        html_part = MimeText(html_content, 'html')
-        msg.attach(html_part)
-        
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_username, smtp_password)
-            server.send_message(msg)
-        
-        logger.info(f"✅ Test permission email sent to {email}")
-        return True
         
     except Exception as e:
         logger.error(f"❌ Failed to send test email to {email}: {e}")

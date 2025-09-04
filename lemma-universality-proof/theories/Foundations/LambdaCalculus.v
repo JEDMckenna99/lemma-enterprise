@@ -8,6 +8,7 @@ Require Import Coq.Lists.List.
 Require Import Coq.Arith.Arith.
 Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Coq.Strings.String.
+Require Import Coq.QArith.QArith.
 Import ListNotations.
 
 (** ** Basic Types *)
