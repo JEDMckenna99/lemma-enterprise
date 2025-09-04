@@ -505,3 +505,81 @@ def debug_smtp_connection():
             'error': f'Debug test failed: {str(e)}',
             'debug_info': debug_info if 'debug_info' in locals() else {}
         }), 500
+
+@simple_test_bp.route('/api/admin/send-test-permission-email', methods=['POST'])
+@cross_origin()
+def admin_send_test_permission_email():
+    """Admin endpoint to send test permission email (alternative to failed permission_email_automation)"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        admin_password = data.get('admin_password', '')
+        
+        if not email:
+            return jsonify({
+                'success': False,
+                'error': 'Email is required'
+            }), 400
+        
+        # Verify admin password
+        expected_admin_pass = os.getenv('LEMMA_ADMIN_PASS', '.511MeV/c^2')
+        if admin_password != expected_admin_pass:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid admin password'
+            }), 401
+        
+        logger.info(f"🔧 Admin test permission email requested for: {email}")
+        
+        # Generate test confirmation token
+        confirmation_token = f"admin_test_{secrets.token_urlsafe(32)}"
+        
+        # Store test confirmation
+        test_confirmations[confirmation_token] = {
+            'email': email,
+            'created_at': datetime.utcnow(),
+            'expires_at': datetime.utcnow() + timedelta(hours=1),
+            'confirmed': False,
+            'admin_issued': True
+        }
+        
+        # Try to send actual email using Mailgun SMTP
+        try:
+            email_sent = send_test_email(email, confirmation_token)
+            
+            if email_sent:
+                return jsonify({
+                    'success': True,
+                    'message': f'Admin test permission email sent to {email}',
+                    'confirmation_token': confirmation_token,
+                    'confirmation_url': f'https://lemma.id/confirm-test-permission/{confirmation_token}',
+                    'expires_in': '1 hour',
+                    'note': 'Check your email for the test confirmation link'
+                })
+            else:
+                return jsonify({
+                    'success': True,
+                    'message': f'Admin test permission prepared for {email} (email failed)',
+                    'confirmation_token': confirmation_token,
+                    'confirmation_url': f'https://lemma.id/confirm-test-permission/{confirmation_token}',
+                    'expires_in': '1 hour',
+                    'note': 'Email failed to send. Use confirmation URL directly to test the permission flow.'
+                })
+                
+        except Exception as email_error:
+            logger.error(f"Admin test email sending failed: {email_error}")
+            return jsonify({
+                'success': True,
+                'message': f'Admin test permission prepared for {email} (email failed)',
+                'confirmation_token': confirmation_token,
+                'confirmation_url': f'https://lemma.id/confirm-test-permission/{confirmation_token}',
+                'expires_in': '1 hour',
+                'note': f'Email failed to send: {str(email_error)}. Use confirmation URL directly.'
+            })
+        
+    except Exception as e:
+        logger.error(f"❌ Admin test permission email error: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
