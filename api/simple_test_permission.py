@@ -219,8 +219,8 @@ def confirm_test_permission(confirmation_token):
                     margin: 20px 0;
                 }}
             </style>
-            <script src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/static/js/lemma-federated-wallet.js?v=672"></script>
-            <script src="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/static/js/lemma-wallet-manager.js"></script>
+            <script src="https://lemma.id/static/js/lemma-federated-wallet.js?v=672"></script>
+            <script src="https://lemma.id/static/js/lemma-wallet-manager.js"></script>
         </head>
         <body>
             <div class="test-container">
@@ -257,10 +257,10 @@ def confirm_test_permission(confirmation_token):
                     </ol>
                     
                     <div style="text-align: center; margin: 40px 0;">
-                        <a href="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/wallet" class="btn btn-primary" style="margin: 0 8px;">
+                        <a href="https://lemma.id/wallet" class="btn btn-primary" style="margin: 0 8px;">
                             Check Your Wallet
                         </a>
-                        <a href="https://lemma-enterprise-0f6ba17076c1.herokuapp.com/admin/permissions" class="btn btn-secondary" style="margin: 0 8px;">
+                        <a href="https://lemma.id/admin/permissions" class="btn btn-secondary" style="margin: 0 8px;">
                             Back to Permission Manager
                         </a>
                     </div>
@@ -269,7 +269,7 @@ def confirm_test_permission(confirmation_token):
             
             <script>
                 // Test wallet integration using centralized manager
-                document.addEventListener('DOMContentLoaded', async function() {{
+                async function initializeWalletIntegration() {{
                     try {{
                         console.log('🧪 Test: Starting wallet integration for test permission...');
                         
@@ -322,6 +322,17 @@ def confirm_test_permission(confirmation_token):
                         console.error('💥 Test wallet error:', error);
                         showMessage('Wallet error: ' + error.message, 'var(--error)');
                     }}
+                }}
+                
+                // Wait for scripts to load, then initialize wallet
+                document.addEventListener('DOMContentLoaded', function() {{
+                    console.log('📄 DOM loaded, waiting for wallet scripts...');
+                    
+                    // Wait a bit for scripts to fully load and execute
+                    setTimeout(async () => {{
+                        console.log('⏰ Starting wallet initialization after delay...');
+                        await initializeWalletIntegration();
+                    }}, 1000); // 1 second delay to ensure scripts are loaded
                 }});
                 
                 function showMessage(message, color) {{
