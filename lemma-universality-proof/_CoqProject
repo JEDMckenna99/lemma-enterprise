@@ -1,0 +1,27 @@
+-R theories LemmaUniversality
+-arg -w -arg -notation-overridden
+-arg -w -arg -redundant-canonical-projection
+
+# Core dependencies
+theories/Foundations/LambdaCalculus.v
+theories/Foundations/Credentials.v
+theories/Foundations/Packages.v
+
+# Cryptographic primitives
+theories/Cryptography/Ed25519.v
+theories/Cryptography/OPRF.v
+theories/Cryptography/BloomFilter.v
+theories/Cryptography/ZKP.v
+
+# Performance analysis
+theories/Performance/TimingBounds.v
+theories/Performance/Caching.v
+theories/Performance/Throughput.v
+
+# Universality proofs
+theories/Universality/CryptoUniversality.v
+theories/Universality/PerfUniversality.v
+theories/Universality/FuncUniversality.v
+
+# Main theorem
+theories/Main/UniversalityTheorem.v

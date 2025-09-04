@@ -432,3 +432,78 @@ def confirm_test_permission(confirmation_token):
                 <p><a href="https://lemma.id/admin/permissions">Back to Permission Manager</a></p>
             </body></html>
         """), 500
+
+@simple_test_bp.route('/api/debug/test-smtp', methods=['GET'])
+@cross_origin()
+def debug_smtp_connection():
+    """Debug SMTP connection and configuration"""
+    import smtplib
+    from email.mime.text import MimeText
+    
+    try:
+        smtp_server = os.getenv('SMTP_SERVER', 'smtp.mailgun.org')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        smtp_username = os.getenv('SMTP_USERNAME', 'postmaster@www.lemma.id')
+        smtp_password = os.getenv('SMTP_PASSWORD')
+        
+        debug_info = {
+            'smtp_server': smtp_server,
+            'smtp_port': smtp_port,
+            'smtp_username': smtp_username,
+            'smtp_password_set': bool(smtp_password),
+            'mailgun_domain': os.getenv('MAILGUN_DOMAIN'),
+            'mailgun_api_key_set': bool(os.getenv('MAILGUN_API_KEY'))
+        }
+        
+        if not smtp_password:
+            return jsonify({
+                'error': 'SMTP_PASSWORD not set',
+                'debug_info': debug_info
+            }), 500
+        
+        # Test SMTP connection step by step
+        test_results = {}
+        
+        try:
+            # Step 1: Create connection
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            test_results['connection'] = 'SUCCESS'
+            
+            # Step 2: Start TLS
+            server.starttls()
+            test_results['tls'] = 'SUCCESS'
+            
+            # Step 3: Login
+            server.login(smtp_username, smtp_password)
+            test_results['authentication'] = 'SUCCESS'
+            
+            # Step 4: Try to send a test email
+            msg = MimeText('SMTP connection test from Lemma Platform debug endpoint')
+            msg['Subject'] = 'SMTP Debug Test - Lemma Platform'
+            msg['From'] = smtp_username
+            msg['To'] = 'jedmckenna@lemma.id'
+            
+            server.send_message(msg)
+            server.quit()
+            test_results['email_send'] = 'SUCCESS'
+            
+            return jsonify({
+                'success': True,
+                'message': 'SMTP connection fully successful and test email sent',
+                'debug_info': debug_info,
+                'test_results': test_results
+            })
+            
+        except Exception as smtp_error:
+            test_results['error'] = str(smtp_error)
+            return jsonify({
+                'error': f'SMTP test failed: {str(smtp_error)}',
+                'debug_info': debug_info,
+                'test_results': test_results
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'error': f'Debug test failed: {str(e)}',
+            'debug_info': debug_info if 'debug_info' in locals() else {}
+        }), 500
