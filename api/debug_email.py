@@ -7,6 +7,8 @@ from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 import logging
 import os
+import smtplib
+from email.mime.text import MimeText
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +72,6 @@ def send_simple_test():
             }), 400
         
         # Try to send simple email
-        import smtplib
-        from email.mime.text import MimeText
         
         msg = MimeText("This is a simple test email from Lemma IAM system.")
         msg['Subject'] = "Simple Test Email - Lemma IAM"
