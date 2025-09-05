@@ -1339,6 +1339,9 @@ class LemmaFederatedWallet {
                         console.log(`🚫 Revocation lists synced: ${Object.keys(data.revocation_updates).length} updates`);
                     }
                     
+                    // Check for forced credential removals (network-wide bot marking)
+                    await this.checkForForcedRemovals();
+                    
                     return true;
                 }
             }

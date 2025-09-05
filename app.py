@@ -171,6 +171,14 @@ def create_app():
         logger.info("✅ Admin Customer Management API registered")
     except Exception as e:
         logger.warning(f"⚠️ Admin Customer Management API registration failed: {e}")
+    
+    # Network revocation system
+    try:
+        from api.network_revocation_system import network_revocation_bp
+        app.register_blueprint(network_revocation_bp)
+        logger.info("✅ Network Revocation System registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Network Revocation System registration failed: {e}")
 
     # Register the QR Generator blueprint for QR code generation
     try:
