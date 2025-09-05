@@ -619,52 +619,10 @@
                     showEmailConfirmationMessage(data.email, data.company);
                     
                     // OLD CODE: Store permission lemma (now moved to confirmation step)
-                    // if (result.permission_lemma) {
-                        try {
-                            // Initialize background wallet if not already done
-                            if (!window.lemmaWallet) {
-                                const { LemmaFederatedWallet } = await import('/static/js/lemma-federated-wallet.js');
-                                window.lemmaWallet = new LemmaFederatedWallet({
-                                    debug: true,
-                                    networkRegistryUrl: window.location.origin
-                                });
-                                await window.lemmaWallet.initialize();
-                            }
-                            
-                            // Store permission lemma in the same wallet as PoH lemmas
-                            const storeResult = await window.lemmaWallet.storeCredential(result.permission_lemma);
-                            
-                            if (storeResult.success) {
-                                console.log('✅ Permission lemma stored in browser wallet for new customer:', result.permission_lemma.claims.permissionId);
-                            } else {
-                                console.warn('⚠️ Failed to store permission lemma in wallet:', storeResult.error);
-                            }
-                            
-                        } catch (error) {
-                            console.warn('⚠️ Wallet integration error during registration:', error);
-                        }
-                    }
+                    // Wallet integration will happen after email confirmation
                     
-                    // Show success message with animation
-                    setTimeout(() => {
-                        document.getElementById('successMessage').style.display = 'block';
-                        
-                        // Hide form with fade
-                        const form = document.getElementById('registerForm');
-                        form.style.opacity = '0';
-                        form.style.transition = 'opacity 0.3s ease';
-                        
-                        setTimeout(() => {
-                            form.style.display = 'none';
-                            
-                            // Show API key
-                            document.getElementById('apiKeyValue').textContent = result.api_key;
-                            document.getElementById('apiKeyDisplay').style.display = 'block';
-                            
-                            // Smooth scroll to top
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }, 300);
-                    }, 500);
+                    // Email confirmation message is already shown by showEmailConfirmationMessage()
+                    // No additional processing needed since API keys come after confirmation
                     
                 } else {
                     // Reset progress
