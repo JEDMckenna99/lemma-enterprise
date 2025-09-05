@@ -106,7 +106,7 @@ def test_performance():
         # Create a simple test credential to verify engine performance
         test_credential = {
             'id': 'test_perf_credential',
-            'issuer': 'did:lemma:identity_network',
+            'issuer': 'did:lemma:federated:issuer',
             'subject': 'did:lemma:test_user',
             'claims': {
                 'isHuman': True,

@@ -169,7 +169,7 @@ def confirm_test_permission(confirmation_token):
         
         test_permission_lemma = {
             'id': f"test_perm_{secrets.token_hex(16)}",
-            'issuer': 'did:lemma:test:lemma.id',
+            'issuer': 'did:lemma:platform:lemma.id',
             'subject': f'did:lemma:test-user:{email.replace("@", "_at_").replace(".", "_")}',
             'packageType': 'permission',
             'issued_at': current_time,
@@ -192,7 +192,7 @@ def confirm_test_permission(confirmation_token):
             'proof': {
                 'type': 'Ed25519Signature2020',
                 'created': current_time,
-                'verificationMethod': 'did:lemma:test:lemma.id',
+                'verificationMethod': 'did:lemma:platform:lemma.id',
                 'signatureValue': f'test_sig_{secrets.token_hex(32)}'
             }
         }

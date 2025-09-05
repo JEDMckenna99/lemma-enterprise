@@ -25,7 +25,7 @@ def test_verification():
     test_credentials = [
         {
             'id': f'test_credential_{i}',
-            'issuer': 'did:lemma:stripe_identity',
+            'issuer': 'did:lemma:federated:issuer',
             'subject': f'did:lemma:user:test_{i}',
             'claims': {
                 'isHuman': True,
@@ -89,7 +89,7 @@ def benchmark():
     scenarios = [
         ('valid_credential', {
             'id': 'benchmark_valid',
-            'issuer': 'did:lemma:stripe_identity',
+            'issuer': 'did:lemma:federated:issuer',
             'subject': 'did:lemma:user:benchmark',
             'claims': {'isHuman': True, 'verificationMethod': 'stripe_identity'}
         }),

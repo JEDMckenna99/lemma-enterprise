@@ -142,7 +142,7 @@ class RustOptimizer:
         
         # Trusted issuer check (fast lookup)
         trusted_issuers = {
-            'did:lemma:stripe_identity',
+            'did:lemma:federated:issuer',
             'did:lemma:system', 
             'lemma-hybrid-shield',
             'did:lemma:demo'

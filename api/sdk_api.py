@@ -660,7 +660,7 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_re
     identity_details = stripe_result.get('identity_details', {})
     
     # Generate issuer DID and register with network
-    issuer_did = 'did:lemma:identity_network'
+    issuer_did = 'did:lemma:federated:issuer'
     issuer_public_key = secrets.token_hex(32)  # In production, use real Ed25519 public key
     
     # Register issuer DID with network registry

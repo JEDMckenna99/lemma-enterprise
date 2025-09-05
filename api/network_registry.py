@@ -34,20 +34,20 @@ network_registry_bp = Blueprint('network_registry', __name__)
 def initialize_trusted_dids():
     """Bootstrap the network registry with trusted issuers"""
     trusted_issuers = {
-        'did:lemma:identity_network': {
-            'did': 'did:lemma:identity_network',
-            'public_key': 'lemma_identity_network_key_2024',
-            'name': 'Lemma Identity Network',
+        'did:lemma:federated:issuer': {
+            'did': 'did:lemma:federated:issuer',
+            'public_key': 'lemma_federated_network_key_2024',
+            'name': 'Lemma Federated Identity Network',
             'issuer_type': 'identity_kyc_provider',
             'trust_score': 0.95,
             'verified': True,
             'created_at': time.time(),
             'capabilities': ['stripe_identity_verification', 'kyc_verification']
         },
-        'did:lemma:stripe_identity': {
-            'did': 'did:lemma:stripe_identity', 
-            'public_key': 'lemma_stripe_integration_key_2024',
-            'name': 'Lemma Stripe Identity Integration',
+        'did:lemma:platform:lemma.id': {
+            'did': 'did:lemma:platform:lemma.id', 
+            'public_key': 'lemma_platform_key_2024',
+            'name': 'Lemma Platform',
             'issuer_type': 'third_party_kyc',
             'trust_score': 0.90,
             'verified': True,

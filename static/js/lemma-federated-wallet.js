@@ -78,32 +78,8 @@ class LemmaFederatedWallet {
      * Initialize trusted DIDs for bootstrap (fixes existing credential validation)
      */
     initializeTrustedDIDs() {
-        // Bootstrap with known trusted issuers
+        // Bootstrap with known trusted issuers (ONLY the two valid ones)
         const trustedIssuers = [
-            {
-                did: 'did:lemma:identity_network',
-                publicKey: 'lemma_identity_network_key_2024',
-                issuerInfo: {
-                    name: 'Lemma Identity Network',
-                    issuer_type: 'identity_kyc_provider',
-                    trust_score: 0.95,
-                    verified: true,
-                    created_at: Date.now(),
-                    capabilities: ['stripe_identity_verification', 'kyc_verification']
-                }
-            },
-            {
-                did: 'did:lemma:stripe_identity',
-                publicKey: 'lemma_stripe_integration_key_2024', 
-                issuerInfo: {
-                    name: 'Lemma Stripe Identity Integration',
-                    issuer_type: 'third_party_kyc',
-                    trust_score: 0.90,
-                    verified: true,
-                    created_at: Date.now(),
-                    capabilities: ['stripe_identity_verification']
-                }
-            },
             {
                 did: 'did:lemma:federated:issuer',
                 publicKey: 'lemma_federated_network_key_2024',
@@ -113,7 +89,7 @@ class LemmaFederatedWallet {
                     trust_score: 1.0,
                     verified: true,
                     created_at: Date.now(),
-                    capabilities: ['federated_identity_verification', 'stripe_identity_verification', 'cross_site_recognition']
+                    capabilities: ['federated_identity_verification', 'stripe_identity_verification', 'cross_site_recognition', 'bot_protection']
                 }
             },
             {
