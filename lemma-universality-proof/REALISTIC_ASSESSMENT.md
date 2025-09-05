@@ -203,3 +203,4 @@ I conflated the **total addressable market** ($300B identity/data market) with w
 **That's still a significant achievement and valuable business - just not the transformation of the entire internet.**
 
 
+

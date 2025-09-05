@@ -440,9 +440,19 @@ customer_manager = CustomerAccountManager()
 @customer_accounts_bp.route('/register', methods=['GET', 'POST'])
 @cross_origin(origins=['https://lemma.id', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com'], supports_credentials=True)
 def register():
-    """Customer registration page and handler"""
+    """Customer registration page and handler - SECURE VERSION"""
     if request.method == 'GET':
         return render_template('modern/register.html')
+    
+    # SECURITY: Redirect POST requests to secure registration
+    elif request.method == 'POST':
+        logger.warning("🚨 Insecure registration attempt blocked - redirecting to secure endpoint")
+        return jsonify({
+            'success': False,
+            'error': 'Registration has been moved to secure endpoint',
+            'secure_endpoint': '/api/customer/register-secure',
+            'message': 'Please use the secure registration endpoint that requires email confirmation'
+        }), 301
     
     try:
         data = request.get_json() if request.is_json else request.form

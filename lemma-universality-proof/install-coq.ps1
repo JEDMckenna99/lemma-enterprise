@@ -107,3 +107,4 @@ Write-Host "  make doc                   # Generate documentation" -ForegroundCo
 Write-Host "`nInstallation complete! 🎯" -ForegroundColor Green
 
 
+

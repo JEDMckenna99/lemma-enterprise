@@ -155,6 +155,14 @@ def create_app():
 
     except Exception as e:
         logger.error(f"❌ Failed to register Customer Accounts blueprint: {e}")
+    
+    # Secure customer registration (email confirmation required)
+    try:
+        from api.secure_customer_registration import secure_registration_bp
+        app.register_blueprint(secure_registration_bp)
+        logger.info("✅ Secure Customer Registration API registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Secure Customer Registration API registration failed: {e}")
 
     # Register the QR Generator blueprint for QR code generation
     try:

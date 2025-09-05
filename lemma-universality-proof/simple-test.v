@@ -29,3 +29,4 @@ Qed.
 Print "✅ Basic proofs work - Coq syntax is valid!".
 
 
+
