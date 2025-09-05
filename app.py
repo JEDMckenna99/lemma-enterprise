@@ -318,29 +318,29 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ Debug Email API registration failed: {e}")
     
-    # Federated onboarding enforcement
-    try:
-        from api.federated_onboarding_enforcement import federated_onboarding_bp
-        app.register_blueprint(federated_onboarding_bp)
-        logger.info("✅ Federated Onboarding Enforcement registered")
-    except Exception as e:
-        logger.warning(f"⚠️ Federated Onboarding Enforcement registration failed: {e}")
+    # Federated onboarding enforcement (temporarily disabled for debugging)
+    # try:
+    #     from api.federated_onboarding_enforcement import federated_onboarding_bp
+    #     app.register_blueprint(federated_onboarding_bp)
+    #     logger.info("✅ Federated Onboarding Enforcement registered")
+    # except Exception as e:
+    #     logger.warning(f"⚠️ Federated Onboarding Enforcement registration failed: {e}")
     
-    # Site trust bundle distribution
-    try:
-        from api.site_trust_bundle_distribution import site_trust_bundle_bp
-        app.register_blueprint(site_trust_bundle_bp)
-        logger.info("✅ Site Trust Bundle Distribution registered")
-    except Exception as e:
-        logger.warning(f"⚠️ Site Trust Bundle Distribution registration failed: {e}")
+    # Site trust bundle distribution (temporarily disabled for debugging)
+    # try:
+    #     from api.site_trust_bundle_distribution import site_trust_bundle_bp
+    #     app.register_blueprint(site_trust_bundle_bp)
+    #     logger.info("✅ Site Trust Bundle Distribution registered")
+    # except Exception as e:
+    #     logger.warning(f"⚠️ Site Trust Bundle Distribution registration failed: {e}")
     
-    # Site-specific IAM verification
-    try:
-        from api.site_specific_iam_verification import site_iam_bp
-        app.register_blueprint(site_iam_bp)
-        logger.info("✅ Site-Specific IAM Verification registered")
-    except Exception as e:
-        logger.warning(f"⚠️ Site-Specific IAM Verification registration failed: {e}")
+    # Site-specific IAM verification (temporarily disabled for debugging)
+    # try:
+    #     from api.site_specific_iam_verification import site_iam_bp
+    #     app.register_blueprint(site_iam_bp)
+    #     logger.info("✅ Site-Specific IAM Verification registered")
+    # except Exception as e:
+    #     logger.warning(f"⚠️ Site-Specific IAM Verification registration failed: {e}")
 
     # Initialize optimized engine
     try:
