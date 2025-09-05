@@ -179,6 +179,14 @@ def create_app():
         logger.info("✅ Network Revocation System registered")
     except Exception as e:
         logger.warning(f"⚠️ Network Revocation System registration failed: {e}")
+    
+    # Privacy-preserving revocation
+    try:
+        from api.privacy_preserving_revocation import privacy_revocation_bp
+        app.register_blueprint(privacy_revocation_bp)
+        logger.info("✅ Privacy-Preserving Revocation System registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Privacy-Preserving Revocation System registration failed: {e}")
 
     # Register the QR Generator blueprint for QR code generation
     try:
@@ -885,6 +893,11 @@ def create_app():
     def admin_permissions():
         """Permission manager - uses same IAM system as customers"""
         return render_template('admin/permissions.html')
+    
+    @app.route('/admin/review-reports')
+    def admin_review_reports():
+        """Admin malicious activity review page"""
+        return render_template('admin/malicious_activity_review.html')
 
     @app.route('/admin/permission-config')
     def admin_permission_config():

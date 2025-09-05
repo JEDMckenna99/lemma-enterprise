@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Malicious Activity Reports - Lemma Admin</title>
+    <link rel="stylesheet" href="/static/css/lemma.css">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        
+        .report-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 24px;
+            margin: 16px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        
+        .report-card.high-confidence {
+            border-left: 4px solid var(--error);
+        }
+        
+        .report-card.medium-confidence {
+            border-left: 4px solid var(--warning);
+        }
+        
+        .report-card.low-confidence {
+            border-left: 4px solid var(--gray-400);
+        }
+        
+        .privacy-notice {
+            background: var(--primary-light);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 20px 0;
+        }
+        
+        .evidence-box {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: 6px;
+            padding: 16px;
+            margin: 12px 0;
+            font-family: var(--font-mono);
+            font-size: 14px;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .btn-revoke {
+            background: var(--error);
+            color: var(--white);
+        }
+        
+        .btn-dismiss {
+            background: var(--gray-400);
+            color: var(--white);
+        }
+        
+        .btn-investigate {
+            background: var(--warning);
+            color: var(--white);
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div style="text-align: center; margin: 40px 0;">
+            <h1 style="color: var(--gray-900);">Review Malicious Activity Reports</h1>
+            <p style="color: var(--gray-600);">Privacy-preserving manual review system</p>
+        </div>
+        
+        <div class="privacy-notice">
+            <h3 style="color: var(--gray-900); margin: 0 0 8px 0;">Privacy Protection Active</h3>
+            <p style="color: var(--gray-700); margin: 0;">
+                User identities are protected with privacy-preserving hashes. You see evidence of malicious activity 
+                without exposing user personal information. User identity is only resolved if you decide to revoke.
+            </p>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 24px 0;">
+            <h2 style="color: var(--gray-900); margin: 0;">Pending Reports</h2>
+            <button onclick="refreshReports()" class="btn btn-primary">Refresh Reports</button>
+        </div>
+        
+        <div id="reports-container">
+            <div style="text-align: center; padding: 40px; color: var(--gray-500);">
+                Loading reports...
+            </div>
+        </div>
+        
+        <div style="margin: 40px 0; text-align: center;">
+            <h3 style="color: var(--gray-900);">Admin Actions</h3>
+            <div style="display: flex; justify-content: center; gap: 16px;">
+                <button onclick="viewRevocationStats()" class="btn btn-secondary">
+                    View Network Revocation Stats
+                </button>
+                <a href="/admin/permissions" class="btn btn-secondary">
+                    Back to Admin Panel
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let adminPassword = '';
+        
+        async function loadReports() {
+            try {
+                if (!adminPassword) {
+                    adminPassword = prompt('Enter admin password:');
+                    if (!adminPassword) return;
+                }
+                
+                const response = await fetch('/api/admin/review-malicious-reports', {
+                    headers: {
+                        'X-Admin-Password': adminPassword
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayReports(data.pending_reports);
+                } else {
+                    alert('Error loading reports: ' + data.error);
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            }
+        }
+        
+        function displayReports(reports) {
+            const container = document.getElementById('reports-container');
+            
+            if (reports.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--gray-500);">
+                        <h3>No Pending Reports</h3>
+                        <p>All malicious activity reports have been reviewed.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = reports.map(report => {
+                const confidence = report.activity_evidence?.confidence || 0;
+                const confidenceClass = confidence > 0.8 ? 'high-confidence' : 
+                                      confidence > 0.5 ? 'medium-confidence' : 'low-confidence';
+                
+                return `
+                    <div class="report-card ${confidenceClass}">
+                        <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 16px;">
+                            <h3 style="color: var(--gray-900); margin: 0;">Report ${report.report_id}</h3>
+                            <span style="background: var(--gray-100); padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+                                Confidence: ${Math.round(confidence * 100)}%
+                            </span>
+                        </div>
+                        
+                        <div style="margin: 12px 0;">
+                            <strong>Site:</strong> ${report.site_id}<br>
+                            <strong>Activity Type:</strong> ${report.activity_evidence?.activity_type || 'Unknown'}<br>
+                            <strong>Reported:</strong> ${new Date(report.reported_at * 1000).toLocaleString()}<br>
+                            <strong>Privacy Hash:</strong> <code>${report.privacy_hash}</code>
+                        </div>
+                        
+                        <div class="evidence-box">
+                            <strong>Evidence:</strong><br>
+                            ${JSON.stringify(report.activity_evidence?.evidence || {}, null, 2)}
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button onclick="reviewReport('${report.report_id}', 'revoke')" class="btn btn-revoke">
+                                Revoke Network-Wide
+                            </button>
+                            <button onclick="reviewReport('${report.report_id}', 'dismiss')" class="btn btn-dismiss">
+                                Dismiss False Positive
+                            </button>
+                            <button onclick="reviewReport('${report.report_id}', 'investigate')" class="btn btn-investigate">
+                                Need More Investigation
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function reviewReport(reportId, decision) {
+            try {
+                const adminNotes = prompt(`Enter notes for ${decision} decision:`);
+                
+                const response = await fetch(`/api/admin/review-report/${reportId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        decision: decision,
+                        admin_notes: adminNotes,
+                        admin_password: adminPassword
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Report ${reportId} ${decision}d successfully.`);
+                    if (decision === 'revoke') {
+                        alert(`Network-wide revocation completed. Revocation ID: ${result.revocation_id}`);
+                    }
+                    refreshReports();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            }
+        }
+        
+        function refreshReports() {
+            loadReports();
+        }
+        
+        async function viewRevocationStats() {
+            try {
+                const response = await fetch('/api/network/revocation-stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.network_revocation_stats;
+                    alert(`Network Revocation Stats:
+Total Revocations: ${stats.total_revocations}
+Bot Activity Revocations: ${stats.bot_activity_revocations}
+Admin Revocations: ${stats.admin_revocations}
+Network Health: ${data.network_health.network_integrity}`);
+                }
+            } catch (error) {
+                alert('Error loading stats: ' + error.message);
+            }
+        }
+        
+        // Load reports on page load
+        document.addEventListener('DOMContentLoaded', loadReports);
+    </script>
+</body>
+</html>
