@@ -41,13 +41,15 @@ class SiteTrustBundleManager:
         # Get all verified human identities from verification card onboarding
         db = get_db()
         
-        # Only include identity lemmas from verification card sources
+        # Include identity lemmas from verification card AND bot shield verification sources
         verified_identities = db.query(UserLemma).filter(
             UserLemma.lemma_type == 'identity',
             UserLemma.lemma_data['verificationSource'].astext.in_([
                 'verification_card',
-                'stripe_identity_verification',
-                'lemma_shield_verification'
+                'stripe_identity_verification', 
+                'lemma_shield_verification',
+                'bot_shield_verification',
+                'lemma_bot_shield_verification'
             ])
         ).all()
         
@@ -119,13 +121,18 @@ class SiteTrustBundleManager:
         valid_sources = [
             'verification_card',
             'stripe_identity_verification',
-            'lemma_shield_verification'
+            'lemma_shield_verification',
+            'bot_shield_verification',
+            'lemma_bot_shield_verification'
         ]
         
         valid_issuers = [
             'did:lemma:verification-card',
             'did:lemma:platform:verification',
-            'did:lemma:shield:verification'
+            'did:lemma:shield:verification',
+            'did:lemma:bot-shield:verification',
+            'did:lemma:stripe:identity',
+            'did:lemma:federated:verification'
         ]
         
         return (verification_source in valid_sources or 

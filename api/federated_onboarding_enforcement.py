@@ -1,6 +1,6 @@
 """
 Federated Identity Onboarding Enforcement
-Ensures verification card is the ONLY path for federated identity network onboarding
+Ensures verification card OR bot shield verification are the valid paths for federated identity network onboarding
 """
 
 from flask import Blueprint, request, jsonify
@@ -16,7 +16,7 @@ federated_onboarding_bp = Blueprint('federated_onboarding', __name__)
 
 def validate_federated_identity_source(credential):
     """
-    Validate that federated identity credentials came from verification card only
+    Validate that federated identity credentials came from verification card OR bot shield verification
     
     Args:
         credential: The identity credential to validate
@@ -37,11 +37,14 @@ def validate_federated_identity_source(credential):
     issuer = credential.get('issuer', '')
     verification_method = credential.get('proof', {}).get('verificationMethod', '')
     
-    # Valid sources for federated identity
+    # Valid sources for federated identity (verification card AND bot shield verification)
     valid_sources = [
         'did:lemma:verification-card',
         'did:lemma:platform:verification',
-        'did:lemma:shield:verification'
+        'did:lemma:shield:verification',
+        'did:lemma:bot-shield:verification',
+        'did:lemma:stripe:identity',
+        'did:lemma:federated:verification'
     ]
     
     # Check if issuer indicates verification card origin
@@ -56,9 +59,16 @@ def validate_federated_identity_source(credential):
     is_human_verified = claims.get('isHuman', False)
     
     if is_verification_card or is_proper_verification:
+        # Determine specific source type
+        source_type = 'verification_card'
+        if 'bot-shield' in issuer or 'shield' in verification_source:
+            source_type = 'bot_shield_verification'
+        elif 'stripe' in issuer or 'stripe' in verification_source:
+            source_type = 'stripe_identity_verification'
+        
         return {
             'valid': True,
-            'source': 'verification_card',
+            'source': source_type,
             'verification_method': verification_method,
             'human_verified': is_human_verified
         }
@@ -132,11 +142,12 @@ def reject_email_onboarding():
         
         return jsonify({
             'success': False,
-            'error': 'Federated identity onboarding only available through verification card',
-            'required_method': 'verification_card',
+            'error': 'Federated identity onboarding only available through verification card or bot shield verification',
+            'required_methods': ['verification_card', 'bot_shield_verification'],
             'attempted_method': attempted_method,
             'verification_card_url': 'https://lemma.id/verify',
-            'message': 'Please use the verification card to join the federated identity network'
+            'bot_shield_url': 'https://lemma.id/ (any site with bot shield)',
+            'message': 'Please use the verification card or complete bot shield verification to join the federated identity network'
         }), 403
         
     except Exception as e:

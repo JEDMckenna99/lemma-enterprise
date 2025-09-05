@@ -4,7 +4,7 @@
 
 ### **1. Federated Identity Network (PoH Lemmas)**
 **Purpose**: Cross-site bot protection with network effects  
-**Onboarding**: **VERIFICATION CARD ONLY** (accurate proof of humanness)  
+**Onboarding**: **VERIFICATION CARD OR BOT SHIELD VERIFICATION** (accurate proof of humanness)  
 **Trust Bundle Distribution**: **TO ALL SITES** (for network-wide bot protection)
 
 ### **2. Site-Specific Permission Lemmas (IAM)**  
@@ -16,9 +16,9 @@
 
 ## 🔐 **Federated Identity Network Architecture**
 
-### **Onboarding Flow (Verification Card Only)**
+### **Onboarding Flow (Verification Card OR Bot Shield Verification)**
 ```
-User Journey:
+User Journey Option A - Verification Card:
 1. Visit https://lemma.id/verify
 2. Complete verification card process
    - Stripe Identity verification
@@ -27,12 +27,21 @@ User Journey:
 3. PoH lemma stored in federated wallet
 4. Available for bot protection across ALL network sites
 
+User Journey Option B - Bot Shield Verification:
+1. Visit any site with Lemma Bot Shield
+2. Complete bot shield verification process
+   - Human verification challenge
+   - Cryptographic proof creation
+   - Accurate proof of humanness
+3. PoH lemma stored in federated wallet
+4. Available for bot protection across ALL network sites
+
 Technical Implementation:
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │ Verification    │    │ Lemma Platform  │    │ All Network     │
-│ Card            │ ──>│ (lemma.id)      │ ──>│ Sites           │
-│ (ONLY source)   │    │ Creates PoH     │    │ Get trust       │
-│                 │    │ Lemma           │    │ bundles         │
+│ Card OR         │ ──>│ (lemma.id)      │ ──>│ Sites           │
+│ Bot Shield      │    │ Creates PoH     │    │ Get trust       │
+│ Verification    │    │ Lemma           │    │ bundles         │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
