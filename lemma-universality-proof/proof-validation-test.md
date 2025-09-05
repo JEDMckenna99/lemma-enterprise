@@ -124,3 +124,5 @@ Let me trace through the main theorem manually:
 - Mathematical foundation is solid
 - Proof approach is correct
 - Most of intellectual work is done
+
+

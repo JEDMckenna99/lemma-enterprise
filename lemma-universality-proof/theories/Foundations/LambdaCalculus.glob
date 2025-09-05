@@ -1,0 +1,121 @@
+DIGEST 3db3c3299eda213125671da9ceb80cc9
+FLambdaCalculus
+R211:224 Coq.Lists.List <> <> lib
+R242:256 Coq.Arith.Arith <> <> lib
+R274:307 Coq.Logic.FunctionalExtensionality <> <> lib
+R325:342 Coq.Strings.String <> <> lib
+R360:376 Coq.QArith.QArith <> <> lib
+R386:398 Coq.Lists.List ListNotations <> mod
+def 472:488 <> SecurityParameter
+R493:495 Coq.Init.Datatypes <> nat ind
+def 551:562 <> Microseconds
+R567:569 Coq.Init.Datatypes <> nat ind
+ind 628:631 <> json
+constr 647:651 <> JNull
+constr 664:668 <> JBool
+constr 689:695 <> JString
+constr 720:726 <> JNumber
+constr 746:751 <> JArray
+constr 777:783 <> JObject
+R655:658 LambdaCalculus <> json:1 ind
+R676:679 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R672:675 Coq.Init.Datatypes <> bool ind
+R680:683 LambdaCalculus <> json:1 ind
+R705:708 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R699:704 Coq.Strings.String <> string ind
+R709:712 LambdaCalculus <> json:1 ind
+R733:736 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R730:732 Coq.Init.Datatypes <> nat ind
+R737:740 LambdaCalculus <> json:1 ind
+R764:767 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R755:758 Coq.Init.Datatypes <> list ind
+R760:763 LambdaCalculus <> json:1 ind
+R768:771 LambdaCalculus <> json:1 ind
+R807:810 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R787:790 Coq.Init.Datatypes <> list ind
+R799:801 Coq.Init.Datatypes <> ::type_scope:x_'*'_x not
+R793:798 Coq.Strings.String <> string ind
+R802:805 LambdaCalculus <> json:1 ind
+R811:814 LambdaCalculus <> json:1 ind
+scheme 628:631 <> json_rect
+scheme 628:631 <> json_ind
+scheme 628:631 <> json_rec
+scheme 628:631 <> json_sind
+def 897:906 <> Credential
+R911:916 Coq.Strings.String <> string ind
+def 981:988 <> ClaimSet
+R993:996 Coq.Init.Datatypes <> list ind
+R1005:1007 Coq.Init.Datatypes <> ::type_scope:x_'*'_x not
+R999:1004 Coq.Strings.String <> string ind
+R1008:1011 LambdaCalculus <> json ind
+def 1091:1101 <> PackageType
+R1106:1111 Coq.Strings.String <> string ind
+ind 1226:1243 <> VerificationResult
+constr 1259:1266 <> Verified
+constr 1375:1380 <> Failed
+R1297:1297 Coq.QArith.QArith_base <> Q rec
+binder 1285:1294 <> confidence:5
+R1310:1321 LambdaCalculus <> Microseconds def
+binder 1301:1307 <> time_us:6
+R1335:1342 LambdaCalculus <> ClaimSet def
+binder 1325:1332 <> metadata:7
+R1352:1369 LambdaCalculus <> VerificationResult:3 ind
+R1407:1412 Coq.Strings.String <> string ind
+binder 1399:1404 <> reason:8
+R1425:1436 LambdaCalculus <> Microseconds def
+binder 1416:1422 <> time_us:9
+R1446:1463 LambdaCalculus <> VerificationResult:3 ind
+scheme 1226:1243 <> VerificationResult_rect
+scheme 1226:1243 <> VerificationResult_ind
+scheme 1226:1243 <> VerificationResult_rec
+scheme 1226:1243 <> VerificationResult_sind
+def 1553:1572 <> VerificationFunction
+R1587:1590 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R1577:1586 LambdaCalculus <> Credential def
+R1591:1608 LambdaCalculus <> VerificationResult ind
+def 1664:1680 <> CredentialCreator
+R1693:1696 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R1685:1692 LambdaCalculus <> ClaimSet def
+R1697:1702 Coq.Init.Datatypes <> option ind
+R1704:1713 LambdaCalculus <> Credential def
+def 1775:1793 <> RevocationExtractor
+R1808:1811 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R1798:1807 LambdaCalculus <> Credential def
+R1812:1817 Coq.Strings.String <> string ind
+def 1870:1883 <> ClaimValidator
+R1896:1899 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R1888:1895 LambdaCalculus <> ClaimSet def
+R1900:1903 Coq.Init.Datatypes <> bool ind
+def 2016:2028 <> Ed25519Verify
+R2043:2046 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2033:2042 LambdaCalculus <> Credential def
+R2047:2050 Coq.Init.Datatypes <> bool ind
+def 2132:2143 <> OPRFEvaluate
+R2158:2161 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2148:2157 LambdaCalculus <> Credential def
+R2162:2165 Coq.Init.Datatypes <> bool ind
+def 2235:2250 <> BloomFilterCheck
+R2265:2268 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2255:2264 LambdaCalculus <> Credential def
+R2269:2272 Coq.Init.Datatypes <> bool ind
+def 2338:2346 <> ZKPVerify
+R2361:2364 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2351:2360 LambdaCalculus <> Credential def
+R2365:2368 Coq.Init.Datatypes <> bool ind
+ax 2454:2473 <> extract_package_type
+R2487:2490 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2477:2486 LambdaCalculus <> Credential def
+R2491:2501 LambdaCalculus <> PackageType def
+ax 2548:2559 <> measure_time
+binder 2571:2571 <> A:12
+R2582:2582 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2592:2597 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2614:2614 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2587:2590 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2583:2586 Coq.Init.Datatypes <> unit ind
+R2591:2591 LambdaCalculus <> A:12 var
+R2599:2601 Coq.Init.Datatypes <> ::type_scope:x_'*'_x not
+R2598:2598 LambdaCalculus <> A:12 var
+R2602:2613 LambdaCalculus <> Microseconds def
+def 2703:2720 <> SECURITY_PARAMETER
+R2724:2740 LambdaCalculus <> SecurityParameter def

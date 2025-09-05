@@ -1,0 +1,22 @@
+DIGEST 7d955ae10b5b8adea41dbc461e44f1b1
+Fminimal_test
+R59:61 Coq.micromega.Lia <> <> lib
+prf 103:117 <> test_arithmetic
+R126:128 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R122:124 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+def 204:211 <> MAX_TIME
+prf 228:242 <> timing_positive
+R254:256 Coq.Init.Peano <> ::nat_scope:x_'>'_x not
+R246:253 minimal_test <> MAX_TIME def
+R274:281 minimal_test <> MAX_TIME def
+def 348:359 <> is_universal
+R366:368 Coq.Init.Datatypes <> nat ind
+binder 362:362 <> x:1
+R382:384 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R381:381 minimal_test <> x:1 var
+R385:385 minimal_test <> x:1 var
+prf 394:415 <> universality_reflexive
+binder 426:426 <> n:2
+R429:440 minimal_test <> is_universal def
+R442:442 minimal_test <> n:2 var
+R469:480 minimal_test <> is_universal def

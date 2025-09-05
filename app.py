@@ -411,9 +411,14 @@ def create_app():
             }), 500
 
     @app.route('/pricing')
-    def pricing():
-        """Pricing page"""
-        return render_template('modern/pricing.html')
+def pricing():
+    """Pricing page"""
+    return render_template('modern/pricing.html')
+
+@app.route('/integrate')
+def integrate():
+    """Simple integration wizard"""
+    return render_template('integrate.html')
 
     @app.route('/playground')
     def playground():

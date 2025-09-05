@@ -105,3 +105,5 @@ Write-Host "  make check                 # Syntax check only" -ForegroundColor W
 Write-Host "  make doc                   # Generate documentation" -ForegroundColor White
 
 Write-Host "`nInstallation complete! 🎯" -ForegroundColor Green
+
+

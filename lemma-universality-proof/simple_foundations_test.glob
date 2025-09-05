@@ -1,0 +1,52 @@
+DIGEST 1ae8767e464f345f6816bf3ad8eb9bc8
+Fsimple_foundations_test
+R60:73 Coq.Lists.List <> <> lib
+R91:105 Coq.Arith.Arith <> <> lib
+R123:140 Coq.Strings.String <> <> lib
+R158:174 Coq.QArith.QArith <> <> lib
+R192:194 Coq.micromega.Lia <> <> lib
+R204:216 Coq.Lists.List ListNotations <> mod
+def 250:266 <> SecurityParameter
+R271:273 Coq.Init.Datatypes <> nat ind
+def 287:298 <> Microseconds
+R303:305 Coq.Init.Datatypes <> nat ind
+def 319:328 <> Credential
+R333:338 Coq.Strings.String <> string ind
+ind 386:403 <> VerificationResult
+constr 419:426 <> Verified
+constr 536:541 <> Failed
+R450:450 Coq.QArith.QArith_base <> Q rec
+binder 438:447 <> confidence:3
+R463:474 simple_foundations_test <> Microseconds def
+binder 454:460 <> time_us:4
+R488:491 Coq.Init.Datatypes <> list ind
+R500:502 Coq.Init.Datatypes <> ::type_scope:x_'*'_x not
+R494:499 Coq.Strings.String <> string ind
+R503:508 Coq.Strings.String <> string ind
+binder 478:485 <> metadata:5
+R513:530 simple_foundations_test <> VerificationResult:1 ind
+R561:566 Coq.Strings.String <> string ind
+binder 553:558 <> reason:6
+R579:590 simple_foundations_test <> Microseconds def
+binder 570:576 <> time_us:7
+R594:611 simple_foundations_test <> VerificationResult:1 ind
+scheme 386:403 <> VerificationResult_rect
+scheme 386:403 <> VerificationResult_ind
+scheme 386:403 <> VerificationResult_rec
+scheme 386:403 <> VerificationResult_sind
+def 643:660 <> SECURITY_PARAMETER
+R664:680 simple_foundations_test <> SecurityParameter def
+def 707:727 <> MAX_VERIFICATION_TIME
+R731:742 simple_foundations_test <> Microseconds def
+prf 789:809 <> timing_bound_positive
+R835:837 Coq.Init.Peano <> ::nat_scope:x_'>'_x not
+R814:834 simple_foundations_test <> MAX_VERIFICATION_TIME def
+R862:882 simple_foundations_test <> MAX_VERIFICATION_TIME def
+prf 946:968 <> verification_has_timing
+R987:1004 simple_foundations_test <> VerificationResult ind
+binder 982:983 <> vr:8
+R1016:1017 simple_foundations_test <> vr:8 var
+R1028:1035 simple_foundations_test <> Verified constr
+R1054:1057 Coq.Init.Peano <> ::nat_scope:x_'>='_x not
+R1069:1074 simple_foundations_test <> Failed constr
+R1091:1094 Coq.Init.Peano <> ::nat_scope:x_'>='_x not

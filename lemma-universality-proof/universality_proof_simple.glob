@@ -1,0 +1,248 @@
+DIGEST fed12321cfe03f7fe9bcbfcbba190795
+Funiversality_proof_simple
+R61:74 Coq.Lists.List <> <> lib
+R92:106 Coq.Arith.Arith <> <> lib
+R124:141 Coq.Strings.String <> <> lib
+R159:175 Coq.QArith.QArith <> <> lib
+R193:195 Coq.micromega.Lia <> <> lib
+R205:217 Coq.Lists.List ListNotations <> mod
+def 254:270 <> SecurityParameter
+R275:277 Coq.Init.Datatypes <> nat ind
+def 291:302 <> Microseconds
+R307:309 Coq.Init.Datatypes <> nat ind
+def 323:332 <> Credential
+R337:342 Coq.Strings.String <> string ind
+def 356:366 <> PackageType
+R371:376 Coq.Strings.String <> string ind
+ind 418:435 <> VerificationResult
+constr 451:458 <> Verified
+constr 533:538 <> Failed
+R482:482 Coq.QArith.QArith_base <> Q rec
+binder 470:479 <> confidence:3
+R495:506 universality_proof_simple <> Microseconds def
+binder 486:492 <> time_us:4
+R510:527 universality_proof_simple <> VerificationResult:1 ind
+R558:563 Coq.Strings.String <> string ind
+binder 550:555 <> reason:5
+R576:587 universality_proof_simple <> Microseconds def
+binder 567:573 <> time_us:6
+R591:608 universality_proof_simple <> VerificationResult:1 ind
+scheme 418:435 <> VerificationResult_rect
+scheme 418:435 <> VerificationResult_ind
+scheme 418:435 <> VerificationResult_rec
+scheme 418:435 <> VerificationResult_sind
+def 652:671 <> VerificationFunction
+R686:689 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R676:685 universality_proof_simple <> Credential def
+R690:707 universality_proof_simple <> VerificationResult ind
+rec 746:764 <> VerificationPackage
+proj 773:784 <> package_type
+proj 803:819 <> verify_credential
+proj 847:867 <> max_verification_time
+proj 887:904 <> security_parameter
+R788:798 universality_proof_simple <> PackageType def
+R823:842 universality_proof_simple <> VerificationFunction def
+R871:882 universality_proof_simple <> Microseconds def
+R908:924 universality_proof_simple <> SecurityParameter def
+def 960:968 <> LemmaCore
+R973:976 Coq.Init.Datatypes <> list ind
+R978:996 universality_proof_simple <> VerificationPackage rec
+def 1031:1047 <> STANDARD_SECURITY
+R1051:1067 universality_proof_simple <> SecurityParameter def
+def 1094:1114 <> MAX_VERIFICATION_TIME
+R1118:1129 universality_proof_simple <> Microseconds def
+def 1262:1287 <> strict_well_formed_package
+R1296:1314 universality_proof_simple <> VerificationPackage rec
+binder 1290:1292 <> pkg:12
+R1362:1367 Coq.Init.Logic <> ::type_scope:x_'/\'_x not
+R1347:1350 Coq.Init.Logic <> ::type_scope:x_'<>'_x not
+R1334:1345 universality_proof_simple <> package_type proj
+R1329:1331 universality_proof_simple <> pkg:12 var
+R1351:1361 Coq.Strings.String <> EmptyString constr
+R1412:1417 Coq.Init.Logic <> ::type_scope:x_'/\'_x not
+R1392:1394 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R1373:1390 universality_proof_simple <> security_parameter proj
+R1368:1370 universality_proof_simple <> pkg:12 var
+R1395:1411 universality_proof_simple <> STANDARD_SECURITY def
+R1446:1449 Coq.Init.Peano <> ::nat_scope:x_'<='_x not
+R1424:1444 universality_proof_simple <> max_verification_time proj
+R1419:1421 universality_proof_simple <> pkg:12 var
+R1450:1470 universality_proof_simple <> MAX_VERIFICATION_TIME def
+def 1521:1543 <> strict_well_formed_core
+R1553:1561 universality_proof_simple <> LemmaCore def
+binder 1546:1549 <> core:13
+R1576:1581 Coq.Lists.List <> Forall ind
+R1610:1613 universality_proof_simple <> core:13 var
+R1583:1608 universality_proof_simple <> strict_well_formed_package def
+def 1731:1749 <> crypto_universality
+R1759:1767 universality_proof_simple <> LemmaCore def
+binder 1752:1755 <> core:14
+R1801:1819 universality_proof_simple <> VerificationPackage rec
+binder 1789:1792 <> pkg1:15
+binder 1794:1797 <> pkg2:16
+R1836:1839 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R1824:1825 Coq.Lists.List <> In def
+R1832:1835 universality_proof_simple <> core:14 var
+R1827:1830 universality_proof_simple <> pkg1:15 var
+R1852:1857 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R1840:1841 Coq.Lists.List <> In def
+R1848:1851 universality_proof_simple <> core:14 var
+R1843:1846 universality_proof_simple <> pkg2:16 var
+R1883:1885 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R1864:1881 universality_proof_simple <> security_parameter proj
+R1858:1861 universality_proof_simple <> pkg1:15 var
+R1892:1909 universality_proof_simple <> security_parameter proj
+R1886:1889 universality_proof_simple <> pkg2:16 var
+def 1991:2014 <> performance_universality
+R2024:2032 universality_proof_simple <> LemmaCore def
+binder 2017:2020 <> core:17
+R2060:2078 universality_proof_simple <> VerificationPackage rec
+binder 2054:2056 <> pkg:18
+R2094:2099 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2083:2084 Coq.Lists.List <> In def
+R2090:2093 universality_proof_simple <> core:17 var
+R2086:2088 universality_proof_simple <> pkg:18 var
+R2128:2131 Coq.Init.Peano <> ::nat_scope:x_'<='_x not
+R2106:2126 universality_proof_simple <> max_verification_time proj
+R2101:2103 universality_proof_simple <> pkg:18 var
+R2132:2152 universality_proof_simple <> MAX_VERIFICATION_TIME def
+def 2239:2259 <> security_universality
+R2269:2277 universality_proof_simple <> LemmaCore def
+binder 2262:2265 <> core:19
+R2305:2323 universality_proof_simple <> VerificationPackage rec
+binder 2299:2301 <> pkg:20
+R2339:2344 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2328:2329 Coq.Lists.List <> In def
+R2335:2338 universality_proof_simple <> core:19 var
+R2331:2333 universality_proof_simple <> pkg:20 var
+R2369:2371 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R2350:2367 universality_proof_simple <> security_parameter proj
+R2345:2347 universality_proof_simple <> pkg:20 var
+R2372:2388 universality_proof_simple <> STANDARD_SECURITY def
+def 2432:2450 <> is_universal_engine
+R2460:2468 universality_proof_simple <> LemmaCore def
+binder 2453:2456 <> core:21
+R2507:2512 Coq.Init.Logic <> ::type_scope:x_'/\'_x not
+R2483:2501 universality_proof_simple <> crypto_universality def
+R2503:2506 universality_proof_simple <> core:21 var
+R2542:2547 Coq.Init.Logic <> ::type_scope:x_'/\'_x not
+R2513:2536 universality_proof_simple <> performance_universality def
+R2538:2541 universality_proof_simple <> core:21 var
+R2548:2568 universality_proof_simple <> security_universality def
+R2570:2573 universality_proof_simple <> core:21 var
+prf 2682:2706 <> lemma_engine_universality
+R2727:2735 universality_proof_simple <> LemmaCore def
+binder 2720:2723 <> core:22
+R2769:2774 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R2741:2763 universality_proof_simple <> strict_well_formed_core def
+R2765:2768 universality_proof_simple <> core:22 var
+R2775:2793 universality_proof_simple <> is_universal_engine def
+R2795:2798 universality_proof_simple <> core:22 var
+R2837:2855 universality_proof_simple <> is_universal_engine def
+R2929:2947 universality_proof_simple <> crypto_universality def
+R3052:3077 universality_proof_simple <> strict_well_formed_package def
+R3052:3077 universality_proof_simple <> strict_well_formed_package def
+R3105:3127 universality_proof_simple <> strict_well_formed_core def
+R3152:3164 Coq.Lists.List <> Forall_forall thm
+R3152:3164 Coq.Lists.List <> Forall_forall thm
+R3152:3164 Coq.Lists.List <> Forall_forall thm
+R3231:3256 universality_proof_simple <> strict_well_formed_package def
+R3231:3256 universality_proof_simple <> strict_well_formed_package def
+R3284:3306 universality_proof_simple <> strict_well_formed_core def
+R3331:3343 Coq.Lists.List <> Forall_forall thm
+R3331:3343 Coq.Lists.List <> Forall_forall thm
+R3331:3343 Coq.Lists.List <> Forall_forall thm
+R3448:3473 universality_proof_simple <> strict_well_formed_package def
+R3653:3669 universality_proof_simple <> STANDARD_SECURITY def
+R3772:3795 universality_proof_simple <> performance_universality def
+R3841:3866 universality_proof_simple <> strict_well_formed_package def
+R3841:3866 universality_proof_simple <> strict_well_formed_package def
+R3893:3915 universality_proof_simple <> strict_well_formed_core def
+R3940:3952 Coq.Lists.List <> Forall_forall thm
+R3940:3952 Coq.Lists.List <> Forall_forall thm
+R3940:3952 Coq.Lists.List <> Forall_forall thm
+R4010:4035 universality_proof_simple <> strict_well_formed_package def
+R4160:4180 universality_proof_simple <> security_universality def
+R4226:4251 universality_proof_simple <> strict_well_formed_package def
+R4226:4251 universality_proof_simple <> strict_well_formed_package def
+R4278:4300 universality_proof_simple <> strict_well_formed_core def
+R4325:4337 Coq.Lists.List <> Forall_forall thm
+R4325:4337 Coq.Lists.List <> Forall_forall thm
+R4325:4337 Coq.Lists.List <> Forall_forall thm
+R4395:4420 universality_proof_simple <> strict_well_formed_package def
+def 4575:4590 <> identity_package
+R4594:4612 universality_proof_simple <> VerificationPackage rec
+R4622:4633 universality_proof_simple <> package_type proj
+R4622:4633 universality_proof_simple <> package_type proj
+R4622:4633 universality_proof_simple <> package_type proj
+R4659:4675 universality_proof_simple <> verify_credential proj
+R4659:4675 universality_proof_simple <> verify_credential proj
+R4732:4752 universality_proof_simple <> max_verification_time proj
+R4732:4752 universality_proof_simple <> max_verification_time proj
+R4771:4788 universality_proof_simple <> security_parameter proj
+R4771:4788 universality_proof_simple <> security_parameter proj
+R4689:4694 universality_proof_simple <> Failed constr
+R4793:4809 universality_proof_simple <> STANDARD_SECURITY def
+prf 4872:4899 <> identity_package_well_formed
+R4903:4928 universality_proof_simple <> strict_well_formed_package def
+R4930:4945 universality_proof_simple <> identity_package def
+R4964:4989 universality_proof_simple <> strict_well_formed_package def
+R4992:5007 universality_proof_simple <> identity_package def
+R5067:5083 universality_proof_simple <> STANDARD_SECURITY def
+R5110:5130 universality_proof_simple <> MAX_VERIFICATION_TIME def
+def 5175:5186 <> example_core
+R5190:5198 universality_proof_simple <> LemmaCore def
+R5203:5203 Coq.Lists.List ListNotations ::list_scope:'['_x_']' not
+R5220:5220 Coq.Lists.List ListNotations ::list_scope:'['_x_']' not
+R5204:5219 universality_proof_simple <> identity_package def
+prf 5276:5299 <> example_core_well_formed
+R5303:5325 universality_proof_simple <> strict_well_formed_core def
+R5327:5338 universality_proof_simple <> example_core def
+R5357:5379 universality_proof_simple <> strict_well_formed_core def
+R5382:5393 universality_proof_simple <> example_core def
+R5421:5448 universality_proof_simple <> identity_package_well_formed thm
+R5421:5448 universality_proof_simple <> identity_package_well_formed thm
+prf 5529:5550 <> example_core_universal
+R5554:5572 universality_proof_simple <> is_universal_engine def
+R5574:5585 universality_proof_simple <> example_core def
+R5603:5627 universality_proof_simple <> lemma_engine_universality thm
+R5603:5627 universality_proof_simple <> lemma_engine_universality thm
+R5638:5661 universality_proof_simple <> example_core_well_formed thm
+R5638:5661 universality_proof_simple <> example_core_well_formed thm
+prf 5765:5793 <> all_packages_128_bit_security
+R5812:5830 universality_proof_simple <> VerificationPackage rec
+binder 5806:5808 <> pkg:23
+R5854:5859 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R5835:5836 Coq.Lists.List <> In def
+R5842:5853 universality_proof_simple <> example_core def
+R5838:5840 universality_proof_simple <> pkg:23 var
+R5884:5887 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R5895:5895 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R5865:5882 universality_proof_simple <> security_parameter proj
+R5860:5862 universality_proof_simple <> pkg:23 var
+R5942:5960 universality_proof_simple <> is_universal_engine def
+R5962:5973 universality_proof_simple <> example_core def
+R5942:5960 universality_proof_simple <> is_universal_engine def
+R5962:5973 universality_proof_simple <> example_core def
+R5987:6008 universality_proof_simple <> example_core_universal thm
+R5987:6008 universality_proof_simple <> example_core_universal thm
+R6022:6040 universality_proof_simple <> is_universal_engine def
+R6103:6123 universality_proof_simple <> security_universality def
+prf 6225:6248 <> all_packages_meet_timing
+R6267:6285 universality_proof_simple <> VerificationPackage rec
+binder 6261:6263 <> pkg:24
+R6309:6314 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R6290:6291 Coq.Lists.List <> In def
+R6297:6308 universality_proof_simple <> example_core def
+R6293:6295 universality_proof_simple <> pkg:24 var
+R6343:6346 Coq.Init.Peano <> ::nat_scope:x_'<='_x not
+R6321:6341 universality_proof_simple <> max_verification_time proj
+R6316:6318 universality_proof_simple <> pkg:24 var
+R6402:6420 universality_proof_simple <> is_universal_engine def
+R6422:6433 universality_proof_simple <> example_core def
+R6402:6420 universality_proof_simple <> is_universal_engine def
+R6422:6433 universality_proof_simple <> example_core def
+R6447:6468 universality_proof_simple <> example_core_universal thm
+R6447:6468 universality_proof_simple <> example_core_universal thm
+R6482:6500 universality_proof_simple <> is_universal_engine def
+R6559:6582 universality_proof_simple <> performance_universality def

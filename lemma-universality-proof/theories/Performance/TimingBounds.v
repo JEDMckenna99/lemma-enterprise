@@ -184,3 +184,5 @@ Qed.
 
 Print "✅ Performance timing bounds proven!".
 Print "🎯 All packages meet ≤4.176μs verification time!".
+
+
