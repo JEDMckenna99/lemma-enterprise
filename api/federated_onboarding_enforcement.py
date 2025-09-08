@@ -6,6 +6,7 @@ Ensures verification card OR bot shield verification are the valid paths for fed
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 import logging
+import json
 from datetime import datetime, timedelta
 
 from .database import get_db, UserLemma, Customer
@@ -37,26 +38,56 @@ def validate_federated_identity_source(credential):
     issuer = credential.get('issuer', '')
     verification_method = credential.get('proof', {}).get('verificationMethod', '')
     
-    # Valid sources for federated identity (verification card AND bot shield verification)
-    valid_sources = [
-        'did:lemma:verification-card',
-        'did:lemma:platform:verification',
-        'did:lemma:shield:verification',
-        'did:lemma:bot-shield:verification',
-        'did:lemma:stripe:identity',
-        'did:lemma:federated:verification'
-    ]
+    # Validate that issuer DID is properly formatted with real public key
+    def is_valid_did_format(did):
+        parts = did.split(':')
+        if len(parts) != 3 or parts[0] != 'did' or parts[1] != 'lemma':
+            return False
+        # Check that the third part is a valid 64-character hex string (Ed25519 public key)
+        public_key_hex = parts[2]
+        try:
+            int(public_key_hex, 16)  # Validate hex
+            return len(public_key_hex) == 64
+        except ValueError:
+            return False
     
-    # Check if issuer indicates verification card origin
-    is_verification_card = any(source in issuer for source in valid_sources)
+    # Check if issuer DID is properly formatted
+    is_valid_issuer = is_valid_did_format(issuer)
     
-    # Check verification method
-    is_proper_verification = any(source in verification_method for source in valid_sources)
+    # Check verification method DID format
+    is_valid_verification_method = is_valid_did_format(verification_method)
     
     # Check claims for verification card indicators
     claims = credential.get('claims', {})
     verification_source = claims.get('verificationSource', '')
     is_human_verified = claims.get('isHuman', False)
+    
+    # CRITICAL: Verify the credential using real crypto engine
+    crypto_verification_result = None
+    try:
+        from lemma_crypto import PyOptimizedVerifier
+        verifier = PyOptimizedVerifier()
+        
+        # Verify the credential cryptographically
+        verification_result = verifier.verify_credential(json.dumps(credential))
+        crypto_verification_result = {
+            'verified': verification_result.verified,
+            'signature_valid': verification_result.signature_valid,
+            'not_revoked': verification_result.not_revoked,
+            'confidence': verification_result.confidence
+        }
+        
+        logger.info(f"🔐 Crypto verification: verified={verification_result.verified}, signature={verification_result.signature_valid}, not_revoked={verification_result.not_revoked}")
+        
+    except Exception as e:
+        logger.error(f"❌ Crypto verification failed: {e}")
+        crypto_verification_result = {
+            'verified': False,
+            'signature_valid': False,
+            'not_revoked': False,
+            'confidence': 0.0,
+            'error': str(e)
+        }
     
     if is_verification_card or is_proper_verification:
         # Determine specific source type
@@ -66,19 +97,27 @@ def validate_federated_identity_source(credential):
         elif 'stripe' in issuer or 'stripe' in verification_source:
             source_type = 'stripe_identity_verification'
         
+        # Final validation requires BOTH format validation AND crypto verification
+        final_valid = (is_valid_issuer and is_valid_verification_method and 
+                      crypto_verification_result and crypto_verification_result['verified'])
+        
         return {
-            'valid': True,
+            'valid': final_valid,
             'source': source_type,
             'verification_method': verification_method,
-            'human_verified': is_human_verified
+            'human_verified': is_human_verified,
+            'crypto_verification': crypto_verification_result,
+            'did_format_valid': is_valid_issuer and is_valid_verification_method
         }
     
-    # Reject non-verification-card sources for federated identity
+    # Reject invalid credentials
     return {
         'valid': False,
-        'reason': f'Invalid source for federated identity: {issuer}',
+        'reason': f'Invalid federated identity credential',
         'source': 'invalid',
-        'required_source': 'verification_card_only'
+        'crypto_verification': crypto_verification_result,
+        'did_format_valid': is_valid_issuer and is_valid_verification_method,
+        'required': 'valid_did_format_and_crypto_verification'
     }
 
 @federated_onboarding_bp.route('/api/federated/validate-identity-source', methods=['POST'])

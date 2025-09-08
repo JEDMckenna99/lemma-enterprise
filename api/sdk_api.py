@@ -706,15 +706,28 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_re
     # Attempt to distribute DID to network (non-blocking)
     distribute_did_to_network(issuer_did, issuer_public_key, issuer_info)
     
-    # Use Rust engine to create the credential instead of Python
+    # Use REAL crypto engine to create properly signed credential
     try:
-        from lemma_crypto import PyLemmaCore
-        rust_engine = PyLemmaCore()
-        logger.info("🦀 Using Rust engine for enhanced identity credential creation")
+        from lemma_crypto import PyMinimalIssuer
         
-        # Use Rust engine's FEDERATED method to create identity credential from Stripe KYC
-        # This ensures the cryptographic core creates the credential with proper signatures AND federation support
-        credential_json = rust_engine.create_federated_identity_credential_from_stripe(user_id, session_id)
+        # Create real issuer with Ed25519 keypair for federated identity
+        federated_issuer = PyMinimalIssuer()
+        logger.info(f"🦀 Creating federated identity credential with real Ed25519 issuer: {federated_issuer.get_did()[:50]}...")
+        
+        # Create enhanced identity claims
+        identity_claims = {
+            "packageType": "identity",
+            "isHuman": "true", 
+            "verificationMethod": "stripe_identity",
+            "verificationLevel": "high",
+            "stripe_session_id": session_id,
+            "stripe_verification_data": json.dumps(stripe_result),
+            "verified_at": str(int(time.time())),
+            "network_type": "federated_identity"
+        }
+        
+        # Issue properly signed credential
+        credential_json = federated_issuer.issue_credential(user_id, identity_claims)
         
         # Parse the JSON response from Rust
         credential = json.loads(credential_json)

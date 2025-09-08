@@ -322,9 +322,26 @@ def create_lemma_credential(user_id: str, stripe_session_id: str) -> Dict[str, A
     try:
         logger.info(f"🦀 Creating lemma credential using Rust engine for user {user_id}")
         
-        # Use Rust engine's FEDERATED method to create identity credential from Stripe KYC
-        # This ensures the cryptographic core creates the credential with proper signatures AND federation support
-        credential_json = rust_engine.create_federated_identity_credential_from_stripe(user_id, stripe_session_id)
+        # Use REAL crypto engine to create properly signed identity credential
+        # Create federated identity credential with real Ed25519 signature
+        federated_issuer = PyMinimalIssuer()  # Create real issuer with Ed25519 keypair
+        
+        # Create identity claims for federated network
+        identity_claims = {
+            "packageType": "identity",
+            "isHuman": "true",
+            "verificationMethod": "stripe_identity",
+            "verificationLevel": "high",
+            "stripe_session_id": stripe_session_id,
+            "verified_at": str(current_time),
+            "network_type": "federated_identity"
+        }
+        
+        # Issue properly signed credential
+        credential_json = federated_issuer.issue_credential(
+            f"did:lemma:federated:user:{user_id}",
+            identity_claims
+        )
         
         # Parse the JSON response from Rust
         credential = json.loads(credential_json)

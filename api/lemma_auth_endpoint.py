@@ -8,6 +8,7 @@ from flask_cors import cross_origin
 from datetime import datetime, timedelta
 import logging
 import secrets
+import json
 
 from .database import get_db, Customer as DBCustomer
 from .customer_accounts import customer_manager
@@ -116,21 +117,21 @@ def lemma_signin():
         session['lemma_verified'] = True
         session['verification_time_us'] = verification_result.get('verification_time_us', 0)
         
-        # Issue fresh permission lemma for the session (client-side storage)
+        # Issue fresh permission lemma using REAL crypto engine
         permission_lemma_data = None
         if customer:
-            import time
-            current_time = int(time.time())
-            user_did = f"did:lemma:customer:{customer.customer_id}"
-            
-            permission_lemma_data = {
-                'id': f"session_perm_{secrets.token_hex(16)}",
-                'issuer': 'did:lemma:platform:lemma.id',
-                'subject': user_did,
-                'packageType': 'permission',
-                'issued_at': current_time,
-                'expires_at': current_time + (90 * 24 * 60 * 60),  # 90 days
-                'claims': {
+            try:
+                from lemma_crypto import PyMinimalIssuer
+                
+                # Create real IAM issuer with Ed25519 keypair
+                iam_issuer = PyMinimalIssuer()
+                logger.info(f"🔐 Creating IAM permission lemma with real issuer: {iam_issuer.get_did()[:50]}...")
+                
+                import time
+                current_time = int(time.time())
+                
+                # Create permission claims
+                permission_claims = {
                     'packageType': 'permission',
                     'siteId': 'lemma.id',
                     'permissionId': f'{user_role}_access',
@@ -138,18 +139,24 @@ def lemma_signin():
                     'email': user_email,
                     'customerId': customer.customer_id,
                     'authMethod': 'lemma_wallet',
-                    'verificationTimeUs': verification_result.get('verification_time_us', 0),
-                    'networkShared': True,
-                    'grantedBy': 'did:lemma:platform:lemma.id',
-                    'grantedAt': current_time,
-                    'scope': ['users:*', 'sites:*', 'permissions:*', 'billing:*', 'analytics:*'] if user_role == 'admin' else ['profile:read', 'profile:write', 'billing:read', 'usage:read']
-                },
-                'proof': {
-                    'type': 'Ed25519Signature2020',
-                    'created': current_time,
-                    'verificationMethod': 'did:lemma:platform:lemma.id',
-                    'signatureValue': f"lemma_wallet_sig_{secrets.token_hex(32)}"
+                    'verificationTimeUs': str(verification_result.get('verification_time_us', 0)),
+                    'networkShared': 'false',  # IAM permissions are site-specific
+                    'grantedAt': str(current_time),
+                    'scope': ','.join(['users:*', 'sites:*', 'permissions:*', 'billing:*', 'analytics:*'] if user_role == 'admin' else ['profile:read', 'profile:write', 'billing:read', 'usage:read'])
                 }
+                
+                # Issue properly signed permission lemma
+                permission_lemma_json = iam_issuer.issue_credential(
+                    f"did:lemma:customer:{customer.customer_id}",
+                    permission_claims
+                )
+                
+                permission_lemma_data = json.loads(permission_lemma_json)
+                logger.info(f"✅ Real IAM permission lemma created: {permission_lemma_data['id']}")
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to create real IAM permission lemma: {e}")
+                permission_lemma_data = None
             }
         
         logger.info(f"✅ Lemma wallet authentication successful for {user_email}")
