@@ -1,0 +1,19 @@
+{
+  "test_timestamp": 1757370934,
+  "test_type": "heroku_real_crypto_deployment",
+  "results": {
+    "test_type": "heroku_real_crypto_optimized",
+    "success": true,
+    "num_tests": 20,
+    "success_rate_percent": 100.0,
+    "cache_hit_rate_percent": 0.0,
+    "credential_type": "Real Ed25519 signed credential",
+    "performance": {
+      "average_time_us": 337.475,
+      "median_time_us": 334.277,
+      "min_time_us": 319.188,
+      "max_time_us": 361.039,
+      "throughput_per_second": 2963
+    }
+  }
+}

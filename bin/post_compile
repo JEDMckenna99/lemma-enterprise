@@ -1,0 +1,41 @@
+#!/bin/bash
+# Heroku post-compile script for lemma-crypto deployment
+
+echo "🔐 Post-compile: Building real crypto engine..."
+
+# Change to lemma-crypto directory
+cd lemma-crypto
+
+# Build the Python bindings with maturin
+echo "📦 Building lemma-crypto Python bindings..."
+maturin build --release --features python --interpreter python
+
+# Install the built wheel
+echo "🔧 Installing lemma-crypto..."
+pip install target/wheels/*.whl
+
+# Verify installation
+echo "✅ Verifying crypto engine installation..."
+python -c "
+try:
+    import lemma_crypto
+    print('✅ lemma_crypto imported successfully')
+    
+    # Test basic functionality
+    issuer = lemma_crypto.PyMinimalIssuer()
+    print(f'✅ Issuer created: {issuer.get_did()[:30]}...')
+    
+    verifier = lemma_crypto.PyOptimizedVerifier()
+    print('✅ Optimized verifier created')
+    
+    print('🎉 REAL CRYPTO ENGINE READY FOR PRODUCTION!')
+    
+except ImportError as e:
+    print(f'❌ Import failed: {e}')
+    exit(1)
+except Exception as e:
+    print(f'❌ Crypto engine test failed: {e}')
+    exit(1)
+"
+
+echo "🏆 Post-compile complete - real crypto engine deployed!"

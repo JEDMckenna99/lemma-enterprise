@@ -102,15 +102,17 @@ def distribute_revocation_to_network(credential_id: str, oprf_evaluation: str, b
         logger.warning(f"⚠️ Network revocation distribution failed: {e}")
         return False
 
-# Try to import Rust engine
+# Import REAL working crypto engine
 try:
-    from lemma_crypto import PyLemmaCore
-    rust_engine = PyLemmaCore()
+    from lemma_crypto import PyCompleteVerifier, PyOptimizedVerifier
+    # Use optimized verifier for production (caching + performance)
+    rust_engine = PyOptimizedVerifier()
     RUST_ENGINE_AVAILABLE = True
-    logger.info("✅ Rust engine loaded for SDK API")
-except ImportError:
+    logger.info("✅ REAL Lemma crypto engine loaded (Ed25519 + OPRF + optimizations)")
+except ImportError as e:
     RUST_ENGINE_AVAILABLE = False
-    logger.warning("⚠️ Rust engine not available for SDK API")
+    logger.error(f"❌ REAL crypto engine not available: {e}")
+    rust_engine = None
 
 def validate_api_key(f):
     """Validate API key for SDK requests"""
@@ -164,15 +166,15 @@ def check_credentials():
         enable_rust_engine = data.get('enableRustEngine', True)
         require_full_crypto = data.get('requireFullCrypto', False)
         
-        # Priority 1: Verify client-provided credentials using REAL Rust crypto engine
+        # Priority 1: Verify client-provided credentials using REAL optimized crypto engine
         if client_credentials and RUST_ENGINE_AVAILABLE and enable_rust_engine:
-            logger.info(f"🔐 Using REAL Rust Crypto Engine (Ed25519 + OPRF + Bloom + ZKP) for {len(client_credentials)} credentials")
+            logger.info(f"🔐 Using REAL Optimized Crypto Engine (Ed25519 + OPRF + caching) for {len(client_credentials)} credentials")
             
             for credential in client_credentials:
                 try:
                     rust_start = time.perf_counter_ns()
                     
-                    # Call REAL Lemma Crypto Engine with full cryptographic verification
+                    # Call REAL optimized crypto engine with caching
                     result = rust_engine.verify_credential(
                         json.dumps(credential) if isinstance(credential, dict) else credential
                     )
@@ -182,23 +184,34 @@ def check_credentials():
                     
                     end_time = time.time()
                     
-                    logger.info(f"✅ REAL CRYPTO ENGINE result: verified={result.verified}, confidence={result.confidence:.3f}, time={verification_time_us:.2f}µs")
+                    logger.info(f"✅ REAL OPTIMIZED CRYPTO result: verified={result.verified}, confidence={result.confidence:.3f}, time={verification_time_us:.2f}µs, cached={result.cache_hit}")
                     
                     return jsonify({
                         'success': True,
                         'verified': result.verified,
+                        'signature_valid': result.signature_valid,
+                        'not_revoked': result.not_revoked,
                         'confidence': result.confidence,
-                        'verification_time_us': verification_time_us,
-                        'total_time_ms': (end_time - start_time) * 1000,
-                        'method': 'rust_crypto_engine',
-                        'crypto_components': ['Ed25519', 'OPRF', 'Bloom', 'ZKP'],
-                        'engine_version': 'lemma_crypto_v0.1.0',
-                        'offline': result.offline if hasattr(result, 'offline') else False,
+                        'verification_time_ns': result.verification_time_ns,
+                        'signature_time_ns': result.signature_time_ns,
+                        'revocation_time_ns': result.revocation_time_ns,
+                        'total_time_us': verification_time_us,
+                        'cache_hit': result.cache_hit,
+                        'optimization_used': result.optimization_used,
+                        'method': 'real_crypto_optimized',
+                        'crypto_components': ['Ed25519', 'OPRF', 'Bloom'],
+                        'engine_version': 'lemma_crypto_v0.1.1_optimized',
+                        'offline': True,
                         'details': {
                             'credential_id': credential.get('id', 'unknown'),
                             'package_type': credential.get('claims', {}).get('packageType', 'unknown'),
-                            'rust_engine_used': True,
-                            'full_crypto_verification': True
+                            'issuer_did': result.issuer_did,
+                            'real_crypto_used': True,
+                            'optimizations_active': True,
+                            'performance_breakdown': {
+                                'signature_pct': round((result.signature_time_ns / result.verification_time_ns) * 100, 1),
+                                'revocation_pct': round((result.revocation_time_ns / result.verification_time_ns) * 100, 1)
+                            }
                         }
                     })
                     
@@ -1128,20 +1141,17 @@ def verify_offline():
             from api.rust_optimizer import rust_engine, RUST_ENGINE_AVAILABLE
             
             if not RUST_ENGINE_AVAILABLE:
-                # Fallback to simulated timing based on your 6μs benchmark
-                engine_time_us = 4 + (time.perf_counter_ns() % 8)  # 4-12μs range
                 return jsonify({
-                    'success': True,
-                    'verified': True,
-                    'confidence': 1.0,
-                    'verification_time_us': engine_time_us,
-                    'engine_time_us': engine_time_us,
+                    'success': False,
+                    'error': 'crypto_engine_not_available',
+                    'message': 'Real cryptographic verification engine not available',
+                    'verified': False,
+                    'confidence': 0.0,
                     'offline': True,
-                    'engine': 'simulated_6us_target',
-                    'note': 'Rust engine not available, using 6μs simulation'
-                })
+                    'note': 'REAL crypto engine required - no simulation fallback'
+                }), 500
             
-            # Call the REAL Rust engine for pure cryptographic verification
+            # Call the REAL optimized crypto engine
             result = rust_engine.verify_credential(
                 json.dumps(credential) if isinstance(credential, dict) else credential
             )
@@ -1149,37 +1159,39 @@ def verify_offline():
             rust_end = time.perf_counter_ns()
             engine_time_us = (rust_end - rust_start) / 1000  # Convert nanoseconds to microseconds
             
-            logger.info(f"⚡ Pure Rust engine verification: {engine_time_us:.1f}μs, verified={result.verified}")
+            logger.info(f"⚡ REAL crypto verification: {engine_time_us:.1f}μs, verified={result.verified}, cached={result.cache_hit}")
             
             return jsonify({
                 'success': True,
                 'verified': result.verified,
+                'signature_valid': result.signature_valid,
+                'not_revoked': result.not_revoked,
                 'confidence': result.confidence,
-                'verification_time_us': engine_time_us,
-                'engine_time_us': engine_time_us,
+                'verification_time_ns': result.verification_time_ns,
+                'signature_time_ns': result.signature_time_ns,
+                'revocation_time_ns': result.revocation_time_ns,
+                'total_time_us': engine_time_us,
+                'cache_hit': result.cache_hit,
+                'optimization_used': result.optimization_used,
                 'offline': True,
-                'engine': 'rust_crypto_engine_pure',
-                'cryptographic_components': ['Ed25519', 'OPRF', 'Bloom', 'ZKP'],
-                'performance_target': '6μs',
-                'actual_time_us': engine_time_us
+                'engine': 'real_crypto_optimized',
+                'cryptographic_components': ['Ed25519', 'OPRF', 'Bloom'],
+                'performance_note': 'Real cryptographic verification with optimizations'
             })
             
         except Exception as rust_error:
-            logger.warning(f"Rust engine verification failed: {rust_error}")
-            
-            # Fallback to simulated timing that matches your benchmark
-            fallback_time_us = 6.0 + (time.perf_counter_ns() % 4000) / 1000  # 6-10μs realistic range
+            logger.error(f"❌ REAL crypto engine verification failed: {rust_error}")
             
             return jsonify({
-                'success': True,
-                'verified': True,  # Assume valid for speed testing
-                'confidence': 0.95,  # Slightly lower confidence for fallback
-                'verification_time_us': fallback_time_us,
-                'engine_time_us': fallback_time_us,
+                'success': False,
+                'error': 'crypto_verification_failed',
+                'message': f'Real cryptographic verification failed: {str(rust_error)}',
+                'verified': False,
+                'confidence': 0.0,
                 'offline': True,
-                'engine': 'fallback_6us_simulation',
-                'note': f'Rust engine error: {str(rust_error)}, using realistic 6μs simulation'
-            })
+                'engine': 'real_crypto_failed',
+                'note': 'Real crypto engine failed - no fallback to simulation'
+            }), 500
             
     except Exception as e:
         logger.error(f"❌ Offline verification failed: {e}")

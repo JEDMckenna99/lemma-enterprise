@@ -7,6 +7,22 @@ edition = "2021"
 name = "lemma_crypto"
 crate-type = ["cdylib", "rlib"]
 
+[[bin]]
+name = "minimal_test"
+path = "src/bin/minimal_test.rs"
+
+[[bin]]
+name = "test_oprf_bloom"
+path = "src/bin/test_oprf_bloom.rs"
+
+[[bin]]
+name = "test_complete_system"
+path = "src/bin/test_complete_system.rs"
+
+[[bin]]
+name = "test_optimizations"
+path = "src/bin/test_optimizations.rs"
+
 [dependencies]
 # Core cryptography
 curve25519-dalek = { version = "4.0", features = ["rand_core"] }

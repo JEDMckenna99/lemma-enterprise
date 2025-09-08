@@ -373,9 +373,21 @@ def confirm_site_permission(confirmation_token):
             import time
             current_time = int(time.time())
             
+            # Determine the correct issuer DID based on site
+            if site_id == 'lemma.id' or site_id == 'lemma_platform':
+                # For your platform, use platform DID
+                issuer_did = 'did:lemma:platform:lemma.id'
+                verification_method = 'did:lemma:platform:lemma.id'
+                granted_by = 'did:lemma:platform:lemma.id'
+            else:
+                # For customer sites, use site-specific DID
+                issuer_did = f'did:lemma:site:{site_id}'
+                verification_method = f'did:lemma:site:{site_id}'
+                granted_by = f'did:lemma:site:{site_id}'
+            
             permission_lemma = {
                 'id': f"site_perm_{secrets.token_hex(16)}",
-                'issuer': f'did:lemma:site:{site_id}',
+                'issuer': issuer_did,
                 'subject': user_did,
                 'packageType': 'permission',
                 'issued_at': current_time,
@@ -388,16 +400,22 @@ def confirm_site_permission(confirmation_token):
                     'accountType': permission_type,
                     'email': email,
                     'scope': permission.scope,
-                    'grantedBy': 'did:lemma:system:email_confirmation',
+                    'grantedBy': granted_by,
                     'grantedAt': current_time,
                     'networkShared': True,
                     'emailConfirmed': True,
-                    'confirmationMethod': 'email_link'
+                    'confirmationMethod': 'email_link',
+                    'subproof': {
+                        'type': 'permission_level',
+                        'level': permission_type,
+                        'granted_by_site': True,
+                        'site_authority': issuer_did
+                    }
                 },
                 'proof': {
                     'type': 'Ed25519Signature2020',
                     'created': current_time,
-                    'verificationMethod': f'did:lemma:site:{site_id}',
+                    'verificationMethod': verification_method,
                     'signatureValue': f'email_confirmed_sig_{secrets.token_hex(32)}'
                 }
             }

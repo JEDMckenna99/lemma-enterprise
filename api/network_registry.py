@@ -54,7 +54,6 @@ def initialize_trusted_dids():
             'created_at': time.time(),
             'capabilities': ['stripe_identity_verification']
         },
-
     }
     return trusted_issuers
 
@@ -404,6 +403,99 @@ def initialize_production_registry():
     NETWORK_REGISTRY['network_metadata']['last_updated'] = time.time()
     
     logger.info(f"🌐 Initialized production network registry with {len(NETWORK_REGISTRY['did_registry'])} trusted issuers")
+
+@network_registry_bp.route('/api/network/did-info', methods=['POST'])
+@cors_headers
+@require_network_auth
+def get_did_info():
+    """
+    Get DID information for dynamic customer site validation
+    
+    POST /api/network/did-info
+    {
+        "did": "did:lemma:site:customer_site_123"
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        did = data.get('did')
+        
+        if not did:
+            return jsonify({
+                'success': False,
+                'error': 'missing_did',
+                'message': 'DID parameter is required'
+            }), 400
+        
+        # Check if DID exists in registry
+        did_info = NETWORK_REGISTRY['did_registry'].get(did)
+        
+        if did_info:
+            return jsonify({
+                'success': True,
+                'did': did,
+                'public_key': did_info.get('public_key'),
+                'name': did_info.get('name') or did_info.get('issuer_info', {}).get('name'),
+                'trust_score': did_info.get('trust_score') or did_info.get('issuer_info', {}).get('trust_score', 0.8),
+                'verified': did_info.get('verified', True),
+                'issuer_type': did_info.get('issuer_type') or did_info.get('issuer_info', {}).get('issuer_type'),
+                'site_id': did_info.get('site_id'),
+                'site_domain': did_info.get('site_domain')
+            })
+        
+        # If not in registry but is a customer site DID, provide default info
+        if did.startswith('did:lemma:site:'):
+            site_id = did.replace('did:lemma:site:', '')
+            
+            # Auto-register customer site DID with default values
+            default_did_info = {
+                'did': did,
+                'public_key': f'customer_site_key_{site_id}',
+                'name': f'Customer Site {site_id}',
+                'issuer_type': 'customer_site_iam',
+                'trust_score': 0.8,
+                'verified': True,
+                'site_id': site_id,
+                'created_at': time.time(),
+                'auto_registered': True,
+                'metadata': {
+                    'created_by': 'auto_registration',
+                    'registration_type': 'customer_site_default'
+                }
+            }
+            
+            # Add to registry
+            NETWORK_REGISTRY['did_registry'][did] = default_did_info
+            NETWORK_REGISTRY['network_metadata']['total_dids'] = len(NETWORK_REGISTRY['did_registry'])
+            NETWORK_REGISTRY['network_metadata']['last_updated'] = time.time()
+            
+            logger.info(f"📝 Auto-registered customer site DID: {did}")
+            
+            return jsonify({
+                'success': True,
+                'did': did,
+                'public_key': default_did_info['public_key'],
+                'name': default_did_info['name'],
+                'trust_score': default_did_info['trust_score'],
+                'verified': default_did_info['verified'],
+                'issuer_type': default_did_info['issuer_type'],
+                'site_id': site_id,
+                'auto_registered': True
+            })
+        
+        # Unknown DID
+        return jsonify({
+            'success': False,
+            'error': 'unknown_did',
+            'message': f'DID not found: {did}'
+        }), 404
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get DID info: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 # Initialize production registry when module is imported
 initialize_production_registry()

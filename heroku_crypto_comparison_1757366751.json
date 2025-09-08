@@ -1,0 +1,37 @@
+{
+  "test_timestamp": 1757366751,
+  "test_type": "heroku_fake_vs_real_comparison",
+  "endpoint_response": {
+    "error": "invalid_auth",
+    "message": "Bearer token required",
+    "success": false
+  },
+  "fake_credentials_results": {
+    "test_type": "fake_credentials_heroku",
+    "success": true,
+    "num_tests": 25,
+    "success_rate_percent": 0.0,
+    "credential_type": "FAKE DIDs (what we measured before)",
+    "performance": {
+      "average_time_us": 330362.608,
+      "median_time_us": 327478.2,
+      "min_time_us": 309319.2,
+      "max_time_us": 382916.0,
+      "throughput_per_second": 3
+    }
+  },
+  "better_credentials_results": {
+    "test_type": "better_credentials_heroku",
+    "success": true,
+    "num_tests": 25,
+    "success_rate_percent": 0.0,
+    "credential_type": "Better formed DIDs (64-char hex)",
+    "performance": {
+      "average_time_us": 337384.16,
+      "median_time_us": 328907.6,
+      "min_time_us": 314801.3,
+      "max_time_us": 380289.3,
+      "throughput_per_second": 3
+    }
+  }
+}
