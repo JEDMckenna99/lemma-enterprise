@@ -11,10 +11,9 @@ use crate::minimal_core::{MinimalCredential, MinimalError};
 use crate::oprf::{OPRFClient, OPRFResult};
 use crate::bloom::CascadedBloomFilter;
 
-use ed25519_dalek::{Verifier, VerifyingKey, Signature, verify_batch};
+use ed25519_dalek::{Verifier, VerifyingKey, Signature};
 use std::collections::HashMap;
 use sha2::{Sha256, Digest};
-use rayon::prelude::*;
 
 /// Ultra-optimized verifier for production deployment
 pub struct UltraOptimizedVerifier {
@@ -177,95 +176,16 @@ impl UltraOptimizedVerifier {
         })
     }
     
-    /// SIMD batch verification for multiple credentials
-    pub fn verify_batch_simd(&mut self, credentials: &[MinimalCredential]) -> std::result::Result<Vec<UltraVerificationResult>, MinimalError> {
-        if credentials.is_empty() {
-            return Ok(vec![]);
-        }
-        
-        let batch_start = std::time::Instant::now();
-        self.stats.batch_verifications += 1;
-        self.stats.simd_operations += 1;
-        
-        // Group credentials by issuer for batch verification
-        let mut issuer_groups: HashMap<String, Vec<&MinimalCredential>> = HashMap::new();
-        for credential in credentials {
-            issuer_groups.entry(credential.issuer.clone())
-                .or_default()
-                .push(credential);
-        }
-        
+    /// Simple batch verification (process multiple credentials efficiently)
+    pub fn verify_batch(&mut self, credentials: &[MinimalCredential]) -> std::result::Result<Vec<UltraVerificationResult>, MinimalError> {
         let mut results = Vec::with_capacity(credentials.len());
         
-        // Process each issuer group with SIMD
-        for (issuer_did, group_credentials) in issuer_groups {
-            let public_key = self.get_cached_public_key_ultra_fast(&issuer_did)?;
-            
-            // Prepare batch data for SIMD verification
-            let messages: Vec<Vec<u8>> = group_credentials.par_iter()
-                .map(|cred| self.get_or_create_message_hash(cred))
-                .collect::<Result<Vec<_>, _>>()?;
-            
-            let signatures: Vec<Signature> = group_credentials.iter()
-                .map(|cred| {
-                    let proof = cred.proof.as_ref().ok_or(MinimalError::InvalidSignature)?;
-                    let sig_bytes = hex::decode(&proof.signature_value)
-                        .map_err(|_| MinimalError::InvalidSignature)?;
-                    if sig_bytes.len() != 64 {
-                        return Err(MinimalError::InvalidSignature);
-                    }
-                    let mut sig_array = [0u8; 64];
-                    sig_array.copy_from_slice(&sig_bytes);
-                    Ok(Signature::from_bytes(&sig_array))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            
-            // SIMD batch verification (Ed25519-dalek supports this)
-            let public_keys = vec![public_key; signatures.len()];
-            let message_refs: Vec<&[u8]> = messages.iter().map(|m| m.as_slice()).collect();
-            
-            match verify_batch(&message_refs, &signatures, &public_keys) {
-                Ok(()) => {
-                    // All signatures valid - check revocation for each
-                    for credential in group_credentials {
-                        let not_revoked = self.check_revocation_ultra_fast(&credential.id)?;
-                        
-                        results.push(UltraVerificationResult {
-                            verified: not_revoked,
-                            signature_valid: true,
-                            not_revoked,
-                            issuer_did: credential.issuer.clone(),
-                            verification_time_ns: 0, // Will be set after batch
-                            signature_time_ns: 0,
-                            revocation_time_ns: 0,
-                            confidence: if not_revoked { 1.0 } else { 0.0 },
-                            cache_level: 1,
-                            optimization_level: "simd_batch",
-                            simd_used: true,
-                        });
-                    }
-                },
-                Err(_) => {
-                    // Batch failed - fall back to individual verification
-                    for credential in group_credentials {
-                        let individual_result = self.verify_ultra_fast(credential)?;
-                        results.push(individual_result);
-                    }
-                }
-            }
+        self.stats.batch_verifications += 1;
+        
+        for credential in credentials {
+            let result = self.verify_ultra_fast(credential)?;
+            results.push(result);
         }
-        
-        let batch_time_ns = batch_start.elapsed().as_nanos() as u64;
-        let avg_time_per_item = batch_time_ns / credentials.len() as u64;
-        
-        // Update batch timing for all results
-        for result in &mut results {
-            if result.optimization_level == "simd_batch" {
-                result.verification_time_ns = avg_time_per_item;
-            }
-        }
-        
-        self.stats.average_batch_ns = (self.stats.average_batch_ns + avg_time_per_item) / 2;
         
         Ok(results)
     }
