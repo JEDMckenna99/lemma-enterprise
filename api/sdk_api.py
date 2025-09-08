@@ -103,16 +103,35 @@ def distribute_revocation_to_network(credential_id: str, oprf_evaluation: str, b
         return False
 
 # Import REAL working crypto engine
-try:
-    from lemma_crypto import PyCompleteVerifier, PyOptimizedVerifier
-    # Use optimized verifier for production (caching + performance)
-    rust_engine = PyOptimizedVerifier()
-    RUST_ENGINE_AVAILABLE = True
-    logger.info("✅ REAL Lemma crypto engine loaded (Ed25519 + OPRF + optimizations)")
-except ImportError as e:
-    RUST_ENGINE_AVAILABLE = False
-    logger.error(f"❌ REAL crypto engine not available: {e}")
-    rust_engine = None
+rust_engine = None
+RUST_ENGINE_AVAILABLE = False
+
+def initialize_crypto_engine():
+    """Initialize the real crypto engine"""
+    global rust_engine, RUST_ENGINE_AVAILABLE
+    
+    if rust_engine is not None:
+        return True
+        
+    try:
+        from lemma_crypto import PyOptimizedVerifier
+        rust_engine = PyOptimizedVerifier()
+        RUST_ENGINE_AVAILABLE = True
+        logger.info("✅ REAL Lemma crypto engine loaded (Ed25519 + OPRF + optimizations)")
+        return True
+    except ImportError as e:
+        RUST_ENGINE_AVAILABLE = False
+        logger.error(f"❌ REAL crypto engine not available: {e}")
+        rust_engine = None
+        return False
+    except Exception as e:
+        RUST_ENGINE_AVAILABLE = False
+        logger.error(f"❌ REAL crypto engine initialization failed: {e}")
+        rust_engine = None
+        return False
+
+# Initialize at startup
+initialize_crypto_engine()
 
 def validate_api_key(f):
     """Validate API key for SDK requests"""
@@ -1137,10 +1156,21 @@ def verify_offline():
         rust_start = time.perf_counter_ns()
         
         try:
-            # Import Rust engine (assuming it's available)
-            from api.rust_optimizer import rust_engine, RUST_ENGINE_AVAILABLE
+            # Ensure crypto engine is initialized
+            if not initialize_crypto_engine():
+                return jsonify({
+                    'success': False,
+                    'error': 'crypto_engine_initialization_failed',
+                    'message': 'Failed to initialize real cryptographic verification engine',
+                    'verified': False,
+                    'confidence': 0.0,
+                    'offline': True,
+                    'note': 'REAL crypto engine required - initialization failed'
+                }), 500
             
-            if not RUST_ENGINE_AVAILABLE:
+            global rust_engine, RUST_ENGINE_AVAILABLE
+            
+            if not RUST_ENGINE_AVAILABLE or rust_engine is None:
                 return jsonify({
                     'success': False,
                     'error': 'crypto_engine_not_available',
