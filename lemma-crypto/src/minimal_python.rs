@@ -7,6 +7,7 @@ use crate::minimal_core::{MinimalIssuer, MinimalCore, MinimalCredential, Minimal
 use crate::complete_verification::{CompleteVerifier, CompleteVerificationResult};
 use crate::zkp_claims::{ZKPVerifier, ZKPCredential, ZKPClaimType, ZKPClaimProof};
 use crate::optimized_verification::{OptimizedVerifier, OptimizedVerificationResult, OptimizationStats};
+use crate::ultra_optimized_verification::{UltraOptimizedVerifier, UltraVerificationResult, UltraOptimizationStats};
 
 /// Python wrapper for MinimalIssuer
 #[pyclass]
@@ -272,6 +273,129 @@ impl From<OptimizationStats> for PyOptimizationStats {
     }
 }
 
+/// Python wrapper for UltraOptimizedVerifier
+#[pyclass]
+pub struct PyUltraOptimizedVerifier {
+    inner: UltraOptimizedVerifier,
+}
+
+#[pymethods]
+impl PyUltraOptimizedVerifier {
+    #[new]
+    pub fn new() -> PyResult<Self> {
+        let inner = UltraOptimizedVerifier::new()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { inner })
+    }
+    
+    pub fn verify_credential(&mut self, credential_json: String) -> PyResult<PyUltraVerificationResult> {
+        let result = self.inner.verify_credential_json_ultra(&credential_json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(result.into())
+    }
+    
+    pub fn revoke_credential(&mut self, credential_id: String) -> PyResult<()> {
+        self.inner.revoke_credential(&credential_id)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(())
+    }
+    
+    pub fn get_ultra_stats(&self) -> PyResult<PyUltraOptimizationStats> {
+        let stats = self.inner.get_ultra_stats();
+        Ok(stats.into())
+    }
+}
+
+/// Python wrapper for UltraVerificationResult
+#[pyclass]
+pub struct PyUltraVerificationResult {
+    #[pyo3(get)]
+    pub verified: bool,
+    #[pyo3(get)]
+    pub signature_valid: bool,
+    #[pyo3(get)]
+    pub not_revoked: bool,
+    #[pyo3(get)]
+    pub issuer_did: String,
+    #[pyo3(get)]
+    pub verification_time_ns: u64,
+    #[pyo3(get)]
+    pub signature_time_ns: u64,
+    #[pyo3(get)]
+    pub revocation_time_ns: u64,
+    #[pyo3(get)]
+    pub confidence: f64,
+    #[pyo3(get)]
+    pub cache_level: u8,
+    #[pyo3(get)]
+    pub optimization_level: String,
+    #[pyo3(get)]
+    pub simd_used: bool,
+}
+
+impl From<UltraVerificationResult> for PyUltraVerificationResult {
+    fn from(result: UltraVerificationResult) -> Self {
+        Self {
+            verified: result.verified,
+            signature_valid: result.signature_valid,
+            not_revoked: result.not_revoked,
+            issuer_did: result.issuer_did,
+            verification_time_ns: result.verification_time_ns,
+            signature_time_ns: result.signature_time_ns,
+            revocation_time_ns: result.revocation_time_ns,
+            confidence: result.confidence,
+            cache_level: result.cache_level,
+            optimization_level: result.optimization_level,
+            simd_used: result.simd_used,
+        }
+    }
+}
+
+/// Python wrapper for UltraOptimizationStats
+#[pyclass]
+pub struct PyUltraOptimizationStats {
+    #[pyo3(get)]
+    pub total_verifications: u64,
+    #[pyo3(get)]
+    pub batch_verifications: u64,
+    #[pyo3(get)]
+    pub single_verifications: u64,
+    #[pyo3(get)]
+    pub cache_hits: u64,
+    #[pyo3(get)]
+    pub cache_misses: u64,
+    #[pyo3(get)]
+    pub simd_operations: u64,
+    #[pyo3(get)]
+    pub memory_pool_hits: u64,
+    #[pyo3(get)]
+    pub average_verification_ns: u64,
+    #[pyo3(get)]
+    pub average_cached_ns: u64,
+    #[pyo3(get)]
+    pub average_batch_ns: u64,
+}
+
+impl From<UltraOptimizationStats> for PyUltraOptimizationStats {
+    fn from(stats: UltraOptimizationStats) -> Self {
+        Self {
+            total_verifications: stats.total_verifications,
+            batch_verifications: stats.batch_verifications,
+            single_verifications: stats.single_verifications,
+            cache_hits: stats.cache_hits,
+            cache_misses: stats.cache_misses,
+            simd_operations: stats.simd_operations,
+            memory_pool_hits: stats.memory_pool_hits,
+            average_verification_ns: stats.average_verification_ns,
+            average_cached_ns: stats.average_cached_ns,
+            average_batch_ns: stats.average_batch_ns,
+        }
+    }
+}
+
 /// Module initialization for minimal Python bindings
 pub fn register_minimal_classes(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyMinimalIssuer>()?;
@@ -280,6 +404,9 @@ pub fn register_minimal_classes(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyOptimizedVerifier>()?;
     m.add_class::<PyOptimizedVerificationResult>()?;
     m.add_class::<PyOptimizationStats>()?;
+    m.add_class::<PyUltraOptimizedVerifier>()?;
+    m.add_class::<PyUltraVerificationResult>()?;
+    m.add_class::<PyUltraOptimizationStats>()?;
     m.add_class::<PyZKPVerifier>()?;
     Ok(())
 }

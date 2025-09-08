@@ -1,0 +1,9 @@
+{
+  "test_timestamp": 1757371688,
+  "test_type": "heroku_real_crypto_deployment",
+  "results": {
+    "success": false,
+    "error": "No valid measurements",
+    "test_type": "heroku_real_crypto"
+  }
+}

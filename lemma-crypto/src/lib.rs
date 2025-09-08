@@ -14,6 +14,7 @@ pub mod zkp_claims;
 
 // PERFORMANCE OPTIMIZATIONS
 pub mod optimized_verification;
+pub mod ultra_optimized_verification;
 // pub mod encrypted_browser_wallet;  // Skip for now - AES-GCM version issue
 
 // WORKING CRYPTO PRIMITIVES
@@ -33,6 +34,7 @@ pub use crate::minimal_core::{MinimalIssuer, MinimalCore, MinimalCredential, Min
 pub use crate::complete_verification::{CompleteVerifier, CompleteVerificationResult};
 pub use crate::zkp_claims::{ZKPCredential, ZKPClaimType, ZKPClaimProof, ZKPVerifier};
 pub use crate::optimized_verification::{OptimizedVerifier, OptimizedVerificationResult, OptimizationStats};
+pub use crate::ultra_optimized_verification::{UltraOptimizedVerifier, UltraVerificationResult, UltraOptimizationStats};
 // pub use crate::encrypted_browser_wallet::{EncryptedBrowserWallet, EncryptedCredentialEntry, EncryptionConfig, WalletStats, CredentialMetadata};
 pub use crate::oprf::{OPRFClient, OPRFServer, OPRFResult};
 pub use crate::bloom::{CascadedBloomFilter};

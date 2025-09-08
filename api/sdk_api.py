@@ -114,10 +114,10 @@ def initialize_crypto_engine():
         return True
         
     try:
-        from lemma_crypto import PyOptimizedVerifier
-        rust_engine = PyOptimizedVerifier()
+        from lemma_crypto import PyUltraOptimizedVerifier
+        rust_engine = PyUltraOptimizedVerifier()
         RUST_ENGINE_AVAILABLE = True
-        logger.info("✅ REAL Lemma crypto engine loaded (Ed25519 + OPRF + optimizations)")
+        logger.info("✅ ULTRA-OPTIMIZED Lemma crypto engine loaded (Ed25519 + OPRF + SIMD + caching)")
         return True
     except ImportError as e:
         RUST_ENGINE_AVAILABLE = False
@@ -1189,7 +1189,7 @@ def verify_offline():
             rust_end = time.perf_counter_ns()
             engine_time_us = (rust_end - rust_start) / 1000  # Convert nanoseconds to microseconds
             
-            logger.info(f"⚡ REAL crypto verification: {engine_time_us:.1f}μs, verified={result.verified}, cached={result.cache_hit}")
+            logger.info(f"⚡ ULTRA-OPTIMIZED crypto: {engine_time_us:.1f}μs, verified={result.verified}, cache_level={result.cache_level}, simd={result.simd_used}")
             
             return jsonify({
                 'success': True,
@@ -1201,12 +1201,13 @@ def verify_offline():
                 'signature_time_ns': result.signature_time_ns,
                 'revocation_time_ns': result.revocation_time_ns,
                 'total_time_us': engine_time_us,
-                'cache_hit': result.cache_hit,
-                'optimization_used': result.optimization_used,
+                'cache_level': result.cache_level,
+                'optimization_level': result.optimization_level,
+                'simd_used': result.simd_used,
                 'offline': True,
-                'engine': 'real_crypto_optimized',
-                'cryptographic_components': ['Ed25519', 'OPRF', 'Bloom'],
-                'performance_note': 'Real cryptographic verification with optimizations'
+                'engine': 'ultra_optimized_crypto',
+                'cryptographic_components': ['Ed25519', 'OPRF', 'Bloom', 'SIMD', 'MemoryPools'],
+                'performance_note': 'Ultra-optimized cryptographic verification with advanced caching'
             })
             
         except Exception as rust_error:
