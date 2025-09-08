@@ -304,7 +304,7 @@ impl PyUltraOptimizedVerifier {
     }
     
     pub fn get_ultra_stats(&self) -> PyResult<PyUltraOptimizationStats> {
-        let stats = self.inner.get_ultra_stats();
+        let stats = self.inner.get_ultra_stats().clone();
         Ok(stats.into())
     }
 }

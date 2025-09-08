@@ -123,7 +123,7 @@ impl UltraOptimizedVerifier {
                 revocation_time_ns,
                 confidence: if not_revoked { 1.0 } else { 0.0 },
                 cache_level: 3, // Triple cache hit
-                optimization_level: "ultra_cached",
+                optimization_level: "ultra_cached".to_string(),
                 simd_used: false,
             });
         }
@@ -171,7 +171,7 @@ impl UltraOptimizedVerifier {
             revocation_time_ns,
             confidence: if verified { 1.0 } else { 0.0 },
             cache_level: if self.public_key_cache.contains_key(&credential.issuer) { 1 } else { 0 },
-            optimization_level: "ultra_optimized",
+            optimization_level: "ultra_optimized".to_string(),
             simd_used: false,
         })
     }
@@ -254,13 +254,12 @@ impl UltraOptimizedVerifier {
         self.signature_buffer_pool[pool_index].copy_from_slice(&signature_bytes);
         let signature = Signature::from_bytes(&self.signature_buffer_pool[pool_index]);
         
-        // Use pooled buffer for message
-        let message_buffer = &mut self.message_buffer_pool[pool_index];
-        message_buffer.clear();
-        self.create_verification_message_pooled(credential, message_buffer)?;
+        // Create verification message without borrowing self
+        let mut temp_message_buffer = Vec::with_capacity(512);
+        self.create_verification_message_simple(credential, &mut temp_message_buffer)?;
         
         // Fast signature verification
-        match public_key.verify(message_buffer, &signature) {
+        match public_key.verify(&temp_message_buffer, &signature) {
             Ok(()) => Ok(true),
             Err(_) => Ok(false),
         }
@@ -296,8 +295,8 @@ impl UltraOptimizedVerifier {
         Ok(!is_revoked)
     }
     
-    /// Create verification message using pooled buffer
-    fn create_verification_message_pooled(
+    /// Create verification message (simplified for borrow checker)
+    fn create_verification_message_simple(
         &self,
         credential: &MinimalCredential,
         buffer: &mut Vec<u8>,
@@ -347,12 +346,9 @@ impl UltraOptimizedVerifier {
             return Ok(cached_hash.clone());
         }
         
-        let pool_index = self.current_pool_index % self.message_buffer_pool.len();
-        let message_buffer = &mut self.message_buffer_pool[pool_index];
-        message_buffer.clear();
-        
-        self.create_verification_message_pooled(credential, message_buffer)?;
-        let hash = message_buffer.clone();
+        let mut temp_buffer = Vec::with_capacity(512);
+        self.create_verification_message_simple(credential, &mut temp_buffer)?;
+        let hash = temp_buffer;
         
         self.message_hash_cache.insert(cache_key, hash.clone());
         Ok(hash)
