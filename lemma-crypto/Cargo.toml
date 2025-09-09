@@ -151,6 +151,7 @@ native = [
 ]
 python = ["pyo3", "pythonize", "native"]
 wasm = ["wasm-bindgen", "js-sys", "web-sys", "serde-wasm-bindgen"]
+wasm-optimized = ["wasm", "rayon"]  # Optimized WASM with parallel processing
 wasm-qr = ["wasm", "qrcode_gen"]
 qr-verification = ["qrcode_gen"]
 benchmark = ["criterion", "native"]

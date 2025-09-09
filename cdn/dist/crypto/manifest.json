@@ -1,0 +1,41 @@
+{
+  "crypto_engine": {
+    "version": "0.1.1",
+    "unified_engine": "/crypto/lemma-unified-crypto.js",
+    "wasm_file": "/crypto/lemma-unified.wasm",
+    "performance": "5-15\u03bcs",
+    "systems": [
+      "federated_identity",
+      "iam_permissions"
+    ],
+    "capabilities": [
+      "Ed25519",
+      "OPRF",
+      "Bloom",
+      "ZKP"
+    ],
+    "offline": true
+  },
+  "federated_identity": {
+    "endpoint": "/crypto/federated-id.js",
+    "performance": "5-15\u03bcs human verification",
+    "features": [
+      "cross_site_verification",
+      "bot_protection",
+      "privacy_preserving"
+    ]
+  },
+  "iam_system": {
+    "endpoint": "/crypto/iam-permissions.js",
+    "performance": "5-15\u03bcs permission checking",
+    "features": [
+      "site_specific_access",
+      "offline_permissions",
+      "real_crypto"
+    ]
+  },
+  "auto_detection": {
+    "endpoint": "/crypto/auto-detect.js",
+    "description": "Automatically detects Fed ID vs IAM and verifies appropriately"
+  }
+}

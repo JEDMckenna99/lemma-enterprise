@@ -1,0 +1,20 @@
+{
+  "deployment_timestamp": 1757375082,
+  "crypto_engine": "real_ed25519_oprf_optimized",
+  "wasm_ready": false,
+  "cdn_ready": true,
+  "edge_capabilities": {
+    "local_authentication": "5-15\u03bcs WASM in browser",
+    "edge_authentication": "50-100\u03bcs on edge nodes",
+    "network_authentication": "93-118\u03bcs on main nodes",
+    "offline_capable": true,
+    "privacy_preserving": true,
+    "real_cryptography": true
+  },
+  "deployment_targets": [
+    "Heroku main: lemma-enterprise-0f6ba17076c1.herokuapp.com",
+    "Heroku CDN: lemma-cdn.herokuapp.com (if deployed)",
+    "Browser WASM: Direct client-side verification",
+    "Edge nodes: Global distribution ready"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "target": "browser_wasm",
+  "features": [
+    "wasm-optimized"
+  ],
+  "expected_performance": "5-15\u03bcs",
+  "capabilities": [
+    "Ed25519 signature verification",
+    "OPRF evaluation",
+    "Bloom filter checking",
+    "Complete offline authentication"
+  ],
+  "build_command": "wasm-pack build --target web --release --features wasm-optimized",
+  "output_dir": "pkg-wasm",
+  "integration": {
+    "module_name": "lemma_crypto_wasm",
+    "global_object": "window.LemmaBrowserCrypto",
+    "auto_init": true
+  }
+}

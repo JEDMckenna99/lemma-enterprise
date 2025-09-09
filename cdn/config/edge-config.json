@@ -1,0 +1,31 @@
+{
+  "edge_nodes": {
+    "primary": {
+      "url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com",
+      "region": "us-east",
+      "crypto_engine": "PyOptimizedVerifier",
+      "expected_performance": "93-118\u03bcs",
+      "cache_enabled": true,
+      "status": "deployed"
+    },
+    "cdn_distribution": {
+      "enabled": true,
+      "static_assets": "/cdn/dist/",
+      "wasm_files": "/cdn/dist/wasm/",
+      "cache_control": "public, max-age=31536000, immutable",
+      "compression": "gzip, br"
+    }
+  },
+  "performance_targets": {
+    "network_auth": "50-100\u03bcs on edge nodes",
+    "local_auth": "33\u03bcs Python local",
+    "wasm_auth": "5-15\u03bcs browser WASM",
+    "cache_hit_rate": "85-95%"
+  },
+  "deployment_strategy": {
+    "phase_1": "Main node deployed \u2705",
+    "phase_2": "CDN assets ready for distribution",
+    "phase_3": "WASM browser crypto (future)",
+    "phase_4": "Global edge node deployment"
+  }
+}
