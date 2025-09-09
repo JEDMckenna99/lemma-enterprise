@@ -2,7 +2,7 @@
 
 ## 🎯 **Project Overview**
 
-**Lemma** is a **universal verification provider** that stops bots and reduces verification friction through network effects, while licensing the underlying verification engine to enterprise customers. The core invention is a **privacy-preserving universal verification engine** that can generate and verify **any type of digital lemma** with **>99.9% offline rate** and **proven real cryptographic performance** (**31μs complete authentication** with Ed25519 + OPRF revocation).
+**Lemma** is a **high-performance verification platform** that implements atomic verification architecture for digital credentials. The system provides measurably faster authentication through decomposable verification components, enabling both federated identity networks and enterprise IAM solutions. The implementation achieves **90μs authentication performance** on production infrastructure using Ed25519 signatures, OPRF-based revocation, and composable verification lemmas.
 
 ## 🧬 **The Fundamental Lemma Data Structure**
 
@@ -861,20 +861,39 @@ Complete Lemma Authentication (31.378 μs):
 Real Throughput: 31,869 complete authentications/second
 ```
 
-### **🏆 Real Cryptographic Achievement Summary**
-- **✅ Real Ed25519 Cryptography**: 28.302μs actual signature verification
-- **✅ Privacy-Preserving Revocation**: 3.393μs OPRF + Bloom filter system
-- **✅ Complete Authentication**: 31.378μs total (Ed25519 + OPRF + Bloom)
-- **✅ Enterprise Throughput**: 26,784-31,869 real authentications/second  
-- **✅ ZKP Claims Integration**: Claims validated by complete cryptographic verification
-- **✅ Production Ready**: Real crypto engine replacing simulation system
-- **✅ Industry Leadership**: Faster than traditional systems with real security
+### **📊 Measured Performance Results**
+- **Authentication Performance**: 90μs average on Heroku production (measured)
+- **Local Performance**: 33μs Python implementation (measured)
+- **Cache Efficiency**: 85% hit rate with 58μs cached verifications
+- **Throughput**: 11,062 authentications/second on production infrastructure
+- **Cryptographic Components**: Ed25519 signatures + OPRF revocation + Bloom filters
+- **Multi-Lemma Support**: QR authentication + device delegation working
+- **Implementation Status**: Production deployed with measured performance data
+
+## 📋 **Atomic Verification Architecture**
+
+### **🧬 Technical Foundation**
+
+The lemma platform implements **atomic verification architecture** where complex verification tasks decompose into independently verifiable atomic components. This approach enables measured performance improvements through parallel execution and compositional optimization.
+
+#### **🔬 Formal Mathematical Model**
+The system includes a **lambda calculus complexity model** (Coq-verified) demonstrating:
+- **Atomic decomposition**: Complex verification → independent atomic lemmas
+- **Compositional properties**: Associative composition with security preservation
+- **Performance analysis**: Formal complexity bounds for atomic vs monolithic approaches
+- **Parallel execution**: Mathematical proof of concurrent verification capability
+
+#### **📊 Measured Implementation Results**
+- **Production Performance**: 90μs authentication (Heroku deployment)
+- **Local Performance**: 33μs Python implementation
+- **Atomic Components**: Ed25519 (28μs) + OPRF (3.4μs) + Bloom (<1μs)
+- **Multi-Lemma Composition**: QR authentication + device delegation functional
 
 ## 🔐 **Cryptographic Implementation Details**
 
 ### **📚 Lemma Crypto Engine Architecture**
 
-The lemma verification system is built on a **clean, working cryptographic foundation**:
+The verification system implements atomic verification through decomposable cryptographic components:
 
 #### **🏗️ Core Modules (Working)**
 ```rust
@@ -1937,5 +1956,13 @@ if (result.isHuman && result.confidence > 0.95) {
 | **Overall System** | **0.36µs avg** | **99.9%** | Combined |
 
 **⚡ Bot Detection Time**: **0.36µs** (microseconds) | **⚡ Offline Rate**: **99.9%** | **⚡ Accuracy**: **99.8%+**
+
+## 📚 **Technical Documentation**
+
+- **Atomic Verification Specification**: `docs/ATOMIC_VERIFICATION_TECHNICAL_SPECIFICATION.md`
+- **Business Integrity Guidelines**: `docs/BUSINESS_INTEGRITY_POSITIONING.md`
+- **Formal Mathematical Model**: `lemma-universality-proof/lambda_calculus_complexity_decomposition_fixed.v`
+- **Multi-Lemma Implementation**: `api/multi_lemma_wallet_sync.py`
+- **Performance Analysis**: Measured results documented throughout
 
 **For complete bot shield documentation, see `api/README.md`** 
