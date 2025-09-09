@@ -691,27 +691,27 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_re
     # Extract identity details from Stripe result (in production, more comprehensive)
     identity_details = stripe_result.get('identity_details', {})
     
-    # Generate issuer DID and register with network
-    issuer_did = 'did:lemma:federated:issuer'
-    issuer_public_key = secrets.token_hex(32)  # In production, use real Ed25519 public key
-    
-    # Register issuer DID with network registry
-    issuer_info = {
-        'name': 'Lemma Identity Network',
-        'issuer_type': 'identity_kyc_provider',
-        'trust_score': 0.95,
-        'verified': True
-    }
-    
-    # Attempt to distribute DID to network (non-blocking)
-    distribute_did_to_network(issuer_did, issuer_public_key, issuer_info)
-    
     # Use REAL crypto engine to create properly signed credential
     try:
         from lemma_crypto import PyMinimalIssuer
         
         # Create real issuer with Ed25519 keypair for federated identity
         federated_issuer = PyMinimalIssuer()
+        
+        # Get real DID and public key from crypto engine
+        issuer_did = federated_issuer.get_did()
+        issuer_public_key = federated_issuer.get_public_key_hex()
+        
+        # Register issuer DID with network registry
+        issuer_info = {
+            'name': 'Lemma Identity Network',
+            'issuer_type': 'identity_kyc_provider',
+            'trust_score': 0.95,
+            'verified': True
+        }
+        
+        # Attempt to distribute DID to network (non-blocking)
+        distribute_did_to_network(issuer_did, issuer_public_key, issuer_info)
         logger.info(f"🦀 Creating federated identity credential with real Ed25519 issuer: {federated_issuer.get_did()[:50]}...")
         
         # Create enhanced identity claims

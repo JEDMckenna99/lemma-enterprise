@@ -337,9 +337,14 @@ def create_lemma_credential(user_id: str, stripe_session_id: str) -> Dict[str, A
             "network_type": "federated_identity"
         }
         
+        # Create real subject DID (in production, this would be the user's own DID)
+        # For now, create a properly formatted DID for the user
+        user_issuer = PyMinimalIssuer()  # Each user should have their own DID
+        user_did = user_issuer.get_did()
+        
         # Issue properly signed credential
         credential_json = federated_issuer.issue_credential(
-            f"did:lemma:federated:user:{user_id}",
+            user_did,  # Real DID with public key
             identity_claims
         )
         

@@ -145,9 +145,13 @@ def lemma_signin():
                     'scope': ','.join(['users:*', 'sites:*', 'permissions:*', 'billing:*', 'analytics:*'] if user_role == 'admin' else ['profile:read', 'profile:write', 'billing:read', 'usage:read'])
                 }
                 
+                # Create real subject DID for the customer
+                customer_issuer = PyMinimalIssuer()  # Each customer should have their own DID
+                customer_did = customer_issuer.get_did()
+                
                 # Issue properly signed permission lemma
                 permission_lemma_json = iam_issuer.issue_credential(
-                    f"did:lemma:customer:{customer.customer_id}",
+                    customer_did,  # Real DID with public key
                     permission_claims
                 )
                 
