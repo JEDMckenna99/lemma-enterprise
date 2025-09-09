@@ -64,6 +64,9 @@ getrandom = "0.2"
 # Hex encoding/decoding
 hex = "0.4"
 
+# Base64 encoding for QR codes
+base64 = "0.21"
+
 # Memory mapping for zero-copy operations (not available in WebAssembly)
 memmap2 = { version = "0.9", optional = true }
 

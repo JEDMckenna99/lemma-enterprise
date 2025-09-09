@@ -291,6 +291,14 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ Email Confirmation API registration failed: {e}")
 
+    # Multi-lemma wallet sync system
+    try:
+        from api.multi_lemma_wallet_sync import multi_lemma_sync_bp
+        app.register_blueprint(multi_lemma_sync_bp)
+        logger.info("✅ Multi-lemma wallet sync system registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Multi-lemma sync system registration failed: {e}")
+
     # Lemma wallet authentication
     try:
         from api.lemma_auth_endpoint import lemma_auth_bp

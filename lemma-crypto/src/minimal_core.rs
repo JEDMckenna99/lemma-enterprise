@@ -27,25 +27,33 @@ pub enum MinimalError {
     Ed25519(#[from] ed25519_dalek::SignatureError),
 }
 
-/// Minimal credential that actually works
+/// W3C compliant Verifiable Credential
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MinimalCredential {
+    #[serde(rename = "@context")]
+    pub context: Vec<String>,        // W3C standard: @context field
     pub id: String,
-    pub issuer: String,  // DID format: did:lemma:{public_key_hex}
+    pub issuer: String,              // DID format: did:lemma:{public_key_hex}
     pub subject: String,
-    pub issued_at: u64,
-    pub expires_at: Option<u64>,
-    pub claims: HashMap<String, serde_json::Value>,
+    #[serde(rename = "issuanceDate")]
+    pub issued_at: u64,              // W3C uses issuanceDate
+    #[serde(rename = "expirationDate")]
+    pub expires_at: Option<u64>,     // W3C uses expirationDate
+    #[serde(rename = "credentialSubject")]
+    pub claims: HashMap<String, serde_json::Value>,  // W3C uses credentialSubject
     pub proof: Option<MinimalProof>,
 }
 
-/// Minimal cryptographic proof
+/// W3C compliant cryptographic proof
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MinimalProof {
-    pub proof_type: String,
+    #[serde(rename = "type")]
+    pub proof_type: String,           // W3C standard: "type" field
     pub created: u64,
-    pub verification_method: String,  // Same as issuer DID
-    pub signature_value: String,      // Hex-encoded signature
+    #[serde(rename = "verificationMethod")]
+    pub verification_method: String,  // W3C standard: camelCase
+    #[serde(rename = "signatureValue")]
+    pub signature_value: String,      // W3C standard: camelCase
 }
 
 /// Minimal credential issuer that ACTUALLY works
@@ -96,8 +104,12 @@ impl MinimalIssuer {
         
         let credential_id = format!("cred_{}", uuid::Uuid::new_v4());
         
-        // Create the credential without proof first
+        // Create W3C compliant credential
         let mut credential = MinimalCredential {
+            context: vec![
+                "https://www.w3.org/2018/credentials/v1".to_string(),
+                "https://lemma.id/contexts/v1".to_string()
+            ],
             id: credential_id,
             issuer: self.did.clone(),
             subject,
@@ -114,7 +126,7 @@ impl MinimalIssuer {
         let signature = self.signing_key.sign(&message);
         let signature_hex = hex::encode(signature.to_bytes());
         
-        // Add the proof
+        // Add the proof (W3C compliant)
         credential.proof = Some(MinimalProof {
             proof_type: "Ed25519Signature2020".to_string(),
             created: current_time,

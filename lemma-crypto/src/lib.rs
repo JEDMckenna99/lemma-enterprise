@@ -11,6 +11,8 @@ use thiserror::Error;
 pub mod minimal_core;
 pub mod complete_verification;
 pub mod zkp_claims;
+pub mod device_delegation;
+pub mod qr_authentication;
 
 // PERFORMANCE OPTIMIZATIONS
 pub mod optimized_verification;
@@ -33,6 +35,8 @@ pub mod minimal_python;
 pub use crate::minimal_core::{MinimalIssuer, MinimalCore, MinimalCredential, MinimalVerificationResult, MinimalError};
 pub use crate::complete_verification::{CompleteVerifier, CompleteVerificationResult};
 pub use crate::zkp_claims::{ZKPCredential, ZKPClaimType, ZKPClaimProof, ZKPVerifier};
+pub use crate::device_delegation::{DeviceDelegationManager, DeviceDelegationLemma, EncryptedSyncPackage, DeviceSyncStats};
+pub use crate::qr_authentication::{QRAuthenticationLemma, QRSyncManager, QRVerificationResult, LemmaSyncStats};
 pub use crate::optimized_verification::{OptimizedVerifier, OptimizedVerificationResult, OptimizationStats};
 pub use crate::ultra_optimized_verification::{UltraOptimizedVerifier, UltraVerificationResult, UltraOptimizationStats};
 // pub use crate::encrypted_browser_wallet::{EncryptedBrowserWallet, EncryptedCredentialEntry, EncryptionConfig, WalletStats, CredentialMetadata};

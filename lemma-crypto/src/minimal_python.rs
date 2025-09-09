@@ -8,6 +8,8 @@ use crate::complete_verification::{CompleteVerifier, CompleteVerificationResult}
 use crate::zkp_claims::{ZKPVerifier, ZKPCredential, ZKPClaimType, ZKPClaimProof};
 use crate::optimized_verification::{OptimizedVerifier, OptimizedVerificationResult, OptimizationStats};
 use crate::ultra_optimized_verification::{UltraOptimizedVerifier, UltraVerificationResult, UltraOptimizationStats};
+use crate::device_delegation::{DeviceDelegationManager, DeviceDelegationLemma};
+use crate::qr_authentication::{QRSyncManager, QRAuthenticationLemma, QRVerificationResult};
 
 /// Python wrapper for MinimalIssuer
 #[pyclass]
@@ -396,6 +398,122 @@ impl From<UltraOptimizationStats> for PyUltraOptimizationStats {
     }
 }
 
+/// Python wrapper for QRSyncManager (Multi-Lemma Wallet Sync)
+#[pyclass]
+pub struct PyQRSyncManager {
+    inner: QRSyncManager,
+}
+
+#[pymethods]
+impl PyQRSyncManager {
+    #[new]
+    pub fn new() -> PyResult<Self> {
+        let inner = QRSyncManager::new()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { inner })
+    }
+    
+    pub fn create_qr_auth_lemma(
+        &self,
+        mobile_issuer: &PyMinimalIssuer,
+        requesting_device_did: String,
+        requested_scope: Vec<String>,
+        requested_duration: u64,
+        device_fingerprint: String,
+    ) -> PyResult<String> {
+        let qr_lemma = self.inner.create_qr_auth_lemma(
+            &mobile_issuer.inner,
+            requesting_device_did,
+            requested_scope,
+            requested_duration,
+            device_fingerprint,
+        ).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        serde_json::to_string(&qr_lemma)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+    
+    pub fn verify_qr_auth_lemma(&mut self, qr_lemma_json: String) -> PyResult<PyQRVerificationResult> {
+        let qr_lemma: QRAuthenticationLemma = serde_json::from_str(&qr_lemma_json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        let result = self.inner.verify_qr_auth_lemma(&qr_lemma)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(result.into())
+    }
+    
+    pub fn generate_qr_data(&self, qr_lemma_json: String) -> PyResult<String> {
+        let qr_lemma: QRAuthenticationLemma = serde_json::from_str(&qr_lemma_json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        self.inner.generate_qr_data(&qr_lemma)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+    
+    pub fn parse_qr_data(&self, qr_data: String) -> PyResult<String> {
+        let qr_lemma = self.inner.parse_qr_data(&qr_data)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        serde_json::to_string(&qr_lemma)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+}
+
+/// Python wrapper for QRVerificationResult
+#[pyclass]
+pub struct PyQRVerificationResult {
+    #[pyo3(get)]
+    pub valid: bool,
+    #[pyo3(get)]
+    pub reason: String,
+    #[pyo3(get)]
+    pub sync_authorized: bool,
+    #[pyo3(get)]
+    pub delegation_lemma_json: Option<String>,
+}
+
+impl From<QRVerificationResult> for PyQRVerificationResult {
+    fn from(result: QRVerificationResult) -> Self {
+        let delegation_json = result.delegation_lemma.map(|lemma| {
+            serde_json::to_string(&lemma).unwrap_or_default()
+        });
+        
+        Self {
+            valid: result.valid,
+            reason: result.reason,
+            sync_authorized: result.sync_authorized,
+            delegation_lemma_json: delegation_json,
+        }
+    }
+}
+
+/// Python wrapper for DeviceDelegationManager
+#[pyclass]
+pub struct PyDeviceDelegationManager {
+    inner: DeviceDelegationManager,
+}
+
+#[pymethods]
+impl PyDeviceDelegationManager {
+    #[new]
+    pub fn new() -> PyResult<Self> {
+        let inner = DeviceDelegationManager::new()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { inner })
+    }
+    
+    pub fn verify_device_delegation(&mut self, delegation_lemma_json: String) -> PyResult<bool> {
+        let delegation_lemma: DeviceDelegationLemma = serde_json::from_str(&delegation_lemma_json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        self.inner.verify_device_delegation(&delegation_lemma)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+}
+
 /// Module initialization for minimal Python bindings
 pub fn register_minimal_classes(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyMinimalIssuer>()?;
@@ -408,6 +526,9 @@ pub fn register_minimal_classes(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyUltraVerificationResult>()?;
     m.add_class::<PyUltraOptimizationStats>()?;
     m.add_class::<PyZKPVerifier>()?;
+    m.add_class::<PyQRSyncManager>()?;
+    m.add_class::<PyQRVerificationResult>()?;
+    m.add_class::<PyDeviceDelegationManager>()?;
     Ok(())
 }
 
