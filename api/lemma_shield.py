@@ -322,9 +322,12 @@ def create_lemma_credential(user_id: str, stripe_session_id: str) -> Dict[str, A
     try:
         logger.info(f"🦀 Creating lemma credential using Rust engine for user {user_id}")
         
-        # Use REAL crypto engine to create properly signed identity credential
-        # Create federated identity credential with real Ed25519 signature
-        federated_issuer = PyMinimalIssuer()  # Create real issuer with Ed25519 keypair
+        # Use REAL crypto engine with consistent issuer
+        from .issuer_management import get_issuer_manager
+        issuer_manager = get_issuer_manager()
+        
+        # Get consistent federated issuer (same DID for all federated credentials)
+        federated_issuer = issuer_manager.get_federated_issuer()
         
         # Create identity claims for federated network
         identity_claims = {
@@ -337,10 +340,8 @@ def create_lemma_credential(user_id: str, stripe_session_id: str) -> Dict[str, A
             "network_type": "federated_identity"
         }
         
-        # Create real subject DID (in production, this would be the user's own DID)
-        # For now, create a properly formatted DID for the user
-        user_issuer = PyMinimalIssuer()  # Each user should have their own DID
-        user_did = user_issuer.get_did()
+        # Generate deterministic user DID (users don't need new issuers)
+        user_did = issuer_manager.generate_deterministic_user_did(user_id)
         
         # Issue properly signed credential
         credential_json = federated_issuer.issue_credential(

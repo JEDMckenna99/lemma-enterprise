@@ -62,32 +62,9 @@ def validate_federated_identity_source(credential):
     verification_source = claims.get('verificationSource', '')
     is_human_verified = claims.get('isHuman', False)
     
-    # CRITICAL: Verify the credential using real crypto engine
-    crypto_verification_result = None
-    try:
-        from lemma_crypto import PyOptimizedVerifier
-        verifier = PyOptimizedVerifier()
-        
-        # Verify the credential cryptographically
-        verification_result = verifier.verify_credential(json.dumps(credential))
-        crypto_verification_result = {
-            'verified': verification_result.verified,
-            'signature_valid': verification_result.signature_valid,
-            'not_revoked': verification_result.not_revoked,
-            'confidence': verification_result.confidence
-        }
-        
-        logger.info(f"🔐 Crypto verification: verified={verification_result.verified}, signature={verification_result.signature_valid}, not_revoked={verification_result.not_revoked}")
-        
-    except Exception as e:
-        logger.error(f"❌ Crypto verification failed: {e}")
-        crypto_verification_result = {
-            'verified': False,
-            'signature_valid': False,
-            'not_revoked': False,
-            'confidence': 0.0,
-            'error': str(e)
-        }
+    # CRITICAL: Verify the credential using DID-extracted crypto
+    from .crypto_validation import verify_credential_with_extracted_crypto
+    crypto_verification_result = verify_credential_with_extracted_crypto(credential)
     
     if is_verification_card or is_proper_verification:
         # Determine specific source type

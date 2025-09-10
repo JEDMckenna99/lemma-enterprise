@@ -63,8 +63,10 @@ def create_qr_auth_lemma():
                 'message': 'mobile_device_did and requesting_device_did are required'
             }), 400
         
-        # Create mobile device issuer (in production, would use stored key)
-        mobile_issuer = PyMinimalIssuer()
+        # Get consistent QR authentication issuer
+        from .issuer_management import get_issuer_manager
+        issuer_manager = get_issuer_manager()
+        mobile_issuer = issuer_manager.get_multi_lemma_issuer('qr_authentication')
         qr_sync_manager = PyQRSyncManager()
         
         # Create QR authentication lemma

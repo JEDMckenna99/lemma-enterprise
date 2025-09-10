@@ -59,10 +59,14 @@ class LemmaWalletManager {
                 debug: true,
                 networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
                 networkAuthKey: 'lemma_network_federated_sync_2024',
-                syncInterval: 30000 // 30 seconds
+                syncInterval: 30000, // 30 seconds
+                enableLocalCrypto: true  // Enable local WASM verification
             });
             
             await wallet.init();
+            
+            // Initialize local crypto if available
+            await this.initializeLocalCrypto(wallet);
             
             // Store in all global locations to prevent multiple instances
             window.lemmaWallet = wallet;
@@ -76,6 +80,51 @@ class LemmaWalletManager {
         } catch (error) {
             console.error('❌ LemmaWalletManager: Wallet initialization failed:', error);
             throw error;
+        }
+    }
+    
+    /**
+     * Initialize local crypto verification capability
+     */
+    async initializeLocalCrypto(wallet) {
+        try {
+            // Try to load WASM crypto engine
+            if (typeof WebAssembly !== 'undefined') {
+                console.log('🔐 Attempting to load local WASM crypto...');
+                
+                // Load from CDN if available
+                const cryptoModule = await import('/crypto/lemma-unified-crypto.js').catch(() => null);
+                
+                if (cryptoModule && cryptoModule.LemmaUnifiedCrypto) {
+                    wallet.localCrypto = new cryptoModule.LemmaUnifiedCrypto();
+                    await wallet.localCrypto.init();
+                    
+                    console.log('✅ Local WASM crypto verification enabled');
+                    console.log('⚡ Expected performance: 5-15μs local verification');
+                    
+                    // Add local verification method to wallet
+                    wallet.verifyLocalCrypto = async function(credential) {
+                        const start = performance.now();
+                        const result = await this.localCrypto.verify(credential);
+                        const time = (performance.now() - start) * 1000;
+                        
+                        return {
+                            verified: result.verified,
+                            verification_time_us: time,
+                            method: 'local_wasm',
+                            offline: true
+                        };
+                    };
+                    
+                } else {
+                    console.warn('⚠️ WASM crypto module not available, using API verification');
+                }
+            } else {
+                console.warn('⚠️ WebAssembly not supported, using API verification');
+            }
+        } catch (error) {
+            console.warn('⚠️ Local crypto initialization failed:', error.message);
+            console.log('🔄 Falling back to API verification');
         }
     }
     

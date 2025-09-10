@@ -123,9 +123,11 @@ def lemma_signin():
             try:
                 from lemma_crypto import PyMinimalIssuer
                 
-                # Create real IAM issuer with Ed25519 keypair
-                iam_issuer = PyMinimalIssuer()
-                logger.info(f"🔐 Creating IAM permission lemma with real issuer: {iam_issuer.get_did()[:50]}...")
+                # Get consistent IAM issuer for lemma.id site
+                from api.issuer_management import get_issuer_manager
+                issuer_manager = get_issuer_manager()
+                iam_issuer = issuer_manager.get_iam_issuer('lemma.id')
+                logger.info(f"🔐 Creating IAM permission lemma with consistent issuer: {iam_issuer.get_did()[:50]}...")
                 
                 import time
                 current_time = int(time.time())
@@ -145,9 +147,8 @@ def lemma_signin():
                     'scope': ','.join(['users:*', 'sites:*', 'permissions:*', 'billing:*', 'analytics:*'] if user_role == 'admin' else ['profile:read', 'profile:write', 'billing:read', 'usage:read'])
                 }
                 
-                # Create real subject DID for the customer
-                customer_issuer = PyMinimalIssuer()  # Each customer should have their own DID
-                customer_did = customer_issuer.get_did()
+                # Generate deterministic customer DID
+                customer_did = issuer_manager.generate_deterministic_user_did(f"customer_{customer.customer_id}")
                 
                 # Issue properly signed permission lemma
                 permission_lemma_json = iam_issuer.issue_credential(

@@ -695,8 +695,10 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_re
     try:
         from lemma_crypto import PyMinimalIssuer
         
-        # Create real issuer with Ed25519 keypair for federated identity
-        federated_issuer = PyMinimalIssuer()
+        # Get consistent federated issuer
+        from api.issuer_management import get_issuer_manager
+        issuer_manager = get_issuer_manager()
+        federated_issuer = issuer_manager.get_federated_issuer()
         
         # Get real DID and public key from crypto engine
         issuer_did = federated_issuer.get_did()
