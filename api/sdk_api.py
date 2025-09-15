@@ -157,8 +157,21 @@ def validate_api_key(f):
         
         api_key = auth_header[7:]  # Remove 'Bearer ' prefix
         
+        # Accept platform internal keys
+        platform_keys = [
+            'lemma_platform_production_key_2024',
+            'lemma_platform_internal_key_2024'
+        ]
+        
         # For demo purposes, accept demo keys
-        if api_key.startswith('demo-') or api_key == 'client-demo-key':
+        if api_key.startswith('demo-') or api_key == 'client-demo-key' or api_key in platform_keys:
+            request.api_key = api_key
+            return f(*args, **kwargs)
+        
+        # Check if it's a Heroku environment variable key
+        import os
+        heroku_api_key = os.environ.get('LEMMA_PLATFORM_API_KEY')
+        if heroku_api_key and api_key == heroku_api_key:
             request.api_key = api_key
             return f(*args, **kwargs)
         

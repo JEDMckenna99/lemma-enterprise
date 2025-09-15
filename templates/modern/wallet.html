@@ -697,6 +697,7 @@
 // Initialize the Lemma Federated Wallet and Shield Widget
 let lemmaWallet;
 let lemmaShield;
+let shieldApiKey = 'lemma_platform_production_key_2024'; // Global API key variable
 
 document.addEventListener('DOMContentLoaded', async function() {
     try {
@@ -724,10 +725,24 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.log('Using integrated wallet initialization');
         }
         
+        // Get API key from server configuration
+        shieldApiKey = 'lemma_platform_production_key_2024'; // Default fallback
+        
+        try {
+            const configResponse = await fetch('/api/network/client-config');
+            if (configResponse.ok) {
+                const config = await configResponse.json();
+                shieldApiKey = config.shield_config?.api_key || shieldApiKey;
+                console.log('✅ Got API key from server config');
+            }
+        } catch (error) {
+            console.warn('⚠️ Using fallback API key:', error);
+        }
+
         // Initialize the Lemma Shield Widget to protect the entire wallet page
         lemmaShield = new LemmaBotShield({
             debug: true,
-            apiKey: 'lemma_platform_internal_key_2024',  // Platform internal API key
+            apiKey: shieldApiKey,  // Use API key from Heroku config
             apiBase: window.location.origin,
             securityLevel: 'medium',
             checkOnEvents: ['entry', 'checkout', 'sensitive_action'],
@@ -1418,7 +1433,7 @@ async function performOfflineVerification(credential) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer lemma_platform_internal_key_2024'
+                'Authorization': `Bearer ${shieldApiKey}`
             },
             body: JSON.stringify({
                 credential: credential,

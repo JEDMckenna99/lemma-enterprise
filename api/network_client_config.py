@@ -3,6 +3,7 @@ Network Client Configuration API
 Provides configuration for federated wallet and bot shield clients
 """
 
+import os
 from flask import Blueprint, jsonify
 from flask_cors import cross_origin
 import logging
@@ -28,7 +29,7 @@ def get_client_config():
                 'auth_key': 'lemma_network_federated_sync_2024'
             },
             'shield_config': {
-                'api_key': 'lemma_platform_internal_key_2024',
+                'api_key': os.environ.get('LEMMA_PLATFORM_API_KEY', 'lemma_platform_production_key_2024'),
                 'security_level': 'medium',
                 'check_interval': 300000,  # 5 minutes
                 'offline_mode': True
