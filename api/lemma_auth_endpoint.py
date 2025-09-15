@@ -162,7 +162,6 @@ def lemma_signin():
             except Exception as e:
                 logger.error(f"❌ Failed to create real IAM permission lemma: {e}")
                 permission_lemma_data = None
-            }
         
         logger.info(f"✅ Lemma wallet authentication successful for {user_email}")
         

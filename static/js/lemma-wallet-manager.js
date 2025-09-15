@@ -142,12 +142,14 @@ class LemmaWalletManager {
                     // Check by ID
                     if (cred.id === credential.id) return true;
                     
-                    // Check by claims (same site, email, permission)
-                    if (credential.claims && cred.claims) {
+                    // Check by claims (same site, email, permission) - handle both claims and credentialSubject
+                    const credClaims = credential.claims || credential.credentialSubject;
+                    const existingClaims = cred.claims || cred.credentialSubject;
+                    if (credClaims && existingClaims) {
                         return (
-                            cred.claims.siteId === credential.claims.siteId &&
-                            cred.claims.email === credential.claims.email &&
-                            cred.claims.permissionId === credential.claims.permissionId
+                            existingClaims.siteId === credClaims.siteId &&
+                            existingClaims.email === credClaims.email &&
+                            existingClaims.permissionId === credClaims.permissionId
                         );
                     }
                     

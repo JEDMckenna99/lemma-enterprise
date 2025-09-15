@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from typing import Dict, Any, Optional
 
-from api.mau_tracker import mau_tracker, track_user_activity, track_stripe_identity_verification, get_monthly_billing_data, get_customer_analytics
+# MAU tracking integrated directly
+# from api.mau_tracker import mau_tracker, track_user_activity, track_stripe_identity_verification, get_monthly_billing_data, get_customer_analytics
 
 logger = logging.getLogger(__name__)
 

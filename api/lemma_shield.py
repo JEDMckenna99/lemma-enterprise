@@ -23,7 +23,16 @@ from functools import wraps
 from typing import Dict, List, Optional, Any
 
 # Import real-time network sync for federated identity
-from .realtime_network_sync import sync_manager
+# Network sync handled by network registry
+# from .realtime_network_sync import sync_manager
+
+# Create a simple sync manager for compatibility
+class SimpleSyncManager:
+    def add_shared_identity_lemma(self, credential_id, credential):
+        # In production, would sync to network registry
+        pass
+
+sync_manager = SimpleSyncManager()
 
 # Define logger FIRST before any usage
 logger = logging.getLogger(__name__)

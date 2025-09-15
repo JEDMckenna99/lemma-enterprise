@@ -111,14 +111,6 @@ class LemmaIssuerManager:
                 
         return self._issuers[issuer_key]
     
-    def get_issuer_metadata(self, issuer_key: str) -> Optional[Dict]:
-        """Get metadata for an issuer"""
-        return self._issuer_metadata.get(issuer_key)
-    
-    def get_all_issuer_metadata(self) -> Dict[str, Dict]:
-        """Get metadata for all issuers"""
-        return self._issuer_metadata.copy()
-    
     def generate_deterministic_user_did(self, user_id: str) -> str:
         """Generate deterministic user DID (not creating new issuer)"""
         import hashlib
@@ -129,13 +121,6 @@ class LemmaIssuerManager:
         # Format as proper DID (note: this is just identifier, not real public key)
         # In production, users would have their own real DIDs with private keys
         return f"did:lemma:user_{user_hash[:56]}"  # 64 chars total for DID format
-    
-    def clear_issuers(self):
-        """Clear all issuers (for testing)"""
-        self._issuers.clear()
-        self._issuer_metadata.clear()
-        self._creation_times.clear()
-        logger.info("🧹 Cleared all issuers")
 
 # Global issuer manager instance
 issuer_manager = LemmaIssuerManager()

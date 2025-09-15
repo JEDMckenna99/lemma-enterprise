@@ -826,7 +826,7 @@ class LemmaFederatedWallet {
                     id: c.id,
                     packageType: c.packageType,
                     storedAt: new Date(c.storedAt).toLocaleString(),
-                    isHuman: c.claims?.isHuman
+                    isHuman: (c.claims || c.credentialSubject)?.isHuman
                 })));
             }
         }

@@ -1,0 +1,79 @@
+DIGEST 4386767baa388958de42f3fba9fb889a
+Fgenerator_authenticator_proof
+R98:112 Coq.Arith.Arith <> <> lib
+R131:144 Coq.Lists.List <> <> lib
+R163:165 Coq.micromega.Lia <> <> lib
+def 202:215 <> TimeComplexity
+R220:222 Coq.Init.Datatypes <> nat ind
+def 237:248 <> EvidenceSize
+R253:255 Coq.Init.Datatypes <> nat ind
+def 270:283 <> NetworkLatency
+R288:290 Coq.Init.Datatypes <> nat ind
+ind 329:341 <> NetworkStatus
+constr 358:363 <> Online
+constr 404:410 <> Offline
+constr 433:440 <> Unstable
+R381:384 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R367:380 generator_authenticator_proof <> NetworkLatency def
+R385:397 generator_authenticator_proof <> NetworkStatus:1 ind
+R414:426 generator_authenticator_proof <> NetworkStatus:1 ind
+R458:461 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R444:457 generator_authenticator_proof <> NetworkLatency def
+R462:474 generator_authenticator_proof <> NetworkStatus:1 ind
+scheme 329:341 <> NetworkStatus_rect
+scheme 329:341 <> NetworkStatus_ind
+scheme 329:341 <> NetworkStatus_rec
+scheme 329:341 <> NetworkStatus_sind
+def 528:554 <> traditional_generation_time
+R573:584 generator_authenticator_proof <> EvidenceSize def
+binder 557:569 <> evidence_size:3
+R598:610 generator_authenticator_proof <> NetworkStatus ind
+binder 588:594 <> network:4
+R615:628 generator_authenticator_proof <> TimeComplexity def
+R668:670 Coq.Init.Peano <> ::nat_scope:x_'*'_x not
+R655:667 generator_authenticator_proof <> evidence_size:3 var
+binder 640:650 <> upload_time:5
+binder 685:701 <> server_processing:6
+R750:756 generator_authenticator_proof <> network:4 var
+R770:775 generator_authenticator_proof <> Online constr
+R795:797 Coq.Init.Peano <> ::nat_scope:x_'*'_x not
+R807:813 generator_authenticator_proof <> Offline constr
+R859:866 generator_authenticator_proof <> Unstable constr
+R886:888 Coq.Init.Peano <> ::nat_scope:x_'*'_x not
+binder 724:739 <> network_overhead:8
+R935:937 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R915:917 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R904:914 generator_authenticator_proof <> upload_time:5 var
+R918:934 generator_authenticator_proof <> server_processing:6 var
+R938:953 generator_authenticator_proof <> network_overhead:8 var
+def 970:990 <> traditional_auth_time
+R1003:1015 generator_authenticator_proof <> NetworkStatus ind
+binder 993:999 <> network:9
+R1020:1033 generator_authenticator_proof <> TimeComplexity def
+R1047:1053 generator_authenticator_proof <> network:9 var
+R1065:1070 generator_authenticator_proof <> Online constr
+R1089:1091 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R1105:1111 generator_authenticator_proof <> Offline constr
+R1153:1160 generator_authenticator_proof <> Unstable constr
+R1179:1181 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R1189:1191 Coq.Init.Peano <> ::nat_scope:x_'*'_x not
+def 1247:1267 <> lemma_generation_time
+R1286:1297 generator_authenticator_proof <> EvidenceSize def
+binder 1270:1282 <> evidence_size:11
+R1302:1315 generator_authenticator_proof <> TimeComplexity def
+R1334:1336 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R1328:1330 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+def 1403:1417 <> lemma_auth_time
+R1421:1434 generator_authenticator_proof <> TimeComplexity def
+R1454:1456 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R1450:1452 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R1445:1447 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+prf 1609:1626 <> auth_always_faster
+R1651:1663 generator_authenticator_proof <> NetworkStatus ind
+binder 1641:1647 <> network:12
+R1685:1687 Coq.Init.Peano <> ::nat_scope:x_'<'_x not
+R1670:1684 generator_authenticator_proof <> lemma_auth_time def
+R1688:1708 generator_authenticator_proof <> traditional_auth_time def
+R1710:1716 generator_authenticator_proof <> network:12 var
+R1804:1818 generator_authenticator_proof <> lemma_auth_time def
+R1821:1841 generator_authenticator_proof <> traditional_auth_time def
