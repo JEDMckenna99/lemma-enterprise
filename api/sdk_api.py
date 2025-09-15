@@ -31,8 +31,7 @@ import json
 import requests
 import hashlib
 
-# Import existing shield functionality
-from .shield import create_credential_from_stripe_verification
+# Import decorators
 from auth.decorators import rate_limit, cors_headers
 
 logger = logging.getLogger(__name__)
