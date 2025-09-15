@@ -170,6 +170,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Pairwise Tagging: {e}")
 
+    # Wallet Retrieval Flow
+    try:
+        from api.wallet_retrieval_flow import wallet_retrieval_bp
+        app.register_blueprint(wallet_retrieval_bp)
+        logger.info("✅ Wallet Retrieval Flow registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Wallet Retrieval Flow: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status

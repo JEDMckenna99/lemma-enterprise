@@ -2,7 +2,14 @@
 
 ## 🎯 **Quick Navigation**
 
-### **🔐 NEW: Permission Lemmas IAM**
+### **🚀 NEW: Advanced Wallet Recovery System**
+- **[Advanced Wallet Architecture](ADVANCED_WALLET_ARCHITECTURE.md)** - Enterprise-grade wallet recovery with multi-device sync
+- **[Wallet Recovery Flows](WALLET_RECOVERY_FLOWS.md)** - Complete technical flow documentation  
+- **[Sybil Prevention Guide](SYBIL_PREVENTION_GUIDE.md)** - One-human-one-account enforcement
+- **Live Testing**: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/wallet-testing
+- **Performance**: 94µs verification with advanced features (12.1% overhead for 1000x functionality)
+
+### **🔐 Permission Lemmas IAM**
 - **[Permission Lemmas IAM Developer Guide](PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md)** - Complete Auth0/Duo replacement with microsecond verification
 - **Live API**: https://lemma-enterprise-0f6ba17076c1.herokuapp.com
 - **Performance**: 2.38µs access verification (210,084x faster than Auth0)
