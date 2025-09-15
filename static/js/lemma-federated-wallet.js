@@ -115,8 +115,7 @@ class LemmaFederatedWallet {
             console.log(`🔐 Initialized ${trustedIssuers.length} trusted DIDs:`, trustedIssuers.map(i => i.did));
         }
         
-        // Load real issuer DIDs from crypto engine
-        this.loadRealIssuerDIDs();
+        // Real issuer DIDs will be loaded during init() to ensure async completion
     }
     
     async loadRealIssuerDIDs() {
@@ -544,6 +543,9 @@ class LemmaFederatedWallet {
             
             // 2. Load existing credentials
             await this.loadExistingCredentials();
+            
+            // 2.5. Load real issuer DIDs from crypto engine (CRITICAL for security)
+            await this.loadRealIssuerDIDs();
             
             // 3. Start network sync
             this.startNetworkSync();
