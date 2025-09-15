@@ -425,7 +425,7 @@
         </div>
     </header>
 
-    <!-- Main Wallet Layout -->
+    <!-- Main Wallet Layout - Protected by Bot Shield -->
     <div class="wallet-main" style="display: none;">
         <!-- Credential Management (moved to primary position) -->
         <section class="credential-management">
@@ -724,21 +724,24 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.log('Using integrated wallet initialization');
         }
         
-        // Initialize the Lemma Shield Widget to protect the FIL join section
+        // Initialize the Lemma Shield Widget to protect the entire wallet page
         lemmaShield = new LemmaBotShield({
             debug: true,
             apiBase: window.location.origin,
+            securityLevel: 'medium',
+            checkOnEvents: ['entry', 'checkout', 'sensitive_action'],
             onVerified: function(result) {
-                console.log('✅ Shield verification successful:', result);
-                showFILJoinInterface();
+                console.log('✅ Shield verification successful - wallet access granted:', result);
+                // Wallet content is automatically shown by the shield
             },
             onError: function(error) {
-                console.error('❌ Shield verification failed:', error);
+                console.error('❌ Shield verification failed - wallet access denied:', error);
+                // Shield will show verification widget automatically
             }
         });
         
-        // Protect the FIL join section with the shield
-        lemmaShield.protect('#fil-join-section');
+        // CRITICAL: Protect the entire wallet page - only verified humans can access
+        await lemmaShield.protect('.wallet-main');
         
         // Load and display wallet data (both PoH and permission lemmas)
         await loadWalletData();
