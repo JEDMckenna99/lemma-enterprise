@@ -727,6 +727,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Initialize the Lemma Shield Widget to protect the entire wallet page
         lemmaShield = new LemmaBotShield({
             debug: true,
+            apiKey: 'lemma_platform_internal_key_2024',  // Platform internal API key
             apiBase: window.location.origin,
             securityLevel: 'medium',
             checkOnEvents: ['entry', 'checkout', 'sensitive_action'],
@@ -1417,7 +1418,7 @@ async function performOfflineVerification(credential) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer demo-integration-key-12345'
+                'Authorization': 'Bearer lemma_platform_internal_key_2024'
             },
             body: JSON.stringify({
                 credential: credential,
@@ -1812,11 +1813,13 @@ async function loadEnhancedWalletData() {
 }
 
 // Update the existing wallet initialization to include enhanced features
-const originalLoadWalletData = loadWalletData;
-loadWalletData = async function() {
-    await originalLoadWalletData();
-    await loadEnhancedWalletData();
-};
+if (typeof window.originalLoadWalletData === 'undefined') {
+    window.originalLoadWalletData = loadWalletData;
+    loadWalletData = async function() {
+        await window.originalLoadWalletData();
+        await loadEnhancedWalletData();
+    };
+}
 
 </script>
 {% endblock %}
