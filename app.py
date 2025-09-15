@@ -228,6 +228,11 @@ def create_app():
         """Advanced wallet with recovery and multi-device features"""
         return render_template('modern/advanced_wallet.html')
 
+    @app.route('/wallet-testing')
+    def wallet_testing():
+        """Manual testing interface for advanced wallet features"""
+        return render_template('modern/wallet_testing.html')
+
     @app.route('/admin')
     def admin_dashboard():
         return render_template('admin/admin_dashboard.html')
