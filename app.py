@@ -154,6 +154,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Multi-lemma Sync: {e}")
 
+    # Recovery Vault Service
+    try:
+        from api.recovery_vault import recovery_vault_bp
+        app.register_blueprint(recovery_vault_bp)
+        logger.info("✅ Recovery Vault Service registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Recovery Vault: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status
