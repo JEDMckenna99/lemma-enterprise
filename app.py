@@ -178,6 +178,13 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Wallet Retrieval Flow: {e}")
 
+    try:
+        from api.network_client_config import network_client_config_bp
+        app.register_blueprint(network_client_config_bp)
+        logger.info("✅ Network Client Config registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Network Client Config: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status

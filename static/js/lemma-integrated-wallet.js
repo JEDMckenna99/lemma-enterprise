@@ -638,6 +638,34 @@ class LemmaIntegratedWallet {
     }
 
     /**
+     * Get credentials (delegates to federated wallet)
+     */
+    async getCredentials(type = null) {
+        if (this.federatedWallet && typeof this.federatedWallet.getCredentials === 'function') {
+            return await this.federatedWallet.getCredentials(type);
+        }
+        
+        // Fallback if federated wallet not available
+        if (this.debug) {
+            console.warn('⚠️ Federated wallet not available for getCredentials');
+        }
+        return [];
+    }
+
+    /**
+     * Check if wallet has valid credentials (delegates to federated wallet)
+     */
+    async hasValidCredentials(type = null) {
+        if (this.federatedWallet && typeof this.federatedWallet.hasValidCredentials === 'function') {
+            return await this.federatedWallet.hasValidCredentials(type);
+        }
+        
+        // Fallback check
+        const credentials = await this.getCredentials(type);
+        return credentials.length > 0;
+    }
+
+    /**
      * Get integrated wallet statistics
      */
     getWalletStats() {
