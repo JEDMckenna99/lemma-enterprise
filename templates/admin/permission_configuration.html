@@ -355,10 +355,14 @@ let configInstance = null;
 document.addEventListener('DOMContentLoaded', async function() {
     try {
         // Initialize wallet for admin access control
-        configInstance = new LemmaFederatedWallet({ 
+        configInstance = new LemmaIntegratedWallet({ 
             debug: true,
             networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-            networkAuthKey: 'lemma_network_federated_sync_2024'
+            networkAuthKey: 'lemma_network_federated_sync_2024',
+            enableAdvancedFeatures: true,
+            enableRecovery: true,
+            vaultUrl: '/vault',
+            enableSybilPrevention: true
         });
         await configInstance.init();
 

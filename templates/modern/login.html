@@ -7,6 +7,8 @@
     {{ super() }}
     <!-- Load the Lemma Federated Wallet for permission lemma storage -->
     <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=672"></script>
+    <script src="{{ url_for('static', filename='js/lemma-advanced-wallet.js') }}?v=672"></script>
+    <script src="{{ url_for('static', filename='js/lemma-integrated-wallet.js') }}?v=672"></script>
     <style>
         .login-container {
             max-width: 580px;
@@ -460,10 +462,14 @@
                         try {
                             // Initialize background wallet if not already done
                             if (!window.lemmaWallet) {
-                                window.lemmaWallet = new LemmaFederatedWallet({
+                                window.lemmaWallet = new LemmaIntegratedWallet({
                                     debug: true,
                                     networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-                                    networkAuthKey: 'lemma_network_federated_sync_2024'
+                                    networkAuthKey: 'lemma_network_federated_sync_2024',
+                                    enableAdvancedFeatures: true,
+                                    enableRecovery: true,
+                                    vaultUrl: '/vault',
+                                    enableSybilPrevention: true
                                 });
                                 await window.lemmaWallet.init();
                             }
@@ -550,10 +556,14 @@
                 
                 // Initialize wallet if not already done
                 if (!window.lemmaWallet) {
-                    window.lemmaWallet = new LemmaFederatedWallet({
+                    window.lemmaWallet = new LemmaIntegratedWallet({
                         debug: true,
                         networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-                        networkAuthKey: 'lemma_network_federated_sync_2024'
+                        networkAuthKey: 'lemma_network_federated_sync_2024',
+                        enableAdvancedFeatures: true,
+                        enableRecovery: true,
+                        vaultUrl: '/vault',
+                        enableSybilPrevention: true
                     });
                     await window.lemmaWallet.init();
                 }

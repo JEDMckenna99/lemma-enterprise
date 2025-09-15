@@ -54,7 +54,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     try {
         // Check for customer access permission
         const { LemmaFederatedWallet } = await import('/static/js/lemma-federated-wallet.js');
-        const wallet = new LemmaFederatedWallet({ debug: true });
+        const { LemmaAdvancedWallet } = await import('/static/js/lemma-advanced-wallet.js');
+        const { LemmaIntegratedWallet } = await import('/static/js/lemma-integrated-wallet.js');
+        const wallet = new LemmaIntegratedWallet({ 
+            debug: true,
+            enableAdvancedFeatures: true,
+            enableRecovery: true,
+            vaultUrl: '/vault',
+            enableSybilPrevention: true
+        });
         await wallet.init();
 
         const permissionLemmas = await wallet.getCredentials('permission');

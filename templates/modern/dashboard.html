@@ -7,6 +7,8 @@
     {{ super() }}
     <!-- Load the Lemma Federated Wallet -->
     <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=672"></script>
+    <script src="{{ url_for('static', filename='js/lemma-advanced-wallet.js') }}?v=672"></script>
+    <script src="{{ url_for('static', filename='js/lemma-integrated-wallet.js') }}?v=672"></script>
     <style>
         .dashboard-container {
             max-width: 1200px;
@@ -402,9 +404,14 @@ const lemmaShield = new LemmaBotShield({
     customerId: '{{ customer.customer_id }}'
 });
 
-// Initialize Federated Wallet
-const lemmaWallet = new LemmaFederatedWallet({
-    apiKey: '{{ customer.api_keys[0].key if customer.api_keys else "YOUR_API_KEY" }}'
+// Initialize Integrated Wallet with advanced features
+const lemmaWallet = new LemmaIntegratedWallet({
+    apiKey: '{{ customer.api_keys[0].key if customer.api_keys else "YOUR_API_KEY" }}',
+    enableAdvancedFeatures: true,
+    enableRecovery: true,
+    vaultUrl: '/vault',
+    enableSybilPrevention: true,
+    debug: true
 });
 
 // Verify users automatically
@@ -466,11 +473,15 @@ lemmaShield.verifyUser();
 
         document.addEventListener('DOMContentLoaded', async function() {
             try {
-                // Initialize wallet to check permission lemmas
-                walletInstance = new LemmaFederatedWallet({ 
+                // Initialize integrated wallet to check permission lemmas
+                walletInstance = new LemmaIntegratedWallet({ 
                     debug: true,
                     networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-                    networkAuthKey: 'lemma_network_federated_sync_2024'
+                    networkAuthKey: 'lemma_network_federated_sync_2024',
+                    enableAdvancedFeatures: true,
+                    enableRecovery: true,
+                    vaultUrl: '/vault',
+                    enableSybilPrevention: true
                 });
                 await walletInstance.init();
 

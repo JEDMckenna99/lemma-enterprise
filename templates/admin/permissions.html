@@ -257,10 +257,14 @@ let permissionManagerInstance = null;
 document.addEventListener('DOMContentLoaded', async function() {
     try {
         // Initialize wallet to check permission lemmas (same as other admin pages)
-        permissionManagerInstance = new LemmaFederatedWallet({ 
+        permissionManagerInstance = new LemmaIntegratedWallet({ 
             debug: true,
             networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-            networkAuthKey: 'lemma_network_federated_sync_2024'
+            networkAuthKey: 'lemma_network_federated_sync_2024',
+            enableAdvancedFeatures: true,
+            enableRecovery: true,
+            vaultUrl: '/vault',
+            enableSybilPrevention: true
         });
         await permissionManagerInstance.init();
 
