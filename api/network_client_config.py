@@ -115,3 +115,71 @@ def check_shared_identity():
             'error': 'check_error',
             'message': 'Failed to check shared identity'
         }), 500
+
+@network_client_config_bp.route('/api/network/trusted-issuers', methods=['GET'])
+@cross_origin()
+def get_trusted_issuers():
+    """
+    Get trusted issuer DIDs from crypto engine for DID registry
+    """
+    try:
+        # Get real issuer DIDs from crypto engine
+        trusted_issuers = []
+        
+        try:
+            # Import crypto engine to get real issuer DIDs
+            from lemma_crypto import PyMinimalIssuer
+            from api.issuer_management import get_issuer_manager
+            
+            # Get issuer manager
+            issuer_manager = get_issuer_manager()
+            
+            # Get federated issuer (for PoH lemmas)
+            federated_issuer = issuer_manager.get_federated_issuer()
+            trusted_issuers.append({
+                'did': federated_issuer.get_did(),
+                'public_key': federated_issuer.get_public_key_hex(),
+                'name': 'Lemma Federated Identity Network',
+                'issuer_type': 'federated_identity',
+                'trust_score': 0.95
+            })
+            
+            # Get IAM issuer (for permission lemmas)
+            iam_issuer = issuer_manager.get_iam_issuer()
+            trusted_issuers.append({
+                'did': iam_issuer.get_did(),
+                'public_key': iam_issuer.get_public_key_hex(),
+                'name': 'Lemma Platform IAM',
+                'issuer_type': 'platform_iam',
+                'trust_score': 0.98
+            })
+            
+            # Get multi-lemma issuer (for advanced wallet features)
+            multi_lemma_issuer = issuer_manager.get_multi_lemma_issuer()
+            trusted_issuers.append({
+                'did': multi_lemma_issuer.get_did(),
+                'public_key': multi_lemma_issuer.get_public_key_hex(),
+                'name': 'Lemma Multi-Lemma System',
+                'issuer_type': 'multi_lemma',
+                'trust_score': 0.92
+            })
+            
+        except ImportError:
+            logger.warning("⚠️ Crypto engine not available for trusted issuers")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not get real issuer DIDs: {e}")
+        
+        logger.info(f"✅ Providing {len(trusted_issuers)} trusted issuer DIDs")
+        return jsonify({
+            'success': True,
+            'issuers': trusted_issuers,
+            'count': len(trusted_issuers)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Trusted issuers error: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'issuers_error',
+            'message': 'Failed to get trusted issuers'
+        }), 500

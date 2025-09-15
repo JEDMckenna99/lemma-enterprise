@@ -114,6 +114,47 @@ class LemmaFederatedWallet {
         if (this.debug) {
             console.log(`🔐 Initialized ${trustedIssuers.length} trusted DIDs:`, trustedIssuers.map(i => i.did));
         }
+        
+        // Load real issuer DIDs from crypto engine
+        this.loadRealIssuerDIDs();
+    }
+    
+    async loadRealIssuerDIDs() {
+        try {
+            // Get real issuer DIDs from the server
+            const response = await fetch('/api/network/trusted-issuers');
+            if (response.ok) {
+                const trustedIssuers = await response.json();
+                
+                if (trustedIssuers.success && trustedIssuers.issuers) {
+                    trustedIssuers.issuers.forEach(issuer => {
+                        this.didRegistry.set(issuer.did, {
+                            publicKey: issuer.public_key,
+                            issuerInfo: {
+                                name: issuer.name,
+                                issuer_type: issuer.issuer_type,
+                                trust_score: issuer.trust_score || 0.90,
+                                verified: true,
+                                created_at: Date.now()
+                            }
+                        });
+                    });
+                    
+                    if (this.debug) {
+                        console.log(`✅ Added ${trustedIssuers.issuers.length} real issuer DIDs to registry`);
+                        console.log(`🔐 Total trusted DIDs: ${this.didRegistry.size}`);
+                    }
+                }
+            } else {
+                if (this.debug) {
+                    console.warn('⚠️ Could not fetch trusted issuers from server');
+                }
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Could not load real issuer DIDs:', error);
+            }
+        }
     }
     
     /**
@@ -831,9 +872,30 @@ class LemmaFederatedWallet {
             }
         }
         
-        // SIMPLIFIED: If we have local credentials, trust them (background checks will validate later)
+        // SECURITY: Only trust credentials that pass verification
         if (hasCredentials) {
-            return true;
+            // Check if any credentials are actually valid (not just present)
+            const validCredentials = credentials.filter(credential => {
+                // Check if issuer is trusted
+                const issuerDid = credential.issuer;
+                const isTrustedIssuer = this.didRegistry.has(issuerDid);
+                
+                if (!isTrustedIssuer) {
+                    if (this.debug) {
+                        console.warn(`⚠️ Rejecting credential with untrusted issuer: ${issuerDid}`);
+                    }
+                    return false;
+                }
+                
+                // Additional validation could go here (signature verification, expiration, etc.)
+                return true;
+            });
+            
+            if (this.debug) {
+                console.log(`🔐 Valid credentials: ${validCredentials.length}/${credentials.length}`);
+            }
+            
+            return validCredentials.length > 0;
         }
         
         // If no local credentials, check shared network for cross-site recognition
