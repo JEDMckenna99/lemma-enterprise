@@ -162,6 +162,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Recovery Vault: {e}")
 
+    # Pairwise Tagging Service
+    try:
+        from api.pairwise_tagging import pairwise_tagging_bp
+        app.register_blueprint(pairwise_tagging_bp)
+        logger.info("✅ Pairwise Tagging Service registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Pairwise Tagging: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status
@@ -214,6 +222,11 @@ def create_app():
     @app.route('/dashboard')
     def customer_dashboard():
         return render_template('modern/customer_dashboard.html')
+
+    @app.route('/advanced-wallet')
+    def advanced_wallet():
+        """Advanced wallet with recovery and multi-device features"""
+        return render_template('modern/advanced_wallet.html')
 
     @app.route('/admin')
     def admin_dashboard():
