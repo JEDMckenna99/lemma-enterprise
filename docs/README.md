@@ -6,6 +6,8 @@
 - **[Advanced Wallet Architecture](ADVANCED_WALLET_ARCHITECTURE.md)** - Enterprise-grade wallet recovery with multi-device sync
 - **[Wallet Recovery Flows](WALLET_RECOVERY_FLOWS.md)** - Complete technical flow documentation  
 - **[Sybil Prevention Guide](SYBIL_PREVENTION_GUIDE.md)** - One-human-one-account enforcement
+- **[Lemma vs Traditional Systems](LEMMA_VS_TRADITIONAL_SYSTEMS_COMPARISON.md)** - Comprehensive comparison analysis
+- **[Quick Comparison Table](QUICK_COMPARISON_TABLE.md)** - At-a-glance comparison summary
 - **Live Testing**: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/wallet-testing
 - **Performance**: 94µs verification with advanced features (12.1% overhead for 1000x functionality)
 
