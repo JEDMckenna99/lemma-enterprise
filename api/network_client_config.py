@@ -59,6 +59,7 @@ def generate_ppid():
     Generate privacy-preserving identifier for user tracking
     """
     try:
+        from flask import request
         import hashlib
         import secrets
         
