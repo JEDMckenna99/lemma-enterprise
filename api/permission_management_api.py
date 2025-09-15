@@ -356,10 +356,11 @@ def add_site_user(site_id):
         logger.error(f"Add site user error: {e}")
         return jsonify({'error': str(e)}), 500
 
-@permission_api.route('/api/v1/sites/<site_id>/users/<user_did>/permissions', methods=['POST'])
-@cross_origin()
-@require_api_key
-def grant_user_permission_client_side(site_id, user_did):
+# Duplicate endpoint removed - keeping the admin version above
+# @permission_api.route('/api/v1/sites/<site_id>/users/<user_did>/permissions', methods=['POST'])
+# @cross_origin()
+# @require_api_key
+def grant_user_permission_client_side_disabled(site_id, user_did):
     """
     Grant permission to user (creates permission lemma for client-side storage)
     This is the CLIENT-SIDE IAM approach - no server storage needed

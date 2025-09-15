@@ -10,6 +10,8 @@ use crate::optimized_verification::{OptimizedVerifier, OptimizedVerificationResu
 use crate::ultra_optimized_verification::{UltraOptimizedVerifier, UltraVerificationResult, UltraOptimizationStats};
 use crate::device_delegation::{DeviceDelegationManager, DeviceDelegationLemma};
 use crate::qr_authentication::{QRSyncManager, QRAuthenticationLemma, QRVerificationResult};
+use crate::advanced_wallet::{AdvancedWalletCrypto, KYCTuple};
+use crate::envelope_encryption::{WalletEnvelopeV2, EnvelopeEncryptionV2};
 
 /// Python wrapper for MinimalIssuer
 #[pyclass]
@@ -529,7 +531,72 @@ pub fn register_minimal_classes(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyQRSyncManager>()?;
     m.add_class::<PyQRVerificationResult>()?;
     m.add_class::<PyDeviceDelegationManager>()?;
+    m.add_class::<PyAdvancedWalletCrypto>()?;
     Ok(())
+}
+
+/// Python wrapper for AdvancedWalletCrypto
+#[pyclass]
+pub struct PyAdvancedWalletCrypto {
+    inner: AdvancedWalletCrypto,
+}
+
+#[pymethods]
+impl PyAdvancedWalletCrypto {
+    #[new]
+    pub fn new(issuer_salt: Vec<u8>, k_pair: Vec<u8>, r_vault: Vec<u8>) -> PyResult<Self> {
+        if issuer_salt.len() != 32 || k_pair.len() != 32 || r_vault.len() != 32 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "All keys must be exactly 32 bytes"
+            ));
+        }
+        
+        let mut issuer_array = [0u8; 32];
+        let mut k_pair_array = [0u8; 32];
+        let mut r_vault_array = [0u8; 32];
+        
+        issuer_array.copy_from_slice(&issuer_salt);
+        k_pair_array.copy_from_slice(&k_pair);
+        r_vault_array.copy_from_slice(&r_vault);
+        
+        Ok(PyAdvancedWalletCrypto {
+            inner: AdvancedWalletCrypto::new(issuer_array, k_pair_array, r_vault_array)
+        })
+    }
+    
+    #[staticmethod]
+    pub fn generate_secrets() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        AdvancedWalletCrypto::generate_secrets()
+    }
+    
+    pub fn derive_rid(&self, kyc_tuple_cbor: Vec<u8>) -> Vec<u8> {
+        self.inner.derive_rid(&kyc_tuple_cbor).to_vec()
+    }
+    
+    pub fn generate_pairwise_tag(&self, rid: Vec<u8>, rp_id: String) -> PyResult<Vec<u8>> {
+        if rid.len() != 32 {
+            return Err(pyo3::exceptions::PyValueError::new_err("RID must be 32 bytes"));
+        }
+        
+        let mut rid_array = [0u8; 32];
+        rid_array.copy_from_slice(&rid);
+        
+        match self.inner.generate_pairwise_tag(&rid_array, &rp_id) {
+            Ok(tag) => Ok(tag.to_vec()),
+            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(e))
+        }
+    }
+    
+    pub fn derive_vid(&self, rid: Vec<u8>) -> PyResult<Vec<u8>> {
+        if rid.len() != 32 {
+            return Err(pyo3::exceptions::PyValueError::new_err("RID must be 32 bytes"));
+        }
+        
+        let mut rid_array = [0u8; 32];
+        rid_array.copy_from_slice(&rid);
+        
+        Ok(self.inner.derive_vid(&rid_array).to_vec())
+    }
 }
 
 /// Python module

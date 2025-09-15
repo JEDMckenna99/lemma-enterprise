@@ -65,9 +65,10 @@ def get_customer_profile():
             'error': 'Failed to get profile'
         }), 500
 
-@dashboard_bp.route('/api/customer/api-keys', methods=['GET'])
-@cross_origin()
-def get_customer_api_keys():
+# Duplicate endpoint removed - handled by customer_accounts.py
+# @dashboard_bp.route('/api/customer/api-keys', methods=['GET'])
+# @cross_origin()
+def get_customer_api_keys_disabled():
     """Get customer API keys"""
     try:
         customer_id = session.get('customer_id')
@@ -98,7 +99,8 @@ def get_customer_api_keys():
             'error': 'Failed to get API keys'
         }), 500
 
-@dashboard_bp.route('/api/customer/api-keys', methods=['POST'])
+# Duplicate endpoint removed - handled by customer_accounts.py
+# @dashboard_bp.route('/api/customer/api-keys', methods=['POST'])
 @cross_origin()
 def create_api_key():
     """Create new API key for customer"""
@@ -125,7 +127,8 @@ def create_api_key():
             'error': 'Failed to create API key'
         }), 500
 
-@dashboard_bp.route('/api/customer/api-keys/<key_id>', methods=['DELETE'])
+# Duplicate endpoint removed - handled by customer_accounts.py  
+# @dashboard_bp.route('/api/customer/api-keys/<key_id>', methods=['DELETE'])
 @cross_origin()
 def revoke_api_key(key_id):
     """Revoke customer API key"""
