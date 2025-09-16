@@ -128,9 +128,132 @@ class LemmaIntegratedWallet {
         // Load envelope counter
         this.envelopeCounter = parseInt(localStorage.getItem('lemma_envelope_counter') || '0');
         
+        // Generate RID if not available (derived from user identity)
+        await this.ensureRIDExists();
+        
         if (this.debug) {
             console.log('🔐 Advanced wallet features initialized');
         }
+    }
+
+    /**
+     * Ensure RID (Root Identity) exists - generate from user identity if needed
+     */
+    async ensureRIDExists() {
+        // Check if RID already exists
+        this.currentRID = localStorage.getItem('lemma_current_rid');
+        
+        if (!this.currentRID) {
+            // Generate RID from available identity data
+            const identitySource = await this.getIdentitySource();
+            
+            if (identitySource) {
+                this.currentRID = await this.deriveRIDFromIdentity(identitySource);
+                localStorage.setItem('lemma_current_rid', this.currentRID);
+                
+                // Also generate and store VID
+                this.currentVID = await this.deriveVID(this.currentRID);
+                localStorage.setItem('lemma_current_vid', this.currentVID);
+                
+                if (this.debug) {
+                    console.log('✅ Generated RID from user identity');
+                    console.log(`🔑 RID: ${this.currentRID.substring(0, 16)}...`);
+                }
+            } else {
+                // Generate temporary RID for wallet functionality
+                this.currentRID = await this.generateTemporaryRID();
+                localStorage.setItem('lemma_current_rid', this.currentRID);
+                
+                this.currentVID = await this.deriveVID(this.currentRID);
+                localStorage.setItem('lemma_current_vid', this.currentVID);
+                
+                if (this.debug) {
+                    console.log('⚠️ Generated temporary RID (no identity found)');
+                    console.log('💡 Complete PoH verification to get persistent RID');
+                }
+            }
+        } else {
+            // Load existing VID
+            this.currentVID = localStorage.getItem('lemma_current_vid');
+            if (!this.currentVID) {
+                this.currentVID = await this.deriveVID(this.currentRID);
+                localStorage.setItem('lemma_current_vid', this.currentVID);
+            }
+            
+            if (this.debug) {
+                console.log('✅ Loaded existing RID from storage');
+            }
+        }
+    }
+
+    /**
+     * Get identity source for RID derivation
+     */
+    async getIdentitySource() {
+        try {
+            // Try to get from federated wallet first
+            if (this.federatedWallet) {
+                const identityCredentials = await this.federatedWallet.getCredentials('identity');
+                if (identityCredentials.length > 0) {
+                    const credential = identityCredentials[0];
+                    return {
+                        type: 'poh_credential',
+                        subject: credential.subject,
+                        issuer: credential.issuer,
+                        verification_method: credential.claims?.verificationMethod,
+                        stripe_session: credential.claims?.stripe_session_id
+                    };
+                }
+            }
+            
+            // Try to get from localStorage
+            const storedUserId = localStorage.getItem('lemma_user_id');
+            if (storedUserId) {
+                return {
+                    type: 'stored_user_id',
+                    user_id: storedUserId
+                };
+            }
+            
+            return null;
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Could not get identity source:', error);
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Derive RID from identity source
+     */
+    async deriveRIDFromIdentity(identitySource) {
+        const encoder = new TextEncoder();
+        let ridInput = '';
+        
+        if (identitySource.type === 'poh_credential') {
+            // Use subject + verification method for RID
+            ridInput = `${identitySource.subject}_${identitySource.verification_method || 'unknown'}`;
+        } else if (identitySource.type === 'stored_user_id') {
+            ridInput = identitySource.user_id;
+        }
+        
+        // Hash to create RID
+        const data = encoder.encode(ridInput + '_root_identity');
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = new Uint8Array(hashBuffer);
+        return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Generate temporary RID for wallet functionality
+     */
+    async generateTemporaryRID() {
+        const encoder = new TextEncoder();
+        const tempData = encoder.encode(`temp_rid_${Date.now()}_${Math.random()}`);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', tempData);
+        const hashArray = new Uint8Array(hashBuffer);
+        return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
     /**

@@ -6,11 +6,11 @@
 {% block head %}
     {{ super() }}
     <!-- Load the existing Lemma Federated Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=810"></script>
-    <script src="{{ url_for('static', filename='js/lemma-advanced-wallet.js') }}?v=810"></script>
-    <script src="{{ url_for('static', filename='js/lemma-integrated-wallet.js') }}?v=810"></script>
+    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=815"></script>
+    <script src="{{ url_for('static', filename='js/lemma-advanced-wallet.js') }}?v=815"></script>
+    <script src="{{ url_for('static', filename='js/lemma-integrated-wallet.js') }}?v=815"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
-    <script src="/static/js/lemma-bot-shield-simple.js?v=810"></script>
+    <script src="/static/js/lemma-bot-shield-simple.js?v=815"></script>
     <style>
         .wallet-container {
             max-width: 1100px;
@@ -427,87 +427,7 @@
 
     <!-- Main Wallet Layout - Protected by Bot Shield -->
     <div class="wallet-main" style="display: none;">
-        <!-- Credential Management (moved to primary position) -->
-        <section class="credential-management">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-                <div>
-                    <h2 style="font-size: 1.3rem; font-weight: 600; color: var(--gray-900); margin: 0;">Your Credentials</h2>
-                    <p style="color: var(--gray-600); margin: 2px 0 0 0; font-size: 0.9rem;">Manage your federated identity proofs</p>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <button class="btn-primary" onclick="refreshWalletCredentials()" style="padding: 8px 16px; font-size: 0.85rem;">
-                        Refresh
-                    </button>
-                    <button class="btn-secondary" onclick="forceReloadWallet()" style="padding: 8px 16px; font-size: 0.85rem;">
-                        Force Reload
-                    </button>
-                    <button class="btn-secondary" onclick="debugWalletStorage()" style="padding: 8px 16px; font-size: 0.85rem;">
-                        Debug
-                    </button>
-                </div>
-            </div>
-            
-            <div id="credential-list" class="credential-list">
-                <div style="padding: 48px; text-align: center; color: var(--gray-500);">
-                    <div style="font-size: 20px; margin-bottom: 12px;">🔄</div>
-                    <div style="font-weight: 500; margin-bottom: 8px;">Loading credentials...</div>
-                    <div style="font-size: 0.9rem;">Connecting to Lemma network</div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Explainer Card -->
-        <div class="explainer-card">
-            <div class="explainer-header">
-                <div class="explainer-icon">🛡️</div>
-                <h2 class="explainer-title">What is Lemma?</h2>
-            </div>
-            
-            <div class="benefits-grid">
-                <div class="benefit-item">
-                    <div class="benefit-icon">🚫</div>
-                    <div class="benefit-content">
-                        <h4>Skip the Friction</h4>
-                        <p>No more CAPTCHAs, 2FA codes, or verification delays. Prove you're human instantly.</p>
-                    </div>
-                </div>
-                
-                <div class="benefit-item">
-                    <div class="benefit-icon">🔒</div>
-                    <div class="benefit-content">
-                        <h4>Privacy First</h4>
-                        <p>Zero personal data collection. Cryptographic proofs, not data harvesting.</p>
-                    </div>
-                </div>
-                
-                <div class="benefit-item">
-                    <div class="benefit-icon">🌐</div>
-                    <div class="benefit-content">
-                        <h4>Universal Access</h4>
-                        <p>One credential works everywhere in the federated network.</p>
-                    </div>
-                </div>
-                
-                <div class="benefit-item">
-                    <div class="benefit-icon">⚡</div>
-                    <div class="benefit-content">
-                        <h4>Lightning Speed</h4>
-                        <p>Microsecond verification across all network sites.</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="pro-tip">
-                <div class="pro-tip-content">
-                    <strong>💡 Keep it secure:</strong> Your credentials are stored locally in your browser. They're your passport to a frictionless internet.
-                </div>
-            </div>
-        </div>
-    </div>
-
-
-
-    <!-- PoH Lemmas Section -->
+    <!-- PoH Section -->
     <section id="poh-lemmas-section" style="margin-bottom: 32px;">
         <h2 class="section-title">Federated Identity Network </h2>
         <div class="wallet-card" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.02), rgba(255, 255, 255, 1)); border: 1px solid rgba(102, 126, 234, 0.15); padding: 24px;">
