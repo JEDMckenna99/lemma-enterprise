@@ -24,7 +24,7 @@ impl PyMinimalIssuer {
     #[new]
     pub fn new() -> Self {
         Self {
-            inner: MinimalIssuer::new(),
+            inner: MinimalIssuer::from_env_or_default(),
         }
     }
     

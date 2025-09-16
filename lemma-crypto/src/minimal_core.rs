@@ -81,6 +81,43 @@ impl MinimalIssuer {
         }
     }
     
+    /// Create an issuer from a deterministic seed (for production consistency)
+    pub fn from_seed(seed: &[u8; 32]) -> Self {
+        let signing_key = SigningKey::from_bytes(seed);
+        let verifying_key = signing_key.verifying_key();
+        
+        // Create DID from public key
+        let public_key_bytes = verifying_key.to_bytes();
+        let public_key_hex = hex::encode(public_key_bytes);
+        let did = format!("did:lemma:{}", public_key_hex);
+        
+        Self {
+            signing_key,
+            verifying_key,
+            did,
+        }
+    }
+    
+    /// Create an issuer from environment variable or default seed (production)
+    pub fn from_env_or_default() -> Self {
+        use std::env;
+        use sha2::{Sha256, Digest};
+        
+        // Try to get seed from environment variable
+        let seed_source = env::var("LEMMA_ISSUER_SEED")
+            .unwrap_or_else(|_| "lemma_production_issuer_seed_2024".to_string());
+        
+        // Create deterministic 32-byte seed from string
+        let mut hasher = Sha256::new();
+        hasher.update(seed_source.as_bytes());
+        let hash_result = hasher.finalize();
+        
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(&hash_result[..32]);
+        
+        Self::from_seed(&seed)
+    }
+    
     /// Get the issuer's DID
     pub fn did(&self) -> &str {
         &self.did
