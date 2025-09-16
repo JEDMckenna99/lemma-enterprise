@@ -141,8 +141,12 @@ class LemmaFederatedWallet {
                 const trustedIssuers = await response.json();
                 
                 if (trustedIssuers.success && trustedIssuers.issuers) {
+                    // Clear any existing DIDs first to ensure fresh registry
+                    this.didRegistry.clear();
+                    
                     trustedIssuers.issuers.forEach(issuer => {
                         this.didRegistry.set(issuer.did, {
+                            did: issuer.did, // Store the DID itself for reference
                             publicKey: issuer.public_key,
                             issuerInfo: {
                                 name: issuer.name,
@@ -157,6 +161,7 @@ class LemmaFederatedWallet {
                     if (this.debug) {
                         console.log(`✅ Added ${trustedIssuers.issuers.length} real issuer DIDs to registry`);
                         console.log(`🔐 Total trusted DIDs: ${this.didRegistry.size}`);
+                        console.log(`📋 Loaded DIDs:`, Array.from(this.didRegistry.keys()));
                     }
                 }
             } else {
