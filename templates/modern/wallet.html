@@ -6,11 +6,11 @@
 {% block head %}
     {{ super() }}
     <!-- Load the existing Lemma Federated Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=800"></script>
-    <script src="{{ url_for('static', filename='js/lemma-advanced-wallet.js') }}?v=800"></script>
-    <script src="{{ url_for('static', filename='js/lemma-integrated-wallet.js') }}?v=800"></script>
+    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=805"></script>
+    <script src="{{ url_for('static', filename='js/lemma-advanced-wallet.js') }}?v=805"></script>
+    <script src="{{ url_for('static', filename='js/lemma-integrated-wallet.js') }}?v=805"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
-    <script src="/static/js/lemma-bot-shield-simple.js?v=800"></script>
+    <script src="/static/js/lemma-bot-shield-simple.js?v=805"></script>
     <style>
         .wallet-container {
             max-width: 1100px;
@@ -1084,25 +1084,25 @@ async function loadWalletData() {
         }
 
         // Get credentials by type from wallet
-        const pohLemmas = await lemmaWallet.getCredentials('identity');
-        const permissionLemmas = await lemmaWallet.getCredentials('permission');
+        const pohCredentials = await lemmaWallet.getCredentials('identity');
+        const permissionCredentials = await lemmaWallet.getCredentials('permission');
         
         console.log('📊 Wallet contents:', {
-            pohLemmas: pohLemmas.length,
-            permissionLemmas: permissionLemmas.length,
-            total: pohLemmas.length + permissionLemmas.length
+            poh: pohCredentials.length,
+            permissions: permissionCredentials.length,
+            total: pohCredentials.length + permissionCredentials.length
         });
 
-        // Display PoH lemmas
-        displayPohLemmas(pohLemmas);
+        // Display PoH credentials
+        displayPohLemmas(pohCredentials);
         
-        // Display permission lemmas
-        displayPermissionLemmas(permissionLemmas);
+        // Display permission credentials
+        displayPermissionLemmas(permissionCredentials);
         
-        // Show/hide join network section based on PoH lemmas
+        // Show/hide join network section based on PoH credentials
         const joinSection = document.getElementById('join-network-section');
         if (joinSection) {
-            joinSection.style.display = pohLemmas.length === 0 ? 'block' : 'none';
+            joinSection.style.display = pohCredentials.length === 0 ? 'block' : 'none';
         }
 
     } catch (error) {
@@ -1125,11 +1125,11 @@ async function loadWalletData() {
     }
 }
 
-// Display PoH Lemmas (Universal Identity)
-function displayPohLemmas(pohLemmas) {
+// Display PoH Credentials (Universal Identity)
+function displayPohLemmas(pohCredentials) {
     const container = document.getElementById('poh-credentials-list');
     
-    if (pohLemmas.length === 0) {
+    if (pohCredentials.length === 0) {
         container.innerHTML = `
             <div style="padding: 32px; text-align: center; color: var(--gray-500);">
                 <div style="font-size: 20px; margin-bottom: 8px;">🌐</div>
@@ -1140,7 +1140,7 @@ function displayPohLemmas(pohLemmas) {
         return;
     }
 
-    container.innerHTML = pohLemmas.map(lemma => {
+    container.innerHTML = pohCredentials.map(lemma => {
         const issuedDate = new Date(lemma.issued_at * 1000).toLocaleDateString();
         const expiresDate = lemma.expires_at ? new Date(lemma.expires_at * 1000).toLocaleDateString() : 'Never';
         const verificationMethod = (lemma.claims || lemma.credentialSubject)?.verificationMethod || 'Unknown';
