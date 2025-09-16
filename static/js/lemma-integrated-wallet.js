@@ -131,6 +131,20 @@ class LemmaIntegratedWallet {
         // Generate RID if not available (derived from user identity)
         await this.ensureRIDExists();
         
+        // Auto-backup to vault for device sync capability
+        if (this.currentRID && this.masterSeed) {
+            try {
+                const backupResult = await this.backupToVault();
+                if (backupResult.success && this.debug) {
+                    console.log('✅ Wallet auto-backed up to vault for device sync');
+                }
+            } catch (error) {
+                if (this.debug) {
+                    console.warn('⚠️ Auto-backup failed (device sync may not work):', error.message);
+                }
+            }
+        }
+        
         if (this.debug) {
             console.log('🔐 Advanced wallet features initialized');
         }
