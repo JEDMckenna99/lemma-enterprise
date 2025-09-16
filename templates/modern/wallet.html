@@ -6,11 +6,11 @@
 {% block head %}
     {{ super() }}
     <!-- Load the existing Lemma Federated Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=805"></script>
-    <script src="{{ url_for('static', filename='js/lemma-advanced-wallet.js') }}?v=805"></script>
-    <script src="{{ url_for('static', filename='js/lemma-integrated-wallet.js') }}?v=805"></script>
+    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=810"></script>
+    <script src="{{ url_for('static', filename='js/lemma-advanced-wallet.js') }}?v=810"></script>
+    <script src="{{ url_for('static', filename='js/lemma-integrated-wallet.js') }}?v=810"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
-    <script src="/static/js/lemma-bot-shield-simple.js?v=805"></script>
+    <script src="/static/js/lemma-bot-shield-simple.js?v=810"></script>
     <style>
         .wallet-container {
             max-width: 1100px;
@@ -509,7 +509,7 @@
 
     <!-- PoH Lemmas Section -->
     <section id="poh-lemmas-section" style="margin-bottom: 32px;">
-        <h2 class="section-title">🌐 Federated Identity Network (PoH Lemmas)</h2>
+        <h2 class="section-title">Federated Identity Network </h2>
         <div class="wallet-card" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.02), rgba(255, 255, 255, 1)); border: 1px solid rgba(102, 126, 234, 0.15); padding: 24px;">
             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
                 <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">🌐</div>
@@ -530,7 +530,7 @@
 
     <!-- Permission Lemmas Section -->
     <section id="permission-lemmas-section" style="margin-bottom: 32px;">
-        <h2 class="section-title">🔑 Permission Lemmas (IAM Access)</h2>
+        <h2 class="section-title">Permissions</h2>
         <div class="wallet-card" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.02), rgba(255, 255, 255, 1)); border: 1px solid rgba(139, 92, 246, 0.15); padding: 24px;">
             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
                 <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--secondary), var(--primary)); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">🔑</div>
@@ -585,7 +585,10 @@
                     Set Up Recovery
                 </button>
                 <button id="sync-device-btn" class="btn-secondary" style="flex: 1; min-width: 140px;">
-                    Sync New Device
+                    Generate QR Sync
+                </button>
+                <button id="scan-qr-btn" class="btn-secondary" style="flex: 1; min-width: 140px;">
+                    Scan QR to Sync
                 </button>
                 <button id="test-recovery-btn" class="btn-secondary" style="flex: 1; min-width: 140px;">
                     Test Recovery
@@ -1753,12 +1756,118 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sync device button
     document.getElementById('sync-device-btn')?.addEventListener('click', async function() {
         try {
-            // Generate transfer code for new device
-            const transferCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-            alert(`Device Transfer Code: ${transferCode}\n\nOn your new device:\n1. Visit lemma.id/wallet\n2. Click "Add New Device"\n3. Enter this code: ${transferCode}`);
-            console.log('📱 Device sync initiated');
+            if (typeof lemmaWallet.generateDeviceSyncQR === 'function') {
+                // Generate QR code for device sync
+                const qrResult = await lemmaWallet.generateDeviceSyncQR();
+                
+                if (qrResult.success) {
+                    // Show QR code modal
+                    const modal = document.createElement('div');
+                    modal.style.cssText = `
+                        position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                        background: rgba(0,0,0,0.8); display: flex; align-items: center; 
+                        justify-content: center; z-index: 10000;
+                    `;
+                    
+                    modal.innerHTML = `
+                        <div style="background: white; padding: 32px; border-radius: 12px; max-width: 400px; text-align: center;">
+                            <h3 style="margin: 0 0 16px 0;">📱 Device Sync QR Code</h3>
+                            <div id="qr-code-container" style="margin: 16px 0; min-height: 200px; display: flex; align-items: center; justify-content: center; border: 2px dashed #ccc; border-radius: 8px;">
+                                <div style="padding: 20px; font-family: monospace; word-break: break-all; font-size: 10px; max-width: 300px;">
+                                    ${qrResult.qr_data}
+                                </div>
+                            </div>
+                            <p style="font-size: 0.9rem; color: #666; margin: 16px 0;">
+                                Scan this QR with your new device to transfer your wallet.<br>
+                                <strong>Expires in 5 minutes</strong>
+                            </p>
+                            <button onclick="this.parentElement.parentElement.remove()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">Close</button>
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(modal);
+                    
+                    console.log('✅ Device sync QR generated');
+                    console.log('📱 QR expires at:', new Date(qrResult.expires_at).toLocaleString());
+                } else {
+                    alert('QR generation failed: ' + (qrResult.reason || 'Unknown error'));
+                }
+            } else {
+                // Fallback for basic transfer
+                alert('Device sync requires advanced wallet features. Please ensure your wallet is fully initialized.');
+            }
         } catch (error) {
             alert('Device sync failed: ' + error.message);
+            console.error('❌ Device sync error:', error);
+        }
+    });
+    
+    // Scan QR button for receiving device
+    document.getElementById('scan-qr-btn')?.addEventListener('click', async function() {
+        try {
+            // Show QR scanner modal
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.8); display: flex; align-items: center; 
+                justify-content: center; z-index: 10000;
+            `;
+            
+            modal.innerHTML = `
+                <div style="background: white; padding: 32px; border-radius: 12px; max-width: 500px; text-align: center;">
+                    <h3 style="margin: 0 0 16px 0;">📱 Sync Wallet from Another Device</h3>
+                    <div style="margin: 16px 0;">
+                        <textarea id="qr-input" placeholder="Paste QR data here or scan QR code..." 
+                                  style="width: 100%; height: 120px; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-family: monospace; font-size: 11px;"></textarea>
+                    </div>
+                    <p style="font-size: 0.9rem; color: #666; margin: 16px 0;">
+                        1. On your other device, click "Generate QR Sync"<br>
+                        2. Copy the QR data and paste it above<br>
+                        3. Click "Sync Wallet" to transfer your credentials
+                    </p>
+                    <div style="display: flex; gap: 12px; justify-content: center;">
+                        <button id="sync-wallet-btn" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer;">Sync Wallet</button>
+                        <button onclick="this.parentElement.parentElement.parentElement.remove()" style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Handle sync button
+            modal.querySelector('#sync-wallet-btn').addEventListener('click', async function() {
+                const qrData = modal.querySelector('#qr-input').value.trim();
+                
+                if (!qrData) {
+                    alert('Please paste the QR data from your other device');
+                    return;
+                }
+                
+                try {
+                    if (typeof lemmaWallet.syncFromDeviceQR === 'function') {
+                        const syncResult = await lemmaWallet.syncFromDeviceQR(qrData);
+                        
+                        if (syncResult.success) {
+                            alert('✅ Wallet sync successful! Your credentials are now available on this device.');
+                            modal.remove();
+                            
+                            // Refresh wallet display
+                            await loadWalletData();
+                        } else {
+                            alert('Sync failed: ' + (syncResult.error || 'Unknown error'));
+                        }
+                    } else {
+                        alert('Device sync not available. Please ensure advanced wallet features are enabled.');
+                    }
+                } catch (error) {
+                    alert('Sync failed: ' + error.message);
+                    console.error('❌ Wallet sync error:', error);
+                }
+            });
+            
+        } catch (error) {
+            alert('QR scanner failed: ' + error.message);
+            console.error('❌ QR scanner error:', error);
         }
     });
     

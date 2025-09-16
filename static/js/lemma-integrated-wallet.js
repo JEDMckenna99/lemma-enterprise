@@ -584,6 +584,164 @@ class LemmaIntegratedWallet {
     }
 
     /**
+     * Recover wallet from vault (for new device)
+     */
+    async recoverFromVault(rid, recoveryKey) {
+        try {
+            if (this.debug) {
+                console.log('🔄 Starting wallet recovery from vault...');
+            }
+            
+            // Derive VID from RID
+            const vid = await this.deriveVID(rid);
+            
+            // Fetch encrypted envelope from vault
+            const response = await fetch(`${this.vaultUrl}/get`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    vid: vid,
+                    recovery_key: recoveryKey
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Vault fetch failed: ${response.status}`);
+            }
+            
+            const vaultData = await response.json();
+            if (!vaultData.success) {
+                throw new Error(vaultData.error || 'Vault recovery failed');
+            }
+            
+            // Decrypt envelope (simplified)
+            const ciphertextHex = vaultData.ciphertext;
+            const ciphertext = new Uint8Array(ciphertextHex.match(/.{2}/g).map(byte => parseInt(byte, 16)));
+            const envelopeJson = new TextDecoder().decode(ciphertext);
+            const envelope = JSON.parse(envelopeJson);
+            
+            // Restore wallet state
+            this.masterSeed = new Uint8Array(envelope.master_seed);
+            this.deviceKey = new Uint8Array(envelope.device_records.device_key);
+            this.currentRID = rid;
+            this.currentVID = vid;
+            this.envelopeCounter = envelope.counter;
+            
+            // Save to local storage
+            localStorage.setItem('lemma_master_seed', Array.from(this.masterSeed).join(','));
+            localStorage.setItem('lemma_device_key', Array.from(this.deviceKey).join(','));
+            localStorage.setItem('lemma_current_rid', this.currentRID);
+            localStorage.setItem('lemma_current_vid', this.currentVID);
+            
+            if (this.debug) {
+                console.log('✅ Wallet recovery successful');
+                console.log(`📱 Device key restored: ${this.deviceKey ? 'Available' : 'Missing'}`);
+                console.log(`🔑 Master seed restored: ${this.masterSeed ? 'Available' : 'Missing'}`);
+            }
+            
+            return {
+                success: true,
+                recovery_time: Date.now(),
+                envelope_version: envelope.version,
+                device_count: envelope.device_records ? 1 : 0
+            };
+            
+        } catch (error) {
+            console.error('❌ Vault recovery failed:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Generate QR code for device sync
+     */
+    async generateDeviceSyncQR() {
+        if (!this.masterSeed || !this.currentRID) {
+            return { success: false, reason: 'wallet_not_ready' };
+        }
+        
+        try {
+            // Create sync package
+            const syncPackage = {
+                type: 'lemma_device_sync',
+                version: 1,
+                rid: this.currentRID,
+                sync_key: Array.from(this.masterSeed.slice(0, 16)), // First 16 bytes as sync key
+                vault_hint: this.currentVID,
+                expires_at: Date.now() + (5 * 60 * 1000), // 5 minutes
+                created_by: this.getDeviceFingerprint()
+            };
+            
+            // Encode as QR-friendly format
+            const syncData = btoa(JSON.stringify(syncPackage));
+            
+            if (this.debug) {
+                console.log('✅ Device sync QR generated');
+                console.log(`⏰ Expires in 5 minutes`);
+            }
+            
+            return {
+                success: true,
+                qr_data: syncData,
+                expires_at: syncPackage.expires_at,
+                sync_type: 'device_transfer'
+            };
+            
+        } catch (error) {
+            console.error('❌ QR generation failed:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Scan QR code to sync from another device
+     */
+    async syncFromDeviceQR(qrData) {
+        try {
+            if (this.debug) {
+                console.log('📱 Processing device sync QR...');
+            }
+            
+            // Decode QR data
+            const syncPackage = JSON.parse(atob(qrData));
+            
+            // Validate sync package
+            if (syncPackage.type !== 'lemma_device_sync' || syncPackage.expires_at < Date.now()) {
+                throw new Error('Invalid or expired sync QR');
+            }
+            
+            // Use sync key to recover wallet
+            const recoveryResult = await this.recoverFromVault(
+                syncPackage.rid,
+                Array.from(syncPackage.sync_key)
+            );
+            
+            if (recoveryResult.success) {
+                // Force refresh credentials from federated wallet
+                if (this.federatedWallet) {
+                    await this.federatedWallet.refreshCredentials();
+                }
+                
+                if (this.debug) {
+                    console.log('✅ Device sync completed via QR');
+                }
+                
+                return {
+                    success: true,
+                    sync_method: 'qr_code',
+                    recovery_result: recoveryResult
+                };
+            } else {
+                throw new Error(recoveryResult.error || 'Recovery failed');
+            }
+            
+        } catch (error) {
+            console.error('❌ QR sync failed:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * Load wallet state from storage
      */
     async loadWalletState() {
@@ -635,6 +793,18 @@ class LemmaIntegratedWallet {
         
         const fingerprint = canvas.toDataURL();
         return btoa(fingerprint).substring(0, 32);
+    }
+
+    /**
+     * Derive VID (Vault Index) from RID (Root Identity)
+     */
+    async deriveVID(rid) {
+        // Use SHA256 to derive VID from RID
+        const encoder = new TextEncoder();
+        const data = encoder.encode(rid + '_vault_index');
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = new Uint8Array(hashBuffer);
+        return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
     /**
