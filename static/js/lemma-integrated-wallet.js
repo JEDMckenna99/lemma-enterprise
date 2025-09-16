@@ -641,6 +641,19 @@ class LemmaIntegratedWallet {
      * Get credentials (delegates to federated wallet)
      */
     async getCredentials(type = null) {
+        // Wait for initialization if not ready
+        if (!this.federatedWallet && !this.initializationPromise) {
+            if (this.debug) {
+                console.warn('⚠️ Integrated wallet not initialized, starting initialization...');
+            }
+            await this.initialize();
+        }
+        
+        // Wait for ongoing initialization
+        if (this.initializationPromise) {
+            await this.initializationPromise;
+        }
+        
         if (this.federatedWallet && typeof this.federatedWallet.getCredentials === 'function') {
             return await this.federatedWallet.getCredentials(type);
         }

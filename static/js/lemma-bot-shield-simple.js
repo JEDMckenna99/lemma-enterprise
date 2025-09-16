@@ -77,17 +77,18 @@ class LemmaBotShield {
             
             if (configResponse.ok) {
                 const serverConfig = await configResponse.json();
-                if (serverConfig.success) {
+                if (serverConfig.success && serverConfig.network_config) {
+                    const netConfig = serverConfig.network_config;
                     networkConfig = {
-                        networkRegistryUrl: serverConfig.network_registry_url,
-                        networkAuthKey: serverConfig.network_auth_key,
-                        syncInterval: serverConfig.sync_interval,
-                        federationEndpoints: serverConfig.federation_endpoints,
-                        nodeId: serverConfig.node_id
+                        networkRegistryUrl: netConfig.registry_url,
+                        networkAuthKey: netConfig.auth_key,
+                        syncInterval: serverConfig.wallet_config?.sync_interval || 30000,
+                        federationEndpoints: netConfig.federation_endpoints,
+                        nodeId: 'lemma-platform'
                     };
                     
                     if (this.config.debug) {
-                        console.log(`🌐 Loaded network config for ${serverConfig.node_name}:`, networkConfig);
+                        console.log(`🌐 Loaded network config for lemma-platform:`, networkConfig);
                     }
                 }
             }

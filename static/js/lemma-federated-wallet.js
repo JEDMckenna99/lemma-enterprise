@@ -1598,7 +1598,11 @@ class LemmaFederatedWallet {
                             
                             if (this.debug) {
                                 console.warn(`⚠️ Background check: Invalid issuer for ${credential.id}: ${issuerValidation.reason}`);
+                                console.warn(`🗑️ Removing invalid credential from storage...`);
                             }
+                            
+                            // Remove invalid credential from storage
+                            await this.removeCredential(credential.id);
                             continue;
                         }
                     }
