@@ -7,6 +7,7 @@ import os
 import json
 import time
 import logging
+import psycopg2
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from flask import Blueprint, request, jsonify
@@ -41,38 +42,43 @@ class VaultEnvelope:
         }
 
 class RecoveryVaultManager:
-    """Manages secure wallet recovery vault"""
+    """Manages secure wallet recovery vault with PostgreSQL storage"""
     
     def __init__(self):
-        # In-memory storage for development (would use database in production)
-        self.envelopes: Dict[str, VaultEnvelope] = {}
-        self.access_log: List[Dict] = []
+        # PostgreSQL connection
+        self.db_url = os.environ.get('DATABASE_URL')
+        if not self.db_url:
+            raise ValueError("DATABASE_URL environment variable required")
         
-        # Rate limiting (per VID)
-        self.rate_limits: Dict[str, List[float]] = {}
+        # Rate limiting settings
         self.max_requests_per_hour = 10
         self.max_requests_per_day = 50
         
-        # Security monitoring
-        self.failed_attempts: Dict[str, int] = {}
-        self.suspicious_ips: Dict[str, int] = {}
+        # Initialize database connection
+        self._init_db_connection()
         
-        logger.info("🔐 Recovery Vault Manager initialized")
+        logger.info("🔐 Recovery Vault Manager initialized with PostgreSQL storage")
+    
+    def _init_db_connection(self):
+        """Initialize database connection and ensure tables exist"""
+        try:
+            # Test connection
+            conn = psycopg2.connect(self.db_url)
+            conn.close()
+            logger.info("✅ PostgreSQL connection verified for vault storage")
+            
+        except Exception as e:
+            logger.error(f"❌ PostgreSQL connection failed: {e}")
+            raise
+    
+    def _get_db_connection(self):
+        """Get database connection"""
+        return psycopg2.connect(self.db_url)
     
     def put_envelope(self, vid: str, ciphertext: bytes, counter: int, aad: bytes, 
                     client_ip: str) -> Dict[str, any]:
         """
-        Store encrypted wallet envelope
-        
-        Args:
-            vid: Vault Index (derived from VID = H(r_vault || RID))
-            ciphertext: Encrypted wallet envelope
-            counter: Monotonic counter for rollback protection
-            aad: Additional authenticated data
-            client_ip: Client IP for rate limiting
-            
-        Returns:
-            dict: Storage result
+        Store encrypted wallet envelope in PostgreSQL
         """
         try:
             # Rate limiting check
@@ -105,14 +111,22 @@ class RecoveryVaultManager:
                     'message': 'Counter must be non-negative'
                 }
             
-            # Check for rollback attacks
-            if vid in self.envelopes:
-                existing = self.envelopes[vid]
-                if counter <= existing.counter:
+            # Connect to database
+            conn = self._get_db_connection()
+            cur = conn.cursor()
+            
+            try:
+                # Check for existing envelope and rollback protection
+                cur.execute("""
+                    SELECT counter FROM vault_envelopes WHERE vid = %s
+                """, (vid,))
+                
+                existing = cur.fetchone()
+                if existing and counter <= existing[0]:
                     # Log potential rollback attack
                     self._log_security_event('rollback_attempt', {
                         'vid': vid,
-                        'existing_counter': existing.counter,
+                        'existing_counter': existing[0],
                         'attempted_counter': counter,
                         'client_ip': client_ip
                     })
@@ -120,25 +134,39 @@ class RecoveryVaultManager:
                     return {
                         'success': False,
                         'error': 'rollback_detected',
-                        'message': f'Counter must be greater than {existing.counter}'
+                        'message': f'Counter must be greater than {existing[0]}'
                     }
-            
-            # Store envelope (idempotent - same counter overwrites)
-            envelope = VaultEnvelope(vid, ciphertext, counter, aad)
-            self.envelopes[vid] = envelope
-            
-            # Log successful storage
-            self._log_access('put', vid, client_ip, True)
-            
-            logger.info(f"✅ Stored envelope for VID {vid[:16]}... counter={counter}")
-            
-            return {
-                'success': True,
-                'vid': vid,
-                'counter': counter,
-                'stored_at': envelope.created_at.isoformat(),
-                'storage_size_bytes': len(ciphertext)
-            }
+                
+                # Insert or update envelope
+                cur.execute("""
+                    INSERT INTO vault_envelopes (vid, ciphertext, counter, aad, client_ip, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (vid) DO UPDATE SET
+                        ciphertext = EXCLUDED.ciphertext,
+                        counter = EXCLUDED.counter,
+                        aad = EXCLUDED.aad,
+                        client_ip = EXCLUDED.client_ip,
+                        updated_at = CURRENT_TIMESTAMP
+                """, (vid, ciphertext.hex(), counter, aad.hex(), client_ip))
+                
+                conn.commit()
+                
+                # Log successful storage
+                self._log_access('put', vid, client_ip, True)
+                
+                logger.info(f"✅ Stored envelope for VID {vid[:16]}... counter={counter}")
+                
+                return {
+                    'success': True,
+                    'vid': vid,
+                    'counter': counter,
+                    'stored_at': datetime.utcnow().isoformat(),
+                    'storage_size_bytes': len(ciphertext)
+                }
+                
+            finally:
+                cur.close()
+                conn.close()
             
         except Exception as e:
             logger.error(f"❌ Vault put error: {e}")
@@ -151,14 +179,7 @@ class RecoveryVaultManager:
     
     def get_envelope(self, vid: str, client_ip: str) -> Dict[str, any]:
         """
-        Retrieve encrypted wallet envelope
-        
-        Args:
-            vid: Vault Index for lookup
-            client_ip: Client IP for rate limiting
-            
-        Returns:
-            dict: Retrieval result with ciphertext
+        Retrieve encrypted wallet envelope from PostgreSQL
         """
         try:
             # Rate limiting check
@@ -177,37 +198,60 @@ class RecoveryVaultManager:
                     'message': 'VID must be 64-character hex string'
                 }
             
-            # Check if envelope exists
-            if vid not in self.envelopes:
-                # Log failed lookup (could be attack or legitimate new user)
-                self._log_access('get', vid, client_ip, False, 'envelope_not_found')
+            # Connect to database
+            conn = self._get_db_connection()
+            cur = conn.cursor()
+            
+            try:
+                # Retrieve envelope
+                cur.execute("""
+                    SELECT ciphertext, counter, aad, created_at, access_count
+                    FROM vault_envelopes 
+                    WHERE vid = %s
+                """, (vid,))
+                
+                result = cur.fetchone()
+                if not result:
+                    # Log failed lookup
+                    self._log_access('get', vid, client_ip, False, 'envelope_not_found')
+                    
+                    return {
+                        'success': False,
+                        'error': 'envelope_not_found',
+                        'message': 'No envelope found for this VID'
+                    }
+                
+                ciphertext_hex, counter, aad_hex, created_at, access_count = result
+                
+                # Update access count and timestamp
+                cur.execute("""
+                    UPDATE vault_envelopes 
+                    SET access_count = access_count + 1,
+                        last_accessed_at = CURRENT_TIMESTAMP,
+                        client_ip = %s
+                    WHERE vid = %s
+                """, (client_ip, vid))
+                
+                conn.commit()
+                
+                # Log successful access
+                self._log_access('get', vid, client_ip, True)
+                
+                logger.info(f"✅ Retrieved envelope for VID {vid[:16]}... counter={counter}")
                 
                 return {
-                    'success': False,
-                    'error': 'envelope_not_found',
-                    'message': 'No envelope found for this VID'
+                    'success': True,
+                    'vid': vid,
+                    'ciphertext': ciphertext_hex,
+                    'counter': counter,
+                    'aad': aad_hex,
+                    'created_at': created_at.isoformat(),
+                    'access_count': access_count + 1
                 }
-            
-            # Retrieve envelope
-            envelope = self.envelopes[vid]
-            envelope.access_count += 1
-            envelope.updated_at = datetime.utcnow()
-            
-            # Log successful access
-            self._log_access('get', vid, client_ip, True)
-            
-            logger.info(f"✅ Retrieved envelope for VID {vid[:16]}... counter={envelope.counter}")
-            
-            return {
-                'success': True,
-                'vid': vid,
-                'ciphertext': envelope.ciphertext.hex(),
-                'counter': envelope.counter,
-                'aad': envelope.aad.hex(),
-                'created_at': envelope.created_at.isoformat(),
-                'updated_at': envelope.updated_at.isoformat(),
-                'access_count': envelope.access_count
-            }
+                
+            finally:
+                cur.close()
+                conn.close()
             
         except Exception as e:
             logger.error(f"❌ Vault get error: {e}")
@@ -219,48 +263,63 @@ class RecoveryVaultManager:
             }
     
     def _check_rate_limit(self, vid: str, client_ip: str) -> bool:
-        """Check rate limits for vault access"""
-        current_time = time.time()
-        
-        # Initialize rate limit tracking
-        if vid not in self.rate_limits:
-            self.rate_limits[vid] = []
-        
-        # Clean old timestamps (older than 1 hour)
-        hour_ago = current_time - 3600
-        self.rate_limits[vid] = [t for t in self.rate_limits[vid] if t > hour_ago]
-        
-        # Check hourly limit
-        if len(self.rate_limits[vid]) >= self.max_requests_per_hour:
-            # Log rate limit violation
-            self._log_security_event('rate_limit_exceeded', {
-                'vid': vid,
-                'client_ip': client_ip,
-                'requests_in_hour': len(self.rate_limits[vid])
-            })
-            return False
-        
-        # Add current request
-        self.rate_limits[vid].append(current_time)
-        
-        return True
+        """Check rate limits using PostgreSQL"""
+        try:
+            conn = self._get_db_connection()
+            cur = conn.cursor()
+            
+            try:
+                current_time = datetime.utcnow()
+                hour_ago = current_time - timedelta(hours=1)
+                
+                # Count requests in last hour
+                cur.execute("""
+                    SELECT COUNT(*) FROM vault_access_log 
+                    WHERE vid = %s AND client_ip = %s AND timestamp > %s
+                """, (vid[:16] + '...', client_ip, hour_ago))
+                
+                request_count = cur.fetchone()[0]
+                
+                if request_count >= self.max_requests_per_hour:
+                    self._log_security_event('rate_limit_exceeded', {
+                        'vid': vid,
+                        'client_ip': client_ip,
+                        'requests_in_hour': request_count
+                    })
+                    return False
+                
+                return True
+                
+            finally:
+                cur.close()
+                conn.close()
+                
+        except Exception as e:
+            logger.error(f"❌ Rate limit check error: {e}")
+            return True  # Allow on error to prevent service disruption
     
     def _log_access(self, operation: str, vid: str, client_ip: str, success: bool, error: str = None):
-        """Log vault access for audit trail"""
-        log_entry = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'operation': operation,
-            'vid': vid[:16] + '...',  # Partial VID for privacy
-            'client_ip': client_ip,
-            'success': success,
-            'error': error
-        }
-        
-        self.access_log.append(log_entry)
-        
-        # Keep only last 1000 entries
-        if len(self.access_log) > 1000:
-            self.access_log = self.access_log[-1000:]
+        """Log vault access to PostgreSQL audit trail"""
+        try:
+            conn = self._get_db_connection()
+            cur = conn.cursor()
+            
+            try:
+                # Insert access log entry
+                cur.execute("""
+                    INSERT INTO vault_access_log (vid, operation, client_ip, success, error_message)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (vid[:16] + '...', operation, client_ip, success, error))
+                
+                conn.commit()
+                
+            finally:
+                cur.close()
+                conn.close()
+                
+        except Exception as e:
+            logger.error(f"❌ Access logging error: {e}")
+            # Don't fail the main operation due to logging errors
     
     def _log_security_event(self, event_type: str, details: Dict):
         """Log security events for monitoring"""

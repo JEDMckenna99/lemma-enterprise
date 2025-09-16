@@ -1,5 +1,6 @@
 -- Lemma.id Platform Database Schema
 -- Complete IAM platform with two-tier billing (PoH + Permissions)
+-- Enhanced with vault storage for device sync and wallet recovery
 
 -- Sites table: Customer sites registered on lemma.id platform
 CREATE TABLE sites (
@@ -346,4 +347,55 @@ CREATE INDEX idx_user_permissions_active ON user_permissions(site_id, user_did, 
 CREATE INDEX idx_mau_current_month ON monthly_active_users(customer_id, month_year, activity_type);
 CREATE INDEX idx_billing_current ON billing_invoices(site_id, invoice_period, payment_status);
 CREATE INDEX idx_api_recent ON api_usage(site_id, created_at DESC);
+
+-- Vault Storage table: Encrypted wallet envelopes for device sync
+CREATE TABLE vault_envelopes (
+    id SERIAL PRIMARY KEY,
+    vid VARCHAR(64) UNIQUE NOT NULL,                    -- Vault Index (privacy-preserving lookup)
+    ciphertext TEXT NOT NULL,                          -- Hex-encoded encrypted wallet envelope
+    counter INTEGER NOT NULL DEFAULT 1,               -- Monotonic counter for rollback protection
+    aad TEXT,                                          -- Additional authenticated data (hex)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,   -- When envelope was first stored
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,   -- When envelope was last updated
+    access_count INTEGER DEFAULT 0,                   -- Number of times accessed
+    last_accessed_at TIMESTAMP,                       -- Last access timestamp
+    client_ip INET,                                    -- Last client IP for security monitoring
+    expires_at TIMESTAMP,                             -- Optional expiration (for temporary envelopes)
+    
+    INDEX idx_vid (vid),                              -- Fast VID lookup
+    INDEX idx_created_at (created_at),                -- Cleanup queries
+    INDEX idx_expires_at (expires_at)                 -- Expiration cleanup
+);
+
+-- Vault Access Log table: Audit trail for security monitoring
+CREATE TABLE vault_access_log (
+    id SERIAL PRIMARY KEY,
+    vid VARCHAR(64) NOT NULL,                         -- Vault Index (partial for privacy)
+    operation VARCHAR(20) NOT NULL,                  -- 'put', 'get', 'delete'
+    client_ip INET NOT NULL,                          -- Client IP address
+    user_agent TEXT,                                  -- User agent string
+    success BOOLEAN NOT NULL,                        -- Operation success/failure
+    error_message TEXT,                              -- Error details if failed
+    response_time_ms INTEGER,                        -- Operation response time
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,   -- When operation occurred
+    
+    INDEX idx_vid_operation (vid, operation),        -- Security queries
+    INDEX idx_timestamp (timestamp),                 -- Time-based queries
+    INDEX idx_client_ip (client_ip),                 -- IP-based monitoring
+    INDEX idx_failed_attempts (success, timestamp)   -- Failed attempt monitoring
+);
+
+-- Vault Rate Limiting table: Track request rates per VID/IP
+CREATE TABLE vault_rate_limits (
+    id SERIAL PRIMARY KEY,
+    vid VARCHAR(64) NOT NULL,                         -- Vault Index
+    client_ip INET NOT NULL,                          -- Client IP address
+    request_count INTEGER DEFAULT 1,                 -- Number of requests
+    window_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Rate limit window start
+    last_request TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Last request time
+    
+    UNIQUE(vid, client_ip, window_start),            -- One record per VID/IP/hour
+    INDEX idx_rate_limit_window (vid, client_ip, window_start),
+    INDEX idx_rate_limit_cleanup (window_start)      -- Cleanup old windows
+);
 CREATE INDEX idx_metrics_recent ON performance_metrics(site_id, metric_type, recorded_at DESC);
