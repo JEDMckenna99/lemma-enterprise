@@ -78,44 +78,59 @@ class LemmaFederatedWallet {
      * Initialize trusted DIDs for bootstrap (fixes existing credential validation)
      */
     initializeTrustedDIDs() {
-        // Bootstrap with known trusted issuers (ONLY the two valid ones)
-        const trustedIssuers = [
+        // Start with empty registry - real DIDs will be loaded first during init()
+        // Only add fallback DIDs if real ones fail to load
+        
+        if (this.debug) {
+            console.log(`🔐 Initializing trusted DID registry (will load real DIDs from server)`);
+        }
+        
+        // Real issuer DIDs will be loaded during init() to ensure async completion
+    }
+    
+    /**
+     * Add fallback trusted DIDs if real ones fail to load
+     */
+    addFallbackTrustedDIDs() {
+        // Only add fallback DIDs if registry is empty
+        if (this.didRegistry.size > 0) {
+            return; // Real DIDs already loaded
+        }
+        
+        const fallbackIssuers = [
             {
                 did: 'did:lemma:federated:issuer',
                 publicKey: 'lemma_federated_network_key_2024',
                 issuerInfo: {
-                    name: 'Lemma Federated Identity Network',
+                    name: 'Lemma Federated Identity Network (Fallback)',
                     issuer_type: 'federated_identity_provider',
-                    trust_score: 1.0,
-                    verified: true,
+                    trust_score: 0.5, // Lower trust for fallback
+                    verified: false,
                     created_at: Date.now(),
-                    capabilities: ['federated_identity_verification', 'stripe_identity_verification', 'cross_site_recognition', 'bot_protection']
+                    capabilities: ['federated_identity_verification']
                 }
             },
             {
                 did: 'did:lemma:platform:lemma.id',
                 publicKey: 'lemma_platform_key_2024',
                 issuerInfo: {
-                    name: 'Lemma Platform',
+                    name: 'Lemma Platform (Fallback)',
                     issuer_type: 'platform_admin',
-                    trust_score: 1.0,
-                    verified: true,
+                    trust_score: 0.5, // Lower trust for fallback
+                    verified: false,
                     created_at: Date.now(),
-                    capabilities: ['admin_access', 'customer_access', 'permission_management', 'platform_administration']
+                    capabilities: ['admin_access']
                 }
             }
         ];
         
-        // Add to DID registry
-        trustedIssuers.forEach(issuer => {
+        fallbackIssuers.forEach(issuer => {
             this.didRegistry.set(issuer.did, issuer);
         });
         
         if (this.debug) {
-            console.log(`🔐 Initialized ${trustedIssuers.length} trusted DIDs:`, trustedIssuers.map(i => i.did));
+            console.warn(`⚠️ Using ${fallbackIssuers.length} fallback DIDs (real DIDs failed to load)`);
         }
-        
-        // Real issuer DIDs will be loaded during init() to ensure async completion
     }
     
     async loadRealIssuerDIDs() {
@@ -154,6 +169,9 @@ class LemmaFederatedWallet {
                 console.warn('⚠️ Could not load real issuer DIDs:', error);
             }
         }
+        
+        // Add fallback DIDs if no real ones were loaded
+        this.addFallbackTrustedDIDs();
     }
     
     /**
@@ -1416,6 +1434,57 @@ class LemmaFederatedWallet {
         }
         
         return false;
+    }
+
+    /**
+     * Check for forced credential removals (network-wide revocation)
+     */
+    async checkForForcedRemovals() {
+        try {
+            if (!this.memoryCache || this.memoryCache.size === 0) {
+                return; // No credentials to check
+            }
+
+            const credentialsToRemove = [];
+            
+            // Check each credential against revocation lists
+            for (const [credId, credential] of this.memoryCache.entries()) {
+                // Check if credential ID is in revocation list
+                if (this.revokedCredentials && this.revokedCredentials.has(credId)) {
+                    credentialsToRemove.push(credId);
+                    if (this.debug) {
+                        console.warn(`🗑️ Credential ${credId} marked for forced removal (revoked)`);
+                    }
+                }
+                
+                // Check if issuer DID is revoked
+                const issuerDid = typeof credential.issuer === 'object' ? credential.issuer.id : credential.issuer;
+                if (issuerDid && this.revokedIssuers && this.revokedIssuers.has(issuerDid)) {
+                    credentialsToRemove.push(credId);
+                    if (this.debug) {
+                        console.warn(`🗑️ Credential ${credId} marked for forced removal (issuer revoked)`);
+                    }
+                }
+            }
+            
+            // Remove revoked credentials
+            for (const credId of credentialsToRemove) {
+                await this.removeCredential(credId);
+                if (this.debug) {
+                    console.warn(`🗑️ Forced removal completed for ${credId}`);
+                }
+            }
+            
+            if (credentialsToRemove.length > 0) {
+                // Notify other components of credential changes
+                this.notifyCredentialUpdate('forced_removal', credentialsToRemove.length);
+            }
+            
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Forced removal check failed:', error.message);
+            }
+        }
     }
     
     /**
