@@ -565,10 +565,16 @@ def vault_recover():
         
         return jsonify({
             'success': False,
-            'error': 'not_implemented',
-            'message': 'KYC-based recovery not yet implemented - use device transfer instead',
-            'alternative': 'Use /vault/transfer for device-assisted recovery'
-        }), 501
+            'error': 'security_disabled',
+            'message': 'KYC-based recovery disabled for security reasons - cannot verify identity match',
+            'explanation': 'No secure way to verify new KYC belongs to original wallet owner',
+            'secure_alternatives': [
+                'Device QR sync (requires original device)',
+                'Social recovery (future - requires trusted contacts)',
+                'Hardware key recovery (future - requires FIDO2 token)'
+            ],
+            'recommended': 'Use device QR sync for secure wallet transfer'
+        }), 403  # Forbidden - security policy
         
     except Exception as e:
         logger.error(f"❌ Vault recover endpoint error: {e}")
