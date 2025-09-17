@@ -185,6 +185,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Network Client Config: {e}")
 
+    # Wallet Revocation API
+    try:
+        from api.wallet_revocation import wallet_revocation_bp
+        app.register_blueprint(wallet_revocation_bp)
+        logger.info("✅ Wallet Revocation API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Wallet Revocation API: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status

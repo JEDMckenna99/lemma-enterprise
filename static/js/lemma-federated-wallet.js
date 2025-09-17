@@ -1854,6 +1854,50 @@ class LemmaFederatedWallet {
      */
     async removeCredential(credentialId) {
         try {
+            // First, get the credential to determine its type for proper revocation
+            const credential = this.memoryCache.get(credentialId);
+            let credentialType = 'unknown';
+            
+            if (credential) {
+                const claims = credential.claims || credential.credentialSubject || {};
+                if (claims.packageType === 'identity' || claims.isHuman) {
+                    credentialType = 'poh';
+                } else if (claims.packageType === 'permission' || claims.permissions) {
+                    credentialType = 'permission';
+                }
+            }
+            
+            // Call network revocation API for proper network updates
+            try {
+                const revocationResponse = await fetch('/api/wallet/revoke', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        credential_id: credentialId,
+                        credential_type: credentialType,
+                        reason: 'user_requested_removal'
+                    })
+                });
+                
+                if (revocationResponse.ok) {
+                    const revocationResult = await revocationResponse.json();
+                    if (this.debug) {
+                        console.log(`🌐 Network revocation result:`, revocationResult);
+                    }
+                } else {
+                    if (this.debug) {
+                        console.warn(`⚠️ Network revocation failed for ${credentialId}: ${revocationResponse.status}`);
+                    }
+                }
+            } catch (networkError) {
+                if (this.debug) {
+                    console.warn(`⚠️ Network revocation API call failed:`, networkError);
+                }
+                // Continue with local removal even if network call fails
+            }
+            
             // Remove from memory cache
             this.memoryCache.delete(credentialId);
             
@@ -1872,7 +1916,12 @@ class LemmaFederatedWallet {
             this.broadcastCredentialRemoved(credentialId);
             
             if (this.debug) {
-                console.log(`🗑️ Removed credential: ${credentialId} (broadcast to other tabs)`);
+                const scopeMessage = credentialType === 'poh' ? 
+                    'network-wide revocation initiated' : 
+                    credentialType === 'permission' ? 
+                    'site-specific revocation completed' : 
+                    'local removal only';
+                console.log(`🗑️ Removed credential: ${credentialId} (${scopeMessage})`);
             }
             
             return true;
