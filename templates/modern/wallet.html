@@ -5,10 +5,8 @@
 
 {% block head %}
     {{ super() }}
-    <!-- Load the existing Lemma Federated Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=835"></script>
-    <script src="{{ url_for('static', filename='js/lemma-advanced-wallet.js') }}?v=835"></script>
-    <script src="{{ url_for('static', filename='js/lemma-integrated-wallet.js') }}?v=835"></script>
+    <!-- Load the unified Lemma Wallet -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=840"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
     <script src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
@@ -624,20 +622,17 @@ let shieldApiKey = 'lemma_platform_production_key_2024'; // Global API key varia
 
 document.addEventListener('DOMContentLoaded', async function() {
     try {
-        // Initialize the Integrated Wallet with advanced features
-        lemmaWallet = new LemmaIntegratedWallet({
+        // Initialize the unified Lemma Wallet with all platform features
+        lemmaWallet = new LemmaWallet({
             debug: true,
             backgroundChecks: true,
             securityLevel: 'medium',
-            // CRITICAL: Add network registry configuration for credential sync
+            enableAdvancedFeatures: true,
+            enableDeviceSync: true,
+            enableVaultStorage: true,
             networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
             networkAuthKey: 'lemma_network_federated_sync_2024',
-            syncInterval: 30000, // 30 seconds for frequent sync
-            // Advanced wallet features
-            enableAdvancedFeatures: true,
-            enableRecovery: true,
-            vaultUrl: '/vault',
-            enableSybilPrevention: true
+            syncInterval: 30000
         });
 
         // Wait for wallet to be ready
@@ -916,19 +911,17 @@ async function forceReloadWallet() {
             console.log('🗑️ Cleared wallet cache');
         }
         
-        // Reinitialize wallet
-        lemmaWallet = new LemmaIntegratedWallet({
+        // Reinitialize unified wallet
+        lemmaWallet = new LemmaWallet({
             debug: true,
             backgroundChecks: true,
             securityLevel: 'medium',
+            enableAdvancedFeatures: true,
+            enableDeviceSync: true,
+            enableVaultStorage: true,
             networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
             networkAuthKey: 'lemma_network_federated_sync_2024',
-            syncInterval: 30000,
-            // Advanced wallet features
-            enableAdvancedFeatures: true,
-            enableRecovery: true,
-            vaultUrl: '/vault',
-            enableSybilPrevention: true
+            syncInterval: 30000
         });
         
         if (typeof lemmaWallet.init === 'function') {
