@@ -1066,6 +1066,21 @@ class LemmaIntegratedWallet {
     }
 
     /**
+     * Remove a credential (delegates to federated wallet)
+     */
+    async removeCredential(credentialId) {
+        if (this.federatedWallet && typeof this.federatedWallet.removeCredential === 'function') {
+            return await this.federatedWallet.removeCredential(credentialId);
+        }
+        
+        if (this.debug) {
+            console.warn('⚠️ Cannot remove credential: federated wallet not available');
+        }
+        
+        return false;
+    }
+
+    /**
      * Clear integrated wallet (for testing)
      */
     clearWallet() {
