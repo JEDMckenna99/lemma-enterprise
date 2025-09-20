@@ -5,10 +5,8 @@
 
 {% block head %}
     {{ super() }}
-    <!-- Load the Lemma Federated Wallet for permission lemma storage -->
-    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=785"></script>
-    <script src="{{ url_for('static', filename='js/lemma-advanced-wallet.js') }}?v=785"></script>
-    <script src="{{ url_for('static', filename='js/lemma-integrated-wallet.js') }}?v=785"></script>
+    <!-- Load the Consolidated Lemma Wallet -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=900"></script>
     <style>
         .login-container {
             max-width: 580px;

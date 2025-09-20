@@ -791,8 +791,37 @@ class LemmaIntegratedWallet {
 
     /**
      * Generate QR code for device sync
+     * SECURITY: Only works on lemma.id/wallet page
      */
     async generateDeviceSyncQR() {
+        // CRITICAL SECURITY CHECK: Only allow on lemma.id/wallet page
+        if (window.location.pathname !== '/wallet') {
+            return { 
+                success: false, 
+                reason: 'security_restriction',
+                message: 'Device sync only available on lemma.id/wallet page',
+                redirect_url: '/wallet'
+            };
+        }
+        
+        // Verify domain is lemma.id (prevent subdomain attacks)
+        if (!window.location.hostname.endsWith('lemma.id') && window.location.hostname !== 'localhost') {
+            return {
+                success: false,
+                reason: 'security_restriction', 
+                message: 'Device sync only available on official lemma.id domain'
+            };
+        }
+        
+        // Check for HTTPS in production
+        if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+            return {
+                success: false,
+                reason: 'security_restriction',
+                message: 'Device sync requires secure HTTPS connection'
+            };
+        }
+        
         if (!this.masterSeed || !this.currentRID) {
             return { success: false, reason: 'wallet_not_ready' };
         }
@@ -832,8 +861,37 @@ class LemmaIntegratedWallet {
 
     /**
      * Scan QR code to sync from another device
+     * SECURITY: Only works on lemma.id/wallet page
      */
     async syncFromDeviceQR(qrData) {
+        // CRITICAL SECURITY CHECK: Only allow on lemma.id/wallet page
+        if (window.location.pathname !== '/wallet') {
+            return { 
+                success: false, 
+                reason: 'security_restriction',
+                message: 'Device sync only available on lemma.id/wallet page',
+                redirect_url: '/wallet'
+            };
+        }
+        
+        // Verify domain is lemma.id (prevent subdomain attacks)
+        if (!window.location.hostname.endsWith('lemma.id') && window.location.hostname !== 'localhost') {
+            return {
+                success: false,
+                reason: 'security_restriction', 
+                message: 'Device sync only available on official lemma.id domain'
+            };
+        }
+        
+        // Check for HTTPS in production
+        if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+            return {
+                success: false,
+                reason: 'security_restriction',
+                message: 'Device sync requires secure HTTPS connection'
+            };
+        }
+        
         try {
             if (this.debug) {
                 console.log('📱 Processing device sync QR...');

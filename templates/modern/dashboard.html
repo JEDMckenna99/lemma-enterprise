@@ -5,10 +5,8 @@
 
 {% block head %}
     {{ super() }}
-    <!-- Load the Lemma Federated Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-federated-wallet.js') }}?v=785"></script>
-    <script src="{{ url_for('static', filename='js/lemma-advanced-wallet.js') }}?v=785"></script>
-    <script src="{{ url_for('static', filename='js/lemma-integrated-wallet.js') }}?v=785"></script>
+    <!-- Load the Consolidated Lemma Wallet -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=900"></script>
     <style>
         .dashboard-container {
             max-width: 1200px;
@@ -395,7 +393,7 @@
                     <button class="copy-code-btn" onclick="copyIntegrationCode()">Copy</button>
                     <div id="integrationCode">&lt;!-- Add to your HTML head --&gt;
 &lt;script src="https://lemma.id/static/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
-&lt;script src="https://lemma.id/static/js/lemma-federated-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
 
 &lt;script&gt;
 // Initialize Lemma Shield

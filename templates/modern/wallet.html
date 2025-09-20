@@ -629,7 +629,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             securityLevel: 'medium',
             enableAdvancedFeatures: true,
             enableDeviceSync: true,
-            enableVaultStorage: true,
+            enableVaultStorage: false, // Disabled - using direct QR sync only
             networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
             networkAuthKey: 'lemma_network_federated_sync_2024',
             syncInterval: 30000
@@ -1669,6 +1669,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sync device button
     document.getElementById('sync-device-btn')?.addEventListener('click', async function() {
         try {
+            console.log('📱 Sync device button clicked');
+            
+            // Debug: Check wallet state
+            console.log('🔍 Wallet debug info:', {
+                walletReady: lemmaWallet.isReady,
+                enableDeviceSync: lemmaWallet.enableDeviceSync,
+                currentPath: window.location.pathname,
+                hasCredentials: await lemmaWallet.getCredentials().then(creds => creds.length).catch(() => 0)
+            });
+            
             if (typeof lemmaWallet.generateDeviceSyncQR === 'function') {
                 // Generate QR code for device sync
                 const qrResult = await lemmaWallet.generateDeviceSyncQR();
@@ -1951,9 +1961,63 @@ document.addEventListener('DOMContentLoaded', function() {
     // Generate QR code button
     document.getElementById('generate-qr-btn')?.addEventListener('click', async function() {
         try {
-            // Generate QR code for device transfer
-            alert('QR Code Generation\n\nIn production: Generates QR code containing encrypted transfer token for easy device pairing.');
-            console.log('📱 QR code generation initiated');
+            console.log('📱 Generating QR code for device sync...');
+            
+            // Debug: Check wallet state
+            console.log('🔍 Wallet debug info:', {
+                walletReady: lemmaWallet.isReady,
+                enableDeviceSync: lemmaWallet.enableDeviceSync,
+                currentPath: window.location.pathname,
+                hasCredentials: await lemmaWallet.getCredentials().then(creds => creds.length).catch(() => 0)
+            });
+            
+            const result = await lemmaWallet.generateDeviceSyncQR();
+            
+            if (result.success) {
+                // Display the QR code image
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.8); display: flex; align-items: center; 
+                    justify-content: center; z-index: 10000;
+                `;
+                
+                modal.innerHTML = `
+                    <div style="background: white; padding: 30px; border-radius: 12px; text-align: center; max-width: 400px;">
+                        <h3 style="margin: 0 0 20px 0; color: #333;">🔄 Device Sync QR Code</h3>
+                        <img src="${result.qr_image_url}" alt="Device Sync QR Code" style="width: 250px; height: 250px; border: 1px solid #ddd; border-radius: 8px;">
+                        <p style="margin: 15px 0; color: #666; font-size: 14px;">
+                            Scan this QR code with your other device to sync your Lemma wallet
+                        </p>
+                        <p style="margin: 10px 0; color: #999; font-size: 12px;">
+                            ⏱️ Expires in 5 minutes | 🔒 Direct encrypted sync (no server storage)
+                        </p>
+                        <button onclick="this.closest('div').parentNode.remove()" 
+                                style="margin-top: 15px; padding: 8px 20px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                            Close
+                        </button>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                console.log('✅ QR code generated successfully');
+            } else {
+                let message = 'Failed to generate QR code';
+                if (result.reason === 'device_sync_disabled') {
+                    message = 'Device sync is disabled';
+                } else if (result.reason === 'security_restriction') {
+                    message = 'Security restriction: ' + result.message;
+                    if (result.redirect_url) {
+                        window.location.href = result.redirect_url;
+                        return;
+                    }
+                } else if (result.reason === 'no_credentials') {
+                    message = 'No credentials to sync. Please verify your identity first.';
+                }
+                
+                alert('QR Generation Failed\n\n' + message);
+                console.error('❌ QR generation failed:', result);
+            }
         } catch (error) {
             alert('QR code generation failed: ' + error.message);
         }
