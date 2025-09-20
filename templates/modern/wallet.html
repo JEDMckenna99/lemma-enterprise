@@ -1701,10 +1701,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div style="background: white; padding: 32px; border-radius: 12px; max-width: 450px; text-align: center;">
                             <h3 style="margin: 0 0 16px 0;">📱 Device Sync QR Code</h3>
                             <div id="qr-code-container" style="margin: 16px 0; min-height: 220px; display: flex; align-items: center; justify-content: center; border: 2px solid #e5e7eb; border-radius: 8px; background: #f9fafb;">
-                                <div id="qr-image-placeholder" style="padding: 20px;">
-                                    <div style="font-size: 48px; color: #9ca3af;">📱</div>
-                                    <div style="margin-top: 8px; color: #6b7280;">Generating QR code...</div>
-                                </div>
+                                <img src="${qrResult.qr_image_url}" 
+                                     alt="Device Sync QR Code" 
+                                     style="width: 250px; height: 250px; border-radius: 8px;"
+                                     onload="console.log('✅ QR image loaded successfully')"
+                                     onerror="console.error('❌ QR image failed to load'); this.style.display='none'; this.parentNode.innerHTML='<div style=\\'padding: 20px; color: #dc2626;\\'>❌ QR image failed to load</div>'">
                             </div>
                             <p style="font-size: 0.9rem; color: #666; margin: 16px 0;">
                                 <strong>Scan with your new device's camera</strong><br>
@@ -1736,10 +1737,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         syncInfo.style.color = '#f59e0b'; // Orange for empty wallet
                     }
                     
-                    // Generate actual QR code using QR.js library or API
-                    setTimeout(() => {
-                        generateQRCodeImage(syncUrl, 'qr-code-container');
-                    }, 100);
+                    // QR image is already embedded in the modal HTML above
                     
                     console.log('✅ Device sync QR generated');
                     console.log('📱 QR expires at:', new Date(qrResult.expires_at).toLocaleString());

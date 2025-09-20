@@ -1364,9 +1364,13 @@ class LemmaWallet {
                 console.log(`⏰ Expires in 5 minutes`);
             }
             
+            // Generate QR code image URL
+            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(syncUrl)}`;
+            
             return {
                 success: true,
                 sync_url: syncUrl,
+                qr_image_url: qrImageUrl,
                 sync_method: 'direct_qr',
                 expires_at: syncPackage.expires_at,
                 password: password,
@@ -1624,6 +1628,33 @@ class LemmaWallet {
      */
     async clearAll() {
         return this.clearWallet();
+    }
+    
+    /**
+     * Get wallet statistics (for UI display)
+     */
+    getWalletStats() {
+        const identityCredentials = this.getCredentialsSync('identity');
+        const permissionCredentials = this.getCredentialsSync('permission');
+        
+        return {
+            totalCredentials: this.memoryCache.size,
+            identityCredentials: identityCredentials.length,
+            permissionCredentials: permissionCredentials.length,
+            isReady: this.isReady,
+            enableAdvancedFeatures: this.enableAdvancedFeatures,
+            enableDeviceSync: this.enableDeviceSync,
+            enableVaultStorage: this.enableVaultStorage,
+            storageInfo: {
+                hasIndexedDB: !!this.db,
+                hasLocalStorage: !!localStorage.getItem(this.storageKey),
+                hasSessionMarker: !!sessionStorage.getItem(this.sessionKey)
+            },
+            lastSync: this.networkConfig.lastDidSync,
+            lastRevocationSync: this.networkConfig.lastRevocationSync,
+            securityLevel: this.securityConfig.securityLevel,
+            backgroundChecksEnabled: this.securityConfig.enabled
+        };
     }
     
     /**
