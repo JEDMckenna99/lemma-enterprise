@@ -1701,11 +1701,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div style="background: white; padding: 32px; border-radius: 12px; max-width: 450px; text-align: center;">
                             <h3 style="margin: 0 0 16px 0;">📱 Device Sync QR Code</h3>
                             <div id="qr-code-container" style="margin: 16px 0; min-height: 220px; display: flex; align-items: center; justify-content: center; border: 2px solid #e5e7eb; border-radius: 8px; background: #f9fafb;">
-                                <img src="${qrResult.qr_image_url}" 
-                                     alt="Device Sync QR Code" 
-                                     style="width: 250px; height: 250px; border-radius: 8px;"
-                                     onload="console.log('✅ QR image loaded successfully')"
-                                     onerror="console.error('❌ QR image failed to load'); this.style.display='none'; this.parentNode.innerHTML='<div style=\\'padding: 20px; color: #dc2626;\\'>❌ QR image failed to load</div>'">
+                                <div id="qr-loading" style="padding: 20px;">
+                                    <div style="font-size: 48px; color: #9ca3af;">📱</div>
+                                    <div style="margin-top: 8px; color: #6b7280;">Loading QR code...</div>
+                                </div>
                             </div>
                             <p style="font-size: 0.9rem; color: #666; margin: 16px 0;">
                                 <strong>Scan with your new device's camera</strong><br>
@@ -1737,7 +1736,61 @@ document.addEventListener('DOMContentLoaded', function() {
                         syncInfo.style.color = '#f59e0b'; // Orange for empty wallet
                     }
                     
-                    // QR image is already embedded in the modal HTML above
+                    // Load QR image with fallback services
+                    const qrContainer = document.getElementById('qr-code-container');
+                    const loadingDiv = document.getElementById('qr-loading');
+                    
+                    // QR services to try (in order)
+                    const qrServices = [
+                        `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(syncUrl)}`,
+                        `https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl=${encodeURIComponent(syncUrl)}`,
+                        // Fallback: Generate QR using local method if external services fail
+                        null
+                    ];
+                    
+                    let serviceIndex = 0;
+                    
+                    function tryLoadQR() {
+                        if (serviceIndex >= qrServices.length) {
+                            // All services failed, show manual link
+                            qrContainer.innerHTML = `
+                                <div style="padding: 20px; text-align: center;">
+                                    <div style="color: #f59e0b; font-size: 24px; margin-bottom: 10px;">⚠️</div>
+                                    <div style="color: #f59e0b; margin-bottom: 10px;">QR image failed to load</div>
+                                    <div style="font-size: 12px; color: #6b7280;">Use manual link below</div>
+                                </div>
+                            `;
+                            return;
+                        }
+                        
+                        const qrUrl = qrServices[serviceIndex];
+                        if (!qrUrl) {
+                            serviceIndex++;
+                            tryLoadQR();
+                            return;
+                        }
+                        
+                        console.log(`🔄 Trying QR service ${serviceIndex + 1}: ${qrUrl.substring(0, 50)}...`);
+                        
+                        const img = new Image();
+                        img.onload = function() {
+                            console.log(`✅ QR image loaded from service ${serviceIndex + 1}`);
+                            qrContainer.innerHTML = `
+                                <img src="${qrUrl}" 
+                                     alt="Device Sync QR Code" 
+                                     style="width: 250px; height: 250px; border-radius: 8px;">
+                            `;
+                        };
+                        img.onerror = function() {
+                            console.warn(`❌ QR service ${serviceIndex + 1} failed, trying next...`);
+                            serviceIndex++;
+                            tryLoadQR();
+                        };
+                        img.src = qrUrl;
+                    }
+                    
+                    // Start loading QR image
+                    setTimeout(tryLoadQR, 100);
                     
                     console.log('✅ Device sync QR generated');
                     console.log('📱 QR expires at:', new Date(qrResult.expires_at).toLocaleString());

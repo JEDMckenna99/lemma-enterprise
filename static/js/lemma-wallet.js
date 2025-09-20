@@ -1364,8 +1364,23 @@ class LemmaWallet {
                 console.log(`⏰ Expires in 5 minutes`);
             }
             
-            // Generate QR code image URL
-            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(syncUrl)}`;
+            // Generate QR code image URL with fallback services
+            const encodedData = encodeURIComponent(syncUrl);
+            
+            if (this.debug) {
+                console.log(`📊 QR URL length: ${syncUrl.length} characters`);
+                console.log(`📊 Encoded length: ${encodedData.length} characters`);
+                console.log(`🔗 Sync URL preview: ${syncUrl.substring(0, 100)}...`);
+            }
+            
+            // Try multiple QR services for reliability
+            const qrServices = [
+                `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodedData}`,
+                `https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl=${encodedData}`,
+                `https://qr-code-generator.com/api/qr-code/?size=250&data=${encodedData}`
+            ];
+            
+            const qrImageUrl = qrServices[0]; // Primary service
             
             return {
                 success: true,
