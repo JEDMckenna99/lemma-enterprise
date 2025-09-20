@@ -1709,7 +1709,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             <p style="font-size: 0.9rem; color: #666; margin: 16px 0;">
                                 <strong>Scan with your new device's camera</strong><br>
                                 Automatically opens wallet sync page<br>
-                                <span style="color: #dc2626; font-weight: 500;">Expires in 5 minutes</span>
+                                <span style="color: #dc2626; font-weight: 500;">Expires in 5 minutes</span><br>
+                                <span style="color: #059669; font-size: 0.8rem;" id="sync-info">
+                                    <!-- Sync info will be populated by JavaScript -->
+                                </span>
                             </p>
                             <div style="margin: 16px 0; padding: 12px; background: #f3f4f6; border-radius: 6px; font-size: 0.8rem; color: #4b5563;">
                                 <strong>Manual option:</strong> Copy link below<br>
@@ -1722,6 +1725,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     `;
                     
                     document.body.appendChild(modal);
+                    
+                    // Update sync info based on credential count
+                    const syncInfo = document.getElementById('sync-info');
+                    const credentialCount = qrResult.metadata?.credential_count || 0;
+                    if (credentialCount > 0) {
+                        syncInfo.textContent = `Will sync ${credentialCount} credentials`;
+                    } else {
+                        syncInfo.textContent = 'Will sync empty wallet (for initial setup)';
+                        syncInfo.style.color = '#f59e0b'; // Orange for empty wallet
+                    }
                     
                     // Generate actual QR code using QR.js library or API
                     setTimeout(() => {
@@ -1743,7 +1756,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             return;
                         }
                     } else if (qrResult.reason === 'no_credentials') {
-                        errorMessage += 'No credentials to sync. Please verify your identity first.';
+                        errorMessage += 'No credentials found. QR will sync empty wallet state.';
                     } else if (qrResult.reason === 'rate_limited') {
                         errorMessage += qrResult.message || 'Please wait before generating another QR code';
                     } else {

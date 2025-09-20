@@ -1265,23 +1265,21 @@ class LemmaWallet {
         try {
             const credentials = await this.getCredentials();
             
-            if (credentials.length === 0) {
-                return { 
-                    success: false, 
-                    reason: 'no_credentials',
-                    message: 'No credentials to sync'
-                };
-            }
-            
+            // Allow QR generation even with empty wallet for initial device setup
             const walletData = {
                 credentials: credentials,
                 metadata: {
                     exported_at: Date.now(),
                     device_fingerprint: this.getDeviceFingerprint(),
                     export_source: window.location.origin,
-                    credential_count: credentials.length
+                    credential_count: credentials.length,
+                    wallet_type: credentials.length > 0 ? 'populated' : 'empty'
                 }
             };
+            
+            if (this.debug) {
+                console.log(`📊 Generating QR for ${credentials.length > 0 ? 'populated' : 'empty'} wallet (${credentials.length} credentials)`);
+            }
             
             const walletJson = JSON.stringify(walletData);
             const walletSize = walletJson.length;
@@ -1373,6 +1371,7 @@ class LemmaWallet {
                 expires_at: syncPackage.expires_at,
                 password: password,
                 vault_required: false,
+                metadata: walletData.metadata,
                 security_features: [
                     'AES-256-GCM encryption',
                     'PBKDF2 key derivation (100k iterations)',
