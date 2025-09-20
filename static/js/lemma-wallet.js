@@ -1364,28 +1364,19 @@ class LemmaWallet {
                 console.log(`⏰ Expires in 5 minutes`);
             }
             
-            // Generate QR code image URL with fallback services
-            const encodedData = encodeURIComponent(syncUrl);
-            
             if (this.debug) {
                 console.log(`📊 QR URL length: ${syncUrl.length} characters`);
-                console.log(`📊 Encoded length: ${encodedData.length} characters`);
                 console.log(`🔗 Sync URL preview: ${syncUrl.substring(0, 100)}...`);
             }
             
-            // Try multiple QR services for reliability
-            const qrServices = [
-                `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodedData}`,
-                `https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl=${encodedData}`,
-                `https://qr-code-generator.com/api/qr-code/?size=250&data=${encodedData}`
-            ];
-            
-            const qrImageUrl = qrServices[0]; // Primary service
+            // Use our own QR generation endpoint (no URL length limits)
+            const qrImageUrl = `/api/qr/generate?t=${Date.now()}`;
             
             return {
                 success: true,
                 sync_url: syncUrl,
                 qr_image_url: qrImageUrl,
+                qr_data_for_server: syncUrl, // Data to send to our QR endpoint
                 sync_method: 'direct_qr',
                 expires_at: syncPackage.expires_at,
                 password: password,

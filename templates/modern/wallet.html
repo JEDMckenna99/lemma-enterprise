@@ -1750,47 +1750,51 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     let serviceIndex = 0;
                     
-                    function tryLoadQR() {
-                        if (serviceIndex >= qrServices.length) {
-                            // All services failed, show manual link
+                    async function generateQRImage() {
+                        try {
+                            console.log('🔄 Generating QR image using our own endpoint...');
+                            
+                            // Use our own QR generation endpoint (supports long URLs)
+                            const response = await fetch('/api/qr/generate-base64', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    sync_url: syncUrl,
+                                    size: 250
+                                })
+                            });
+                            
+                            if (response.ok) {
+                                const result = await response.json();
+                                if (result.success) {
+                                    console.log(`✅ QR image generated successfully (URL length: ${result.url_length})`);
+                                    qrContainer.innerHTML = `
+                                        <img src="${result.qr_image_data_url}" 
+                                             alt="Device Sync QR Code" 
+                                             style="width: 250px; height: 250px; border-radius: 8px;">
+                                    `;
+                                } else {
+                                    throw new Error(result.error || 'QR generation failed');
+                                }
+                            } else {
+                                throw new Error(`QR API failed: ${response.status}`);
+                            }
+                        } catch (error) {
+                            console.error('❌ QR generation failed:', error);
                             qrContainer.innerHTML = `
                                 <div style="padding: 20px; text-align: center;">
                                     <div style="color: #f59e0b; font-size: 24px; margin-bottom: 10px;">⚠️</div>
-                                    <div style="color: #f59e0b; margin-bottom: 10px;">QR image failed to load</div>
+                                    <div style="color: #f59e0b; margin-bottom: 10px;">QR image failed to generate</div>
                                     <div style="font-size: 12px; color: #6b7280;">Use manual link below</div>
                                 </div>
                             `;
-                            return;
                         }
-                        
-                        const qrUrl = qrServices[serviceIndex];
-                        if (!qrUrl) {
-                            serviceIndex++;
-                            tryLoadQR();
-                            return;
-                        }
-                        
-                        console.log(`🔄 Trying QR service ${serviceIndex + 1}: ${qrUrl.substring(0, 50)}...`);
-                        
-                        const img = new Image();
-                        img.onload = function() {
-                            console.log(`✅ QR image loaded from service ${serviceIndex + 1}`);
-                            qrContainer.innerHTML = `
-                                <img src="${qrUrl}" 
-                                     alt="Device Sync QR Code" 
-                                     style="width: 250px; height: 250px; border-radius: 8px;">
-                            `;
-                        };
-                        img.onerror = function() {
-                            console.warn(`❌ QR service ${serviceIndex + 1} failed, trying next...`);
-                            serviceIndex++;
-                            tryLoadQR();
-                        };
-                        img.src = qrUrl;
                     }
                     
-                    // Start loading QR image
-                    setTimeout(tryLoadQR, 100);
+                    // Start generating QR image
+                    setTimeout(generateQRImage, 100);
                     
                     console.log('✅ Device sync QR generated');
                     console.log('📱 QR expires at:', new Date(qrResult.expires_at).toLocaleString());

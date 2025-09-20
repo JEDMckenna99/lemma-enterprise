@@ -1,116 +1,123 @@
+#!/usr/bin/env python3
 """
-Lemma QR Code Generator API
+QR Code Generation API for Lemma Wallet Sync
 """
 
+from flask import Blueprint, request, jsonify, send_file
+from flask_cors import cross_origin
+import qrcode
+import io
+import base64
 import json
-import hashlib
-import hmac
-import time
-from datetime import datetime
-from flask import Blueprint, request, jsonify
-import logging
 
-logger = logging.getLogger(__name__)
 qr_generator_bp = Blueprint('qr_generator', __name__)
 
-class LemmaQRGenerator:
-    def __init__(self):
-        self.demo_key = "lemma_demo_key_2024"
-    
-    def generate_demo_signature(self, claims):
-        """Generate demo signature for QR codes"""
-        claims_json = json.dumps(claims, sort_keys=True)
-        timestamp = str(int(time.time()))
-        message = f"{claims_json}:{timestamp}"
-        signature = hmac.new(
-            self.demo_key.encode(),
-            message.encode(),
-            hashlib.sha256
-        ).hexdigest()[:32]
-        return f"lemma:sig:{signature}:{timestamp}"
-    
-    def create_qr_data(self, qr_type, claims, metadata=None):
-        """Create QR code data with Lemma signature"""
-        claims['timestamp'] = datetime.utcnow().isoformat() + 'Z'
-        claims['qr_id'] = hashlib.sha256(
-            f"{qr_type}:{json.dumps(claims, sort_keys=True)}:{time.time()}"
-            .encode()
-        ).hexdigest()[:16]
-        
-        lemma_signature = self.generate_demo_signature(claims)
-        
-        verification_times = {
-            'ticket': 4.2, 'product': 3.8, 'access': 5.1
-        }
-        
-        return {
-            'type': 'lemma_verification',
-            'qr_type': qr_type,
-            'claims': claims,
-            'lemma_signature': lemma_signature,
-            'offline_verification': True,
-            'verification_time_us': verification_times.get(qr_type, 5.0)
-        }
-
-qr_generator = LemmaQRGenerator()
-
-@qr_generator_bp.route('/api/qr/demo-codes', methods=['GET'])
-def get_demo_qr_codes():
-    """Get demo QR codes for the demo page"""
+@qr_generator_bp.route('/api/qr/generate', methods=['POST'])
+@cross_origin()
+def generate_qr_code():
+    """
+    Generate QR code image for wallet sync
+    Accepts sync data in POST body to avoid URL length limits
+    """
     try:
-        demo_codes = []
+        data = request.get_json()
         
-        # Event Ticket
-        ticket_data = qr_generator.create_qr_data(
-            'ticket',
-            {
-                'event_name': 'Tech Conference 2024',
-                'ticket_id': 'TC2024-001',
-                'seat': 'A-15',
-                'date': '2024-12-15'
-            }
-        )
-        demo_codes.append({
-            'id': 'ticket',
-            'title': 'Event Ticket',
-            'data': json.dumps(ticket_data, separators=(',', ':'))
-        })
+        if not data or 'sync_url' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing sync_url in request body'
+            }), 400
         
-        # Product Authentication
-        product_data = qr_generator.create_qr_data(
-            'product',
-            {
-                'product_name': 'Premium Headphones',
-                'serial_number': 'PH-2024-789',
-                'manufacturer': 'AudioTech Inc'
-            }
-        )
-        demo_codes.append({
-            'id': 'product',
-            'title': 'Product Authentication',
-            'data': json.dumps(product_data, separators=(',', ':'))
-        })
+        sync_url = data['sync_url']
+        size = data.get('size', 250)  # Default 250x250
         
-        # Access Control
-        access_data = qr_generator.create_qr_data(
-            'access',
-            {
-                'access_level': 'Level 3',
-                'building': 'Main Office',
-                'room': 'Conference Room B',
-                'user_id': 'emp_001'
-            }
+        # Create QR code
+        qr = qrcode.QRCode(
+            version=1,  # Auto-adjust version based on data
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
         )
-        demo_codes.append({
-            'id': 'access',
-            'title': 'Access Control',
-            'data': json.dumps(access_data, separators=(',', ':'))
-        })
+        
+        qr.add_data(sync_url)
+        qr.make(fit=True)
+        
+        # Create image
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Resize to requested size
+        img = img.resize((size, size))
+        
+        # Convert to bytes
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        
+        # Return image directly
+        return send_file(
+            img_buffer,
+            mimetype='image/png',
+            as_attachment=False
+        )
+        
+    except Exception as e:
+        print(f"❌ QR generation failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@qr_generator_bp.route('/api/qr/generate-base64', methods=['POST'])
+@cross_origin()
+def generate_qr_base64():
+    """
+    Generate QR code as base64 data URL
+    """
+    try:
+        data = request.get_json()
+        
+        if not data or 'sync_url' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing sync_url in request body'
+            }), 400
+        
+        sync_url = data['sync_url']
+        size = data.get('size', 250)
+        
+        # Create QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        
+        qr.add_data(sync_url)
+        qr.make(fit=True)
+        
+        # Create image
+        img = qr.make_image(fill_color="black", back_color="white")
+        img = img.resize((size, size))
+        
+        # Convert to base64
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        
+        img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
+        data_url = f"data:image/png;base64,{img_base64}"
         
         return jsonify({
             'success': True,
-            'demo_codes': demo_codes
+            'qr_image_data_url': data_url,
+            'url_length': len(sync_url),
+            'qr_version': qr.version
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        print(f"❌ QR base64 generation failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
