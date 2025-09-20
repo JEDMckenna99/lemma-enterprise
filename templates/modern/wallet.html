@@ -1883,9 +1883,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Mobile debugging with alerts
     if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        const apiBase = window.location.hostname === 'lemma.id' ? 
-            'https://lemma-enterprise-0f6ba17076c1.herokuapp.com' : 
-            window.location.origin;
+        const apiBase = window.location.origin;
             
         const debugInfo = `🔍 MOBILE DEBUG
 Domain: ${window.location.hostname}
@@ -1909,10 +1907,8 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
         try {
             console.log('📦 Compressed sync data detected - expanding...');
             
-            // Ensure API calls go to the correct backend
-            const apiBase = window.location.hostname === 'lemma.id' ? 
-                'https://lemma-enterprise-0f6ba17076c1.herokuapp.com' : 
-                window.location.origin;
+            // Use current origin for API calls (lemma.id or Heroku)
+            const apiBase = window.location.origin;
                 
             const response = await fetch(`${apiBase}/api/qr/expand-compressed`, {
                 method: 'POST',
@@ -1956,10 +1952,8 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
                 // Request wallet data from transfer session
                 console.log('📤 Requesting wallet data from transfer session...');
                 
-                // Ensure API calls go to the correct backend
-                const apiBase = window.location.hostname === 'lemma.id' ? 
-                    'https://lemma-enterprise-0f6ba17076c1.herokuapp.com' : 
-                    window.location.origin;
+                // Use current origin for API calls (lemma.id or Heroku)
+                const apiBase = window.location.origin;
                 
                 console.log('🔗 API base URL:', apiBase);
                 

@@ -1310,10 +1310,8 @@ class LemmaWallet {
                 console.log('🔄 Creating transfer session for wallet sync...');
             }
             
-            // Create transfer session (ensure it uses the correct backend)
-            const apiBase = window.location.hostname === 'lemma.id' ? 
-                'https://lemma-enterprise-0f6ba17076c1.herokuapp.com' : 
-                window.location.origin;
+            // Create transfer session (use current origin - lemma.id or Heroku)
+            const apiBase = window.location.origin;
                 
             const sessionResponse = await fetch(`${apiBase}/api/wallet/transfer/create-session`, {
                 method: 'POST',
