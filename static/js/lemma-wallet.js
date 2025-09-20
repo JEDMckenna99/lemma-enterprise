@@ -1333,19 +1333,37 @@ class LemmaWallet {
             }
             
             // Store wallet data in the session
+            const setWalletData = {
+                session_id: sessionResult.session_id,
+                wallet_data: walletData
+            };
+            
+            if (this.debug) {
+                console.log('📤 Setting wallet data in session...');
+                console.log('📋 API URL:', `${apiBase}/api/wallet/transfer/set-wallet`);
+                console.log('📋 Request data:', {
+                    session_id: setWalletData.session_id,
+                    wallet_data_size: JSON.stringify(setWalletData.wallet_data).length
+                });
+            }
+            
             const walletResponse = await fetch(`${apiBase}/api/wallet/transfer/set-wallet`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    session_id: sessionResult.session_id,
-                    wallet_data: walletData
-                })
+                body: JSON.stringify(setWalletData)
             });
             
+            if (this.debug) {
+                console.log('📥 Set wallet response status:', walletResponse.status);
+                console.log('📥 Set wallet response headers:', Object.fromEntries(walletResponse.headers.entries()));
+            }
+            
             if (!walletResponse.ok) {
-                throw new Error(`Failed to set wallet data: ${walletResponse.status}`);
+                const errorText = await walletResponse.text();
+                console.error('❌ Set wallet error response:', errorText);
+                throw new Error(`Failed to set wallet data: ${walletResponse.status} - ${errorText}`);
             }
             
             // Create QR data (small token only)
