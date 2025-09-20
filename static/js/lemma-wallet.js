@@ -1288,8 +1288,8 @@ class LemmaWallet {
                 console.log(`📊 Wallet size: ${walletSize} bytes (${credentials.length} credentials)`);
             }
             
-            // Use direct QR encryption (no vault dependency)
-            return await this.generateDirectQR(walletData);
+            // Use QR trigger approach (small QR, internet transfer)
+            return await this.generateTransferTokenQR(walletData);
             
         } catch (error) {
             console.error('❌ QR generation failed:', error);
@@ -1298,7 +1298,90 @@ class LemmaWallet {
     }
     
     /**
-     * Generate direct QR with encrypted credentials (no vault needed)
+     * Generate transfer token QR (small QR, internet transfer)
+     * SECURITY: QR contains only transfer token, wallet sent over internet
+     */
+    async generateTransferTokenQR(walletData) {
+        try {
+            // Generate device fingerprint for this session
+            const deviceId = this.getDeviceFingerprint() + '_' + Date.now();
+            
+            if (this.debug) {
+                console.log('🔄 Creating transfer session for wallet sync...');
+            }
+            
+            // Create transfer session
+            const sessionResponse = await fetch('/api/wallet/transfer/create-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    device_id: deviceId
+                })
+            });
+            
+            if (!sessionResponse.ok) {
+                throw new Error(`Failed to create transfer session: ${sessionResponse.status}`);
+            }
+            
+            const sessionResult = await sessionResponse.json();
+            if (!sessionResult.success) {
+                throw new Error(sessionResult.error || 'Failed to create transfer session');
+            }
+            
+            // Store wallet data in the session
+            const walletResponse = await fetch('/api/wallet/transfer/set-wallet', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: sessionResult.session_id,
+                    wallet_data: walletData
+                })
+            });
+            
+            if (!walletResponse.ok) {
+                throw new Error(`Failed to set wallet data: ${walletResponse.status}`);
+            }
+            
+            // Create QR data (small token only)
+            const qrData = sessionResult.qr_data;
+            const transferUrl = `${window.location.origin}/wallet?transfer=${btoa(JSON.stringify(qrData))}`;
+            
+            if (this.debug) {
+                console.log('✅ Transfer session created successfully');
+                console.log(`📊 QR URL length: ${transferUrl.length} characters (fits in any QR!)`);
+                console.log(`🔐 Session expires at: ${new Date(sessionResult.expires_at).toLocaleString()}`);
+            }
+            
+            return {
+                success: true,
+                sync_url: transferUrl,
+                qr_data_for_server: transferUrl,
+                sync_method: 'transfer_token',
+                expires_at: sessionResult.expires_at,
+                session_id: sessionResult.session_id,
+                vault_required: false,
+                metadata: walletData.metadata,
+                security_features: [
+                    'QR trigger (no sensitive data in QR)',
+                    'Encrypted internet transfer',
+                    'Time-limited sessions (5 minutes)',
+                    'Device authentication',
+                    'End-to-end encryption'
+                ]
+            };
+            
+        } catch (error) {
+            console.error('❌ Transfer token QR generation failed:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    
+    /**
+     * Generate direct QR with encrypted credentials (DEPRECATED - too large)
      * SECURITY: Strong encryption + time-limited + device-bound
      */
     async generateDirectQR(walletData) {

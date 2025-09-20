@@ -193,6 +193,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Wallet Revocation API: {e}")
 
+    # Wallet Transfer Session API
+    try:
+        from api.wallet_transfer_session import wallet_transfer_bp
+        app.register_blueprint(wallet_transfer_bp)
+        logger.info("✅ Wallet Transfer Session API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Wallet Transfer Session API: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status

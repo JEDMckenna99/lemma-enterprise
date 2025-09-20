@@ -1872,6 +1872,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const urlParams = new URLSearchParams(window.location.search);
     let syncData = urlParams.get('sync');
     const compressedData = urlParams.get('c');
+    const transferToken = urlParams.get('transfer');
     
     // Handle compressed URLs
     if (compressedData && !syncData) {
@@ -1897,8 +1898,63 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
     
+    // Handle transfer token (new QR trigger approach)
+    if (transferToken && !syncData) {
+        try {
+            console.log('🔄 Transfer token detected - initiating wallet transfer...');
+            const tokenData = JSON.parse(atob(transferToken));
+            
+            if (tokenData.type === 'lemma_transfer_token') {
+                // Request wallet data from transfer session
+                const walletResponse = await fetch('/api/wallet/transfer/get-wallet', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: tokenData.session_id,
+                        transfer_key: tokenData.transfer_key,
+                        target_device_id: lemmaWallet.getDeviceFingerprint()
+                    })
+                });
+                
+                if (walletResponse.ok) {
+                    const walletResult = await walletResponse.json();
+                    if (walletResult.success && walletResult.wallet_data) {
+                        // Process the received wallet data
+                        const credentials = walletResult.wallet_data.credentials || [];
+                        let storedCount = 0;
+                        
+                        for (const credential of credentials) {
+                            try {
+                                const storeResult = await lemmaWallet.storeCredential(credential);
+                                if (storeResult.success) storedCount++;
+                            } catch (error) {
+                                console.warn(`⚠️ Failed to store credential:`, error);
+                            }
+                        }
+                        
+                        alert(`✅ Wallet Transfer Complete!\\n\\n${storedCount} credentials transferred to this device.\\n\\nYour Lemma wallet is now available.`);
+                        window.location.reload();
+                    } else {
+                        alert('❌ Transfer failed: ' + (walletResult.error || 'Wallet data not available'));
+                    }
+                } else {
+                    alert('❌ Transfer failed: Unable to retrieve wallet data');
+                }
+            }
+        } catch (error) {
+            console.error('❌ Transfer token processing failed:', error);
+            alert('❌ Transfer failed: Invalid transfer token');
+        }
+        
+        // Clear the URL parameter
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+    }
+    
     if (syncData) {
-        // Auto-initiate wallet sync from QR scan
+        // Auto-initiate wallet sync from QR scan (legacy direct sync)
         console.log('📱 QR scan detected - auto-initiating wallet sync...');
         
         // Show sync confirmation modal
@@ -1979,7 +2035,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Clean URL after 30 seconds
         setTimeout(() => {
-            if (window.location.search.includes('sync=') || window.location.search.includes('c=')) {
+            if (window.location.search.includes('sync=') || 
+                window.location.search.includes('c=') || 
+                window.location.search.includes('transfer=')) {
                 window.history.replaceState({}, '', '/wallet');
             }
         }, 30000);
