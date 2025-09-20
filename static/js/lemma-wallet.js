@@ -1310,8 +1310,12 @@ class LemmaWallet {
                 console.log('🔄 Creating transfer session for wallet sync...');
             }
             
-            // Create transfer session
-            const sessionResponse = await fetch('/api/wallet/transfer/create-session', {
+            // Create transfer session (ensure it uses the correct backend)
+            const apiBase = window.location.hostname === 'lemma.id' ? 
+                'https://lemma-enterprise-0f6ba17076c1.herokuapp.com' : 
+                window.location.origin;
+                
+            const sessionResponse = await fetch(`${apiBase}/api/wallet/transfer/create-session`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1331,7 +1335,7 @@ class LemmaWallet {
             }
             
             // Store wallet data in the session
-            const walletResponse = await fetch('/api/wallet/transfer/set-wallet', {
+            const walletResponse = await fetch(`${apiBase}/api/wallet/transfer/set-wallet`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1348,6 +1352,7 @@ class LemmaWallet {
             
             // Create QR data (small token only)
             const qrData = sessionResult.qr_data;
+            // Ensure transfer URL points to the same domain as the current session
             const transferUrl = `${window.location.origin}/wallet?transfer=${btoa(JSON.stringify(qrData))}`;
             
             if (this.debug) {

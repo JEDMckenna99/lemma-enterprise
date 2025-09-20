@@ -1883,8 +1883,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Mobile debugging with alerts
     if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        const apiBase = window.location.hostname === 'lemma.id' ? 
+            'https://lemma-enterprise-0f6ba17076c1.herokuapp.com' : 
+            window.location.origin;
+            
         const debugInfo = `🔍 MOBILE DEBUG
-URL: ${window.location.href.substring(0, 100)}...
+Domain: ${window.location.hostname}
+API Base: ${apiBase}
+URL: ${window.location.href.substring(0, 80)}...
 Params: ${window.location.search}
 Sync: ${syncData ? 'YES' : 'NO'}
 Compressed: ${compressedData ? 'YES' : 'NO'}
@@ -1902,7 +1908,13 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
     if (compressedData && !syncData) {
         try {
             console.log('📦 Compressed sync data detected - expanding...');
-            const response = await fetch('/api/qr/expand-compressed', {
+            
+            // Ensure API calls go to the correct backend
+            const apiBase = window.location.hostname === 'lemma.id' ? 
+                'https://lemma-enterprise-0f6ba17076c1.herokuapp.com' : 
+                window.location.origin;
+                
+            const response = await fetch(`${apiBase}/api/qr/expand-compressed`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ compressed_param: compressedData })
@@ -1944,6 +1956,13 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
                 // Request wallet data from transfer session
                 console.log('📤 Requesting wallet data from transfer session...');
                 
+                // Ensure API calls go to the correct backend
+                const apiBase = window.location.hostname === 'lemma.id' ? 
+                    'https://lemma-enterprise-0f6ba17076c1.herokuapp.com' : 
+                    window.location.origin;
+                
+                console.log('🔗 API base URL:', apiBase);
+                
                 const requestData = {
                     session_id: tokenData.session_id,
                     transfer_key: tokenData.transfer_key,
@@ -1952,7 +1971,7 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
                 
                 console.log('📋 Request data:', requestData);
                 
-                const walletResponse = await fetch('/api/wallet/transfer/get-wallet', {
+                const walletResponse = await fetch(`${apiBase}/api/wallet/transfer/get-wallet`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
