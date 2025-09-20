@@ -1684,8 +1684,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 const qrResult = await lemmaWallet.generateDeviceSyncQR();
                 
                 if (qrResult.success) {
-                    // Create QR code URL that routes to wallet sync
-                    const syncUrl = `${window.location.origin}/wallet?sync=${encodeURIComponent(qrResult.qr_data)}`;
+                    // Use the sync URL directly from the wallet result
+                    const syncUrl = qrResult.sync_url;
+                    
+                    console.log('🔗 Sync URL generated:', syncUrl);
                     
                     // Show QR code modal with actual QR image
                     const modal = document.createElement('div');
@@ -1729,7 +1731,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('✅ Device sync QR generated');
                     console.log('📱 QR expires at:', new Date(qrResult.expires_at).toLocaleString());
                 } else {
-                    alert('QR generation failed: ' + (qrResult.reason || 'Unknown error'));
+                    console.error('❌ QR generation failed:', qrResult);
+                    let errorMessage = 'QR generation failed: ';
+                    
+                    if (qrResult.reason === 'device_sync_disabled') {
+                        errorMessage += 'Device sync is disabled';
+                    } else if (qrResult.reason === 'security_restriction') {
+                        errorMessage += qrResult.message || 'Security restriction';
+                        if (qrResult.redirect_url) {
+                            window.location.href = qrResult.redirect_url;
+                            return;
+                        }
+                    } else if (qrResult.reason === 'no_credentials') {
+                        errorMessage += 'No credentials to sync. Please verify your identity first.';
+                    } else if (qrResult.reason === 'rate_limited') {
+                        errorMessage += qrResult.message || 'Please wait before generating another QR code';
+                    } else {
+                        errorMessage += qrResult.reason || qrResult.error || 'Unknown error';
+                    }
+                    
+                    alert(errorMessage);
                 }
             } else {
                 // Fallback for basic transfer
