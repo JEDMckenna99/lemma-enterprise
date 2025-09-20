@@ -1938,7 +1938,7 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
             
             // Mobile debugging
             if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                alert('🔄 TRANSFER DETECTED\n\nTransfer token found in URL.\nProcessing wallet transfer...');
+                alert('🔄 STEP 1: TRANSFER DETECTED\n\nTransfer token found in URL.\nProcessing wallet transfer...');
             }
             
             const tokenData = JSON.parse(atob(transferToken));
@@ -1948,6 +1948,11 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
                 console.log('✅ Valid transfer token detected');
                 console.log('📋 Session ID:', tokenData.session_id);
                 console.log('📋 Transfer key:', tokenData.transfer_key.substring(0, 8) + '...');
+                
+                // Mobile debugging
+                if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                    alert(`🔄 STEP 2: TOKEN PARSED\n\nSession: ${tokenData.session_id}\nKey: ${tokenData.transfer_key.substring(0, 8)}...\n\nRequesting wallet data...`);
+                }
                 
                 // Request wallet data from transfer session
                 console.log('📤 Requesting wallet data from transfer session...');
@@ -1975,6 +1980,11 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
                 
                 console.log('📥 Wallet response status:', walletResponse.status);
                 console.log('📥 Wallet response headers:', Object.fromEntries(walletResponse.headers.entries()));
+                
+                // Mobile debugging for API response
+                if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                    alert(`🔄 STEP 3: API RESPONSE\n\nStatus: ${walletResponse.status}\nAPI: ${apiBase}\n\n${walletResponse.ok ? 'Processing wallet data...' : 'API call failed!'}`);
+                }
                 
                 if (walletResponse.ok) {
                     const walletResult = await walletResponse.json();
@@ -2020,7 +2030,13 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
                 } else {
                     const errorText = await walletResponse.text();
                     console.error('❌ Wallet response error:', errorText);
-                    alert('❌ Transfer failed: Unable to retrieve wallet data');
+                    
+                    // Mobile debugging for API error
+                    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                        alert(`❌ STEP 3 FAILED: API ERROR\n\nStatus: ${walletResponse.status}\nError: ${errorText.substring(0, 100)}...\n\nAPI call failed!`);
+                    } else {
+                        alert('❌ Transfer failed: Unable to retrieve wallet data');
+                    }
                 }
             }
         } catch (error) {
