@@ -199,6 +199,7 @@ def get_wallet_data():
         
         transfer_sessions, transfer_lock = get_transfer_sessions()
         with transfer_lock:
+            debug_session_state("GET WALLET LOOKUP", session_id)
             if session_id not in transfer_sessions:
                 return jsonify({
                     'success': False,
