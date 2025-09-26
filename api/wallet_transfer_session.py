@@ -15,18 +15,29 @@ from datetime import datetime, timedelta
 
 wallet_transfer_bp = Blueprint('wallet_transfer', __name__)
 
-# Global module storage - initialized once per worker process
-_transfer_sessions = None
-_transfer_lock = None
+# Singleton pattern for session storage
+class SessionStorage:
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SessionStorage, cls).__new__(cls)
+        return cls._instance
+    
+    def __init__(self):
+        if not self._initialized:
+            self.sessions = {}
+            self.lock = threading.Lock()
+            self._initialized = True
+            print(f"🔧 SINGLETON: Session storage initialized at memory {id(self.sessions)}")
+
+# Global singleton instance
+_storage = SessionStorage()
 
 def get_transfer_sessions():
-    """Get transfer sessions with lazy initialization"""
-    global _transfer_sessions, _transfer_lock
-    if _transfer_sessions is None:
-        _transfer_sessions = {}
-        _transfer_lock = threading.Lock()
-        print(f"🔧 INITIALIZED: Global session storage at memory {id(_transfer_sessions)}")
-    return _transfer_sessions, _transfer_lock
+    """Get transfer sessions from singleton"""
+    return _storage.sessions, _storage.lock
 
 # Debug: Track session operations
 session_operation_count = 0
@@ -41,7 +52,8 @@ def debug_session_state(operation, session_id=None):
     if session_id:
         print(f"🎯 Target session: {session_id}")
     print(f"📍 Memory ID: {id(transfer_sessions)}")
-    print(f"🧩 Global Module ID: {id(_transfer_sessions)}")
+    print(f"🔒 Singleton ID: {id(_storage)}")
+    print(f"🗂️ Sessions Dict ID: {id(_storage.sessions)}")
     print("---")
 
 class TransferSession:
