@@ -6,7 +6,7 @@
 {% block head %}
     {{ super() }}
     <!-- Load the unified Lemma Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=925"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=930"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
     <script src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
@@ -1714,11 +1714,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <!-- Sync info will be populated by JavaScript -->
                                 </span>
                             </p>
-                            <div style="margin: 16px 0; padding: 12px; background: #f3f4f6; border-radius: 6px; font-size: 0.8rem; color: #4b5563;">
-                                <strong>Manual option:</strong> Copy link below<br>
+                            <div style="margin: 16px 0; padding: 12px; background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 6px; font-size: 0.8rem; color: #0369a1;">
+                                <strong>💡 Cross-Browser Sync:</strong> Copy link and paste in any browser<br>
                                 <input type="text" value="${syncUrl}" readonly 
-                                       style="width: 100%; margin-top: 4px; padding: 4px; font-size: 10px; border: 1px solid #d1d5db; border-radius: 3px;"
-                                       onclick="this.select()">
+                                       style="width: 100%; margin-top: 4px; padding: 4px; font-size: 10px; border: 1px solid #0ea5e9; border-radius: 3px; background: white;"
+                                       onclick="this.select(); navigator.clipboard.writeText(this.value); alert('✅ Sync URL copied! Paste in any browser to transfer wallet.');">
+                                <div style="margin-top: 4px; font-size: 0.7rem; color: #0369a1;">
+                                    Click input to copy → Works in Chrome, Firefox, Safari, Edge
+                                </div>
                             </div>
                             <button onclick="this.parentElement.parentElement.remove()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">Close</button>
                         </div>
