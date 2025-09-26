@@ -168,7 +168,19 @@ class LemmaWallet {
      * Load real issuer DIDs from server
      */
     async loadRealIssuerDIDs() {
+        // Skip if DIDs already loaded to prevent repeated API calls
+        if (this.didRegistry.size > 0) {
+            if (this.debug) {
+                console.log('📋 DIDs already loaded - skipping API call');
+            }
+            return;
+        }
+        
         try {
+            if (this.debug) {
+                console.log('📡 Loading real issuer DIDs from API...');
+            }
+            
             const response = await fetch('/api/network/trusted-issuers');
             if (response.ok) {
                 const trustedIssuers = await response.json();
