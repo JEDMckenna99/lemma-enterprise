@@ -1821,6 +1821,93 @@ class LemmaWallet {
             console.log('🗑️ Wallet cleared');
         }
     }
+
+    // Clear all local wallet data (local only - does not revoke credentials)
+    async clearAllLocalData() {
+        try {
+            console.log('🧹 Starting comprehensive local wallet clear...');
+            
+            // Clear in-memory storage
+            this.credentials = [];
+            this.issuers = {};
+            this.trustedDIDs = [];
+            this.memoryCache.clear();
+            console.log('✅ In-memory storage cleared');
+            
+            // Clear IndexedDB
+            if (this.db) {
+                const transaction = this.db.transaction(['credentials'], 'readwrite');
+                const store = transaction.objectStore('credentials');
+                await store.clear();
+                console.log('✅ IndexedDB credentials cleared');
+            }
+            
+            // Clear localStorage (all lemma-related data)
+            const localStorageKeys = Object.keys(localStorage);
+            let localCleared = 0;
+            localStorageKeys.forEach(key => {
+                if (key.startsWith('lemma_') || 
+                    key.includes('credential') || 
+                    key.includes('wallet') ||
+                    key.includes('recovery') ||
+                    key.includes('device_fingerprint') ||
+                    key.includes('master_seed')) {
+                    localStorage.removeItem(key);
+                    localCleared++;
+                }
+            });
+            console.log(`✅ localStorage cleared (${localCleared} items)`);
+            
+            // Clear sessionStorage
+            const sessionStorageKeys = Object.keys(sessionStorage);
+            let sessionCleared = 0;
+            sessionStorageKeys.forEach(key => {
+                if (key.startsWith('lemma_') || 
+                    key.includes('credential') || 
+                    key.includes('wallet')) {
+                    sessionStorage.removeItem(key);
+                    sessionCleared++;
+                }
+            });
+            console.log(`✅ sessionStorage cleared (${sessionCleared} items)`);
+            
+            // Reset wallet state
+            this.walletReady = false;
+            this.deviceFingerprint = null;
+            
+            // Broadcast clearing to other tabs
+            try {
+                if (this.broadcastChannel) {
+                    this.broadcastChannel.postMessage({
+                        type: 'credentials_cleared',
+                        timestamp: Date.now()
+                    });
+                }
+            } catch (error) {
+                if (this.debug) {
+                    console.warn('⚠️ Clear broadcast failed:', error.message);
+                }
+            }
+            
+            console.log('🎉 Complete local wallet clear successful');
+            console.log('🔐 Credentials remain valid (not revoked)');
+            console.log('📱 Use recovery or QR sync to restore wallet');
+            
+            return {
+                success: true,
+                cleared: {
+                    inMemory: true,
+                    indexedDB: true,
+                    localStorage: localCleared,
+                    sessionStorage: sessionCleared
+                }
+            };
+            
+        } catch (error) {
+            console.error('❌ Clear wallet error:', error);
+            throw new Error(`Failed to clear local wallet data: ${error.message}`);
+        }
+    }
 }
 
 // ================================================================

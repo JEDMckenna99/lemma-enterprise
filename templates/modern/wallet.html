@@ -6,7 +6,7 @@
 {% block head %}
     {{ super() }}
     <!-- Load the unified Lemma Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=930"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=935"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
     <script src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
@@ -510,6 +510,9 @@
                 </button>
                 <button id="test-recovery-btn" class="btn-secondary" style="flex: 1; min-width: 140px;">
                     Test Recovery
+                </button>
+                <button id="clear-wallet-btn" class="btn-danger" style="flex: 1; min-width: 140px;">
+                    Clear Wallet
                 </button>
             </div>
         </div>
@@ -2251,6 +2254,79 @@ if (document.readyState === 'loading') {
             } catch (error) {
                 alert('Recovery test failed: ' + error.message);
             }
+        }
+    });
+    
+    // Clear wallet button
+    document.getElementById('clear-wallet-btn')?.addEventListener('click', async function() {
+        const confirmed = confirm(
+            '⚠️ Clear Local Wallet Data?\n\n' +
+            'This will remove ALL credentials from this browser/device:\n' +
+            '• Identity credentials (PoH)\n' +
+            '• Permission credentials (site access)\n' +
+            '• Wallet metadata and settings\n\n' +
+            '🔐 IMPORTANT: This only clears LOCAL data.\n' +
+            'Your credentials are NOT revoked and remain valid.\n' +
+            'You can restore them using wallet recovery.\n\n' +
+            'Continue with local wallet clear?'
+        );
+        
+        if (confirmed) {
+            try {
+                console.log('🧹 Clearing local wallet data...');
+                
+                // Clear all wallet storage layers
+                if (lemmaWallet) {
+                    await lemmaWallet.clearAllLocalData();
+                    console.log('✅ Wallet storage cleared via lemmaWallet.clearAllLocalData()');
+                } else {
+                    // Fallback: Manual storage clearing
+                    console.log('🔄 Fallback: Manual storage clearing...');
+                    
+                    // Clear IndexedDB
+                    if (window.indexedDB) {
+                        const deleteReq = indexedDB.deleteDatabase('lemma_wallet');
+                        deleteReq.onsuccess = () => console.log('✅ IndexedDB cleared');
+                        deleteReq.onerror = () => console.log('⚠️ IndexedDB clear failed');
+                    }
+                    
+                    // Clear localStorage
+                    Object.keys(localStorage).forEach(key => {
+                        if (key.startsWith('lemma_') || key.includes('credential') || key.includes('wallet')) {
+                            localStorage.removeItem(key);
+                        }
+                    });
+                    console.log('✅ localStorage cleared');
+                    
+                    // Clear sessionStorage
+                    Object.keys(sessionStorage).forEach(key => {
+                        if (key.startsWith('lemma_') || key.includes('credential') || key.includes('wallet')) {
+                            sessionStorage.removeItem(key);
+                        }
+                    });
+                    console.log('✅ sessionStorage cleared');
+                }
+                
+                // Show success message
+                alert('✅ Local wallet data cleared successfully!\n\n' +
+                      '• All credentials removed from this browser/device\n' +
+                      '• Wallet metadata cleared\n' +
+                      '• Storage layers reset\n\n' +
+                      '🔄 Refresh the page to see empty wallet.\n' +
+                      '🔐 Your credentials remain valid (not revoked).\n' +
+                      '📱 Use wallet recovery or QR sync to restore.');
+                
+                // Refresh page to show empty wallet
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+                
+            } catch (error) {
+                console.error('❌ Clear wallet error:', error);
+                alert('❌ Failed to clear wallet: ' + error.message);
+            }
+        } else {
+            console.log('🚫 Wallet clear cancelled by user');
         }
     });
     
