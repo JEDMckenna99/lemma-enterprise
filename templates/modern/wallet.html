@@ -6,7 +6,7 @@
 {% block head %}
     {{ super() }}
     <!-- Load the unified Lemma Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=910"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=918"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
     <script src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
@@ -1867,14 +1867,14 @@ function generateQRCodeImage(text, containerId) {
     }
 }
 
-// Check for sync parameter on page load
-document.addEventListener('DOMContentLoaded', async function() {
+// Function to check and process URL parameters
+async function checkUrlParameters() {
     const urlParams = new URLSearchParams(window.location.search);
     let syncData = urlParams.get('sync');
     const compressedData = urlParams.get('c');
     const transferToken = urlParams.get('transfer');
     
-    console.log('🔍 URL parameter detection:');
+    console.log('🔍 URL parameter detection (checkUrlParameters):');
     console.log('📋 Current URL:', window.location.href);
     console.log('📋 Search params:', window.location.search);
     console.log('📋 Sync data:', syncData ? 'present' : 'not found');
@@ -2144,7 +2144,20 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
             }
         }, 30000);
     }
-});
+}
+
+// Check for URL parameters on page load
+document.addEventListener('DOMContentLoaded', checkUrlParameters);
+
+// Also check immediately in case DOMContentLoaded already fired (mobile Safari issue)
+if (document.readyState === 'loading') {
+    // Document still loading, DOMContentLoaded will fire
+    console.log('📋 Document loading - waiting for DOMContentLoaded');
+} else {
+    // Document already loaded, call immediately
+    console.log('📋 Document already loaded - checking parameters immediately');
+    checkUrlParameters();
+}
     
     // Scan QR button for receiving device
     document.getElementById('scan-qr-btn')?.addEventListener('click', async function() {
