@@ -19,6 +19,20 @@ wallet_transfer_bp = Blueprint('wallet_transfer', __name__)
 transfer_sessions = {}
 transfer_lock = threading.Lock()
 
+# Debug: Track session operations
+session_operation_count = 0
+
+def debug_session_state(operation, session_id=None):
+    global session_operation_count
+    session_operation_count += 1
+    print(f"🔍 DEBUG #{session_operation_count}: {operation}")
+    print(f"📊 Current sessions: {len(transfer_sessions)}")
+    print(f"📋 Session keys: {list(transfer_sessions.keys())}")
+    if session_id:
+        print(f"🎯 Target session: {session_id}")
+    print(f"📍 Memory ID: {id(transfer_sessions)}")
+    print("---")
+
 class TransferSession:
     def __init__(self, source_device_id, wallet_data=None):
         self.session_id = str(uuid.uuid4())[:12]  # Short session ID
@@ -67,8 +81,7 @@ def create_transfer_session():
         
         with transfer_lock:
             transfer_sessions[session.session_id] = session
-            print(f"📊 Session stored. Total sessions: {len(transfer_sessions)}")
-            print(f"📋 Session keys: {list(transfer_sessions.keys())}")
+            debug_session_state("SESSION CREATED", session.session_id)
         
         print(f"✅ Created transfer session {session.session_id} for device {device_id[:8]}...")
         
@@ -105,13 +118,10 @@ def set_wallet_data():
         wallet_data = data['wallet_data']
         
         with transfer_lock:
-            # Debug logging
-            print(f"🔍 Looking for session {session_id}")
-            print(f"📋 Available sessions: {list(transfer_sessions.keys())}")
-            print(f"📊 Total sessions: {len(transfer_sessions)}")
+            debug_session_state("SET WALLET LOOKUP", session_id)
             
             if session_id not in transfer_sessions:
-                print(f"❌ Session {session_id} not found in {list(transfer_sessions.keys())}")
+                debug_session_state("SESSION NOT FOUND", session_id)
                 return jsonify({
                     'success': False,
                     'error': 'Transfer session not found'
