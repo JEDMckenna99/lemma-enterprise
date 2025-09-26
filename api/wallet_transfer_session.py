@@ -67,6 +67,8 @@ def create_transfer_session():
         
         with transfer_lock:
             transfer_sessions[session.session_id] = session
+            print(f"📊 Session stored. Total sessions: {len(transfer_sessions)}")
+            print(f"📋 Session keys: {list(transfer_sessions.keys())}")
         
         print(f"✅ Created transfer session {session.session_id} for device {device_id[:8]}...")
         
@@ -103,7 +105,13 @@ def set_wallet_data():
         wallet_data = data['wallet_data']
         
         with transfer_lock:
+            # Debug logging
+            print(f"🔍 Looking for session {session_id}")
+            print(f"📋 Available sessions: {list(transfer_sessions.keys())}")
+            print(f"📊 Total sessions: {len(transfer_sessions)}")
+            
             if session_id not in transfer_sessions:
+                print(f"❌ Session {session_id} not found in {list(transfer_sessions.keys())}")
                 return jsonify({
                     'success': False,
                     'error': 'Transfer session not found'
