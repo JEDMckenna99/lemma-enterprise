@@ -226,13 +226,13 @@ def get_wallet_data():
                     'error': 'Wallet data not ready yet'
                 }), 202  # Accepted, but not ready
             
-            # Mark as completed and clean up
+            # Mark as completed but keep session for multiple retrievals
             wallet_data = session.wallet_data
             session.status = 'completed'
             session.target_device_id = target_device_id
             
-            # Clean up after successful transfer
-            del transfer_sessions[session_id]
+            # Keep session alive for cross-browser sync (will auto-expire in 5 minutes)
+            # del transfer_sessions[session_id]  # Commented out to allow multiple retrievals
         
         print(f"✅ Wallet transferred from session {session_id} to device {target_device_id[:8]}...")
         
