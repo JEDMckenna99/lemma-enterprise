@@ -4,7 +4,7 @@ Wallet Transfer Session API - QR Trigger Approach
 Handles real-time wallet transfers between devices
 """
 
-from flask import Blueprint, request, jsonify, Response
+from flask import Blueprint, request, jsonify, Response, g, current_app
 from flask_cors import cross_origin
 import json
 import time
@@ -15,9 +15,13 @@ from datetime import datetime, timedelta
 
 wallet_transfer_bp = Blueprint('wallet_transfer', __name__)
 
-# In-memory storage for transfer sessions (in production, use Redis)
-transfer_sessions = {}
-transfer_lock = threading.Lock()
+# Use Flask app context for persistent storage across requests
+def get_transfer_sessions():
+    """Get transfer sessions from Flask app context"""
+    if not hasattr(current_app, 'transfer_sessions'):
+        current_app.transfer_sessions = {}
+        current_app.transfer_lock = threading.Lock()
+    return current_app.transfer_sessions, current_app.transfer_lock
 
 # Debug: Track session operations
 session_operation_count = 0
@@ -25,12 +29,14 @@ session_operation_count = 0
 def debug_session_state(operation, session_id=None):
     global session_operation_count
     session_operation_count += 1
+    transfer_sessions, transfer_lock = get_transfer_sessions()
     print(f"🔍 DEBUG #{session_operation_count}: {operation}")
     print(f"📊 Current sessions: {len(transfer_sessions)}")
     print(f"📋 Session keys: {list(transfer_sessions.keys())}")
     if session_id:
         print(f"🎯 Target session: {session_id}")
     print(f"📍 Memory ID: {id(transfer_sessions)}")
+    print(f"🏗️ App Context ID: {id(current_app)}")
     print("---")
 
 class TransferSession:
@@ -79,6 +85,7 @@ def create_transfer_session():
         # Create transfer session
         session = TransferSession(device_id, wallet_data)
         
+        transfer_sessions, transfer_lock = get_transfer_sessions()
         with transfer_lock:
             transfer_sessions[session.session_id] = session
             debug_session_state("SESSION CREATED", session.session_id)
@@ -117,6 +124,7 @@ def set_wallet_data():
         session_id = data['session_id']
         wallet_data = data['wallet_data']
         
+        transfer_sessions, transfer_lock = get_transfer_sessions()
         with transfer_lock:
             debug_session_state("SET WALLET LOOKUP", session_id)
             
@@ -172,6 +180,7 @@ def get_wallet_data():
         transfer_key = data['transfer_key']
         target_device_id = data.get('target_device_id', 'unknown')
         
+        transfer_sessions, transfer_lock = get_transfer_sessions()
         with transfer_lock:
             if session_id not in transfer_sessions:
                 return jsonify({
@@ -230,6 +239,7 @@ def get_transfer_status(session_id):
     Get transfer session status
     """
     try:
+        transfer_sessions, transfer_lock = get_transfer_sessions()
         with transfer_lock:
             if session_id not in transfer_sessions:
                 return jsonify({
