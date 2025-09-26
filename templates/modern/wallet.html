@@ -6,7 +6,7 @@
 {% block head %}
     {{ super() }}
     <!-- Load the unified Lemma Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=918"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=925"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
     <script src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
@@ -1867,8 +1867,16 @@ function generateQRCodeImage(text, containerId) {
     }
 }
 
+// Flag to prevent double execution
+let transferProcessed = false;
+
 // Function to check and process URL parameters
 async function checkUrlParameters() {
+    if (transferProcessed) {
+        console.log('🔄 Transfer already processed - skipping duplicate execution');
+        return;
+    }
+    
     const urlParams = new URLSearchParams(window.location.search);
     let syncData = urlParams.get('sync');
     const compressedData = urlParams.get('c');
@@ -1933,6 +1941,7 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
     // Handle transfer token (new QR trigger approach)
     if (transferToken && !syncData) {
         try {
+            transferProcessed = true; // Mark as processed to prevent double execution
             console.log('🔄 Transfer token detected - initiating wallet transfer...');
             console.log('📋 Raw transfer token:', transferToken.substring(0, 100) + '...');
             
