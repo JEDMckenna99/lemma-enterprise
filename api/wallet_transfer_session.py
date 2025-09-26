@@ -4,7 +4,7 @@ Wallet Transfer Session API - QR Trigger Approach
 Handles real-time wallet transfers between devices
 """
 
-from flask import Blueprint, request, jsonify, Response, g, current_app
+from flask import Blueprint, request, jsonify, Response
 from flask_cors import cross_origin
 import json
 import time
@@ -15,13 +15,18 @@ from datetime import datetime, timedelta
 
 wallet_transfer_bp = Blueprint('wallet_transfer', __name__)
 
-# Use Flask app context for persistent storage across requests
+# Global module storage - initialized once per worker process
+_transfer_sessions = None
+_transfer_lock = None
+
 def get_transfer_sessions():
-    """Get transfer sessions from Flask app context"""
-    if not hasattr(current_app, 'transfer_sessions'):
-        current_app.transfer_sessions = {}
-        current_app.transfer_lock = threading.Lock()
-    return current_app.transfer_sessions, current_app.transfer_lock
+    """Get transfer sessions with lazy initialization"""
+    global _transfer_sessions, _transfer_lock
+    if _transfer_sessions is None:
+        _transfer_sessions = {}
+        _transfer_lock = threading.Lock()
+        print(f"🔧 INITIALIZED: Global session storage at memory {id(_transfer_sessions)}")
+    return _transfer_sessions, _transfer_lock
 
 # Debug: Track session operations
 session_operation_count = 0
@@ -36,7 +41,7 @@ def debug_session_state(operation, session_id=None):
     if session_id:
         print(f"🎯 Target session: {session_id}")
     print(f"📍 Memory ID: {id(transfer_sessions)}")
-    print(f"🏗️ App Context ID: {id(current_app)}")
+    print(f"🧩 Global Module ID: {id(_transfer_sessions)}")
     print("---")
 
 class TransferSession:
