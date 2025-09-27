@@ -9,8 +9,17 @@
  * - Backwards compatibility with existing code
  */
 
+// EMERGENCY: Global wallet initialization prevention
+window.LEMMA_WALLET_INITIALIZED = window.LEMMA_WALLET_INITIALIZED || false;
+
 class LemmaWallet {
     constructor(options = {}) {
+        // EMERGENCY: Absolute prevention of multiple instances
+        if (window.LEMMA_WALLET_INITIALIZED) {
+            console.warn('⚠️ EMERGENCY: Wallet already initialized - blocking duplicate');
+            return window.LEMMA_WALLET_INSTANCE;
+        }
+        
         // Singleton pattern - prevent multiple instances
         if (LemmaWallet.instance) {
             if (options.debug) {
@@ -464,6 +473,8 @@ class LemmaWallet {
             
             // Set singleton instance
             LemmaWallet.instance = this;
+            window.LEMMA_WALLET_INSTANCE = this;
+            window.LEMMA_WALLET_INITIALIZED = true;
             
             if (this.debug) {
                 console.log(`✅ Lemma wallet ready - ${this.memoryCache.size} credentials loaded`);

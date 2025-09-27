@@ -6,7 +6,7 @@
 {% block head %}
     {{ super() }}
     <!-- Load the unified Lemma Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=950"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=955"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
     <script src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
@@ -625,8 +625,9 @@ let shieldApiKey = 'lemma_platform_production_key_2024'; // Global API key varia
 let walletInitialized = false; // Prevent multiple wallet initializations
 
 document.addEventListener('DOMContentLoaded', async function() {
-    if (walletInitialized) {
-        console.log('🔄 Wallet already initialized - skipping duplicate initialization');
+    // EMERGENCY: Multiple prevention layers
+    if (window.LEMMA_WALLET_INITIALIZED || walletInitialized || window.lemmaWallet) {
+        console.warn('⚠️ EMERGENCY: Blocking wallet initialization - already exists');
         return;
     }
     
@@ -914,8 +915,9 @@ async function refreshWalletCredentials() {
 async function forceReloadWallet() {
     console.log('🔄 Force reloading wallet...');
     
-    if (walletInitialized) {
-        console.log('⚠️ Wallet already initialized - skipping force reload to prevent spam');
+    // EMERGENCY: Multiple prevention layers
+    if (window.LEMMA_WALLET_INITIALIZED || walletInitialized || window.lemmaWallet) {
+        console.warn('⚠️ EMERGENCY: Blocking force reload - wallet already exists');
         return;
     }
     
