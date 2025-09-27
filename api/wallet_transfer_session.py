@@ -22,8 +22,6 @@ try:
     REDIS_URL = os.environ.get('REDISCLOUD_URL') or os.environ.get('REDIS_URL')
     
     if REDIS_URL:
-        print(f"🔴 REDIS: Attempting connection to {REDIS_URL[:30]}...")
-        
         # Handle SSL Redis with cert issues
         if REDIS_URL.startswith('rediss://'):
             redis_client = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
@@ -31,10 +29,9 @@ try:
             redis_client = redis.from_url(REDIS_URL, decode_responses=True)
             
         # Test connection
-        ping_result = redis_client.ping()
-        print(f"🔴 REDIS: Ping successful: {ping_result}")
+        redis_client.ping()
         USE_REDIS = True
-        print(f"🔴 REDIS: Connected successfully for session storage")
+        print(f"🔴 REDIS: Connected for multi-dyno session storage")
     else:
         USE_REDIS = False
         print("⚠️ REDIS: No REDIS_URL or REDISCLOUD_URL found, using in-memory storage")
