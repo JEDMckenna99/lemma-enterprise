@@ -2,6 +2,7 @@
 """
 Wallet Transfer Session API - QR Trigger Approach
 Handles real-time wallet transfers between devices
+Multi-dyno compatible with Redis fallback
 """
 
 from flask import Blueprint, request, jsonify, Response
@@ -11,33 +12,102 @@ import time
 import uuid
 import hashlib
 import threading
+import os
 from datetime import datetime, timedelta
+
+# Try Redis first, fallback to in-memory
+try:
+    import redis
+    REDIS_URL = os.environ.get('REDIS_URL')
+    if REDIS_URL:
+        redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+        # Test connection
+        redis_client.ping()
+        USE_REDIS = True
+        print("🔴 REDIS: Connected for session storage")
+    else:
+        USE_REDIS = False
+        print("⚠️ REDIS: No REDIS_URL found, using in-memory storage")
+except Exception as e:
+    USE_REDIS = False
+    print(f"⚠️ REDIS: Connection failed ({e}), using in-memory storage")
 
 wallet_transfer_bp = Blueprint('wallet_transfer', __name__)
 
-# Singleton pattern for session storage
+# Multi-dyno compatible session storage
 class SessionStorage:
-    _instance = None
-    _initialized = False
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(SessionStorage, cls).__new__(cls)
-        return cls._instance
-    
     def __init__(self):
-        if not self._initialized:
+        self.lock = threading.Lock()
+        if USE_REDIS:
+            print("🔴 REDIS: Using Redis for session storage")
+        else:
             self.sessions = {}
-            self.lock = threading.Lock()
-            self._initialized = True
-            print(f"🔧 SINGLETON: Session storage initialized at memory {id(self.sessions)}")
+            print(f"🔧 IN-MEMORY: Session storage initialized at memory {id(self.sessions)}")
+    
+    def set_session(self, session_id, session_data):
+        """Store session data"""
+        if USE_REDIS:
+            try:
+                # Store as JSON with 5 minute expiry
+                redis_client.setex(
+                    f"transfer_session:{session_id}",
+                    300,  # 5 minutes
+                    json.dumps(session_data)
+                )
+                return True
+            except Exception as e:
+                print(f"❌ REDIS SET failed: {e}")
+                return False
+        else:
+            with self.lock:
+                self.sessions[session_id] = session_data
+                return True
+    
+    def get_session(self, session_id):
+        """Retrieve session data"""
+        if USE_REDIS:
+            try:
+                data = redis_client.get(f"transfer_session:{session_id}")
+                if data:
+                    return json.loads(data)
+                return None
+            except Exception as e:
+                print(f"❌ REDIS GET failed: {e}")
+                return None
+        else:
+            with self.lock:
+                return self.sessions.get(session_id)
+    
+    def delete_session(self, session_id):
+        """Delete session data"""
+        if USE_REDIS:
+            try:
+                redis_client.delete(f"transfer_session:{session_id}")
+                return True
+            except Exception as e:
+                print(f"❌ REDIS DELETE failed: {e}")
+                return False
+        else:
+            with self.lock:
+                if session_id in self.sessions:
+                    del self.sessions[session_id]
+                return True
+    
+    def list_sessions(self):
+        """List all session IDs"""
+        if USE_REDIS:
+            try:
+                keys = redis_client.keys("transfer_session:*")
+                return [key.replace("transfer_session:", "") for key in keys]
+            except Exception as e:
+                print(f"❌ REDIS LIST failed: {e}")
+                return []
+        else:
+            with self.lock:
+                return list(self.sessions.keys())
 
-# Global singleton instance
+# Global session storage instance
 _storage = SessionStorage()
-
-def get_transfer_sessions():
-    """Get transfer sessions from singleton"""
-    return _storage.sessions, _storage.lock
 
 # Debug: Track session operations
 session_operation_count = 0
@@ -45,15 +115,14 @@ session_operation_count = 0
 def debug_session_state(operation, session_id=None):
     global session_operation_count
     session_operation_count += 1
-    transfer_sessions, transfer_lock = get_transfer_sessions()
+    session_keys = _storage.list_sessions()
+    storage_type = "REDIS" if USE_REDIS else "IN-MEMORY"
+    
     print(f"🔍 DEBUG #{session_operation_count}: {operation}")
-    print(f"📊 Current sessions: {len(transfer_sessions)}")
-    print(f"📋 Session keys: {list(transfer_sessions.keys())}")
+    print(f"📊 Current sessions: {len(session_keys)} ({storage_type})")
+    print(f"📋 Session keys: {session_keys}")
     if session_id:
         print(f"🎯 Target session: {session_id}")
-    print(f"📍 Memory ID: {id(transfer_sessions)}")
-    print(f"🔒 Singleton ID: {id(_storage)}")
-    print(f"🗂️ Sessions Dict ID: {id(_storage.sessions)}")
     print("---")
 
 class TransferSession:
@@ -102,10 +171,25 @@ def create_transfer_session():
         # Create transfer session
         session = TransferSession(device_id, wallet_data)
         
-        transfer_sessions, transfer_lock = get_transfer_sessions()
-        with transfer_lock:
-            transfer_sessions[session.session_id] = session
-            debug_session_state("SESSION CREATED", session.session_id)
+        # Store session using new storage system
+        session_data = {
+            'session_id': session.session_id,
+            'source_device_id': session.source_device_id,
+            'transfer_key': session.transfer_key,
+            'created_at': session.created_at.isoformat(),
+            'expires_at': session.expires_at.isoformat(),
+            'wallet_data': session.wallet_data,
+            'status': session.status,
+            'target_device_id': session.target_device_id
+        }
+        
+        if not _storage.set_session(session.session_id, session_data):
+            return jsonify({
+                'success': False,
+                'error': 'Failed to store session'
+            }), 500
+            
+        debug_session_state("SESSION CREATED", session.session_id)
         
         print(f"✅ Created transfer session {session.session_id} for device {device_id[:8]}...")
         
@@ -141,29 +225,37 @@ def set_wallet_data():
         session_id = data['session_id']
         wallet_data = data['wallet_data']
         
-        transfer_sessions, transfer_lock = get_transfer_sessions()
-        with transfer_lock:
-            debug_session_state("SET WALLET LOOKUP", session_id)
-            
-            if session_id not in transfer_sessions:
-                debug_session_state("SESSION NOT FOUND", session_id)
-                return jsonify({
-                    'success': False,
-                    'error': 'Transfer session not found'
-                }), 404
-            
-            session = transfer_sessions[session_id]
-            
-            if session.is_expired():
-                del transfer_sessions[session_id]
-                return jsonify({
-                    'success': False,
-                    'error': 'Transfer session expired'
-                }), 410
-            
-            session.wallet_data = wallet_data
-            session.status = 'ready'
+        debug_session_state("SET WALLET LOOKUP", session_id)
         
+        # Get session from storage
+        session_data = _storage.get_session(session_id)
+        if not session_data:
+            debug_session_state("SESSION NOT FOUND", session_id)
+            return jsonify({
+                'success': False,
+                'error': 'Transfer session not found'
+            }), 404
+        
+        # Check if expired
+        expires_at = datetime.fromisoformat(session_data['expires_at'])
+        if datetime.now() > expires_at:
+            _storage.delete_session(session_id)
+            return jsonify({
+                'success': False,
+                'error': 'Transfer session expired'
+            }), 410
+        
+        # Update session data
+        session_data['wallet_data'] = wallet_data
+        session_data['status'] = 'ready'
+        
+        if not _storage.set_session(session_id, session_data):
+            return jsonify({
+                'success': False,
+                'error': 'Failed to update session'
+            }), 500
+            
+        debug_session_state("WALLET DATA SET", session_id)
         print(f"✅ Wallet data set for session {session_id}")
         
         return jsonify({
@@ -197,43 +289,44 @@ def get_wallet_data():
         transfer_key = data['transfer_key']
         target_device_id = data.get('target_device_id', 'unknown')
         
-        transfer_sessions, transfer_lock = get_transfer_sessions()
-        with transfer_lock:
-            debug_session_state("GET WALLET LOOKUP", session_id)
-            if session_id not in transfer_sessions:
-                return jsonify({
-                    'success': False,
-                    'error': 'Transfer session not found'
-                }), 404
-            
-            session = transfer_sessions[session_id]
-            
-            if session.is_expired():
-                del transfer_sessions[session_id]
-                return jsonify({
-                    'success': False,
-                    'error': 'Transfer session expired'
-                }), 410
-            
-            if session.transfer_key != transfer_key:
-                return jsonify({
-                    'success': False,
-                    'error': 'Invalid transfer key'
-                }), 403
-            
-            if not session.wallet_data:
-                return jsonify({
-                    'success': False,
-                    'error': 'Wallet data not ready yet'
-                }), 202  # Accepted, but not ready
-            
-            # Mark as completed but keep session for multiple retrievals
-            wallet_data = session.wallet_data
-            session.status = 'completed'
-            session.target_device_id = target_device_id
-            
-            # Keep session alive for cross-browser sync (will auto-expire in 5 minutes)
-            # del transfer_sessions[session_id]  # Commented out to allow multiple retrievals
+        debug_session_state("GET WALLET LOOKUP", session_id)
+        
+        # Get session from storage
+        session_data = _storage.get_session(session_id)
+        if not session_data:
+            return jsonify({
+                'success': False,
+                'error': 'Transfer session not found'
+            }), 404
+        
+        # Check if expired
+        expires_at = datetime.fromisoformat(session_data['expires_at'])
+        if datetime.now() > expires_at:
+            _storage.delete_session(session_id)
+            return jsonify({
+                'success': False,
+                'error': 'Transfer session expired'
+            }), 410
+        
+        if session_data['transfer_key'] != transfer_key:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid transfer key'
+            }), 403
+        
+        if not session_data['wallet_data']:
+            return jsonify({
+                'success': False,
+                'error': 'Wallet data not ready yet'
+            }), 202  # Accepted, but not ready
+        
+        # Mark as completed but keep session for multiple retrievals
+        wallet_data = session_data['wallet_data']
+        session_data['status'] = 'completed'
+        session_data['target_device_id'] = target_device_id
+        
+        # Keep session alive for cross-browser sync (will auto-expire in 5 minutes)
+        _storage.set_session(session_id, session_data)  # Update but don't delete
         
         print(f"✅ Wallet transferred from session {session_id} to device {target_device_id[:8]}...")
         

@@ -10,6 +10,7 @@ PyJWT>=2.8.0
 Flask-CORS>=4.0.0
 SQLAlchemy>=2.0.0
 psycopg2-binary>=2.9.0
+redis>=5.0.0
 
 # QR code generation for multi-lemma wallet sync
 qrcode[pil]>=7.4.2
