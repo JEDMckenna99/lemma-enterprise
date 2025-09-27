@@ -1328,16 +1328,7 @@ class LemmaWallet {
         }
         
         // 4. Rate limiting check (prevent abuse)
-        const lastQRGenTime = localStorage.getItem('lemma_last_qr_gen');
-        const now = Date.now();
-        if (lastQRGenTime && (now - parseInt(lastQRGenTime)) < 10000) { // 10 second cooldown
-            return {
-                success: false,
-                reason: 'rate_limited',
-                message: 'Please wait 10 seconds between QR generations'
-            };
-        }
-        localStorage.setItem('lemma_last_qr_gen', now.toString());
+        // Removed rate limiting to allow unique QR generation each time
         
         try {
             const credentials = await this.getCredentials();
@@ -1621,16 +1612,7 @@ class LemmaWallet {
         }
         
         // 4. Rate limiting check for sync attempts (prevent brute force)
-        const lastSyncAttempt = localStorage.getItem('lemma_last_sync_attempt');
-        const now = Date.now();
-        if (lastSyncAttempt && (now - parseInt(lastSyncAttempt)) < 5000) { // 5 second cooldown
-            return {
-                success: false,
-                reason: 'rate_limited',
-                message: 'Please wait 5 seconds between sync attempts'
-            };
-        }
-        localStorage.setItem('lemma_last_sync_attempt', now.toString());
+        // Removed sync rate limiting to allow immediate QR generation
         
         try {
             if (this.debug) {
