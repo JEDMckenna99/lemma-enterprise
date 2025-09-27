@@ -18,16 +18,16 @@ from datetime import datetime, timedelta
 # Try Redis first, fallback to in-memory
 try:
     import redis
-    REDIS_URL = os.environ.get('REDIS_URL')
+    REDIS_URL = os.environ.get('REDIS_URL') or os.environ.get('REDISCLOUD_URL')
     if REDIS_URL:
         redis_client = redis.from_url(REDIS_URL, decode_responses=True)
         # Test connection
         redis_client.ping()
         USE_REDIS = True
-        print("🔴 REDIS: Connected for session storage")
+        print(f"🔴 REDIS: Connected for session storage ({REDIS_URL[:20]}...)")
     else:
         USE_REDIS = False
-        print("⚠️ REDIS: No REDIS_URL found, using in-memory storage")
+        print("⚠️ REDIS: No REDIS_URL or REDISCLOUD_URL found, using in-memory storage")
 except Exception as e:
     USE_REDIS = False
     print(f"⚠️ REDIS: Connection failed ({e}), using in-memory storage")
