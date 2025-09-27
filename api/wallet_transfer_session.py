@@ -19,18 +19,24 @@ from datetime import datetime, timedelta
 try:
     import redis
     REDIS_URL = os.environ.get('REDIS_URL') or os.environ.get('REDISCLOUD_URL')
+    print(f"🔍 REDIS DEBUG: REDIS_URL={os.environ.get('REDIS_URL')}")
+    print(f"🔍 REDIS DEBUG: REDISCLOUD_URL={os.environ.get('REDISCLOUD_URL')}")
+    print(f"🔍 REDIS DEBUG: Final URL={REDIS_URL}")
+    
     if REDIS_URL:
+        print(f"🔴 REDIS: Attempting connection to {REDIS_URL[:30]}...")
         redis_client = redis.from_url(REDIS_URL, decode_responses=True)
         # Test connection
-        redis_client.ping()
+        ping_result = redis_client.ping()
+        print(f"🔴 REDIS: Ping result: {ping_result}")
         USE_REDIS = True
-        print(f"🔴 REDIS: Connected for session storage ({REDIS_URL[:20]}...)")
+        print(f"🔴 REDIS: Connected successfully for session storage")
     else:
         USE_REDIS = False
         print("⚠️ REDIS: No REDIS_URL or REDISCLOUD_URL found, using in-memory storage")
 except Exception as e:
     USE_REDIS = False
-    print(f"⚠️ REDIS: Connection failed ({e}), using in-memory storage")
+    print(f"⚠️ REDIS: Connection failed ({type(e).__name__}: {e}), using in-memory storage")
 
 wallet_transfer_bp = Blueprint('wallet_transfer', __name__)
 
