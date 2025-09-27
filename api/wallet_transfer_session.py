@@ -18,17 +18,21 @@ from datetime import datetime, timedelta
 # Try Redis first, fallback to in-memory
 try:
     import redis
-    REDIS_URL = os.environ.get('REDIS_URL') or os.environ.get('REDISCLOUD_URL')
-    print(f"🔍 REDIS DEBUG: REDIS_URL={os.environ.get('REDIS_URL')}")
-    print(f"🔍 REDIS DEBUG: REDISCLOUD_URL={os.environ.get('REDISCLOUD_URL')}")
-    print(f"🔍 REDIS DEBUG: Final URL={REDIS_URL}")
+    # Prefer REDISCLOUD_URL (non-SSL) over REDIS_URL (SSL with cert issues)
+    REDIS_URL = os.environ.get('REDISCLOUD_URL') or os.environ.get('REDIS_URL')
     
     if REDIS_URL:
         print(f"🔴 REDIS: Attempting connection to {REDIS_URL[:30]}...")
-        redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+        
+        # Handle SSL Redis with cert issues
+        if REDIS_URL.startswith('rediss://'):
+            redis_client = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
+        else:
+            redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+            
         # Test connection
         ping_result = redis_client.ping()
-        print(f"🔴 REDIS: Ping result: {ping_result}")
+        print(f"🔴 REDIS: Ping successful: {ping_result}")
         USE_REDIS = True
         print(f"🔴 REDIS: Connected successfully for session storage")
     else:
