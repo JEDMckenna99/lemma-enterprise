@@ -11,6 +11,14 @@
 
 class LemmaWallet {
     constructor(options = {}) {
+        // Singleton pattern - prevent multiple instances
+        if (LemmaWallet.instance) {
+            if (options.debug) {
+                console.log('🔄 Wallet already exists - returning existing instance');
+            }
+            return LemmaWallet.instance;
+        }
+        
         this.debug = options.debug || false;
         
         // Feature flags
@@ -170,10 +178,7 @@ class LemmaWallet {
     async loadRealIssuerDIDs() {
         // Skip if DIDs already loaded to prevent repeated API calls
         if (this.didRegistry.size > 0) {
-            if (this.debug) {
-                console.log('📋 DIDs already loaded - skipping API call');
-            }
-            return;
+            return; // Silent skip to reduce log spam
         }
         
         try {
@@ -429,6 +434,7 @@ class LemmaWallet {
         }
         
         try {
+            // Reduced logging to prevent console spam
             if (this.debug) {
                 console.log('🚀 Initializing Lemma Wallet...');
             }
@@ -456,6 +462,9 @@ class LemmaWallet {
             // 7. Mark as ready
             this.isReady = true;
             
+            // Set singleton instance
+            LemmaWallet.instance = this;
+            
             if (this.debug) {
                 console.log(`✅ Lemma wallet ready - ${this.memoryCache.size} credentials loaded`);
                 console.log(`🎯 Mode: ${this.enableAdvancedFeatures ? 'Advanced' : 'Standard'} federated wallet`);
@@ -481,7 +490,7 @@ class LemmaWallet {
             
             request.onsuccess = (event) => {
                 this.db = event.target.result;
-                if (this.debug) console.log('📊 IndexedDB ready');
+                // IndexedDB ready (reduced logging)
                 resolve();
             };
             
@@ -517,7 +526,7 @@ class LemmaWallet {
                             this.memoryCache.set(cred.id, cred);
                         });
                         indexedDBCount = credentials.length;
-                        if (this.debug) console.log(`📊 Loaded ${credentials.length} credentials from IndexedDB`);
+                        // Loaded from IndexedDB (reduced logging)
                         resolve();
                     };
                     request.onerror = () => {
@@ -544,16 +553,14 @@ class LemmaWallet {
                         }
                     });
                     localStorageCount = credentials.length;
-                    if (this.debug) console.log(`📊 Loaded ${credentials.length} credentials from localStorage (${addedCount} new)`);
+                    // Loaded from localStorage (reduced logging)
                 }
             }
         } catch (error) {
             if (this.debug) console.warn('localStorage load failed:', error);
         }
         
-        if (this.debug) {
-            console.log(`📊 Total credentials loaded: ${this.memoryCache.size}`);
-        }
+        // Total credentials loaded (reduced logging)
     }
     
     /**
@@ -953,9 +960,7 @@ class LemmaWallet {
             this.syncRevocationLists();
         }, this.networkConfig.syncInterval);
         
-        if (this.debug) {
-            console.log(`📡 Network sync started - interval: ${this.networkConfig.syncInterval / 1000}s`);
-        }
+        // Network sync started (reduced logging)
     }
     
     /**
@@ -975,10 +980,7 @@ class LemmaWallet {
         }
         
         if (this.networkConfig.didsCached && timeSinceLastSync < minSyncInterval) {
-            if (this.debug) {
-                console.log(`📡 DID sync skipped - last sync ${Math.round(timeSinceLastSync / 1000)}s ago`);
-            }
-            return true;
+            return true; // Silent skip to reduce log spam
         }
         
         try {
@@ -1013,10 +1015,7 @@ class LemmaWallet {
         const minSyncInterval = 5 * 60 * 1000; // 5 minutes minimum
         
         if (timeSinceLastSync < minSyncInterval) {
-            if (this.debug) {
-                console.log(`📡 Revocation sync skipped - last sync ${Math.round(timeSinceLastSync / 1000)}s ago`);
-            }
-            return true;
+            return true; // Silent skip to reduce log spam
         }
         
         try {
@@ -1050,9 +1049,7 @@ class LemmaWallet {
             this.performBackgroundCheck();
         }, checkInterval);
         
-        if (this.debug) {
-            console.log(`🛡️ Background security checks started - interval: ${checkInterval / 1000}s`);
-        }
+        // Background security checks started (reduced logging)
     }
     
     /**
@@ -1126,9 +1123,7 @@ class LemmaWallet {
             const existingSeed = localStorage.getItem('lemma_master_seed');
             if (existingSeed) {
                 this.masterSeed = new Uint8Array(JSON.parse(existingSeed));
-                if (this.debug) {
-                    console.log('🔑 Loaded existing master seed');
-                }
+                // Loaded existing master seed (reduced logging)
             } else {
                 this.masterSeed = new Uint8Array(32);
                 crypto.getRandomValues(this.masterSeed);
@@ -1374,8 +1369,11 @@ class LemmaWallet {
      */
     async generateTransferTokenQR(walletData) {
         try {
-            // Generate device fingerprint for this session
-            const deviceId = this.getDeviceFingerprint() + '_' + Date.now();
+            // Generate unique device ID for this session (security: must be unique each time)
+            const randomBytes = new Uint8Array(16);
+            crypto.getRandomValues(randomBytes);
+            const randomHex = Array.from(randomBytes, b => b.toString(16).padStart(2, '0')).join('');
+            const deviceId = this.getDeviceFingerprint() + '_' + Date.now() + '_' + randomHex;
             
             if (this.debug) {
                 console.log('🔄 Creating transfer session for wallet sync...');
