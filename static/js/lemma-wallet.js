@@ -10,6 +10,8 @@
  */
 
 // EMERGENCY: Global wallet initialization prevention
+window.LEMMA_INIT_COUNT = window.LEMMA_INIT_COUNT || 0;
+window.LEMMA_INIT_MAX = 1; // Only allow ONE init ever
 window.LEMMA_WALLET_INITIALIZED = window.LEMMA_WALLET_INITIALIZED || false;
 
 class LemmaWallet {
@@ -435,8 +437,17 @@ class LemmaWallet {
      * Initialize wallet - MUST be called before use
      */
     async init() {
+        // EMERGENCY: Absolute hard limit on init calls
+        window.LEMMA_INIT_COUNT = (window.LEMMA_INIT_COUNT || 0) + 1;
+        
+        if (window.LEMMA_INIT_COUNT > window.LEMMA_INIT_MAX) {
+            console.error(`⛔ BLOCKED: Init called ${window.LEMMA_INIT_COUNT} times - MAX is ${window.LEMMA_INIT_MAX}`);
+            return; // Hard block any additional inits
+        }
+        
         // EMERGENCY: Global flag prevents ANY re-initialization
         if (window.LEMMA_INIT_IN_PROGRESS) {
+            console.warn('⚠️ Init already in progress - blocking duplicate');
             return; // Silently block if already initializing
         }
         
