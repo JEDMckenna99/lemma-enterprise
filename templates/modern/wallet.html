@@ -15,7 +15,7 @@
         }, true);
     </script>
     <!-- Load the unified Lemma Wallet -->
-    <script data-cfasync="false" type="text/javascript" src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=980"></script>
+    <script data-cfasync="false" type="text/javascript" src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=985"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
     <script data-cfasync="false" type="text/javascript" src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
@@ -433,7 +433,7 @@
     </header>
 
     <!-- Main Wallet Layout - Protected by Bot Shield -->
-    <div class="wallet-main" style="display: none;">
+    <div class="wallet-main">
     <!-- PoH Section -->
     <section id="poh-lemmas-section" style="margin-bottom: 32px;">
         <h2 class="section-title">Federated Identity Network </h2>
