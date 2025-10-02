@@ -16,7 +16,8 @@ class LemmaWallet {
     constructor(options = {}) {
         // EMERGENCY: Absolute prevention of multiple instances
         if (window.LEMMA_WALLET_INITIALIZED) {
-            console.warn('⚠️ EMERGENCY: Wallet already initialized - blocking duplicate');
+            console.error('⛔ EMERGENCY: Wallet already initialized - BLOCKED DUPLICATE CALL');
+            console.trace('Stack trace of duplicate wallet call:');
             return window.LEMMA_WALLET_INSTANCE;
         }
         

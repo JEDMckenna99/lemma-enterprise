@@ -6,7 +6,7 @@
 {% block head %}
     {{ super() }}
     <!-- Load the unified Lemma Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=960"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=965"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
     <script src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
@@ -1493,19 +1493,7 @@ function updateLastCheckTime() {
     lastCheckTime.textContent = timeString;
 }
 
-// Auto-test speed on page load and wallet initialization
-document.addEventListener('DOMContentLoaded', function() {
-    // Wait a bit for wallet to initialize, then test speed
-    setTimeout(async function() {
-        if (lemmaWallet && lemmaWallet.isReady) {
-            await testVerificationSpeed();
-        } else {
-            // Set initial state
-            document.getElementById('verification-speed-live').textContent = 'Initializing...';
-            document.getElementById('last-check-time').textContent = 'Waiting for wallet...';
-        }
-    }, 3000); // Give more time for wallet initialization
-});
+// Auto-test speed - MERGED into main DOMContentLoaded to prevent duplicate listeners
 
 // Test speed whenever wallet data is loaded (but focus on engine time, not load time)
 const originalLoadWalletData = loadWalletData;
@@ -1666,8 +1654,8 @@ async function loadUniquenessInfo() {
     }
 }
 
-// Recovery Action Handlers
-document.addEventListener('DOMContentLoaded', function() {
+// Recovery Action Handlers - MERGED into main DOMContentLoaded
+function setupRecoveryHandlers() {
     // Set up recovery button
     document.getElementById('setup-recovery-btn')?.addEventListener('click', async function() {
         const passphrase = prompt('Enter a secure recovery passphrase (remember this!):');
