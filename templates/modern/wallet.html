@@ -15,7 +15,7 @@
         }, true);
     </script>
     <!-- Load the unified Lemma Wallet -->
-    <script data-cfasync="false" type="text/javascript" src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=985"></script>
+    <script data-cfasync="false" type="text/javascript" src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=990"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
     <script data-cfasync="false" type="text/javascript" src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
@@ -634,13 +634,31 @@ let shieldApiKey = 'lemma_platform_production_key_2024'; // Global API key varia
 let walletInitialized = false; // Prevent multiple wallet initializations
 
 document.addEventListener('DOMContentLoaded', async function() {
+    console.log('🚀 DOMContentLoaded fired');
+    console.log('🔍 Checking if LemmaWallet class exists:', typeof LemmaWallet);
+    console.log('🔍 Checking if LemmaBotShield class exists:', typeof LemmaBotShield);
+    
     // EMERGENCY: Multiple prevention layers
     if (window.LEMMA_WALLET_INITIALIZED || walletInitialized || window.lemmaWallet) {
         console.warn('⚠️ EMERGENCY: Blocking wallet initialization - already exists');
         return;
     }
     
+    // Check if required classes loaded
+    if (typeof LemmaWallet === 'undefined') {
+        console.error('❌ CRITICAL: LemmaWallet class not loaded - lemma-wallet.js failed to load!');
+        console.error('❌ This means Cloudflare Rocket Loader is breaking the script.');
+        document.getElementById('poh-loading').innerHTML = `
+            <div style="padding: 32px; text-align: center; color: #dc2626;">
+                <div style="font-weight: 600; margin-bottom: 8px;">JavaScript Loading Error</div>
+                <div style="font-size: 0.85rem;">Wallet script failed to load. Please disable Cloudflare Rocket Loader.</div>
+            </div>
+        `;
+        return;
+    }
+    
     try {
+        console.log('✅ LemmaWallet class found - initializing...');
         // Initialize the unified Lemma Wallet with all platform features
         walletInitialized = true;
         lemmaWallet = new LemmaWallet({
