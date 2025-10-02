@@ -597,7 +597,8 @@ class LemmaWallet {
      * Store a credential with maximum redundancy (CORE FEDERATED FUNCTIONALITY)
      */
     async storeCredential(credential) {
-        await this.init(); // Ensure initialized
+        // Don't call init() - wallet should already be initialized
+        // await this.init(); // REMOVED: Caused redundant init attempts
         
         const credentialWithMeta = {
             ...credential,
@@ -679,7 +680,8 @@ class LemmaWallet {
      * Get credentials (core federated functionality)
      */
     async getCredentials(packageType = 'identity') {
-        await this.init();
+        // Don't call init() - wallet should already be initialized
+        // await this.init(); // REMOVED: Caused 10+ redundant init attempts
         return this.getCredentialsSync(packageType);
     }
     
@@ -702,7 +704,8 @@ class LemmaWallet {
      * Check if we have valid credentials (core federated functionality)
      */
     async hasValidCredentials(packageType = 'identity') {
-        await this.init();
+        // Don't call init() - wallet should already be initialized
+        // await this.init(); // REMOVED: Caused redundant init attempts
         
         const credentials = this.getCredentialsSync(packageType);
         const hasCredentials = credentials.length > 0;
