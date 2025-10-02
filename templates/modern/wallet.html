@@ -5,19 +5,10 @@
 
 {% block head %}
     {{ super() }}
-    <!-- EMERGENCY: Disable Cloudflare Rocket Loader for this page -->
-    <script data-cfasync="false">
-        // Block Rocket Loader from activating
-        window.addEventListener('DOMContentLoaded', function(e) {
-            if (document.querySelector('script[src*="rocket-loader"]')) {
-                e.stopImmediatePropagation();
-            }
-        }, true);
-    </script>
     <!-- Load the unified Lemma Wallet -->
-    <script data-cfasync="false" type="text/javascript" src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=990"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=960"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
-    <script data-cfasync="false" type="text/javascript" src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
+    <script src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
         .wallet-container {
             max-width: 1100px;
@@ -433,7 +424,7 @@
     </header>
 
     <!-- Main Wallet Layout - Protected by Bot Shield -->
-    <div class="wallet-main">
+    <div class="wallet-main" style="display: none;">
     <!-- PoH Section -->
     <section id="poh-lemmas-section" style="margin-bottom: 32px;">
         <h2 class="section-title">Federated Identity Network </h2>
@@ -634,31 +625,13 @@ let shieldApiKey = 'lemma_platform_production_key_2024'; // Global API key varia
 let walletInitialized = false; // Prevent multiple wallet initializations
 
 document.addEventListener('DOMContentLoaded', async function() {
-    console.log('🚀 DOMContentLoaded fired');
-    console.log('🔍 Checking if LemmaWallet class exists:', typeof LemmaWallet);
-    console.log('🔍 Checking if LemmaBotShield class exists:', typeof LemmaBotShield);
-    
     // EMERGENCY: Multiple prevention layers
     if (window.LEMMA_WALLET_INITIALIZED || walletInitialized || window.lemmaWallet) {
         console.warn('⚠️ EMERGENCY: Blocking wallet initialization - already exists');
         return;
     }
     
-    // Check if required classes loaded
-    if (typeof LemmaWallet === 'undefined') {
-        console.error('❌ CRITICAL: LemmaWallet class not loaded - lemma-wallet.js failed to load!');
-        console.error('❌ This means Cloudflare Rocket Loader is breaking the script.');
-        document.getElementById('poh-loading').innerHTML = `
-            <div style="padding: 32px; text-align: center; color: #dc2626;">
-                <div style="font-weight: 600; margin-bottom: 8px;">JavaScript Loading Error</div>
-                <div style="font-size: 0.85rem;">Wallet script failed to load. Please disable Cloudflare Rocket Loader.</div>
-            </div>
-        `;
-        return;
-    }
-    
     try {
-        console.log('✅ LemmaWallet class found - initializing...');
         // Initialize the unified Lemma Wallet with all platform features
         walletInitialized = true;
         lemmaWallet = new LemmaWallet({
@@ -720,25 +693,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Set up periodic refresh
         setInterval(loadWalletData, 30000); // Refresh every 30 seconds
-        
-        // Set up recovery handlers (was separate DOMContentLoaded)
-        setupRecoveryHandlers();
-        
-        // Check for URL parameters (was separate DOMContentLoaded)
-        checkUrlParameters();
-        
-        // Set up speed test (was separate DOMContentLoaded) - delayed
-        setTimeout(async function() {
-            if (lemmaWallet && lemmaWallet.isReady) {
-                await testVerificationSpeed();
-            } else {
-                // Set initial state
-                const speedEl = document.getElementById('verification-speed-live');
-                const timeEl = document.getElementById('last-check-time');
-                if (speedEl) speedEl.textContent = 'Initializing...';
-                if (timeEl) timeEl.textContent = 'Waiting for wallet...';
-            }
-        }, 3000);
         
     } catch (error) {
         console.error('Failed to initialize Lemma Federated Wallet:', error);
@@ -1539,7 +1493,19 @@ function updateLastCheckTime() {
     lastCheckTime.textContent = timeString;
 }
 
-// Auto-test speed - MERGED into main DOMContentLoaded to prevent duplicate listeners
+// Auto-test speed on page load and wallet initialization
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait a bit for wallet to initialize, then test speed
+    setTimeout(async function() {
+        if (lemmaWallet && lemmaWallet.isReady) {
+            await testVerificationSpeed();
+        } else {
+            // Set initial state
+            document.getElementById('verification-speed-live').textContent = 'Initializing...';
+            document.getElementById('last-check-time').textContent = 'Waiting for wallet...';
+        }
+    }, 3000); // Give more time for wallet initialization
+});
 
 // Test speed whenever wallet data is loaded (but focus on engine time, not load time)
 const originalLoadWalletData = loadWalletData;
@@ -1700,8 +1666,8 @@ async function loadUniquenessInfo() {
     }
 }
 
-// Recovery Action Handlers - MERGED into main DOMContentLoaded
-function setupRecoveryHandlers() {
+// Recovery Action Handlers
+document.addEventListener('DOMContentLoaded', function() {
     // Set up recovery button
     document.getElementById('setup-recovery-btn')?.addEventListener('click', async function() {
         const passphrase = prompt('Enter a secure recovery passphrase (remember this!):');
@@ -1848,10 +1814,10 @@ function setupRecoveryHandlers() {
                                 throw new Error(`QR API failed: ${response.status} - ${errorText}`);
                             }
                         } catch (error) {
-                            console.error('QR generation failed:', error);
+                            console.error('❌ QR generation failed:', error);
                             qrContainer.innerHTML = `
                                 <div style="padding: 20px; text-align: center;">
-                                    <div style="color: #f59e0b; font-size: 24px; margin-bottom: 10px;">!</div>
+                                    <div style="color: #f59e0b; font-size: 24px; margin-bottom: 10px;">⚠️</div>
                                     <div style="color: #f59e0b; margin-bottom: 10px;">QR image failed to generate</div>
                                     <div style="font-size: 12px; color: #6b7280;">Use manual link below</div>
                                 </div>
@@ -2210,7 +2176,18 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
     }
 }
 
-// URL parameter checking is now handled in main DOMContentLoaded listener above
+// Check for URL parameters on page load
+document.addEventListener('DOMContentLoaded', checkUrlParameters);
+
+// Also check immediately in case DOMContentLoaded already fired (mobile Safari issue)
+if (document.readyState === 'loading') {
+    // Document still loading, DOMContentLoaded will fire
+    console.log('📋 Document loading - waiting for DOMContentLoaded');
+} else {
+    // Document already loaded, call immediately
+    console.log('📋 Document already loaded - checking parameters immediately');
+    checkUrlParameters();
+}
     
     // Scan QR button for receiving device
     document.getElementById('scan-qr-btn')?.addEventListener('click', async function() {
