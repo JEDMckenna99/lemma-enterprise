@@ -435,12 +435,17 @@ class LemmaWallet {
      * Initialize wallet - MUST be called before use
      */
     async init() {
-        if (this.isReady) {
-            if (this.debug) {
-                console.log('📋 Lemma wallet already initialized');
-            }
-            return;
+        // EMERGENCY: Global flag prevents ANY re-initialization
+        if (window.LEMMA_INIT_IN_PROGRESS) {
+            return; // Silently block if already initializing
         }
+        
+        if (this.isReady) {
+            return; // Already ready, skip
+        }
+        
+        // Set global flag IMMEDIATELY
+        window.LEMMA_INIT_IN_PROGRESS = true;
         
         try {
             // Reduced logging to prevent console spam
@@ -484,6 +489,9 @@ class LemmaWallet {
         } catch (error) {
             console.error('❌ Wallet init failed:', error);
             this.isReady = true; // Fallback to localStorage only
+        } finally {
+            // Always clear the init flag when done
+            window.LEMMA_INIT_IN_PROGRESS = false;
         }
     }
     
