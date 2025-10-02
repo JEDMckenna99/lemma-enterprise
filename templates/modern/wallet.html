@@ -15,7 +15,7 @@
         }, true);
     </script>
     <!-- Load the unified Lemma Wallet -->
-    <script data-cfasync="false" type="text/javascript" src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=970"></script>
+    <script data-cfasync="false" type="text/javascript" src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=980"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
     <script data-cfasync="false" type="text/javascript" src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
@@ -1830,10 +1830,10 @@ function setupRecoveryHandlers() {
                                 throw new Error(`QR API failed: ${response.status} - ${errorText}`);
                             }
                         } catch (error) {
-                            console.error('❌ QR generation failed:', error);
+                            console.error('QR generation failed:', error);
                             qrContainer.innerHTML = `
                                 <div style="padding: 20px; text-align: center;">
-                                    <div style="color: #f59e0b; font-size: 24px; margin-bottom: 10px;">⚠️</div>
+                                    <div style="color: #f59e0b; font-size: 24px; margin-bottom: 10px;">!</div>
                                     <div style="color: #f59e0b; margin-bottom: 10px;">QR image failed to generate</div>
                                     <div style="font-size: 12px; color: #6b7280;">Use manual link below</div>
                                 </div>
