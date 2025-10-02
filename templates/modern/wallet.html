@@ -5,10 +5,19 @@
 
 {% block head %}
     {{ super() }}
+    <!-- EMERGENCY: Disable Cloudflare Rocket Loader for this page -->
+    <script data-cfasync="false">
+        // Block Rocket Loader from activating
+        window.addEventListener('DOMContentLoaded', function(e) {
+            if (document.querySelector('script[src*="rocket-loader"]')) {
+                e.stopImmediatePropagation();
+            }
+        }, true);
+    </script>
     <!-- Load the unified Lemma Wallet -->
-    <script data-cfasync="false" src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=966"></script>
+    <script data-cfasync="false" type="text/javascript" src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=967"></script>
     <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
-    <script data-cfasync="false" src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
+    <script data-cfasync="false" type="text/javascript" src="/static/js/lemma-bot-shield-simple.js?v=825"></script>
     <style>
         .wallet-container {
             max-width: 1100px;

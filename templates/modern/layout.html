@@ -6,6 +6,15 @@
     <title>{% block title %}Lemma - Identity Verification Platform{% endblock %}</title>
     <meta name="description" content="{% block description %}Professional identity verification platform. Secure your platform with cryptographic verification.{% endblock %}">
     
+    <!-- Disable Cloudflare Rocket Loader globally for this page -->
+    <meta http-equiv="x-dns-prefetch-control" content="off">
+    <script data-cfasync="false">
+        // Force disable Rocket Loader
+        if (window.cloudflare) {
+            window.cloudflare.disableRocketLoader = true;
+        }
+    </script>
+    
     <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" type="image/svg+xml">
     
