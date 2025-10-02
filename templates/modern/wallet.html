@@ -691,6 +691,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Load and display wallet data (both PoH and permission lemmas)
         await loadWalletData();
         
+        // If user has no credentials, also protect the join section
+        const credentials = await lemmaWallet.getCredentials();
+        if (credentials.length === 0) {
+            console.log('🔐 No credentials found - protecting join section with Shield');
+            await lemmaShield.protect('#fil-join-section');
+        }
+        
         // Set up periodic refresh
         setInterval(loadWalletData, 30000); // Refresh every 30 seconds
         
