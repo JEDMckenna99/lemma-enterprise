@@ -93,15 +93,23 @@ class LemmaBotShield {
                 }
             }
             
-            // Initialize federated wallet with network configuration
-            this.backgroundWallet = new LemmaFederatedWallet({
-                debug: this.config.debug,
-                securityLevel: this.config.securityLevel,
-                customCheckInterval: this.config.customCheckInterval,
-                checkOnEvents: this.config.checkOnEvents,
-                backgroundChecks: this.config.backgroundChecks,
-                ...networkConfig
-            });
+            // Use existing global wallet if available (prevent duplicate instances)
+            if (window.lemmaWallet && window.LEMMA_WALLET_INITIALIZED) {
+                this.backgroundWallet = window.lemmaWallet;
+                if (this.config.debug) {
+                    console.log('🔄 Using existing global wallet instance');
+                }
+            } else {
+                // Initialize federated wallet with network configuration
+                this.backgroundWallet = new LemmaFederatedWallet({
+                    debug: this.config.debug,
+                    securityLevel: this.config.securityLevel,
+                    customCheckInterval: this.config.customCheckInterval,
+                    checkOnEvents: this.config.checkOnEvents,
+                    backgroundChecks: this.config.backgroundChecks,
+                    ...networkConfig
+                });
+            }
             
         } catch (error) {
             if (this.config.debug) {
@@ -202,7 +210,8 @@ class LemmaBotShield {
         }
         
         // CRITICAL: Ensure background wallet is initialized before checking
-        await this.backgroundWallet.init();
+        // Don't call init() - wallet already initialized in main script
+        // await this.backgroundWallet.init(); // REMOVED: Causes redundant init attempts
         
         // Check if returning from Stripe verification
         const stripeReturn = this.checkStripeReturn();
