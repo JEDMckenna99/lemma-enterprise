@@ -152,7 +152,24 @@ impl OPRFClient {
             });
         }
 
-        // Perform OPRF evaluation
+        // OPTIMIZATION: Server-side fast path
+        // Since we have the server key, skip blinding and directly compute k·H
+        if let Some(server_key) = self.server_key {
+            // Direct evaluation: k·H (skips blind/unblind overhead)
+            let input_point = hash_to_point(credential_id.as_bytes());
+            let evaluated_point = input_point * server_key;
+            let final_result = evaluated_point.compress().to_bytes();
+            
+            // Cache the result
+            self.cache.put(credential_id.to_string(), final_result);
+            
+            return Ok(OPRFResult {
+                evaluation: final_result,
+                cached: false,
+            });
+        }
+
+        // Fallback: Full OPRF protocol (for client-server scenarios)
         let blind_result = self.blind(credential_id)?;
         let evaluated_point = self.evaluate(&blind_result.blinded_point)?;
         let final_result = self.unblind(&evaluated_point, &blind_result.unblind_scalar);
