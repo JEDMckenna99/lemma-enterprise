@@ -203,6 +203,49 @@ impl PyOptimizedVerifier {
         let stats = self.inner.get_performance_stats();
         Ok(stats.into())
     }
+    
+    /// Compute OPRF evaluation for privacy-preserving revocation
+    /// 
+    /// This takes a credential ID and returns a privacy-preserving hash using
+    /// Ristretto255 OPRF. The server's secret key is used to evaluate the OPRF
+    /// without learning the credential ID.
+    pub fn compute_oprf_evaluation(&self, credential_id: String) -> PyResult<String> {
+        use crate::oprf::OPRFClient;
+        use sha2::{Sha512, Digest};
+        
+        // Get or create server key from environment
+        let server_key_bytes = std::env::var("LEMMA_OPRF_SERVER_KEY")
+            .ok()
+            .and_then(|hex| hex::decode(hex).ok())
+            .and_then(|bytes| {
+                if bytes.len() == 32 {
+                    let mut arr = [0u8; 32];
+                    arr.copy_from_slice(&bytes);
+                    Some(arr)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| {
+                // Generate deterministic key from a constant seed for consistency
+                let mut hasher = Sha512::new();
+                hasher.update(b"LEMMA_OPRF_SERVER_KEY_V1");
+                let hash = hasher.finalize();
+                let mut key = [0u8; 32];
+                key.copy_from_slice(&hash[0..32]);
+                key
+            });
+        
+        // Create OPRF client with server key
+        let mut oprf_client = OPRFClient::new_with_server_key(server_key_bytes);
+        
+        // Perform complete OPRF evaluation
+        let oprf_result = oprf_client.get_evaluation(&credential_id)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        // Return hex-encoded OPRF evaluation
+        Ok(hex::encode(oprf_result.evaluation))
+    }
 }
 
 /// Python wrapper for OptimizedVerificationResult
