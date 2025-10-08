@@ -85,7 +85,7 @@ def test_permission_creation(site_id: str, api_key: str, site_domain: str):
     
     return permissions
 
-def test_permission_grant(site_id: str, api_key: str):
+def test_permission_grant(site_id: str, api_key: str, site_domain: str):
     """Test 3: Grant permission to user (issue real Ed25519 credential)"""
     print("\n" + "="*60)
     print("TEST 3: Permission Grant (Real Ed25519 Credential)")
@@ -98,7 +98,10 @@ def test_permission_grant(site_id: str, api_key: str):
         headers={"X-API-Key": api_key},
         json={
             "permission_id": "admin",
-            "expiry_days": 90
+            "expiry_days": 90,
+            "site_domain": site_domain,  # Required for multi-dyno
+            "permission_display_name": "Administrator",
+            "permission_scope": ["*"]
         }
     )
     
@@ -209,7 +212,7 @@ def run_all_tests():
         permissions = test_permission_creation(site_id, api_key, site_domain)
         
         # Test 3: Permission grant
-        user_did, credential = test_permission_grant(site_id, api_key)
+        user_did, credential = test_permission_grant(site_id, api_key, site_domain)
         
         # Test 4: Access verification
         test_access_verification(site_id, user_did, credential)

@@ -183,21 +183,25 @@ def grant_user_permission(site_id, user_did):
         data = request.get_json()
         permission_id = data['permission_id']
         expiry_days = data.get('expiry_days', 90)
+        site_domain = data.get('site_domain', f"site_{site_id}.com")
         
         # Get or recreate REAL IAM manager (multi-dyno safe)
-        site = None
-        try:
-            site = db.get_site(site_id)
-        except:
-            pass
-        
-        if site:
-            manager = get_site_manager(site_id, site.site_domain)
-        else:
-            manager = get_site_manager(site_id)
+        manager = get_site_manager(site_id, site_domain)
         
         if not manager:
             return jsonify({'error': 'Site not found'}), 404
+        
+        # Recreate permission definitions if not in memory (multi-dyno)
+        if permission_id not in manager.permissions:
+            # Permission was created on different dyno, recreate it
+            logger.info(f"🔄 Recreating permission '{permission_id}' for site {site_id} (multi-dyno)")
+            manager.add_permission({
+                'permission_id': permission_id,
+                'display_name': data.get('permission_display_name', permission_id.title()),
+                'scope': data.get('permission_scope', ['*']),
+                'conditions': [],
+                'priority': 100
+            })
         
         # Issue REAL permission lemma using Rust crypto
         # This uses the site's UNIQUE Ed25519 keypair
