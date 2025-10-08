@@ -193,7 +193,8 @@ class RealIAMSubnetManager:
         # Verify each credential and check if it grants access
         for credential in user_credentials:
             # Skip if not a permission lemma for this site
-            claims = credential.get('claims', {})
+            # Handle both 'claims' and 'credentialSubject' formats
+            claims = credential.get('claims') or credential.get('credentialSubject', {})
             if claims.get('packageType') != 'permission':
                 continue
             if claims.get('siteId') != self.site_id:
@@ -209,6 +210,14 @@ class RealIAMSubnetManager:
             # Check if permission grants access to resource
             permission_id = claims.get('permissionId')
             scope = claims.get('scope', [])
+            
+            # Handle scope as string or list
+            if isinstance(scope, str):
+                try:
+                    import ast
+                    scope = ast.literal_eval(scope)
+                except:
+                    scope = [scope]
             
             if self._scope_grants_access(scope, resource, action):
                 matched_permissions.append({
