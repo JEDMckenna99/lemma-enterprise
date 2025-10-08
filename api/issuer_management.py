@@ -28,8 +28,8 @@ class LemmaIssuerManager:
             try:
                 from lemma_crypto import PyMinimalIssuer
                 
-                # Create persistent federated issuer
-                issuer = PyMinimalIssuer()
+                # Create persistent federated issuer from environment (shared key)
+                issuer = PyMinimalIssuer.from_env_or_default()
                 
                 self._issuers[issuer_key] = issuer
                 self._issuer_metadata[issuer_key] = {
@@ -51,15 +51,15 @@ class LemmaIssuerManager:
         return self._issuers[issuer_key]
     
     def get_iam_issuer(self, site_id: str):
-        """Get consistent IAM issuer for specific site"""
+        """Get consistent IAM issuer for specific site - UNIQUE keypair per site"""
         issuer_key = f'iam_{site_id}'
         
         if issuer_key not in self._issuers:
             try:
                 from lemma_crypto import PyMinimalIssuer
                 
-                # Create persistent IAM issuer for this site
-                issuer = PyMinimalIssuer()
+                # Create NEW unique IAM issuer for this site (NOT shared!)
+                issuer = PyMinimalIssuer()  # Generates NEW keypair!
                 
                 self._issuers[issuer_key] = issuer
                 self._issuer_metadata[issuer_key] = {

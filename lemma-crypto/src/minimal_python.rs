@@ -24,6 +24,14 @@ impl PyMinimalIssuer {
     #[new]
     pub fn new() -> Self {
         Self {
+            inner: MinimalIssuer::new(),  // Generate NEW unique keypair each time!
+        }
+    }
+    
+    #[staticmethod]
+    pub fn from_env_or_default() -> Self {
+        // For federated identity network - use consistent keypair from env
+        Self {
             inner: MinimalIssuer::from_env_or_default(),
         }
     }
