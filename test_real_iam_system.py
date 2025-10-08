@@ -43,7 +43,7 @@ def test_site_registration():
     
     return data['site_id'], data['api_key']
 
-def test_permission_creation(site_id: str, api_key: str):
+def test_permission_creation(site_id: str, api_key: str, site_domain: str):
     """Test 2: Create permission definitions"""
     print("\n" + "="*60)
     print("TEST 2: Permission Creation")
@@ -54,19 +54,22 @@ def test_permission_creation(site_id: str, api_key: str):
             "permission_id": "admin",
             "display_name": "Administrator",
             "scope": ["*"],
-            "description": "Full access"
+            "description": "Full access",
+            "site_domain": site_domain  # Required for multi-dyno
         },
         {
             "permission_id": "editor",
             "display_name": "Editor",
             "scope": ["posts:*", "comments:*"],
-            "description": "Content management"
+            "description": "Content management",
+            "site_domain": site_domain  # Required for multi-dyno
         },
         {
             "permission_id": "viewer",
             "display_name": "Viewer",
             "scope": ["posts:read", "comments:read"],
-            "description": "Read-only access"
+            "description": "Read-only access",
+            "site_domain": site_domain  # Required for multi-dyno
         }
     ]
     
@@ -78,7 +81,7 @@ def test_permission_creation(site_id: str, api_key: str):
         )
         
         assert response.status_code == 201, f"Permission creation failed: {response.text}"
-        print(f"✅ Created permission: {perm['permission_id']}")
+        print(f"Created permission: {perm['permission_id']}")
     
     return permissions
 
@@ -200,9 +203,10 @@ def run_all_tests():
     try:
         # Test 1: Site registration
         site_id, api_key = test_site_registration()
+        site_domain = "testcompany.com"  # Store for multi-dyno requests
         
         # Test 2: Permission creation
-        permissions = test_permission_creation(site_id, api_key)
+        permissions = test_permission_creation(site_id, api_key, site_domain)
         
         # Test 3: Permission grant
         user_did, credential = test_permission_grant(site_id, api_key)

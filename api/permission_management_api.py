@@ -113,45 +113,27 @@ def create_permission(site_id):
     try:
         data = request.get_json()
         
-        # Get or recreate REAL IAM manager (multi-dyno safe)
-        # First try to get from database to get site_domain
-        site = None
-        try:
-            site = db.get_site(site_id)
-        except:
-            pass
-        
-        if site:
-            # Recreate manager if not in memory (multi-dyno safe)
-            manager = get_site_manager(site_id, site.site_domain)
-        else:
-            # Try without domain (will fail if not in memory)
-            manager = get_site_manager(site_id)
-        
-        if not manager:
-            return jsonify({'error': 'Site not found'}), 404
-        
         # Validate required fields
         required_fields = ['permission_id', 'display_name', 'scope']
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'error': f'Missing required field: {field}'}), 400
         
-        # Create permission in database (if db available)
-        try:
-            permission = db.create_permission(site_id, data)
-            permission_id = permission.permission_id
-            display_name = permission.display_name
-            scope = permission.scope
-            conditions = permission.conditions or []
-            priority = permission.priority or 100
-        except:
-            # If database not available, use data directly
-            permission_id = data['permission_id']
-            display_name = data['display_name']
-            scope = data['scope']
-            conditions = data.get('conditions', [])
-            priority = data.get('priority', 100)
+        # Extract site_domain from request (client must provide it for multi-dyno)
+        site_domain = data.get('site_domain', f"site_{site_id}.com")
+        
+        # Get or recreate REAL IAM manager (multi-dyno safe)
+        manager = get_site_manager(site_id, site_domain)
+        
+        if not manager:
+            return jsonify({'error': 'Site not found - provide site_domain in request'}), 404
+        
+        # Use data directly (no database dependency)
+        permission_id = data['permission_id']
+        display_name = data['display_name']
+        scope = data['scope']
+        conditions = data.get('conditions', [])
+        priority = data.get('priority', 100)
         
         # Add permission to real manager
         perm_info = {
