@@ -1,84 +1,34 @@
 """
 Permission Management API for Lemma.id Platform
 Provides complete IAM functionality for customer sites
+NOW USING REAL RUST CRYPTO ENGINE - Each site has unique DID key and revocation list
 """
 
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
-import jwt
 import uuid
 import time
+import secrets
+import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
 
 from auth.decorators import require_api_key, require_site_admin
 from billing.usage_logger import log_permission_operation
 from .database_models import db, Site, Permission, ActivityType
 
-# Mock classes for testing - replace with actual imports when Rust package is ready
-class LemmaCore:
-    def __init__(self):
-        pass
-    
-    def register_package(self, package):
-        pass
+# REAL IAM manager with Rust crypto - site-specific keys and revocation
+from .real_iam_manager import get_or_create_site_manager, get_site_manager
 
-class PermissionPackage:
-    def __init__(self, site_id, permission_registry, subnet_config, revocation_authority):
-        self.site_id = site_id
-        self.permission_registry = permission_registry
-        self.subnet_config = subnet_config
-        self.revocation_authority = revocation_authority
-    
-    def add_permission(self, permission_info):
-        pass
-
-class IAMSubnetManager:
-    def __init__(self, site_id, site_domain):
-        self.site_id = site_id
-        self.site_domain = site_domain
-        self.permission_package = PermissionPackage(site_id, {}, {}, f"did:lemma:site:{site_id}")
-    
-    def grant_permission(self, user_did, permission_id):
-        return {
-            'user_did': user_did,
-            'permission_id': permission_id,
-            'site_id': self.site_id,
-            'granted_at': datetime.utcnow().isoformat()
-        }
-    
-    def revoke_permission(self, user_did, permission_id):
-        return f"revoke_{self.site_id}_{user_did}_{permission_id}"
-    
-    def check_access(self, access_request, credentials):
-        # Mock access check - always return True for testing
-        return True
-
-class CredentialIssuer:
-    def __init__(self, issuer_did):
-        self.issuer_did = issuer_did
-    
-    def issue_credential(self, user_did, claims):
-        return {
-            'id': f"cred_{uuid.uuid4().hex[:8]}",
-            'issuer': self.issuer_did,
-            'subject': user_did,
-            'claims': claims,
-            'issued_at': datetime.utcnow().isoformat()
-        }
-
-class VerifiableCredential:
-    @staticmethod
-    def from_dict(data):
-        return data
+logger = logging.getLogger(__name__)
 
 permission_api = Blueprint('permission_api', __name__)
 
-# Global lemma core instance
-lemma_core = LemmaCore()
-
-# Site managers registry
-site_managers: Dict[str, IAMSubnetManager] = {}
+# Note: Site managers are now managed by real_iam_manager module
+# Each site gets:
+# - Unique Ed25519 keypair (site-specific DID)
+# - Unique OPRF key for revocation
+# - Unique Bloom filter for revoked credentials
+# NO SHARING between sites!
 
 @permission_api.route('/api/v1/sites/register', methods=['POST'])
 @cross_origin()
@@ -86,6 +36,8 @@ site_managers: Dict[str, IAMSubnetManager] = {}
 def register_site():
     """
     Register a new customer site for permission management
+    NOW USING REAL RUST CRYPTO ENGINE
+    Each site gets unique Ed25519 keypair and revocation list
     
     POST /api/v1/sites/register
     {
@@ -107,12 +59,21 @@ def register_site():
         # Create site in database
         site = db.create_site(data)
         
-        # Create IAM subnet manager for this site
-        manager = IAMSubnetManager(site.site_id, site.site_domain)
-        site_managers[site.site_id] = manager
+        # Create REAL IAM manager with Rust crypto engine
+        # This creates a UNIQUE Ed25519 keypair for this site
+        # This creates a UNIQUE OPRF key for this site's revocation
+        # This creates a UNIQUE Bloom filter for this site's revoked credentials
+        # NO SHARING with other sites!
+        manager = get_or_create_site_manager(site.site_id, site.site_domain)
         
         # Log billing event
         log_permission_operation(site.site_id, 'site_registration', 1)
+        
+        logger.info(f"✅ Registered site {site.site_domain} with REAL crypto engine")
+        logger.info(f"🔐 Site-specific issuer DID: {manager.issuer_did[:50]}...")
+        logger.info(f"🔐 Site has unique Ed25519 keypair (NOT shared)")
+        logger.info(f"🔐 Site has unique OPRF key for revocation (NOT shared)")
+        logger.info(f"🔐 Site has unique Bloom filter (NOT shared)")
         
         return jsonify({
             'success': True,
@@ -120,11 +81,15 @@ def register_site():
             'api_key': site.api_key,
             'oauth_client_id': site.oauth_client_id,
             'oauth_client_secret': site.oauth_client_secret,
+            'issuer_did': manager.issuer_did,
+            'crypto_engine': 'rust_ed25519_oprf',
+            'site_isolation': 'unique_keys_and_revocation_per_site',
             'integration_guide': f"https://docs.lemma.id/integration/{site.site_id}",
             'dashboard_url': f"https://lemma.id/dashboard/{site.site_id}"
         }), 201
         
     except Exception as e:
+        logger.error(f"Site registration error: {e}")
         return jsonify({'error': str(e)}), 400
 
 @permission_api.route('/api/v1/sites/<site_id>/permissions', methods=['POST'])
@@ -133,6 +98,7 @@ def register_site():
 def create_permission(site_id):
     """
     Create a new permission definition for a site
+    NOW USING REAL RUST CRYPTO ENGINE
     
     POST /api/v1/sites/{site_id}/permissions
     {
@@ -161,35 +127,39 @@ def create_permission(site_id):
         # Create permission in database
         permission = db.create_permission(site_id, data)
         
-        # Update IAM subnet manager
-        if site_id in site_managers:
-            manager = site_managers[site_id]
-            # Convert to PermissionInfo for manager (mock for testing)
-            perm_info = {
-                'permission_id': permission.permission_id,
-                'display_name': permission.display_name,
-                'scope': permission.scope,
-                'expiry': None,  # Handled at user level
-                'conditions': permission.conditions,
-                'delegation_allowed': permission.delegation_allowed,
-                'priority': permission.priority,
-                'created_at': permission.created_at,
-                'created_by': permission.created_by or f"did:lemma:site:{site_id}"
-            }
-            manager.permission_package.add_permission(perm_info)
+        # Update REAL IAM manager
+        manager = get_site_manager(site_id)
+        if not manager:
+            return jsonify({'error': 'IAM manager not initialized for site'}), 500
+        
+        # Add permission to real manager
+        perm_info = {
+            'permission_id': permission.permission_id,
+            'display_name': permission.display_name,
+            'scope': permission.scope,
+            'conditions': permission.conditions or [],
+            'priority': permission.priority or 100,
+        }
+        manager.add_permission(perm_info)
         
         # Log billing event
         log_permission_operation(site_id, 'permission_created', 1)
+        
+        logger.info(f"✅ Created permission '{permission.permission_id}' for site {site_id}")
+        logger.info(f"🔐 Permission will be signed with site-specific key: {manager.issuer_did[:50]}...")
         
         return jsonify({
             'success': True,
             'permission_id': permission.permission_id,
             'display_name': permission.display_name,
             'scope': permission.scope,
+            'crypto_engine': 'rust_ed25519_oprf',
+            'site_specific': True,
             'message': f'Permission "{permission.display_name}" created successfully'
         }), 201
         
     except Exception as e:
+        logger.error(f"Permission creation error: {e}")
         return jsonify({'error': str(e)}), 400
 
 @permission_api.route('/api/v1/sites/<site_id>/users/<user_did>/permissions', methods=['POST'])
@@ -197,7 +167,8 @@ def create_permission(site_id):
 @require_site_admin
 def grant_user_permission(site_id, user_did):
     """
-    Grant permission to a user (creates permission lemma in their wallet)
+    Grant permission to a user (creates REAL permission lemma with Ed25519 signature)
+    Uses site-specific Ed25519 keypair (NOT shared with other sites)
     
     POST /api/v1/sites/{site_id}/users/{user_did}/permissions
     {
@@ -208,42 +179,48 @@ def grant_user_permission(site_id, user_did):
     try:
         data = request.get_json()
         permission_id = data['permission_id']
+        expiry_days = data.get('expiry_days', 90)
         
-        if site_id not in site_managers:
+        manager = get_site_manager(site_id)
+        if not manager:
             return jsonify({'error': 'Site not found'}), 404
-            
-        manager = site_managers[site_id]
         
-        # Create permission lemma claims
-        claims = manager.grant_permission(user_did, permission_id)
-        
-        # Create actual credential using lemma core (mock for testing)
-        issuer = CredentialIssuer(f"did:lemma:site:{site_id}")
-        
-        # Add expiry if specified
-        if data.get('expiry_days'):
-            expiry = datetime.utcnow() + timedelta(days=data['expiry_days'])
-            claims['expirationDate'] = expiry.isoformat()
-        
-        credential = issuer.issue_credential(user_did, claims)
-        
-        # Store in user's wallet (via wallet API)
-        # TODO: Integrate with wallet storage
-        wallet_response = store_permission_lemma_in_wallet(user_did, credential)
+        # Issue REAL permission lemma using Rust crypto
+        # This uses the site's UNIQUE Ed25519 keypair
+        # This credential is ONLY valid for THIS site
+        start_time = time.perf_counter()
+        credential = manager.issue_permission_lemma(
+            user_did, 
+            permission_id,
+            expiry_days,
+            custom_claims=data.get('custom_claims')
+        )
+        issue_time_us = (time.perf_counter() - start_time) * 1_000_000
         
         # Log billing event (MAU tracking)
         log_permission_operation(site_id, 'permission_granted', 1, user_did)
         
+        logger.info(f"✅ Granted permission '{permission_id}' to {user_did[:30]}...")
+        logger.info(f"🔐 Signed with site-specific key: {manager.issuer_did[:50]}...")
+        logger.info(f"⚡ Issue time: {issue_time_us:.2f}µs")
+        logger.info(f"🔐 Credential ONLY valid for site: {site_id}")
+        
         return jsonify({
             'success': True,
-            'credential_id': credential.id,
+            'credential': credential,
             'permission_id': permission_id,
             'user_did': user_did,
-            'wallet_stored': wallet_response.get('success', False),
-            'message': f'Permission "{permission_id}" granted to user'
+            'issue_time_us': round(issue_time_us, 2),
+            'crypto_engine': 'rust_ed25519_oprf',
+            'issuer_did': manager.issuer_did,
+            'site_specific': True,
+            'site_isolation': 'unique_key_per_site',
+            'message': f'Permission "{permission_id}" granted to user',
+            'instructions': 'Send this credential to user\'s browser to store in wallet'
         }), 201
         
     except Exception as e:
+        logger.error(f"Permission grant error: {e}")
         return jsonify({'error': str(e)}), 400
 
 @permission_api.route('/api/v1/sites/<site_id>/users/<user_did>/permissions/<permission_id>', methods=['DELETE'])
@@ -436,7 +413,9 @@ def remove_site_user(site_id, user_did):
 @cross_origin()
 def verify_access():
     """
-    Verify user access for a resource (used by customer sites)
+    Verify user access for a resource using REAL Rust crypto engine
+    PERFORMANCE TARGET: 31-94µs verification time
+    Uses site-specific Ed25519 + OPRF verification (NOT shared keys)
     
     POST /api/v1/auth/verify
     {
@@ -444,7 +423,7 @@ def verify_access():
         "user_did": "did:lemma:user456", 
         "resource": "/admin/users",
         "action": "read",
-        "user_lemmas": [...] // User's permission lemmas
+        "user_lemmas": [...] // User's permission lemmas from wallet
     }
     """
     try:
@@ -455,12 +434,11 @@ def verify_access():
         action = data['action']
         user_lemmas = data.get('user_lemmas', [])
         
-        if site_id not in site_managers:
+        manager = get_site_manager(site_id)
+        if not manager:
             return jsonify({'error': 'Site not found'}), 404
-            
-        manager = site_managers[site_id]
         
-        # Create access request (mock for testing)
+        # Create access request
         access_request = {
             'user_did': user_did,
             'resource': resource,
@@ -471,21 +449,29 @@ def verify_access():
             'session_id': data.get('session_id')
         }
         
-        # Convert lemma data to credentials (mock for testing)
-        credentials = [VerifiableCredential.from_dict(lemma) for lemma in user_lemmas]
-        
-        # Verify access using lemma core (4.176µs performance!)
-        start_time = time.time()
-        has_access = manager.check_access(access_request, credentials)
-        verification_time = (time.time() - start_time) * 1_000_000  # Convert to microseconds
+        # Verify access using REAL Rust crypto (Ed25519 + OPRF)
+        # This verifies credentials using the site's UNIQUE Ed25519 public key
+        # This checks revocation using the site's UNIQUE OPRF key and Bloom filter
+        start_time = time.perf_counter()
+        has_access, verification_details = manager.check_access(access_request, user_lemmas)
+        total_time_us = (time.perf_counter() - start_time) * 1_000_000
         
         # Log billing event (MAU tracking)
         log_permission_operation(site_id, 'access_verification', 1, user_did)
         
+        logger.info(f"{'✅' if has_access else '❌'} Access check: {resource}:{action} for {user_did[:30]}...")
+        logger.info(f"⚡ Total verification time: {total_time_us:.2f}µs")
+        logger.info(f"🔐 Verified with site-specific key: {manager.issuer_did[:50]}...")
+        logger.info(f"🔐 Site-specific revocation check: {site_id}")
+        
         return jsonify({
             'success': True,
             'has_access': has_access,
-            'verification_time_us': verification_time,
+            'verification_time_us': round(total_time_us, 2),
+            'verification_details': verification_details,
+            'crypto_engine': 'rust_ed25519_oprf',
+            'site_specific': True,
+            'site_isolation': 'unique_key_and_revocation_per_site',
             'user_did': user_did,
             'resource': resource,
             'action': action,
@@ -493,6 +479,7 @@ def verify_access():
         }), 200
         
     except Exception as e:
+        logger.error(f"Access verification error: {e}")
         return jsonify({'error': str(e)}), 400
 
 @permission_api.route('/api/v1/oauth/authorize', methods=['GET'])
@@ -515,7 +502,8 @@ def oauth_authorize():
             
         site_id = client_id.replace('lemma_oauth_', '')
         
-        if site_id not in site_managers:
+        manager = get_site_manager(site_id)
+        if not manager:
             return jsonify({'error': 'Site not found'}), 404
         
         # Generate authorization code
@@ -597,21 +585,5 @@ def oauth_token():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
-# Helper functions
-def store_permission_lemma_in_wallet(user_did: str, credential) -> Dict:
-    """Store permission lemma in user's wallet"""
-    # TODO: Integrate with wallet API
-    return {'success': True, 'stored': True}
-
-def add_to_revocation_filter(revocation_key: str):
-    """Add revocation key to bloom filter"""
-    # TODO: Integrate with bloom filter system
-    pass
-
-# Temporary storage (replace with Redis/database)
+# Temporary storage for OAuth (replace with Redis/database in production)
 auth_requests = {}
-
-if __name__ == '__main__':
-    # Register permission packages for all sites
-    for site_id, manager in site_managers.items():
-        lemma_core.register_package(manager.permission_package)
