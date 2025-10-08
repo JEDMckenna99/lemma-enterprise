@@ -117,10 +117,12 @@ class RealIAMSubnetManager:
             claims.update(custom_claims)
         
         # Issue credential using REAL Rust crypto
+        # Convert claims dict to HashMap<String, String> for Rust
+        claims_for_rust = {k: str(v) for k, v in claims.items()}
+        
         credential_json = self.issuer.issue_credential(
             user_did,
-            json.dumps(claims),
-            expiry_days * 24 * 60 * 60  # expiry in seconds
+            claims_for_rust
         )
         
         credential = json.loads(credential_json)
