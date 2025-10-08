@@ -306,12 +306,28 @@ _site_managers: Dict[str, RealIAMSubnetManager] = {}
 
 
 def get_or_create_site_manager(site_id: str, site_domain: str) -> RealIAMSubnetManager:
-    """Get or create IAM manager for site"""
+    """
+    Get or create IAM manager for site
+    Handles multi-dyno Heroku environment by recreating manager on demand
+    """
     if site_id not in _site_managers:
         _site_managers[site_id] = RealIAMSubnetManager(site_id, site_domain)
+        logger.info(f"✅ Created new site manager for {site_id} (multi-dyno safe)")
     return _site_managers[site_id]
 
 
-def get_site_manager(site_id: str) -> Optional[RealIAMSubnetManager]:
-    """Get existing site manager"""
-    return _site_managers.get(site_id)
+def get_site_manager(site_id: str, site_domain: str = None) -> Optional[RealIAMSubnetManager]:
+    """
+    Get existing site manager, or create if not in memory (multi-dyno safe)
+    This handles Heroku's multi-dyno environment where in-memory state doesn't persist
+    """
+    if site_id not in _site_managers:
+        if site_domain:
+            # Recreate manager from persistent issuer (multi-dyno safe)
+            logger.info(f"🔄 Recreating site manager for {site_id} (multi-dyno)")
+            _site_managers[site_id] = RealIAMSubnetManager(site_id, site_domain)
+        else:
+            # Try to get site_domain from somewhere (database, etc.)
+            logger.warning(f"⚠️ Site manager not in memory and no domain provided for {site_id}")
+            return None
+    return _site_managers[site_id]

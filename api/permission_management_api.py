@@ -113,13 +113,23 @@ def create_permission(site_id):
     try:
         data = request.get_json()
         
-        # Check if REAL IAM manager exists for this site
-        manager = get_site_manager(site_id)
-        if not manager:
-            # Try database lookup as fallback
+        # Get or recreate REAL IAM manager (multi-dyno safe)
+        # First try to get from database to get site_domain
+        site = None
+        try:
             site = db.get_site(site_id)
-            if not site:
-                return jsonify({'error': 'Site not found'}), 404
+        except:
+            pass
+        
+        if site:
+            # Recreate manager if not in memory (multi-dyno safe)
+            manager = get_site_manager(site_id, site.site_domain)
+        else:
+            # Try without domain (will fail if not in memory)
+            manager = get_site_manager(site_id)
+        
+        if not manager:
+            return jsonify({'error': 'Site not found'}), 404
         
         # Validate required fields
         required_fields = ['permission_id', 'display_name', 'scope']
@@ -192,7 +202,18 @@ def grant_user_permission(site_id, user_did):
         permission_id = data['permission_id']
         expiry_days = data.get('expiry_days', 90)
         
-        manager = get_site_manager(site_id)
+        # Get or recreate REAL IAM manager (multi-dyno safe)
+        site = None
+        try:
+            site = db.get_site(site_id)
+        except:
+            pass
+        
+        if site:
+            manager = get_site_manager(site_id, site.site_domain)
+        else:
+            manager = get_site_manager(site_id)
+        
         if not manager:
             return jsonify({'error': 'Site not found'}), 404
         
@@ -445,7 +466,18 @@ def verify_access():
         action = data['action']
         user_lemmas = data.get('user_lemmas', [])
         
+        # Get or recreate REAL IAM manager (multi-dyno safe)
+        # For verify_access, we don't have site_domain, so try to get from somewhere
         manager = get_site_manager(site_id)
+        if not manager:
+            # Try to get site_domain from database
+            try:
+                site = db.get_site(site_id)
+                if site:
+                    manager = get_site_manager(site_id, site.site_domain)
+            except:
+                pass
+        
         if not manager:
             return jsonify({'error': 'Site not found'}), 404
         
