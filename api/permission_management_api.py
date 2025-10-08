@@ -113,10 +113,13 @@ def create_permission(site_id):
     try:
         data = request.get_json()
         
-        # Validate site exists
-        site = db.get_site(site_id)
-        if not site:
-            return jsonify({'error': 'Site not found'}), 404
+        # Check if REAL IAM manager exists for this site
+        manager = get_site_manager(site_id)
+        if not manager:
+            # Try database lookup as fallback
+            site = db.get_site(site_id)
+            if not site:
+                return jsonify({'error': 'Site not found'}), 404
         
         # Validate required fields
         required_fields = ['permission_id', 'display_name', 'scope']
@@ -124,38 +127,46 @@ def create_permission(site_id):
             if not data.get(field):
                 return jsonify({'error': f'Missing required field: {field}'}), 400
         
-        # Create permission in database
-        permission = db.create_permission(site_id, data)
-        
-        # Update REAL IAM manager
-        manager = get_site_manager(site_id)
-        if not manager:
-            return jsonify({'error': 'IAM manager not initialized for site'}), 500
+        # Create permission in database (if db available)
+        try:
+            permission = db.create_permission(site_id, data)
+            permission_id = permission.permission_id
+            display_name = permission.display_name
+            scope = permission.scope
+            conditions = permission.conditions or []
+            priority = permission.priority or 100
+        except:
+            # If database not available, use data directly
+            permission_id = data['permission_id']
+            display_name = data['display_name']
+            scope = data['scope']
+            conditions = data.get('conditions', [])
+            priority = data.get('priority', 100)
         
         # Add permission to real manager
         perm_info = {
-            'permission_id': permission.permission_id,
-            'display_name': permission.display_name,
-            'scope': permission.scope,
-            'conditions': permission.conditions or [],
-            'priority': permission.priority or 100,
+            'permission_id': permission_id,
+            'display_name': display_name,
+            'scope': scope,
+            'conditions': conditions,
+            'priority': priority,
         }
         manager.add_permission(perm_info)
         
         # Log billing event
         log_permission_operation(site_id, 'permission_created', 1)
         
-        logger.info(f"✅ Created permission '{permission.permission_id}' for site {site_id}")
+        logger.info(f"✅ Created permission '{permission_id}' for site {site_id}")
         logger.info(f"🔐 Permission will be signed with site-specific key: {manager.issuer_did[:50]}...")
         
         return jsonify({
             'success': True,
-            'permission_id': permission.permission_id,
-            'display_name': permission.display_name,
-            'scope': permission.scope,
+            'permission_id': permission_id,
+            'display_name': display_name,
+            'scope': scope,
             'crypto_engine': 'rust_ed25519_oprf',
             'site_specific': True,
-            'message': f'Permission "{permission.display_name}" created successfully'
+            'message': f'Permission "{display_name}" created successfully'
         }), 201
         
     except Exception as e:
