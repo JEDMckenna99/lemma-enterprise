@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Lemma - Authenticated Networks & Secure Communication | Privacy-Preserving Identity Verification{% endblock %}
-{% block description %}Build better authenticated networks with Lemma's cryptographic identity verification. Enable secure communication, eliminate bots, and preserve privacy with zero-knowledge proofs. Microsecond verification for federated networks.{% endblock %}
+{% block title %}Lemma IAM - Email-Based Authentication | 1,000x Faster Than Auth0 | $0.15/MAU{% endblock %}
+{% block description %}Replace Auth0, Okta, and Duo with email-based IAM. 182µs verification (1,000x faster), $0.15/MAU (90% cheaper), no passwords. Optional bot protection add-on. Start free trial.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -142,15 +142,20 @@
     <div class="container" style="position: relative; z-index: 1;">
         <div style="display: grid; grid-template-columns: 1fr auto; gap: 48px; align-items: center; max-width: 1200px; margin: 0 auto;" class="hero-grid">
             <div>
-                <h1>Revolutionary Identity & Access Management</h1>
-                <p><strong>Federated Identity Network:</strong> Users verify once with Stripe Identity, access everywhere with cryptographic proof of humanity.</p>
-                <p><strong>Client-Side IAM:</strong> Permission data stored in user's wallet, not your database. Zero infrastructure costs, infinite scalability, maximum privacy.</p>
+                <h1>Authentication as Simple as Email</h1>
+                <p style="font-size: var(--font-size-xl); font-weight: 600; margin-bottom: var(--space-6);">1,000x faster than Auth0. 90% cheaper than Okta. No passwords, no MFA setup.</p>
+                <p>Email-based IAM system with microsecond verification (182µs). Permissions stored in user's wallet for zero infrastructure costs and maximum privacy.</p>
                 
+                <div style="margin-top: 32px; padding: 24px; background: var(--success-50); border-radius: 12px; border-left: 4px solid var(--success-600);">
+                    <p style="margin: 0; font-size: var(--font-size-lg); color: var(--success-800);">
+                        <strong>Optional:</strong> Add federated bot protection (+$0.05/MAU) for network-wide human verification.
+                    </p>
+                </div>
 
                 
                 <div style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-                    <a href="/register" class="btn btn-primary">Start Building</a>
-                    <a href="/pricing" class="btn btn-secondary">View Pricing</a>
+                    <a href="/register" class="btn btn-primary">Start Free Trial</a>
+                    <a href="/pricing" class="btn btn-secondary">View Pricing ($0.15/MAU)</a>
                 </div>
             </div>
             
@@ -168,37 +173,41 @@
 <section class="section">
     <div class="container">
         <div style="text-align: center; margin-bottom: var(--space-16);">
-            <h2>What is Lemma?</h2>
-            <p class="text-gray">Revolutionary identity and access management that eliminates traditional IAM infrastructure costs through client-side storage and cryptographic verification.</p>
+            <h2>Email-Based IAM That Just Works</h2>
+            <p class="text-gray">Replace Auth0, Okta, and Duo with a simpler system. Issue permission credentials via email confirmation. Verify in microseconds.</p>
             
             <div style="margin: 48px 0; padding: 48px; background: linear-gradient(135deg, #f8fafc, #e2e8f0); border-radius: 24px; text-align: left;">
-                <h3 style="text-align: center; margin-bottom: 32px; color: var(--primary);">Two Revolutionary Systems</h3>
+                <h3 style="text-align: center; margin-bottom: 32px; color: var(--primary);">Lemma IAM System</h3>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 48px;">
-                    <div style="padding: 24px; background: white; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                        <h4 style="color: var(--primary); margin-bottom: 16px;">Federated Identity Network</h4>
+                    <div style="padding: 24px; background: white; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 4px solid var(--primary);">
+                        <h4 style="color: var(--primary); margin-bottom: 16px;">Core IAM Features</h4>
                         <ul style="margin: 0; padding-left: 20px; color: var(--gray-600);">
-                            <li><strong>Verify once, access everywhere</strong> - Stripe Identity KYC creates universal PoH lemma</li>
-                            <li><strong>Cross-site recognition</strong> - Works across all network sites</li>
-                            <li><strong>Bot protection</strong> - Cryptographic proof of humanity</li>
-                            <li><strong>2.38µs verification</strong> - Microsecond Ed25519 performance</li>
+                            <li><strong>Email-based authentication</strong> - No passwords, no MFA setup</li>
+                            <li><strong>182µs verification</strong> - 1,000x faster than traditional IAM</li>
+                            <li><strong>RBAC + scopes</strong> - Full permission management</li>
+                            <li><strong>Client-side storage</strong> - Zero infrastructure costs</li>
+                            <li><strong>Works offline</strong> - No network calls needed</li>
+                            <li><strong>$0.15/MAU</strong> - 90% cheaper than competitors</li>
                         </ul>
                     </div>
                     
-                    <div style="padding: 24px; background: white; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                        <h4 style="color: var(--secondary); margin-bottom: 16px;">Client-Side IAM System</h4>
+                    <div style="padding: 24px; background: white; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 4px solid var(--success);">
+                        <h4 style="color: var(--success); margin-bottom: 16px;">Optional: Bot Protection Add-On</h4>
                         <ul style="margin: 0; padding-left: 20px; color: var(--gray-600);">
-                            <li><strong>User owns permission data</strong> - Stored in browser wallet, not your database</li>
-                            <li><strong>Zero infrastructure costs</strong> - No scaling database or storage fees</li>
-                            <li><strong>Privacy by design</strong> - No central permission honeypot</li>
-                            <li><strong>Ed25519 tamper protection</strong> - Cryptographically secure permissions</li>
+                            <li><strong>Federated identity network</strong> - Verify once, access everywhere</li>
+                            <li><strong>Stripe Identity verification</strong> - Proof of humanity</li>
+                            <li><strong>Cross-site recognition</strong> - Network-wide bot shield</li>
+                            <li><strong>Privacy-preserving</strong> - OPRF revocation checks</li>
+                            <li><strong>Multi-device sync</strong> - QR code wallet transfer</li>
+                            <li><strong>+$0.05/MAU</strong> - Optional upgrade from base IAM</li>
                         </ul>
                     </div>
                 </div>
                 
                 <div style="text-align: center; margin-top: 32px; padding: 24px; background: rgba(16, 185, 129, 0.1); border-radius: 12px;">
                     <p style="margin: 0; font-weight: 600; color: var(--gray-700);">
-                        <strong>Result:</strong> 95% cost reduction vs Auth0/Duo + infinite scalability + maximum privacy
+                        <strong>Result:</strong> $0.15/MAU for IAM only, or $0.20/MAU for IAM + bot protection (vs $2-8/MAU for Auth0/Okta)
                     </p>
                 </div>
             </div>
@@ -206,32 +215,32 @@
         
         <div style="max-width: 800px; margin: 0 auto 48px; padding: 32px; background: var(--gray-50); border-radius: 12px; border-left: 4px solid var(--primary);">
             <p style="font-size: var(--font-size-lg); line-height: 1.6; color: var(--gray-700); margin-bottom: 16px;">
-                <strong>In the digital world, a lemma is a privacy-preserving cryptographic proof</strong> (e.g., "this user is a verified human" or "this device is authentic") that can be generated once and verified instantly anywhere in the network.
+                <strong>A "lemma" is a cryptographic permission credential</strong> that proves access rights without revealing sensitive data. Think of it as a digital key that can't be forged, copied, or tampered with.
             </p>
             <p style="color: var(--gray-600); line-height: 1.6;">
-                Using advanced techniques like <strong>zero-knowledge proofs (ZKPs)</strong>, lemmas allow selective disclosure—proving specific claims (e.g., "over 18") without revealing underlying data. This creates <strong>better authenticated networks</strong> where communication is secure, unlinkable, and resistant to bots or fraud, all with >99.9% offline operation and microsecond-level performance (proven at 4.176µs in production).
+                Users receive permission lemmas via email confirmation. These credentials are stored in their browser wallet (not your database), verified in microseconds (182µs), and work offline. Using <strong>Ed25519 signatures</strong> and <strong>zero-knowledge proofs</strong>, lemmas provide enterprise-grade security without the complexity or cost of traditional IAM systems.
             </p>
         </div>
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; margin-top: 64px;">
             <div class="card">
-                <h3 class="card-title">Cryptographic Bot Protection</h3>
-                <p>Advanced proof-of-humanity verification that eliminates bots while real users pass through seamlessly—no CAPTCHAs, no friction.</p>
+                <h3 class="card-title">Email-Based Authentication</h3>
+                <p>No passwords to remember or reset. No MFA setup hassle. Users confirm via email, receive permission credential, and access instantly.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Zero-Knowledge Privacy</h3>
-                <p>Verify identity claims without collecting personal data. Selective disclosure allows proving "over 18" without revealing age or birthdate.</p>
+                <h3 class="card-title">Zero Infrastructure Costs</h3>
+                <p>Permissions stored in user's wallet, not your database. No scaling costs as you grow. Costs stay flat while revenue scales linearly.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Microsecond Verification</h3>
-                <p>4.176µs offline verification with our optimized Rust engine—1000x faster than traditional solutions that require network calls.</p>
+                <h3 class="card-title">182µs Verification</h3>
+                <p>1,000x faster than Auth0 (200ms). Works offline with Ed25519 signature verification. No network calls, no latency.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Federated Network Effects</h3>
-                <p>Verify once, communicate everywhere. Users proven on one platform are instantly trusted across the entire authenticated network.</p>
+                <h3 class="card-title">Optional Bot Protection</h3>
+                <p>Upgrade to federated identity for network-wide bot shield. Verify once with Stripe Identity, protect across all sites (+$0.05/MAU).</p>
             </div>
         </div>
     </div>
@@ -241,30 +250,30 @@
 <section class="section" style="background: var(--gray-100);">
     <div class="container">
         <div style="text-align: center; margin-bottom: var(--space-16);">
-            <h2>The Problem</h2>
-            <p class="text-gray">Bots and fake accounts are destroying online platforms.</p>
+            <h2>Traditional IAM is Broken</h2>
+            <p class="text-gray">Passwords, slow authentication, and expensive infrastructure are holding businesses back.</p>
         </div>
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 48px; text-align: center; margin-top: 48px;">
             <div>
-                <h3 style="font-size: 48px; font-weight: 700; color: var(--primary); margin-bottom: 12px;">50%</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">of internet traffic is automated bots</p>
-                <p style="color: var(--gray-400); font-size: var(--font-size-sm); margin-top: 8px;">
-                    <a href="https://as.com/meristation/betech/la-mitad-del-trafico-de-internet-proviene-de-bots-muchos-de-ellos-maliciosos-n/" target="_blank" style="color: var(--gray-400); text-decoration: underline;">Imperva 2025 Study</a>
+                <h3 style="font-size: 48px; font-weight: 700; color: var(--danger-600); margin-bottom: 12px;">$2-8</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">per user/month for Auth0/Okta</p>
+                <p style="color: var(--success-600); font-size: var(--font-size-sm); margin-top: 8px; font-weight: 600;">
+                    Lemma: $0.15/MAU (90% savings)
                 </p>
             </div>
             <div>
-                <h3 style="font-size: 48px; font-weight: 700; color: var(--secondary); margin-bottom: 12px;">$10.5T</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">global cybercrime cost in 2025</p>
-                <p style="color: var(--gray-400); font-size: var(--font-size-sm); margin-top: 8px;">
-                    <a href="https://identitytheft.org/statistics/cyber-security/" target="_blank" style="color: var(--gray-400); text-decoration: underline;">Identity Theft Resource Center 2025</a>
+                <h3 style="font-size: 48px; font-weight: 700; color: var(--danger-600); margin-bottom: 12px;">200ms</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">average Auth0 verification time</p>
+                <p style="color: var(--success-600); font-size: var(--font-size-sm); margin-top: 8px; font-weight: 600;">
+                    Lemma: 182µs (1,000x faster)
                 </p>
             </div>
             <div>
-                <h3 style="font-size: 48px; font-weight: 700; color: var(--primary); margin-bottom: 12px;">43%</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">of cyberattacks target small businesses</p>
-                <p style="color: var(--gray-400); font-size: var(--font-size-sm); margin-top: 8px;">
-                    <a href="https://wifitalents.com/cyber-security-industry-statistics/" target="_blank" style="color: var(--gray-400); text-decoration: underline;">2025 Cybersecurity Industry Report</a>
+                <h3 style="font-size: 48px; font-weight: 700; color: var(--danger-600); margin-bottom: 12px;">80%</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">of breaches involve passwords</p>
+                <p style="color: var(--success-600); font-size: var(--font-size-sm); margin-top: 8px; font-weight: 600;">
+                    Lemma: No passwords, just email
                 </p>
             </div>
         </div>
@@ -394,15 +403,17 @@
 <!-- CTA Section -->
 <section class="section" style="background: linear-gradient(135deg, var(--gray-900) 0%, var(--black) 100%); color: var(--white); padding: 100px 0;">
     <div class="container" style="text-align: center;">
-        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Ready to Secure Your Platform?</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 480px; margin-left: auto; margin-right: auto;">Create your account and start protecting your platform with cryptographic verification.</p>
+        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Replace Auth0 in 5 Minutes</h2>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Start with email-based IAM ($0.15/MAU). Add bot protection later if needed (+$0.05/MAU). No credit card required.</p>
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-            <a href="/register" class="btn btn-primary">
-
-                Create Account
+            <a href="/register" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">
+                Start Free Trial
             </a>
-            <a href="/contact" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Talk to Us</a>
+            <a href="/pricing" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">View Pricing</a>
         </div>
+        <p style="color: var(--gray-500); font-size: var(--font-size-sm); margin-top: 24px;">
+            5-minute integration • No credit card • Cancel anytime
+        </p>
     </div>
 </section>
 

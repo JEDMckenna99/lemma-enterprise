@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Pricing - Lemma Shield{% endblock %}
-{% block description %}Simple per-user pricing that scales with your business. No hidden fees, no minimum commitments.{% endblock %}
+{% block title %}Pricing - Lemma IAM | $0.15/MAU | 90% Cheaper Than Auth0{% endblock %}
+{% block description %}Email-based IAM at $0.15/MAU (90% cheaper than Auth0). Add bot protection for +$0.05/MAU. 1,000x faster verification. No credit card required.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -576,10 +576,10 @@
     <!-- Hero Section -->
     <section class="pricing-hero">
         <div class="pricing-container">
-            <div class="hero-badge">Simple Pricing</div>
-            <h1 class="hero-title">Pay Only For What You Use</h1>
+            <div class="hero-badge">90% Cheaper Than Auth0</div>
+            <h1 class="hero-title">Start at $0.15/MAU</h1>
             <p class="hero-subtitle">
-                Simple per-user pricing that scales with your business. No hidden fees, no minimum commitments, no setup costs.
+                Email-based IAM that's 1,000x faster and 90% cheaper. Add bot protection later if needed. No hidden fees, no credit card required.
             </p>
         </div>
     </section>
@@ -590,51 +590,10 @@
             <div class="pricing-grid">
                 <!-- Pricing Plans (Left Side) -->
                 <div class="pricing-plans">
-                    <!-- Federated Identity Network Plan -->
-                    <div class="pricing-card">
-                        <div class="pricing-header">
-                            <h2 class="pricing-title">Federated Identity Network</h2>
-                            <p class="pricing-description">
-                                <strong>Bot protection, lite KYC, and user verification.</strong> Universal Proof of Humanity across all network sites.
-                            </p>
-                        </div>
-
-                        <div class="price-display">
-                            <div class="price-main">
-                                <span class="price-currency">$</span>
-                                <span class="price-amount">0.06</span>
-                                <span class="price-unit">per active user per month</span>
-                            </div>
-                            <div class="price-secondary">
-                                + <span class="price-highlight">$2.00</span> per new Federated ID user<br>
-                                <small>(one-time fee for enhanced identity verification)</small>
-                            </div>
-                        </div>
-
-                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--success-50); border-radius: 12px;">
-                            <h4 style="margin-bottom: var(--space-3); color: var(--success-800); font-weight: 600;">Fed ID Network Features:</h4>
-                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--success-700); line-height: 1.8;">
-                                <li><strong>Advanced bot protection</strong> - 99.9% bot elimination</li>
-                                <li><strong>Lite KYC verification</strong> - identity without full compliance</li>
-                                <li><strong>Universal user verification</strong> - works across all sites</li>
-                                <li><strong>2.38µs verification time</strong> - 210,084x faster than Auth0</li>
-                                <li><strong>99.9% offline operation</strong> - no network dependency</li>
-                                <li><strong>Zero-knowledge privacy</strong> - no data collection or tracking</li>
-                            </ul>
-                        </div>
-
-                        <div class="cta-section">
-                            <button onclick="window.location.href='/register'" class="cta-button" style="background: linear-gradient(135deg, var(--success-500), var(--success-600));">
-                                Start Fed ID Network
-                            </button>
-                            <p class="cta-tagline">
-                                Perfect for bot protection • Lite KYC • Universal verification
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Lemma IAM System Plan -->
-                    <div class="pricing-card">
+                    <!-- Lemma IAM System Plan (MOVED TO TOP) -->
+                    <div class="pricing-card featured">
+                        <div class="pricing-badge" style="background: linear-gradient(135deg, var(--primary-500), var(--primary-600));">Most Popular</div>
+                        
                         <div class="pricing-header">
                             <h2 class="pricing-title">Lemma IAM System</h2>
                             <p class="pricing-description">
@@ -734,6 +693,49 @@
                             </button>
                             <p class="cta-tagline">
                                 Fed ID + IAM • Best value • Complete platform protection
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Federated Identity Network Plan (MOVED AFTER COMBINED) -->
+                    <div class="pricing-card">
+                        <div class="pricing-header">
+                            <h2 class="pricing-title">Bot Protection Add-On</h2>
+                            <p class="pricing-description">
+                                <strong>Federated identity network for bot protection.</strong> Add to your IAM system or use standalone. Stripe Identity verification for proof of humanity.
+                            </p>
+                        </div>
+
+                        <div class="price-display">
+                            <div class="price-main">
+                                <span class="price-currency">$</span>
+                                <span class="price-amount">0.05</span>
+                                <span class="price-unit">per active user per month (add-on)</span>
+                            </div>
+                            <div class="price-secondary">
+                                + <span class="price-highlight">$2.00</span> per new user verification<br>
+                                <small>(one-time Stripe Identity KYC fee)</small>
+                            </div>
+                        </div>
+
+                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--success-50); border-radius: 12px;">
+                            <h4 style="margin-bottom: var(--space-3); color: var(--success-800); font-weight: 600;">Bot Protection Features:</h4>
+                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--success-700); line-height: 1.8;">
+                                <li><strong>Advanced bot protection</strong> - 99.9% bot elimination</li>
+                                <li><strong>Stripe Identity verification</strong> - proof of humanity</li>
+                                <li><strong>Cross-site recognition</strong> - works across all network sites</li>
+                                <li><strong>Privacy-preserving</strong> - OPRF revocation checks</li>
+                                <li><strong>Multi-device sync</strong> - QR code wallet transfer</li>
+                                <li><strong>Offline operation</strong> - 99.9% verifications work offline</li>
+                            </ul>
+                        </div>
+
+                        <div class="cta-section">
+                            <button onclick="window.location.href='/register'" class="cta-button" style="background: linear-gradient(135deg, var(--success-500), var(--success-600));">
+                                Add Bot Protection
+                            </button>
+                            <p class="cta-tagline">
+                                Perfect add-on to IAM • Network-wide bot shield
                             </p>
                         </div>
                     </div>
