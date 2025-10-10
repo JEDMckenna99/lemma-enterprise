@@ -123,6 +123,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Permission Management: {e}")
 
+    # IAM Email Confirmation
+    try:
+        from api.iam_email_confirmation import iam_email_bp
+        app.register_blueprint(iam_email_bp)
+        logger.info("✅ IAM Email Confirmation registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register IAM Email Confirmation: {e}")
+
     # Network System
     try:
         from api.network_registry import network_registry_bp
