@@ -6,7 +6,7 @@
 //! - IndexedDB persistence with encryption
 //! - Cross-tab synchronization
 
-use aes_gcm::{Aes256Gcm, Key, aead::{Aead, KeyInit}, generic_array::GenericArray};
+use aes_gcm::{Aes256Gcm, Key, aead::{Aead, KeyInit}, Nonce};
 use pbkdf2::{pbkdf2_hmac};
 use sha2::Sha256;
 use rand::{RngCore, rngs::OsRng};
@@ -14,8 +14,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::minimal_core::{MinimalCredential, MinimalError};
-use crate::complete_verification::{CompleteVerificationResult};
-use crate::zkp_claims::ZKPCredential;
 
 /// Encrypted credential storage entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,7 +59,7 @@ pub struct EncryptedBrowserWallet {
 }
 
 /// Wallet performance and usage statistics
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WalletStats {
     pub total_credentials: usize,
     pub identity_credentials: usize,
@@ -154,11 +152,11 @@ impl EncryptedBrowserWallet {
         pbkdf2_hmac::<Sha256>(&master_key, &salt, 1000, &mut encryption_key);
         
         // Encrypt credential
-        let key = Key::from_slice(&encryption_key);
+        let key = Key::<Aes256Gcm>::from_slice(&encryption_key);
         let cipher = Aes256Gcm::new(key);
-        let nonce_ga = GenericArray::from_slice(&nonce);
+        let nonce_ref = Nonce::from_slice(&nonce);
         
-        let encrypted_data = cipher.encrypt(nonce_ga, credential_json.as_bytes())
+        let encrypted_data = cipher.encrypt(nonce_ref, credential_json.as_bytes())
             .map_err(|_| MinimalError::Serialization("Encryption failed".to_string()))?;
         
         // Create encrypted entry
@@ -220,11 +218,11 @@ impl EncryptedBrowserWallet {
         pbkdf2_hmac::<Sha256>(&master_key, &entry.salt, 1000, &mut decryption_key);
         
         // Decrypt credential
-        let key = Key::from_slice(&decryption_key);
+        let key = Key::<Aes256Gcm>::from_slice(&decryption_key);
         let cipher = Aes256Gcm::new(key);
-        let nonce_ga = GenericArray::from_slice(&entry.nonce);
+        let nonce_ref = Nonce::from_slice(&entry.nonce);
         
-        let decrypted_data = cipher.decrypt(nonce_ga, entry.encrypted_data.as_slice())
+        let decrypted_data = cipher.decrypt(nonce_ref, entry.encrypted_data.as_slice())
             .map_err(|_| MinimalError::Serialization("Decryption failed".to_string()))?;
         
         let credential_json = String::from_utf8(decrypted_data)

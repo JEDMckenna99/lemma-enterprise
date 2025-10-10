@@ -12,6 +12,7 @@ use crate::device_delegation::{DeviceDelegationManager, DeviceDelegationLemma};
 use crate::qr_authentication::{QRSyncManager, QRAuthenticationLemma, QRVerificationResult};
 use crate::advanced_wallet::{AdvancedWalletCrypto, KYCTuple};
 use crate::envelope_encryption::{WalletEnvelopeV2, EnvelopeEncryptionV2};
+use crate::encrypted_browser_wallet::{EncryptedBrowserWallet, CredentialMetadata};
 
 /// Python wrapper for MinimalIssuer
 #[pyclass]
@@ -583,6 +584,7 @@ pub fn register_minimal_classes(m: &PyModule) -> PyResult<()> {
     m.add_class::<PyQRVerificationResult>()?;
     m.add_class::<PyDeviceDelegationManager>()?;
     m.add_class::<PyAdvancedWalletCrypto>()?;
+    m.add_class::<PyEncryptedWallet>()?;  // Add encrypted wallet
     Ok(())
 }
 
@@ -647,6 +649,95 @@ impl PyAdvancedWalletCrypto {
         rid_array.copy_from_slice(&rid);
         
         Ok(self.inner.derive_vid(&rid_array).to_vec())
+    }
+}
+
+/// Python wrapper for EncryptedBrowserWallet
+#[pyclass]
+pub struct PyEncryptedWallet {
+    inner: EncryptedBrowserWallet,
+}
+
+#[pymethods]
+impl PyEncryptedWallet {
+    #[new]
+    pub fn new() -> Self {
+        Self {
+            inner: EncryptedBrowserWallet::new(),
+        }
+    }
+    
+    /// Unlock wallet with password/PIN
+    pub fn unlock(&mut self, password: String) -> PyResult<()> {
+        self.inner.unlock(&password)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                format!("Failed to unlock wallet: {:?}", e)
+            ))
+    }
+    
+    /// Lock wallet (clear master key from memory)
+    pub fn lock(&mut self) {
+        self.inner.lock();
+    }
+    
+    /// Store encrypted credential
+    pub fn store_credential(&mut self, credential_json: String, credential_type: String) -> PyResult<String> {
+        let credential: MinimalCredential = serde_json::from_str(&credential_json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                format!("Failed to parse credential: {}", e)
+            ))?;
+        
+        self.inner.store_credential(&credential, &credential_type)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                format!("Failed to store credential: {:?}", e)
+            ))
+    }
+    
+    /// Get encrypted credential by ID
+    pub fn get_credential(&mut self, credential_id: String) -> PyResult<String> {
+        let credential = self.inner.get_credential(&credential_id)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                format!("Failed to get credential: {:?}", e)
+            ))?;
+        
+        serde_json::to_string(&credential)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                format!("Failed to serialize credential: {}", e)
+            ))
+    }
+    
+    /// List all credentials (metadata only, non-sensitive)
+    pub fn list_credentials(&self) -> PyResult<Vec<String>> {
+        let metadata_list = self.inner.list_credentials();
+        
+        metadata_list.into_iter()
+            .map(|meta| serde_json::to_string(&meta)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    format!("Failed to serialize metadata: {}", e)
+                )))
+            .collect()
+    }
+    
+    /// Remove credential from wallet
+    pub fn remove_credential(&mut self, credential_id: String) -> PyResult<()> {
+        self.inner.remove_credential(&credential_id)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                format!("Failed to remove credential: {:?}", e)
+            ))
+    }
+    
+    /// Check if wallet is unlocked
+    pub fn is_unlocked(&self) -> bool {
+        self.inner.is_unlocked()
+    }
+    
+    /// Get wallet statistics
+    pub fn get_stats(&self) -> PyResult<String> {
+        let stats = self.inner.get_stats();
+        serde_json::to_string(stats)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                format!("Failed to serialize stats: {}", e)
+            ))
     }
 }
 

@@ -595,6 +595,7 @@ class LemmaWallet {
     
     /**
      * Store a credential with maximum redundancy (CORE FEDERATED FUNCTIONALITY)
+     * NOW WITH TRANSPARENT ENCRYPTION
      */
     async storeCredential(credential) {
         // Don't call init() - wallet should already be initialized
@@ -611,7 +612,8 @@ class LemmaWallet {
         const results = {
             memory: false,
             indexedDB: false,
-            localStorage: false
+            localStorage: false,
+            encrypted: false
         };
         
         try {
@@ -619,8 +621,29 @@ class LemmaWallet {
             this.memoryCache.set(credentialWithMeta.id, credentialWithMeta);
             results.memory = true;
             
-            // 2. Store in IndexedDB (persistent across sessions)
-            if (this.db) {
+            // 2. TRY ENCRYPTED STORAGE FIRST (transparent, no UX change)
+            if (typeof EncryptedLemmaWallet !== 'undefined') {
+                try {
+                    if (!this.encryptedWallet) {
+                        this.encryptedWallet = new EncryptedLemmaWallet({ debug: this.debug });
+                        await this.encryptedWallet.init();
+                    }
+                    
+                    await this.encryptedWallet.storeCredential(credentialWithMeta);
+                    results.encrypted = true;
+                    
+                    if (this.debug) {
+                        console.log('✅ Stored credential with transparent encryption');
+                    }
+                } catch (encryptError) {
+                    if (this.debug) {
+                        console.warn('⚠️ Encryption failed, falling back to plaintext:', encryptError);
+                    }
+                }
+            }
+            
+            // 3. Store in IndexedDB (persistent across sessions) - ONLY IF ENCRYPTION FAILED
+            if (!results.encrypted && this.db) {
                 try {
                     const transaction = this.db.transaction(['credentials'], 'readwrite');
                     const store = transaction.objectStore('credentials');
@@ -637,16 +660,18 @@ class LemmaWallet {
                 }
             }
             
-            // 3. Store in localStorage (backup)
-            try {
-                const allCredentials = Array.from(this.memoryCache.values());
-                localStorage.setItem(this.storageKey, JSON.stringify(allCredentials));
-                results.localStorage = true;
-            } catch (error) {
-                if (this.debug) console.warn('localStorage store failed:', error);
+            // 4. Store in localStorage (backup) - ONLY IF ENCRYPTION FAILED
+            if (!results.encrypted) {
+                try {
+                    const allCredentials = Array.from(this.memoryCache.values());
+                    localStorage.setItem(this.storageKey, JSON.stringify(allCredentials));
+                    results.localStorage = true;
+                } catch (error) {
+                    if (this.debug) console.warn('localStorage store failed:', error);
+                }
             }
             
-            // 4. Set session marker
+            // 5. Set session marker
             sessionStorage.setItem(this.sessionKey, 'true');
             
             // 5. Broadcast to other tabs

@@ -21,7 +21,7 @@ pub mod hpke_rewrapping;
 // PERFORMANCE OPTIMIZATIONS
 pub mod optimized_verification;
 pub mod ultra_optimized_verification;
-// pub mod encrypted_browser_wallet;  // Skip for now - AES-GCM version issue
+pub mod encrypted_browser_wallet;
 
 // WORKING CRYPTO PRIMITIVES
 pub mod constants;
@@ -47,7 +47,7 @@ pub use crate::hpke_rewrapping::{HPKERewrapper, DevicePublicKey, RewrappedEnvelo
 pub use crate::envelope_encryption::{WalletEnvelopeV2, EnvelopeEncryptionV2};
 pub use crate::optimized_verification::{OptimizedVerifier, OptimizedVerificationResult, OptimizationStats};
 pub use crate::ultra_optimized_verification::{UltraOptimizedVerifier, UltraVerificationResult, UltraOptimizationStats};
-// pub use crate::encrypted_browser_wallet::{EncryptedBrowserWallet, EncryptedCredentialEntry, EncryptionConfig, WalletStats, CredentialMetadata};
+pub use crate::encrypted_browser_wallet::{EncryptedBrowserWallet, EncryptedCredentialEntry, EncryptionConfig, WalletStats, CredentialMetadata};
 pub use crate::oprf::{OPRFClient, OPRFServer, OPRFResult};
 pub use crate::bloom::{CascadedBloomFilter};
 pub use crate::utils::{bytes_to_hex, hex_to_bytes, current_timestamp};

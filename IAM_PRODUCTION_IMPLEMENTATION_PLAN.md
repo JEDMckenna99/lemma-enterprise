@@ -1378,3 +1378,4 @@ export default LemmaIAM;
 Ready to implement? Let's start with **Day 1-2: Replace Mock Classes**.
 
 I'll create the `api/real_iam_manager.py` file and update the permission API to use real Rust crypto.
+
