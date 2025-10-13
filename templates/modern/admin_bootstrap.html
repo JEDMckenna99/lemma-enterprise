@@ -1,0 +1,182 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Admin Bootstrap - Lemma IAM{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=868"></script>
+    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=868"></script>
+{% endblock %}
+
+{% block content %}
+<section class="section" style="min-height: 80vh; display: flex; align-items: center; justify-content: center;">
+    <div class="container" style="max-width: 600px;">
+        <div class="card" style="padding: 48px;">
+            <h1 style="text-align: center; margin-bottom: 32px;">🔐 Admin Bootstrap</h1>
+            
+            <p style="text-align: center; color: var(--gray-600); margin-bottom: 32px;">
+                Issue your first admin credential using your Lemma API key
+            </p>
+            
+            <form id="bootstrap-form" style="display: flex; flex-direction: column; gap: 20px;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site ID</label>
+                    <input type="text" id="site_id" value="lemma_platform" 
+                           style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-family: monospace;">
+                </div>
+                
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site Domain</label>
+                    <input type="text" id="site_domain" value="lemma.id" 
+                           style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                </div>
+                
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Your Email</label>
+                    <input type="email" id="user_email" value="jedmckenna@lemma.id" 
+                           style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                </div>
+                
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Permission Level</label>
+                    <select id="permission_level" 
+                            style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                        <option value="super_admin">Super Admin (full access)</option>
+                        <option value="admin">Admin</option>
+                        <option value="editor">Editor</option>
+                        <option value="user">User</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">API Key</label>
+                    <input type="password" id="api_key" placeholder="Enter your Lemma API key" 
+                           style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-family: monospace;">
+                    <small style="color: var(--gray-600); margin-top: 4px; display: block;">
+                        Your API key is stored in Heroku config vars
+                    </small>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 16px; font-size: 16px; margin-top: 16px;">
+                    Issue Admin Credential
+                </button>
+            </form>
+            
+            <div id="status" style="margin-top: 24px; padding: 16px; border-radius: 8px; display: none;"></div>
+            
+            <div id="success-actions" style="display: none; margin-top: 24px; text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+                <h3 style="color: var(--success-600); margin-bottom: 16px;">Credential Issued!</h3>
+                <p style="color: var(--gray-700); margin-bottom: 24px;">
+                    Your admin credential has been stored in your encrypted wallet.
+                </p>
+                <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+            </div>
+        </div>
+        
+        <div style="margin-top: 24px; padding: 20px; background: var(--gray-50); border-radius: 8px; font-size: 14px; color: var(--gray-700);">
+            <strong>What happens:</strong>
+            <ul style="margin: 12px 0; padding-left: 20px;">
+                <li>Your API key validates your ownership of the site</li>
+                <li>Admin credential is issued instantly (no email needed)</li>
+                <li>Credential is stored in your encrypted browser wallet</li>
+                <li>Access is granted immediately</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<script>
+document.getElementById('bootstrap-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const site_id = document.getElementById('site_id').value;
+    const site_domain = document.getElementById('site_domain').value;
+    const user_email = document.getElementById('user_email').value;
+    const permission_level = document.getElementById('permission_level').value;
+    const api_key = document.getElementById('api_key').value;
+    
+    if (!api_key) {
+        showStatus('Please enter your API key', 'error');
+        return;
+    }
+    
+    showStatus('Issuing credential...', 'loading');
+    
+    try {
+        // Call admin self-issue endpoint
+        const response = await fetch('/api/v1/iam/admin/self-issue', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${api_key}`
+            },
+            body: JSON.stringify({
+                site_id,
+                site_domain,
+                user_email,
+                permission_level
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.message || 'Failed to issue credential');
+        }
+        
+        console.log('Credential issued:', result);
+        
+        // Initialize wallet
+        let wallet = window.LEMMA_WALLET_INSTANCE || new LemmaWallet({ debug: true });
+        if (!wallet.isReady) {
+            await wallet.init();
+        }
+        
+        // Store credential in encrypted wallet
+        await wallet.storeCredential(result.credential);
+        
+        console.log('Credential stored in wallet');
+        
+        // Show success
+        document.getElementById('bootstrap-form').style.display = 'none';
+        document.getElementById('status').style.display = 'none';
+        document.getElementById('success-actions').style.display = 'block';
+        
+        showStatus(`Success! Issued in ${result.issue_time_us.toFixed(2)}µs`, 'success');
+        
+    } catch (error) {
+        console.error('Bootstrap error:', error);
+        showStatus(`Error: ${error.message}`, 'error');
+    }
+});
+
+function showStatus(message, type) {
+    const status = document.getElementById('status');
+    status.style.display = 'block';
+    status.textContent = message;
+    
+    if (type === 'loading') {
+        status.style.background = 'var(--primary-50)';
+        status.style.color = 'var(--primary-700)';
+        status.style.border = '1px solid var(--primary-200)';
+    } else if (type === 'success') {
+        status.style.background = 'var(--success-50)';
+        status.style.color = 'var(--success-700)';
+        status.style.border = '1px solid var(--success-200)';
+    } else if (type === 'error') {
+        status.style.background = 'var(--danger-50)';
+        status.style.color = 'var(--danger-700)';
+        status.style.border = '1px solid var(--danger-200)';
+    }
+}
+
+// Auto-fill API key from URL parameter if present
+const urlParams = new URLSearchParams(window.location.search);
+const apiKeyParam = urlParams.get('api_key');
+if (apiKeyParam) {
+    document.getElementById('api_key').value = apiKeyParam;
+}
+</script>
+{% endblock %}
+

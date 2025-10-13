@@ -131,6 +131,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register IAM Email Confirmation: {e}")
 
+    # Admin Self-Issue
+    try:
+        from api.admin_self_issue import admin_self_issue_bp
+        app.register_blueprint(admin_self_issue_bp)
+        logger.info("✅ Admin Self-Issue registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Admin Self-Issue: {e}")
+
     # Network System
     try:
         from api.network_registry import network_registry_bp
@@ -275,6 +283,11 @@ def create_app():
     @app.route('/admin')
     def admin_dashboard():
         return render_template('admin/admin_dashboard.html')
+
+    @app.route('/admin/bootstrap')
+    def admin_bootstrap():
+        """Admin credential bootstrap page"""
+        return render_template('modern/admin_bootstrap.html')
 
     # Health check
     @app.route('/api/health')
