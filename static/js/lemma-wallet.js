@@ -742,6 +742,20 @@ class LemmaWallet {
         if (hasCredentials) {
             const validCredentials = credentials.filter(credential => {
                 const issuerDid = credential.issuer;
+                
+                // Skip DID registry check for IAM permission lemmas (site-specific issuers)
+                const claims = credential.claims || credential.credentialSubject || {};
+                const isIAMPermission = claims.packageType === 'permission' && claims.networkType === 'iam_permission';
+                
+                if (isIAMPermission) {
+                    // IAM permissions use site-specific issuers, not federated network
+                    if (this.debug) {
+                        console.log(`✅ IAM permission credential accepted (site-specific issuer): ${issuerDid.substring(0, 50)}...`);
+                    }
+                    return true;
+                }
+                
+                // For federated credentials, check DID registry
                 const isTrustedIssuer = this.didRegistry.has(issuerDid);
                 
                 if (!isTrustedIssuer) {
