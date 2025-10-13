@@ -69,7 +69,13 @@
                 <p style="color: var(--gray-700); margin-bottom: 24px;">
                     Your admin credential has been stored in your encrypted wallet.
                 </p>
-                <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+                <a href="/wallet" class="btn btn-primary" style="margin-right: 12px;">View Wallet</a>
+                <a href="/dashboard" class="btn btn-secondary">Go to Dashboard</a>
+            </div>
+            
+            <div id="credential-debug" style="display: none; margin-top: 24px; padding: 16px; background: var(--gray-100); border-radius: 8px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto;">
+                <strong>Debug - Credential Details:</strong>
+                <pre id="credential-json" style="margin: 8px 0; white-space: pre-wrap;"></pre>
             </div>
         </div>
         
@@ -132,10 +138,23 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             await wallet.init();
         }
         
-        // Store credential in encrypted wallet
-        await wallet.storeCredential(result.credential);
+        // Ensure credential has packageType set
+        const credentialToStore = {
+            ...result.credential,
+            packageType: 'permission',  // Explicitly set packageType
+            claims: result.credential.claims || result.credential.credentialSubject
+        };
         
-        console.log('Credential stored in wallet');
+        console.log('Storing credential:', credentialToStore);
+        
+        // Store credential in wallet
+        const storeResult = await wallet.storeCredential(credentialToStore);
+        
+        console.log('Credential stored in wallet:', storeResult);
+        
+        // Show debug info
+        document.getElementById('credential-debug').style.display = 'block';
+        document.getElementById('credential-json').textContent = JSON.stringify(credentialToStore, null, 2);
         
         // Show success
         document.getElementById('bootstrap-form').style.display = 'none';
