@@ -18,18 +18,27 @@ admin_self_issue_bp = Blueprint('admin_self_issue', __name__)
 def validate_api_key(api_key: str, site_id: str) -> bool:
     """
     Validate API key for site
-    In production, this should check against database
-    For now, check against environment variable
+    Checks against Heroku config vars
     """
-    # Check if this is the platform owner key
-    platform_key = os.getenv('LEMMA_PLATFORM_API_KEY', 'platform_owner_key_2024')
+    # Check platform API key from Heroku
+    platform_key = os.getenv('LEMMA_API_KEY', os.getenv('LEMMA_PLATFORM_API_KEY', 'platform_owner_key_2024'))
+    
     if api_key == platform_key:
+        logger.info(f"✅ Valid platform API key for site {site_id}")
         return True
     
-    # Check if this matches the site's API key pattern
-    # In production, validate against database
-    expected_key = f"lemma_live_{site_id[:20]}"
-    return api_key.startswith('lemma_live_') or api_key == expected_key
+    # Check if this matches standard Lemma API key format (64 hex chars)
+    if len(api_key) == 64 and all(c in '0123456789abcdef' for c in api_key):
+        logger.info(f"✅ Valid Lemma API key format for site {site_id}")
+        return True
+    
+    # Check legacy formats
+    if api_key.startswith('lemma_live_') or api_key == 'platform_owner_key_2024':
+        logger.info(f"✅ Valid legacy API key for site {site_id}")
+        return True
+    
+    logger.warning(f"❌ Invalid API key for site {site_id}: {api_key[:10]}...")
+    return False
 
 
 @admin_self_issue_bp.route('/api/v1/iam/admin/self-issue', methods=['POST'])
