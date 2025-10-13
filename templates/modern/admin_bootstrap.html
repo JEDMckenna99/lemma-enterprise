@@ -145,16 +145,50 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             claims: result.credential.claims || result.credential.credentialSubject
         };
         
-        console.log('Storing credential:', credentialToStore);
+        console.log('=== STORING CREDENTIAL ===');
+        console.log('Credential to store:', credentialToStore);
+        console.log('Wallet instance:', wallet);
+        console.log('Wallet ready:', wallet.isReady);
         
         // Store credential in wallet
         const storeResult = await wallet.storeCredential(credentialToStore);
         
-        console.log('Credential stored in wallet:', storeResult);
+        console.log('=== STORAGE RESULT ===');
+        console.log('Store result:', storeResult);
+        
+        // Verify it was stored by reading it back
+        const permissionCreds = await wallet.getCredentials('permission');
+        console.log('=== VERIFICATION ===');
+        console.log('Permission credentials in wallet:', permissionCreds);
+        console.log('Total permission credentials:', permissionCreds.length);
+        
+        // Check all storage layers
+        console.log('=== STORAGE LAYERS ===');
+        console.log('Memory cache size:', wallet.memoryCache.size);
+        console.log('Memory cache contents:', Array.from(wallet.memoryCache.entries()).map(([id, cred]) => ({
+            id, 
+            packageType: cred.packageType,
+            siteDomain: cred.claims?.siteDomain || cred.credentialSubject?.siteDomain
+        })));
+        
+        // Check localStorage
+        const localStorageData = localStorage.getItem('lemma_credentials');
+        if (localStorageData) {
+            const parsed = JSON.parse(localStorageData);
+            console.log('localStorage credentials:', parsed.length);
+            console.log('localStorage permission credentials:', parsed.filter(c => c.packageType === 'permission'));
+        }
         
         // Show debug info
         document.getElementById('credential-debug').style.display = 'block';
-        document.getElementById('credential-json').textContent = JSON.stringify(credentialToStore, null, 2);
+        document.getElementById('credential-json').textContent = JSON.stringify({
+            credential: credentialToStore,
+            storeResult: storeResult,
+            verificationCheck: {
+                foundInWallet: permissionCreds.length > 0,
+                totalPermissionCreds: permissionCreds.length
+            }
+        }, null, 2);
         
         // Show success
         document.getElementById('bootstrap-form').style.display = 'none';
