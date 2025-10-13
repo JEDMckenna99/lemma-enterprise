@@ -126,21 +126,27 @@ def confirm_access():
         token = request.args.get('token')
         
         if not token:
-            return render_template('error.html', 
-                                 message='Missing confirmation token'), 400
+            return jsonify({
+                'error': 'missing_token',
+                'message': 'Missing confirmation token'
+            }), 400
         
         # Get pending request
         pending = pending_access_requests.get(token)
         
         if not pending:
-            return render_template('error.html',
-                                 message='Invalid or expired confirmation link'), 400
+            return jsonify({
+                'error': 'invalid_token',
+                'message': 'Invalid or expired confirmation link'
+            }), 400
         
         # Check expiration
         if time.time() > pending['expires_at']:
             del pending_access_requests[token]
-            return render_template('error.html',
-                                 message='Confirmation link expired (24 hour limit)'), 400
+            return jsonify({
+                'error': 'expired_token',
+                'message': 'Confirmation link expired (24 hour limit)'
+            }), 400
         
         # Get site manager
         site_id = pending['site_id']
@@ -151,8 +157,10 @@ def confirm_access():
             # Try to recreate manager
             manager = get_or_create_site_manager(site_id, site_domain)
             if not manager:
-                return render_template('error.html',
-                                     message='Site not found'), 404
+                return jsonify({
+                    'error': 'site_not_found',
+                    'message': 'Site not found'
+                }), 404
         
         # Recreate permission if not in memory (multi-dyno issue)
         permission_level = pending['permission_level']
@@ -187,7 +195,7 @@ def confirm_access():
         logger.info(f"🔐 Credential ID: {permission_lemma['id']}")
         
         # Render confirmation page with credential
-        return render_template('confirm_access.html',
+        return render_template('modern/confirm_access.html',
                              permission_lemma=json.dumps(permission_lemma),
                              redirect_url=pending['redirect_url'],
                              user_email=user_email,
@@ -199,8 +207,10 @@ def confirm_access():
         logger.error(f"❌ Confirm access error: {e}")
         import traceback
         traceback.print_exc()
-        return render_template('error.html',
-                             message=f'Error confirming access: {str(e)}'), 500
+        return jsonify({
+            'error': 'internal_error',
+            'message': f'Error confirming access: {str(e)}'
+        }), 500
 
 
 def get_default_scope(permission_level: str) -> list:
@@ -283,4 +293,5 @@ def send_credential_directly():
     except Exception as e:
         logger.error(f"❌ Send credential email error: {e}")
         return jsonify({'error': str(e)}), 500
+
 
