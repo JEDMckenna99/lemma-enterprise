@@ -349,23 +349,58 @@ class EncryptedLemmaWallet {
     }
     
     /**
+     * List credentials (returns metadata for all stored credentials)
+     */
+    async listCredentials() {
+        if (!this.isInitialized) {
+            await this.init();
+        }
+        
+        // Return array of credential metadata from memory cache
+        return Array.from(this.memoryCache.values()).map(cred => ({
+            id: cred.id,
+            packageType: cred.packageType,
+            issuer: cred.issuer,
+            subject: cred.subject,
+            created_at: cred.storedAt,
+            last_accessed: Date.now()
+        }));
+    }
+    
+    /**
      * Load existing credentials from storage and decrypt into memory
      */
     async loadExistingCredentials() {
         const allEncrypted = this.getAllEncryptedFromStorage();
         
+        if (this.debug) {
+            console.log(`🔐 Loading from encrypted storage: ${Object.keys(allEncrypted).length} credentials found`);
+        }
+        
+        let loadedCount = 0;
         for (const [credentialId, encrypted] of Object.entries(allEncrypted)) {
             try {
                 const credential = await this.decryptCredential(encrypted);
                 this.memoryCache.set(credentialId, credential);
+                loadedCount++;
+                if (this.debug) {
+                    console.log(`✅ Decrypted credential ${loadedCount}/${Object.keys(allEncrypted).length}: ${credentialId} (${credential.packageType})`);
+                }
             } catch (error) {
                 console.error(`⚠️ Failed to decrypt credential ${credentialId}:`, error);
             }
         }
         
+        if (this.debug && loadedCount > 0) {
+            console.log(`✅ Loaded ${loadedCount} encrypted credentials into memory`);
+        }
+        
         // Also load plaintext credentials (legacy compatibility)
         const plaintext = this.getPlaintextAll();
         if (plaintext && plaintext.length > 0) {
+            if (this.debug) {
+                console.log(`📋 Found ${plaintext.length} plaintext credentials (legacy)`);
+            }
             for (const credential of plaintext) {
                 if (!this.memoryCache.has(credential.id)) {
                     this.memoryCache.set(credential.id, credential);
