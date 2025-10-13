@@ -1025,6 +1025,15 @@ async function loadWalletData() {
         }
 
         // Get credentials by type from wallet
+        console.log('🔍 DEBUG: Getting credentials from wallet...');
+        console.log('🔍 DEBUG: Memory cache size:', lemmaWallet.memoryCache.size);
+        console.log('🔍 DEBUG: Memory cache contents:', Array.from(lemmaWallet.memoryCache.values()).map(c => ({
+            id: c.id,
+            packageType: c.packageType,
+            networkType: c.claims?.networkType || c.credentialSubject?.networkType,
+            siteId: c.claims?.siteId || c.credentialSubject?.siteId
+        })));
+        
         const pohCredentials = await lemmaWallet.getCredentials('identity');
         const permissionCredentials = await lemmaWallet.getCredentials('permission');
         
@@ -1033,6 +1042,8 @@ async function loadWalletData() {
             permissions: permissionCredentials.length,
             total: pohCredentials.length + permissionCredentials.length
         });
+        
+        console.log('🔍 DEBUG: Permission credentials returned:', permissionCredentials);
 
         // Display PoH credentials
         displayPohLemmas(pohCredentials);
