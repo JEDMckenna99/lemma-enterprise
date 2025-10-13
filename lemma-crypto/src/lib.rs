@@ -26,7 +26,9 @@ pub mod encrypted_browser_wallet;
 // WORKING CRYPTO PRIMITIVES
 pub mod constants;
 pub mod oprf;
+pub mod oprf_key_manager;
 pub mod bloom;
+pub mod bloom_envelope;
 pub mod utils;
 
 // WORKING INTEGRATIONS (WASM removed for clean build)
@@ -49,7 +51,9 @@ pub use crate::optimized_verification::{OptimizedVerifier, OptimizedVerification
 pub use crate::ultra_optimized_verification::{UltraOptimizedVerifier, UltraVerificationResult, UltraOptimizationStats};
 pub use crate::encrypted_browser_wallet::{EncryptedBrowserWallet, EncryptedCredentialEntry, EncryptionConfig, WalletStats, CredentialMetadata};
 pub use crate::oprf::{OPRFClient, OPRFServer, OPRFResult};
+pub use crate::oprf_key_manager::{OPRFKeyManager, OPRFKeyVersion, KeyStatus, KeyType, RotationPlan};
 pub use crate::bloom::{CascadedBloomFilter};
+pub use crate::bloom_envelope::{BloomFilterEnvelope, BloomFilterParams};
 pub use crate::utils::{bytes_to_hex, hex_to_bytes, current_timestamp};
 pub use crate::constants::*;
 

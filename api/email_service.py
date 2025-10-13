@@ -277,3 +277,4 @@ def render_email_template(template_name: str, **kwargs) -> str:
     
     return template
 
+

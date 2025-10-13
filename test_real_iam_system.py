@@ -118,7 +118,7 @@ def test_permission_grant(site_id: str, api_key: str, site_domain: str):
     
     return user_did, data['credential']
 
-def test_access_verification(site_id: str, user_did: str, credential: Dict):
+def test_access_verification(site_id: str, user_did: str, credential: Dict, site_domain: str):
     """Test 4: Verify access using real crypto (Ed25519 + OPRF)"""
     print("\n" + "="*60)
     print("TEST 4: Access Verification (Real Crypto)")
@@ -136,6 +136,7 @@ def test_access_verification(site_id: str, user_did: str, credential: Dict):
             f"{API_BASE}/api/v1/auth/verify",
             json={
                 "site_id": site_id,
+                "site_domain": site_domain,  # Add for multi-dyno
                 "user_did": user_did,
                 "resource": resource,
                 "action": action,
@@ -218,7 +219,7 @@ def run_all_tests():
         user_did, credential = test_permission_grant(site_id, api_key, site_domain)
         
         # Test 4: Access verification
-        test_access_verification(site_id, user_did, credential)
+        test_access_verification(site_id, user_did, credential, site_domain)
         
         # Test 5: Performance benchmark
         avg_time = test_performance_benchmark(site_id, user_did, credential)
