@@ -539,11 +539,40 @@ class LemmaWallet {
      * Load existing credentials from all storage layers
      */
     async loadExistingCredentials() {
+        let encryptedCount = 0;
         let indexedDBCount = 0;
         let localStorageCount = 0;
         
-        // 1. Try IndexedDB first
-        if (this.db) {
+        // 1. PRIORITY: Try encrypted storage first (most secure)
+        if (typeof EncryptedLemmaWallet !== 'undefined') {
+            try {
+                if (!this.encryptedWallet) {
+                    this.encryptedWallet = new EncryptedLemmaWallet({ debug: this.debug });
+                    await this.encryptedWallet.init();
+                }
+                
+                const encryptedCredentials = await this.encryptedWallet.listCredentials();
+                if (encryptedCredentials && encryptedCredentials.length > 0) {
+                    for (const credMeta of encryptedCredentials) {
+                        try {
+                            const fullCred = await this.encryptedWallet.getCredential(credMeta.id);
+                            if (fullCred) {
+                                this.memoryCache.set(fullCred.id, fullCred);
+                                encryptedCount++;
+                            }
+                        } catch (e) {
+                            if (this.debug) console.warn(`Failed to load encrypted credential ${credMeta.id}:`, e);
+                        }
+                    }
+                    if (this.debug) console.log(`🔐 Loaded ${encryptedCount} credentials from encrypted storage`);
+                }
+            } catch (error) {
+                if (this.debug) console.warn('Encrypted wallet load failed:', error);
+            }
+        }
+        
+        // 2. Try IndexedDB (only if no encrypted storage)
+        if (encryptedCount === 0 && this.db) {
             try {
                 const transaction = this.db.transaction(['credentials'], 'readonly');
                 const store = transaction.objectStore('credentials');
@@ -553,7 +582,9 @@ class LemmaWallet {
                     request.onsuccess = () => {
                         const credentials = request.result || [];
                         credentials.forEach(cred => {
-                            this.memoryCache.set(cred.id, cred);
+                            if (!this.memoryCache.has(cred.id)) {
+                                this.memoryCache.set(cred.id, cred);
+                            }
                         });
                         indexedDBCount = credentials.length;
                         // Loaded from IndexedDB (reduced logging)
@@ -569,28 +600,30 @@ class LemmaWallet {
             }
         }
         
-        // 2. Fallback to localStorage
-        try {
-            const stored = localStorage.getItem(this.storageKey);
-            if (stored) {
-                const credentials = JSON.parse(stored);
-                if (Array.isArray(credentials)) {
-                    let addedCount = 0;
-                    credentials.forEach(cred => {
-                        if (!this.memoryCache.has(cred.id)) {
-                            this.memoryCache.set(cred.id, cred);
-                            addedCount++;
-                        }
-                    });
-                    localStorageCount = credentials.length;
-                    // Loaded from localStorage (reduced logging)
+        // 3. Fallback to localStorage (only if no other storage found)
+        if (encryptedCount === 0 && indexedDBCount === 0) {
+            try {
+                const stored = localStorage.getItem(this.storageKey);
+                if (stored) {
+                    const credentials = JSON.parse(stored);
+                    if (Array.isArray(credentials)) {
+                        credentials.forEach(cred => {
+                            if (!this.memoryCache.has(cred.id)) {
+                                this.memoryCache.set(cred.id, cred);
+                            }
+                        });
+                        localStorageCount = credentials.length;
+                        // Loaded from localStorage (reduced logging)
+                    }
                 }
+            } catch (error) {
+                if (this.debug) console.warn('localStorage load failed:', error);
             }
-        } catch (error) {
-            if (this.debug) console.warn('localStorage load failed:', error);
         }
         
-        // Total credentials loaded (reduced logging)
+        if (this.debug) {
+            console.log(`📊 Loaded credentials: ${encryptedCount} encrypted, ${indexedDBCount} IndexedDB, ${localStorageCount} localStorage`);
+        }
     }
     
     /**
@@ -642,8 +675,8 @@ class LemmaWallet {
                 }
             }
             
-            // 3. Store in IndexedDB (persistent across sessions) - ALWAYS
-            if (this.db) {
+            // 3. Store in IndexedDB (persistent across sessions) - ONLY IF ENCRYPTION FAILED
+            if (!results.encrypted && this.db) {
                 try {
                     const transaction = this.db.transaction(['credentials'], 'readwrite');
                     const store = transaction.objectStore('credentials');
@@ -660,13 +693,24 @@ class LemmaWallet {
                 }
             }
             
-            // 4. Store in localStorage (backup) - ALWAYS (needed for page load before memory cache)
-            try {
-                const allCredentials = Array.from(this.memoryCache.values());
-                localStorage.setItem(this.storageKey, JSON.stringify(allCredentials));
-                results.localStorage = true;
-            } catch (error) {
-                if (this.debug) console.warn('localStorage store failed:', error);
+            // 4. Store in localStorage (backup) - ONLY IF ENCRYPTION FAILED
+            // NEVER store in plaintext localStorage if encryption succeeded
+            if (!results.encrypted) {
+                try {
+                    const allCredentials = Array.from(this.memoryCache.values());
+                    localStorage.setItem(this.storageKey, JSON.stringify(allCredentials));
+                    results.localStorage = true;
+                } catch (error) {
+                    if (this.debug) console.warn('localStorage store failed:', error);
+                }
+            } else {
+                // Encryption succeeded - clear any old plaintext data
+                try {
+                    localStorage.removeItem(this.storageKey);
+                    if (this.debug) console.log('🗑️ Cleared plaintext localStorage (using encryption)');
+                } catch (error) {
+                    // Silent fail
+                }
             }
             
             // 5. Set session marker
