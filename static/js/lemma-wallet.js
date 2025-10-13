@@ -642,8 +642,8 @@ class LemmaWallet {
                 }
             }
             
-            // 3. Store in IndexedDB (persistent across sessions) - ONLY IF ENCRYPTION FAILED
-            if (!results.encrypted && this.db) {
+            // 3. Store in IndexedDB (persistent across sessions) - ALWAYS
+            if (this.db) {
                 try {
                     const transaction = this.db.transaction(['credentials'], 'readwrite');
                     const store = transaction.objectStore('credentials');
@@ -660,15 +660,13 @@ class LemmaWallet {
                 }
             }
             
-            // 4. Store in localStorage (backup) - ONLY IF ENCRYPTION FAILED
-            if (!results.encrypted) {
-                try {
-                    const allCredentials = Array.from(this.memoryCache.values());
-                    localStorage.setItem(this.storageKey, JSON.stringify(allCredentials));
-                    results.localStorage = true;
-                } catch (error) {
-                    if (this.debug) console.warn('localStorage store failed:', error);
-                }
+            // 4. Store in localStorage (backup) - ALWAYS (needed for page load before memory cache)
+            try {
+                const allCredentials = Array.from(this.memoryCache.values());
+                localStorage.setItem(this.storageKey, JSON.stringify(allCredentials));
+                results.localStorage = true;
+            } catch (error) {
+                if (this.debug) console.warn('localStorage store failed:', error);
             }
             
             // 5. Set session marker
