@@ -97,18 +97,29 @@ class LemmaBotShield {
             if (window.lemmaWallet && window.LEMMA_WALLET_INITIALIZED) {
                 this.backgroundWallet = window.lemmaWallet;
                 if (this.config.debug) {
-                    console.log('🔄 Using existing global wallet instance');
+                    console.log('🔄 Shield: Using existing global wallet instance');
+                }
+            } else if (window.LEMMA_WALLET_INSTANCE) {
+                this.backgroundWallet = window.LEMMA_WALLET_INSTANCE;
+                if (this.config.debug) {
+                    console.log('🔄 Shield: Using LEMMA_WALLET_INSTANCE');
                 }
             } else {
-                // Initialize federated wallet with network configuration
-                this.backgroundWallet = new LemmaFederatedWallet({
+                // Initialize LemmaWallet (the actual wallet class that supports encryption)
+                this.backgroundWallet = new LemmaWallet({
                     debug: this.config.debug,
                     securityLevel: this.config.securityLevel,
                     customCheckInterval: this.config.customCheckInterval,
-                    checkOnEvents: this.config.checkOnEvents,
                     backgroundChecks: this.config.backgroundChecks,
                     ...networkConfig
                 });
+                
+                // Initialize the wallet
+                await this.backgroundWallet.init();
+                
+                if (this.config.debug) {
+                    console.log('✅ Shield: Created new LemmaWallet instance');
+                }
             }
             
         } catch (error) {
