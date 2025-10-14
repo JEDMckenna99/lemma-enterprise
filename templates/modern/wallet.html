@@ -1379,42 +1379,9 @@ async function testVerificationSpeed() {
 async function performOfflineVerification(credential) {
     const startTime = performance.now();
     
-    try {
-        // Call the backend API with offline-only flag to get pure engine timing
-        const response = await fetch('/api/sdk/verify-offline', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${shieldApiKey}`
-            },
-            body: JSON.stringify({
-                credential: credential,
-                offlineOnly: true,           // No network calls
-                measureEngineTime: true,     // Return pure Rust engine timing
-                requireFullCrypto: true      // Full Ed25519 + OPRF + Bloom verification
-            })
-        });
-        
-        if (!response.ok) {
-            // Fallback to local verification if API not available
-            return await performLocalVerification(credential);
-        }
-        
-        const result = await response.json();
-        
-        // The API should return the actual Rust engine verification time
-        return {
-            verified: result.verified || true,
-            confidence: result.confidence || 1.0,
-            verification_time_us: result.verification_time_us || result.engine_time_us || 6, // Default to 6μs if not provided
-            offline: true,
-            engine: 'rust_crypto_engine_direct'
-        };
-        
-    } catch (error) {
-        console.warn('API offline verification failed, using local fallback:', error);
-        return await performLocalVerification(credential);
-    }
+    // TRUE OFFLINE: Don't call any API, just verify locally
+    // The credential has an Ed25519 signature that can be verified client-side
+    return await performLocalVerification(credential);
 }
 
 // Local verification fallback (estimates based on your 6μs benchmark)
