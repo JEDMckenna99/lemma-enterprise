@@ -29,6 +29,8 @@ pub mod oprf;
 pub mod oprf_key_manager;
 pub mod bloom;
 pub mod bloom_envelope;
+pub mod network_partition;
+pub mod credential_lifecycle;
 pub mod utils;
 
 // WORKING INTEGRATIONS (WASM removed for clean build)
@@ -54,6 +56,8 @@ pub use crate::oprf::{OPRFClient, OPRFServer, OPRFResult};
 pub use crate::oprf_key_manager::{OPRFKeyManager, OPRFKeyVersion, KeyStatus, KeyType, RotationPlan};
 pub use crate::bloom::{CascadedBloomFilter};
 pub use crate::bloom_envelope::{BloomFilterEnvelope, BloomFilterParams};
+pub use crate::network_partition::{NetworkPartitionHandler, GraceConfig, RiskLevel, FilterFreshness, VerificationDecision, SyncStrategy};
+pub use crate::credential_lifecycle::{CredentialLifecycleManager, CredentialState, RenewalPolicy};
 pub use crate::utils::{bytes_to_hex, hex_to_bytes, current_timestamp};
 pub use crate::constants::*;
 
