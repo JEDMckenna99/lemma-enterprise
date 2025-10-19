@@ -471,43 +471,44 @@ class EncryptedLemmaWallet {
      */
     async removeCredential(credentialId) {
         try {
+            console.log(`🗑️ Encrypted Wallet: Starting removal of ${credentialId}`);
+            
             // 1. Remove from memory cache
-            const existed = this.memoryCache.has(credentialId);
+            const existedInMemory = this.memoryCache.has(credentialId);
             this.memoryCache.delete(credentialId);
             
-            if (this.debug && existed) {
-                console.log(`🗑️ Removed credential ${credentialId} from memory cache`);
-            }
+            console.log(`  ${existedInMemory ? '✅' : '⚠️'} Memory cache: ${existedInMemory ? 'deleted' : 'not found'}`);
             
             // 2. Remove from encrypted storage
             const encryptedData = this.getAllEncryptedFromStorage();
-            if (encryptedData[credentialId]) {
+            const existedInEncrypted = !!encryptedData[credentialId];
+            
+            if (existedInEncrypted) {
                 delete encryptedData[credentialId];
                 localStorage.setItem(this.storageKey, JSON.stringify(encryptedData));
-                
-                if (this.debug) {
-                    console.log(`🗑️ Removed credential ${credentialId} from encrypted storage`);
-                }
+                console.log(`  ✅ Encrypted storage: deleted (${Object.keys(encryptedData).length} credentials remaining)`);
+            } else {
+                console.log(`  ⚠️ Encrypted storage: not found`);
             }
             
             // 3. Remove from plaintext storage (legacy compatibility)
             const plaintext = this.getPlaintextAll();
             const filtered = plaintext.filter(c => c.id !== credentialId);
-            if (filtered.length < plaintext.length) {
+            const existedInPlaintext = filtered.length < plaintext.length;
+            
+            if (existedInPlaintext) {
                 localStorage.setItem(this.plaintextKey, JSON.stringify(filtered));
-                
-                if (this.debug) {
-                    console.log(`🗑️ Removed credential ${credentialId} from plaintext storage`);
-                }
+                console.log(`  ✅ Plaintext storage: deleted (${filtered.length} credentials remaining)`);
+            } else {
+                console.log(`  ⚠️ Plaintext storage: not found`);
             }
             
-            if (this.debug) {
-                console.log(`✅ Credential ${credentialId} completely removed from wallet`);
-            }
+            const totalRemoved = (existedInMemory ? 1 : 0) + (existedInEncrypted ? 1 : 0) + (existedInPlaintext ? 1 : 0);
+            console.log(`✅ Encrypted Wallet: Removed credential ${credentialId} from ${totalRemoved} storage layers`);
             
             return true;
         } catch (error) {
-            console.error(`❌ Failed to remove credential ${credentialId}:`, error);
+            console.error(`❌ Encrypted Wallet: Failed to remove credential ${credentialId}:`, error);
             return false;
         }
     }

@@ -986,11 +986,21 @@ class LemmaWallet {
             // Remove from all storage layers
             this.memoryCache.delete(credentialId);
             
-            // Remove from encrypted wallet if available
-            if (window.encryptedWallet && typeof window.encryptedWallet.removeCredential === 'function') {
-                await window.encryptedWallet.removeCredential(credentialId);
+            // Remove from encrypted wallet if available (use this.encryptedWallet, not window)
+            if (this.encryptedWallet && typeof this.encryptedWallet.removeCredential === 'function') {
+                await this.encryptedWallet.removeCredential(credentialId);
                 if (this.debug) {
                     console.log(`🔐 Removed from encrypted wallet: ${credentialId}`);
+                }
+            } else if (window.encryptedWallet && typeof window.encryptedWallet.removeCredential === 'function') {
+                // Fallback to global instance
+                await window.encryptedWallet.removeCredential(credentialId);
+                if (this.debug) {
+                    console.log(`🔐 Removed from encrypted wallet (global): ${credentialId}`);
+                }
+            } else {
+                if (this.debug) {
+                    console.warn(`⚠️ No encrypted wallet instance found for removal of ${credentialId}`);
                 }
             }
             
