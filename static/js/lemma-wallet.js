@@ -939,6 +939,7 @@ class LemmaWallet {
             // Get credential to determine type for proper revocation
             const credential = this.memoryCache.get(credentialId);
             let credentialType = 'unknown';
+            let siteDomain = null;
             
             if (credential) {
                 const claims = credential.claims || credential.credentialSubject || {};
@@ -946,6 +947,8 @@ class LemmaWallet {
                     credentialType = 'poh';
                 } else if (claims.packageType === 'permission' || claims.permissions) {
                     credentialType = 'permission';
+                    // Extract site domain for site-specific revocation
+                    siteDomain = claims.siteDomain || credential.issuer?.split(':').pop();
                 }
             }
             
@@ -959,6 +962,7 @@ class LemmaWallet {
                     body: JSON.stringify({
                         credential_id: credentialId,
                         credential_type: credentialType,
+                        site_domain: siteDomain,
                         reason: 'user_requested_removal'
                     })
                 });
@@ -982,12 +986,25 @@ class LemmaWallet {
             // Remove from all storage layers
             this.memoryCache.delete(credentialId);
             
+            // Remove from encrypted wallet if available
+            if (window.encryptedWallet && typeof window.encryptedWallet.removeCredential === 'function') {
+                await window.encryptedWallet.removeCredential(credentialId);
+                if (this.debug) {
+                    console.log(`🔐 Removed from encrypted wallet: ${credentialId}`);
+                }
+            }
+            
+            // Remove from IndexedDB
             if (this.db) {
                 const transaction = this.db.transaction(['credentials'], 'readwrite');
                 const store = transaction.objectStore('credentials');
                 store.delete(credentialId);
+                if (this.debug) {
+                    console.log(`💾 Removed from IndexedDB: ${credentialId}`);
+                }
             }
             
+            // Remove from plaintext localStorage (legacy)
             const allCredentials = Array.from(this.memoryCache.values());
             localStorage.setItem(this.storageKey, JSON.stringify(allCredentials));
             
@@ -998,7 +1015,7 @@ class LemmaWallet {
                 const scopeMessage = credentialType === 'poh' ? 
                     'network-wide revocation initiated' : 
                     credentialType === 'permission' ? 
-                    'site-specific revocation completed' : 
+                    `site-specific revocation for ${siteDomain || 'unknown site'}` : 
                     'local removal only';
                 console.log(`🗑️ Removed credential: ${credentialId} (${scopeMessage})`);
             }

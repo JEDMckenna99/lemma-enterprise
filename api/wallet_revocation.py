@@ -35,6 +35,7 @@ def revoke_credential():
         
         credential_id = data.get('credential_id')
         credential_type = data.get('credential_type', 'unknown')  # 'poh' or 'permission'
+        site_domain = data.get('site_domain')  # Site domain for permission lemmas
         reason = data.get('reason', 'user_requested')
         
         if not credential_id:
@@ -44,7 +45,7 @@ def revoke_credential():
                 'message': 'credential_id is required'
             }), 400
         
-        logger.info(f"🚨 Wallet revocation request: {credential_id} (type: {credential_type})")
+        logger.info(f"🚨 Wallet revocation request: {credential_id} (type: {credential_type}, site: {site_domain})")
         
         # For PoH lemmas: Network-wide revocation
         if credential_type == 'poh':
@@ -56,20 +57,24 @@ def revoke_credential():
                 'revocation_type': 'network_wide',
                 'network_propagated': network_success,
                 'message': 'PoH lemma revoked - network-wide revocation initiated',
-                'scope': 'All sites in federated network will be updated'
+                'scope': 'All sites in federated network will be updated',
+                'wallet_deleted': True
             })
         
         # For permission lemmas: Site-specific revocation
         elif credential_type == 'permission':
-            site_success = await_site_revocation(credential_id, reason)
+            site_success = await_site_revocation(credential_id, reason, site_domain)
             
             return jsonify({
                 'success': True,
                 'credential_id': credential_id,
                 'revocation_type': 'site_specific',
                 'site_updated': site_success,
-                'message': 'Permission lemma revoked - site-specific revocation completed',
-                'scope': 'Only this site\'s permissions affected'
+                'site_domain': site_domain,
+                'message': f'Permission lemma revoked for {site_domain}',
+                'scope': 'Only this site\'s permissions affected',
+                'wallet_deleted': True,
+                'registry_updated': site_success
             })
         
         # Unknown type: Local revocation only
@@ -120,23 +125,50 @@ def await_network_revocation(credential_id: str, reason: str) -> bool:
         logger.warning(f"⚠️ Network revocation failed for {credential_id}: {e}")
         return False
 
-def await_site_revocation(credential_id: str, reason: str) -> bool:
+def await_site_revocation(credential_id: str, reason: str, site_domain: str = None) -> bool:
     """
     Handle site-specific permission lemma revocation
+    Updates database revocation registry for the specific site
     """
     try:
-        # For permission lemmas, update local site revocation list
-        # In production, this would update the site's permission database
+        from api.database import get_db_session, RevocationList
+        from datetime import datetime
         
         logger.info(f"🏠 Site-specific revocation for {credential_id}: {reason}")
         
-        # Simulate site revocation list update
-        # This would typically:
-        # 1. Add to site's revoked permissions table
-        # 2. Update site's permission bloom filter
-        # 3. Notify site administrators if needed
-        
-        return True
+        # Add to database revocation list
+        session = get_db_session()
+        try:
+            # Check if already revoked
+            existing = session.query(RevocationList).filter_by(lemma_id=credential_id).first()
+            if existing:
+                logger.info(f"⚠️ Credential {credential_id} already revoked at {existing.revoked_at}")
+                return True
+            
+            # Create new revocation entry
+            revocation = RevocationList(
+                lemma_id=credential_id,
+                lemma_type='permission',
+                site_id=site_domain or 'unknown',
+                user_did='user_requested',  # Would extract from credential in production
+                revoked_by='user_self_revoke',
+                revoked_at=datetime.utcnow(),
+                reason=reason,
+                bloom_filter_updated=False  # Will be updated by background job
+            )
+            
+            session.add(revocation)
+            session.commit()
+            
+            logger.info(f"✅ Added {credential_id} to revocation registry for site {site_domain}")
+            
+            # TODO: Update bloom filter for efficient offline checking
+            # This would be done by a background job in production
+            
+            return True
+            
+        finally:
+            session.close()
         
     except Exception as e:
         logger.warning(f"⚠️ Site revocation failed for {credential_id}: {e}")

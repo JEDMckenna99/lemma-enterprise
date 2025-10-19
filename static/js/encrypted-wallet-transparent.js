@@ -467,6 +467,52 @@ class EncryptedLemmaWallet {
     }
     
     /**
+     * Remove credential from wallet (encrypted storage + plaintext + memory)
+     */
+    async removeCredential(credentialId) {
+        try {
+            // 1. Remove from memory cache
+            const existed = this.memoryCache.has(credentialId);
+            this.memoryCache.delete(credentialId);
+            
+            if (this.debug && existed) {
+                console.log(`🗑️ Removed credential ${credentialId} from memory cache`);
+            }
+            
+            // 2. Remove from encrypted storage
+            const encryptedData = this.getAllEncryptedFromStorage();
+            if (encryptedData[credentialId]) {
+                delete encryptedData[credentialId];
+                localStorage.setItem(this.storageKey, JSON.stringify(encryptedData));
+                
+                if (this.debug) {
+                    console.log(`🗑️ Removed credential ${credentialId} from encrypted storage`);
+                }
+            }
+            
+            // 3. Remove from plaintext storage (legacy compatibility)
+            const plaintext = this.getPlaintextAll();
+            const filtered = plaintext.filter(c => c.id !== credentialId);
+            if (filtered.length < plaintext.length) {
+                localStorage.setItem(this.plaintextKey, JSON.stringify(filtered));
+                
+                if (this.debug) {
+                    console.log(`🗑️ Removed credential ${credentialId} from plaintext storage`);
+                }
+            }
+            
+            if (this.debug) {
+                console.log(`✅ Credential ${credentialId} completely removed from wallet`);
+            }
+            
+            return true;
+        } catch (error) {
+            console.error(`❌ Failed to remove credential ${credentialId}:`, error);
+            return false;
+        }
+    }
+    
+    /**
      * Get wallet statistics
      */
     getStats() {
