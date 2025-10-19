@@ -1277,10 +1277,31 @@ async function revokeLemma(lemmaId, lemmaType) {
     }
     
     try {
-        // Remove from wallet
-        await lemmaWallet.removeCredential(lemmaId);
+        console.log(`🗑️ Starting revocation of ${lemmaId}...`);
+        
+        // Remove from wallet (this should delete from encrypted storage)
+        const removeResult = await lemmaWallet.removeCredential(lemmaId);
+        console.log(`  Removal result: ${removeResult ? 'SUCCESS' : 'FAILED'}`);
+        
+        // Wait a moment to ensure encrypted storage write completes
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Verify it's actually gone from encrypted storage
+        if (window.encryptedWallet) {
+            const stillExists = window.encryptedWallet.memoryCache.has(lemmaId);
+            console.log(`  Still in encrypted wallet memory: ${stillExists}`);
+            
+            // Double-check encrypted storage
+            const encryptedData = localStorage.getItem('lemma_credentials_encrypted');
+            if (encryptedData) {
+                const parsed = JSON.parse(encryptedData);
+                const stillInStorage = !!parsed[lemmaId];
+                console.log(`  Still in encrypted localStorage: ${stillInStorage}`);
+            }
+        }
         
         // Refresh display
+        console.log(`  Refreshing wallet display...`);
         await loadWalletData();
         
         // Show success message with scope clarification
