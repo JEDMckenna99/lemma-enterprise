@@ -569,13 +569,38 @@
                 // Check for permission credentials (IAM-only authentication)
                 const permissionCredentials = await window.lemmaWallet.getCredentials('permission');
                 
-                // Filter for lemma.id permission lemmas
-                const lemmaIdPermissions = permissionCredentials.filter(cred => 
-                    cred.claims?.siteId === 'lemma.id' || 
-                    cred.credentialSubject?.siteId === 'lemma.id'
-                );
+                console.log('🔍 Checking permission credentials:', permissionCredentials.map(c => ({
+                    id: c.id,
+                    siteId: c.claims?.siteId,
+                    siteDomain: c.claims?.siteDomain,
+                    site_domain: c.claims?.site_domain,
+                    permissionId: c.claims?.permissionId,
+                    allClaims: c.claims
+                })));
+                
+                // Filter for lemma.id permission lemmas (PRIMARY: siteDomain, FALLBACK: siteId)
+                const lemmaIdPermissions = permissionCredentials.filter(cred => {
+                    const claims = cred.claims || cred.credentialSubject || {};
+                    
+                    // Check all possible field names for site domain
+                    const siteDomain = claims.siteDomain || claims.site_domain;
+                    const siteId = claims.siteId || claims.site_id;
+                    
+                    console.log(`  Checking credential ${cred.id}:`, {
+                        siteDomain,
+                        siteId,
+                        matches: siteDomain === 'lemma.id' || siteId === 'lemma.id'
+                    });
+                    
+                    return siteDomain === 'lemma.id' || 
+                           siteId === 'lemma.id';
+                });
+                
+                console.log('✅ Found lemma.id permissions:', lemmaIdPermissions.length);
                 
                 if (lemmaIdPermissions.length === 0) {
+                    console.error('❌ No lemma.id permissions found!');
+                    console.error('Available credentials:', permissionCredentials);
                     showError('email', 'No permission lemma found for lemma.id. Please use admin bootstrap or contact support.');
                     button.disabled = false;
                     button.innerHTML = originalText;
