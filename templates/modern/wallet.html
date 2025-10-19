@@ -1283,21 +1283,43 @@ async function revokeLemma(lemmaId, lemmaType) {
         const removeResult = await lemmaWallet.removeCredential(lemmaId);
         console.log(`  Removal result: ${removeResult ? 'SUCCESS' : 'FAILED'}`);
         
-        // Wait a moment to ensure encrypted storage write completes
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Verify it's actually gone from encrypted storage
-        if (window.encryptedWallet) {
-            const stillExists = window.encryptedWallet.memoryCache.has(lemmaId);
-            console.log(`  Still in encrypted wallet memory: ${stillExists}`);
-            
-            // Double-check encrypted storage
+        // CRITICAL FIX: Directly remove from encrypted localStorage to ensure it's gone
+        try {
             const encryptedData = localStorage.getItem('lemma_credentials_encrypted');
             if (encryptedData) {
                 const parsed = JSON.parse(encryptedData);
-                const stillInStorage = !!parsed[lemmaId];
-                console.log(`  Still in encrypted localStorage: ${stillInStorage}`);
+                if (parsed[lemmaId]) {
+                    console.log(`  Found credential in encrypted storage, removing...`);
+                    delete parsed[lemmaId];
+                    localStorage.setItem('lemma_credentials_encrypted', JSON.stringify(parsed));
+                    console.log(`  ✅ Directly removed from encrypted localStorage`);
+                }
             }
+            
+            // Also remove from plaintext if it exists
+            const plaintextData = localStorage.getItem('lemma_credentials');
+            if (plaintextData) {
+                const plaintextCreds = JSON.parse(plaintextData);
+                const filtered = plaintextCreds.filter(c => c.id !== lemmaId);
+                if (filtered.length < plaintextCreds.length) {
+                    localStorage.setItem('lemma_credentials', JSON.stringify(filtered));
+                    console.log(`  ✅ Removed from plaintext localStorage`);
+                }
+            }
+        } catch (storageError) {
+            console.error(`  ❌ Failed to clean localStorage:`, storageError);
+        }
+        
+        // Wait a moment to ensure all writes complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Verify it's actually gone
+        const encryptedCheck = localStorage.getItem('lemma_credentials_encrypted');
+        if (encryptedCheck) {
+            const parsedCheck = JSON.parse(encryptedCheck);
+            const stillInStorage = !!parsedCheck[lemmaId];
+            console.log(`  Verification: Still in encrypted localStorage: ${stillInStorage}`);
+            console.log(`  Encrypted storage now has ${Object.keys(parsedCheck).length} credentials`);
         }
         
         // Refresh display

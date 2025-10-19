@@ -546,9 +546,15 @@ class LemmaWallet {
         // 1. PRIORITY: Try encrypted storage first (most secure)
         if (typeof EncryptedLemmaWallet !== 'undefined') {
             try {
-                if (!this.encryptedWallet) {
+                // Use global singleton encrypted wallet instance
+                if (!this.encryptedWallet && !window.encryptedWallet) {
                     this.encryptedWallet = new EncryptedLemmaWallet({ debug: this.debug });
                     await this.encryptedWallet.init();
+                    // Store globally to ensure single instance across entire app
+                    window.encryptedWallet = this.encryptedWallet;
+                } else if (window.encryptedWallet && !this.encryptedWallet) {
+                    // Use existing global instance
+                    this.encryptedWallet = window.encryptedWallet;
                 }
                 
                 const encryptedCredentials = await this.encryptedWallet.listCredentials();
@@ -657,9 +663,15 @@ class LemmaWallet {
             // 2. TRY ENCRYPTED STORAGE FIRST (transparent, no UX change)
             if (typeof EncryptedLemmaWallet !== 'undefined') {
                 try {
-                    if (!this.encryptedWallet) {
+                    // Use global singleton encrypted wallet instance
+                    if (!this.encryptedWallet && !window.encryptedWallet) {
                         this.encryptedWallet = new EncryptedLemmaWallet({ debug: this.debug });
                         await this.encryptedWallet.init();
+                        // Store globally to ensure single instance across entire app
+                        window.encryptedWallet = this.encryptedWallet;
+                    } else if (window.encryptedWallet && !this.encryptedWallet) {
+                        // Use existing global instance
+                        this.encryptedWallet = window.encryptedWallet;
                     }
                     
                     await this.encryptedWallet.storeCredential(credentialWithMeta);
