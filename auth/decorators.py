@@ -194,6 +194,41 @@ def get_current_user():
         return {'api_key': g.api_key}
     return None
 
+def require_permission_lemma(site_id='lemma.id', required_permissions=None):
+    """
+    Decorator to require a valid permission lemma for site access
+    Does NOT require identity/PoH lemma - permission lemma only
+    
+    Usage:
+        @app.route('/dashboard')
+        @require_permission_lemma('lemma.id', ['customer_access', 'admin_access'])
+        def dashboard():
+            return render_template('dashboard.html')
+    """
+    if required_permissions is None:
+        required_permissions = ['customer_access', 'admin_access']
+    
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            from flask import session, redirect, url_for, request
+            
+            # Check session for permission lemma
+            permission_verified = session.get('permission_verified', False)
+            permission_site = session.get('permission_site')
+            permission_id = session.get('permission_id')
+            
+            if permission_verified and permission_site == site_id and permission_id in required_permissions:
+                # Valid permission lemma found in session
+                return f(*args, **kwargs)
+            
+            # No valid permission - redirect to login
+            session['return_url'] = request.url
+            return redirect(url_for('customer_accounts.login'))
+        
+        return decorated_function
+    return decorator
+
 def rate_limit(max_requests=100, window=60):
     """
     Decorator for rate limiting (mock implementation)

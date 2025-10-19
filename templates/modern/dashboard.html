@@ -396,12 +396,7 @@
 &lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
 
 &lt;script&gt;
-// Initialize Lemma Shield
-const lemmaShield = new LemmaBotShield({
-    apiKey: '{{ customer.api_keys[0].key if customer.api_keys else "YOUR_API_KEY" }}',
-    customerId: '{{ customer.customer_id }}'
-});
-
+// Shield disabled - using IAM permission-only authentication
 // Initialize Integrated Wallet with advanced features
 const lemmaWallet = new LemmaIntegratedWallet({
     apiKey: '{{ customer.api_keys[0].key if customer.api_keys else "YOUR_API_KEY" }}',
@@ -412,8 +407,7 @@ const lemmaWallet = new LemmaIntegratedWallet({
     debug: true
 });
 
-// Verify users automatically
-lemmaShield.verifyUser();
+// Shield removed - permission lemmas checked client-side in DOMContentLoaded
 &lt;/script&gt;</div>
                 </div>
 

@@ -117,6 +117,12 @@ def lemma_signin():
         session['lemma_verified'] = True
         session['verification_time_us'] = verification_result.get('verification_time_us', 0)
         
+        # Set permission lemma session variables for IAM system
+        session['permission_verified'] = True
+        session['permission_site'] = 'lemma.id'
+        session['permission_id'] = f'{user_role}_access'
+        session['permission_email'] = user_email
+        
         # Issue fresh permission lemma using REAL crypto engine
         permission_lemma_data = None
         if customer:
