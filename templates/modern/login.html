@@ -566,17 +566,24 @@
                     await window.lemmaWallet.init();
                 }
                 
-                // Check for identity credentials (PoH)
-                const identityCredentials = await window.lemmaWallet.getCredentials('identity');
-                if (identityCredentials.length === 0) {
-                    showError('email', 'No Lemma identity credentials found. Please verify your identity first.');
+                // Check for permission credentials (IAM-only authentication)
+                const permissionCredentials = await window.lemmaWallet.getCredentials('permission');
+                
+                // Filter for lemma.id permission lemmas
+                const lemmaIdPermissions = permissionCredentials.filter(cred => 
+                    cred.claims?.siteId === 'lemma.id' || 
+                    cred.credentialSubject?.siteId === 'lemma.id'
+                );
+                
+                if (lemmaIdPermissions.length === 0) {
+                    showError('email', 'No permission lemma found for lemma.id. Please use admin bootstrap or contact support.');
                     button.disabled = false;
                     button.innerHTML = originalText;
                     return;
                 }
                 
-                // Check for permission credentials
-                const permissionCredentials = await window.lemmaWallet.getCredentials('permission');
+                // Check for identity credentials (optional, for Fed Network later)
+                const identityCredentials = await window.lemmaWallet.getCredentials('identity');
                 
                 button.innerHTML = `
                     <div class="button-content">
@@ -615,11 +622,11 @@
                     return;
                 }
                 
-                // Verify credentials using the Lemma API
+                // Verify credentials using the Lemma API (permission-only)
                 button.innerHTML = `
                     <div class="button-content">
                         <span class="button-icon">⚡</span>
-                        Verifying (${identityCredentials.length + permissionCredentials.length} credentials)...
+                        Verifying (${lemmaIdPermissions.length} permission${lemmaIdPermissions.length !== 1 ? 's' : ''})...
                     </div>
                 `;
                 
@@ -630,7 +637,7 @@
                         'Authorization': 'Bearer demo-integration-key-12345'
                     },
                     body: JSON.stringify({
-                        credentials: [...identityCredentials, ...permissionCredentials],
+                        credentials: [...lemmaIdPermissions, ...identityCredentials],
                         enableRustEngine: true,
                         requireFullCrypto: true
                     })

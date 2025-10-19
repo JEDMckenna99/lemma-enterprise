@@ -48,10 +48,11 @@ def lemma_signin():
                 'error': 'User email is required'
             }), 400
         
-        if not identity_credentials:
+        # IAM-only authentication: Accept permission credentials (identity optional for now)
+        if not permission_credentials and not identity_credentials:
             return jsonify({
                 'success': False,
-                'error': 'Identity credentials are required'
+                'error': 'At least one credential type is required (permission or identity)'
             }), 400
         
         if not verification_result.get('verified'):
