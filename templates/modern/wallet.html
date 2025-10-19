@@ -672,6 +672,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Shield disabled on wallet page - users need direct access to view credentials
         console.log('ℹ️ Shield protection disabled on wallet page (low-risk, need wallet access)');
         
+        // Show the wallet UI immediately (no Shield blocking)
+        const walletMain = document.querySelector('.wallet-main');
+        if (walletMain) {
+            walletMain.style.display = 'block';
+        }
+        
         // Load and display wallet data (both PoH and permission lemmas)
         await loadWalletData();
         
