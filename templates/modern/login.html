@@ -621,26 +621,38 @@
                 let userEmail = null;
                 let userRole = 'customer';
                 
-                // Check permission credentials for user info
-                for (const cred of permissionCredentials) {
-                    if (cred.claims?.email && cred.claims?.siteId === 'lemma.id') {
-                        userEmail = cred.claims.email;
-                        userRole = cred.claims.accountType || 'customer';
+                // Extract from lemma.id permission credentials (already filtered)
+                for (const cred of lemmaIdPermissions) {
+                    const claims = cred.claims || cred.credentialSubject || {};
+                    if (claims.email) {
+                        userEmail = claims.email;
+                        userRole = claims.accountType || claims.permissionId?.replace('_access', '') || 'customer';
+                        
+                        console.log('📧 Extracted user info from permission lemma:', {
+                            email: userEmail,
+                            role: userRole,
+                            permissionId: claims.permissionId
+                        });
                         break;
                     }
                 }
                 
                 // Fallback: try to extract from identity credentials
-                if (!userEmail) {
+                if (!userEmail && identityCredentials.length > 0) {
                     for (const cred of identityCredentials) {
-                        if (cred.claims?.email) {
-                            userEmail = cred.claims.email;
+                        const claims = cred.claims || cred.credentialSubject || {};
+                        if (claims.email) {
+                            userEmail = claims.email;
+                            console.log('📧 Extracted email from identity credential:', userEmail);
                             break;
                         }
                     }
                 }
                 
                 if (!userEmail) {
+                    console.error('❌ Could not find email in any credentials!');
+                    console.error('Permission credentials:', lemmaIdPermissions);
+                    console.error('Identity credentials:', identityCredentials);
                     showError('email', 'Could not determine user email from Lemma credentials.');
                     button.disabled = false;
                     button.innerHTML = originalText;
