@@ -669,34 +669,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // Initialize the Lemma Shield Widget to protect the entire wallet page
-        lemmaShield = new LemmaBotShield({
-            debug: true,
-            apiKey: shieldApiKey,  // Use API key from Heroku config
-            apiBase: window.location.origin,
-            securityLevel: 'medium',
-            checkOnEvents: ['entry', 'checkout', 'sensitive_action'],
-            onVerified: function(result) {
-                console.log('✅ Shield verification successful - wallet access granted:', result);
-                // Wallet content is automatically shown by the shield
-            },
-            onError: function(error) {
-                console.error('❌ Shield verification failed - wallet access denied:', error);
-                // Shield will show verification widget automatically
-            }
-        });
-        
-        // CRITICAL: Protect the entire wallet page - only verified humans can access
-        await lemmaShield.protect('.wallet-main');
+        // Shield disabled on wallet page - users need direct access to view credentials
+        console.log('ℹ️ Shield protection disabled on wallet page (low-risk, need wallet access)');
         
         // Load and display wallet data (both PoH and permission lemmas)
         await loadWalletData();
-        
-        // If user has no credentials, also protect the join section
-        const credentials = await lemmaWallet.getCredentials();
-        if (credentials.length === 0) {
-            console.log('🔐 No credentials found - protecting join section with Shield');
-            await lemmaShield.protect('#fil-join-section');
-        }
         
         // Set up periodic refresh
         setInterval(loadWalletData, 30000); // Refresh every 30 seconds
@@ -1321,6 +1298,12 @@ async function testVerificationSpeed() {
     const speedDisplay = document.getElementById('verification-speed-live');
     const lastCheckTime = document.getElementById('last-check-time');
     
+    // Check if elements exist before updating
+    if (!button || !speedDisplay || !lastCheckTime) {
+        console.warn('⚠️ Speed test UI elements not found - skipping test');
+        return;
+    }
+    
     // Update UI to show testing state
     button.textContent = 'Testing...';
     button.disabled = true;
@@ -1485,9 +1468,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (lemmaWallet && lemmaWallet.isReady) {
             await testVerificationSpeed();
         } else {
-            // Set initial state
-            document.getElementById('verification-speed-live').textContent = 'Initializing...';
-            document.getElementById('last-check-time').textContent = 'Waiting for wallet...';
+            // Set initial state (with null checks)
+            const speedDisplay = document.getElementById('verification-speed-live');
+            const lastCheckTime = document.getElementById('last-check-time');
+            if (speedDisplay) speedDisplay.textContent = 'Initializing...';
+            if (lastCheckTime) lastCheckTime.textContent = 'Waiting for wallet...';
         }
     }, 3000); // Give more time for wallet initialization
 });
