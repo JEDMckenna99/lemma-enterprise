@@ -2479,8 +2479,23 @@ if (typeof window.originalLoadWalletData === 'undefined') {
 }
 
 // Initialize Bot Shield for wallet protection
-document.addEventListener('DOMContentLoaded', async () => {
+// IMPORTANT: Wait for wallet to be fully initialized first
+async function initWalletShieldProtection() {
     console.log('🛡️ Initializing permission-based Bot Shield for wallet...');
+    
+    // Wait for global wallet to be available
+    let retries = 0;
+    while (!window.lemmaWallet && !window.LEMMA_WALLET_INITIALIZED && retries < 10) {
+        console.log('⏳ Waiting for wallet initialization... (attempt ' + (retries + 1) + ')');
+        await new Promise(resolve => setTimeout(resolve, 200));
+        retries++;
+    }
+    
+    if (!window.lemmaWallet && !window.LEMMA_WALLET_INITIALIZED) {
+        console.error('❌ Wallet not initialized after 2 seconds, shield may not work correctly');
+    } else {
+        console.log('✅ Wallet ready, initializing shield...');
+    }
     
     const shield = new LemmaBotShield({
         apiKey: 'platform_owner_key_2024',
@@ -2496,7 +2511,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     await shield.protect('.wallet-container');
     
     console.log('✅ Wallet protected by permission-based Bot Shield');
-});
+}
+
+// Start shield initialization after DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initWalletShieldProtection);
+} else {
+    initWalletShieldProtection();
+}
 
 </script>
 {% endblock %}

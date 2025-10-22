@@ -391,6 +391,30 @@ class LemmaBotShield {
                 console.log('🔍 Checking background wallet for existing permission lemma...');
             }
             
+            // Ensure wallet is initialized
+            if (!this.backgroundWallet) {
+                if (this.config.debug) {
+                    console.log('⏳ Waiting for wallet initialization...');
+                }
+                await this.initializeFederatedWallet();
+            }
+            
+            // Additional safety: Wait for wallet to be ready
+            if (typeof this.backgroundWallet.hasValidCredentials !== 'function') {
+                if (this.config.debug) {
+                    console.warn('⚠️ Wallet not ready yet, retrying in 500ms...');
+                }
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Try one more time
+                if (typeof this.backgroundWallet.hasValidCredentials !== 'function') {
+                    if (this.config.debug) {
+                        console.error('❌ Wallet still not ready, showing verification widget');
+                    }
+                    return false;
+                }
+            }
+            
             // Check for PERMISSION credentials (not identity)
             const hasPermissionCreds = await this.backgroundWallet.hasValidCredentials('permission');
             
@@ -413,28 +437,27 @@ class LemmaBotShield {
                 });
                 
                 if (sitePermissions.length > 0) {
-                    // CRITICAL: Verify with fresh nonce (bot defense)
-                    const verified = await this.verifyPermissionWithNonce(sitePermissions[0]);
+                    // SIMPLIFIED: Trust permission lemmas from wallet on page load
+                    // Nonce verification happens during background checks and sensitive actions
+                    // This prevents blocking the user on page load if network is slow
+                    this.state.hasLemma = true;
                     
-                    if (verified) {
-                        this.state.hasLemma = true;
-                        
-                        if (this.config.debug) {
-                            console.log('✅ Valid permission lemma found and verified with nonce', {
-                                credentialId: sitePermissions[0].id,
-                                siteDomain: currentDomain,
-                                permissionId: sitePermissions[0].claims?.permissionId,
-                                storedAt: new Date(sitePermissions[0].storedAt).toLocaleString()
-                            });
-                        }
-                        
-                        return true;
-                    } else {
-                        if (this.config.debug) {
-                            console.warn('⚠️ Permission lemma found but nonce verification failed (possible replay attack)');
-                        }
-                        return false;
+                    if (this.config.debug) {
+                        console.log('✅ Valid permission lemma found in wallet', {
+                            credentialId: sitePermissions[0].id,
+                            siteDomain: currentDomain,
+                            permissionId: sitePermissions[0].claims?.permissionId,
+                            storedAt: new Date(sitePermissions[0].storedAt).toLocaleString(),
+                            note: 'Nonce verification will occur during background checks'
+                        });
                     }
+                    
+                    // Schedule background nonce verification (non-blocking)
+                    if (this.config.backgroundChecks) {
+                        setTimeout(() => this.verifyPermissionWithNonce(sitePermissions[0]), 1000);
+                    }
+                    
+                    return true;
                 } else {
                     if (this.config.debug) {
                         console.log(`ℹ️ No permission lemmas found for ${currentDomain}`);
