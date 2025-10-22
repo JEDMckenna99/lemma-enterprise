@@ -57,6 +57,26 @@ impl PyMinimalIssuer {
         self.issuer.signing_key_bytes().to_vec()
     }
     
+    /// Issue credential (takes subject DID and claims dict)
+    pub fn issue_credential(&self, subject: &str, claims: std::collections::HashMap<String, String>) -> PyResult<String> {
+        use std::collections::HashMap;
+        use serde_json::Value;
+        
+        // Convert HashMap<String, String> to HashMap<String, Value>
+        let claims_json: HashMap<String, Value> = claims.into_iter()
+            .map(|(k, v)| (k, Value::String(v)))
+            .collect();
+        
+        // Issue credential
+        let credential = self.issuer
+            .issue_credential(subject.to_string(), claims_json)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        
+        // Serialize credential to JSON
+        serde_json::to_string(&credential)
+            .map_err(|e| PyRuntimeError::new_err(format!("Serialization error: {}", e)))
+    }
+    
     /// Issue credential (simplified: takes subject and claims as JSON)
     pub fn issue_credential_simple(&self, subject: &str, claims_json: &str) -> PyResult<String> {
         use std::collections::HashMap;
