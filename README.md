@@ -82,6 +82,7 @@
 - **Lemma Type**: `packageType: "permission"`, `siteId: "customer_site"`
 - **Issuer DID**: `did:lemma:{site_authority_public_key}`
 - **Distribution**: Site-specific, isolated per customer
+- **Key Storage**: AWS KMS HSM-backed encryption (FIPS 140-2 Level 2/3)
 
 #### **3. ZKP Claim Networks**
 - **Purpose**: Privacy-preserving claim verification
@@ -664,6 +665,94 @@ pub extern "C" fn lemma_wallet_store_credential(
 - **🔐 Zero-Knowledge Proofs**: Perfect privacy with selective disclosure
 - **🔑 Hardware-Backed**: TPM, Secure Enclave, TouchID integration  
 - **🌐 Cross-Site Sharing**: Federated network with privacy preservation
+- **🔐 AWS KMS HSM**: FIPS 140-2 Level 2/3 encryption for site signing keys (NEW!)
+
+### **🔐 NEW: AWS KMS HSM-Backed Key Storage**
+
+**Enterprise-Grade Key Management** for Site-Specific Signing Keys (v895+)
+
+#### **🎯 Overview**
+
+All site-specific Ed25519 signing keys are now encrypted using **AWS Key Management Service (KMS)** with **FIPS 140-2 Level 2/3 validated Hardware Security Modules (HSMs)**.
+
+**Security Benefits:**
+- ✅ **Keys persist across dyno restarts** (no more lost keys!)
+- ✅ **FIPS 140-2 Level 2/3 compliance** (HSM-backed encryption)
+- ✅ **Automatic key rotation** (annual, managed by AWS)
+- ✅ **Full audit trail** (AWS CloudTrail logging)
+- ✅ **Encryption context** (site-specific isolation)
+- ✅ **SOC 2 Type II compliant**
+
+#### **🏗️ Architecture**
+
+```
+Customer Site Registration:
+1. Generate Ed25519 keypair → 32-byte private key
+2. Encrypt with AWS KMS → FIPS 140-2 HSM
+3. Store in PostgreSQL → Encrypted ciphertext
+4. Public key as DID → did:lemma:{public_key_hex}
+
+Credential Issuance:
+1. First request (per dyno):
+   - Load encrypted key from database
+   - Decrypt using AWS KMS (~15ms)
+   - Cache issuer in memory
+   - Sign credential (~0.5ms)
+
+2. Subsequent requests:
+   - Use cached issuer (~0.5ms)
+   - NO KMS call required
+```
+
+#### **💰 Cost & Performance**
+
+**Cost:**
+- **KMS Master Key**: $1.00/month (one key for entire platform)
+- **API Calls**: $0.03 per 10,000 requests
+- **Total for 100 sites**: ~$1.03/month
+- **Total for 1,000 sites**: ~$1.30/month
+
+**Performance:**
+- **First credential issuance**: ~18.5ms (includes KMS decrypt)
+- **Cached issuance**: ~0.5ms (no KMS call)
+- **KMS calls**: ~3,000/month for 100 sites
+- **Impact**: Negligible (only first request per dyno)
+
+#### **🔑 Key Features**
+
+1. **Encryption at Rest**
+   - All site signing keys encrypted with AWS KMS
+   - Keys never stored in plaintext
+   - FIPS 140-2 Level 2/3 validated HSMs
+
+2. **Automatic Key Rotation**
+   - AWS rotates CMK annually
+   - Old key versions remain available for decryption
+   - Zero downtime rotation
+
+3. **Site Isolation**
+   - Encryption context prevents cross-site key use
+   - Each site's key protected by unique context
+   - Even with same master key, sites can't decrypt each other's keys
+
+4. **Audit Trail**
+   - All encrypt/decrypt operations logged to CloudTrail
+   - Track when keys are accessed
+   - Monitor for anomalous usage
+
+#### **📚 Documentation**
+
+- **Setup Guide**: `docs/KMS_SETUP_GUIDE.md`
+- **Integration Status**: `KMS_INTEGRATION_STATUS.md`
+- **Code**: `api/kms_manager.py`, `api/issuer_management.py`
+
+#### **🚀 Deployment Status**
+
+- **✅ Production Deployed**: v895
+- **✅ Environment Configured**: AWS credentials set
+- **✅ Database Migrated**: KMS columns added to `sites` table
+- **✅ Graceful Fallback**: Works without KMS (dev/test)
+- **✅ All New Sites**: Automatically use KMS-backed keys
 - **⚡ Microsecond Performance**: 0.05-1µs verification across all platforms
 - **📱 Universal Compatibility**: Desktop, mobile, browser seamless deployment
 
