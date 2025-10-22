@@ -2478,5 +2478,25 @@ if (typeof window.originalLoadWalletData === 'undefined') {
     };
 }
 
+// Initialize Bot Shield for wallet protection
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🛡️ Initializing permission-based Bot Shield for wallet...');
+    
+    const shield = new LemmaBotShield({
+        apiKey: 'platform_owner_key_2024',
+        apiBase: window.location.origin,
+        debug: true,
+        securityLevel: 'high', // Wallet is sensitive data
+        backgroundChecks: true,
+        checkOnEvents: ['entry', 'revocation', 'export'],
+        permissionRequestUrl: '/request-access'
+    });
+    
+    // Protect the wallet container
+    await shield.protect('.wallet-container');
+    
+    console.log('✅ Wallet protected by permission-based Bot Shield');
+});
+
 </script>
 {% endblock %}

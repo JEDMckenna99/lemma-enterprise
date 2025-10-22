@@ -763,4 +763,29 @@ const lemmaWallet = new LemmaIntegratedWallet({
             }
         });
     </script>
+
+    <!-- Lemma Bot Shield - Permission-Based Protection -->
+    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lemma-bot-shield-simple.js') }}"></script>
+    <script>
+        // Initialize Bot Shield with permission-based verification
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🛡️ Initializing permission-based Bot Shield for dashboard...');
+            
+            const shield = new LemmaBotShield({
+                apiKey: '{{ customer.api_keys[0].key if customer.api_keys else "platform_owner_key_2024" }}',
+                apiBase: window.location.origin,
+                debug: true,
+                securityLevel: 'medium',
+                backgroundChecks: true,
+                checkOnEvents: ['entry', 'sensitive_action'],
+                permissionRequestUrl: '/request-access'
+            });
+            
+            // Protect the entire dashboard content
+            await shield.protect('.dashboard-container');
+            
+            console.log('✅ Dashboard protected by permission-based Bot Shield');
+        });
+    </script>
 {% endblock %}
