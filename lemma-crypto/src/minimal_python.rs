@@ -1,11 +1,111 @@
-//! Minimal Python bindings for OPRF Key Manager
+//! Python bindings for Lemma Crypto
 //! 
-//! Provides Python interface to key management functionality
+//! Provides Python interface to cryptographic functionality
 
 use pyo3::prelude::*;
 use pyo3::exceptions::PyRuntimeError;
 use crate::oprf_key_manager::{OPRFKeyManager, KeyType, KeyStatus};
+use crate::minimal_core::{MinimalIssuer, MinimalVerifier};
+use crate::optimized_verification::OptimizedVerifier;
 use crate::Result as LemmaResult;
+
+/// Python wrapper for MinimalIssuer
+#[pyclass]
+pub struct PyMinimalIssuer {
+    issuer: MinimalIssuer,
+}
+
+#[pymethods]
+impl PyMinimalIssuer {
+    #[new]
+    pub fn new() -> Self {
+        Self {
+            issuer: MinimalIssuer::new(),
+        }
+    }
+    
+    /// Create issuer from seed (for KMS-backed keys)
+    #[staticmethod]
+    pub fn from_seed(seed: Vec<u8>) -> PyResult<Self> {
+        if seed.len() != 32 {
+            return Err(PyRuntimeError::new_err("Seed must be exactly 32 bytes"));
+        }
+        let mut seed_array = [0u8; 32];
+        seed_array.copy_from_slice(&seed);
+        Ok(Self {
+            issuer: MinimalIssuer::from_seed(&seed_array),
+        })
+    }
+    
+    /// Get DID
+    pub fn get_did(&self) -> String {
+        self.issuer.get_did()
+    }
+    
+    /// Get public key hex
+    pub fn get_public_key_hex(&self) -> String {
+        self.issuer.get_public_key_hex()
+    }
+    
+    /// Get signing key bytes (for KMS encryption)
+    pub fn signing_key_bytes(&self) -> Vec<u8> {
+        self.issuer.signing_key_bytes().to_vec()
+    }
+    
+    /// Issue credential
+    pub fn issue_credential(&self, credential_json: &str) -> PyResult<String> {
+        self.issuer
+            .issue_credential(credential_json)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+}
+
+/// Python wrapper for MinimalVerifier
+#[pyclass]
+pub struct PyMinimalVerifier {
+    verifier: MinimalVerifier,
+}
+
+#[pymethods]
+impl PyMinimalVerifier {
+    /// Create verifier from public key hex
+    #[staticmethod]
+    pub fn from_public_key_hex(public_key_hex: &str) -> PyResult<Self> {
+        let verifier = MinimalVerifier::from_public_key_hex(public_key_hex)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok(Self { verifier })
+    }
+    
+    /// Verify credential
+    pub fn verify_credential(&self, credential_json: &str, signature_hex: &str) -> PyResult<bool> {
+        self.verifier
+            .verify_credential(credential_json, signature_hex)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+}
+
+/// Python wrapper for OptimizedVerifier
+#[pyclass]
+pub struct PyOptimizedVerifier {
+    verifier: OptimizedVerifier,
+}
+
+#[pymethods]
+impl PyOptimizedVerifier {
+    #[new]
+    pub fn new() -> Self {
+        Self {
+            verifier: OptimizedVerifier::new(),
+        }
+    }
+    
+    /// Verify credential (optimized)
+    pub fn verify(&self, credential_json: &str, signature_hex: &str, public_key_hex: &str) -> PyResult<bool> {
+        let result = self.verifier
+            .verify(credential_json, signature_hex, public_key_hex);
+        Ok(result.verified)
+    }
+}
 
 /// Python wrapper for OPRF Key Manager
 #[pyclass]
@@ -86,7 +186,14 @@ impl PyOPRFKeyManager {
 
 /// Register Python module
 #[pymodule]
-fn oprf_key_management(_py: Python, m: &PyModule) -> PyResult<()> {
+fn lemma_crypto(_py: Python, m: &PyModule) -> PyResult<()> {
+    // Core classes
+    m.add_class::<PyMinimalIssuer>()?;
+    m.add_class::<PyMinimalVerifier>()?;
+    m.add_class::<PyOptimizedVerifier>()?;
+    
+    // OPRF Key Management
     m.add_class::<PyOPRFKeyManager>()?;
+    
     Ok(())
 }
