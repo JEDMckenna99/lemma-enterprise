@@ -12,6 +12,10 @@ SQLAlchemy>=2.0.0
 psycopg2-binary>=2.9.0
 redis>=5.0.0
 
+# AWS KMS for HSM-backed key storage
+boto3>=1.26.0
+botocore>=1.29.0
+
 # QR code generation for multi-lemma wallet sync
 qrcode[pil]>=7.4.2
 

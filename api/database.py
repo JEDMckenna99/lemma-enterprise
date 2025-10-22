@@ -57,6 +57,18 @@ class Site(Base):
     oauth_client_id = Column(String, nullable=False)
     oauth_client_secret = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # KMS-encrypted Ed25519 signing key (HSM-backed storage)
+    kms_encrypted_signing_key = Column(Text)  # Base64-encoded KMS ciphertext
+    kms_key_id = Column(String)  # AWS KMS CMK ID used for encryption
+    public_key_hex = Column(String)  # Ed25519 public key (64 hex chars)
+    issuer_did = Column(String)  # did:lemma:{public_key_hex}
+    
+    # Key lifecycle management
+    key_created_at = Column(DateTime)
+    key_last_used = Column(DateTime)
+    key_rotation_due = Column(DateTime)
+    key_status = Column(String, default='active')  # 'active', 'rotating', 'deprecated', 'revoked'
 
 class Permission(Base):
     """Permission model for IAM"""

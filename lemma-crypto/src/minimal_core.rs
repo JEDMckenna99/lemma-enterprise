@@ -128,6 +128,12 @@ impl MinimalIssuer {
         hex::encode(self.verifying_key.to_bytes())
     }
     
+    /// Get the signing key bytes (for KMS encryption)
+    /// WARNING: This exposes the private key - only use for secure storage!
+    pub fn signing_key_bytes(&self) -> [u8; 32] {
+        self.signing_key.to_bytes()
+    }
+    
     /// Issue and sign a credential
     pub fn issue_credential(
         &self,
