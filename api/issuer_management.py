@@ -111,7 +111,7 @@ class LemmaIssuerManager:
             issuer = PyMinimalIssuer()  # Generates NEW keypair!
             
             # Get signing key bytes for encryption
-            signing_key_bytes = bytes(issuer.get_signing_key_bytes())
+            signing_key_bytes = bytes(issuer.signing_key_bytes())
             
             if is_kms_available():
                 # ENCRYPT with AWS KMS

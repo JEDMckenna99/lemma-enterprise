@@ -47,7 +47,12 @@ impl PyMinimalIssuer {
         self.issuer.public_key_hex()
     }
     
-    /// Get signing key bytes (for KMS encryption)
+    /// Get signing key bytes (for KMS encryption) - Python-friendly name
+    pub fn get_signing_key_bytes(&self) -> Vec<u8> {
+        self.issuer.signing_key_bytes().to_vec()
+    }
+    
+    /// Get signing key bytes (for KMS encryption) - Rust-style name
     pub fn signing_key_bytes(&self) -> Vec<u8> {
         self.issuer.signing_key_bytes().to_vec()
     }
