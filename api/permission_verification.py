@@ -111,9 +111,9 @@ def verify_permission_lemma():
             }), 403
         
         # 5. Check revocation status
-        from api.database import get_db_session, RevocationList
+        from api.database import get_db, RevocationList
         
-        session = get_db_session()
+        session = get_db()
         try:
             revoked = session.query(RevocationList).filter_by(lemma_id=cred_id).first()
             if revoked:
