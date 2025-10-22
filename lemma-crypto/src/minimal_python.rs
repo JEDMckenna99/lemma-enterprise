@@ -39,12 +39,12 @@ impl PyMinimalIssuer {
     
     /// Get DID
     pub fn get_did(&self) -> String {
-        self.issuer.get_did()
+        self.issuer.did().to_string()
     }
     
     /// Get public key hex
     pub fn get_public_key_hex(&self) -> String {
-        self.issuer.get_public_key_hex()
+        self.issuer.public_key_hex()
     }
     
     /// Get signing key bytes (for KMS encryption)
@@ -52,11 +52,23 @@ impl PyMinimalIssuer {
         self.issuer.signing_key_bytes().to_vec()
     }
     
-    /// Issue credential
-    pub fn issue_credential(&self, credential_json: &str) -> PyResult<String> {
-        self.issuer
-            .issue_credential(credential_json)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    /// Issue credential (simplified: takes subject and claims as JSON)
+    pub fn issue_credential_simple(&self, subject: &str, claims_json: &str) -> PyResult<String> {
+        use std::collections::HashMap;
+        use serde_json::Value;
+        
+        // Parse claims from JSON
+        let claims: HashMap<String, Value> = serde_json::from_str(claims_json)
+            .map_err(|e| PyRuntimeError::new_err(format!("Invalid claims JSON: {}", e)))?;
+        
+        // Issue credential
+        let credential = self.issuer
+            .issue_credential(subject.to_string(), claims)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        
+        // Serialize credential to JSON
+        serde_json::to_string(&credential)
+            .map_err(|e| PyRuntimeError::new_err(format!("Serialization error: {}", e)))
     }
 }
 
@@ -68,18 +80,24 @@ pub struct PyMinimalVerifier {
 
 #[pymethods]
 impl PyMinimalVerifier {
-    /// Create verifier from public key hex
-    #[staticmethod]
-    pub fn from_public_key_hex(public_key_hex: &str) -> PyResult<Self> {
-        let verifier = MinimalVerifier::from_public_key_hex(public_key_hex)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        Ok(Self { verifier })
+    #[new]
+    pub fn new() -> Self {
+        Self {
+            verifier: MinimalVerifier::new(),
+        }
     }
     
-    /// Verify credential
-    pub fn verify_credential(&self, credential_json: &str, signature_hex: &str) -> PyResult<bool> {
+    /// Verify credential from JSON
+    pub fn verify_credential_json(&self, credential_json: &str) -> PyResult<bool> {
+        use crate::minimal_core::MinimalCredential;
+        
+        // Parse credential from JSON
+        let credential: MinimalCredential = serde_json::from_str(credential_json)
+            .map_err(|e| PyRuntimeError::new_err(format!("Invalid credential JSON: {}", e)))?;
+        
+        // Verify
         self.verifier
-            .verify_credential(credential_json, signature_hex)
+            .verify(&credential)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 }
@@ -93,16 +111,24 @@ pub struct PyOptimizedVerifier {
 #[pymethods]
 impl PyOptimizedVerifier {
     #[new]
-    pub fn new() -> Self {
-        Self {
-            verifier: OptimizedVerifier::new(),
-        }
+    pub fn new() -> PyResult<Self> {
+        let verifier = OptimizedVerifier::new()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok(Self { verifier })
     }
     
-    /// Verify credential (optimized)
-    pub fn verify(&self, credential_json: &str, signature_hex: &str, public_key_hex: &str) -> PyResult<bool> {
-        let result = self.verifier
-            .verify(credential_json, signature_hex, public_key_hex);
+    /// Verify credential from JSON (optimized)
+    pub fn verify_credential_json(&self, credential_json: &str) -> PyResult<bool> {
+        use crate::minimal_core::MinimalCredential;
+        
+        // Parse credential from JSON
+        let credential: MinimalCredential = serde_json::from_str(credential_json)
+            .map_err(|e| PyRuntimeError::new_err(format!("Invalid credential JSON: {}", e)))?;
+        
+        // Verify using the credential reference
+        let result = self.verifier.verify_single(&credential)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        
         Ok(result.verified)
     }
 }
