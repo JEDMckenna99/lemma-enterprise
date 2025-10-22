@@ -379,7 +379,7 @@ class LemmaBotShield {
     }
     
     /**
-     * Check for existing lemma credentials (FEDERATED NETWORK - Client-side only)
+     * Check for existing lemma credentials (Permission-based with nonce verification)
      */
     async checkForExistingLemma() {
         if (this.state.checking) return false;
@@ -388,33 +388,62 @@ class LemmaBotShield {
         
         try {
             if (this.config.debug) {
-                console.log('🔍 Checking background wallet for existing lemma...');
+                console.log('🔍 Checking background wallet for existing permission lemma...');
             }
             
-            // Check background wallet (client-side, works across all sites)
-            const hasCredentials = await this.backgroundWallet.hasValidCredentials('identity');
+            // Check for PERMISSION credentials (not identity)
+            const hasPermissionCreds = await this.backgroundWallet.hasValidCredentials('permission');
             
-            if (hasCredentials) {
-                // SIMPLIFIED: Trust stored credentials on page load (background checks will validate later)
-                const credentials = await this.backgroundWallet.getCredentials('identity');
-                if (credentials.length > 0) {
-                    this.state.hasLemma = true;
+            if (hasPermissionCreds) {
+                // Get permission credentials and filter by site domain
+                const permissionCreds = await this.backgroundWallet.getCredentials('permission');
+                
+                // Extract site domain from current URL
+                const currentDomain = window.location.hostname;
+                
+                if (this.config.debug) {
+                    console.log(`🔍 Found ${permissionCreds.length} permission credentials, filtering for ${currentDomain}...`);
+                }
+                
+                // Filter for current site's permission lemmas
+                const sitePermissions = permissionCreds.filter(cred => {
+                    const claims = cred.claims || cred.credentialSubject || {};
+                    const siteDomain = claims.siteDomain || claims.site_domain;
+                    return siteDomain === currentDomain;
+                });
+                
+                if (sitePermissions.length > 0) {
+                    // CRITICAL: Verify with fresh nonce (bot defense)
+                    const verified = await this.verifyPermissionWithNonce(sitePermissions[0]);
                     
-                    if (this.config.debug) {
-                        console.log('✅ Valid lemma found in background wallet', {
-                            credentialId: credentials[0].id,
-                            packageType: credentials[0].packageType,
-                            isHuman: credentials[0].claims?.isHuman,
-                            storedAt: new Date(credentials[0].storedAt).toLocaleString()
-                        });
+                    if (verified) {
+                        this.state.hasLemma = true;
+                        
+                        if (this.config.debug) {
+                            console.log('✅ Valid permission lemma found and verified with nonce', {
+                                credentialId: sitePermissions[0].id,
+                                siteDomain: currentDomain,
+                                permissionId: sitePermissions[0].claims?.permissionId,
+                                storedAt: new Date(sitePermissions[0].storedAt).toLocaleString()
+                            });
+                        }
+                        
+                        return true;
+                    } else {
+                        if (this.config.debug) {
+                            console.warn('⚠️ Permission lemma found but nonce verification failed (possible replay attack)');
+                        }
+                        return false;
                     }
-                    
-                    return true;
+                } else {
+                    if (this.config.debug) {
+                        console.log(`ℹ️ No permission lemmas found for ${currentDomain}`);
+                    }
                 }
             }
             
             if (this.config.debug) {
-                console.log('ℹ️ No valid lemma found in background wallet');
+                console.log('ℹ️ No valid permission lemma found in background wallet');
             }
             
             return false;
@@ -425,6 +454,66 @@ class LemmaBotShield {
         } finally {
             this.state.checking = false;
         }
+    }
+    
+    /**
+     * Verify permission credential with fresh nonce (bot defense)
+     */
+    async verifyPermissionWithNonce(credential) {
+        try {
+            // Generate fresh nonce for this verification
+            const nonce = this.generateNonce();
+            
+            if (this.config.debug) {
+                console.log('🎲 Generated fresh nonce for verification:', nonce);
+            }
+            
+            // Call server-side verification with nonce
+            const response = await fetch(`${this.config.apiBase}/api/sdk/verify-permission-lemma`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.config.apiKey}`
+                },
+                body: JSON.stringify({
+                    credential: credential,
+                    nonce: nonce,
+                    site_domain: window.location.hostname,
+                    timestamp: Date.now()
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.verified) {
+                if (this.config.debug) {
+                    console.log('✅ Nonce verification passed:', {
+                        nonce: nonce,
+                        verification_time_us: result.verification_time_us,
+                        confidence: result.confidence
+                    });
+                }
+                return true;
+            } else {
+                if (this.config.debug) {
+                    console.warn('❌ Nonce verification failed:', result.error || 'Unknown error');
+                }
+                return false;
+            }
+            
+        } catch (error) {
+            console.error('❌ Nonce verification error:', error);
+            return false;
+        }
+    }
+    
+    /**
+     * Generate cryptographically secure nonce
+     */
+    generateNonce() {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
     }
     
     /**
@@ -452,9 +541,11 @@ class LemmaBotShield {
     }
     
     /**
-     * Show verification widget (user needs lemma)
+     * Show verification widget (user needs permission lemma)
      */
     showVerificationWidget(element) {
+        const siteDomain = window.location.hostname;
+        
         // Create verification widget
         const widget = document.createElement('div');
         widget.innerHTML = `
@@ -493,7 +584,7 @@ class LemmaBotShield {
                     margin-bottom: 1.5rem;
                     color: #6b7280;
                     font-size: 0.875rem;
-                ">Verify your identity to access this content</p>
+                ">Request access permission to view this content</p>
                 
                 <button id="verify-lemma-btn" style="
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -508,14 +599,14 @@ class LemmaBotShield {
                     width: 100%;
                 " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.4)'" 
                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                    Verify a Lemma
+                    Request Permission
                 </button>
                 
                 <p style="
                     margin-top: 1rem;
                     color: #9ca3af;
                     font-size: 0.75rem;
-                ">One-time verification • Never see CAPTCHAs again</p>
+                ">Protected by cryptographic permission lemmas • Site-specific access</p>
             </div>
         `;
         
@@ -524,15 +615,64 @@ class LemmaBotShield {
         
         // Add click handler to verification button
         const verifyBtn = widget.querySelector('#verify-lemma-btn');
-        verifyBtn.addEventListener('click', () => this.startVerification(element, widget));
+        verifyBtn.addEventListener('click', () => this.requestPermission(element, widget, siteDomain));
         
         if (this.config.debug) {
-            console.log('🔧 Showing verification widget');
+            console.log('🔧 Showing permission request widget for:', siteDomain);
         }
     }
     
     /**
-     * Start the verification process (Stripe redirect)
+     * Request permission for site access (redirect to permission request page)
+     */
+    async requestPermission(protectedElement, widget, siteDomain) {
+        if (this.state.verifying) return;
+        
+        this.state.verifying = true;
+        
+        // Update button to show loading state
+        const verifyBtn = widget.querySelector('#verify-lemma-btn');
+        const originalText = verifyBtn.textContent;
+        verifyBtn.textContent = 'Redirecting...';
+        verifyBtn.disabled = true;
+        
+        try {
+            if (this.config.debug) {
+                console.log(`🚀 Redirecting to permission request for ${siteDomain}...`);
+            }
+            
+            // Redirect to site's permission request/contact page
+            // Each site can customize this URL in their shield config
+            const requestUrl = this.config.permissionRequestUrl || 
+                               `${this.config.apiBase}/request-access?site=${siteDomain}&return_url=${encodeURIComponent(window.location.href)}`;
+            
+            if (this.config.debug) {
+                console.log('📍 Permission request URL:', requestUrl);
+            }
+            
+            window.location.href = requestUrl;
+            
+        } catch (error) {
+            console.error('❌ Permission request failed:', error);
+            
+            // Reset button
+            verifyBtn.textContent = originalText;
+            verifyBtn.disabled = false;
+            
+            // Show error message
+            verifyBtn.textContent = 'Request failed - Try again';
+            setTimeout(() => {
+                verifyBtn.textContent = originalText;
+            }, 3000);
+            
+        } finally {
+            this.state.verifying = false;
+        }
+    }
+    
+    /**
+     * Start the verification process (Stripe redirect) - DEPRECATED for Shield
+     * Kept for backwards compatibility but Shield now uses permissions
      */
     async startVerification(protectedElement, widget) {
         if (this.state.verifying) return;

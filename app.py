@@ -228,6 +228,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register OPRF Key Management API: {e}")
 
+    # Permission Verification with Nonce (Bot Defense)
+    try:
+        from api.permission_verification import permission_verification_bp
+        app.register_blueprint(permission_verification_bp)
+        logger.info("✅ Permission Verification (Nonce Bot Defense) registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Permission Verification: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status

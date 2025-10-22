@@ -338,3 +338,4 @@ site.issuer_did = new_issuer.get_did()
 - 🔄 Formal verification of critical paths
 - 🔄 Bug bounty program
 
+
