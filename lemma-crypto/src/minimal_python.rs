@@ -118,15 +118,15 @@ impl PyOptimizedVerifier {
     }
     
     /// Verify credential from JSON (optimized)
-    pub fn verify_credential_json(&self, credential_json: &str) -> PyResult<bool> {
+    pub fn verify_credential_json(&mut self, credential_json: &str) -> PyResult<bool> {
         use crate::minimal_core::MinimalCredential;
         
         // Parse credential from JSON
         let credential: MinimalCredential = serde_json::from_str(credential_json)
             .map_err(|e| PyRuntimeError::new_err(format!("Invalid credential JSON: {}", e)))?;
         
-        // Verify using the credential reference
-        let result = self.verifier.verify_single(&credential)
+        // Verify using optimized verifier
+        let result = self.verifier.verify_optimized(&credential)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         
         Ok(result.verified)
