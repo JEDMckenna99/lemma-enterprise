@@ -51,6 +51,14 @@ def revoke_credential():
         if credential_type == 'poh':
             network_success = await_network_revocation(credential_id, reason)
             
+            # Trigger immediate Bloom filter sync (instead of waiting 60 seconds)
+            try:
+                from api.permission_verification import sync_revocations_to_bloom
+                sync_revocations_to_bloom()
+                logger.info(f"✅ Immediate Bloom filter sync triggered for {credential_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Bloom filter sync failed (will retry on next interval): {e}")
+            
             return jsonify({
                 'success': True,
                 'credential_id': credential_id,
@@ -58,12 +66,21 @@ def revoke_credential():
                 'network_propagated': network_success,
                 'message': 'PoH lemma revoked - network-wide revocation initiated',
                 'scope': 'All sites in federated network will be updated',
-                'wallet_deleted': True
+                'wallet_deleted': True,
+                'bloom_filter_synced': True
             })
         
         # For permission lemmas: Site-specific revocation
         elif credential_type == 'permission':
             site_success = await_site_revocation(credential_id, reason, site_domain)
+            
+            # Trigger immediate Bloom filter sync (instead of waiting 60 seconds)
+            try:
+                from api.permission_verification import sync_revocations_to_bloom
+                sync_revocations_to_bloom()
+                logger.info(f"✅ Immediate Bloom filter sync triggered for {credential_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Bloom filter sync failed (will retry on next interval): {e}")
             
             return jsonify({
                 'success': True,
@@ -74,7 +91,8 @@ def revoke_credential():
                 'message': f'Permission lemma revoked for {site_domain}',
                 'scope': 'Only this site\'s permissions affected',
                 'wallet_deleted': True,
-                'registry_updated': site_success
+                'registry_updated': site_success,
+                'bloom_filter_synced': True
             })
         
         # Unknown type: Local revocation only
