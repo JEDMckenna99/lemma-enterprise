@@ -142,7 +142,7 @@ impl PyOptimizedVerifier {
         Ok(Self { verifier })
     }
     
-    /// Verify credential from JSON (optimized)
+    /// Verify credential from JSON (optimized with OPRF + Bloom filter)
     pub fn verify_credential_json(&mut self, credential_json: &str) -> PyResult<bool> {
         use crate::minimal_core::MinimalCredential;
         
@@ -150,11 +150,36 @@ impl PyOptimizedVerifier {
         let credential: MinimalCredential = serde_json::from_str(credential_json)
             .map_err(|e| PyRuntimeError::new_err(format!("Invalid credential JSON: {}", e)))?;
         
-        // Verify using optimized verifier
+        // Verify using optimized verifier (includes OPRF + Bloom revocation check)
         let result = self.verifier.verify_optimized(&credential)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         
         Ok(result.verified)
+    }
+    
+    /// Add revoked credential ID to Bloom filter (via OPRF)
+    pub fn revoke_credential(&mut self, credential_id: &str) -> PyResult<()> {
+        self.verifier.add_revocation(credential_id)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+    
+    /// Check if credential is revoked (OPRF + Bloom filter)
+    pub fn is_revoked(&mut self, credential_id: &str) -> PyResult<bool> {
+        self.verifier.check_revocation_status(credential_id)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+    
+    /// Get verification statistics
+    pub fn get_stats(&self) -> PyResult<pyo3::Py<pyo3::types::PyDict>> {
+        let stats = self.verifier.get_stats();
+        Python::with_gil(|py| {
+            let dict = pyo3::types::PyDict::new(py);
+            dict.set_item("total_verifications", stats.total_verifications)?;
+            dict.set_item("cache_hits", stats.cache_hits)?;
+            dict.set_item("cache_misses", stats.cache_misses)?;
+            dict.set_item("cache_hit_rate", stats.cache_hit_rate())?;
+            Ok(dict.into())
+        })
     }
 }
 

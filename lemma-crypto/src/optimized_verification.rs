@@ -223,8 +223,8 @@ impl OptimizedVerifier {
         Ok(results)
     }
     
-    /// Add credential to revocation list
-    pub fn revoke_credential(&mut self, credential_id: &str) -> std::result::Result<(), MinimalError> {
+    /// Add credential to revocation list (OPRF + Bloom filter)
+    pub fn add_revocation(&mut self, credential_id: &str) -> std::result::Result<(), MinimalError> {
         let oprf_result = self.oprf_client.get_evaluation(credential_id)
             .map_err(|e| MinimalError::Serialization(e.to_string()))?;
         
@@ -237,7 +237,26 @@ impl OptimizedVerifier {
         Ok(())
     }
     
+    /// Add credential to revocation list (deprecated, use add_revocation)
+    pub fn revoke_credential(&mut self, credential_id: &str) -> std::result::Result<(), MinimalError> {
+        self.add_revocation(credential_id)
+    }
+    
+    /// Check if credential is revoked (OPRF + Bloom filter)
+    pub fn check_revocation_status(&mut self, credential_id: &str) -> std::result::Result<bool, MinimalError> {
+        let oprf_result = self.oprf_client.get_evaluation(credential_id)
+            .map_err(|e| MinimalError::Serialization(e.to_string()))?;
+        
+        let (is_revoked, _level) = self.revocation_filter.contains(&oprf_result.evaluation);
+        Ok(is_revoked)
+    }
+    
     /// Get performance statistics
+    pub fn get_stats(&self) -> OptimizationStats {
+        self.get_performance_stats()
+    }
+    
+    /// Get performance statistics (full name)
     pub fn get_performance_stats(&self) -> OptimizationStats {
         OptimizationStats {
             total_verifications: self.total_verifications,
