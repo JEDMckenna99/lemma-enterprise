@@ -177,7 +177,9 @@ impl PyOptimizedVerifier {
             dict.set_item("total_verifications", stats.total_verifications)?;
             dict.set_item("cache_hits", stats.cache_hits)?;
             dict.set_item("cache_misses", stats.cache_misses)?;
-            dict.set_item("cache_hit_rate", stats.cache_hit_rate())?;
+            dict.set_item("cache_hit_rate", stats.cache_hit_rate)?;
+            dict.set_item("public_key_cache_size", stats.public_key_cache_size)?;
+            dict.set_item("oprf_cache_size", stats.oprf_cache_size)?;
             Ok(dict.into())
         })
     }
