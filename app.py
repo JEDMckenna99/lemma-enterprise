@@ -273,14 +273,17 @@ def create_app():
     def simple_health():
         """Simple health check endpoint for uptime monitoring"""
         try:
-            from api.database_models import db
-            db.engine.execute('SELECT 1')
+            # Check database connectivity
+            from api.database import engine
+            with engine.connect() as conn:
+                conn.execute('SELECT 1')
             
             return jsonify({
                 'status': 'healthy',
                 'timestamp': datetime.now().isoformat()
             }), 200
         except Exception as e:
+            logger.error(f"Health check failed: {e}")
             return jsonify({
                 'status': 'unhealthy',
                 'error': str(e)
@@ -292,18 +295,19 @@ def create_app():
         checks = {'database': False, 'crypto': False}
         
         try:
-            from api.database_models import db
-            db.engine.execute('SELECT 1')
+            from api.database import engine
+            with engine.connect() as conn:
+                conn.execute('SELECT 1')
             checks['database'] = True
-        except:
-            pass
+        except Exception as e:
+            logger.warning(f"Database check failed: {e}")
         
         try:
             from lemma_crypto import PyMinimalVerifier
             PyMinimalVerifier()
             checks['crypto'] = True
-        except:
-            pass
+        except Exception as e:
+            logger.warning(f"Crypto check failed: {e}")
         
         all_healthy = all(checks.values())
         return jsonify({

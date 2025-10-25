@@ -14,13 +14,13 @@ from typing import Dict, Optional, List
 
 logger = logging.getLogger(__name__)
 
-# Import database models
+# Import database engine
 try:
-    from api.database_models import db
+    from api.database import engine
     DATABASE_AVAILABLE = True
 except ImportError:
     DATABASE_AVAILABLE = False
-    logger.warning("⚠️ Database models not available - audit logging disabled")
+    logger.warning("⚠️ Database not available - audit logging disabled")
 
 
 class AuditEvent:
@@ -111,7 +111,9 @@ def init_audit_logging():
         CREATE INDEX IF NOT EXISTS idx_audit_ip ON audit_logs (ip_address);
         """
         
-        db.engine.execute(create_table_sql)
+        with engine.connect() as conn:
+            conn.execute(create_table_sql)
+            conn.commit()
         logger.info("✅ Audit logs table created successfully")
         return True
         
@@ -191,14 +193,16 @@ def log_event(
         )
         """
         
-        db.engine.execute(
-            insert_sql,
-            (
-                event_type, user_email, user_did, site_id,
-                resource, action, result, ip_address, user_agent,
-                nonce, credential_id, json.dumps(metadata)
+        with engine.connect() as conn:
+            conn.execute(
+                insert_sql,
+                (
+                    event_type, user_email, user_did, site_id,
+                    resource, action, result, ip_address, user_agent,
+                    nonce, credential_id, json.dumps(metadata)
+                )
             )
-        )
+            conn.commit()
         
         # Also log to standard logger for real-time monitoring
         log_level = logging.WARNING if result == 'failure' else logging.INFO
@@ -349,27 +353,28 @@ def get_audit_logs(
         params.extend([limit, offset])
         
         # Execute query
-        result = db.engine.execute(query, params)
-        
-        # Convert to list of dicts
-        logs = []
-        for row in result:
-            logs.append({
-                'id': row[0],
-                'timestamp': row[1].isoformat(),
-                'event_type': row[2],
-                'user_email': row[3],
-                'user_did': row[4],
-                'site_id': row[5],
-                'resource': row[6],
-                'action': row[7],
-                'result': row[8],
-                'ip_address': str(row[9]) if row[9] else None,
-                'user_agent': row[10],
-                'nonce': row[11],
-                'credential_id': row[12],
-                'metadata': row[13]
-            })
+        with engine.connect() as conn:
+            result = conn.execute(query, params)
+            
+            # Convert to list of dicts
+            logs = []
+            for row in result:
+                logs.append({
+                    'id': row[0],
+                    'timestamp': row[1].isoformat(),
+                    'event_type': row[2],
+                    'user_email': row[3],
+                    'user_did': row[4],
+                    'site_id': row[5],
+                    'resource': row[6],
+                    'action': row[7],
+                    'result': row[8],
+                    'ip_address': str(row[9]) if row[9] else None,
+                    'user_agent': row[10],
+                    'nonce': row[11],
+                    'credential_id': row[12],
+                    'metadata': row[13]
+                })
         
         return logs
         
