@@ -336,7 +336,7 @@ def create_app():
     # Essential pages
     @app.route('/pricing')
     def pricing():
-        return render_template('modern/pricing.html')
+        return render_template('modern/pricing_new.html')
 
     @app.route('/docs')
     def docs():
