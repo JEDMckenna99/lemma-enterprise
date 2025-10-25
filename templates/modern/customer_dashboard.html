@@ -544,20 +544,48 @@ async function loadUsageStats() {
 function displayUsageStats(usage) {
     const container = document.getElementById('usageStats');
     
+    const tier = usage.current_tier || {};
+    const mau = usage.current_mau || 0;
+    const monthlyPrice = tier.monthly_price || 0;
+    const tierName = tier.name || 'Free';
+    const usagePercent = usage.usage_percentage || 0;
+    
+    // Determine if approaching limit
+    const showWarning = usage.approaching_limit;
+    const warningClass = showWarning ? 'style="color: var(--warning);"' : '';
+    
     container.innerHTML = `
         <div class="usage-item">
-            <div class="usage-value">${usage.federated_id_network.monthly_active_users}</div>
-            <div class="usage-label">Fed ID MAU</div>
+            <div class="usage-value" ${warningClass}>${mau.toLocaleString()}</div>
+            <div class="usage-label">Monthly Active Users</div>
         </div>
         <div class="usage-item">
-            <div class="usage-value">${usage.iam_system.monthly_active_users}</div>
-            <div class="usage-label">IAM MAU</div>
+            <div class="usage-value">${tierName}</div>
+            <div class="usage-label">Current Tier</div>
         </div>
         <div class="usage-item">
-            <div class="usage-value">$${usage.total_cost.toFixed(2)}</div>
+            <div class="usage-value">$${monthlyPrice.toFixed(2)}</div>
             <div class="usage-label">Monthly Bill</div>
         </div>
+        <div class="usage-item">
+            <div class="usage-value">${usagePercent.toFixed(0)}%</div>
+            <div class="usage-label">Tier Usage</div>
+        </div>
     `;
+    
+    // Show upgrade warning if approaching limit
+    if (showWarning) {
+        const warningDiv = document.createElement('div');
+        warningDiv.style.cssText = 'grid-column: 1 / -1; margin-top: 16px; padding: 16px; background: #fff3cd; border-left: 4px solid var(--warning); border-radius: 8px;';
+        warningDiv.innerHTML = `
+            <strong>⚠️ Approaching Tier Limit</strong><br>
+            <span style="font-size: 14px; color: var(--gray-700);">
+                You're using ${usagePercent.toFixed(1)}% of your ${tierName} tier limit. 
+                You'll be automatically upgraded when you reach ${tier.mau_limit?.toLocaleString()} users.
+            </span>
+        `;
+        container.appendChild(warningDiv);
+    }
 }
 
 // Load permission lemmas preview

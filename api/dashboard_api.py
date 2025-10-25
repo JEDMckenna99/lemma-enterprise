@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 # Create dashboard blueprint
 dashboard_bp = Blueprint('dashboard', __name__)
 
+# Import usage tracking
+from .usage_tracking import get_usage_summary, get_monthly_active_users, track_active_user
+
 # ================================================================================
 # CUSTOMER DASHBOARD ENDPOINTS
 # ================================================================================
@@ -64,6 +67,44 @@ def get_customer_profile():
             'success': False,
             'error': 'Failed to get profile'
         }), 500
+
+
+@dashboard_bp.route('/api/customer/usage', methods=['GET'])
+@cross_origin()
+def get_customer_usage():
+    """
+    Get usage statistics and billing information for customer's site
+    
+    Returns MAU count, current tier, pricing, and historical data
+    """
+    try:
+        customer_id = session.get('customer_id')
+        if not customer_id:
+            # For demo/testing, use query parameter
+            site_id = request.args.get('site_id', 'lemma_platform')
+        else:
+            # In production, get site_id from customer account
+            from .customer_accounts import customer_manager
+            customer = customer_manager.get_customer_by_id(customer_id)
+            if not customer:
+                return jsonify({'success': False, 'error': 'Customer not found'}), 404
+            site_id = customer.customer_id  # Use customer_id as site_id for now
+        
+        # Get comprehensive usage summary
+        usage = get_usage_summary(site_id)
+        
+        return jsonify({
+            'success': True,
+            'usage': usage
+        })
+        
+    except Exception as e:
+        logger.error(f"Get customer usage error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 
 # Duplicate endpoint removed - handled by customer_accounts.py
 # @dashboard_bp.route('/api/customer/api-keys', methods=['GET'])
