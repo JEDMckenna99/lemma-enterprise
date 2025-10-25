@@ -31,6 +31,12 @@ def create_app():
 
     # Initialize components
     try:
+        # Initialize error monitoring FIRST (catch initialization errors too)
+        from monitoring.sentry_config import init_sentry
+        sentry_enabled = init_sentry(app)
+        if sentry_enabled:
+            logger.info("✅ Sentry error monitoring active")
+        
         # Initialize CSRF protection
         from auth.decorators import init_csrf_protection
         init_csrf_protection(app)
@@ -122,6 +128,14 @@ def create_app():
         logger.info("✅ Permission Management registered")
     except Exception as e:
         logger.error(f"❌ Failed to register Permission Management: {e}")
+
+    # Audit Logging API
+    try:
+        from api.audit_api import audit_api
+        app.register_blueprint(audit_api)
+        logger.info("✅ Audit API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Audit API: {e}")
 
     # IAM Email Confirmation
     try:
@@ -250,6 +264,52 @@ def create_app():
     app.config['SESSION_PERMANENT'] = True
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
     app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+
+    # ================================================================================
+    # HEALTH CHECK & MONITORING ENDPOINTS
+    # ================================================================================
+
+    @app.route('/health')
+    def health_check():
+        """Health check endpoint for uptime monitoring"""
+        try:
+            from api.database_models import db
+            db.engine.execute('SELECT 1')
+            
+            return jsonify({
+                'status': 'healthy',
+                'timestamp': datetime.now().isoformat()
+            }), 200
+        except Exception as e:
+            return jsonify({
+                'status': 'unhealthy',
+                'error': str(e)
+            }), 500
+
+    @app.route('/ready')
+    def readiness_check():
+        """Readiness check - detailed system status"""
+        checks = {'database': False, 'crypto': False}
+        
+        try:
+            from api.database_models import db
+            db.engine.execute('SELECT 1')
+            checks['database'] = True
+        except:
+            pass
+        
+        try:
+            from lemma_crypto import PyMinimalVerifier
+            PyMinimalVerifier()
+            checks['crypto'] = True
+        except:
+            pass
+        
+        all_healthy = all(checks.values())
+        return jsonify({
+            'ready': all_healthy,
+            'checks': checks
+        }), 200 if all_healthy else 503
 
     # ================================================================================
     # ESSENTIAL ROUTES ONLY
