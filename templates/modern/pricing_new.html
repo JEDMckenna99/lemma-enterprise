@@ -1,358 +1,363 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pricing - Lemma IAM</title>
-    <link rel="stylesheet" href="/static/css/lemma.css">
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333;
-        }
-        .pricing-hero {
-            text-align: center;
-            padding: 60px 20px 40px;
-            color: white;
-        }
-        .pricing-hero h1 {
-            font-size: 48px;
-            margin: 0 0 20px 0;
-            font-weight: 700;
-        }
-        .pricing-hero p {
-            font-size: 24px;
-            margin: 0;
-            opacity: 0.9;
-        }
-        .pricing-container {
-            max-width: 1200px;
-            margin: 0 auto 60px;
-            padding: 0 20px;
-        }
-        .pricing-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin-top: 40px;
-        }
-        .pricing-card {
-            background: white;
-            border-radius: 12px;
-            padding: 40px 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            position: relative;
-        }
-        .pricing-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
-        }
-        .pricing-card.featured {
-            border: 3px solid #667eea;
-            transform: scale(1.05);
-        }
-        .pricing-card.featured .badge {
-            position: absolute;
-            top: -15px;
-            right: 30px;
-            background: #667eea;
-            color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 600;
-        }
-        .pricing-tier {
-            font-size: 14px;
-            font-weight: 600;
-            color: #667eea;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
-        }
-        .pricing-card h2 {
-            font-size: 32px;
-            margin: 0 0 10px 0;
-            color: #1a1a1a;
-        }
-        .pricing-card .price {
-            font-size: 48px;
-            font-weight: 700;
-            color: #1a1a1a;
-            margin: 20px 0;
-        }
-        .pricing-card .price span {
-            font-size: 20px;
-            color: #666;
-            font-weight: 400;
-        }
-        .pricing-card .description {
-            color: #666;
-            margin-bottom: 30px;
-            min-height: 40px;
-        }
-        .pricing-card .features {
-            list-style: none;
-            padding: 0;
-            margin: 30px 0;
-        }
-        .pricing-card .features li {
-            padding: 12px 0;
-            border-bottom: 1px solid #f0f0f0;
-            color: #444;
-        }
-        .pricing-card .features li:last-child {
-            border-bottom: none;
-        }
-        .pricing-card .features li:before {
-            content: "✓ ";
-            color: #667eea;
-            font-weight: 700;
-            margin-right: 8px;
-        }
-        .pricing-card .cta-button {
-            display: block;
-            width: 100%;
-            padding: 15px;
-            background: #667eea;
-            color: white;
-            text-align: center;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 16px;
-            border: none;
-            cursor: pointer;
-            transition: background 0.3s ease;
-        }
-        .pricing-card .cta-button:hover {
-            background: #5568d3;
-        }
-        .pricing-card.free .cta-button {
-            background: #48bb78;
-        }
-        .pricing-card.free .cta-button:hover {
-            background: #38a169;
-        }
-        .comparison-section {
-            background: white;
-            padding: 60px 20px;
-            margin-top: 40px;
-        }
-        .comparison-table {
-            max-width: 1000px;
-            margin: 40px auto;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        th {
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #1a1a1a;
-        }
-        .highlight {
-            background: #f0f4ff;
-            font-weight: 600;
-            color: #667eea;
-        }
-        .faq-section {
-            max-width: 800px;
-            margin: 60px auto;
-            padding: 0 20px;
-        }
-        .faq-section h2 {
-            text-align: center;
-            color: white;
-            margin-bottom: 40px;
-        }
-        .faq-item {
-            background: white;
-            padding: 25px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-        }
-        .faq-item h3 {
-            color: #667eea;
-            margin: 0 0 10px 0;
-        }
-        .faq-item p {
-            color: #444;
-            margin: 0;
-            line-height: 1.6;
-        }
-    </style>
-</head>
-<body>
-    <div class="pricing-hero">
-        <h1>Simple, Transparent Pricing</h1>
-        <p>Pay only for what you use. No hidden fees.</p>
+{% extends "modern/layout.html" %}
+
+{% block title %}Pricing - Lemma IAM | 67% Cheaper Than Auth0{% endblock %}
+{% block description %}Simple, transparent pricing. Free tier for 1K users. Starter $5/month. Growth $0.023/MAU. 1,000x faster than Auth0, 67% cheaper.{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    .pricing-hero {
+        text-align: center;
+        padding: 80px 20px 60px;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        color: var(--white);
+    }
+    .pricing-hero h1 {
+        font-size: 48px;
+        margin: 0 0 16px 0;
+        font-weight: 700;
+    }
+    .pricing-hero p {
+        font-size: 24px;
+        margin: 0;
+        opacity: 0.95;
+    }
+    .pricing-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 30px;
+        margin: 60px auto;
+        max-width: 1200px;
+        padding: 0 20px;
+    }
+    .pricing-card {
+        background: var(--white);
+        border-radius: 12px;
+        padding: 40px 30px;
+        box-shadow: var(--shadow-lg);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        position: relative;
+        border: 2px solid var(--gray-200);
+    }
+    .pricing-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    }
+    .pricing-card.featured {
+        border: 3px solid var(--primary);
+        transform: scale(1.05);
+    }
+    .pricing-card.featured .badge {
+        position: absolute;
+        top: -15px;
+        right: 30px;
+        background: var(--primary);
+        color: var(--white);
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .pricing-tier {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--primary);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 12px;
+    }
+    .pricing-card h2 {
+        font-size: 32px;
+        margin: 0 0 12px 0;
+        color: var(--gray-900);
+    }
+    .pricing-card .price {
+        font-size: 48px;
+        font-weight: 700;
+        color: var(--gray-900);
+        margin: 24px 0;
+    }
+    .pricing-card .price span {
+        font-size: 20px;
+        color: var(--gray-600);
+        font-weight: 400;
+    }
+    .pricing-card .description {
+        color: var(--gray-600);
+        margin-bottom: 24px;
+        min-height: 48px;
+    }
+    .pricing-card .features {
+        list-style: none;
+        padding: 0;
+        margin: 30px 0;
+    }
+    .pricing-card .features li {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--gray-200);
+        color: var(--gray-700);
+        font-size: 15px;
+    }
+    .pricing-card .features li:last-child {
+        border-bottom: none;
+    }
+    .pricing-card .features li:before {
+        content: "✓ ";
+        color: var(--primary);
+        font-weight: 700;
+        margin-right: 8px;
+    }
+    .pricing-card .cta-button {
+        display: block;
+        width: 100%;
+        padding: 16px;
+        background: var(--primary);
+        color: var(--white);
+        text-align: center;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 16px;
+        border: none;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+    .pricing-card .cta-button:hover {
+        background: var(--primary-dark);
+    }
+    .pricing-card.free .cta-button {
+        background: var(--success);
+    }
+    .pricing-card.free .cta-button:hover {
+        background: #059669;
+    }
+    .comparison-section {
+        background: var(--gray-100);
+        padding: 80px 20px;
+    }
+    .comparison-table {
+        max-width: 1000px;
+        margin: 40px auto;
+        background: var(--white);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    th, td {
+        padding: 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--gray-200);
+    }
+    th {
+        background: var(--gray-50);
+        font-weight: 600;
+        color: var(--gray-900);
+    }
+    .highlight {
+        background: #f0f4ff;
+        font-weight: 600;
+        color: var(--primary);
+    }
+    .faq-section {
+        max-width: 900px;
+        margin: 0 auto 80px;
+        padding: 0 20px;
+    }
+    .faq-section h2 {
+        text-align: center;
+        color: var(--gray-900);
+        margin-bottom: 48px;
+        font-size: 36px;
+    }
+    .faq-item {
+        background: var(--white);
+        padding: 32px;
+        margin-bottom: 20px;
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--gray-200);
+    }
+    .faq-item h3 {
+        color: var(--primary);
+        margin: 0 0 12px 0;
+        font-size: 19px;
+    }
+    .faq-item p {
+        color: var(--gray-700);
+        margin: 0;
+        line-height: 1.7;
+    }
+    .cta-section {
+        background: var(--white);
+        padding: 80px 20px;
+        text-align: center;
+    }
+    .cta-section h2 {
+        margin-bottom: 16px;
+        color: var(--gray-900);
+    }
+    .cta-section p {
+        color: var(--gray-600);
+        margin-bottom: 32px;
+        font-size: 19px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pricing-hero">
+    <h1>Simple, Transparent Pricing</h1>
+    <p>Pay only for what you use. No hidden fees.</p>
+</div>
+
+<div class="pricing-grid">
+    <!-- Free Tier -->
+    <div class="pricing-card free">
+        <div class="pricing-tier">Free Forever</div>
+        <h2>Free</h2>
+        <div class="price">$0<span>/month</span></div>
+        <div class="description">Perfect for hobby projects and testing</div>
+        <ul class="features">
+            <li>Up to 1,000 monthly active users</li>
+            <li>Unlimited sites</li>
+            <li>Unlimited permissions</li>
+            <li>Email-based authentication</li>
+            <li>Real Ed25519 + OPRF crypto</li>
+            <li>30-day audit logs</li>
+            <li>Community support</li>
+        </ul>
+        <a href="/dashboard" class="cta-button">Get Started Free</a>
     </div>
 
-    <div class="pricing-container">
-        <div class="pricing-grid">
-            <!-- Free Tier -->
-            <div class="pricing-card free">
-                <div class="pricing-tier">Free Forever</div>
-                <h2>Free</h2>
-                <div class="price">$0<span>/month</span></div>
-                <div class="description">Perfect for hobby projects and testing</div>
-                <ul class="features">
-                    <li>Up to 1,000 monthly active users</li>
-                    <li>Unlimited sites</li>
-                    <li>Unlimited permissions</li>
-                    <li>Email-based authentication</li>
-                    <li>Real Ed25519 + OPRF crypto</li>
-                    <li>30-day audit logs</li>
-                    <li>Community support</li>
-                </ul>
-                <a href="/dashboard" class="cta-button">Get Started Free</a>
-            </div>
+    <!-- Starter Tier -->
+    <div class="pricing-card">
+        <div class="pricing-tier">Starter</div>
+        <h2>Starter</h2>
+        <div class="price">$5<span>/month</span></div>
+        <div class="description">For growing projects (1K-5K users)</div>
+        <ul class="features">
+            <li>1,000 - 5,000 monthly active users</li>
+            <li>Everything in Free</li>
+            <li>90-day audit logs</li>
+            <li>Email support</li>
+            <li>Client-side verification</li>
+            <li>Offline capability</li>
+            <li>Custom branding</li>
+        </ul>
+        <a href="/dashboard" class="cta-button">Start Trial</a>
+    </div>
 
-            <!-- Starter Tier -->
-            <div class="pricing-card">
-                <div class="pricing-tier">Starter</div>
-                <h2>Starter</h2>
-                <div class="price">$5<span>/month</span></div>
-                <div class="description">For growing projects (1K-5K users)</div>
-                <ul class="features">
-                    <li>1,000 - 5,000 monthly active users</li>
-                    <li>Everything in Free</li>
-                    <li>90-day audit logs</li>
-                    <li>Email support</li>
-                    <li>Client-side verification (WebAssembly)</li>
-                    <li>Offline capability</li>
-                    <li>Custom branding</li>
-                </ul>
-                <a href="/dashboard" class="cta-button">Start Trial</a>
-            </div>
+    <!-- Growth Tier -->
+    <div class="pricing-card featured">
+        <div class="badge">Most Popular</div>
+        <div class="pricing-tier">Growth</div>
+        <h2>Growth</h2>
+        <div class="price">$0.023<span>/MAU</span></div>
+        <div class="description">For scaling businesses (5K+ users)</div>
+        <ul class="features">
+            <li>5,000+ monthly active users</li>
+            <li>Everything in Starter</li>
+            <li>1-year audit logs</li>
+            <li>Priority email support</li>
+            <li>OPRF privacy-preserving</li>
+            <li>Advanced analytics</li>
+            <li>99.9% uptime SLA</li>
+        </ul>
+        <a href="/dashboard" class="cta-button">Start Growing</a>
+    </div>
 
-            <!-- Growth Tier -->
-            <div class="pricing-card featured">
-                <div class="badge">Most Popular</div>
-                <div class="pricing-tier">Growth</div>
-                <h2>Growth</h2>
-                <div class="price">$0.023<span>/MAU</span></div>
-                <div class="description">For scaling businesses (5K+ users)</div>
-                <ul class="features">
-                    <li>5,000+ monthly active users</li>
-                    <li>Everything in Starter</li>
-                    <li>1-year audit logs</li>
-                    <li>Priority email support</li>
-                    <li>OPRF privacy-preserving revocation</li>
-                    <li>Advanced analytics</li>
-                    <li>99.9% uptime SLA</li>
-                </ul>
-                <a href="/dashboard" class="cta-button">Start Growing</a>
-            </div>
+    <!-- Enterprise Tier -->
+    <div class="pricing-card">
+        <div class="pricing-tier">Enterprise</div>
+        <h2>Enterprise</h2>
+        <div class="price">Custom</div>
+        <div class="description">For large organizations (100K+ users)</div>
+        <ul class="features">
+            <li>100,000+ monthly active users</li>
+            <li>Everything in Growth</li>
+            <li>7-year audit logs</li>
+            <li>24/7 priority support</li>
+            <li>SAML 2.0 (optional)</li>
+            <li>Dedicated account manager</li>
+            <li>Custom SLA (99.95%+)</li>
+        </ul>
+        <a href="mailto:sales@lemma.id" class="cta-button">Contact Sales</a>
+    </div>
+</div>
 
-            <!-- Enterprise Tier -->
-            <div class="pricing-card">
-                <div class="pricing-tier">Enterprise</div>
-                <h2>Enterprise</h2>
-                <div class="price">Custom</div>
-                <div class="description">For large organizations (100K+ users)</div>
-                <ul class="features">
-                    <li>100,000+ monthly active users</li>
-                    <li>Everything in Growth</li>
-                    <li>7-year audit logs (compliance)</li>
-                    <li>24/7 priority support</li>
-                    <li>SAML 2.0 (optional)</li>
-                    <li>Dedicated account manager</li>
-                    <li>Custom SLA (99.95%+)</li>
-                </ul>
-                <a href="mailto:sales@lemma.id" class="cta-button">Contact Sales</a>
-            </div>
+<div class="comparison-section">
+    <div class="container">
+        <h2 style="text-align: center; margin-bottom: 48px; color: var(--gray-900);">How We Compare</h2>
+        <div class="comparison-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th class="highlight">Lemma</th>
+                        <th>Auth0</th>
+                        <th>Okta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Price (10K users)</strong></td>
+                        <td class="highlight">$23/mo</td>
+                        <td>$70/mo</td>
+                        <td>$120/mo</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Savings vs Auth0</strong></td>
+                        <td class="highlight">67% cheaper</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Verification Speed</strong></td>
+                        <td class="highlight">31-182µs</td>
+                        <td>200-500ms</td>
+                        <td>150-400ms</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Faster than Auth0</strong></td>
+                        <td class="highlight">1,000-2,700x</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Works Offline</strong></td>
+                        <td class="highlight">✓ Yes</td>
+                        <td>✗ No</td>
+                        <td>✗ No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Privacy-Preserving</strong></td>
+                        <td class="highlight">✓ OPRF</td>
+                        <td>✗ No</td>
+                        <td>✗ No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Client-Side Verify</strong></td>
+                        <td class="highlight">✓ WebAssembly</td>
+                        <td>✗ No</td>
+                        <td>✗ No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Setup Time</strong></td>
+                        <td class="highlight">5 minutes</td>
+                        <td>30+ minutes</td>
+                        <td>60+ minutes</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
+</div>
 
-    <div class="comparison-section">
-        <div class="pricing-container">
-            <h2 style="text-align: center; margin-bottom: 40px; color: #1a1a1a;">How We Compare</h2>
-            <div class="comparison-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Feature</th>
-                            <th class="highlight">Lemma</th>
-                            <th>Auth0</th>
-                            <th>Okta</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>Price (10K users)</strong></td>
-                            <td class="highlight">$23/mo</td>
-                            <td>$70/mo</td>
-                            <td>$120/mo</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Savings vs Auth0</strong></td>
-                            <td class="highlight">67% cheaper</td>
-                            <td>-</td>
-                            <td>-</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Verification Speed</strong></td>
-                            <td class="highlight">31-182µs</td>
-                            <td>200-500ms</td>
-                            <td>150-400ms</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Faster than Auth0</strong></td>
-                            <td class="highlight">1,000-2,700x</td>
-                            <td>-</td>
-                            <td>-</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Works Offline</strong></td>
-                            <td class="highlight">✓ Yes</td>
-                            <td>✗ No</td>
-                            <td>✗ No</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Privacy-Preserving</strong></td>
-                            <td class="highlight">✓ OPRF</td>
-                            <td>✗ No</td>
-                            <td>✗ No</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Client-Side Verify</strong></td>
-                            <td class="highlight">✓ WebAssembly</td>
-                            <td>✗ No</td>
-                            <td>✗ No</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Free Tier</strong></td>
-                            <td class="highlight">✓ 1K users</td>
-                            <td>✓ 7.5K users</td>
-                            <td>✗ No</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Setup Time</strong></td>
-                            <td class="highlight">5 minutes</td>
-                            <td>30+ minutes</td>
-                            <td>60+ minutes</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
+<div style="background: var(--gray-100); padding: 80px 20px;">
     <div class="faq-section">
         <h2>Frequently Asked Questions</h2>
         
@@ -393,26 +398,17 @@
 
         <div class="faq-item">
             <h3>How is Lemma faster than Auth0?</h3>
-            <p>Lemma uses client-side verification (WebAssembly) which runs in the user's browser at 0.36µs. Auth0 requires API calls to their servers (200-500ms). That's 500,000x-1,400,000x faster!</p>
+            <p>Lemma uses client-side verification (WebAssembly) which runs in the user's browser at 0.36µs. Auth0 requires API calls to their servers (200-500ms). That's up to 1,000,000x faster!</p>
         </div>
     </div>
+</div>
 
-    <div style="background: white; padding: 60px 20px; text-align: center;">
-        <h2 style="margin-bottom: 20px;">Ready to get started?</h2>
-        <p style="color: #666; margin-bottom: 30px; font-size: 18px;">Join thousands of developers building with Lemma IAM</p>
-        <a href="/dashboard" style="display: inline-block; padding: 15px 40px; background: #667eea; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 18px;">Start Free</a>
-        <p style="margin-top: 20px; color: #999; font-size: 14px;">No credit card required</p>
+<div class="cta-section">
+    <div class="container">
+        <h2>Ready to get started?</h2>
+        <p>Join thousands of developers building with Lemma IAM</p>
+        <a href="/dashboard" class="btn-primary" style="font-size: 18px; padding: 16px 48px;">Start Free</a>
+        <p style="margin-top: 20px; color: var(--gray-500); font-size: 14px;">No credit card required</p>
     </div>
-
-    <footer style="background: #1a1a1a; color: white; padding: 40px 20px; text-align: center;">
-        <p style="margin: 0 0 10px 0;">© 2025 Lemma. All rights reserved.</p>
-        <p style="margin: 0;">
-            <a href="/terms" style="color: #999; text-decoration: none;">Terms of Service</a> | 
-            <a href="/privacy" style="color: #999; text-decoration: none;">Privacy Policy</a> |
-            <a href="/docs" style="color: #999; text-decoration: none;">Documentation</a> |
-            <a href="mailto:support@lemma.id" style="color: #999; text-decoration: none;">Support</a>
-        </p>
-    </footer>
-</body>
-</html>
-
+</div>
+{% endblock %}
