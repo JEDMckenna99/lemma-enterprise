@@ -13,6 +13,7 @@ from flask_cors import cross_origin
 
 from api.email_service import send_email, render_email_template
 from api.real_iam_manager import get_site_manager, get_or_create_site_manager
+from api.rate_limiter import rate_limit_email_confirmation, check_ip_not_blocked
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,8 @@ pending_access_requests = {}
 
 @iam_email_bp.route('/api/v1/iam/request-access', methods=['POST'])
 @cross_origin()
+@check_ip_not_blocked()
+@rate_limit_email_confirmation()
 def request_access():
     """
     User requests access to a site via email

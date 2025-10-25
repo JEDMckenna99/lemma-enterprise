@@ -19,6 +19,14 @@ from .database_models import db, Site, Permission, ActivityType
 # REAL IAM manager with Rust crypto - site-specific keys and revocation
 from .real_iam_manager import get_or_create_site_manager, get_site_manager
 
+# Rate limiting
+from .rate_limiter import (
+    rate_limit_site_registration,
+    rate_limit_permission_grant,
+    rate_limit_access_verification,
+    check_ip_not_blocked
+)
+
 logger = logging.getLogger(__name__)
 
 permission_api = Blueprint('permission_api', __name__)
@@ -33,6 +41,8 @@ permission_api = Blueprint('permission_api', __name__)
 @permission_api.route('/api/v1/sites/register', methods=['POST'])
 @cross_origin()
 @require_api_key
+@check_ip_not_blocked()
+@rate_limit_site_registration()
 def register_site():
     """
     Register a new customer site for permission management
@@ -168,6 +178,7 @@ def create_permission(site_id):
 @permission_api.route('/api/v1/sites/<site_id>/users/<user_did>/permissions', methods=['POST'])
 @cross_origin()
 @require_site_admin
+@rate_limit_permission_grant()
 def grant_user_permission(site_id, user_did):
     """
     Grant permission to a user (creates REAL permission lemma with Ed25519 signature)
@@ -429,6 +440,7 @@ def remove_site_user(site_id, user_did):
 
 @permission_api.route('/api/v1/auth/verify', methods=['POST'])
 @cross_origin()
+@rate_limit_access_verification()
 def verify_access():
     """
     Verify user access for a resource using REAL Rust crypto engine

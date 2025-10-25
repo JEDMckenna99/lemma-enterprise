@@ -15,6 +15,7 @@ from .audit_logger import (
     log_event,
     AuditEvent
 )
+from .rate_limiter import rate_limit_audit_export
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +122,7 @@ def query_audit_logs():
 @audit_api.route('/api/v1/audit/export', methods=['GET'])
 @cross_origin()
 @require_site_admin
+@rate_limit_audit_export()
 def export_audit_logs_endpoint():
     """
     Export audit logs for compliance

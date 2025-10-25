@@ -350,6 +350,17 @@ def create_app():
     def qr_reader():
         return render_template('modern/qr_reader.html')
 
+    # Legal pages
+    @app.route('/terms')
+    def terms_of_service():
+        """Terms of Service"""
+        return render_template('legal/terms.html')
+
+    @app.route('/privacy')
+    def privacy_policy():
+        """Privacy Policy"""
+        return render_template('legal/privacy.html')
+
     # Dashboard routes
     @app.route('/dashboard')
     def customer_dashboard():

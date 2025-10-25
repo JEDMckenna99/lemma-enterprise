@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Lemma IAM</title>
+    <link rel="stylesheet" href="/static/css/lemma.css">
+    <style>
+        .legal-container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .legal-container h1 {
+            color: #1a1a1a;
+            margin-bottom: 10px;
+        }
+        .legal-container .last-updated {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        .legal-container h2 {
+            color: #333;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        .legal-container p, .legal-container li {
+            line-height: 1.6;
+            color: #444;
+            margin-bottom: 12px;
+        }
+        .legal-container ul {
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="legal-container">
+        <h1>Privacy Policy</h1>
+        <p class="last-updated">Last Updated: October 25, 2025</p>
+
+        <h2>1. Introduction</h2>
+        <p>Lemma IAM ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our identity and access management service.</p>
+
+        <h2>2. Information We Collect</h2>
+        
+        <h3>2.1 Information You Provide</h3>
+        <ul>
+            <li><strong>Account Information:</strong> Email address, company name, site domain</li>
+            <li><strong>Payment Information:</strong> Processed by Stripe (we do not store credit card numbers)</li>
+            <li><strong>API Keys:</strong> Generated for your account to access our services</li>
+        </ul>
+
+        <h3>2.2 Information Automatically Collected</h3>
+        <ul>
+            <li><strong>Usage Data:</strong> API calls, verification requests, monthly active users</li>
+            <li><strong>Log Data:</strong> IP addresses, user agents, timestamps, request paths</li>
+            <li><strong>Performance Data:</strong> Response times, error rates, system metrics</li>
+            <li><strong>Security Events:</strong> Authentication attempts, permission grants, access verifications</li>
+        </ul>
+
+        <h3>2.3 Cryptographic Data</h3>
+        <ul>
+            <li><strong>Credentials:</strong> Stored in user's browser (we do not have access)</li>
+            <li><strong>Public Keys:</strong> Ed25519 public keys for verification</li>
+            <li><strong>Revocation Data:</strong> OPRF-blinded credential identifiers (privacy-preserving)</li>
+        </ul>
+
+        <h2>3. How We Use Your Information</h2>
+        <p>We use collected information to:</p>
+        <ul>
+            <li>Provide and maintain the Service</li>
+            <li>Process payments and billing</li>
+            <li>Send service notifications and updates</li>
+            <li>Monitor usage for billing purposes (MAU tracking)</li>
+            <li>Detect and prevent fraud, abuse, and security incidents</li>
+            <li>Comply with legal obligations</li>
+            <li>Improve the Service through analytics</li>
+        </ul>
+
+        <h2>4. Privacy-Preserving Features</h2>
+        <p>Lemma IAM is designed with privacy as a core principle:</p>
+        <ul>
+            <li><strong>OPRF Revocation:</strong> We cannot determine which credentials are being checked (privacy-preserving blind evaluation)</li>
+            <li><strong>Client-Side Verification:</strong> Credentials verified in user's browser, reducing server-side tracking</li>
+            <li><strong>Minimal Data Collection:</strong> We collect only what's necessary to provide the Service</li>
+            <li><strong>No Third-Party Tracking:</strong> We do not sell or share your data with advertisers</li>
+        </ul>
+
+        <h2>5. Data Sharing and Disclosure</h2>
+        <p>We do not sell your personal information. We may share data with:</p>
+        
+        <h3>5.1 Service Providers</h3>
+        <ul>
+            <li><strong>Stripe:</strong> Payment processing (PCI DSS compliant)</li>
+            <li><strong>Heroku/AWS:</strong> Hosting infrastructure</li>
+            <li><strong>Sentry:</strong> Error monitoring (anonymized error data)</li>
+            <li><strong>Email Service:</strong> Mailgun or SendGrid for transactional emails</li>
+        </ul>
+
+        <h3>5.2 Legal Requirements</h3>
+        <p>We may disclose information if required by law, court order, or government request, or to protect our rights and safety.</p>
+
+        <h3>5.3 Business Transfers</h3>
+        <p>If Lemma is involved in a merger, acquisition, or sale of assets, your information may be transferred. We will notify you before your information becomes subject to a different privacy policy.</p>
+
+        <h2>6. Data Security</h2>
+        <p>We implement industry-standard security measures:</p>
+        <ul>
+            <li><strong>Encryption:</strong> All data transmitted over HTTPS/TLS</li>
+            <li><strong>Cryptographic Keys:</strong> Stored in AWS KMS (HSM-backed)</li>
+            <li><strong>Database Security:</strong> PostgreSQL with encrypted connections</li>
+            <li><strong>Access Controls:</strong> Role-based access to internal systems</li>
+            <li><strong>Audit Logging:</strong> All security events logged for compliance</li>
+            <li><strong>Regular Updates:</strong> Security patches applied promptly</li>
+        </ul>
+        <p>However, no method of transmission over the internet is 100% secure. We cannot guarantee absolute security.</p>
+
+        <h2>7. Data Retention</h2>
+        <ul>
+            <li><strong>Account Data:</strong> Retained while your account is active</li>
+            <li><strong>Audit Logs:</strong> 
+                <ul>
+                    <li>Free Tier: 30 days</li>
+                    <li>Starter: 90 days</li>
+                    <li>Professional: 1 year</li>
+                    <li>Enterprise: 7 years (compliance requirement)</li>
+                </ul>
+            </li>
+            <li><strong>After Account Deletion:</strong> Data deleted within 30 days, except where legally required to retain</li>
+        </ul>
+
+        <h2>8. Your Rights</h2>
+        <p>You have the right to:</p>
+        <ul>
+            <li><strong>Access:</strong> Request a copy of your personal data</li>
+            <li><strong>Correction:</strong> Update inaccurate or incomplete information</li>
+            <li><strong>Deletion:</strong> Request deletion of your data (subject to legal retention requirements)</li>
+            <li><strong>Export:</strong> Download your audit logs in CSV or JSON format</li>
+            <li><strong>Opt-Out:</strong> Unsubscribe from marketing emails (service emails may still be sent)</li>
+        </ul>
+        <p>To exercise these rights, contact us at privacy@lemma.id</p>
+
+        <h2>9. International Data Transfers</h2>
+        <p>Your information may be transferred to and processed in the United States and other countries. We ensure appropriate safeguards are in place for international transfers.</p>
+
+        <h2>10. GDPR Compliance (EU Users)</h2>
+        <p>If you are in the European Economic Area (EEA), you have additional rights under GDPR:</p>
+        <ul>
+            <li><strong>Legal Basis:</strong> We process data based on contractual necessity and legitimate business interests</li>
+            <li><strong>Data Protection Officer:</strong> Contact dpo@lemma.id</li>
+            <li><strong>Right to Lodge Complaint:</strong> You may file a complaint with your local data protection authority</li>
+            <li><strong>Data Portability:</strong> Export your data in machine-readable format</li>
+        </ul>
+
+        <h2>11. CCPA Compliance (California Users)</h2>
+        <p>If you are a California resident, you have rights under the California Consumer Privacy Act (CCPA):</p>
+        <ul>
+            <li><strong>Right to Know:</strong> What personal information we collect</li>
+            <li><strong>Right to Delete:</strong> Request deletion of your personal information</li>
+            <li><strong>Right to Opt-Out:</strong> We do not sell personal information</li>
+            <li><strong>Non-Discrimination:</strong> We will not discriminate against you for exercising your rights</li>
+        </ul>
+
+        <h2>12. Children's Privacy</h2>
+        <p>Our Service is not intended for users under 18 years of age. We do not knowingly collect information from children. If we learn we have collected information from a child, we will delete it immediately.</p>
+
+        <h2>13. Cookies and Tracking</h2>
+        <p>We use minimal cookies:</p>
+        <ul>
+            <li><strong>Session Cookies:</strong> To maintain your logged-in state</li>
+            <li><strong>Functional Cookies:</strong> To remember your preferences</li>
+            <li><strong>Analytics:</strong> We do not use third-party analytics trackers</li>
+        </ul>
+        <p>You can disable cookies in your browser, but some features may not work properly.</p>
+
+        <h2>14. Third-Party Links</h2>
+        <p>Our Service may contain links to third-party websites. We are not responsible for the privacy practices of other sites. We encourage you to read their privacy policies.</p>
+
+        <h2>15. Changes to Privacy Policy</h2>
+        <p>We may update this Privacy Policy from time to time. We will notify you of any material changes by:</p>
+        <ul>
+            <li>Posting the updated policy on this page</li>
+            <li>Updating the "Last Updated" date</li>
+            <li>Sending an email notification for significant changes</li>
+        </ul>
+        <p>Your continued use of the Service after changes constitutes acceptance of the updated Privacy Policy.</p>
+
+        <h2>16. Data Breach Notification</h2>
+        <p>In the event of a data breach that may compromise your personal information, we will notify you within 72 hours via email and post a notice on our website.</p>
+
+        <h2>17. Contact Us</h2>
+        <p>For privacy-related questions or to exercise your rights:</p>
+        <p>
+            Email: privacy@lemma.id<br>
+            Data Protection Officer: dpo@lemma.id<br>
+            Website: https://lemma.id/privacy
+        </p>
+
+        <hr style="margin: 40px 0; border: none; border-top: 1px solid #ddd;">
+        
+        <p style="text-align: center; color: #666; font-size: 14px;">
+            <a href="/" style="color: #0066cc;">Back to Home</a> | 
+            <a href="/terms" style="color: #0066cc;">Terms of Service</a> | 
+            <a href="/dashboard" style="color: #0066cc;">Dashboard</a>
+        </p>
+    </div>
+</body>
+</html>
+
