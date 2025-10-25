@@ -16,7 +16,12 @@ logger = logging.getLogger(__name__)
 try:
     REDIS_URL = os.getenv('REDIS_URL')
     if REDIS_URL:
-        redis_client = redis.from_url(REDIS_URL)
+        # Configure SSL for Heroku Redis
+        redis_client = redis.from_url(
+            REDIS_URL,
+            decode_responses=False,
+            ssl_cert_reqs=None  # Disable SSL cert verification for Heroku Redis
+        )
         redis_client.ping()  # Test connection
         REDIS_AVAILABLE = True
         logger.info("✅ Redis rate limiting initialized")
@@ -25,7 +30,8 @@ try:
         logger.warning("⚠️ REDIS_URL not set - rate limiting disabled")
 except Exception as e:
     REDIS_AVAILABLE = False
-    logger.error(f"❌ Redis connection failed: {e}")
+    logger.warning(f"⚠️ Redis connection failed: {e}")
+    logger.warning("   Rate limiting disabled - requests will not be limited")
 
 
 def rate_limit(

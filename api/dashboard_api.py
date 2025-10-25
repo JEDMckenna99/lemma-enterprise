@@ -193,50 +193,7 @@ def revoke_api_key(key_id):
             'error': 'Failed to revoke API key'
         }), 500
 
-@dashboard_bp.route('/api/customer/usage', methods=['GET'])
-@cross_origin()
-def get_customer_usage():
-    """Get customer usage statistics"""
-    try:
-        customer_id = session.get('customer_id')
-        if not customer_id:
-            return jsonify({
-                'success': False,
-                'error': 'Not authenticated'
-            }), 401
-
-        # Mock usage data for now
-        current_month = datetime.now().strftime('%Y-%m')
-        
-        usage_data = {
-            'current_month': current_month,
-            'federated_id_network': {
-                'monthly_active_users': 1247,
-                'new_verifications': 156,
-                'total_verifications': 45623,
-                'cost': 62.35  # $0.05 * 1247 MAU
-            },
-            'iam_system': {
-                'monthly_active_users': 856,
-                'permission_grants': 234,
-                'access_verifications': 12890,
-                'cost': 128.40  # $0.15 * 856 MAU
-            },
-            'total_cost': 190.75,
-            'next_billing_date': (datetime.now() + timedelta(days=7)).isoformat()
-        }
-
-        return jsonify({
-            'success': True,
-            'usage': usage_data
-        })
-
-    except Exception as e:
-        logger.error(f"Get usage error: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Failed to get usage data'
-        }), 500
+# Removed duplicate get_customer_usage - now using real usage tracking from line 72
 
 # ================================================================================
 # ADMIN DASHBOARD ENDPOINTS
