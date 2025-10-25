@@ -111,8 +111,9 @@ def init_audit_logging():
         CREATE INDEX IF NOT EXISTS idx_audit_ip ON audit_logs (ip_address);
         """
         
+        from sqlalchemy import text
         with engine.connect() as conn:
-            conn.execute(create_table_sql)
+            conn.execute(text(create_table_sql))
             conn.commit()
         logger.info("✅ Audit logs table created successfully")
         return True
@@ -183,24 +184,37 @@ def log_event(
             metadata['request_id'] = getattr(g, 'request_id', None)
         
         # Insert into database
-        insert_sql = """
+        from sqlalchemy import text
+        
+        insert_sql = text("""
         INSERT INTO audit_logs (
             timestamp, event_type, user_email, user_did, site_id,
             resource, action, result, ip_address, user_agent,
             nonce, credential_id, metadata
         ) VALUES (
-            NOW(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            NOW(), :event_type, :user_email, :user_did, :site_id,
+            :resource, :action, :result, :ip_address, :user_agent,
+            :nonce, :credential_id, :metadata
         )
-        """
+        """)
         
         with engine.connect() as conn:
             conn.execute(
                 insert_sql,
-                (
-                    event_type, user_email, user_did, site_id,
-                    resource, action, result, ip_address, user_agent,
-                    nonce, credential_id, json.dumps(metadata)
-                )
+                {
+                    'event_type': event_type,
+                    'user_email': user_email,
+                    'user_did': user_did,
+                    'site_id': site_id,
+                    'resource': resource,
+                    'action': action,
+                    'result': result,
+                    'ip_address': ip_address,
+                    'user_agent': user_agent,
+                    'nonce': nonce,
+                    'credential_id': credential_id,
+                    'metadata': json.dumps(metadata)
+                }
             )
             conn.commit()
         
@@ -320,48 +334,51 @@ def get_audit_logs(
         return []
     
     try:
-        # Build query
-        query = "SELECT * FROM audit_logs WHERE 1=1"
-        params = []
+        # Build query with named parameters
+        from sqlalchemy import text
+        
+        base_query = "SELECT * FROM audit_logs WHERE 1=1"
+        param_dict = {}
         
         if site_id:
-            query += " AND site_id = %s"
-            params.append(site_id)
+            base_query += " AND site_id = :site_id"
+            param_dict['site_id'] = site_id
         
         if user_email:
-            query += " AND user_email = %s"
-            params.append(user_email)
+            base_query += " AND user_email = :user_email"
+            param_dict['user_email'] = user_email
         
         if event_types:
-            placeholders = ','.join(['%s'] * len(event_types))
-            query += f" AND event_type IN ({placeholders})"
-            params.extend(event_types)
+            # Handle multiple event types
+            base_query += " AND event_type = ANY(:event_types)"
+            param_dict['event_types'] = event_types
         
         if start_date:
-            query += " AND timestamp >= %s"
-            params.append(start_date)
+            base_query += " AND timestamp >= :start_date"
+            param_dict['start_date'] = start_date
         
         if end_date:
-            query += " AND timestamp <= %s"
-            params.append(end_date)
+            base_query += " AND timestamp <= :end_date"
+            param_dict['end_date'] = end_date
         
         if result:
-            query += " AND result = %s"
-            params.append(result)
+            base_query += " AND result = :result"
+            param_dict['result'] = result
         
-        query += " ORDER BY timestamp DESC LIMIT %s OFFSET %s"
-        params.extend([limit, offset])
+        base_query += " ORDER BY timestamp DESC LIMIT :limit OFFSET :offset"
+        param_dict['limit'] = limit
+        param_dict['offset'] = offset
         
         # Execute query
         with engine.connect() as conn:
-            result = conn.execute(query, params)
+            query_result = conn.execute(text(base_query), param_dict)
             
             # Convert to list of dicts
             logs = []
-            for row in result:
+            for row in query_result:
                 logs.append({
                     'id': row[0],
-                    'timestamp': row[1].isoformat(),
+                    'timestamp': row[1].isoformat() if row[1] else None,
                     'event_type': row[2],
                     'user_email': row[3],
                     'user_did': row[4],

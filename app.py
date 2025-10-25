@@ -275,8 +275,9 @@ def create_app():
         try:
             # Check database connectivity
             from api.database import engine
+            from sqlalchemy import text
             with engine.connect() as conn:
-                conn.execute('SELECT 1')
+                conn.execute(text('SELECT 1'))
             
             return jsonify({
                 'status': 'healthy',
@@ -296,8 +297,9 @@ def create_app():
         
         try:
             from api.database import engine
+            from sqlalchemy import text
             with engine.connect() as conn:
-                conn.execute('SELECT 1')
+                conn.execute(text('SELECT 1'))
             checks['database'] = True
         except Exception as e:
             logger.warning(f"Database check failed: {e}")
