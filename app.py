@@ -270,8 +270,8 @@ def create_app():
     # ================================================================================
 
     @app.route('/health')
-    def health_check():
-        """Health check endpoint for uptime monitoring"""
+    def simple_health():
+        """Simple health check endpoint for uptime monitoring"""
         try:
             from api.database_models import db
             db.engine.execute('SELECT 1')
@@ -287,7 +287,7 @@ def create_app():
             }), 500
 
     @app.route('/ready')
-    def readiness_check():
+    def ready_check():
         """Readiness check - detailed system status"""
         checks = {'database': False, 'crypto': False}
         
