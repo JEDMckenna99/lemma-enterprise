@@ -481,10 +481,12 @@ class LemmaBotShield {
     
     /**
      * Verify permission credential (OPTIMIZED - CLIENT-SIDE WASM)
+     * NOTE: NO PIN CHECK HERE - Shield should be SEAMLESS
+     * PIN only used for /wallet page access
      */
     async verifyPermissionWithNonce(credential) {
         try {
-            // Use OPTIMIZED client-side WASM verification (18µs, $0 cost)
+            // Use OPTIMIZED client-side WASM verification (18µs, $0 cost, NO PIN)
             if (window.LemmaWASMVerifierOptimized) {
                 if (!this.wasmVerifier) {
                     this.wasmVerifier = new LemmaWASMVerifierOptimized({ 
@@ -494,15 +496,15 @@ class LemmaBotShield {
                     await this.wasmVerifier.init();
                     
                     if (this.config.debug) {
-                        console.log('⚡ Using OPTIMIZED WASM verifier (18µs, $0 cost, 19,000x faster than Auth0)');
+                        console.log('⚡ Using OPTIMIZED WASM verifier (18µs, $0 cost, seamless - no PIN)');
                     }
                 }
                 
-                // Verify CLIENT-SIDE (no server call!)
+                // Verify CLIENT-SIDE (no server call, NO PIN check!)
                 const result = await this.wasmVerifier.verify(credential);
                 
                 if (this.config.debug) {
-                    console.log(`${result.verified ? '✅' : '❌'} Client-side verification:`, {
+                    console.log(`${result.verified ? '✅' : '❌'} Seamless verification (no PIN required):`, {
                         verified: result.verified,
                         time_us: result.verification_time_us?.toFixed(2),
                         cost: '$0.00',
