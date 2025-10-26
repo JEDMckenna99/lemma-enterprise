@@ -354,6 +354,11 @@ def create_app():
     def qr_demo():
         return render_template('modern/qr_demo.html')
 
+    @app.route('/test-client-verification')
+    def test_client_verification():
+        """Test client-side verification performance"""
+        return render_template('test_client_verification.html')
+
     @app.route('/qr-reader')
     def qr_reader():
         return render_template('modern/qr_reader.html')
