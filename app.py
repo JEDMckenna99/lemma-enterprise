@@ -359,6 +359,11 @@ def create_app():
         """Test client-side verification performance"""
         return render_template('test_client_verification.html')
 
+    @app.route('/setup-pin')
+    def setup_pin():
+        """One-time PIN setup for existing wallet"""
+        return render_template('setup_pin_protection.html')
+
     @app.route('/qr-reader')
     def qr_reader():
         return render_template('modern/qr_reader.html')
