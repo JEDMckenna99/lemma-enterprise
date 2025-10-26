@@ -7,8 +7,14 @@
     {{ super() }}
     <!-- Load the unified Lemma Wallet -->
     <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1005"></script>
-    <!-- Load the Lemma Shield Widget for verification (from Heroku app with session management fixes) -->
-    <script src="/static/js/lemma-bot-shield-simple.js?v=908"></script>
+    
+    <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
+    <script src="/static/js/lemma-wallet-pin.js"></script>
+    <script src="/static/js/lemma-pin-ui.js"></script>
+    <script src="/static/js/lemma-wallet-with-pin.js"></script>
+    
+    <!-- WASM Verifier (for seamless verification, no PIN) -->
+    <script src="/static/js/lemma-wasm-verifier-optimized.js"></script>
     <style>
         .wallet-container {
             max-width: 1100px;
@@ -2478,46 +2484,86 @@ if (typeof window.originalLoadWalletData === 'undefined') {
     };
 }
 
-// Initialize Bot Shield for wallet protection
-// IMPORTANT: Wait for wallet to be fully initialized first
-async function initWalletShieldProtection() {
-    console.log('🛡️ Initializing permission-based Bot Shield for wallet...');
+// Initialize OPTIONAL PIN Protection for Wallet Page
+// NOTE: NO SHIELD - This is the CENTRAL wallet for ALL users
+// Anyone can visit lemma.id/wallet to manage their credentials
+// PIN is optional security layer (recommended but not required)
+async function initWalletPINProtection() {
+    console.log('🔐 Initializing optional PIN protection for wallet...');
     
-    // Wait for global wallet to be available
-    let retries = 0;
-    while (!window.lemmaWallet && !window.LEMMA_WALLET_INITIALIZED && retries < 10) {
-        console.log('⏳ Waiting for wallet initialization... (attempt ' + (retries + 1) + ')');
-        await new Promise(resolve => setTimeout(resolve, 200));
-        retries++;
+    try {
+        // Check if user has enabled PIN protection
+        const hasPIN = localStorage.getItem('lemma_wallet_salt');
+        
+        if (hasPIN) {
+            // User has PIN enabled - must unlock to access wallet
+            console.log('🔒 PIN protection enabled - prompting for unlock');
+            
+            const pinManager = new LemmaWalletPIN();
+            const pinUI = new LemmaPINUI(pinManager);
+            
+            try {
+                // Show PIN entry modal
+                await pinUI.showPINEntry('Enter your PIN to access your wallet');
+                
+                console.log('✅ Wallet unlocked with PIN');
+                console.log('🎯 4-factor authentication: Credential + Browser + PIN + WASM verification');
+                
+                // Show wallet (already visible, no action needed)
+                
+            } catch (error) {
+                // User cancelled or wrong PIN
+                console.warn('❌ PIN unlock cancelled or failed');
+                
+                // Show message
+                document.querySelector('.wallet-container').innerHTML = `
+                    <div style="text-align: center; padding: 60px 20px;">
+                        <h2 style="color: var(--gray-900); margin-bottom: 16px;">Wallet Locked</h2>
+                        <p style="color: var(--gray-600); margin-bottom: 24px;">
+                            Enter your PIN to access your credentials
+                        </p>
+                        <button onclick="location.reload()" class="btn-primary">
+                            Try Again
+                        </button>
+                        <p style="margin-top: 16px; font-size: 14px; color: var(--gray-500);">
+                            <a href="/setup-pin" style="color: var(--primary);">Forgot PIN?</a>
+                        </p>
+                    </div>
+                `;
+            }
+        } else {
+            // No PIN protection - wallet is accessible to anyone
+            console.log('ℹ️ PIN protection not enabled (wallet accessible)');
+            console.log('💡 Visit /setup-pin to add PIN protection (optional)');
+            
+            // Show optional PIN setup banner
+            const banner = document.createElement('div');
+            banner.style.cssText = 'background: #e0f2fe; padding: 16px; margin-bottom: 24px; border-left: 4px solid #3b82f6; border-radius: 4px;';
+            banner.innerHTML = `
+                <strong>🔐 Optional: Secure Your Wallet with PIN</strong><br>
+                <span style="font-size: 14px; color: var(--gray-700);">
+                    Add 4-digit PIN protection for extra security. 
+                    <a href="/setup-pin" style="color: var(--primary); font-weight: 600;">Setup PIN</a>
+                </span>
+            `;
+            
+            const container = document.querySelector('.wallet-container');
+            if (container && container.firstChild) {
+                container.insertBefore(banner, container.firstChild);
+            }
+        }
+        
+    } catch (error) {
+        console.error('PIN initialization error:', error);
+        // Fail open - show wallet even if PIN check fails
     }
-    
-    if (!window.lemmaWallet && !window.LEMMA_WALLET_INITIALIZED) {
-        console.error('❌ Wallet not initialized after 2 seconds, shield may not work correctly');
-    } else {
-        console.log('✅ Wallet ready, initializing shield...');
-    }
-    
-    const shield = new LemmaBotShield({
-        apiKey: 'platform_owner_key_2024',
-        apiBase: window.location.origin,
-        debug: true,
-        securityLevel: 'high', // Wallet is sensitive data
-        backgroundChecks: true,
-        checkOnEvents: ['entry', 'revocation', 'export'],
-        permissionRequestUrl: '/request-access'
-    });
-    
-    // Protect the wallet container
-    await shield.protect('.wallet-container');
-    
-    console.log('✅ Wallet protected by permission-based Bot Shield');
 }
 
-// Start shield initialization after DOM is ready
+// Initialize PIN protection (or show wallet if no PIN)
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initWalletShieldProtection);
+    document.addEventListener('DOMContentLoaded', initWalletPINProtection);
 } else {
-    initWalletShieldProtection();
+    initWalletPINProtection();
 }
 
 </script>
