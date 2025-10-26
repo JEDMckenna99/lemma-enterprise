@@ -241,11 +241,23 @@ impl OPRFKeyManager {
 
     /// Generate cryptographically secure random key
     fn generate_secure_key() -> Result<[u8; KEY_SIZE]> {
-        use ring::rand::{SystemRandom, SecureRandom};
-        let rng = SystemRandom::new();
         let mut key = [0u8; KEY_SIZE];
-        rng.fill(&mut key)
-            .map_err(|_| crate::LemmaError::OPRF("Key generation failed".to_string()))?;
+        
+        #[cfg(feature = "ring")]
+        {
+            use ring::rand::{SystemRandom, SecureRandom};
+            let rng = SystemRandom::new();
+            rng.fill(&mut key)
+                .map_err(|_| crate::LemmaError::OPRF("Key generation failed".to_string()))?;
+        }
+        
+        #[cfg(not(feature = "ring"))]
+        {
+            use rand::RngCore;
+            let mut rng = rand::thread_rng();
+            rng.fill_bytes(&mut key);
+        }
+        
         Ok(key)
     }
 
