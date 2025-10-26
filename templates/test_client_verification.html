@@ -42,10 +42,13 @@
 
         <div style="margin: 32px 0;">
             <button onclick="runSpeedTest()" class="btn-primary" style="font-size: 18px; padding: 16px 32px;">
-                🚀 Run Speed Test
+                🚀 Run Speed Test (Standard)
+            </button>
+            <button onclick="runOptimizedTest()" class="btn-primary" style="font-size: 18px; padding: 16px 32px; margin-left: 12px; background: var(--success);">
+                ⚡ Run Optimized Test
             </button>
             <button onclick="runComparisonTest()" class="btn-secondary" style="font-size: 18px; padding: 16px 32px; margin-left: 12px;">
-                📊 Compare Server vs Client
+                📊 Compare All Methods
             </button>
         </div>
 
@@ -79,11 +82,13 @@
         initWasm();
     </script>
 
-    <!-- Load client-side verifier -->
+    <!-- Load client-side verifiers -->
     <script src="/static/js/lemma-full-client-verifier.js"></script>
+    <script src="/static/js/lemma-wasm-verifier-optimized.js"></script>
 
     <script>
         let verifier;
+        let optimizedVerifier;
         let testCredential;
         
         function log(message) {
@@ -273,6 +278,86 @@
                 showMetric('vs Your Server', speedRatio > 1 ? speedRatio.toFixed(1) + 'x faster' : (1/speedRatio).toFixed(1) + 'x slower', '', speedRatio > 1 ? 'success' : 'warning');
                 showMetric('vs Auth0', (auth0Avg / avgClient).toFixed(0) + 'x', 'faster', 'success');
                 showMetric('Monthly Savings (1M verifications)', '$1,000', '', 'success');
+                
+            } catch (error) {
+                log(`\n❌ Error: ${error.message}`);
+                console.error(error);
+            }
+        }
+        
+        async function runOptimizedTest() {
+            clearLog();
+            log('⚡ OPTIMIZED WebAssembly Verification Test\n' + '='.repeat(60));
+            
+            try {
+                log('\n1️⃣ Initializing optimized verifier...');
+                optimizedVerifier = new LemmaWASMVerifierOptimized({ debug: false });
+                await optimizedVerifier.init();
+                log('   ✅ Optimized WASM verifier ready');
+                
+                testCredential = await createTestCredential();
+                log('\n2️⃣ Test credential created');
+                
+                // Single verification
+                log('\n3️⃣ Running single optimized verification...');
+                const resultSingle = await optimizedVerifier.verify(testCredential);
+                log(`   Result: ${resultSingle.verified ? '✅ Valid' : '❌ Invalid'} (${resultSingle.reason})`);
+                log(`   ⚡ Time: ${(resultSingle.verification_time_us / 1000).toFixed(3)}ms (${resultSingle.verification_time_us.toFixed(2)}µs)`);
+                
+                // Batch test for accurate average
+                log('\n4️⃣ Running 1000 optimized verifications...');
+                const times = [];
+                
+                for (let i = 0; i < 1000; i++) {
+                    const result = await optimizedVerifier.verify(testCredential);
+                    times.push(result.verification_time_us);
+                }
+                
+                const avgUs = times.reduce((a, b) => a + b) / times.length;
+                const minUs = Math.min(...times);
+                const maxUs = Math.max(...times);
+                const sortedTimes = times.sort((a, b) => a - b);
+                const p50Us = sortedTimes[Math.floor(times.length * 0.5)];
+                const p95Us = sortedTimes[Math.floor(times.length * 0.95)];
+                const p99Us = sortedTimes[Math.floor(times.length * 0.99)];
+                
+                log('\n📊 OPTIMIZED Performance (1000 verifications):');
+                log(`   Average: ${avgUs.toFixed(2)}µs (${(avgUs / 1000).toFixed(3)}ms)`);
+                log(`   Minimum: ${minUs.toFixed(2)}µs`);
+                log(`   Maximum: ${maxUs.toFixed(2)}µs`);
+                log(`   p50 (median): ${p50Us.toFixed(2)}µs`);
+                log(`   p95: ${p95Us.toFixed(2)}µs`);
+                log(`   p99: ${p99Us.toFixed(2)}µs`);
+                log(`   Throughput: ${(1000000 / avgUs).toFixed(0)} verifications/second`);
+                
+                // Cost analysis
+                log('\n💰 Cost Savings:');
+                log(`   Server cost (1000 verifications): $1.00`);
+                log(`   Optimized client cost: $0.00`);
+                log(`   Savings: $1.00`);
+                log(`   Monthly (1M verifications): $1,000 saved`);
+                log(`   Yearly (12M verifications): $12,000 saved`);
+                
+                // vs Auth0
+                const auth0Avg = 350000;  // 350ms = 350,000µs
+                log('\n🆚 vs AUTH0:');
+                log(`   Auth0 average: ${auth0Avg.toFixed(0)}µs (350ms)`);
+                log(`   Optimized Lemma: ${avgUs.toFixed(2)}µs`);
+                log(`   Speed improvement: ${(auth0Avg / avgUs).toFixed(0)}x faster`);
+                
+                // Show metrics
+                showMetric('Optimized Average', avgUs.toFixed(2), 'µs', 'success');
+                showMetric('Throughput', (1000000 / avgUs).toFixed(0), 'verifications/sec', 'success');
+                showMetric('vs Auth0', (auth0Avg / avgUs).toFixed(0) + 'x', 'faster', 'success');
+                showMetric('Yearly Savings', '$12,000', '(1M verifications/month)', 'success');
+                
+                // Compare to target
+                const target = 100;  // 100µs target
+                if (avgUs < target) {
+                    log(`\n🎯 TARGET ACHIEVED! Under ${target}µs!`);
+                } else {
+                    log(`\n⚠️ ${(avgUs - target).toFixed(2)}µs over target (${target}µs)`);
+                }
                 
             } catch (error) {
                 log(`\n❌ Error: ${error.message}`);
