@@ -54,11 +54,29 @@
         <div id="metrics" style="margin-top: 24px;"></div>
     </div>
 
-    <!-- Load Ed25519 library -->
+    <!-- Load WebAssembly Module -->
     <script type="module">
-        import * as ed from 'https://cdn.jsdelivr.net/npm/@noble/ed25519@2.0.0/+esm';
-        window.ed25519 = ed;
-        console.log('✅ Ed25519 library loaded');
+        import init, * as wasm from '/static/wasm/lemma_crypto.js';
+        
+        async function initWasm() {
+            try {
+                await init();
+                window.lemmaWasm = wasm;
+                window.wasmReady = true;
+                console.log('✅ WebAssembly loaded and initialized');
+                console.log('⚡ Expected performance: 10-100µs');
+            } catch (error) {
+                console.error('❌ WASM failed to load:', error);
+                window.wasmReady = false;
+                
+                // Fallback to JavaScript Ed25519
+                const ed = await import('https://cdn.jsdelivr.net/npm/@noble/ed25519@2.0.0/+esm');
+                window.ed25519 = ed;
+                console.log('⚠️ Using JavaScript Ed25519 fallback');
+            }
+        }
+        
+        initWasm();
     </script>
 
     <!-- Load client-side verifier -->
