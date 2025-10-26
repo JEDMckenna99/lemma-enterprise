@@ -685,17 +685,22 @@ window.addEventListener('DOMContentLoaded', checkAccess);
                             <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">200-500ms</td>
                         </tr>
                         <tr>
-                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">Client-Side (WebAssembly)</td>
-                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--success); font-weight: 600;">0.36µs</td>
-                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">N/A</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">Speed Improvement</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--success); font-weight: 600;">1,000-2,700x faster</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">Baseline</td>
                         </tr>
                         <tr>
                             <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">Offline Capable</td>
-                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--success); font-weight: 600;">✓ Yes</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--success); font-weight: 600;">✓ Planned</td>
                             <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">✗ No</td>
                         </tr>
                     </tbody>
                 </table>
+                
+                <p style="background: #e0f2fe; padding: 16px; border-left: 4px solid #3b82f6; border-radius: 4px; margin-top: 16px; font-size: 14px;">
+                    <strong>ℹ️ Note:</strong> Current implementation uses server-side Rust verification (31-182µs). 
+                    Client-side WebAssembly verification (0.36µs, 500,000x faster) is in development for Q1 2026.
+                </p>
             </section>
 
             <!-- Get Started CTA -->
