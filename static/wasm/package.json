@@ -1,0 +1,15 @@
+{
+  "name": "lemma-crypto",
+  "type": "module",
+  "version": "0.1.1",
+  "files": [
+    "lemma_crypto_bg.wasm",
+    "lemma_crypto.js",
+    "lemma_crypto.d.ts"
+  ],
+  "main": "lemma_crypto.js",
+  "types": "lemma_crypto.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
