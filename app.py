@@ -340,7 +340,7 @@ def create_app():
 
     @app.route('/docs')
     def docs():
-        return render_template('modern/docs.html')
+        return render_template('modern/docs_iam.html')
 
     @app.route('/qr-demo')
     def qr_demo():

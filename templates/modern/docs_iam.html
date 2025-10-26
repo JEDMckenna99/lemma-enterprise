@@ -1,0 +1,745 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Developer Documentation - Lemma IAM{% endblock %}
+{% block description %}Integrate Lemma IAM into your platform in 5 minutes. REST API, SDKs, and comprehensive guides for adding authentication and access control.{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    .docs-hero {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        color: var(--white);
+        padding: 80px 20px;
+        text-align: center;
+    }
+    .docs-hero h1 {
+        font-size: 48px;
+        margin: 0 0 16px 0;
+        font-weight: 700;
+    }
+    .docs-hero p {
+        font-size: 20px;
+        opacity: 0.95;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    .docs-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 60px 20px;
+    }
+    .docs-grid {
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        gap: 60px;
+        margin-top: 40px;
+    }
+    .docs-nav {
+        position: sticky;
+        top: 80px;
+        height: fit-content;
+    }
+    .nav-section {
+        margin-bottom: 32px;
+    }
+    .nav-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--gray-900);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 12px;
+    }
+    .nav-link {
+        display: block;
+        padding: 8px 12px;
+        color: var(--gray-600);
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 15px;
+        transition: all 0.2s;
+        margin-bottom: 4px;
+    }
+    .nav-link:hover {
+        background: var(--gray-100);
+        color: var(--gray-900);
+    }
+    .nav-link.active {
+        background: var(--primary);
+        color: var(--white);
+    }
+    .docs-section {
+        margin-bottom: 60px;
+        scroll-margin-top: 80px;
+    }
+    .docs-section h2 {
+        color: var(--gray-900);
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid var(--gray-200);
+    }
+    .code-block {
+        background: var(--gray-900);
+        color: #e0e0e0;
+        padding: 20px;
+        border-radius: 8px;
+        font-family: 'Monaco', monospace;
+        font-size: 14px;
+        overflow-x: auto;
+        margin: 16px 0;
+        position: relative;
+    }
+    .code-header {
+        background: var(--gray-800);
+        padding: 8px 16px;
+        border-radius: 8px 8px 0 0;
+        margin: -20px -20px 12px -20px;
+        font-size: 12px;
+        color: var(--gray-400);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .copy-btn {
+        background: var(--gray-700);
+        border: none;
+        color: var(--white);
+        padding: 4px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    .copy-btn:hover {
+        background: var(--gray-600);
+    }
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 24px;
+        margin: 32px 0;
+    }
+    .feature-card {
+        background: var(--white);
+        border: 1px solid var(--gray-200);
+        padding: 24px;
+        border-radius: 12px;
+    }
+    .feature-card h3 {
+        color: var(--primary);
+        margin: 0 0 12px 0;
+        font-size: 18px;
+    }
+    .feature-card p {
+        color: var(--gray-600);
+        margin: 0;
+        line-height: 1.6;
+    }
+    .api-endpoint {
+        background: var(--gray-50);
+        padding: 16px;
+        border-left: 4px solid var(--primary);
+        border-radius: 4px;
+        margin: 16px 0;
+    }
+    .http-method {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 12px;
+        margin-right: 8px;
+    }
+    .http-post {
+        background: #10b981;
+        color: white;
+    }
+    .http-get {
+        background: #3b82f6;
+        color: white;
+    }
+    .http-delete {
+        background: #ef4444;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="docs-hero">
+    <h1>Lemma IAM Developer Docs</h1>
+    <p>Integrate enterprise-grade authentication and access control into your platform in minutes</p>
+</div>
+
+<div class="docs-container">
+    <div class="docs-grid">
+        <!-- Sidebar Navigation -->
+        <nav class="docs-nav">
+            <div class="nav-section">
+                <div class="nav-title">Getting Started</div>
+                <a href="#quickstart" class="nav-link active">Quick Start</a>
+                <a href="#features" class="nav-link">Key Features</a>
+                <a href="#how-it-works" class="nav-link">How It Works</a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-title">Integration</div>
+                <a href="#register-site" class="nav-link">1. Register Site</a>
+                <a href="#define-permissions" class="nav-link">2. Define Permissions</a>
+                <a href="#grant-access" class="nav-link">3. Grant Access</a>
+                <a href="#verify-access" class="nav-link">4. Verify Access</a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-title">API Reference</div>
+                <a href="#api-sites" class="nav-link">Sites</a>
+                <a href="#api-permissions" class="nav-link">Permissions</a>
+                <a href="#api-users" class="nav-link">Users</a>
+                <a href="#api-verification" class="nav-link">Verification</a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-title">SDKs</div>
+                <a href="#sdk-javascript" class="nav-link">JavaScript</a>
+                <a href="#sdk-python" class="nav-link">Python</a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-title">Resources</div>
+                <a href="/pricing" class="nav-link">Pricing</a>
+                <a href="#support" class="nav-link">Support</a>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="docs-content">
+            <!-- Quick Start -->
+            <section id="quickstart" class="docs-section">
+                <h2>Quick Start (5 Minutes)</h2>
+                <p>Get up and running with Lemma IAM in just a few minutes.</p>
+                
+                <h3 style="margin-top: 32px;">Step 1: Register Your Site</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>curl</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+<pre>curl -X POST https://lemma.id/api/v1/sites/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "site_domain": "yourcompany.com",
+    "company_name": "Your Company Inc",
+    "admin_email": "admin@yourcompany.com",
+    "plan": "starter"
+  }'</pre>
+                </div>
+                
+                <p><strong>Response:</strong> You'll receive your <code>site_id</code> and <code>api_key</code>. Save these!</p>
+                
+                <h3 style="margin-top: 32px;">Step 2: Define Permissions</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>curl</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+<pre>curl -X POST https://lemma.id/api/v1/sites/YOUR_SITE_ID/permissions \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "permission_id": "admin",
+    "display_name": "Administrator",
+    "scope": ["*"],
+    "description": "Full access"
+  }'</pre>
+                </div>
+                
+                <h3 style="margin-top: 32px;">Step 3: Add to Your Site</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>HTML</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+<pre>&lt;script src="https://lemma.id/static/js/lemma-iam-sdk.js"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+const lemmaIAM = new LemmaIAM({
+    apiKey: 'YOUR_API_KEY',
+    siteId: 'YOUR_SITE_ID'
+});
+
+// Check if user has access
+const hasAccess = await lemmaIAM.verifyAccess(
+    '/admin/users', 
+    'read'
+);
+
+if (hasAccess) {
+    // Show protected content
+} else {
+    // Redirect to access request
+}
+&lt;/script&gt;</pre>
+                </div>
+                
+                <p style="background: var(--success-50); padding: 16px; border-left: 4px solid var(--success); border-radius: 4px; margin-top: 24px;">
+                    ✅ <strong>Done!</strong> You now have enterprise-grade IAM with microsecond verification.
+                </p>
+            </section>
+
+            <!-- Key Features -->
+            <section id="features" class="docs-section">
+                <h2>Key Features</h2>
+                
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>⚡ 1,000x Faster</h3>
+                        <p>31-182µs verification vs 200-500ms for Auth0. Client-side verification eliminates API calls.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>💰 67% Cheaper</h3>
+                        <p>$0.023/MAU vs $0.07/MAU for Auth0. Client-side compute offloads costs to users.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🔒 Cryptographically Secure</h3>
+                        <p>Ed25519 signatures (unforgeable), OPRF revocation (privacy-preserving), AES-256-GCM encryption.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🌐 Works Offline</h3>
+                        <p>Credentials verified in browser. No internet required after initial setup.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🔐 Privacy-Preserving</h3>
+                        <p>OPRF-based revocation means server cannot track which credentials are being checked.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>📧 Email-Based Auth</h3>
+                        <p>No passwords to manage. Users confirm via email, get cryptographic credentials.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- How It Works -->
+            <section id="how-it-works" class="docs-section">
+                <h2>How It Works</h2>
+                
+                <h3>Architecture Overview</h3>
+                <div style="background: var(--gray-50); padding: 24px; border-radius: 12px; margin: 24px 0;">
+                    <ol style="line-height: 2;">
+                        <li><strong>User requests access</strong> → Enters email on your site</li>
+                        <li><strong>Email confirmation</strong> → Lemma sends confirmation email</li>
+                        <li><strong>Permission lemma issued</strong> → Ed25519-signed credential</li>
+                        <li><strong>Stored in browser wallet</strong> → AES-256-GCM encrypted</li>
+                        <li><strong>Verification (client-side)</strong> → 0.36µs WebAssembly</li>
+                        <li><strong>Background checks</strong> → Continuous nonce verification</li>
+                        <li><strong>Revocation (if needed)</strong> → OPRF + Bloom filter</li>
+                    </ol>
+                </div>
+                
+                <h3>Authentication Flow</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>Sequence Diagram</span>
+                    </div>
+<pre>User → Your Site: "Login with email"
+Your Site → Lemma API: POST /api/v1/iam/request-access
+Lemma → User Email: Confirmation link
+User → Lemma: Click confirmation
+Lemma → User Browser: Permission lemma (Ed25519 signed)
+User Browser → Local Storage: Store encrypted credential
+User → Your Site: Return with credential
+Your Site → Client (0.36µs): Verify Ed25519 signature
+Client → Your Site: ✅ Access granted
+
+Every 5 minutes (background):
+Your Site → Lemma API: Verify with fresh nonce
+Lemma → Your Site: ✅ Still valid (or ❌ revoked)</pre>
+                </div>
+            </section>
+
+            <!-- API Reference -->
+            <section id="api-sites" class="docs-section">
+                <h2>API Reference - Sites</h2>
+                
+                <div class="api-endpoint">
+                    <div>
+                        <span class="http-method http-post">POST</span>
+                        <code>/api/v1/sites/register</code>
+                    </div>
+                    <p style="margin: 12px 0 0 0; color: var(--gray-600);">Register a new site to use Lemma IAM</p>
+                </div>
+                
+                <h4>Request Body:</h4>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>JSON</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+<pre>{
+  "site_domain": "yourcompany.com",
+  "company_name": "Your Company Inc",
+  "admin_email": "admin@yourcompany.com",
+  "plan": "starter"
+}</pre>
+                </div>
+                
+                <h4>Response:</h4>
+                <div class="code-block">
+<pre>{
+  "success": true,
+  "site_id": "site_abc123",
+  "api_key": "lemma_api_xyz789",
+  "issuer_did": "did:lemma:a1b2c3...",
+  "crypto_engine": "rust_ed25519_oprf"
+}</pre>
+                </div>
+            </section>
+
+            <section id="api-permissions" class="docs-section">
+                <h2>API Reference - Permissions</h2>
+                
+                <div class="api-endpoint">
+                    <div>
+                        <span class="http-method http-post">POST</span>
+                        <code>/api/v1/sites/{site_id}/permissions</code>
+                    </div>
+                    <p style="margin: 12px 0 0 0; color: var(--gray-600);">Create a permission definition</p>
+                </div>
+                
+                <h4>Request Body:</h4>
+                <div class="code-block">
+<pre>{
+  "permission_id": "admin",
+  "display_name": "Administrator",
+  "scope": ["*"],
+  "description": "Full access to all resources"
+}</pre>
+                </div>
+                
+                <h4>Scope Examples:</h4>
+                <ul style="margin-left: 20px; color: var(--gray-700);">
+                    <li><code>"*"</code> - Full access to everything</li>
+                    <li><code>"posts:*"</code> - All actions on posts</li>
+                    <li><code>"posts:read"</code> - Read-only on posts</li>
+                    <li><code>"/admin/*:*"</code> - All actions on /admin paths</li>
+                </ul>
+            </section>
+
+            <section id="api-users" class="docs-section">
+                <h2>API Reference - User Access</h2>
+                
+                <div class="api-endpoint">
+                    <div>
+                        <span class="http-method http-post">POST</span>
+                        <code>/api/v1/iam/request-access</code>
+                    </div>
+                    <p style="margin: 12px 0 0 0; color: var(--gray-600);">User requests access (sends email confirmation)</p>
+                </div>
+                
+                <h4>Request Body:</h4>
+                <div class="code-block">
+<pre>{
+  "site_id": "site_abc123",
+  "user_email": "user@example.com",
+  "permission_level": "admin",
+  "redirect_url": "https://yourcompany.com/dashboard"
+}</pre>
+                </div>
+                
+                <h4>Flow:</h4>
+                <ol style="margin-left: 20px; line-height: 1.8; color: var(--gray-700);">
+                    <li>User enters email on your site</li>
+                    <li>Your site calls this API</li>
+                    <li>Lemma sends confirmation email to user</li>
+                    <li>User clicks link</li>
+                    <li>Permission lemma issued to user's browser</li>
+                    <li>User redirected back to your site</li>
+                    <li>Verification happens automatically</li>
+                </ol>
+            </section>
+
+            <section id="api-verification" class="docs-section">
+                <h2>API Reference - Verification</h2>
+                
+                <div class="api-endpoint">
+                    <div>
+                        <span class="http-method http-post">POST</span>
+                        <code>/api/v1/auth/verify</code>
+                    </div>
+                    <p style="margin: 12px 0 0 0; color: var(--gray-600);">Verify user has access to resource (31-182µs)</p>
+                </div>
+                
+                <h4>Request Body:</h4>
+                <div class="code-block">
+<pre>{
+  "site_id": "site_abc123",
+  "user_did": "did:lemma:user456",
+  "resource": "/admin/users",
+  "action": "read",
+  "user_lemmas": [...]  // From user's wallet
+}</pre>
+                </div>
+                
+                <h4>Response:</h4>
+                <div class="code-block">
+<pre>{
+  "success": true,
+  "has_access": true,
+  "verification_time_us": 87.3,
+  "crypto_engine": "rust_ed25519_oprf"
+}</pre>
+                </div>
+            </section>
+
+            <!-- JavaScript SDK -->
+            <section id="sdk-javascript" class="docs-section">
+                <h2>JavaScript SDK</h2>
+                
+                <h3>Installation</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>HTML</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+<pre>&lt;script src="https://lemma.id/static/js/lemma-iam-sdk.js"&gt;&lt;/script&gt;</pre>
+                </div>
+                
+                <h3>Basic Usage</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>JavaScript</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+<pre>// Initialize
+const lemmaIAM = new LemmaIAM({
+    apiKey: 'YOUR_API_KEY',
+    siteId: 'YOUR_SITE_ID'
+});
+
+// Check access (client-side, 0.36µs)
+const result = await lemmaIAM.verifyAccess(
+    '/admin/users',  // resource
+    'read'           // action
+);
+
+if (result.hasAccess) {
+    showAdminPanel();
+} else {
+    redirectToAccessRequest();
+}</pre>
+                </div>
+                
+                <h3>Protect Routes</h3>
+                <div class="code-block">
+<pre>// Express.js example
+app.get('/admin/*', async (req, res, next) => {
+    const hasAccess = await lemmaIAM.verifyAccess(
+        req.path,
+        'read'
+    );
+    
+    if (hasAccess) {
+        next();
+    } else {
+        res.status(403).send('Access denied');
+    }
+});</pre>
+                </div>
+            </section>
+
+            <!-- Python SDK -->
+            <section id="sdk-python" class="docs-section">
+                <h2>Python SDK</h2>
+                
+                <p style="background: #fff3cd; padding: 16px; border-left: 4px solid var(--warning); border-radius: 4px; margin: 16px 0;">
+                    ⚠️ <strong>Coming Soon:</strong> Python SDK is in development. For now, use direct API calls.
+                </p>
+                
+                <h3>Direct API Usage (Current)</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>Python</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+<pre>import requests
+
+# Verify access
+response = requests.post('https://lemma.id/api/v1/auth/verify', 
+    json={
+        'site_id': 'site_abc123',
+        'user_did': 'did:lemma:user456',
+        'resource': '/admin/users',
+        'action': 'read',
+        'user_lemmas': user_credentials
+    }
+)
+
+result = response.json()
+has_access = result['has_access']</pre>
+                </div>
+            </section>
+
+            <!-- Support -->
+            <section id="support" class="docs-section">
+                <h2>Support & Resources</h2>
+                
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>📧 Email Support</h3>
+                        <p>support@lemma.id<br>Response within 24 hours</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>📚 Guides</h3>
+                        <p><a href="/pricing">Pricing</a><br>
+                        <a href="/terms">Terms of Service</a><br>
+                        <a href="/privacy">Privacy Policy</a></p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🔧 Status</h3>
+                        <p><a href="/health">System Health</a><br>
+                        99.9% uptime SLA</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>💬 Community</h3>
+                        <p>GitHub Issues<br>Developer Discord (coming soon)</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Examples -->
+            <section id="examples" class="docs-section">
+                <h2>Complete Examples</h2>
+                
+                <h3>Protect Admin Dashboard</h3>
+                <div class="code-block">
+<pre>// 1. User requests access
+&lt;form onsubmit="requestAccess(event)"&gt;
+    &lt;input type="email" id="userEmail" placeholder="Enter your email"&gt;
+    &lt;button type="submit"&gt;Request Access&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;script&gt;
+async function requestAccess(e) {
+    e.preventDefault();
+    const email = document.getElementById('userEmail').value;
+    
+    await fetch('https://lemma.id/api/v1/iam/request-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            site_id: 'YOUR_SITE_ID',
+            user_email: email,
+            permission_level: 'admin',
+            redirect_url: window.location.href
+        })
+    });
+    
+    alert('Check your email to complete setup!');
+}
+&lt;/script&gt;
+
+// 2. Verify access on page load
+&lt;script&gt;
+async function checkAccess() {
+    const lemmaIAM = new LemmaIAM({
+        apiKey: 'YOUR_API_KEY',
+        siteId: 'YOUR_SITE_ID'
+    });
+    
+    const result = await lemmaIAM.verifyAccess('/admin', 'read');
+    
+    if (result.hasAccess) {
+        document.getElementById('admin-panel').style.display = 'block';
+    } else {
+        window.location.href = '/request-access';
+    }
+}
+
+window.addEventListener('DOMContentLoaded', checkAccess);
+&lt;/script&gt;</pre>
+                </div>
+            </section>
+
+            <!-- Performance -->
+            <section id="performance" class="docs-section">
+                <h2>Performance</h2>
+                
+                <table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+                    <thead>
+                        <tr style="background: var(--gray-50);">
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--gray-200);">Operation</th>
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--gray-200);">Lemma</th>
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--gray-200);">Auth0</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">Access Verification</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--success); font-weight: 600;">31-182µs</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">200-500ms</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">Client-Side (WebAssembly)</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--success); font-weight: 600;">0.36µs</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">N/A</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">Offline Capable</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--success); font-weight: 600;">✓ Yes</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">✗ No</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Get Started CTA -->
+            <section style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 48px; border-radius: 16px; text-align: center; margin: 60px 0;">
+                <h2 style="color: white; margin-bottom: 16px;">Ready to Get Started?</h2>
+                <p style="margin-bottom: 32px; opacity: 0.95;">Start with our free tier - no credit card required</p>
+                <a href="/dashboard" class="btn-primary" style="background: white; color: var(--primary); padding: 16px 48px; font-size: 18px;">
+                    Start Free
+                </a>
+            </section>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Copy code functionality
+    function copyCode(btn) {
+        const codeBlock = btn.closest('.code-block');
+        const code = codeBlock.querySelector('pre').textContent;
+        
+        navigator.clipboard.writeText(code).then(() => {
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+                btn.textContent = 'Copy';
+            }, 2000);
+        });
+    }
+    
+    // Smooth scroll for nav links
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            if (link.getAttribute('href').startsWith('#')) {
+                e.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                    
+                    // Update active state
+                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
+
