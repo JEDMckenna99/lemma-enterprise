@@ -137,6 +137,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Audit API: {e}")
 
+    # Revocation API (for client-side bloom filter)
+    try:
+        from api.revocation_api import revocation_api
+        app.register_blueprint(revocation_api)
+        logger.info("✅ Revocation API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Revocation API: {e}")
+
     # IAM Email Confirmation
     try:
         from api.iam_email_confirmation import iam_email_bp
