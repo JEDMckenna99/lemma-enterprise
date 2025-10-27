@@ -107,15 +107,16 @@
                 setupBtn.textContent = 'Setting up...';
                 statusDiv.innerHTML = '';
                 
-                // Get existing credentials
+                // Get existing credentials (or empty array)
                 const existingCreds = JSON.parse(localStorage.getItem('lemma_credentials') || '[]');
                 
                 if (existingCreds.length === 0) {
-                    log('❌ No credentials to protect');
-                    return;
+                    log('ℹ️ No credentials yet - setting up empty PIN-protected wallet');
+                    log('   Credentials added later will be automatically encrypted');
+                } else {
+                    log(`🔐 Protecting ${existingCreds.length} credential(s) with PIN...`);
                 }
                 
-                log(`🔐 Protecting ${existingCreds.length} credential(s) with PIN...`);
                 log('');
                 
                 // Initialize PIN manager and UI
