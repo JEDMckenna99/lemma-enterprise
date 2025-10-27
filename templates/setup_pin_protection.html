@@ -159,13 +159,23 @@
         }
         
         // Check status on load (handle both cases: loading and already loaded)
+        console.log('🔍 Setup PIN page - initializing...');
+        console.log('Document ready state:', document.readyState);
+        
         if (document.readyState === 'loading') {
-            window.addEventListener('DOMContentLoaded', checkWalletStatus);
+            console.log('⏳ Waiting for DOM to load...');
+            window.addEventListener('DOMContentLoaded', function() {
+                console.log('✅ DOM loaded, calling checkWalletStatus');
+                checkWalletStatus();
+            });
         } else {
             // DOM already loaded, run immediately
-            checkWalletStatus();
+            console.log('✅ DOM already loaded, calling checkWalletStatus immediately');
+            setTimeout(checkWalletStatus, 100);  // Small delay to ensure elements are ready
         }
     </script>
+</body>
+</html>
 </body>
 </html>
 
