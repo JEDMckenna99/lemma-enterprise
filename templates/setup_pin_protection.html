@@ -144,14 +144,11 @@
                 }
                 
                 if (existingCreds.length === 0) {
-                    log('\n❌ No credentials found in any storage location');
-                    log('   Check browser console and tell me what keys you see');
-                    setupBtn.disabled = false;
-                    setupBtn.textContent = 'Try Again';
-                    return;
+                    log('\n⚠️ No credentials in localStorage (may be in encrypted wallet - IndexedDB)');
+                    log('   Setting up PIN anyway to protect wallet page access');
                 }
                 
-                log(`🔐 Protecting ${existingCreds.length} credential(s) with PIN...`);
+                log(`🔐 Setting up PIN protection for wallet page...`);
                 log('');
                 
                 // Initialize PIN manager and UI
@@ -161,8 +158,8 @@
                 // Show PIN setup modal
                 await pinUI.showPINSetup({ allowSkip: false });
                 
-                // Encrypt existing credentials with PIN
-                log('🔒 Encrypting wallet with your PIN...');
+                // Save wallet (even if empty - creates the PIN)
+                log('🔒 Creating PIN-protected wallet...');
                 await pinManager.saveWallet(existingCreds);
                 
                 // Clear unencrypted storage
