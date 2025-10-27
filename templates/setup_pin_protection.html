@@ -28,11 +28,6 @@
         </div>
     </div>
 
-    <!-- Load PIN modules -->
-    <script src="/static/js/lemma-wallet-pin.js"></script>
-    <script src="/static/js/lemma-pin-ui.js"></script>
-    <script src="/static/js/lemma-wallet-with-pin.js"></script>
-
     <script>
         const statusDiv = document.getElementById('status');
         const setupBtn = document.getElementById('setupBtn');
@@ -174,6 +169,11 @@
             setTimeout(checkWalletStatus, 100);  // Small delay to ensure elements are ready
         }
     </script>
+    
+    <!-- Load PIN modules AFTER page logic (defer loading) -->
+    <script src="/static/js/lemma-wallet-pin.js" defer></script>
+    <script src="/static/js/lemma-pin-ui.js" defer></script>
+    <script src="/static/js/lemma-wallet-with-pin.js" defer></script>
 </body>
 </html>
 
