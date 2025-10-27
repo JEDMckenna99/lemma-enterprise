@@ -153,21 +153,16 @@
             }
         }
         
-        // Check status on load (handle both cases: loading and already loaded)
+        // FORCE RUN after timeout (DOM events not reliable with external scripts)
         console.log('🔍 Setup PIN page - initializing...');
         console.log('Document ready state:', document.readyState);
+        console.log('⏰ Will run checkWalletStatus in 500ms regardless of DOM state');
         
-        if (document.readyState === 'loading') {
-            console.log('⏳ Waiting for DOM to load...');
-            window.addEventListener('DOMContentLoaded', function() {
-                console.log('✅ DOM loaded, calling checkWalletStatus');
-                checkWalletStatus();
-            });
-        } else {
-            // DOM already loaded, run immediately
-            console.log('✅ DOM already loaded, calling checkWalletStatus immediately');
-            setTimeout(checkWalletStatus, 100);  // Small delay to ensure elements are ready
-        }
+        // Just run after short delay - don't wait for DOM events
+        setTimeout(function() {
+            console.log('✅ Running checkWalletStatus now');
+            checkWalletStatus();
+        }, 500);
     </script>
     
     <!-- Load ONLY core PIN modules (no auto-init wrapper) -->
