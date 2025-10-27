@@ -158,8 +158,13 @@
             }
         }
         
-        // Check status on load
-        window.addEventListener('DOMContentLoaded', checkWalletStatus);
+        // Check status on load (handle both cases: loading and already loaded)
+        if (document.readyState === 'loading') {
+            window.addEventListener('DOMContentLoaded', checkWalletStatus);
+        } else {
+            // DOM already loaded, run immediately
+            checkWalletStatus();
+        }
     </script>
 </body>
 </html>
