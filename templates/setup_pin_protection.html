@@ -42,39 +42,67 @@
         }
         
         async function checkWalletStatus() {
-            // Check if PIN already set up
-            if (localStorage.getItem('lemma_wallet_salt')) {
-                log('✅ PIN protection already enabled');
-                log('   Your wallet is encrypted and secure');
+            try {
+                statusDiv.innerHTML = 'Checking wallet status...\n';
                 
-                setTimeout(() => {
-                    window.location.href = '/dashboard';
-                }, 2000);
-                return;
-            }
-            
-            // Check if has credentials
-            const unencrypted = localStorage.getItem('lemma_credentials');
-            const encrypted = localStorage.getItem('lemma_wallet_encrypted');
-            
-            if (unencrypted) {
-                const creds = JSON.parse(unencrypted);
-                log(`📋 Found ${creds.length} credential(s) in unprotected storage`);
-                log('⚠️ Credentials not encrypted with PIN');
+                // Check if PIN already set up
+                const hasPIN = localStorage.getItem('lemma_wallet_salt');
+                log(`PIN salt found: ${hasPIN ? 'YES' : 'NO'}`);
+                
+                if (hasPIN) {
+                    log('✅ PIN protection already enabled');
+                    log('   Your wallet is encrypted and secure');
+                    
+                    setTimeout(() => {
+                        window.location.href = '/wallet';
+                    }, 2000);
+                    return;
+                }
+                
+                // Check if has credentials
+                const unencrypted = localStorage.getItem('lemma_credentials');
+                const encrypted = localStorage.getItem('lemma_wallet_encrypted');
+                
+                log(`Unencrypted credentials: ${unencrypted ? 'FOUND' : 'NONE'}`);
+                log(`Encrypted wallet: ${encrypted ? 'FOUND' : 'NONE'}`);
                 log('');
-                log('Click below to add PIN protection →');
                 
+                if (unencrypted) {
+                    try {
+                        const creds = JSON.parse(unencrypted);
+                        log(`📋 Found ${creds.length} credential(s) in unprotected storage`);
+                        log('⚠️ Credentials not encrypted with PIN');
+                        log('');
+                        log('Click below to add PIN protection →');
+                        
+                        setupBtn.style.display = 'block';
+                    } catch (e) {
+                        log('❌ Error parsing credentials: ' + e.message);
+                    }
+                } else if (encrypted) {
+                    log('✅ Wallet already encrypted');
+                    log('   (PIN should be set up)');
+                    
+                    setTimeout(() => {
+                        window.location.href = '/wallet';
+                    }, 2000);
+                } else {
+                    log('ℹ️ No credentials found yet');
+                    log('   PIN will be set up when you receive your first credential');
+                    log('');
+                    log('You can still set up PIN now, or wait until you have credentials');
+                    
+                    // Show setup button anyway
+                    setupBtn.style.display = 'block';
+                    setupBtn.textContent = 'Setup PIN Anyway';
+                }
+                
+            } catch (error) {
+                log('❌ Error checking wallet status: ' + error.message);
+                console.error('Wallet status check error:', error);
+                
+                // Show setup button anyway
                 setupBtn.style.display = 'block';
-            } else if (encrypted) {
-                log('✅ Wallet already encrypted');
-                log('   (PIN should be set up)');
-            } else {
-                log('ℹ️ No credentials found yet');
-                log('   PIN will be set up when you receive your first credential');
-                
-                setTimeout(() => {
-                    window.location.href = '/dashboard';
-                }, 2000);
             }
         }
         
