@@ -9,12 +9,12 @@
     <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1005"></script>
     
     <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
-    <script src="/static/js/lemma-wallet-pin.js"></script>
-    <script src="/static/js/lemma-pin-ui.js"></script>
-    <script src="/static/js/lemma-wallet-with-pin.js"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet-with-pin.js') }}"></script>
     
     <!-- WASM Verifier (for seamless verification, no PIN) -->
-    <script src="/static/js/lemma-wasm-verifier-optimized.js"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}"></script>
     <style>
         .wallet-container {
             max-width: 1100px;
