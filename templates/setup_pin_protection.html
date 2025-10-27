@@ -107,16 +107,51 @@
                 setupBtn.textContent = 'Setting up...';
                 statusDiv.innerHTML = '';
                 
-                // Get existing credentials (or empty array)
-                const existingCreds = JSON.parse(localStorage.getItem('lemma_credentials') || '[]');
+                // Check ALL possible credential storage locations
+                let existingCreds = [];
                 
-                if (existingCreds.length === 0) {
-                    log('ℹ️ No credentials yet - setting up empty PIN-protected wallet');
-                    log('   Credentials added later will be automatically encrypted');
-                } else {
-                    log(`🔐 Protecting ${existingCreds.length} credential(s) with PIN...`);
+                // Try lemma_credentials
+                const unencrypted = localStorage.getItem('lemma_credentials');
+                if (unencrypted) {
+                    try {
+                        existingCreds = JSON.parse(unencrypted);
+                        log(`Found ${existingCreds.length} in lemma_credentials`);
+                    } catch (e) {
+                        log('Error parsing lemma_credentials');
+                    }
                 }
                 
+                // Try encrypted_wallet_data
+                if (existingCreds.length === 0) {
+                    const encrypted = localStorage.getItem('encrypted_wallet_data');
+                    if (encrypted) {
+                        try {
+                            const parsed = JSON.parse(encrypted);
+                            existingCreds = parsed.credentials || [];
+                            log(`Found ${existingCreds.length} in encrypted_wallet_data`);
+                        } catch (e) {}
+                    }
+                }
+                
+                // List ALL localStorage keys for debugging
+                log('\n📋 All localStorage keys:');
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.includes('lemma') || key.includes('wallet') || key.includes('cred')) {
+                        const value = localStorage.getItem(key);
+                        log(`   ${key}: ${value ? (value.length > 100 ? value.substring(0, 100) + '...' : value) : 'empty'}`);
+                    }
+                }
+                
+                if (existingCreds.length === 0) {
+                    log('\n❌ No credentials found in any storage location');
+                    log('   Check browser console and tell me what keys you see');
+                    setupBtn.disabled = false;
+                    setupBtn.textContent = 'Try Again';
+                    return;
+                }
+                
+                log(`🔐 Protecting ${existingCreds.length} credential(s) with PIN...`);
                 log('');
                 
                 // Initialize PIN manager and UI
