@@ -170,10 +170,10 @@
         }
     </script>
     
-    <!-- Load PIN modules AFTER page logic (defer loading) -->
-    <script src="/static/js/lemma-wallet-pin.js" defer></script>
-    <script src="/static/js/lemma-pin-ui.js" defer></script>
-    <script src="/static/js/lemma-wallet-with-pin.js" defer></script>
+    <!-- Load ONLY core PIN modules (no auto-init wrapper) -->
+    <script src="/static/js/lemma-wallet-pin.js"></script>
+    <script src="/static/js/lemma-pin-ui.js"></script>
+    <!-- NOT loading lemma-wallet-with-pin.js - it has auto-init that blocks -->
 </body>
 </html>
 
