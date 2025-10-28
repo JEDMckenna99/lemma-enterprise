@@ -439,7 +439,7 @@ Year 1 ARR: $1,140,000
 
 ## ✅ **FINAL RECOMMENDATION**
 
-### **DON'T Rebuild - REPOSITION**
+-### **DON'T Rebuild - REPOSITION**
 
 **What to KEEP:**
 - ✅ Both systems (IAM + Federated)
