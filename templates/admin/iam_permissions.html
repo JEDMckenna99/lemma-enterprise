@@ -1,0 +1,587 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}IAM Permission Management - Lemma Admin{% endblock %}
+{% block description %}Manage permissions, users, and access control{% endblock %}
+
+{% block content %}
+<div class="iam-dashboard">
+    <!-- Page Header -->
+    <div style="margin-bottom: 32px;">
+        <h1 style="font-size: 2rem; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;">
+            IAM Permission Management
+        </h1>
+        <p style="font-size: 1rem; color: var(--gray-600);">
+            Manage permission types, grant access, and track user permissions
+        </p>
+    </div>
+    
+    <!-- Stats Overview -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 32px;">
+        <div class="stat-card" style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 12px; padding: 24px;">
+            <div style="font-size: 2.5rem; font-weight: 700; color: var(--primary); margin-bottom: 8px;" id="totalPermissionTypes">-</div>
+            <div style="font-size: 0.9rem; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">Permission Types</div>
+        </div>
+        <div class="stat-card" style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 12px; padding: 24px;">
+            <div style="font-size: 2.5rem; font-weight: 700; color: var(--primary); margin-bottom: 8px;" id="activeUsers">-</div>
+            <div style="font-size: 0.9rem; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">Active Users</div>
+        </div>
+        <div class="stat-card" style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 12px; padding: 24px;">
+            <div style="font-size: 2.5rem; font-weight: 700; color: var(--primary); margin-bottom: 8px;" id="activeInstances">-</div>
+            <div style="font-size: 0.9rem; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">Active Permissions</div>
+        </div>
+        <div class="stat-card" style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 12px; padding: 24px;">
+            <div style="font-size: 2.5rem; font-weight: 700; color: #f59e0b; margin-bottom: 8px;" id="expiringSoon">-</div>
+            <div style="font-size: 0.9rem; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">Expiring Soon</div>
+        </div>
+    </div>
+    
+    <!-- Tabs -->
+    <div style="border-bottom: 2px solid var(--gray-200); margin-bottom: 32px;">
+        <button class="tab-btn active" onclick="switchTab('permission-types')" style="background: none; border: none; padding: 12px 24px; font-size: 1rem; color: var(--gray-600); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s;">
+            Permission Types
+        </button>
+        <button class="tab-btn" onclick="switchTab('users')" style="background: none; border: none; padding: 12px 24px; font-size: 1rem; color: var(--gray-600); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s;">
+            Users
+        </button>
+        <button class="tab-btn" onclick="switchTab('audit-log')" style="background: none; border: none; padding: 12px 24px; font-size: 1rem; color: var(--gray-600); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s;">
+            Audit Log
+        </button>
+    </div>
+    
+    <!-- Permission Types Tab -->
+    <div id="tab-permission-types" class="tab-content" style="display: block;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--gray-900);">Permission Types</h2>
+            <button class="btn-primary" onclick="showCreatePermissionModal()">+ Create Permission Type</button>
+        </div>
+        
+        <div id="permissionTypesList" style="display: grid; gap: 16px;">
+            <div style="text-align: center; padding: 40px; color: var(--gray-500);">
+                Loading permission types...
+            </div>
+        </div>
+    </div>
+    
+    <!-- Users Tab -->
+    <div id="tab-users" class="tab-content" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--gray-900);">Users</h2>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <input type="text" id="userSearchInput" placeholder="Search by email or permission..." style="padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px; min-width: 300px;">
+                <button class="btn-secondary" onclick="searchUsers()">Search</button>
+            </div>
+        </div>
+        
+        <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 12px; overflow: hidden;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: var(--gray-50);">
+                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--gray-900); border-bottom: 1px solid var(--gray-200);">Email</th>
+                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--gray-900); border-bottom: 1px solid var(--gray-200);">Permissions</th>
+                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--gray-900); border-bottom: 1px solid var(--gray-200);">Granted</th>
+                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--gray-900); border-bottom: 1px solid var(--gray-200);">Status</th>
+                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--gray-900); border-bottom: 1px solid var(--gray-200);">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                    <tr>
+                        <td colspan="5" style="padding: 40px; text-align: center; color: var(--gray-500);">
+                            Loading users...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Audit Log Tab -->
+    <div id="tab-audit-log" class="tab-content" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--gray-900);">Audit Log</h2>
+            <select id="auditEventFilter" onchange="loadAuditLog()" style="padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                <option value="">All Events</option>
+                <option value="permission_granted">Permission Granted</option>
+                <option value="permission_revoked">Permission Revoked</option>
+                <option value="permission_type_created">Type Created</option>
+                <option value="permission_type_updated">Type Updated</option>
+            </select>
+        </div>
+        
+        <div id="auditLogList" style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 12px; padding: 20px;">
+            <div style="text-align: center; padding: 20px; color: var(--gray-500);">
+                Loading audit log...
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Permission Type Modal -->
+<div id="createPermissionModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); align-items: center; justify-content: center; z-index: 1000;">
+    <div style="background: var(--white); border-radius: 12px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+        <div style="padding: 20px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--gray-900);">Create Permission Type</h3>
+            <button onclick="closeModal('createPermissionModal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray-500);">&times;</button>
+        </div>
+        <div style="padding: 20px;">
+            <form id="createPermissionForm">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;">Permission Name *</label>
+                    <input type="text" id="permissionName" required placeholder="e.g., premium_tier_1, admin, moderator" style="width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 1rem;">
+                    <small style="display: block; margin-top: 4px; font-size: 0.85rem; color: var(--gray-600);">Use lowercase with underscores</small>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;">Permission Type *</label>
+                    <select id="permissionType" required onchange="updatePermissionTypeConfig()" style="width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 1rem;">
+                        <option value="">-- Select Type --</option>
+                        <option value="role">Role (simple user roles like admin, moderator)</option>
+                        <option value="scope">Scope (OAuth-style permissions like read:posts)</option>
+                        <option value="time-bound">Time-Bound (expires after duration)</option>
+                        <option value="attribute">Attribute (key-value pairs)</option>
+                        <option value="hierarchical">Hierarchical (nested permission trees)</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;">Description</label>
+                    <textarea id="permissionDescription" rows="3" placeholder="Describe what this permission grants access to" style="width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 1rem;"></textarea>
+                </div>
+                
+                <!-- Time-bound specific config -->
+                <div id="timeBoundConfig" style="margin-bottom: 20px; display: none;">
+                    <label style="display: block; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;">Duration (days)</label>
+                    <input type="number" id="durationDays" value="365" min="1" style="width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 1rem;">
+                </div>
+                
+                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+                    <button type="button" class="btn-secondary" onclick="closeModal('createPermissionModal')">Cancel</button>
+                    <button type="submit" class="btn-primary">Create Permission Type</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Grant Permission Modal -->
+<div id="grantPermissionModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); align-items: center; justify-content: center; z-index: 1000;">
+    <div style="background: var(--white); border-radius: 12px; max-width: 500px; width: 90%;">
+        <div style="padding: 20px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--gray-900);">Grant Permission</h3>
+            <button onclick="closeModal('grantPermissionModal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray-500);">&times;</button>
+        </div>
+        <div style="padding: 20px;">
+            <form id="grantPermissionForm">
+                <input type="hidden" id="grantPermissionName">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;">User Email *</label>
+                    <input type="email" id="grantUserEmail" required placeholder="user@example.com" style="width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 1rem;">
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;">Reason (optional)</label>
+                    <textarea id="grantReason" rows="2" placeholder="Why is this permission being granted?" style="width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 1rem;"></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button type="button" class="btn-secondary" onclick="closeModal('grantPermissionModal')">Cancel</button>
+                    <button type="submit" class="btn-primary">Grant Permission</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Tab styling */
+.tab-btn {
+    position: relative;
+}
+
+.tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary) !important;
+    font-weight: 600;
+}
+
+.tab-btn:hover {
+    color: var(--primary);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Modal styling */
+.modal {
+    display: flex !important;
+}
+
+/* Permission type card */
+.permission-type-card {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    transition: all 0.2s ease;
+}
+
+.permission-type-card:hover {
+    border-color: var(--gray-300);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.type-badge {
+    display: inline-block;
+    background: var(--gray-100);
+    color: var(--gray-700);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-right: 8px;
+}
+
+.audit-entry {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.audit-entry:last-child {
+    border-bottom: none;
+}
+</style>
+
+<script>
+// Get site ID from lemma platform (should be 'lemma_platform')
+const SITE_ID = 'lemma_platform';
+
+// Load dashboard data
+async function loadDashboard() {
+    try {
+        console.log('📊 Loading IAM dashboard...');
+        
+        // Load stats
+        await loadStats();
+        
+        // Load permission types
+        await loadPermissionTypes();
+        
+        console.log('✅ Dashboard loaded');
+    } catch (error) {
+        console.error('❌ Dashboard load error:', error);
+    }
+}
+
+async function loadStats() {
+    try {
+        const response = await fetch(`/api/iam/sites/${SITE_ID}/stats`, {
+            headers: {
+                'X-Admin-Email': 'admin@lemma.id'
+            }
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('totalPermissionTypes').textContent = data.permission_types || 0;
+            document.getElementById('activeUsers').textContent = data.active_users || 0;
+            document.getElementById('activeInstances').textContent = data.active_instances || 0;
+            document.getElementById('expiringSoon').textContent = data.expiring_soon || 0;
+        }
+    } catch (error) {
+        console.error('Stats load error:', error);
+    }
+}
+
+async function loadPermissionTypes() {
+    try {
+        const response = await fetch(`/api/iam/sites/${SITE_ID}/permission-types`, {
+            headers: {
+                'X-Admin-Email': 'admin@lemma.id'
+            }
+        });
+        const data = await response.json();
+        
+        const list = document.getElementById('permissionTypesList');
+        
+        if (data.success && data.permission_types.length > 0) {
+            list.innerHTML = data.permission_types.map(pt => `
+                <div class="permission-type-card">
+                    <div>
+                        <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;">${pt.name}</h3>
+                        <div style="margin-bottom: 12px;">
+                            <span class="type-badge">${pt.type}</span>
+                            ${pt.description ? `<span style="color: var(--gray-600); font-size: 0.9rem;">${pt.description}</span>` : ''}
+                        </div>
+                        <div style="display: flex; gap: 16px; font-size: 0.85rem; color: var(--gray-600);">
+                            <div>
+                                <strong style="color: var(--gray-900);">${pt.active_instances}</strong> active users
+                            </div>
+                            <div>
+                                Created ${new Date(pt.created_at).toLocaleDateString()}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-secondary" onclick="grantPermission('${pt.name}')">Grant</button>
+                        <button class="btn-secondary" onclick="viewUsers('${pt.name}')">View Users</button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            list.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--gray-600);">
+                    No permission types created yet. Click "Create Permission Type" to get started.
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Load permission types error:', error);
+    }
+}
+
+function switchTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
+    
+    // Show selected tab
+    document.getElementById(`tab-${tabName}`).style.display = 'block';
+    
+    // Load tab data
+    if (tabName === 'users') loadUsers();
+    if (tabName === 'audit-log') loadAuditLog();
+}
+
+function showCreatePermissionModal() {
+    document.getElementById('createPermissionModal').style.display = 'flex';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+function updatePermissionTypeConfig() {
+    const type = document.getElementById('permissionType').value;
+    const timeBoundConfig = document.getElementById('timeBoundConfig');
+    
+    if (type === 'time-bound') {
+        timeBoundConfig.style.display = 'block';
+    } else {
+        timeBoundConfig.style.display = 'none';
+    }
+}
+
+// Create permission type form
+document.getElementById('createPermissionForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = {
+        name: document.getElementById('permissionName').value,
+        type: document.getElementById('permissionType').value,
+        description: document.getElementById('permissionDescription').value,
+        config: {}
+    };
+    
+    if (formData.type === 'time-bound') {
+        formData.config.duration_days = parseInt(document.getElementById('durationDays').value);
+    }
+    
+    try {
+        const response = await fetch(`/api/iam/sites/${SITE_ID}/permission-types`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Email': 'admin@lemma.id'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`Permission type "${formData.name}" created successfully!`);
+            closeModal('createPermissionModal');
+            loadPermissionTypes();
+            loadStats();
+            document.getElementById('createPermissionForm').reset();
+        } else {
+            alert(`Error: ${result.error}`);
+        }
+    } catch (error) {
+        alert(`Failed to create permission type: ${error.message}`);
+    }
+});
+
+// Grant permission
+function grantPermission(permissionName) {
+    document.getElementById('grantPermissionName').value = permissionName;
+    document.getElementById('grantPermissionModal').style.display = 'flex';
+}
+
+// Grant permission form
+document.getElementById('grantPermissionForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = {
+        email: document.getElementById('grantUserEmail').value,
+        permission: document.getElementById('grantPermissionName').value,
+        metadata: {
+            reason: document.getElementById('grantReason').value || 'Manual grant from admin dashboard'
+        }
+    };
+    
+    try {
+        const response = await fetch(`/api/iam/sites/${SITE_ID}/permissions/grant`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Email': 'admin@lemma.id'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`Permission "${formData.permission}" granted to ${formData.email}!`);
+            closeModal('grantPermissionModal');
+            loadPermissionTypes();
+            loadStats();
+            document.getElementById('grantPermissionForm').reset();
+        } else {
+            alert(`Error: ${result.error}`);
+        }
+    } catch (error) {
+        alert(`Failed to grant permission: ${error.message}`);
+    }
+});
+
+// View users with permission
+function viewUsers(permissionName) {
+    switchTab('users');
+    document.getElementById('userSearchInput').value = permissionName;
+    searchUsers();
+}
+
+async function searchUsers() {
+    const permission = document.getElementById('userSearchInput').value.trim();
+    const tbody = document.getElementById('usersTableBody');
+    
+    tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--gray-500);">Searching...</td></tr>';
+    
+    try {
+        const url = permission ? 
+            `/api/iam/sites/${SITE_ID}/users/search?permission=${encodeURIComponent(permission)}` :
+            `/api/iam/sites/${SITE_ID}/users/search`;
+            
+        const response = await fetch(url, {
+            headers: {
+                'X-Admin-Email': 'admin@lemma.id'
+            }
+        });
+        const data = await response.json();
+        
+        if (data.success && data.users.length > 0) {
+            tbody.innerHTML = data.users.map(user => {
+                const grantedDate = new Date(user.granted_at).toLocaleDateString();
+                const expiresDate = user.expires_at ? new Date(user.expires_at).toLocaleDateString() : 'Never';
+                const isExpired = user.expires_at && new Date(user.expires_at) < new Date();
+                
+                return `
+                    <tr style="border-bottom: 1px solid var(--gray-100);">
+                        <td style="padding: 12px 16px;">${user.email}</td>
+                        <td style="padding: 12px 16px;"><span class="type-badge">${user.permission}</span></td>
+                        <td style="padding: 12px 16px; font-size: 0.9rem; color: var(--gray-600);">${grantedDate}</td>
+                        <td style="padding: 12px 16px;">
+                            <span style="padding: 4px 12px; border-radius: 6px; font-size: 0.85rem; ${isExpired ? 'background: var(--error-50); color: var(--error);' : 'background: var(--success-50); color: var(--success);'}">
+                                ${isExpired ? 'Expired' : 'Active'}
+                            </span>
+                        </td>
+                        <td style="padding: 12px 16px;">
+                            <button class="btn-secondary" onclick="revokePermission('${user.email}', '${user.permission}')" style="font-size: 0.85rem; padding: 6px 12px;">Revoke</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 40px; text-align: center; color: var(--gray-500);">No users found with this permission</td></tr>';
+        }
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--error);">Error loading users: ${error.message}</td></tr>`;
+    }
+}
+
+async function revokePermission(email, permission) {
+    if (!confirm(`Revoke "${permission}" from ${email}?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/iam/sites/${SITE_ID}/permissions/revoke`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Email': 'admin@lemma.id'
+            },
+            body: JSON.stringify({
+                email: email,
+                permission: permission,
+                reason: 'Revoked from admin dashboard'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`Permission revoked from ${email}`);
+            searchUsers();
+            loadStats();
+        } else {
+            alert(`Error: ${result.error}`);
+        }
+    } catch (error) {
+        alert(`Failed to revoke permission: ${error.message}`);
+    }
+}
+
+async function loadUsers() {
+    await searchUsers();
+}
+
+async function loadAuditLog() {
+    const eventType = document.getElementById('auditEventFilter').value;
+    const container = document.getElementById('auditLogList');
+    
+    container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--gray-500);">Loading audit log...</div>';
+    
+    // TODO: Implement audit log API endpoint
+    // For now, show placeholder
+    setTimeout(() => {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--gray-600);">
+                <p>Audit log functionality coming soon</p>
+                <p style="font-size: 0.9rem; color: var(--gray-500); margin-top: 8px;">
+                    All IAM operations are being logged to the database
+                </p>
+            </div>
+        `;
+    }, 500);
+}
+
+// Load dashboard on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadDashboard();
+});
+</script>
+{% endblock %}
+

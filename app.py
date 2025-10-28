@@ -405,6 +405,11 @@ def create_app():
     @app.route('/admin')
     def admin_dashboard():
         return render_template('admin/admin_dashboard.html')
+    
+    @app.route('/admin/iam')
+    def admin_iam_permissions():
+        """IAM Permission Management Dashboard"""
+        return render_template('admin/iam_permissions.html')
 
     @app.route('/admin/bootstrap')
     def admin_bootstrap():
