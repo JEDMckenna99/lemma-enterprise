@@ -172,6 +172,7 @@
                     <!-- Authenticated User Navigation -->
                     {% if session.get('user_role') == 'admin' %}
                         <a href="/admin" class="nav-link">Admin Dashboard</a>
+                        <a href="/admin/iam" class="nav-link">IAM</a>
                         <a href="/dashboard" class="nav-link">My Account</a>
                         <a href="/docs" class="nav-link">Documentation</a>
                         <a href="/pricing" class="nav-link">Pricing</a>
@@ -225,6 +226,9 @@
                             <div class="dropdown-divider"></div>
                             <a href="/admin" class="dropdown-item admin-item">
                                 Admin Panel
+                            </a>
+                            <a href="/admin/iam" class="dropdown-item admin-item">
+                                IAM Permissions
                             </a>
                             <a href="/site-management" class="dropdown-item admin-item">
                                 Site Management
