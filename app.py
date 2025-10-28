@@ -265,6 +265,14 @@ def create_app():
         logger.info("✅ Permission Verification (Nonce Bot Defense) registered")
     except Exception as e:
         logger.error(f"❌ Failed to register Permission Verification: {e}")
+    
+    # Test Credential Endpoint (for testing client-side verification)
+    try:
+        from api.test_credential_endpoint import test_credential_bp
+        app.register_blueprint(test_credential_bp)
+        logger.info("✅ Test Credential Endpoint registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Test Credential Endpoint: {e}")
 
     # Health Monitoring
     try:

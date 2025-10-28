@@ -18,6 +18,9 @@ class LemmaWASMVerifierOptimized {
         this.wasm = null;
         this.ready = false;
         
+        // Message constructor (MUST match Rust server)
+        this.messageConstructor = new LemmaMessageConstructor();
+        
         // Object pools (reduce allocations)
         this.messageBufferPool = [];
         this.hexCacheSize = 1000;
@@ -140,7 +143,7 @@ class LemmaWASMVerifierOptimized {
     }
     
     /**
-     * FAST signature verification (minimal overhead)
+     * CORRECT signature verification (matches Rust server)
      */
     async verifySignatureFast(credential) {
         try {
@@ -154,9 +157,18 @@ class LemmaWASMVerifierOptimized {
             const pubKeyHex = issuerDID.substring(11, 75);  // 'did:lemma:' = 11 chars, key = 64 chars
             const publicKey = this.hexToBytesOptimized(pubKeyHex);
             
-            // Create message (optimized - minimal allocations)
-            const message = this.createMessageFast(credential);
-            const messageBytes = this.textEncoder.encode(message);
+            // Create message (CRITICAL: MUST match Rust server exactly!)
+            const messageBytes = await this.messageConstructor.createVerificationMessage(credential);
+            
+            // Debug if enabled
+            if (this.debug) {
+                console.log('🔐 Verifying signature:', {
+                    credentialId: credential.id,
+                    messageLength: messageBytes.length,
+                    messageHash: Array.from(messageBytes.slice(0, 8))
+                        .map(b => b.toString(16).padStart(2, '0')).join('')
+                });
+            }
             
             // Verify (direct WASM/ed25519 call)
             const isValid = await (this.wasm?.verify || window.ed25519.verify)(
@@ -199,16 +211,7 @@ class LemmaWASMVerifierOptimized {
         return bytes;
     }
     
-    /**
-     * OPTIMIZED message creation (minimal allocations)
-     */
-    createMessageFast(credential) {
-        // Pre-sorted keys for canonical JSON (avoid sorting on every call)
-        const c = credential.claims || {};
-        
-        // Build minimal JSON string (faster than JSON.stringify for small objects)
-        return `{"issuer":"${credential.issuer}","subject":"${credential.subject}","claims":${JSON.stringify(c)},"issuedAt":${credential.issuedAt},"expiresAt":${credential.expiresAt}}`;
-    }
+    // Removed old createMessageFast() - now using LemmaMessageConstructor which matches Rust server
     
     /**
      * OPTIMIZED result creation (reused structure)
