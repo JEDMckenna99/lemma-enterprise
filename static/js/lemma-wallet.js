@@ -1433,7 +1433,8 @@ class LemmaWallet {
     
     /**
      * Generate QR code for device sync (direct method only - no vault needed)
-     * SECURITY: Only works on lemma.id/wallet page after bot shield verification
+     * SECURITY: Only works on PIN-protected lemma.id/wallet page
+     * NO SHIELD - Wallet accepts credentials from ANY site
      */
     async generateDeviceSyncQR() {
         if (!this.enableDeviceSync) {
@@ -1441,7 +1442,7 @@ class LemmaWallet {
         }
         
         // SECURITY CHECK: Multiple layers of protection
-        // 1. Only allow on lemma.id/wallet page
+        // 1. Only allow on lemma.id/wallet page (protected by optional PIN)
         if (window.location.pathname !== '/wallet') {
             return { 
                 success: false, 
@@ -1705,7 +1706,7 @@ class LemmaWallet {
                     'Random salt per QR',
                     'Time-limited (5 minutes)',
                     'Device fingerprint validation',
-                    'Bot shield protection required'
+                    'Optional PIN protection (wallet page only)'
                 ]
             };
             
@@ -1717,7 +1718,8 @@ class LemmaWallet {
     
     /**
      * Sync from device QR (direct method only - no vault)
-     * SECURITY: Only works on lemma.id/wallet page after bot shield verification
+     * SECURITY: Only works on PIN-protected lemma.id/wallet page
+     * NO SHIELD - Wallet is universal credential manager for ALL sites
      */
     async syncFromDeviceQR(qrData) {
         if (!this.enableDeviceSync) {
@@ -1725,7 +1727,7 @@ class LemmaWallet {
         }
         
         // SECURITY CHECK: Multiple layers of protection
-        // 1. Only allow on lemma.id/wallet page
+        // 1. Only allow on lemma.id/wallet page (protected by optional PIN)
         if (window.location.pathname !== '/wallet') {
             return { 
                 success: false, 
