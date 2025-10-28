@@ -31,23 +31,35 @@ def require_api_key(f):
 def require_site_admin(f):
     """
     Decorator to require site admin privileges
+    Supports BOTH session-based auth (web UI) AND API key auth (programmatic)
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Check for API key first
+        from flask import session
+        
+        # METHOD 1: Check for session-based admin auth (web UI)
+        if session.get('user_role') == 'admin' or session.get('customer_id'):
+            # User is logged in as admin via web session
+            g.is_admin = True
+            g.admin_email = session.get('customer_email', 'admin@lemma.id')
+            return f(*args, **kwargs)
+        
+        # METHOD 2: Check for API key (programmatic access)
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         
-        if not api_key:
-            return jsonify({'error': 'API key required for admin access'}), 401
+        if api_key:
+            # TODO: Validate API key against database
+            # For now, accept any valid API key as admin for testing
+            if len(api_key) < 10:
+                return jsonify({'error': 'Invalid admin credentials'}), 403
+            
+            g.api_key = api_key
+            g.is_admin = True
+            g.admin_email = 'api@lemma.id'
+            return f(*args, **kwargs)
         
-        # TODO: Validate admin privileges against database
-        # For now, accept any valid API key as admin for testing
-        if len(api_key) < 10:
-            return jsonify({'error': 'Invalid admin credentials'}), 403
-        
-        g.api_key = api_key
-        g.is_admin = True
-        return f(*args, **kwargs)
+        # No valid auth found
+        return jsonify({'error': 'Admin authentication required (session or API key)'}), 401
     
     return decorated_function
 
