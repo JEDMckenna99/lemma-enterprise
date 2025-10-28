@@ -10,7 +10,9 @@
 
 **Overall Status:** ⚠️ **PARTIALLY SECURE** with **CRITICAL GAPS**
 
-The client-side verification implementation has **good cryptographic foundations** but suffers from **significant security vulnerabilities** that could allow credential forgery and bypass attacks.
+**IMPORTANT:** Client-side verification ONLY verifies credentials (does NOT issue them). The server issues credentials using Rust `PyMinimalIssuer`, and the client JavaScript/WASM code verifies them.
+
+The client-side verification implementation has **good cryptographic foundations** but suffers from **significant security vulnerabilities** in how it validates the server-issued credentials.
 
 ###
 
@@ -88,9 +90,9 @@ fn verify_signature_optimized(
 
 ### 2. Message Construction ❌ **CRITICAL VULNERABILITY**
 
-**Issue:** **Issuer and verifier use DIFFERENT message construction algorithms!**
+**Issue:** **Server (issuer) and client (verifier) use DIFFERENT message construction algorithms!**
 
-**Issuer (signs this):**
+**Server Issuer - Rust (signs this):**
 ```rust:184:210:lemma-crypto/src/minimal_core.rs
 fn create_signing_message(&self, credential: &MinimalCredential) -> std::result::Result<Vec<u8>, MinimalError> {
     // Create a deterministic message from the credential
@@ -121,7 +123,7 @@ fn create_signing_message(&self, credential: &MinimalCredential) -> std::result:
 }
 ```
 
-**Verifier (validates against this):**
+**Client Verifier - JavaScript (validates against this):**
 ```javascript:205:211:static/js/lemma-wasm-verifier-optimized.js
 createMessageFast(credential) {
     // Pre-sorted keys for canonical JSON (avoid sorting on every call)
@@ -134,13 +136,15 @@ createMessageFast(credential) {
 
 **CRITICAL PROBLEM:**
 
-| **Aspect** | **Issuer (Rust)** | **Verifier (JavaScript)** | **Match?** |
-|-----------|-------------------|---------------------------|------------|
+| **Aspect** | **Server Issuer (Rust)** | **Client Verifier (JavaScript)** | **Match?** |
+|-----------|--------------------------|----------------------------------|------------|
 | **Hashing** | SHA-256 hash | Raw JSON string | ❌ **NO** |
 | **Field Order** | id, issuer, subject, issued_at, expires_at, claims | issuer, subject, claims, issuedAt, expiresAt | ❌ **NO** |
-| **Field Names** | `issued_at`, `expires_at` | `issuedAt`, `expiresAt` | ❌ **NO** |
+| **Field Names** | `issued_at`, `expires_at` (from Rust struct) | `issuedAt`, `expiresAt` (from JSON) | ⚠️ **DEPENDS** |
 | **ID Included?** | ✅ Yes | ❌ **NO** | ❌ **NO** |
 | **Claims Sorting** | Keys sorted alphabetically | `JSON.stringify` (undefined order) | ❌ **NO** |
+
+**Note:** The server serializes the credential to JSON with `issued_at`/`expires_at`, but the JavaScript may receive it as `issuedAt`/`expiresAt` depending on the API response format.
 
 **Attack Vector:**
 
