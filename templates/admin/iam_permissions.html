@@ -116,11 +116,11 @@
 </div>
 
 <!-- Create Permission Type Modal -->
-<div id="createPermissionModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); align-items: center; justify-content: center; z-index: 1000;">
-    <div style="background: var(--white); border-radius: 12px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+<div id="createPermissionModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); align-items: center; justify-content: center; z-index: 2000;">
+    <div onclick="event.stopPropagation()" style="background: var(--white); border-radius: 12px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
         <div style="padding: 20px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
             <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--gray-900);">Create Permission Type</h3>
-            <button onclick="closeModal('createPermissionModal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray-500);">&times;</button>
+            <button onclick="closeModal('createPermissionModal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray-500); line-height: 1;">&times;</button>
         </div>
         <div style="padding: 20px;">
             <form id="createPermissionForm">
@@ -163,11 +163,11 @@
 </div>
 
 <!-- Grant Permission Modal -->
-<div id="grantPermissionModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); align-items: center; justify-content: center; z-index: 1000;">
-    <div style="background: var(--white); border-radius: 12px; max-width: 500px; width: 90%;">
+<div id="grantPermissionModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); align-items: center; justify-content: center; z-index: 2000;">
+    <div onclick="event.stopPropagation()" style="background: var(--white); border-radius: 12px; max-width: 500px; width: 90%;">
         <div style="padding: 20px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
             <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--gray-900);">Grant Permission</h3>
-            <button onclick="closeModal('grantPermissionModal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray-500);">&times;</button>
+            <button onclick="closeModal('grantPermissionModal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray-500); line-height: 1;">&times;</button>
         </div>
         <div style="padding: 20px;">
             <form id="grantPermissionForm">
@@ -363,12 +363,41 @@ function switchTab(tabName) {
 }
 
 function showCreatePermissionModal() {
+    // Close any other open modals first
+    closeModal('grantPermissionModal');
+    // Open this modal
     document.getElementById('createPermissionModal').style.display = 'flex';
 }
 
 function closeModal(modalId) {
-    document.getElementById(modalId).style.display = 'none';
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+        // Reset forms when closing
+        if (modalId === 'createPermissionModal') {
+            document.getElementById('createPermissionForm').reset();
+            document.getElementById('timeBoundConfig').style.display = 'none';
+        }
+        if (modalId === 'grantPermissionModal') {
+            document.getElementById('grantPermissionForm').reset();
+        }
+    }
 }
+
+// Close modal on backdrop click
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal')) {
+        closeModal(e.target.id);
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeModal('createPermissionModal');
+        closeModal('grantPermissionModal');
+    }
+});
 
 function updatePermissionTypeConfig() {
     const type = document.getElementById('permissionType').value;
@@ -424,6 +453,9 @@ document.getElementById('createPermissionForm').addEventListener('submit', async
 
 // Grant permission
 function grantPermission(permissionName) {
+    // Close any other open modals first
+    closeModal('createPermissionModal');
+    // Set permission name and open modal
     document.getElementById('grantPermissionName').value = permissionName;
     document.getElementById('grantPermissionModal').style.display = 'flex';
 }
