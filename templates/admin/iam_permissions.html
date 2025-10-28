@@ -391,21 +391,6 @@ function closeModal(modalId) {
     }
 }
 
-// Close modal on backdrop click
-document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal')) {
-        closeModal(e.target.id);
-    }
-});
-
-// Close modal on Escape key
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        closeModal('createPermissionModal');
-        closeModal('grantPermissionModal');
-    }
-});
-
 function updatePermissionTypeConfig() {
     const type = document.getElementById('permissionType').value;
     const timeBoundConfig = document.getElementById('timeBoundConfig');
@@ -417,8 +402,7 @@ function updatePermissionTypeConfig() {
     }
 }
 
-// Create permission type form
-document.getElementById('createPermissionForm').addEventListener('submit', async (e) => {
+async function handleCreatePermissionSubmit(e) {
     e.preventDefault();
     
     const formData = {
@@ -449,14 +433,13 @@ document.getElementById('createPermissionForm').addEventListener('submit', async
             closeModal('createPermissionModal');
             loadPermissionTypes();
             loadStats();
-            document.getElementById('createPermissionForm').reset();
         } else {
             alert(`Error: ${result.error}`);
         }
     } catch (error) {
         alert(`Failed to create permission type: ${error.message}`);
     }
-});
+}
 
 // Grant permission
 function grantPermission(permissionName) {
@@ -467,8 +450,7 @@ function grantPermission(permissionName) {
     document.getElementById('grantPermissionModal').style.display = 'flex';
 }
 
-// Grant permission form
-document.getElementById('grantPermissionForm').addEventListener('submit', async (e) => {
+async function handleGrantPermissionSubmit(e) {
     e.preventDefault();
     
     const formData = {
@@ -496,14 +478,13 @@ document.getElementById('grantPermissionForm').addEventListener('submit', async 
             closeModal('grantPermissionModal');
             loadPermissionTypes();
             loadStats();
-            document.getElementById('grantPermissionForm').reset();
         } else {
             alert(`Error: ${result.error}`);
         }
     } catch (error) {
         alert(`Failed to grant permission: ${error.message}`);
     }
-});
+}
 
 // View users with permission
 function viewUsers(permissionName) {
@@ -618,10 +599,52 @@ async function loadAuditLog() {
     }, 500);
 }
 
-// Load dashboard on page load
+// Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🔧 Initializing IAM dashboard...');
+    
+    // Load dashboard data
     loadDashboard();
+    
+    // Attach modal event listeners
+    initModalHandlers();
+    
+    // Attach form handlers
+    initFormHandlers();
 });
+
+function initModalHandlers() {
+    // Close modal on backdrop click
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal')) {
+            console.log('Backdrop clicked, closing modal:', e.target.id);
+            closeModal(e.target.id);
+        }
+    });
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            console.log('ESC pressed, closing all modals');
+            closeModal('createPermissionModal');
+            closeModal('grantPermissionModal');
+        }
+    });
+}
+
+function initFormHandlers() {
+    // Create permission type form
+    const createForm = document.getElementById('createPermissionForm');
+    if (createForm) {
+        createForm.addEventListener('submit', handleCreatePermissionSubmit);
+    }
+    
+    // Grant permission form
+    const grantForm = document.getElementById('grantPermissionForm');
+    if (grantForm) {
+        grantForm.addEventListener('submit', handleGrantPermissionSubmit);
+    }
+}
 </script>
 {% endblock %}
 
