@@ -162,8 +162,31 @@ def create_transfer_session():
     """
     Create a new wallet transfer session
     Returns QR data for scanning
+    
+    SECURITY: Only the PIN-protected /wallet page can initiate transfers
     """
     try:
+        # SECURITY CHECK: Only allow transfers from /wallet page
+        referer = request.headers.get('Referer', '')
+        origin = request.headers.get('Origin', '')
+        
+        # Check if request came from /wallet page
+        valid_origins = [
+            'https://lemma.id/wallet',
+            'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/wallet',
+            'http://localhost:5000/wallet',  # Dev only
+            'http://127.0.0.1:5000/wallet'   # Dev only
+        ]
+        
+        is_valid = any(referer.startswith(valid_origin) for valid_origin in valid_origins)
+        
+        if not is_valid:
+            print(f"🚫 SECURITY: Blocked transfer attempt from {referer or origin or 'unknown'}")
+            return jsonify({
+                'success': False,
+                'error': 'Wallet transfers can only be initiated from the Lemma wallet page'
+            }), 403
+        
         data = request.get_json()
         
         if not data or 'device_id' not in data:
@@ -219,8 +242,26 @@ def create_transfer_session():
 def set_wallet_data():
     """
     Set wallet data for an existing transfer session
+    
+    SECURITY: Only the PIN-protected /wallet page can set wallet data
     """
     try:
+        # SECURITY CHECK: Only allow from /wallet page
+        referer = request.headers.get('Referer', '')
+        valid_origins = [
+            'https://lemma.id/wallet',
+            'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/wallet',
+            'http://localhost:5000/wallet',
+            'http://127.0.0.1:5000/wallet'
+        ]
+        
+        if not any(referer.startswith(origin) for origin in valid_origins):
+            print(f"🚫 SECURITY: Blocked set-wallet attempt from {referer or 'unknown'}")
+            return jsonify({
+                'success': False,
+                'error': 'Wallet data can only be set from the Lemma wallet page'
+            }), 403
+        
         data = request.get_json()
         
         if not data or 'session_id' not in data or 'wallet_data' not in data:
