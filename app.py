@@ -128,6 +128,14 @@ def create_app():
         logger.info("✅ Permission Management registered")
     except Exception as e:
         logger.error(f"❌ Failed to register Permission Management: {e}")
+    
+    # IAM Permission Types API (new structured permission system)
+    try:
+        from api.iam_permission_types import iam_types_bp
+        app.register_blueprint(iam_types_bp)
+        logger.info("✅ IAM Permission Types registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register IAM Permission Types: {e}")
 
     # Audit Logging API
     try:
