@@ -4,6 +4,7 @@ Database setup and models for Lemma.id platform
 
 import os
 import logging
+import psycopg2
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from sqlalchemy import create_engine, Column, String, DateTime, Boolean, Integer, Text, JSON
@@ -22,6 +23,24 @@ if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+# Raw psycopg2 connection for IAM API (needs cursor access)
+def get_db_connection():
+    """
+    Get raw psycopg2 database connection for IAM API
+    Returns connection with cursor() method for SQL queries
+    """
+    db_url = os.getenv('DATABASE_URL')
+    if not db_url:
+        raise Exception("DATABASE_URL not set in environment")
+    
+    # Fix URL for psycopg2
+    if db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+    
+    # Connect with SSL required (Heroku)
+    conn = psycopg2.connect(db_url, sslmode='require')
+    return conn
 
 class Customer(Base):
     """Customer account model"""
