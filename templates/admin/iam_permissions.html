@@ -624,12 +624,28 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initModalHandlers() {
+    console.log('🔧 Attaching modal close handlers...');
+    
+    // Attach click handlers to ALL close/cancel buttons
+    document.querySelectorAll('.modal-close-btn, .modal-cancel-btn').forEach(btn => {
+        const modalId = btn.getAttribute('data-modal');
+        console.log('Found close button for modal:', modalId);
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Close button clicked for:', modalId);
+            closeModal(modalId);
+        });
+    });
+    
     // Close modal on backdrop click
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal')) {
-            console.log('Backdrop clicked, closing modal:', e.target.id);
-            closeModal(e.target.id);
-        }
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                console.log('Backdrop clicked for:', modal.id);
+                closeModal(modal.id);
+            }
+        });
     });
 
     // Close modal on Escape key
@@ -640,6 +656,8 @@ function initModalHandlers() {
             closeModal('grantPermissionModal');
         }
     });
+    
+    console.log('✅ Modal handlers attached');
 }
 
 function initFormHandlers() {
