@@ -12,6 +12,9 @@
         </h1>
         <p style="font-size: 1rem; color: var(--gray-600);">
             Manage permission types, grant access, and track user permissions
+            {% if session.get('user_role') != 'admin' %}
+            <br><span style="font-size: 0.9rem; color: var(--primary); font-weight: 600;">Your Site: {{ session.get('customer_id', 'N/A') }}</span>
+            {% endif %}
         </p>
     </div>
     
@@ -259,8 +262,10 @@
 </style>
 
 <script>
-// Get site ID from lemma platform (should be 'lemma_platform')
-const SITE_ID = 'lemma_platform';
+// Get site ID from session
+// For Lemma admin: 'lemma_platform' (to manage lemma.id users)
+// For customers: their site_id (to manage their own users)
+const SITE_ID = '{{ session.get("customer_id", "lemma_platform") }}';
 
 // Load dashboard data
 async function loadDashboard() {
@@ -281,9 +286,10 @@ async function loadDashboard() {
 
 async function loadStats() {
     try {
+        console.log(`Loading stats for site: ${SITE_ID}`);
         const response = await fetch(`/api/iam/sites/${SITE_ID}/stats`, {
             headers: {
-                'X-Admin-Email': 'admin@lemma.id'
+                'X-Admin-Email': '{{ session.get("customer_email", "admin@lemma.id") }}'
             }
         });
         const data = await response.json();
@@ -301,9 +307,10 @@ async function loadStats() {
 
 async function loadPermissionTypes() {
     try {
+        console.log(`Loading permission types for site: ${SITE_ID}`);
         const response = await fetch(`/api/iam/sites/${SITE_ID}/permission-types`, {
             headers: {
-                'X-Admin-Email': 'admin@lemma.id'
+                'X-Admin-Email': '{{ session.get("customer_email", "admin@lemma.id") }}'
             }
         });
         const data = await response.json();
@@ -430,7 +437,7 @@ document.getElementById('createPermissionForm').addEventListener('submit', async
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Admin-Email': 'admin@lemma.id'
+                'X-Admin-Email': '{{ session.get("customer_email", "admin@lemma.id") }}'
             },
             body: JSON.stringify(formData)
         });
@@ -477,7 +484,7 @@ document.getElementById('grantPermissionForm').addEventListener('submit', async 
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Admin-Email': 'admin@lemma.id'
+                'X-Admin-Email': '{{ session.get("customer_email", "admin@lemma.id") }}'
             },
             body: JSON.stringify(formData)
         });
@@ -516,9 +523,10 @@ async function searchUsers() {
             `/api/iam/sites/${SITE_ID}/users/search?permission=${encodeURIComponent(permission)}` :
             `/api/iam/sites/${SITE_ID}/users/search`;
             
+        console.log(`Searching users for site: ${SITE_ID}, permission: ${permission}`);
         const response = await fetch(url, {
             headers: {
-                'X-Admin-Email': 'admin@lemma.id'
+                'X-Admin-Email': '{{ session.get("customer_email", "admin@lemma.id") }}'
             }
         });
         const data = await response.json();
@@ -563,7 +571,7 @@ async function revokePermission(email, permission) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Admin-Email': 'admin@lemma.id'
+                'X-Admin-Email': '{{ session.get("customer_email", "admin@lemma.id") }}'
             },
             body: JSON.stringify({
                 email: email,
