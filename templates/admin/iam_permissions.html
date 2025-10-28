@@ -123,7 +123,7 @@
     <div onclick="event.stopPropagation()" style="background: var(--white); border-radius: 12px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
         <div style="padding: 20px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
             <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--gray-900);">Create Permission Type</h3>
-            <button onclick="closeModal('createPermissionModal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray-500); line-height: 1;">&times;</button>
+            <button onclick="closeIAMModal('createPermissionModal'); return false;" type="button" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray-500); line-height: 1; padding: 0 8px;">&times;</button>
         </div>
         <div style="padding: 20px;">
             <form id="createPermissionForm">
@@ -157,7 +157,7 @@
                 </div>
                 
                 <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
-                    <button type="button" class="btn-secondary" onclick="closeModal('createPermissionModal')">Cancel</button>
+                    <button type="button" class="btn-secondary" onclick="closeIAMModal('createPermissionModal'); return false;">Cancel</button>
                     <button type="submit" class="btn-primary">Create Permission Type</button>
                 </div>
             </form>
@@ -170,7 +170,7 @@
     <div onclick="event.stopPropagation()" style="background: var(--white); border-radius: 12px; max-width: 500px; width: 90%;">
         <div style="padding: 20px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
             <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--gray-900);">Grant Permission</h3>
-            <button onclick="closeModal('grantPermissionModal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray-500); line-height: 1;">&times;</button>
+            <button onclick="closeIAMModal('grantPermissionModal'); return false;" type="button" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray-500); line-height: 1; padding: 0 8px;">&times;</button>
         </div>
         <div style="padding: 20px;">
             <form id="grantPermissionForm">
@@ -186,7 +186,7 @@
                 </div>
                 
                 <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                    <button type="button" class="btn-secondary" onclick="closeModal('grantPermissionModal')">Cancel</button>
+                    <button type="button" class="btn-secondary" onclick="closeIAMModal('grantPermissionModal'); return false;">Cancel</button>
                     <button type="submit" class="btn-primary">Grant Permission</button>
                 </div>
             </form>
@@ -377,19 +377,29 @@ function showCreatePermissionModal() {
 }
 
 function closeModal(modalId) {
+    console.log('closeModal called for:', modalId);
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.style.display = 'none';
+        console.log('Modal closed:', modalId);
         // Reset forms when closing
         if (modalId === 'createPermissionModal') {
-            document.getElementById('createPermissionForm').reset();
-            document.getElementById('timeBoundConfig').style.display = 'none';
+            const form = document.getElementById('createPermissionForm');
+            if (form) form.reset();
+            const config = document.getElementById('timeBoundConfig');
+            if (config) config.style.display = 'none';
         }
         if (modalId === 'grantPermissionModal') {
-            document.getElementById('grantPermissionForm').reset();
+            const form = document.getElementById('grantPermissionForm');
+            if (form) form.reset();
         }
+    } else {
+        console.error('Modal not found:', modalId);
     }
 }
+
+// Global function to close modals (for onclick handlers)
+window.closeIAMModal = closeModal;
 
 function updatePermissionTypeConfig() {
     const type = document.getElementById('permissionType').value;
