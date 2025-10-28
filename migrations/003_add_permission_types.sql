@@ -13,12 +13,13 @@ CREATE TABLE IF NOT EXISTS permission_types (
     created_by VARCHAR(255),
     active BOOLEAN DEFAULT TRUE,
     
-    UNIQUE (site_id, name),
-    FOREIGN KEY (site_id) REFERENCES sites(site_id) ON DELETE CASCADE,
-    INDEX idx_permission_types_site (site_id),
-    INDEX idx_permission_types_type (type),
-    INDEX idx_permission_types_active (site_id, active)
+    CONSTRAINT unique_site_permission_type UNIQUE (site_id, name),
+    CONSTRAINT fk_permission_types_site FOREIGN KEY (site_id) REFERENCES sites(site_id) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_permission_types_site ON permission_types(site_id);
+CREATE INDEX IF NOT EXISTS idx_permission_types_type ON permission_types(type);
+CREATE INDEX IF NOT EXISTS idx_permission_types_active ON permission_types(site_id, active);
 
 -- Permission Instances table (tracks who has which permission)
 CREATE TABLE IF NOT EXISTS permission_instances (
@@ -35,13 +36,14 @@ CREATE TABLE IF NOT EXISTS permission_instances (
     revocation_reason TEXT,
     metadata JSONB DEFAULT '{}',                -- Custom attributes
     
-    FOREIGN KEY (permission_type_id) REFERENCES permission_types(id) ON DELETE CASCADE,
-    FOREIGN KEY (site_id) REFERENCES sites(site_id) ON DELETE CASCADE,
-    INDEX idx_permission_instances_email (email),
-    INDEX idx_permission_instances_site (site_id, email),
-    INDEX idx_permission_instances_active (email, revoked_at) WHERE revoked_at IS NULL,
-    INDEX idx_permission_instances_expiring (expires_at) WHERE expires_at IS NOT NULL
+    CONSTRAINT fk_permission_instances_type FOREIGN KEY (permission_type_id) REFERENCES permission_types(id) ON DELETE CASCADE,
+    CONSTRAINT fk_permission_instances_site FOREIGN KEY (site_id) REFERENCES sites(site_id) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_permission_instances_email ON permission_instances(email);
+CREATE INDEX IF NOT EXISTS idx_permission_instances_site ON permission_instances(site_id, email);
+CREATE INDEX IF NOT EXISTS idx_permission_instances_active ON permission_instances(email, revoked_at) WHERE revoked_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_permission_instances_expiring ON permission_instances(expires_at) WHERE expires_at IS NOT NULL;
 
 -- Permission Policies table (complex permission rules)
 CREATE TABLE IF NOT EXISTS permission_policies (
@@ -54,11 +56,12 @@ CREATE TABLE IF NOT EXISTS permission_policies (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    UNIQUE (site_id, name),
-    FOREIGN KEY (site_id) REFERENCES sites(site_id) ON DELETE CASCADE,
-    INDEX idx_permission_policies_site (site_id),
-    INDEX idx_permission_policies_active (site_id, active)
+    CONSTRAINT unique_site_policy UNIQUE (site_id, name),
+    CONSTRAINT fk_permission_policies_site FOREIGN KEY (site_id) REFERENCES sites(site_id) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_permission_policies_site ON permission_policies(site_id);
+CREATE INDEX IF NOT EXISTS idx_permission_policies_active ON permission_policies(site_id, active);
 
 -- IAM Audit Log table
 CREATE TABLE IF NOT EXISTS iam_audit_log (
@@ -70,13 +73,13 @@ CREATE TABLE IF NOT EXISTS iam_audit_log (
     target VARCHAR(255),                         -- Who was affected
     details JSONB DEFAULT '{}',
     ip_address INET,
-    user_agent TEXT,
-    
-    INDEX idx_audit_log_site (site_id, timestamp DESC),
-    INDEX idx_audit_log_event (event_type, timestamp DESC),
-    INDEX idx_audit_log_actor (actor, timestamp DESC),
-    INDEX idx_audit_log_target (target, timestamp DESC)
+    user_agent TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_site ON iam_audit_log(site_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_log_event ON iam_audit_log(event_type, timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON iam_audit_log(actor, timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_log_target ON iam_audit_log(target, timestamp);
 
 -- Add comment
 COMMENT ON TABLE permission_types IS 'Structured permission type definitions (role, scope, time-bound, etc.)';
