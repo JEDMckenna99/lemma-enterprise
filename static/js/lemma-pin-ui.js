@@ -185,7 +185,7 @@ class LemmaPINUI {
                 </div>
                 
                 <p style="margin-top: 16px; font-size: 13px; color: var(--gray-500); text-align: center;">
-                    <a href="#" onclick="alert('Contact support@lemma.id to reset your PIN'); return false;" style="color: var(--primary);">
+                    <a href="#" onclick="requestPINReset(); return false;" style="color: var(--primary);">
                         Forgot PIN?
                     </a>
                 </p>
@@ -365,9 +365,43 @@ class LemmaPINUI {
     }
 }
 
+/**
+ * Request PIN Reset (called from "Forgot PIN?" link)
+ */
+async function requestPINReset() {
+    const email = prompt('Enter your email address to receive a PIN reset link:');
+    
+    if (!email) return;
+    
+    if (!email.includes('@') || !email.includes('.')) {
+        alert('Please enter a valid email address');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/wallet/pin-reset/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim().toLowerCase() })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`PIN reset email sent to ${email}!\n\nCheck your inbox for a reset link (valid for 1 hour).`);
+        } else {
+            alert(`Failed to send reset email: ${data.message || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('PIN reset request failed:', error);
+        alert('Failed to request PIN reset. Please try again.');
+    }
+}
+
 // Export for use in other modules
 if (typeof window !== 'undefined') {
     window.LemmaPINUI = LemmaPINUI;
+    window.requestPINReset = requestPINReset;
 }
 
 if (typeof module !== 'undefined' && module.exports) {

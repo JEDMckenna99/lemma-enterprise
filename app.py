@@ -247,6 +247,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Wallet Transfer Session API: {e}")
     
+    # Wallet PIN Reset API
+    try:
+        from api.wallet_pin_reset import wallet_pin_reset_bp
+        app.register_blueprint(wallet_pin_reset_bp)
+        logger.info("✅ Wallet PIN Reset API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Wallet PIN Reset API: {e}")
+    
     # OPRF Key Management API
     try:
         from api.oprf_key_api import oprf_key_bp, init_oprf_key_manager
@@ -356,6 +364,12 @@ def create_app():
         """Lemma Federated Wallet"""
         logger.info("🌐 Serving wallet")
         return render_template('modern/wallet.html')
+    
+    @app.route('/wallet/reset-pin')
+    def wallet_reset_pin():
+        """Wallet PIN Reset Page"""
+        logger.info("🔐 Serving PIN reset page")
+        return render_template('modern/reset_pin.html')
 
     # Essential pages
     @app.route('/pricing')
