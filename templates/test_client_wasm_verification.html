@@ -312,15 +312,22 @@
                 results.push(result.verified ? '✅ CLIENT-SIDE VERIFICATION PASSED' : '❌ CLIENT-SIDE VERIFICATION FAILED');
                 results.push(`\n⚡ Verification Time: ${timeUs.toFixed(2)}µs`);
                 results.push(`📊 Method: ${result.method || 'client-side'}`);
-                results.push(`🔐 Reason: ${result.reason || 'valid'}`);
+                results.push(`🔐 Reason: ${result.reason || 'unknown'}`);
                 
-                if (result.verified) {
-                    results.push(`\n✅ SUCCESS: Client-side WASM verification is working!`);
-                    results.push(`💰 Cost: $0.00 (no server call)`);
+                if (result.verified && result.reason === 'valid') {
+                    results.push(`\n✅ SUCCESS: Full local verification passed!`);
+                    results.push(`🔒 All checks passed:`);
+                    results.push(`   ✅ Not expired`);
+                    results.push(`   ✅ Not revoked`);
+                    results.push(`   ✅ Valid signature (Ed25519)`);
+                    results.push(`\n💰 Cost: $0.00 (no server call)`);
                     results.push(`📡 Server calls: 0`);
                 } else {
-                    results.push(`\n❌ FAILURE: Signature verification failed!`);
-                    results.push(`⚠️ This means message construction mismatch!`);
+                    results.push(`\n❌ FAILURE: Verification failed!`);
+                    results.push(`⚠️ Reason: ${result.reason}`);
+                    if (result.error) {
+                        results.push(`⚠️ Error: ${result.error}`);
+                    }
                 }
 
                 testResults.fullFlowWorks = result.verified;
@@ -370,6 +377,8 @@
                 // Benchmark 100 verifications
                 const iterations = 100;
                 const times = [];
+                let passCount = 0;
+                let failCount = 0;
 
                 for (let i = 0; i < iterations; i++) {
                     const start = performance.now();
@@ -377,9 +386,12 @@
                     const end = performance.now();
                     times.push((end - start) * 1000); // Convert to microseconds
 
-                    if (!result.verified) {
-                        throw new Error(`Verification failed on iteration ${i + 1}`);
+                    // STRICT VALIDATION: Must pass with 'valid' reason
+                    if (!result.verified || result.reason !== 'valid') {
+                        failCount++;
+                        throw new Error(`Verification failed on iteration ${i + 1}: ${result.reason || 'unknown'}`);
                     }
+                    passCount++;
                 }
 
                 // Calculate statistics
@@ -389,12 +401,16 @@
                 const median = times.sort((a, b) => a - b)[Math.floor(times.length / 2)];
 
                 const results = [];
-                results.push(`✅ Completed ${iterations} verifications\n`);
+                results.push(`✅ ALL ${passCount} VERIFICATIONS PASSED WITH 'valid' REASON\n`);
                 results.push(`📊 Statistics:`);
                 results.push(`   Average: ${avg.toFixed(2)}µs`);
                 results.push(`   Median:  ${median.toFixed(2)}µs`);
                 results.push(`   Min:     ${min.toFixed(2)}µs`);
                 results.push(`   Max:     ${max.toFixed(2)}µs`);
+                results.push(`\n🔐 Security Checks (per verification):`);
+                results.push(`   ✅ Expiration check (local)`);
+                results.push(`   ✅ Revocation check (cached bloom filter)`);
+                results.push(`   ✅ Signature verification (Ed25519)`);
                 results.push(`\n💰 Cost Analysis:`);
                 results.push(`   Client-side: $0.00 (${iterations} verifications)`);
                 results.push(`   Server-side: $${(iterations * 0.001).toFixed(2)} (equivalent)`);
