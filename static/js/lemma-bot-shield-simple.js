@@ -491,12 +491,13 @@ class LemmaBotShield {
                 if (!this.wasmVerifier) {
                     this.wasmVerifier = new LemmaWASMVerifierOptimized({ 
                         debug: this.config.debug,
-                        apiBase: this.config.apiBase
+                        apiBase: this.config.apiBase,
+                        forceWebCrypto: true  // Use Web Crypto API (63µs, hardware-accelerated)
                     });
                     await this.wasmVerifier.init();
                     
                     if (this.config.debug) {
-                        console.log('⚡ Using OPTIMIZED WASM verifier (18µs, $0 cost, seamless - no PIN)');
+                        console.log('⚡ Using Web Crypto API verifier (63µs, $0 cost, hardware-accelerated)');
                     }
                 }
                 
