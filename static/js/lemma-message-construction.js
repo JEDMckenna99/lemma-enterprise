@@ -42,15 +42,15 @@ class LemmaMessageConstructor {
             }
             parts.push(this.textEncoder.encode(credential.subject));
             
-            // 4. credential.issued_at or issuedAt (required, as u64 little-endian)
-            const issuedAt = credential.issued_at || credential.issuedAt;
+            // 4. credential.issued_at, issuedAt, or issuanceDate (W3C) (required, as u64 little-endian)
+            const issuedAt = credential.issued_at || credential.issuedAt || credential.issuanceDate;
             if (!issuedAt) {
-                throw new Error('Credential missing issued_at/issuedAt field');
+                throw new Error('Credential missing issued_at/issuedAt/issuanceDate field');
             }
             parts.push(this.u64ToLeBytes(issuedAt));
             
-            // 5. credential.expires_at or expiresAt (optional, as u64 little-endian)
-            const expiresAt = credential.expires_at || credential.expiresAt;
+            // 5. credential.expires_at, expiresAt, or expirationDate (W3C) (optional, as u64 little-endian)
+            const expiresAt = credential.expires_at || credential.expiresAt || credential.expirationDate;
             if (expiresAt) {
                 parts.push(this.u64ToLeBytes(expiresAt));
             }
