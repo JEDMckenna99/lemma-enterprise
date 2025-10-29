@@ -54,12 +54,18 @@ class LemmaWASMVerifierOptimized {
             // Load WASM module
             if (window.lemmaWasm) {
                 this.wasm = window.lemmaWasm;
-            } else if (window.wasmReady) {
-                // Already loaded by another script
-                const module = await import('/static/wasm/lemma_crypto.js');
-                await module.default();
-                this.wasm = module;
-                window.lemmaWasm = module;
+            } else {
+                // Load from static/wasm/
+                try {
+                    const module = await import('/static/wasm/lemma_crypto.js');
+                    await module.default('/static/wasm/lemma_crypto_bg.wasm');
+                    this.wasm = module;
+                    window.lemmaWasm = module;
+                    console.log('✅ WASM module loaded successfully');
+                } catch (wasmError) {
+                    console.warn('⚠️ WASM load failed, will use Web Crypto API fallback:', wasmError);
+                    this.wasm = null;
+                }
             }
             
             // Sync bloom filter
@@ -68,14 +74,15 @@ class LemmaWASMVerifierOptimized {
             this.ready = true;
             
             if (this.debug) {
-                console.log('✅ Optimized WASM verifier ready');
+                console.log('✅ Optimized verifier ready');
+                console.log('🎯 Using:', this.wasm ? 'WASM (Rust)' : 'Web Crypto API (fallback)');
                 console.log('🎯 Target: <100µs per verification');
             }
             
             return true;
             
         } catch (error) {
-            console.error('WASM init failed:', error);
+            console.error('Verifier init failed:', error);
             this.ready = false;
             return false;
         }
@@ -170,26 +177,37 @@ class LemmaWASMVerifierOptimized {
                 });
             }
             
-            // Verify using Web Crypto API (Ed25519)
-            const cryptoKey = await crypto.subtle.importKey(
-                'raw',
-                publicKey,
-                {
-                    name: 'Ed25519',
-                    namedCurve: 'Ed25519'
-                },
-                false,
-                ['verify']
-            );
-            
-            const isValid = await crypto.subtle.verify(
-                'Ed25519',
-                cryptoKey,
-                signature,
-                messageBytes
-            );
-            
-            return isValid;
+            // Verify using WASM module (if available) or Web Crypto API fallback
+            if (this.wasm && this.wasm.verify_signature_bytes) {
+                // Use WASM (Rust compiled to WebAssembly)
+                const isValid = this.wasm.verify_signature_bytes(
+                    publicKey,
+                    messageBytes,
+                    signature
+                );
+                return isValid;
+            } else {
+                // Fallback to Web Crypto API (Ed25519)
+                const cryptoKey = await crypto.subtle.importKey(
+                    'raw',
+                    publicKey,
+                    {
+                        name: 'Ed25519',
+                        namedCurve: 'Ed25519'
+                    },
+                    false,
+                    ['verify']
+                );
+                
+                const isValid = await crypto.subtle.verify(
+                    'Ed25519',
+                    cryptoKey,
+                    signature,
+                    messageBytes
+                );
+                
+                return isValid;
+            }
             
         } catch (error) {
             if (this.debug) {
