@@ -55,13 +55,14 @@ class LemmaWASMVerifierOptimized {
             if (window.lemmaWasm) {
                 this.wasm = window.lemmaWasm;
             } else {
-                // Load from static/wasm/
+                // Load from static/wasm/ (with cache-busting version)
                 try {
-                    const module = await import('/static/wasm/lemma_crypto.js');
-                    await module.default('/static/wasm/lemma_crypto_bg.wasm');
+                    const WASM_VERSION = '985';  // Increment to bust Cloudflare cache
+                    const module = await import(`/static/wasm/lemma_crypto.js?v=${WASM_VERSION}`);
+                    await module.default(`/static/wasm/lemma_crypto_bg.wasm?v=${WASM_VERSION}`);
                     this.wasm = module;
                     window.lemmaWasm = module;
-                    console.log('✅ WASM module loaded successfully');
+                    console.log('✅ WASM module loaded successfully (v' + WASM_VERSION + ')');
                     console.log('🔍 WASM exports:', Object.keys(module));
                     console.log('🔍 verify_signature_bytes available:', typeof module.verify_signature_bytes);
                 } catch (wasmError) {
