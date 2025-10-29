@@ -90,9 +90,12 @@
                 <input type="tel" maxlength="1" class="pin-digit" id="pin4">
             </div>
             
-            <p style="text-align: center; color: var(--gray-600); font-size: 14px; margin: 16px 0;">
-                For: <strong id="user-email"></strong>
-            </p>
+            <div style="background: #eff6ff; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                <p style="text-align: center; color: #1e40af; font-size: 14px; margin: 0;">
+                    Resetting PIN for:<br>
+                    <strong id="user-email" style="font-size: 16px;"></strong>
+                </p>
+            </div>
             
             <button onclick="resetPIN()" id="reset-button" class="btn-primary" style="width: 100%; margin-top: 24px;">
                 Set New PIN

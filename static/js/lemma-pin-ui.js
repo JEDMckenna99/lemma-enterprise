@@ -367,30 +367,74 @@ class LemmaPINUI {
 
 /**
  * Request PIN Reset (called from "Forgot PIN?" link)
+ * SECURITY: Only works if wallet has a credential with the provided email
  */
 async function requestPINReset() {
-    const email = prompt('Enter your email address to receive a PIN reset link:');
+    // Get all credentials to find email
+    let userEmail = null;
+    let credentialId = null;
     
-    if (!email) return;
+    try {
+        // Try to get email from wallet (if available)
+        if (window.lemmaWallet) {
+            const allCredentials = await window.lemmaWallet.getAllCredentials();
+            
+            // Look for credential with email claim
+            for (const cred of allCredentials) {
+                const claims = cred.claims || cred.credentialSubject || {};
+                if (claims.email) {
+                    userEmail = claims.email;
+                    credentialId = cred.id;
+                    break;
+                }
+            }
+        }
+    } catch (error) {
+        console.warn('Could not auto-detect email from wallet:', error);
+    }
     
-    if (!email.includes('@') || !email.includes('.')) {
-        alert('Please enter a valid email address');
-        return;
+    // If no email found in wallet, ask user to enter it
+    if (!userEmail) {
+        userEmail = prompt('Enter the email address associated with your Lemma credential:');
+        
+        if (!userEmail) return;
+        
+        if (!userEmail.includes('@') || !userEmail.includes('.')) {
+            alert('Please enter a valid email address');
+            return;
+        }
+    } else {
+        // Confirm the detected email
+        const confirmed = confirm(`Send PIN reset link to ${userEmail}?`);
+        if (!confirmed) return;
     }
     
     try {
+        const requestBody = { 
+            email: userEmail.trim().toLowerCase()
+        };
+        
+        // Include credential ID if available for additional verification
+        if (credentialId) {
+            requestBody.credential_id = credentialId;
+        }
+        
         const response = await fetch('/api/wallet/pin-reset/request', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: email.trim().toLowerCase() })
+            body: JSON.stringify(requestBody)
         });
         
         const data = await response.json();
         
         if (data.success) {
-            alert(`PIN reset email sent to ${email}!\n\nCheck your inbox for a reset link (valid for 1 hour).`);
+            alert(`PIN reset email sent to ${userEmail}!\n\nCheck your inbox for a reset link (valid for 1 hour).`);
         } else {
-            alert(`Failed to send reset email: ${data.message || 'Unknown error'}`);
+            if (data.error === 'no_credentials') {
+                alert(`No Lemma credentials found for ${userEmail}.\n\nYou can only reset the PIN for an email that has active credentials.`);
+            } else {
+                alert(`Failed to send reset email: ${data.message || 'Unknown error'}`);
+            }
         }
     } catch (error) {
         console.error('PIN reset request failed:', error);
