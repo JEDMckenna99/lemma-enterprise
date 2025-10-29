@@ -144,11 +144,11 @@
     </div>
 
     <!-- Load Required Scripts -->
-    <script src="/static/js/lemma-message-construction.js?v=970"></script>
-    <script src="/static/js/lemma-wasm-verifier-optimized.js?v=970"></script>
+    <script src="/static/js/lemma-message-construction.js?v=971" data-cfasync="false"></script>
+    <script src="/static/js/lemma-wasm-verifier-optimized.js?v=971" data-cfasync="false"></script>
 
-    <!-- Test Scripts -->
-    <script>
+    <!-- Test Scripts (disable Cloudflare Rocket Loader) -->
+    <script data-cfasync="false">
         // Global test results
         const testResults = {
             scriptsLoaded: false,
