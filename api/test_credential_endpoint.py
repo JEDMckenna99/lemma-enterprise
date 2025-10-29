@@ -43,27 +43,35 @@ def issue_test_credential():
         
         subject = data.get('subject', 'did:lemma:test_user')
         permission = data.get('permission', 'test_permission')
-        duration_days = data.get('duration_days', 365)
         
         # Build claims
         claims = data.get('claims', {})
         claims['permission'] = permission
         
-        # Create test issuer
+        # Create test issuer (this creates a fresh keypair for testing)
         issuer = PyMinimalIssuer.new()
         
         # Convert claims to string dict for Rust
         claims_str = {k: str(v) for k, v in claims.items()}
         
-        # Issue credential with expiry
-        credential_json = issuer.issue_credential_with_expiry(subject, claims_str, duration_days)
+        # Issue credential (uses default 365 day expiry from Rust)
+        credential_json = issuer.issue_credential(subject, claims_str)
         credential = json.loads(credential_json)
         
-        logger.info(f"✅ Issued test credential: {credential['id']}")
-        logger.info(f"🔐 Issuer DID: {issuer.get_did()}")
-        logger.info(f"⏰ Expires in {duration_days} days")
+        # Extract public key for client-side verification
+        issuer_did = issuer.get_did()
+        public_key_hex = issuer.get_public_key_hex()
         
-        return jsonify({'credential': credential}), 200
+        logger.info(f"✅ Issued test credential: {credential['id']}")
+        logger.info(f"🔐 Issuer DID: {issuer_did}")
+        logger.info(f"🔑 Public Key: {public_key_hex}")
+        
+        # Return both credential and issuer's public key for verification
+        return jsonify({
+            'credential': credential,
+            'issuer_did': issuer_did,
+            'public_key': public_key_hex
+        }), 200
         
     except Exception as e:
         logger.error(f"❌ Test credential issue failed: {e}")
