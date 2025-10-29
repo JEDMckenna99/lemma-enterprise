@@ -374,6 +374,11 @@ def create_app():
     def test_client_verification():
         """Test client-side verification performance"""
         return render_template('test_client_verification.html')
+    
+    @app.route('/test-wasm-verification')
+    def test_wasm_verification():
+        """Comprehensive WASM verification test suite"""
+        return render_template('test_client_wasm_verification.html')
 
     @app.route('/setup-pin')
     def setup_pin():

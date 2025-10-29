@@ -39,14 +39,15 @@ def issue_test_credential():
                 'error': 'Rust crypto engine not available'
             }), 500
         
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'error': 'JSON payload required'
-            }), 400
+        data = request.get_json() or {}
         
         subject = data.get('subject', 'did:lemma:test_user')
+        permission = data.get('permission', 'test_permission')
+        duration_days = data.get('duration_days', 365)
+        
+        # Build claims
         claims = data.get('claims', {})
+        claims['permission'] = permission
         
         # Create test issuer
         issuer = PyMinimalIssuer.new()
@@ -54,14 +55,15 @@ def issue_test_credential():
         # Convert claims to string dict for Rust
         claims_str = {k: str(v) for k, v in claims.items()}
         
-        # Issue credential
-        credential_json = issuer.issue_credential(subject, claims_str)
+        # Issue credential with expiry
+        credential_json = issuer.issue_credential_with_expiry(subject, claims_str, duration_days)
         credential = json.loads(credential_json)
         
         logger.info(f"✅ Issued test credential: {credential['id']}")
         logger.info(f"🔐 Issuer DID: {issuer.get_did()}")
+        logger.info(f"⏰ Expires in {duration_days} days")
         
-        return jsonify(credential), 200
+        return jsonify({'credential': credential}), 200
         
     except Exception as e:
         logger.error(f"❌ Test credential issue failed: {e}")
