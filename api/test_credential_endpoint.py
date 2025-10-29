@@ -49,7 +49,7 @@ def issue_test_credential():
         claims['permission'] = permission
         
         # Create test issuer (this creates a fresh keypair for testing)
-        issuer = PyMinimalIssuer.new()
+        issuer = PyMinimalIssuer()
         
         # Convert claims to string dict for Rust
         claims_str = {k: str(v) for k, v in claims.items()}
