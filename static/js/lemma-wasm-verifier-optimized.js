@@ -161,7 +161,7 @@ class LemmaWASMVerifierOptimized {
             
             // Extract public key (cached)
             const issuerDID = credential.issuer;
-            const pubKeyHex = issuerDID.substring(11, 75);  // 'did:lemma:' = 11 chars, key = 64 chars
+            const pubKeyHex = issuerDID.substring(10, 74);  // 'did:lemma:' = 10 chars, key = 64 hex chars (32 bytes)
             const publicKey = this.hexToBytesOptimized(pubKeyHex);
             
             // Create message (CRITICAL: MUST match Rust server exactly!)
