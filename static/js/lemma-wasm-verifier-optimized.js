@@ -180,6 +180,9 @@ class LemmaWASMVerifierOptimized {
             // Verify using WASM module (if available) or Web Crypto API fallback
             if (this.wasm && this.wasm.verify_signature_bytes) {
                 // Use WASM (Rust compiled to WebAssembly)
+                if (this.debug) {
+                    console.log('🦀 Using Rust WASM verification');
+                }
                 // NOTE: Order is public_key, message, signature
                 const isValid = this.wasm.verify_signature_bytes(
                     publicKey,      // 32 bytes
@@ -189,6 +192,9 @@ class LemmaWASMVerifierOptimized {
                 return isValid;
             } else {
                 // Fallback to Web Crypto API (Ed25519)
+                if (this.debug) {
+                    console.log('🌐 Fallback to Web Crypto API');
+                }
                 const cryptoKey = await crypto.subtle.importKey(
                     'raw',
                     publicKey,
