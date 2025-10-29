@@ -83,18 +83,35 @@
         </div>
         
         <div id="reset-form" style="display: none;">
-            <div class="pin-input-group">
-                <input type="tel" maxlength="1" class="pin-digit" id="pin1" autofocus>
-                <input type="tel" maxlength="1" class="pin-digit" id="pin2">
-                <input type="tel" maxlength="1" class="pin-digit" id="pin3">
-                <input type="tel" maxlength="1" class="pin-digit" id="pin4">
-            </div>
-            
-            <div style="background: #eff6ff; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <div style="background: #eff6ff; padding: 16px; border-radius: 8px; margin: 0 0 24px 0;">
                 <p style="text-align: center; color: #1e40af; font-size: 14px; margin: 0;">
                     Resetting PIN for:<br>
                     <strong id="user-email" style="font-size: 16px;"></strong>
                 </p>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--gray-700); font-size: 14px;">
+                    Enter New PIN
+                </label>
+                <div class="pin-input-group">
+                    <input type="tel" maxlength="1" class="pin-digit" id="pin1" autofocus>
+                    <input type="tel" maxlength="1" class="pin-digit" id="pin2">
+                    <input type="tel" maxlength="1" class="pin-digit" id="pin3">
+                    <input type="tel" maxlength="1" class="pin-digit" id="pin4">
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--gray-700); font-size: 14px;">
+                    Confirm New PIN
+                </label>
+                <div class="pin-input-group">
+                    <input type="tel" maxlength="1" class="pin-digit" id="confirm1">
+                    <input type="tel" maxlength="1" class="pin-digit" id="confirm2">
+                    <input type="tel" maxlength="1" class="pin-digit" id="confirm3">
+                    <input type="tel" maxlength="1" class="pin-digit" id="confirm4">
+                </div>
             </div>
             
             <button onclick="resetPIN()" id="reset-button" class="btn-primary" style="width: 100%; margin-top: 24px;">
@@ -179,6 +196,12 @@ async function resetPIN() {
     const pin4 = document.getElementById('pin4').value;
     const newPin = pin1 + pin2 + pin3 + pin4;
     
+    const confirm1 = document.getElementById('confirm1').value;
+    const confirm2 = document.getElementById('confirm2').value;
+    const confirm3 = document.getElementById('confirm3').value;
+    const confirm4 = document.getElementById('confirm4').value;
+    const confirmPin = confirm1 + confirm2 + confirm3 + confirm4;
+    
     const errorMsg = document.getElementById('error-message');
     const successMsg = document.getElementById('success-message');
     const resetButton = document.getElementById('reset-button');
@@ -186,9 +209,28 @@ async function resetPIN() {
     errorMsg.style.display = 'none';
     successMsg.style.display = 'none';
     
+    // Validate PIN format
     if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
         errorMsg.textContent = 'Please enter a valid 4-digit PIN';
         errorMsg.style.display = 'block';
+        return;
+    }
+    
+    // Validate confirmation
+    if (confirmPin.length !== 4 || !/^\d{4}$/.test(confirmPin)) {
+        errorMsg.textContent = 'Please confirm your PIN';
+        errorMsg.style.display = 'block';
+        return;
+    }
+    
+    // Check PINs match
+    if (newPin !== confirmPin) {
+        errorMsg.textContent = 'PINs do not match. Please try again.';
+        errorMsg.style.display = 'block';
+        
+        // Clear inputs
+        document.querySelectorAll('.pin-digit').forEach(input => input.value = '');
+        document.getElementById('pin1').focus();
         return;
     }
     
