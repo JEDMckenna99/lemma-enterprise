@@ -17,7 +17,7 @@ wallet_pin_reset_bp = Blueprint('wallet_pin_reset', __name__)
 
 # Store reset tokens temporarily (in production, use Redis)
 reset_tokens = {}  # {token: {'email': str, 'created_at': int, 'user_did': str}}
-TOKEN_EXPIRY = 3600  # 1 hour
+TOKEN_EXPIRY = 86400  # 24 hours (disabled during setup)
 
 def generate_reset_token():
     """Generate secure reset token"""

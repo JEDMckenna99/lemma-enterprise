@@ -2529,8 +2529,32 @@ async function initWalletPINProtection() {
                             Try Again
                         </button>
                         <p style="margin-top: 16px; font-size: 14px; color: var(--gray-500);">
-                            <a href="#" onclick="requestPINReset(); return false;" style="color: var(--primary);">Forgot PIN?</a>
+                            <a href="#" onclick="resetPINSimple(); return false;" style="color: var(--primary);">Forgot PIN?</a>
                         </p>
+                        <script>
+                        async function resetPINSimple() {
+                            const msg = 'To reset your PIN:\\n\\n1. Clear browser data (localStorage.clear())\\n2. Reload page\\n3. Set new PIN\\n\\nOR enter your email for reset link:';
+                            const email = prompt(msg);
+                            
+                            if (!email || !email.includes('@')) return;
+                            
+                            try {
+                                const resp = await fetch('/api/wallet/pin-reset/request', {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({email: email.trim().toLowerCase()})
+                                });
+                                const data = await resp.json();
+                                if (data.success) {
+                                    alert('Reset email sent to ' + email + '! Check your inbox (link valid 24 hours).');
+                                } else {
+                                    alert('Failed: ' + (data.message || 'Unknown error'));
+                                }
+                            } catch(e) {
+                                alert('Failed to send reset email. Try clearing localStorage and setting new PIN.');
+                            }
+                        }
+                        </script>
                     </div>
                 `;
                 return; // Stop wallet initialization
