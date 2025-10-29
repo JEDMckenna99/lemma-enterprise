@@ -19,19 +19,27 @@ iam_types_bp = Blueprint('iam_types', __name__)
 VALID_PERMISSION_TYPES = ['role', 'scope', 'time-bound', 'attribute', 'hierarchical']
 
 # Helper function to get database connection
-def get_db_conn():
-    """Get database connection - uses PostgreSQL or mock"""
+def get_db_conn(site_id=None):
+    """
+    Get database connection with optional RLS context
+    
+    Args:
+        site_id (str, optional): Site ID for Row-Level Security isolation
+    
+    Returns connection with RLS session variable set (if site_id provided)
+    """
     try:
         from api.database import get_db_connection
-        return get_db_connection()
+        return get_db_connection(site_id=site_id)
     except:
         # Fallback to mock for testing
         return None
 
 def log_audit_event(site_id, event_type, actor, target=None, details=None, ip_address=None):
-    """Log IAM audit event"""
+    """Log IAM audit event with RLS isolation"""
     try:
-        conn = get_db_conn()
+        # Pass site_id for RLS context
+        conn = get_db_conn(site_id=site_id)
         if not conn:
             logger.warning("No DB connection - audit log skipped")
             return
@@ -168,7 +176,8 @@ def create_permission_type(site_id):
                 'error': f'Invalid type. Must be one of: {VALID_PERMISSION_TYPES}'
             }), 400
         
-        conn = get_db_conn()
+        # Get connection with RLS context for this site
+        conn = get_db_conn(site_id=site_id)
         if not conn:
             return jsonify({
                 'success': False,

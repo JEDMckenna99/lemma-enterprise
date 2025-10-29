@@ -25,10 +25,16 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 # Raw psycopg2 connection for IAM API (needs cursor access)
-def get_db_connection():
+def get_db_connection(site_id=None):
     """
     Get raw psycopg2 database connection for IAM API
     Returns connection with cursor() method for SQL queries
+    
+    Args:
+        site_id (str, optional): Site ID for Row-Level Security (RLS) context
+    
+    If site_id is provided, sets PostgreSQL session variable for RLS policies.
+    This ensures even with SQL injection, customers only see their own data.
     """
     db_url = os.getenv('DATABASE_URL')
     if not db_url:
@@ -40,6 +46,15 @@ def get_db_connection():
     
     # Connect with SSL required (Heroku)
     conn = psycopg2.connect(db_url, sslmode='require')
+    
+    # Set RLS context if site_id provided (for Row-Level Security policies)
+    if site_id:
+        cursor = conn.cursor()
+        # Set session variable for RLS policies
+        # This makes all queries automatically filtered by site_id
+        cursor.execute("SET app.current_site_id = %s", (site_id,))
+        cursor.close()
+    
     return conn
 
 class Customer(Base):
