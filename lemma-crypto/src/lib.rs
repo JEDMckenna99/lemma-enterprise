@@ -33,11 +33,15 @@ pub mod network_partition;
 pub mod credential_lifecycle;
 pub mod utils;
 
-// WORKING INTEGRATIONS (WASM removed for clean build)
+// WORKING INTEGRATIONS
 
 // Minimal Python bindings (only if Python feature enabled)
 #[cfg(feature = "python")]
 pub mod minimal_python;
+
+// WebAssembly bindings (only if wasm feature enabled)
+#[cfg(feature = "wasm")]
+pub mod wasm_bindings;
 
 // Re-export WORKING types
 pub use crate::minimal_core::{MinimalIssuer, MinimalCore, MinimalCredential, MinimalVerificationResult, MinimalError};

@@ -180,10 +180,11 @@ class LemmaWASMVerifierOptimized {
             // Verify using WASM module (if available) or Web Crypto API fallback
             if (this.wasm && this.wasm.verify_signature_bytes) {
                 // Use WASM (Rust compiled to WebAssembly)
+                // NOTE: Order is public_key, message, signature
                 const isValid = this.wasm.verify_signature_bytes(
-                    publicKey,
-                    messageBytes,
-                    signature
+                    publicKey,      // 32 bytes
+                    messageBytes,   // 32 bytes (SHA-256 hash)
+                    signature       // 64 bytes
                 );
                 return isValid;
             } else {
