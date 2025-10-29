@@ -291,12 +291,15 @@
 
                 resultDiv.textContent = `✅ Credential issued from server\n\n🔍 Verifying client-side...`;
 
-                // Step 2: Verify client-side (WASM verifier)
+                // Step 2: Verify client-side (FORCE WEB CRYPTO API FOR TESTING)
                 if (!window.LemmaWASMVerifierOptimized) {
                     throw new Error('LemmaWASMVerifierOptimized not loaded!');
                 }
 
-                const verifier = new LemmaWASMVerifierOptimized({ debug: true });
+                const verifier = new LemmaWASMVerifierOptimized({ 
+                    debug: true,
+                    forceWebCrypto: true  // TEST WEB CRYPTO API ONLY
+                });
                 await verifier.init();
 
                 const startTime = performance.now();
@@ -355,7 +358,10 @@
                 const issueData = await issueResponse.json();
                 const credential = issueData.credential;
 
-                const verifier = new LemmaWASMVerifierOptimized({ debug: false });
+                const verifier = new LemmaWASMVerifierOptimized({ 
+                    debug: false,
+                    forceWebCrypto: true  // TEST WEB CRYPTO API ONLY
+                });
                 await verifier.init();
 
                 // Warm-up (first verification is slower due to initialization)
@@ -444,8 +450,11 @@
                 const issueData = await issueResponse.json();
                 const credential = issueData.credential;
 
-                // Verify client-side
-                const verifier = new LemmaWASMVerifierOptimized({ debug: true });
+                // Verify client-side (FORCE WEB CRYPTO API FOR TESTING)
+                const verifier = new LemmaWASMVerifierOptimized({ 
+                    debug: true,
+                    forceWebCrypto: true  // TEST WEB CRYPTO API ONLY
+                });
                 await verifier.init();
 
                 const result = await verifier.verify(credential);

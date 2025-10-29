@@ -15,6 +15,7 @@
 class LemmaWASMVerifierOptimized {
     constructor(config = {}) {
         this.debug = config.debug || false;
+        this.forceWebCrypto = config.forceWebCrypto || false;  // Force Web Crypto API (bypass WASM)
         this.wasm = null;
         this.ready = false;
         
@@ -51,8 +52,11 @@ class LemmaWASMVerifierOptimized {
      */
     async init() {
         try {
-            // Load WASM module
-            if (window.lemmaWasm) {
+            // Load WASM module (unless forced to use Web Crypto API)
+            if (this.forceWebCrypto) {
+                console.log('⚙️ FORCED WEB CRYPTO API MODE (for testing)');
+                this.wasm = null;
+            } else if (window.lemmaWasm) {
                 this.wasm = window.lemmaWasm;
             } else {
                 // Load from static/wasm/ (with cache-busting version)
