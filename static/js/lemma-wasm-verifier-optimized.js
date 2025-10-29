@@ -170,11 +170,23 @@ class LemmaWASMVerifierOptimized {
                 });
             }
             
-            // Verify (direct WASM/ed25519 call)
-            const isValid = await (this.wasm?.verify || window.ed25519.verify)(
+            // Verify using Web Crypto API (Ed25519)
+            const cryptoKey = await crypto.subtle.importKey(
+                'raw',
+                publicKey,
+                {
+                    name: 'Ed25519',
+                    namedCurve: 'Ed25519'
+                },
+                false,
+                ['verify']
+            );
+            
+            const isValid = await crypto.subtle.verify(
+                'Ed25519',
+                cryptoKey,
                 signature,
-                messageBytes,
-                publicKey
+                messageBytes
             );
             
             return isValid;
