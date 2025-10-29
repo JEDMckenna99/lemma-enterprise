@@ -62,6 +62,8 @@ class LemmaWASMVerifierOptimized {
                     this.wasm = module;
                     window.lemmaWasm = module;
                     console.log('✅ WASM module loaded successfully');
+                    console.log('🔍 WASM exports:', Object.keys(module));
+                    console.log('🔍 verify_signature_bytes available:', typeof module.verify_signature_bytes);
                 } catch (wasmError) {
                     console.warn('⚠️ WASM load failed, will use Web Crypto API fallback:', wasmError);
                     this.wasm = null;
