@@ -65,6 +65,9 @@ def issue_test_credential():
         logger.info(f"✅ Issued test credential: {credential['id']}")
         logger.info(f"🔐 Issuer DID: {issuer_did}")
         logger.info(f"🔑 Public Key: {public_key_hex}")
+        logger.info(f"📋 Credential structure: {json.dumps(credential, indent=2)}")
+        logger.info(f"🔍 Has proof: {credential.get('proof') is not None}")
+        logger.info(f"🔍 Has signatureValue: {credential.get('proof', {}).get('signatureValue') is not None if credential.get('proof') else False}")
         
         # Return both credential and issuer's public key for verification
         return jsonify({
