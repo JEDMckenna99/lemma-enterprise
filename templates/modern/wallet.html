@@ -2566,15 +2566,12 @@ async function initWalletPINProtection() {
     }
 }
 
-// TEMPORARILY DISABLED - Allow direct wallet access to clear data
-// Initialize PIN protection (or show wallet if no PIN)
-// if (document.readyState === 'loading') {
-//     document.addEventListener('DOMContentLoaded', initWalletPINProtection);
-// } else {
-//     initWalletPINProtection();
-// }
-
-console.log('⚠️ PIN protection temporarily disabled for wallet cleanup');
+// Initialize PIN protection on wallet page load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initWalletPINProtection);
+} else {
+    initWalletPINProtection();
+}
 
 </script>
 {% endblock %}
