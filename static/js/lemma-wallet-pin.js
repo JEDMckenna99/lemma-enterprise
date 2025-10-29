@@ -95,25 +95,39 @@ class LemmaWalletPIN {
         const saltBase64 = this.arrayBufferToBase64(salt);
         localStorage.setItem('lemma_wallet_salt', saltBase64);
         
-        // Derive key
-        const key = await this.deriveKeyFromPIN(pin, salt);
+        // Create PIN hash for verification (doesn't encrypt anything, just verifies PIN)
+        const pinHash = await this.hashPIN(pin, salt);
+        localStorage.setItem('lemma_wallet_pin_hash', pinHash);
         
         // Store key reference (for session)
-        this.currentKey = key;
+        this.currentKey = null;  // Not needed for hash-based verification
         this.isLocked = false;
         this.failedAttempts = 0;
         
-        // Initialize empty wallet if not exists
-        if (!localStorage.getItem('lemma_wallet_encrypted')) {
-            await this.saveWallet([]);
-        }
-        
-        console.log('✅ PIN setup complete');
+        console.log('✅ PIN setup complete (hash-based verification)');
         return true;
     }
     
     /**
-     * Unlock wallet with PIN
+     * Hash PIN for verification (doesn't encrypt data)
+     */
+    async hashPIN(pin, salt) {
+        const fingerprint = await this.getBrowserFingerprint();
+        const pinData = new TextEncoder().encode(pin + fingerprint);
+        const saltArray = salt instanceof Uint8Array ? salt : this.base64ToArrayBuffer(salt);
+        
+        // Combine PIN data and salt
+        const combined = new Uint8Array(pinData.length + saltArray.length);
+        combined.set(pinData);
+        combined.set(saltArray, pinData.length);
+        
+        // SHA-256 hash
+        const hashBuffer = await crypto.subtle.digest('SHA-256', combined);
+        return this.arrayBufferToBase64(hashBuffer);
+    }
+    
+    /**
+     * Unlock wallet with PIN (hash-based verification, doesn't decrypt anything)
      */
     async unlock(pin) {
         // Check if locked out
@@ -133,47 +147,29 @@ class LemmaWalletPIN {
             throw new Error('PIN not set up. Please set up PIN first.');
         }
         
+        // Get stored PIN hash
+        const storedHash = localStorage.getItem('lemma_wallet_pin_hash');
+        if (!storedHash) {
+            throw new Error('PIN hash not found. Please set up PIN again.');
+        }
+        
         const salt = this.base64ToArrayBuffer(saltBase64);
         
-        // Derive key
-        const key = await this.deriveKeyFromPIN(pin, salt);
+        // Hash the entered PIN
+        const enteredHash = await this.hashPIN(pin, salt);
         
-        // Try to decrypt wallet (this verifies PIN is correct)
-        try {
-            const encryptedWallet = localStorage.getItem('lemma_wallet_encrypted');
-            if (!encryptedWallet) {
-                // No wallet yet, PIN is correct (just set up)
-                this.currentKey = key;
-                this.isLocked = false;
-                this.failedAttempts = 0;
-                this.updateActivity();
-                return [];
-            }
-            
-            const walletData = JSON.parse(encryptedWallet);
-            const iv = this.base64ToArrayBuffer(walletData.iv);
-            const encryptedData = this.base64ToArrayBuffer(walletData.data);
-            
-            // Attempt decryption
-            const decrypted = await crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv: iv },
-                key,
-                encryptedData
-            );
-            
-            // Decryption succeeded = CORRECT PIN ✅
-            const credentials = JSON.parse(new TextDecoder().decode(decrypted));
-            
-            this.currentKey = key;
+        // Compare hashes
+        if (enteredHash === storedHash) {
+            // CORRECT PIN ✅
             this.isLocked = false;
             this.failedAttempts = 0;
             this.updateActivity();
             
-            console.log('✅ Wallet unlocked successfully');
-            return credentials;
+            console.log('✅ PIN verified successfully');
+            return [];  // Don't return credentials (they're in IndexedDB, not localStorage)
             
-        } catch (error) {
-            // Decryption failed = WRONG PIN ❌
+        } else {
+            // WRONG PIN ❌
             this.failedAttempts++;
             
             if (this.failedAttempts >= this.maxAttempts) {
