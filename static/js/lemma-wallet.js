@@ -640,8 +640,13 @@ class LemmaWallet {
         // Don't call init() - wallet should already be initialized
         // await this.init(); // REMOVED: Caused redundant init attempts
         
+        // Extract packageType from claims for filtering
+        const claims = credential.claims || credential.credentialSubject || {};
+        const packageType = claims.packageType || 'identity';  // Default to identity if not specified
+        
         const credentialWithMeta = {
             ...credential,
+            packageType: packageType,  // Add to root level for filtering
             storedAt: Date.now(),
             lastVerified: Date.now(),
             networkShared: true,
