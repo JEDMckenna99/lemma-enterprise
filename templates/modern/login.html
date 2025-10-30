@@ -234,7 +234,16 @@
                     </ol>
                 </div>
 
-                <div style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--gray-200); text-align: center;">
+                <div style="margin-top: var(--space-4); text-align: center;">
+                    <button type="button" onclick="signInWithWalletCredential()" class="lemma-auth-button" style="background: #10b981; margin-bottom: var(--space-2);">
+                        <span>🔐 Sign in with Wallet Credential</span>
+                    </button>
+                    <p style="font-size: var(--font-size-xs); color: var(--gray-500);">
+                        Uses existing credential in your browser (no email needed)
+                    </p>
+                </div>
+
+                <div style="margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--gray-200); text-align: center;">
                     <p style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: var(--space-2);">
                         Already have a credential on another device?
                     </p>
@@ -306,5 +315,60 @@
         
         // Auto-focus email input
         document.getElementById('email').focus();
+
+        /**
+         * Sign in with existing wallet credential (NO EMAIL PROMPT)
+         */
+        async function signInWithWalletCredential() {
+            try {
+                console.log('🔐 Attempting wallet credential sign-in...');
+                
+                // Check if wallet exists
+                if (!window.lemmaWallet) {
+                    alert('No wallet found. Please use email sign-in to get your first credential.');
+                    return;
+                }
+                
+                // Get permission credentials
+                const permissionCreds = await window.lemmaWallet.getCredentials('permission');
+                
+                if (!permissionCreds || permissionCreds.length === 0) {
+                    alert('No permission credentials found in wallet. Please use email sign-in first.');
+                    return;
+                }
+                
+                // Use first permission credential
+                const credential = permissionCreds[0];
+                const claims = credential.claims || credential.credentialSubject || {};
+                
+                console.log('✅ Found credential:', claims);
+                
+                // Sign in with credential
+                const response = await fetch('/api/auth/lemma-signin', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        user_email: claims.email || claims.userEmail || 'unknown@lemma.id',
+                        user_role: claims.permission || 'user',
+                        permission_credentials: [credential],
+                        verification_result: {verified: true, method: 'wallet_local'},
+                        auth_method: 'lemma_wallet'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('✅ Signed in successfully!');
+                    window.location.href = result.redirect || '/dashboard';
+                } else {
+                    alert('Sign-in failed: ' + (result.error || 'Unknown error'));
+                }
+                
+            } catch (error) {
+                console.error('❌ Wallet sign-in error:', error);
+                alert('Sign-in failed. Please use email sign-in.');
+            }
+        }
     </script>
 {% endblock %}
