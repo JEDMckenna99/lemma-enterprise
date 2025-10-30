@@ -2597,12 +2597,14 @@ async function initWalletPINProtection() {
     }
 }
 
+// PIN PROTECTION DISABLED - User request
 // Initialize PIN protection on wallet page load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initWalletPINProtection);
-} else {
-    initWalletPINProtection();
-}
+// if (document.readyState === 'loading') {
+//     document.addEventListener('DOMContentLoaded', initWalletPINProtection);
+// } else {
+//     initWalletPINProtection();
+// }
+console.log('⚠️ PIN protection DISABLED - wallet accessible without PIN');
 
 </script>
 {% endblock %}
