@@ -76,12 +76,14 @@
                         log('❌ Error parsing credentials: ' + e.message);
                     }
                 } else if (encrypted) {
-                    log('✅ Wallet already encrypted');
-                    log('   (PIN should be set up)');
+                    // Credentials exist (encrypted with browser fingerprint)
+                    // But PIN might not be set up yet - PIN is for wallet page access, not encryption
+                    log('✅ Found encrypted credentials in wallet');
+                    log('   Set up a PIN to protect wallet page access');
+                    log('');
                     
-                    setTimeout(() => {
-                        window.location.href = '/wallet';
-                    }, 2000);
+                    setupBtn.style.display = 'block';
+                    setupBtn.textContent = 'Setup PIN Protection';
                 } else {
                     log('ℹ️ No credentials found yet');
                     log('   PIN will be set up when you receive your first credential');
