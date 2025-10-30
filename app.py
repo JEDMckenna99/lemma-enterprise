@@ -17,6 +17,10 @@ def create_app():
     # Configuration
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-for-testing')
     app.config['DEBUG'] = os.environ.get('FLASK_ENV') == 'development'
+    
+    # CRITICAL: Disable template caching (fixes stale HTML on Heroku)
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
     # Configure MIME types for proper asset serving
     import mimetypes
