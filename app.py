@@ -239,6 +239,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Wallet Revocation API: {e}")
 
+    # Credential Auto-Refresh API
+    try:
+        from api.credential_refresh import credential_refresh_bp
+        app.register_blueprint(credential_refresh_bp)
+        logger.info("✅ Credential Auto-Refresh API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Credential Auto-Refresh API: {e}")
+
     # Wallet Transfer Session API
     try:
         from api.wallet_transfer_session import wallet_transfer_bp
