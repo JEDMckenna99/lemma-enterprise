@@ -165,6 +165,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register IAM Email Confirmation: {e}")
 
+    # Beta Access Request (Simplified Login)
+    try:
+        from api.beta_access import beta_access_bp
+        app.register_blueprint(beta_access_bp)
+        logger.info("✅ Beta Access Request registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Beta Access Request: {e}")
+
     # Admin Self-Issue
     try:
         from api.admin_self_issue import admin_self_issue_bp
@@ -375,7 +383,13 @@ def create_app():
     def wallet():
         """Lemma Federated Wallet"""
         logger.info("🌐 Serving wallet")
-        return render_template('modern/wallet.html')
+        # Force disable template caching
+        app.jinja_env.cache = {}
+        return render_template('modern/wallet.html'), 200, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
     
     @app.route('/wallet/reset-pin')
     def wallet_reset_pin():
