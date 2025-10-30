@@ -54,9 +54,10 @@
                     return;
                 }
                 
-                // Check if has credentials
+                // Check if has credentials (check ALL possible storage keys)
                 const unencrypted = localStorage.getItem('lemma_credentials');
-                const encrypted = localStorage.getItem('lemma_wallet_encrypted');
+                const encrypted = localStorage.getItem('lemma_wallet_encrypted') || 
+                                 localStorage.getItem('lemma_credentials_encrypted');
                 
                 log(`Unencrypted credentials: ${unencrypted ? 'FOUND' : 'NONE'}`);
                 log(`Encrypted wallet: ${encrypted ? 'FOUND' : 'NONE'}`);
@@ -110,7 +111,7 @@
                 // Check ALL possible credential storage locations
                 let existingCreds = [];
                 
-                // Try lemma_credentials
+                // Try lemma_credentials (unencrypted legacy)
                 const unencrypted = localStorage.getItem('lemma_credentials');
                 if (unencrypted) {
                     try {
@@ -121,7 +122,18 @@
                     }
                 }
                 
-                // Try encrypted_wallet_data
+                // Try lemma_credentials_encrypted (EncryptedLemmaWallet)
+                if (existingCreds.length === 0) {
+                    const encryptedNew = localStorage.getItem('lemma_credentials_encrypted');
+                    if (encryptedNew) {
+                        log(`✅ Found encrypted credentials in lemma_credentials_encrypted`);
+                        log('   Credentials are already encrypted with browser fingerprint');
+                        // Don't try to decrypt here, just note they exist
+                        existingCreds = ['encrypted']; // Placeholder to indicate creds exist
+                    }
+                }
+                
+                // Try encrypted_wallet_data (legacy)
                 if (existingCreds.length === 0) {
                     const encrypted = localStorage.getItem('encrypted_wallet_data');
                     if (encrypted) {
