@@ -2495,8 +2495,10 @@ async function initWalletPINProtection() {
     console.log('🔐 Initializing MANDATORY PIN protection for wallet...');
     
     try {
-        // Check if user has set up PIN
-        const hasPIN = localStorage.getItem('lemma_wallet_salt');
+        // Check if user has set up PIN (need BOTH salt AND hash)
+        const hasSalt = localStorage.getItem('lemma_wallet_salt');
+        const hasHash = localStorage.getItem('lemma_wallet_pin_hash');
+        const hasPIN = hasSalt && hasHash;
         
         if (hasPIN) {
             // User has PIN - must unlock to access wallet
@@ -2560,7 +2562,11 @@ async function initWalletPINProtection() {
                 return; // Stop wallet initialization
             }
         } else {
-            // NO PIN SET - FORCE SETUP (MANDATORY)
+            // NO PIN SET OR INCOMPLETE - FORCE SETUP (MANDATORY)
+            if (hasSalt && !hasHash) {
+                console.log('⚠️ INCOMPLETE PIN SETUP - Clearing and forcing re-setup');
+                localStorage.removeItem('lemma_wallet_salt');
+            }
             console.log('⚠️ PIN NOT SET - Forcing setup (MANDATORY for security)');
             
             document.querySelector('.wallet-container').innerHTML = `
