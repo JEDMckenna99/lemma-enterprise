@@ -22,27 +22,48 @@ from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 import logging
 import time
+import os
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 permission_verification_bp = Blueprint('permission_verification', __name__)
 
-# In-memory nonce cache (use Redis in production)
+# Redis-based nonce cache (FIXES VULN-002: Multi-dyno nonce sharing)
+try:
+    import redis
+    REDIS_URL = os.getenv('REDISCLOUD_URL') or os.getenv('REDIS_URL')
+    if REDIS_URL:
+        # Handle SSL Redis with cert issues
+        if REDIS_URL.startswith('rediss://'):
+            redis_client = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
+        else:
+            redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+        redis_client.ping()
+        REDIS_AVAILABLE = True
+        logger.info("✅ Nonce cache using Redis (multi-dyno safe)")
+    else:
+        REDIS_AVAILABLE = False
+        logger.warning("⚠️ Redis not available - nonce cache will use in-memory (not multi-dyno safe!)")
+except Exception as e:
+    REDIS_AVAILABLE = False
+    logger.warning(f"⚠️ Redis connection failed: {e} - nonce cache will use in-memory")
+
+# Fallback in-memory cache if Redis not available
 _nonce_cache = {}
 _NONCE_EXPIRY_SECONDS = 300  # 5 minutes
 
 # Global verifier with OPRF + Bloom filter (singleton)
 _global_verifier = None
-_verifier_last_sync = 0
-_SYNC_INTERVAL_SECONDS = 60  # Sync revocations every 60 seconds
 
 def get_global_verifier():
     """
     Get or create global OptimizedVerifier instance
-    Automatically syncs revocations from database to Bloom filter
+    
+    NOTE: Bloom filter sync is now EVENT-DRIVEN (not periodic)
+    Revocations are synced immediately when credentials are revoked via Redis pub/sub
     """
-    global _global_verifier, _verifier_last_sync
+    global _global_verifier
     
     from lemma_crypto import PyOptimizedVerifier
     
@@ -50,23 +71,31 @@ def get_global_verifier():
     if _global_verifier is None:
         logger.info("🔐 Initializing global OptimizedVerifier with OPRF + Bloom filter...")
         _global_verifier = PyOptimizedVerifier.new()
-        _verifier_last_sync = 0  # Force initial sync
-    
-    # Sync revocations from database to Bloom filter
-    now = time.time()
-    if now - _verifier_last_sync > _SYNC_INTERVAL_SECONDS:
+        
+        # Do INITIAL sync of existing revocations
         try:
             sync_revocations_to_bloom()
-            _verifier_last_sync = now
+            logger.info("✅ Initial bloom filter sync complete")
         except Exception as e:
-            logger.warning(f"⚠️ Failed to sync revocations to Bloom filter: {e}")
+            logger.warning(f"⚠️ Initial bloom filter sync failed: {e}")
+        
+        # Start event-driven revocation listener
+        try:
+            from api.revocation_sync import get_event_bus
+            event_bus = get_event_bus()
+            if event_bus.subscribed:
+                logger.info("✅ Event-driven revocation sync active (Redis pub/sub)")
+            else:
+                logger.warning("⚠️ Event-driven revocation sync not available - using local-only mode")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not start revocation event bus: {e}")
     
     return _global_verifier
 
 def sync_revocations_to_bloom():
     """
-    Sync all revoked credentials from database to Bloom filter
-    This enables privacy-preserving, offline-capable revocation checks
+    Sync ALL revoked credentials from database to Bloom filter
+    This is called on startup to populate the bloom filter
     """
     global _global_verifier
     
@@ -102,11 +131,70 @@ def sync_revocations_to_bloom():
     except Exception as e:
         logger.error(f"❌ Revocation sync failed: {e}")
 
+
+def sync_single_revocation(credential_id: str) -> bool:
+    """
+    Add a SINGLE revoked credential to Bloom filter immediately
+    
+    This is called by the event-driven revocation system when a 
+    revocation event is received via Redis pub/sub.
+    
+    FIXES VULN-001: Immediate bloom filter update (no 60-second delay)
+    
+    Args:
+        credential_id: ID of credential to revoke
+        
+    Returns:
+        True if successfully added to bloom filter
+    """
+    global _global_verifier
+    
+    if _global_verifier is None:
+        logger.warning("⚠️ Verifier not initialized - cannot sync revocation")
+        return False
+    
+    try:
+        _global_verifier.revoke_credential(credential_id)
+        logger.info(f"✅ Added {credential_id} to bloom filter (immediate sync)")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to add {credential_id} to bloom filter: {e}")
+        return False
+
 def is_nonce_fresh(nonce: str) -> bool:
     """
-    Check if nonce has been used before
-    Also clean up expired nonces
+    Check if nonce has been used before (MULTI-DYNO SAFE)
+    
+    FIXES VULN-002: Uses Redis for shared nonce cache across all dynos
+    
+    Args:
+        nonce: Nonce string to check
+        
+    Returns:
+        True if nonce is fresh (not used), False if already used
     """
+    if REDIS_AVAILABLE:
+        # REDIS-BASED (multi-dyno safe)
+        try:
+            nonce_key = f"lemma:nonce:{nonce}"
+            
+            # Atomic check-and-set with SET NX (set if not exists)
+            # Returns True if key was set (nonce is fresh)
+            # Returns False if key already exists (nonce was used)
+            was_set = redis_client.set(nonce_key, '1', nx=True, ex=_NONCE_EXPIRY_SECONDS)
+            
+            if not was_set:
+                logger.warning(f"⚠️ Nonce reuse detected (possible replay attack): {nonce[:16]}...")
+                logger.warning(f"   Multi-dyno replay protection working (Redis)")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Redis nonce check failed: {e} - falling back to in-memory")
+            # Fall through to in-memory cache
+    
+    # IN-MEMORY FALLBACK (not multi-dyno safe!)
     global _nonce_cache
     
     # Clean up expired nonces
@@ -118,6 +206,7 @@ def is_nonce_fresh(nonce: str) -> bool:
     # Check if nonce is fresh
     if nonce in _nonce_cache:
         logger.warning(f"⚠️ Nonce reuse detected (possible replay attack): {nonce[:16]}...")
+        logger.warning(f"   WARNING: In-memory cache not multi-dyno safe!")
         return False
     
     # Mark nonce as used

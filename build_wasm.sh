@@ -28,3 +28,4 @@ echo "   import init, { verify_signature_bytes } from '/static/wasm/lemma_crypto
 echo "   await init();"
 echo "   const isValid = verify_signature_bytes(publicKey, message, signature);"
 
+

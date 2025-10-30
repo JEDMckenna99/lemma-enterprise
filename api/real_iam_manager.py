@@ -66,6 +66,8 @@ class RealIAMSubnetManager:
         """
         Add permission definition to site registry
         
+        FIXES VULN-003: Persists to database so it survives dyno restarts
+        
         Args:
             permission_info: {
                 'permission_id': 'admin',
@@ -76,9 +78,60 @@ class RealIAMSubnetManager:
             }
         """
         permission_id = permission_info['permission_id']
+        
+        # Add to in-memory cache
         self.permissions[permission_id] = permission_info
-        logger.info(f"✅ Added permission '{permission_id}' to site {self.site_id}")
+        
+        # Persist to database (survives dyno restarts)
+        try:
+            self._persist_permission_to_db(permission_info)
+            logger.info(f"✅ Added permission '{permission_id}' to site {self.site_id} (persisted to DB)")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to persist permission to database: {e}")
+            logger.warning(f"   Permission will be lost on dyno restart!")
+        
         return True
+    
+    def _persist_permission_to_db(self, permission_info: Dict):
+        """Persist permission definition to database"""
+        try:
+            from api.database import get_db_session, Permission
+            
+            session = get_db_session()
+            try:
+                # Check if permission already exists
+                existing = session.query(Permission).filter_by(
+                    site_id=self.site_id,
+                    permission_id=permission_info['permission_id']
+                ).first()
+                
+                if existing:
+                    # Update existing permission
+                    existing.display_name = permission_info.get('display_name', '')
+                    existing.scope = permission_info.get('scope', [])
+                    existing.conditions = permission_info.get('conditions', [])
+                    existing.priority = permission_info.get('priority', 100)
+                    logger.debug(f"Updated existing permission in database: {permission_info['permission_id']}")
+                else:
+                    # Create new permission
+                    perm = Permission(
+                        site_id=self.site_id,
+                        permission_id=permission_info['permission_id'],
+                        display_name=permission_info.get('display_name', ''),
+                        scope=permission_info.get('scope', []),
+                        conditions=permission_info.get('conditions', []),
+                        priority=permission_info.get('priority', 100)
+                    )
+                    session.add(perm)
+                    logger.debug(f"Created new permission in database: {permission_info['permission_id']}")
+                
+                session.commit()
+            finally:
+                session.close()
+                
+        except Exception as e:
+            logger.error(f"Database persistence failed: {e}")
+            raise
     
     def issue_permission_lemma(
         self, 
@@ -316,29 +369,93 @@ class RealIAMSubnetManager:
 _site_managers: Dict[str, RealIAMSubnetManager] = {}
 
 
+def _load_permissions_from_db(site_id: str) -> Dict[str, Dict]:
+    """
+    Load permission definitions from database
+    
+    FIXES VULN-003: Reload permissions after dyno restart
+    
+    Args:
+        site_id: Site identifier
+        
+    Returns:
+        Dictionary of {permission_id: permission_info}
+    """
+    try:
+        from api.database import get_db_session, Permission
+        
+        session = get_db_session()
+        try:
+            permissions = session.query(Permission).filter_by(site_id=site_id).all()
+            
+            permission_dict = {}
+            for perm in permissions:
+                permission_dict[perm.permission_id] = {
+                    'permission_id': perm.permission_id,
+                    'display_name': perm.display_name,
+                    'scope': perm.scope,
+                    'conditions': perm.conditions or [],
+                    'priority': perm.priority or 100
+                }
+            
+            logger.info(f"✅ Loaded {len(permission_dict)} permissions from database for site {site_id}")
+            return permission_dict
+            
+        finally:
+            session.close()
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to load permissions from database for {site_id}: {e}")
+        return {}
+
+
 def get_or_create_site_manager(site_id: str, site_domain: str) -> RealIAMSubnetManager:
     """
     Get or create IAM manager for site
+    
+    FIXES VULN-003: Reloads permissions from database on creation (survives dyno restarts)
     Handles multi-dyno Heroku environment by recreating manager on demand
     """
     if site_id not in _site_managers:
-        _site_managers[site_id] = RealIAMSubnetManager(site_id, site_domain)
-        logger.info(f"✅ Created new site manager for {site_id} (multi-dyno safe)")
+        # Create manager
+        manager = RealIAMSubnetManager(site_id, site_domain)
+        
+        # CRITICAL: Reload permissions from database (survives dyno restarts)
+        permissions = _load_permissions_from_db(site_id)
+        for perm_id, perm_info in permissions.items():
+            # Add to in-memory cache (don't persist again - already in DB)
+            manager.permissions[perm_id] = perm_info
+        
+        _site_managers[site_id] = manager
+        logger.info(f"✅ Created site manager for {site_id} with {len(permissions)} permissions (multi-dyno safe)")
+    
     return _site_managers[site_id]
 
 
 def get_site_manager(site_id: str, site_domain: str = None) -> Optional[RealIAMSubnetManager]:
     """
     Get existing site manager, or create if not in memory (multi-dyno safe)
+    
+    FIXES VULN-003: Reloads permissions from database if manager recreated
     This handles Heroku's multi-dyno environment where in-memory state doesn't persist
     """
     if site_id not in _site_managers:
         if site_domain:
-            # Recreate manager from persistent issuer (multi-dyno safe)
+            # Recreate manager from persistent storage (multi-dyno safe)
             logger.info(f"🔄 Recreating site manager for {site_id} (multi-dyno)")
-            _site_managers[site_id] = RealIAMSubnetManager(site_id, site_domain)
+            
+            manager = RealIAMSubnetManager(site_id, site_domain)
+            
+            # CRITICAL: Reload permissions from database
+            permissions = _load_permissions_from_db(site_id)
+            for perm_id, perm_info in permissions.items():
+                manager.permissions[perm_id] = perm_info
+            
+            _site_managers[site_id] = manager
+            logger.info(f"✅ Recreated site manager with {len(permissions)} permissions from DB")
         else:
             # Try to get site_domain from somewhere (database, etc.)
             logger.warning(f"⚠️ Site manager not in memory and no domain provided for {site_id}")
             return None
+    
     return _site_managers[site_id]

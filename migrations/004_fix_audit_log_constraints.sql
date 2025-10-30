@@ -70,3 +70,4 @@ COMMENT ON POLICY iam_audit_log_isolation ON iam_audit_log IS
 
 -- Migration complete
 
+

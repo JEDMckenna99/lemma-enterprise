@@ -51,13 +51,17 @@ def revoke_credential():
         if credential_type == 'poh':
             network_success = await_network_revocation(credential_id, reason)
             
-            # Trigger immediate Bloom filter sync (instead of waiting 60 seconds)
+            # Trigger IMMEDIATE bloom filter sync via event bus (FIXES VULN-001)
             try:
-                from api.permission_verification import sync_revocations_to_bloom
-                sync_revocations_to_bloom()
-                logger.info(f"✅ Immediate Bloom filter sync triggered for {credential_id}")
+                from api.revocation_sync import trigger_revocation_sync
+                event_published = trigger_revocation_sync(credential_id, 'poh')
+                
+                if event_published:
+                    logger.info(f"✅ Revocation event published - ALL dynos will sync immediately")
+                else:
+                    logger.warning(f"⚠️ Event bus not available - local sync only")
             except Exception as e:
-                logger.warning(f"⚠️ Bloom filter sync failed (will retry on next interval): {e}")
+                logger.error(f"❌ Event-driven revocation sync failed: {e}")
             
             return jsonify({
                 'success': True,
@@ -67,20 +71,25 @@ def revoke_credential():
                 'message': 'PoH lemma revoked - network-wide revocation initiated',
                 'scope': 'All sites in federated network will be updated',
                 'wallet_deleted': True,
-                'bloom_filter_synced': True
+                'bloom_filter_synced': True,
+                'sync_method': 'event_driven_redis_pubsub'
             })
         
         # For permission lemmas: Site-specific revocation
         elif credential_type == 'permission':
             site_success = await_site_revocation(credential_id, reason, site_domain)
             
-            # Trigger immediate Bloom filter sync (instead of waiting 60 seconds)
+            # Trigger IMMEDIATE bloom filter sync via event bus (FIXES VULN-001)
             try:
-                from api.permission_verification import sync_revocations_to_bloom
-                sync_revocations_to_bloom()
-                logger.info(f"✅ Immediate Bloom filter sync triggered for {credential_id}")
+                from api.revocation_sync import trigger_revocation_sync
+                event_published = trigger_revocation_sync(credential_id, 'permission')
+                
+                if event_published:
+                    logger.info(f"✅ Revocation event published - ALL dynos will sync immediately")
+                else:
+                    logger.warning(f"⚠️ Event bus not available - local sync only")
             except Exception as e:
-                logger.warning(f"⚠️ Bloom filter sync failed (will retry on next interval): {e}")
+                logger.error(f"❌ Event-driven revocation sync failed: {e}")
             
             return jsonify({
                 'success': True,
@@ -92,7 +101,8 @@ def revoke_credential():
                 'scope': 'Only this site\'s permissions affected',
                 'wallet_deleted': True,
                 'registry_updated': site_success,
-                'bloom_filter_synced': True
+                'bloom_filter_synced': True,
+                'sync_method': 'event_driven_redis_pubsub'
             })
         
         # Unknown type: Local revocation only
