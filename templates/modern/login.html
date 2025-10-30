@@ -1,15 +1,14 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Sign In - Lemma Shield{% endblock %}
-{% block description %}Business customer login to manage API keys, billing, and integration analytics.{% endblock %}
+{% block title %}Sign In - Lemma Platform | FREE Beta{% endblock %}
+{% block description %}Access the Lemma developer platform with email-based authentication. No passwords, just secure cryptographic credentials.{% endblock %}
 
 {% block head %}
     {{ super() }}
-    <!-- Load the Consolidated Lemma Wallet -->
     <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=991"></script>
     <style>
         .login-container {
-            max-width: 580px;
+            max-width: 520px;
             margin: var(--space-12) auto;
             padding: 0 var(--space-6);
         }
@@ -21,10 +20,7 @@
             padding: var(--space-12);
             box-shadow: 
                 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-                0 2px 4px -1px rgba(0, 0, 0, 0.06),
-                0 0 0 1px rgba(255, 255, 255, 0.05);
-            position: relative;
-            overflow: hidden;
+                0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
         .login-card::before {
@@ -34,26 +30,25 @@
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899);
+            background: linear-gradient(90deg, #10b981, #059669);
         }
 
         .login-header {
             text-align: center;
             margin-bottom: var(--space-10);
-            position: relative;
         }
 
         .login-icon {
             width: 64px;
             height: 64px;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            background: linear-gradient(135deg, #10b981, #059669);
             border-radius: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto var(--space-4);
             font-size: 28px;
-            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
         }
 
         .login-title {
@@ -61,45 +56,27 @@
             font-weight: 800;
             color: var(--gray-900);
             margin-bottom: var(--space-3);
-            background: linear-gradient(135deg, #1f2937, #4b5563);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
         }
 
         .login-subtitle {
             color: var(--gray-600);
             font-size: var(--font-size-lg);
             line-height: 1.6;
-            max-width: 400px;
-            margin: 0 auto;
         }
 
-        .form-section {
-            background: var(--gray-50);
-            border-radius: 16px;
-            padding: var(--space-6);
-            margin-bottom: var(--space-6);
-            border: 1px solid var(--gray-100);
-        }
-
-        .section-title {
-            font-size: var(--font-size-lg);
+        .beta-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: var(--space-2) var(--space-4);
+            border-radius: 50px;
+            font-size: var(--font-size-sm);
             font-weight: 700;
-            color: var(--gray-800);
             margin-bottom: var(--space-4);
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-        }
-
-        .section-icon {
-            font-size: 20px;
         }
 
         .form-group {
-            margin-bottom: var(--space-5);
-            position: relative;
+            margin-bottom: var(--space-6);
         }
 
         .form-label {
@@ -108,195 +85,84 @@
             color: var(--gray-700);
             margin-bottom: var(--space-2);
             font-size: var(--font-size-base);
-            display: flex;
-            align-items: center;
-            gap: var(--space-1);
-        }
-
-        .required-indicator {
-            color: #ef4444;
-            font-weight: 700;
         }
 
         .form-input {
             width: 100%;
-            padding: var(--space-4) var(--space-4) var(--space-4) var(--space-12);
+            padding: var(--space-4);
             border: 2px solid var(--gray-200);
             border-radius: 12px;
-            font-size: var(--font-size-base);
+            font-size: var(--font-size-lg);
             transition: all 0.3s ease;
             background: var(--white);
-            position: relative;
-        }
-
-        .input-icon {
-            position: absolute;
-            left: var(--space-4);
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--gray-400);
-            font-size: 18px;
-            z-index: 1;
-            pointer-events: none;
         }
 
         .form-input:focus {
             outline: none;
-            border-color: var(--primary-500);
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
-            background: var(--white);
-        }
-
-        .form-input:focus + .input-icon {
-            color: var(--primary-500);
-        }
-
-        .form-input.error {
-            border-color: var(--error);
-            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
-        }
-
-        .form-input.success {
             border-color: #10b981;
             box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
         }
 
-        .form-help {
-            font-size: var(--font-size-sm);
-            color: var(--gray-500);
-            margin-top: var(--space-2);
-            padding-left: var(--space-1);
-            display: flex;
-            align-items: center;
-            gap: var(--space-1);
-        }
-
-        .help-icon {
-            font-size: 14px;
-            color: var(--gray-400);
-        }
-
-        .error-message {
-            color: var(--error);
-            font-size: var(--font-size-sm);
-            margin-top: var(--space-2);
-            padding: var(--space-2) var(--space-3);
-            background: rgba(239, 68, 68, 0.1);
-            border-radius: 8px;
-            border-left: 3px solid var(--error);
-            display: none;
-            font-weight: 500;
-        }
-
-        .login-button {
+        .lemma-auth-button {
             width: 100%;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            color: var(--white);
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
             border: none;
-            padding: var(--space-5);
             border-radius: 16px;
+            padding: var(--space-5);
             font-size: var(--font-size-lg);
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin-top: var(--space-6);
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
         }
 
-        .login-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s ease;
-        }
-
-        .login-button:hover::before {
-            left: 100%;
-        }
-
-        .login-button:hover:not(:disabled) {
+        .lemma-auth-button:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 16px 40px rgba(99, 102, 241, 0.4);
-            background: linear-gradient(135deg, #5b5bf6, #7c3aed);
+            box-shadow: 0 16px 40px rgba(16, 185, 129, 0.4);
+            background: linear-gradient(135deg, #059669, #047857);
         }
 
-        .login-button:active:not(:disabled) {
-            transform: translateY(0);
-            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
-        }
-
-        .lemma-auth-button {
-            width: 100%;
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            border: none;
-            border-radius: 16px;
-            padding: 16px 24px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 
-                0 4px 15px rgba(40, 167, 69, 0.2),
-                0 2px 8px rgba(0, 0, 0, 0.1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .lemma-auth-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 
-                0 8px 25px rgba(40, 167, 69, 0.25),
-                0 4px 12px rgba(0, 0, 0, 0.15);
-            background: linear-gradient(135deg, #218838 0%, #1ea085 100%);
-        }
-
-        .lemma-auth-button:active {
-            transform: translateY(0);
-            box-shadow: 
-                0 4px 15px rgba(40, 167, 69, 0.2);
-        }
-
-        .login-button:disabled {
+        .lemma-auth-button:disabled {
             opacity: 0.7;
             cursor: not-allowed;
-            transform: none;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
         }
 
-        .button-content {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: var(--space-2);
-        }
-
-        .button-icon {
-            font-size: 20px;
-        }
-
-        .register-link {
-            text-align: center;
+        .info-box {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            padding: var(--space-4);
             margin-top: var(--space-6);
-            padding-top: var(--space-6);
-            border-top: 1px solid var(--gray-200);
+            font-size: var(--font-size-sm);
+            color: var(--gray-600);
         }
 
-        .register-link a {
-            color: var(--primary-600);
-            text-decoration: none;
-            font-weight: 600;
+        .success-message {
+            background: #ecfdf5;
+            border: 2px solid #10b981;
+            border-radius: 12px;
+            padding: var(--space-6);
+            margin-top: var(--space-6);
+            display: none;
         }
 
-        .register-link a:hover {
-            color: var(--primary-700);
-            text-decoration: underline;
+        .success-message.show {
+            display: block;
+        }
+
+        .error-message {
+            background: #fef2f2;
+            border: 2px solid #ef4444;
+            border-radius: 12px;
+            padding: var(--space-4);
+            margin-top: var(--space-4);
+            color: #991b1b;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
         }
 
         .loading-spinner {
@@ -313,20 +179,6 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-
-        .login-note {
-            background: var(--primary-50);
-            border: 1px solid var(--primary-200);
-            border-radius: 12px;
-            padding: var(--space-4);
-            margin-bottom: var(--space-6);
-            color: var(--primary-800);
-            font-size: var(--font-size-sm);
-        }
-
-        .login-note strong {
-            color: var(--primary-900);
-        }
     </style>
 {% endblock %}
 
@@ -334,82 +186,63 @@
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
+                <div class="beta-badge">FREE Beta Access</div>
                 <div class="login-icon">🔐</div>
-                <h1 class="login-title">Welcome Back</h1>
+                <h1 class="login-title">Sign In with Lemma</h1>
                 <p class="login-subtitle">
-                    Sign in to manage your Lemma integration, API keys, and analytics
+                    Email-based authentication powered by Lemma IAM. No passwords needed.
                 </p>
             </div>
 
             <form id="loginForm">
-                <div class="form-section">
-                    <div class="section-title">
-                        <span class="section-icon">👤</span>
-                        Account Access
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label" for="email">
-                            Email Address <span class="required-indicator">*</span>
-                        </label>
-                        <div class="input-icon">📧</div>
-                        <input type="email" id="email" name="email" class="form-input" required 
-                               placeholder="you@company.com">
-                        <div class="form-help">
-                            <span class="help-icon">💡</span>
-                            Enter your registered business email address
-                        </div>
-                        <div class="error-message" id="emailError"></div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label" for="password">
-                            Password <span class="required-indicator">*</span>
-                        </label>
-                        <div class="input-icon">🔒</div>
-                        <input type="password" id="password" name="password" class="form-input" required 
-                               placeholder="Enter your password">
-                        <div class="form-help">
-                            <span class="help-icon">💡</span>
-                            Enter your account password
-                        </div>
-                        <div class="error-message" id="passwordError"></div>
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" for="email">
+                        Email Address
+                    </label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        class="form-input" 
+                        required 
+                        placeholder="your@email.com"
+                        autocomplete="email">
                 </div>
 
-                <button type="submit" class="login-button" id="loginButton">
-                    <div class="button-content">
-                        <span class="button-icon">🚀</span>
-                        Sign In to Dashboard
-                    </div>
+                <button type="submit" class="lemma-auth-button" id="submitBtn">
+                    <span id="buttonText">Sign in with Lemma</span>
                 </button>
+
+                <div class="error-message" id="errorMessage"></div>
+                <div class="success-message" id="successMessage">
+                    <h3 style="color: #047857; margin-bottom: var(--space-2);">Check your email!</h3>
+                    <p style="color: #065f46; margin-bottom: var(--space-3);">
+                        We've sent a sign-in link to <strong id="emailDisplay"></strong>
+                    </p>
+                    <p style="color: #065f46; font-size: var(--font-size-sm);">
+                        Click the link in your email to receive your beta-user credential and access the platform.
+                    </p>
+                </div>
+
+                <div class="info-box">
+                    <strong>How it works:</strong>
+                    <ol style="margin: var(--space-2) 0 0 var(--space-4); padding: 0;">
+                        <li>Enter your email address</li>
+                        <li>We'll send you a secure sign-in link</li>
+                        <li>Click the link to receive your permission credential</li>
+                        <li>Access granted - no password needed!</li>
+                    </ol>
+                </div>
+
+                <div style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--gray-200); text-align: center;">
+                    <p style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: var(--space-2);">
+                        Already have a credential on another device?
+                    </p>
+                    <a href="/wallet" style="color: #10b981; text-decoration: none; font-weight: 600; font-size: var(--font-size-sm);">
+                        Transfer credential from another device →
+                    </a>
+                </div>
             </form>
-
-            <!-- Sign in with Lemma Option -->
-            <div style="margin: 24px 0; text-align: center;">
-                <div style="position: relative;">
-                    <div style="position: absolute; inset: 0; display: flex; align-items: center;">
-                        <div style="width: 100%; border-top: 1px solid var(--gray-200);"></div>
-                    </div>
-                    <div style="position: relative; display: flex; justify-content: center;">
-                        <span style="background: var(--white); padding: 0 16px; color: var(--gray-500); font-size: 0.9rem;">or</span>
-                    </div>
-                </div>
-            </div>
-
-            <button type="button" class="lemma-auth-button" id="lemmaAuthButton" onclick="signInWithLemma()">
-                <div class="button-content">
-                    <span class="button-icon">🔐</span>
-                    Sign in with Lemma Wallet
-                </div>
-                <div style="font-size: 0.8rem; opacity: 0.8; margin-top: 4px;">
-                    Use your Lemma credentials (0.36µs verification)
-                </div>
-            </button>
-
-            <div class="register-link">
-                Don't have an account? <a href="/register">Create one here</a>
-            </div>
         </div>
     </div>
 
@@ -417,317 +250,59 @@
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const button = document.getElementById('loginButton');
-            const originalText = button.innerHTML;
+            const button = document.getElementById('submitBtn');
+            const buttonText = document.getElementById('buttonText');
+            const email = document.getElementById('email').value;
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
             
-            // Clear previous errors
-            clearErrors();
+            // Clear previous messages
+            errorMessage.classList.remove('show');
+            successMessage.classList.remove('show');
             
             // Show loading state
             button.disabled = true;
-            button.innerHTML = `
-                <div class="button-content">
-                    <span class="loading-spinner"></span>
-                    Signing in...
-                </div>
+            buttonText.innerHTML = `
+                <span class="loading-spinner"></span>
+                Sending sign-in link...
             `;
             
             try {
-                const formData = new FormData(this);
-                const data = Object.fromEntries(formData.entries());
-                
-                const response = await fetch('/login', {
+                const response = await fetch('/api/auth/request-beta-access', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify({ email: email })
                 });
                 
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Success state
-                    button.innerHTML = `
-                        <div class="button-content">
-                            <span class="button-icon">✅</span>
-                            Welcome back!
-                        </div>
-                    `;
+                    // Show success message
+                    document.getElementById('emailDisplay').textContent = email;
+                    successMessage.classList.add('show');
+                    buttonText.textContent = 'Email sent!';
                     
-                    // NEW: Store permission lemma in browser wallet (same wallet as PoH lemma)
-                    if (result.permission_lemma) {
-                        try {
-                            // Initialize background wallet if not already done
-                            if (!window.lemmaWallet) {
-                                window.lemmaWallet = new LemmaIntegratedWallet({
-                                    debug: true,
-                                    networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-                                    networkAuthKey: 'lemma_network_federated_sync_2024',
-                                    enableAdvancedFeatures: true,
-                                    enableRecovery: true,
-                                    vaultUrl: '/vault',
-                                    enableSybilPrevention: true
-                                });
-                                await window.lemmaWallet.init();
-                            }
-                            
-                            // Store permission lemma in the same wallet as PoH lemmas
-                            const storeResult = await window.lemmaWallet.storeCredential(result.permission_lemma);
-                            
-                            if (storeResult.success) {
-                                console.log('✅ Permission lemma stored in browser wallet:', result.permission_lemma.claims.permissionId);
-                            } else {
-                                console.warn('⚠️ Failed to store permission lemma in wallet:', storeResult.error);
-                            }
-                            
-                        } catch (error) {
-                            console.warn('⚠️ Wallet integration error:', error);
-                        }
-                    }
+                    // Reset form but keep button disabled
+                    document.getElementById('email').value = '';
                     
-                    // Redirect to dashboard
-                    setTimeout(() => {
-                        const redirectUrl = result.redirect_url === '/wallet' 
-                            ? '/wallet'     // Use wallet page (what's actually built)
-                            : result.redirect_url === '/admin'
-                            ? '/admin'      // Use relative URL
-                            : result.redirect_url || '/wallet';
-                        window.location.href = redirectUrl;
-                    }, 1500);  // Slightly longer to allow wallet storage
                 } else {
                     // Show error
-                    showError('email', result.error || 'Login failed');
+                    errorMessage.textContent = result.error || 'Failed to send sign-in link. Please try again.';
+                    errorMessage.classList.add('show');
                     button.disabled = false;
-                    button.innerHTML = originalText;
+                    buttonText.textContent = 'Sign in with Lemma';
                 }
                 
             } catch (error) {
-                console.error('Login error:', error);
-                showError('email', 'Network error. Please try again.');
+                console.error('Request error:', error);
+                errorMessage.textContent = 'Network error. Please check your connection and try again.';
+                errorMessage.classList.add('show');
                 button.disabled = false;
-                button.innerHTML = originalText;
+                buttonText.textContent = 'Sign in with Lemma';
             }
         });
-        
-        function clearErrors() {
-            const errorElements = document.querySelectorAll('.error-message');
-            errorElements.forEach(el => {
-                el.style.display = 'none';
-                el.textContent = '';
-            });
-            
-            const inputs = document.querySelectorAll('.form-input');
-            inputs.forEach(input => input.classList.remove('error'));
-        }
-        
-        function showError(field, message) {
-            const errorElement = document.getElementById(field + 'Error');
-            if (errorElement) {
-                errorElement.textContent = message;
-                errorElement.style.display = 'block';
-                
-                const input = document.getElementById(field);
-                if (input) {
-                    input.classList.add('error');
-                }
-            }
-        }
-        
-        // Sign in with Lemma wallet authentication
-        async function signInWithLemma() {
-            const button = document.getElementById('lemmaAuthButton');
-            const originalText = button.innerHTML;
-            
-            try {
-                // Clear previous errors
-                clearErrors();
-                
-                // Show loading state
-                button.disabled = true;
-                button.innerHTML = `
-                    <div class="button-content">
-                        <span class="button-icon">🔄</span>
-                        Checking Lemma Wallet...
-                    </div>
-                `;
-                
-                // Initialize wallet if not already done
-                if (!window.lemmaWallet) {
-                    window.lemmaWallet = new LemmaIntegratedWallet({
-                        debug: true,
-                        networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-                        networkAuthKey: 'lemma_network_federated_sync_2024',
-                        enableAdvancedFeatures: true,
-                        enableRecovery: true,
-                        vaultUrl: '/vault',
-                        enableSybilPrevention: true
-                    });
-                    await window.lemmaWallet.init();
-                }
-                
-                // Check for permission credentials (IAM-only authentication)
-                const permissionCredentials = await window.lemmaWallet.getCredentials('permission');
-                
-                console.log('🔍 Checking permission credentials:', permissionCredentials.map(c => ({
-                    id: c.id,
-                    siteId: c.claims?.siteId,
-                    siteDomain: c.claims?.siteDomain,
-                    site_domain: c.claims?.site_domain,
-                    permissionId: c.claims?.permissionId,
-                    allClaims: c.claims
-                })));
-                
-                // Filter for lemma.id permission lemmas (PRIMARY: siteDomain, FALLBACK: siteId)
-                const lemmaIdPermissions = permissionCredentials.filter(cred => {
-                    const claims = cred.claims || cred.credentialSubject || {};
-                    
-                    // Check all possible field names for site domain
-                    const siteDomain = claims.siteDomain || claims.site_domain;
-                    const siteId = claims.siteId || claims.site_id;
-                    
-                    console.log(`  Checking credential ${cred.id}:`, {
-                        siteDomain,
-                        siteId,
-                        matches: siteDomain === 'lemma.id' || siteId === 'lemma.id'
-                    });
-                    
-                    return siteDomain === 'lemma.id' || 
-                           siteId === 'lemma.id';
-                });
-                
-                console.log('✅ Found lemma.id permissions:', lemmaIdPermissions.length);
-                
-                if (lemmaIdPermissions.length === 0) {
-                    console.error('❌ No lemma.id permissions found!');
-                    console.error('Available credentials:', permissionCredentials);
-                    showError('email', 'No permission lemma found for lemma.id. Please use admin bootstrap or contact support.');
-                    button.disabled = false;
-                    button.innerHTML = originalText;
-                    return;
-                }
-                
-                // Check for identity credentials (optional, for Fed Network later)
-                const identityCredentials = await window.lemmaWallet.getCredentials('identity');
-                
-                button.innerHTML = `
-                    <div class="button-content">
-                        <span class="button-icon">🔐</span>
-                        Verifying Credentials...
-                    </div>
-                `;
-                
-                // Extract user information from credentials
-                let userEmail = null;
-                let userRole = 'customer';
-                
-                // Extract from lemma.id permission credentials (already filtered)
-                for (const cred of lemmaIdPermissions) {
-                    const claims = cred.claims || cred.credentialSubject || {};
-                    if (claims.email) {
-                        userEmail = claims.email;
-                        userRole = claims.accountType || claims.permissionId?.replace('_access', '') || 'customer';
-                        
-                        console.log('📧 Extracted user info from permission lemma:', {
-                            email: userEmail,
-                            role: userRole,
-                            permissionId: claims.permissionId
-                        });
-                        break;
-                    }
-                }
-                
-                // Fallback: try to extract from identity credentials
-                if (!userEmail && identityCredentials.length > 0) {
-                    for (const cred of identityCredentials) {
-                        const claims = cred.claims || cred.credentialSubject || {};
-                        if (claims.email) {
-                            userEmail = claims.email;
-                            console.log('📧 Extracted email from identity credential:', userEmail);
-                            break;
-                        }
-                    }
-                }
-                
-                if (!userEmail) {
-                    console.error('❌ Could not find email in any credentials!');
-                    console.error('Permission credentials:', lemmaIdPermissions);
-                    console.error('Identity credentials:', identityCredentials);
-                    showError('email', 'Could not determine user email from Lemma credentials.');
-                    button.disabled = false;
-                    button.innerHTML = originalText;
-                    return;
-                }
-                
-                // For IAM permission lemmas: Trust wallet storage (signature already verified on issue)
-                // The credential being in the encrypted wallet IS the verification
-                button.innerHTML = `
-                    <div class="button-content">
-                        <span class="button-icon">✅</span>
-                        Permission verified (${lemmaIdPermissions.length} lemma${lemmaIdPermissions.length !== 1 ? 's' : ''})
-                    </div>
-                `;
-                
-                // Create verification result (permission lemmas are pre-verified)
-                const verifyResult = {
-                    verified: true,
-                    confidence: 1.0,
-                    verification_time_us: 0,  // No server call needed
-                    method: 'wallet_storage',
-                    reason: 'Permission lemma found in encrypted wallet'
-                };
-                
-                // Success! Authenticate with the platform using verified credentials
-                button.innerHTML = `
-                    <div class="button-content">
-                        <span class="button-icon">✅</span>
-                        Credentials Verified! Signing in...
-                    </div>
-                `;
-                
-                // Create authenticated session using Lemma credentials
-                const authResponse = await fetch('/api/auth/lemma-signin', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        user_email: userEmail,
-                        user_role: userRole,
-                        identity_credentials: identityCredentials,
-                        permission_credentials: permissionCredentials,
-                        verification_result: verifyResult,
-                        auth_method: 'lemma_wallet'
-                    })
-                });
-                
-                const authResult = await authResponse.json();
-                
-                if (authResult.success) {
-                    button.innerHTML = `
-                        <div class="button-content">
-                            <span class="button-icon">🎉</span>
-                            Welcome back, ${userEmail}!
-                        </div>
-                    `;
-                    
-                    // Redirect to dashboard
-                    setTimeout(() => {
-                        window.location.href = authResult.redirect_url || '/dashboard';
-                    }, 1500);
-                } else {
-                    showError('email', authResult.error || 'Lemma authentication failed');
-                    button.disabled = false;
-                    button.innerHTML = originalText;
-                }
-                
-            } catch (error) {
-                console.error('Sign in with Lemma error:', error);
-                showError('email', 'Lemma authentication failed. Please try again or use email/password.');
-                button.disabled = false;
-                button.innerHTML = originalText;
-            }
-        }
         
         // Auto-focus email input
         document.getElementById('email').focus();
