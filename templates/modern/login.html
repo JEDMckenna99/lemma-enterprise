@@ -258,10 +258,11 @@
                 const permissions = await wallet.getCredentials('permission');
                 console.log('🔍 Found', permissions.length, 'permission credential(s)');
                 
-                // Filter for lemma.id permissions
+                // Filter for lemma.id permissions (accept lemma.id OR lemma_platform)
                 const lemmaPermissions = permissions.filter(p => {
                     const claims = p.claims || p.credentialSubject || {};
-                    return claims.siteId === 'lemma.id' || claims.site === 'lemma.id';
+                    const siteId = claims.siteId || claims.site || '';
+                    return siteId === 'lemma.id' || siteId === 'lemma_platform';
                 });
                 
                 if (lemmaPermissions.length > 0) {
