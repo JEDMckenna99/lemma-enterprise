@@ -12,9 +12,10 @@
     <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=993"></script>
     
     <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1005"></script>
-    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1005"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wallet-with-pin.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1006"></script>
+    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1006"></script>
+    <!-- NOTE: lemma-wallet-with-pin.js auto-init conflicts with wallet page PIN logic - commenting out -->
+    <!-- <script src="{{ url_for('static', filename='js/lemma-wallet-with-pin.js') }}?v=1006"></script> -->
     
     <!-- Message Constructor & WASM Verifier (for client-side verification) -->
     <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=910"></script>
