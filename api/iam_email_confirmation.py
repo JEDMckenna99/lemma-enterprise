@@ -15,13 +15,72 @@ from api.email_service import send_email, render_email_template
 from api.real_iam_manager import get_site_manager, get_or_create_site_manager
 from api.rate_limiter import rate_limit_email_confirmation, check_ip_not_blocked
 
+# Import Redis for persistent token storage
+try:
+    from api.database import get_redis_client
+    redis_available = True
+except ImportError:
+    redis_available = False
+
 logger = logging.getLogger(__name__)
 
 iam_email_bp = Blueprint('iam_email', __name__)
 
-# In-memory storage for pending access requests
-# In production, use Redis with TTL
-pending_access_requests = {}
+# Token storage (Redis for production, fallback to in-memory for dev)
+if redis_available:
+    logger.info("✅ Using Redis for email confirmation tokens")
+else:
+    logger.warning("⚠️ Redis not available - using in-memory storage (tokens lost on restart!)")
+    pending_access_requests = {}
+
+def store_confirmation_token(token, data, ttl=86400):
+    """Store confirmation token (Redis or in-memory)"""
+    if redis_available:
+        try:
+            redis = get_redis_client()
+            key = f"email_confirm:{token}"
+            redis.setex(key, ttl, json.dumps(data))
+            logger.info(f"📦 Stored confirmation token in Redis: {token[:16]}...")
+        except Exception as e:
+            logger.error(f"❌ Failed to store token in Redis: {e}")
+            # Fallback to in-memory
+            pending_access_requests[token] = data
+    else:
+        pending_access_requests[token] = data
+
+def get_confirmation_token(token):
+    """Retrieve confirmation token data"""
+    if redis_available:
+        try:
+            redis = get_redis_client()
+            key = f"email_confirm:{token}"
+            data = redis.get(key)
+            if data:
+                logger.info(f"✅ Retrieved token from Redis: {token[:16]}...")
+                return json.loads(data)
+            logger.warning(f"⚠️ Token not found in Redis: {token[:16]}...")
+            return None
+        except Exception as e:
+            logger.error(f"❌ Failed to retrieve token from Redis: {e}")
+            # Fallback to in-memory
+            return pending_access_requests.get(token)
+    else:
+        return pending_access_requests.get(token)
+
+def delete_confirmation_token(token):
+    """Delete confirmation token after use"""
+    if redis_available:
+        try:
+            redis = get_redis_client()
+            key = f"email_confirm:{token}"
+            redis.delete(key)
+            logger.info(f"🗑️ Deleted confirmation token from Redis: {token[:16]}...")
+        except Exception as e:
+            logger.error(f"❌ Failed to delete token from Redis: {e}")
+            # Fallback to in-memory
+            pending_access_requests.pop(token, None)
+    else:
+        pending_access_requests.pop(token, None)
 
 @iam_email_bp.route('/api/v1/iam/request-access', methods=['POST'])
 @cross_origin()
@@ -65,8 +124,8 @@ def request_access():
         # Generate confirmation token
         confirmation_token = secrets.token_urlsafe(32)
         
-        # Store pending request (expires in 24 hours)
-        pending_access_requests[confirmation_token] = {
+        # Store pending request (in Redis with TTL, expires in 24 hours)
+        token_data = {
             'site_id': site_id,
             'site_domain': site_domain,
             'user_email': user_email,
@@ -75,6 +134,7 @@ def request_access():
             'created_at': time.time(),
             'expires_at': time.time() + (24 * 60 * 60)
         }
+        store_confirmation_token(confirmation_token, token_data, ttl=86400)
         
         # Generate confirmation link
         base_url = request.host_url.rstrip('/')
@@ -132,10 +192,11 @@ def confirm_access():
                 'message': 'Missing confirmation token'
             }), 400
         
-        # Get pending request
-        pending = pending_access_requests.get(token)
+        # Get pending request from Redis
+        pending = get_confirmation_token(token)
         
         if not pending:
+            logger.warning(f"⚠️ Invalid or expired token attempted: {token[:16]}...")
             return jsonify({
                 'error': 'invalid_token',
                 'message': 'Invalid or expired confirmation link'
@@ -143,7 +204,8 @@ def confirm_access():
         
         # Check expiration
         if time.time() > pending['expires_at']:
-            del pending_access_requests[token]
+            delete_confirmation_token(token)
+            logger.warning(f"⏰ Expired token attempted: {token[:16]}...")
             return jsonify({
                 'error': 'expired_token',
                 'message': 'Confirmation link expired (24 hour limit)'
@@ -188,8 +250,8 @@ def confirm_access():
         )
         issue_time_us = (time.perf_counter() - start_time) * 1_000_000
         
-        # Clean up pending request
-        del pending_access_requests[token]
+        # Clean up pending request (delete from Redis)
+        delete_confirmation_token(token)
         
         logger.info(f"✅ Issued {permission_level} credential to {user_email} for {site_domain}")
         logger.info(f"⚡ Issue time: {issue_time_us:.2f}µs")
