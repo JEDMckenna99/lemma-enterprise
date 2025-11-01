@@ -136,6 +136,16 @@ class LemmaVerificationCard {
             // Check for valid credentials and verify them locally
             await this.checkAndValidateCredentials();
             
+            // Re-render the card with updated status
+            if (this.state.cardElement) {
+                const hasValidCredentials = this.state.hasCredentials && this.state.credentialsValid;
+                if (this.config.debug) {
+                    console.log(`🔄 Re-rendering card after validation - valid: ${hasValidCredentials}`);
+                }
+                this.createCard(this.state.cardElement, hasValidCredentials);
+                this.setupEventListeners();
+            }
+            
         } catch (error) {
             console.error('❌ Failed to initialize wallet/verifier:', error);
         }
@@ -958,11 +968,13 @@ class LemmaVerificationCard {
 window.LemmaVerificationCard = LemmaVerificationCard;
 
 // Auto-initialize cards with data attributes
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Find all elements with data-lemma-card attribute
     const cardElements = document.querySelectorAll('[data-lemma-card]');
     
-    cardElements.forEach((element, index) => {
+    for (let index = 0; index < cardElements.length; index++) {
+        const element = cardElements[index];
+        
         // Get configuration from data attributes
         const config = {
             // Core API configuration
@@ -981,9 +993,22 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlways: element.getAttribute('data-show-always') === 'true'
         };
         
-        // Create and render the card
+        // Create card and wait for wallet initialization before rendering
         const card = new LemmaVerificationCard(config);
-        card.render(element);
+        
+        // Wait for wallet/verifier to initialize and validate (up to 5 seconds)
+        let waitCount = 0;
+        while (!card.state.wallet && waitCount < 50) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            waitCount++;
+        }
+        
+        if (config.debug) {
+            console.log(`🎯 Wallet ready for card ${index + 1} - hasCredentials: ${card.state.hasCredentials}, valid: ${card.state.credentialsValid}`);
+        }
+        
+        // Now render with validated state
+        await card.render(element);
         
         // Store reference for later access
         element.lemmaCard = card;
@@ -991,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (config.debug) {
             console.log(`🎯 Auto-initialized verification card ${index + 1}`, config);
         }
-    });
+    }
 });
 
 // Utility function for easy programmatic creation
