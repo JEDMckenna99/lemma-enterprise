@@ -74,22 +74,41 @@ const redirectUrl = "{{ redirect_url }}";
 async function storeCredentialAndRedirect() {
     try {
         console.log('🔐 Storing permission credential in wallet...');
+        console.log('📋 Credential:', credential);
+        
+        // Check if LemmaWallet is loaded
+        if (typeof LemmaWallet === 'undefined') {
+            throw new Error('LemmaWallet not loaded! Check if lemma-wallet.js loaded correctly.');
+        }
+        
+        console.log('✅ LemmaWallet class found');
         
         // Initialize wallet
         let wallet = window.LEMMA_WALLET_INSTANCE || new LemmaWallet({ debug: true });
+        console.log('🔧 Wallet instance created, initializing...');
         
         if (!wallet.isReady) {
             await wallet.init();
+            console.log('✅ Wallet initialized');
         }
+        
+        console.log('💾 Calling storeCredential...');
         
         // Store credential (will encrypt automatically if EncryptedLemmaWallet available)
         const result = await wallet.storeCredential(credential);
         
-        console.log('✅ Credential stored:', result);
+        console.log('✅ Credential stored successfully:', result);
+        console.log('🔍 Verifying storage...');
+        
+        // Verify it was stored
+        const allCreds = await wallet.getAllCredentials();
+        console.log('📊 Total credentials in wallet:', allCreds.length);
         
         // Update UI
         document.getElementById('status-message').style.display = 'none';
         document.getElementById('success-actions').style.display = 'block';
+        
+        console.log(`🚀 Redirecting to ${redirectUrl} in 3 seconds...`);
         
         // Auto-redirect after 3 seconds
         setTimeout(() => {
@@ -98,11 +117,18 @@ async function storeCredentialAndRedirect() {
         
     } catch (error) {
         console.error('❌ Failed to store credential:', error);
+        console.error('❌ Error stack:', error.stack);
         
         // Show error but allow user to continue
         document.getElementById('status-message').style.display = 'none';
         document.getElementById('error-message').style.display = 'block';
-        document.getElementById('error-text').textContent = error.message;
+        document.getElementById('error-text').textContent = error.message || 'Unknown error';
+        
+        // Still allow redirect
+        console.log('⚠️ Continuing to redirect despite error...');
+        setTimeout(() => {
+            window.location.href = redirectUrl;
+        }, 5000);
     }
 }
 
