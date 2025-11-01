@@ -132,8 +132,14 @@ async function storeCredentialAndRedirect() {
     }
 }
 
-// Auto-store on page load
-window.addEventListener('DOMContentLoaded', storeCredentialAndRedirect);
+// Auto-store on page load (works regardless of load timing)
+if (document.readyState === 'loading') {
+    // Page still loading
+    window.addEventListener('DOMContentLoaded', storeCredentialAndRedirect);
+} else {
+    // Page already loaded, run immediately
+    storeCredentialAndRedirect();
+}
 </script>
 {% endblock %}
 
