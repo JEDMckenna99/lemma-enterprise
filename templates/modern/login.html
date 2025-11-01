@@ -327,12 +327,18 @@
             `;
             
             try {
-                const response = await fetch('/api/auth/request-beta-access', {
+                const response = await fetch('/api/v1/iam/request-access', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ email: email })
+                    body: JSON.stringify({ 
+                        site_id: 'lemma_platform',
+                        site_domain: 'lemma.id',
+                        user_email: email,
+                        permission_level: 'admin',
+                        redirect_url: window.location.origin + '/dashboard'
+                    })
                 });
                 
                 const result = await response.json();
