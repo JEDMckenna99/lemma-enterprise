@@ -132,13 +132,38 @@ async function storeCredentialAndRedirect() {
     }
 }
 
-// Auto-store on page load (works regardless of load timing)
-if (document.readyState === 'loading') {
-    // Page still loading
-    window.addEventListener('DOMContentLoaded', storeCredentialAndRedirect);
-} else {
-    // Page already loaded, run immediately
+// Auto-store with retry logic (ensures wallet is fully loaded)
+let retryCount = 0;
+const maxRetries = 10;
+
+function tryStoreCredential() {
+    console.log(`🔄 Attempt ${retryCount + 1}/${maxRetries} to store credential...`);
+    
+    // Check if wallet is loaded
+    if (typeof LemmaWallet === 'undefined') {
+        console.log('⏳ LemmaWallet not loaded yet, retrying in 200ms...');
+        retryCount++;
+        if (retryCount < maxRetries) {
+            setTimeout(tryStoreCredential, 200);
+        } else {
+            console.error('❌ LemmaWallet failed to load after 10 retries');
+            // Still redirect after error
+            setTimeout(() => {
+                window.location.href = redirectUrl;
+            }, 2000);
+        }
+        return;
+    }
+    
+    console.log('✅ LemmaWallet loaded, executing storage...');
     storeCredentialAndRedirect();
+}
+
+// Start trying immediately
+if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', tryStoreCredential);
+} else {
+    tryStoreCredential();
 }
 </script>
 {% endblock %}
