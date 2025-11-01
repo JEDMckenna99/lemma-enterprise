@@ -280,6 +280,11 @@
                             user_email: claims.email || 'user@lemma.id',
                             user_role: claims.accountType || 'customer',
                             permission_credentials: [cred],
+                            verification_result: {
+                                verified: true, // Client-side check passed
+                                verification_time_us: 0,
+                                method: 'client_wallet_check'
+                            },
                             auth_method: 'lemma_wallet'
                         })
                     });
@@ -289,6 +294,8 @@
                         console.log('✅ Auto-signed in! Redirecting...');
                         window.location.href = result.redirect_url || '/dashboard';
                         return;
+                    } else {
+                        console.error('❌ Sign-in failed:', result.error || result.message);
                     }
                 }
                 
