@@ -35,37 +35,73 @@ else:
 
 def store_confirmation_token(token, data, ttl=86400):
     """Store confirmation token (Redis or in-memory)"""
+    logger.info(f"🔍 Attempting to store token: {token[:16]}... (redis_available={redis_available})")
+    
     if redis_available:
         try:
             redis = get_redis_client()
             key = f"email_confirm:{token}"
+            logger.info(f"🔍 Redis client obtained, storing with key: {key}")
             redis.setex(key, ttl, json.dumps(data))
             logger.info(f"📦 Stored confirmation token in Redis: {token[:16]}...")
+            
+            # Verify it was stored
+            verify = redis.get(key)
+            if verify:
+                logger.info(f"✅ Verified token stored in Redis (size: {len(verify)} bytes)")
+            else:
+                logger.error(f"❌ Token stored but cannot retrieve immediately!")
         except Exception as e:
             logger.error(f"❌ Failed to store token in Redis: {e}")
+            logger.error(f"   Falling back to in-memory storage")
             # Fallback to in-memory
+            if 'pending_access_requests' not in globals():
+                globals()['pending_access_requests'] = {}
             pending_access_requests[token] = data
     else:
+        logger.warning(f"⚠️ Redis not available, using in-memory storage")
+        if 'pending_access_requests' not in globals():
+            globals()['pending_access_requests'] = {}
         pending_access_requests[token] = data
 
 def get_confirmation_token(token):
     """Retrieve confirmation token data"""
+    logger.info(f"🔍 Attempting to retrieve token: {token[:16]}... (redis_available={redis_available})")
+    
     if redis_available:
         try:
             redis = get_redis_client()
             key = f"email_confirm:{token}"
+            logger.info(f"🔍 Checking Redis key: {key}")
+            
+            # Check if key exists
+            exists = redis.exists(key)
+            logger.info(f"🔍 Key exists in Redis: {exists}")
+            
             data = redis.get(key)
             if data:
-                logger.info(f"✅ Retrieved token from Redis: {token[:16]}...")
+                logger.info(f"✅ Retrieved token from Redis: {token[:16]}... (size: {len(data)} bytes)")
                 return json.loads(data)
             logger.warning(f"⚠️ Token not found in Redis: {token[:16]}...")
+            logger.warning(f"   Checking all email_confirm:* keys in Redis...")
+            
+            # Debug: List all email confirmation keys
+            all_keys = redis.keys("email_confirm:*")
+            logger.warning(f"   Found {len(all_keys)} total confirmation tokens in Redis")
+            
             return None
         except Exception as e:
             logger.error(f"❌ Failed to retrieve token from Redis: {e}")
+            logger.error(f"   Exception type: {type(e).__name__}")
             # Fallback to in-memory
-            return pending_access_requests.get(token)
+            if 'pending_access_requests' in globals():
+                return pending_access_requests.get(token)
+            return None
     else:
-        return pending_access_requests.get(token)
+        logger.warning(f"⚠️ Redis not available, checking in-memory storage")
+        if 'pending_access_requests' in globals():
+            return pending_access_requests.get(token)
+        return None
 
 def delete_confirmation_token(token):
     """Delete confirmation token after use"""
