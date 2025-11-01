@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Lemma IAM - Email-Based Authentication | 1,000x Faster Than Auth0 | $0.15/MAU{% endblock %}
-{% block description %}Replace Auth0, Okta, and Duo with email-based IAM. 182µs verification (1,000x faster), $0.15/MAU (90% cheaper), no passwords. Optional bot protection add-on. Start free trial.{% endblock %}
+{% block title %}Lemma IAM - Email-Based Authentication | 1,000x Faster Than Auth0 | FREE Beta{% endblock %}
+{% block description %}Replace Auth0, Okta, and Duo with email-based IAM. 182µs verification (1,000x faster), FREE during beta, no passwords. Optional bot protection add-on. Start using today.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -10,8 +10,8 @@
     <meta name="cf-2fa-verify" content="false">
     
     <!-- Verification Card Assets -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma-verification-card.css') }}?v=667">
-    <script src="{{ url_for('static', filename='js/lemma-verification-card.js') }}?v=667" data-api-key="demo-integration-key-12345"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma-verification-card.css') }}?v=1034">
+    <script src="{{ url_for('static', filename='js/lemma-verification-card.js') }}?v=1034" data-api-key="demo-integration-key-12345"></script>
     
     <!-- Bot Shield Assets (from Heroku app with session management fixes) -->
     <script src="/static/js/lemma-bot-shield-simple.js?v=659"></script>
@@ -143,19 +143,25 @@
         <div style="display: grid; grid-template-columns: 1fr auto; gap: 48px; align-items: center; max-width: 1200px; margin: 0 auto;" class="hero-grid">
             <div>
                 <h1>Authentication as Simple as Email</h1>
-                <p style="font-size: var(--font-size-xl); font-weight: 600; margin-bottom: var(--space-6);">1,000x faster than Auth0. 90% cheaper than Okta. No passwords, no MFA setup.</p>
+                <p style="font-size: var(--font-size-xl); font-weight: 600; margin-bottom: var(--space-6);">1,000x faster than Auth0. FREE during beta. No passwords, no MFA setup.</p>
                 <p>Email-based IAM system with microsecond verification (182µs). Permissions stored in user's wallet for zero infrastructure costs and maximum privacy.</p>
                 
-                <div style="margin-top: 32px; padding: 24px; background: var(--success-50); border-radius: 12px; border-left: 4px solid var(--success-600);">
-                    <p style="margin: 0; font-size: var(--font-size-lg); color: var(--success-800);">
-                        <strong>Optional:</strong> Add federated bot protection (+$0.05/MAU) for network-wide human verification.
+                <div style="margin-top: 32px; padding: 32px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 12px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);">
+                    <p style="margin: 0 0 12px 0; font-size: var(--font-size-2xl); color: var(--white); font-weight: 700; text-align: center;">
+                        FREE Beta Access
+                    </p>
+                    <p style="margin: 0; font-size: var(--font-size-lg); color: var(--white); text-align: center;">
+                        Complete IAM system with optional bot protection - no cost during beta phase
+                    </p>
+                    <p style="margin: 12px 0 0 0; font-size: var(--font-size-sm); color: rgba(255,255,255,0.9); text-align: center;">
+                        Future pricing: $0.16/MAU for IAM, +$0.05/MAU for bot protection
                     </p>
                 </div>
 
                 
                 <div style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-                    <a href="/register" class="btn btn-primary">Start Free Trial</a>
-                    <a href="/pricing" class="btn btn-secondary">View Pricing ($0.15/MAU)</a>
+                    <a href="/register" class="btn btn-primary">Start Free Beta Access</a>
+                    <a href="/pricing" class="btn btn-secondary">View Future Pricing</a>
                 </div>
             </div>
             
@@ -188,7 +194,7 @@
                             <li><strong>RBAC + scopes</strong> - Full permission management</li>
                             <li><strong>Client-side storage</strong> - Zero infrastructure costs</li>
                             <li><strong>Works offline</strong> - No network calls needed</li>
-                            <li><strong>$0.15/MAU</strong> - 90% cheaper than competitors</li>
+                            <li><strong>FREE during beta</strong> - Future: $0.16/MAU (67-92% cheaper than competitors)</li>
                         </ul>
                     </div>
                     
@@ -200,14 +206,14 @@
                             <li><strong>Cross-site recognition</strong> - Network-wide bot shield</li>
                             <li><strong>Privacy-preserving</strong> - OPRF revocation checks</li>
                             <li><strong>Multi-device sync</strong> - QR code wallet transfer</li>
-                            <li><strong>+$0.05/MAU</strong> - Optional upgrade from base IAM</li>
+                            <li><strong>FREE during beta</strong> - Future: +$0.05/MAU optional upgrade</li>
                         </ul>
                     </div>
                 </div>
                 
                 <div style="text-align: center; margin-top: 32px; padding: 24px; background: rgba(16, 185, 129, 0.1); border-radius: 12px;">
                     <p style="margin: 0; font-weight: 600; color: var(--gray-700);">
-                        <strong>Result:</strong> $0.15/MAU for IAM only, or $0.20/MAU for IAM + bot protection (vs $2-8/MAU for Auth0/Okta)
+                        <strong>Result:</strong> FREE during beta • Future: $0.16/MAU for IAM, $0.20/MAU for IAM + bot protection (vs $0.48-$2/MAU for Auth0 Pro/Okta)
                     </p>
                 </div>
             </div>
@@ -256,10 +262,10 @@
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 48px; text-align: center; margin-top: 48px;">
             <div>
-                <h3 style="font-size: 48px; font-weight: 700; color: var(--danger-600); margin-bottom: 12px;">$2-8</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">per user/month for Auth0/Okta</p>
+                <h3 style="font-size: 48px; font-weight: 700; color: var(--danger-600); margin-bottom: 12px;">$0.48-$2</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">per user/month for Auth0 Pro & Okta</p>
                 <p style="color: var(--success-600); font-size: var(--font-size-sm); margin-top: 8px; font-weight: 600;">
-                    Lemma: $0.15/MAU (90% savings)
+                    Lemma IAM: FREE (beta) • Future: $0.16/MAU
                 </p>
             </div>
             <div>
@@ -306,7 +312,7 @@
             
             <div class="card">
                 <h3 class="card-title">Economic Edge</h3>
-                <p>At $0.10 per active verified user/month, lemmas reduce costs by 25-98% vs. per-challenge models while boosting conversions by eliminating friction.</p>
+                <p>FREE during beta. Future pricing of $0.16-$0.20 per MAU reduces costs by 67-92% vs Auth0/Okta while boosting conversions by eliminating friction.</p>
             </div>
         </div>
 
@@ -403,16 +409,16 @@
 <!-- CTA Section -->
 <section class="section" style="background: linear-gradient(135deg, var(--gray-900) 0%, var(--black) 100%); color: var(--white); padding: 100px 0;">
     <div class="container" style="text-align: center;">
-        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Replace Auth0 in 5 Minutes</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Start with email-based IAM ($0.15/MAU). Add bot protection later if needed (+$0.05/MAU). No credit card required.</p>
+        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Replace Auth0 in 5 Minutes - FREE Beta</h2>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Get complete email-based IAM with optional bot protection. Completely free during beta phase. No credit card required.</p>
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
             <a href="/register" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">
-                Start Free Trial
+                Start Free Beta Access
             </a>
-            <a href="/pricing" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">View Pricing</a>
+            <a href="/pricing" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">View Future Pricing</a>
         </div>
         <p style="color: var(--gray-500); font-size: var(--font-size-sm); margin-top: 24px;">
-            5-minute integration • No credit card • Cancel anytime
+            5-minute integration • FREE during beta • No credit card required
         </p>
     </div>
 </section>

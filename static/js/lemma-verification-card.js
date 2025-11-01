@@ -312,15 +312,16 @@ class LemmaVerificationCard {
                 ` : ''}
                 
                 <div style="${theme.content}">
-                    <p style="${theme.description}">One-time verification • Works across the network</p>
+                    <p style="${theme.description}">Passwordless authentication • Verified identity network</p>
                     
                     <button id="lemma-verify-btn" style="${theme.button}" 
+                            onclick="window.location.href='/login'"
                             onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" 
                             onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='${theme.buttonShadow}'">
-                        Verify with Lemma
+                        Sign In with Lemma
                     </button>
                     
-                    <p style="${theme.footer}">Powered by Lemma • Microsecond verification</p>
+                    <p style="${theme.footer}">Powered by Lemma • Zero-knowledge verification</p>
                 </div>
             </div>
         `;
@@ -331,30 +332,30 @@ class LemmaVerificationCard {
      */
     createVerifiedCard(theme) {
         return `
-            <div class="lemma-verification-card verified" style="${theme.container.replace('#667eea', '#10b981')}">
+            <div class="lemma-verification-card verified" style="${theme.container.replace('linear-gradient(135deg, #667eea 0%, #ffffff 100%)', '#ffffff').replace('border: 2px solid #667eea', 'border: 2px solid #10b981')}">
                 <div style="margin: 0 auto 1rem; text-align: center;">
                     <img src="/static/img/lemma_logo.svg" alt="Lemma" style="width: 80px; height: 80px;">
                 </div>
                 
                 <div style="${theme.content}">
-                    <h3 style="${theme.title}">Verified Human</h3>
-                    <p style="${theme.description}">Your Lemma is active across the network</p>
+                    <h3 style="${theme.title}">Signed In</h3>
+                    <p style="${theme.description}">Your Lemma credential is active</p>
                     
                     ${this.config.showStatus ? `
                         <div style="${theme.status}">
                             <span style="color: #10b981;">✅</span>
-                            <span style="font-size: 0.875rem; color: #059669;">Verified & Protected</span>
+                            <span style="font-size: 0.875rem; color: #059669;">Verified & Active</span>
                         </div>
                     ` : ''}
                     
-                    <button style="${theme.button.replace('#667eea 0%, #764ba2 100%', '#10b981 0%, #059669 100%')}" 
-                            onclick="window.open('/wallet', '_blank')"
+                    <button style="${theme.button.replace('linear-gradient(135deg, #667eea 0%, #764ba2 100%)', '#10b981').replace('background: linear-gradient', 'background: ')}" 
+                            onclick="window.location.href='/wallet'"
                             onmouseover="this.style.transform='translateY(-1px)'" 
                             onmouseout="this.style.transform='translateY(0)'">
-                        View in Wallet
+                        Go to Wallet
                     </button>
                     
-                    <p style="${theme.footer}">Protected by Lemma • Active verification</p>
+                    <p style="${theme.footer}">Powered by Lemma • Verified identity</p>
                 </div>
             </div>
         `;
@@ -425,7 +426,7 @@ class LemmaVerificationCard {
                 width: 48px;
                 height: 48px;
                 margin: 0 auto 1rem;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: #667eea;
                 border-radius: 50%;
                 display: flex;
                 align-items: center;
@@ -455,7 +456,7 @@ class LemmaVerificationCard {
                 display: none;
             `,
             button: `
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: #667eea;
                 color: white;
                 border: none;
                 padding: 0.75rem 1.5rem;
@@ -492,7 +493,7 @@ class LemmaVerificationCard {
                     max-width: 380px;
                     margin: 1rem auto;
                     padding: 2rem;
-                    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+                    background: #ffffff;
                     border-radius: 16px;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
                     text-align: center;
@@ -503,7 +504,7 @@ class LemmaVerificationCard {
                     width: 60px;
                     height: 60px;
                     margin: 0 auto 1.5rem;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: #667eea;
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
@@ -513,7 +514,7 @@ class LemmaVerificationCard {
                     font-weight: bold;
                 `,
                 button: `
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: #667eea;
                     color: white;
                     border: none;
                     padding: 1rem 2rem;
