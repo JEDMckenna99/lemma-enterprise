@@ -40,13 +40,14 @@ def get_redis_client():
         
         logger.info(f"🔗 Connecting to Redis...")
         
-        # Parse URL and connect
+        # Parse URL and connect (disable SSL verification for Heroku self-signed certs)
         _redis_client = redis.from_url(
             redis_url,
             decode_responses=True,  # Return strings instead of bytes
             socket_connect_timeout=5,
             socket_keepalive=True,
-            health_check_interval=30
+            health_check_interval=30,
+            ssl_cert_reqs=None  # Disable SSL certificate verification (Heroku uses self-signed certs)
         )
         
         # Test connection
