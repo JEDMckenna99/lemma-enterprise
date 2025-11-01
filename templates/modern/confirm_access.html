@@ -106,9 +106,13 @@ async function storeCredentialAndRedirect() {
         console.log('✅ Credential stored successfully:', result);
         console.log('🔍 Verifying storage...');
         
-        // Verify it was stored
-        const allCreds = await wallet.getAllCredentials();
-        console.log('📊 Total credentials in wallet:', allCreds.length);
+        // Verify it was stored (use getCredentials instead of getAllCredentials)
+        try {
+            const allCreds = await wallet.getCredentials();
+            console.log('📊 Total credentials in wallet:', allCreds ? allCreds.length : 'unknown');
+        } catch (e) {
+            console.log('📊 Verification skipped (method not available)');
+        }
         
         // Update UI
         document.getElementById('status-message').style.display = 'none';
