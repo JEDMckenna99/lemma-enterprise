@@ -66,10 +66,16 @@
     </div>
 </section>
 
-<script>
+<script data-cfasync="false">
+// IMMEDIATE DEBUG - This should execute first
+console.log('🚀 SCRIPT EXECUTING! timestamp:', Date.now());
+console.log('🔍 Document state:', document.readyState);
+
 // Store credential in wallet automatically
 const credential = {{ permission_lemma|safe }};
 const redirectUrl = "{{ redirect_url }}";
+
+console.log('📋 Variables defined - credential:', !!credential, 'redirectUrl:', redirectUrl);
 
 async function storeCredentialAndRedirect() {
     try {
