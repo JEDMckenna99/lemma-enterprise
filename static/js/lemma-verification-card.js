@@ -63,13 +63,16 @@ class LemmaVerificationCard {
         this.state = {
             initialized: false,
             hasCredentials: false,
+            credentialsValid: false,
             verifying: false,
             checking: false,
-            cardElement: null
+            cardElement: null,
+            wallet: null,
+            verifier: null
         };
         
-        // Initialize federated wallet for network access
-        this.initializeFederatedWallet();
+        // Initialize wallet and verifier for local validation
+        this.initializeWalletAndVerifier();
         
         if (this.config.debug) {
             console.log('🎯 Lemma Verification Card initialized', this.config);
@@ -89,7 +92,122 @@ class LemmaVerificationCard {
     }
     
     /**
-     * Initialize federated wallet for network access (EXACT SAME as shield)
+     * Initialize wallet and verifier for local credential validation
+     */
+    async initializeWalletAndVerifier() {
+        try {
+            if (this.config.debug) {
+                console.log('🔐 Initializing wallet and verifier for credential validation...');
+            }
+            
+            // Wait for LemmaWallet and verifier to be available
+            let retries = 0;
+            while ((!window.LemmaWallet || !window.LemmaWASMVerifierOptimized) && retries < 20) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                retries++;
+            }
+            
+            if (!window.LemmaWallet) {
+                console.warn('⚠️ LemmaWallet not available, card will show sign-in prompt');
+                return;
+            }
+            
+            // Initialize wallet
+            this.state.wallet = new window.LemmaWallet({ debug: this.config.debug });
+            await this.state.wallet.init();
+            
+            if (this.config.debug) {
+                console.log('✅ Wallet initialized');
+            }
+            
+            // Initialize verifier with Web Crypto API
+            if (window.LemmaWASMVerifierOptimized) {
+                this.state.verifier = new window.LemmaWASMVerifierOptimized({
+                    debug: this.config.debug,
+                    forceWebCrypto: true  // Use Web Crypto API for 63µs verification
+                });
+                await this.state.verifier.init();
+                
+                if (this.config.debug) {
+                    console.log('✅ Verifier initialized (Web Crypto API)');
+                }
+            }
+            
+            // Check for valid credentials and verify them locally
+            await this.checkAndValidateCredentials();
+            
+        } catch (error) {
+            console.error('❌ Failed to initialize wallet/verifier:', error);
+        }
+    }
+    
+    /**
+     * Check for valid lemma.id permissions and verify them locally
+     */
+    async checkAndValidateCredentials() {
+        try {
+            if (!this.state.wallet) return;
+            
+            // Get permission credentials for lemma.id
+            const permissions = await this.state.wallet.getCredentials('permission');
+            
+            if (this.config.debug) {
+                console.log(`🔍 Found ${permissions.length} permission credential(s)`);
+            }
+            
+            // Filter for lemma.id/lemma_platform permissions
+            const lemmaPermissions = permissions.filter(p => {
+                const claims = p.claims || p.credentialSubject || {};
+                const siteId = claims.siteId || claims.site || '';
+                return siteId === 'lemma.id' || siteId === 'lemma_platform';
+            });
+            
+            if (lemmaPermissions.length === 0) {
+                this.state.hasCredentials = false;
+                this.state.credentialsValid = false;
+                if (this.config.debug) {
+                    console.log('ℹ️ No lemma.id permissions found');
+                }
+                return;
+            }
+            
+            if (this.config.debug) {
+                console.log(`✅ Found ${lemmaPermissions.length} lemma.id permission(s), verifying...`);
+            }
+            
+            // Verify the first credential locally
+            const credential = lemmaPermissions[0];
+            
+            if (this.state.verifier) {
+                const result = await this.state.verifier.verify(credential);
+                
+                this.state.hasCredentials = true;
+                this.state.credentialsValid = result.verified;
+                
+                if (this.config.debug) {
+                    console.log(`🔐 Local verification result: ${result.verified ? 'VALID ✅' : 'INVALID ❌'}`);
+                    console.log(`   Reason: ${result.reason}`);
+                    console.log(`   Verification time: ${result.verificationTime || 'N/A'}`);
+                }
+            } else {
+                // No verifier available, assume credentials are valid if they exist
+                this.state.hasCredentials = true;
+                this.state.credentialsValid = true;
+                
+                if (this.config.debug) {
+                    console.log('ℹ️ No verifier available, assuming credentials valid');
+                }
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to check/validate credentials:', error);
+            this.state.hasCredentials = false;
+            this.state.credentialsValid = false;
+        }
+    }
+    
+    /**
+     * Initialize federated wallet for network access (LEGACY - keeping for compatibility)
      */
     async initializeFederatedWallet() {
         try {
@@ -186,11 +304,22 @@ class LemmaVerificationCard {
             return;
         }
         
-        // Check current verification status
-        const hasCredentials = await this.checkCredentials();
+        // Wait for wallet/verifier initialization to complete
+        let waitCount = 0;
+        while (!this.state.wallet && waitCount < 30) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            waitCount++;
+        }
+        
+        // Use the validated state from checkAndValidateCredentials
+        const hasValidCredentials = this.state.hasCredentials && this.state.credentialsValid;
+        
+        if (this.config.debug) {
+            console.log(`🎯 Rendering card - hasCredentials: ${this.state.hasCredentials}, valid: ${this.state.credentialsValid}`);
+        }
         
         // Create card based on current status
-        this.createCard(target, hasCredentials);
+        this.createCard(target, hasValidCredentials);
         
         // Set up event listeners
         this.setupEventListeners();
