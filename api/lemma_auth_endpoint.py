@@ -181,7 +181,7 @@ def lemma_signin():
             'permission_lemma': permission_lemma_data,
             'verification_time_us': verification_result.get('verification_time_us', 0),
             'message': f'Welcome back! Authenticated via Lemma wallet in {verification_result.get("verification_time_us", "unknown")}µs',
-            'redirect_url': '/dashboard'
+            'redirect_url': '/'
         })
         
     except Exception as e:

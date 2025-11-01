@@ -292,7 +292,7 @@
                     const result = await response.json();
                     if (result.success) {
                         console.log('✅ Auto-signed in! Redirecting...');
-                        window.location.href = result.redirect_url || '/dashboard';
+                        window.location.href = result.redirect_url || '/';
                         return;
                     } else {
                         console.error('❌ Sign-in failed:', result.error || result.message);
@@ -337,7 +337,7 @@
                         site_domain: 'lemma.id',
                         user_email: email,
                         permission_level: 'beta-user',
-                        redirect_url: window.location.origin + '/dashboard'
+                        redirect_url: window.location.origin + '/'
                     })
                 });
                 
