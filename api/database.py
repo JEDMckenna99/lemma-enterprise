@@ -12,7 +12,48 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from dataclasses import dataclass, asdict
 
+# Redis for caching and session storage
+try:
+    import redis
+    redis_available = True
+except ImportError:
+    redis_available = False
+    logger.warning("⚠️ Redis library not available")
+
 logger = logging.getLogger(__name__)
+
+# Redis client (lazy initialization)
+_redis_client = None
+
+def get_redis_client():
+    """Get Redis client (singleton pattern)"""
+    global _redis_client
+    
+    if not redis_available:
+        raise Exception("Redis library not installed")
+    
+    if _redis_client is None:
+        redis_url = os.getenv('REDIS_URL') or os.getenv('REDIS_TLS_URL')
+        
+        if not redis_url:
+            raise Exception("REDIS_URL not set in environment")
+        
+        logger.info(f"🔗 Connecting to Redis...")
+        
+        # Parse URL and connect
+        _redis_client = redis.from_url(
+            redis_url,
+            decode_responses=True,  # Return strings instead of bytes
+            socket_connect_timeout=5,
+            socket_keepalive=True,
+            health_check_interval=30
+        )
+        
+        # Test connection
+        _redis_client.ping()
+        logger.info(f"✅ Redis connected successfully")
+    
+    return _redis_client
 
 # Database setup
 DATABASE_URL = os.getenv('DATABASE_URL')
