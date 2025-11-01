@@ -59,10 +59,8 @@ def request_access():
         if '@' not in user_email or '.' not in user_email:
             return jsonify({'error': 'Invalid email address'}), 400
         
-        # Get site manager (validates site exists)
-        manager = get_site_manager(site_id, site_domain)
-        if not manager:
-            return jsonify({'error': 'Site not found'}), 404
+        # Get or create site manager (auto-creates for new sites)
+        manager = get_or_create_site_manager(site_id, site_domain)
         
         # Generate confirmation token
         confirmation_token = secrets.token_urlsafe(32)
