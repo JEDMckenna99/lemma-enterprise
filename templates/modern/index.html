@@ -182,250 +182,51 @@
     </div>
 </section>
 
-<!-- What is Lemma Section -->
-<section class="section">
+<!-- How It Works Section -->
+<section class="section" id="how-it-works">
     <div class="container">
-        <div style="text-align: center; margin-bottom: var(--space-16);">
-            <h2 id="how-it-works">Authentication Built for Privacy</h2>
-            <p class="text-gray">Email-based IAM that works alongside your existing auth. Credentials stay in the user's browser. Verification happens locally with zero tracking.</p>
-            
-            <div style="margin: 48px 0; padding: 48px; background: #ffffff; border-radius: 24px; text-align: left; border: 2px solid #e2e8f0;">
-                <h3 style="text-align: center; margin-bottom: 32px; color: var(--primary);">How Lemma Works</h3>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 48px;">
-                    <div style="padding: 24px; background: #f8fafc; border-radius: 16px; border-left: 4px solid var(--primary);">
-                        <h4 style="color: var(--primary); margin-bottom: 16px;">Core Features</h4>
-                        <ul style="margin: 0; padding-left: 20px; color: var(--gray-600);">
-                            <li><strong>Email-based</strong> - No passwords or MFA setup</li>
-                            <li><strong>63µs verification</strong> - 1,500x faster than Auth0</li>
-                            <li><strong>Privacy-first</strong> - Credentials encrypted in browser, not your database</li>
-                            <li><strong>Works offline</strong> - Local verification with Web Crypto API</li>
-                            <li><strong>Add-on friendly</strong> - Runs alongside existing authentication</li>
-                            <li><strong>FREE beta access</strong> - Join now to help shape the product</li>
-                        </ul>
-                    </div>
-                    
-                    <div style="padding: 24px; background: #f0fdf4; border-radius: 16px; border-left: 4px solid var(--success);">
-                        <h4 style="color: var(--success); margin-bottom: 16px;">Optional: Bot Protection</h4>
-                        <ul style="margin: 0; padding-left: 20px; color: var(--gray-600);">
-                            <li><strong>Proof of humanity</strong> - Stripe Identity verification</li>
-                            <li><strong>Network-wide protection</strong> - Verify once, protected everywhere</li>
-                            <li><strong>Revocation list</strong> - Real-time bot detection</li>
-                            <li><strong>Privacy-preserving</strong> - Zero-knowledge proof checks</li>
-                            <li><strong>Multi-device sync</strong> - QR code wallet transfer</li>
-                            <li><strong>FREE beta access</strong> - Optional upgrade when you need it</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <div style="text-align: center; margin-top: 32px; padding: 24px; background: #eff6ff; border-radius: 12px;">
-                    <p style="margin: 0; font-weight: 600; color: var(--gray-700);">
-                        <strong>Join Beta:</strong> Free access to complete IAM system • Pricing TBD based on beta feedback
-                    </p>
-                </div>
-            </div>
+        <div style="text-align: center; margin-bottom: 64px;">
+            <h2>How Lemma Works</h2>
+            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Email-based authentication with local verification. Credentials stay in the user's browser. Zero tracking, zero hassle.</p>
         </div>
         
-        <div style="max-width: 800px; margin: 0 auto 48px; padding: 32px; background: var(--gray-50); border-radius: 12px; border-left: 4px solid var(--primary);">
-            <p style="font-size: var(--font-size-lg); line-height: 1.6; color: var(--gray-700); margin-bottom: 16px;">
-                <strong>A "lemma" is a cryptographic permission credential</strong> that proves access rights without revealing user data. Credentials stay encrypted in the user's browser—never stored in your database.
-            </p>
-            <p style="color: var(--gray-600); line-height: 1.6;">
-                Users receive credentials via email confirmation. Verification happens locally using <strong>Web Crypto API</strong> (63µs average) with <strong>Ed25519 signatures</strong>. Zero server calls during authentication means zero tracking, zero latency, and maximum privacy.
-            </p>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; margin-top: 64px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px;">
             <div class="card">
                 <h3 class="card-title">Privacy by Design</h3>
-                <p>Credentials encrypted in user's browser with AES-256. Zero tracking. Zero data collection. Local verification means your users' activity stays private.</p>
+                <p>Credentials encrypted in user's browser. Zero tracking. Zero data collection. Local verification means your users' activity stays private.</p>
             </div>
             
             <div class="card">
                 <h3 class="card-title">63µs Verification</h3>
-                <p>1,500x faster than Auth0. Uses Web Crypto API for hardware-accelerated Ed25519 verification. Works offline with zero server calls.</p>
+                <p>1,500x faster than Auth0. Hardware-accelerated Ed25519 verification. Works offline with zero server calls.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Passwordless Experience</h3>
-                <p>Email confirmation creates cryptographic credential. No passwords to remember, reset, or leak. Auto-sign-in when credential is valid.</p>
+                <h3 class="card-title">Passwordless</h3>
+                <p>Email confirmation creates cryptographic credential. No passwords to remember, reset, or leak. Auto-sign-in when valid.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Works Alongside Existing Auth</h3>
-                <p>Add Lemma without replacing your current system. Enhance login experience and add privacy-preserving verification. Easy SDK integration.</p>
+                <h3 class="card-title">Easy Integration</h3>
+                <p>Works alongside existing auth. SDK integration in 5 minutes. Enhance login without replacing your current system.</p>
             </div>
         </div>
     </div>
 </section>
-
-<!-- Problem Section -->
-<section class="section" style="background: var(--gray-100);">
-    <div class="container">
-        <div style="text-align: center; margin-bottom: var(--space-16);">
-            <h2>Traditional IAM is Broken</h2>
-            <p class="text-gray">Passwords, slow authentication, and expensive infrastructure are holding businesses back.</p>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 48px; text-align: center; margin-top: 48px;">
-            <div>
-                <h3 style="font-size: 48px; font-weight: 700; color: var(--danger-600); margin-bottom: 12px;">100ms+</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">Auth0 verification latency</p>
-                <p style="color: var(--success-600); font-size: var(--font-size-sm); margin-top: 8px; font-weight: 600;">
-                    Lemma: 63µs (1,500x faster)
-                </p>
-            </div>
-            <div>
-                <h3 style="font-size: 48px; font-weight: 700; color: var(--danger-600); margin-bottom: 12px;">100%</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">of Auth0 verifications tracked</p>
-                <p style="color: var(--success-600); font-size: var(--font-size-sm); margin-top: 8px; font-weight: 600;">
-                    Lemma: 0% (local verification)
-                </p>
-            </div>
-            <div>
-                <h3 style="font-size: 48px; font-weight: 700; color: var(--danger-600); margin-bottom: 12px;">80%</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-lg);">of breaches involve passwords</p>
-                <p style="color: var(--success-600); font-size: var(--font-size-sm); margin-top: 8px; font-weight: 600;">
-                    Lemma: Passwordless by design
-                </p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Network Benefits Section -->
-<section class="section">
-    <div class="container">
-        <div style="text-align: center; margin-bottom: var(--space-16);">
-            <h2>Superior Authenticated Networks</h2>
-            <p class="text-gray">Lemmas transform authenticated networks by enabling secure, efficient communication across decentralized ecosystems.</p>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; margin-bottom: 64px;">
-            <div class="card">
-                <h3 class="card-title">Revocable and Resilient</h3>
-                <p>Built-in kill switches via status lists allow instant network-wide revocation of compromised credentials, without disrupting real-time communication.</p>
-            </div>
-            
-            <div class="card">
-                <h3 class="card-title">Offline-First Communication</h3>
-                <p>Verifications require zero network calls in the hot path, supporting internet-independent mesh networks for IoT devices or remote operations.</p>
-        </div>
-        
-            <div class="card">
-                <h3 class="card-title">Privacy-Enhanced Networks</h3>
-                <p>ZKPs ensure unlinkability and selective disclosure, fostering trust in communication without data leaks or tracking across platforms.</p>
-            </div>
-            
-            <div class="card">
-                <h3 class="card-title">Designed for Privacy</h3>
-                <p>FREE during beta. Local verification means zero user tracking, zero activity logs, and maximum privacy. Credentials stay in the user's control.</p>
-            </div>
-        </div>
-
-
-        
-        <div style="text-align: center; margin-top: 48px;">
-            <p style="color: var(--gray-600); margin-bottom: 24px; font-size: var(--font-size-lg);">
-                <strong>Result:</strong> Networks that are not just faster and safer, but more scalable—handling millions of users with 99.9% bot elimination and zero false positives for legitimate interactions.
-            </p>
-            <a href="/docs" class="btn btn-secondary">Technical Documentation</a>
-        </div>
-    </div>
-</section>
-
-{% if show_fil_widget %}
-<!-- FIL Join Widget - For New Users -->
-
-{% endif %}
-
-<!-- Industry Applications Section -->
-<section class="section" style="background: var(--white); padding: 80px 0;">
-    <div class="container">
-        <div style="text-align: center; margin-bottom: 64px;">
-            <h2 style="font-size: var(--font-size-3xl); margin-bottom: 16px;">Powering Authenticated Networks Across Industries</h2>
-            <p style="color: var(--gray-600); font-size: var(--font-size-lg); max-width: 600px; margin: 0 auto;">Lemmas enable secure, privacy-preserving communication in every sector where trust and authenticity matter.</p>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px;">
-            <div class="card" style="border-left: 4px solid var(--primary);">
-                <h3 class="card-title">E-commerce & Fintech</h3>
-                <p>Lemmas secure transactions by verifying human intent in microseconds, preventing fraud while enabling seamless, authenticated communication between buyers, sellers, and payment systems—<strong>no more fake reviews or account takeovers</strong>.</p>
-                <ul style="margin-top: 16px; color: var(--gray-600); padding-left: 20px;">
-                    <li>Frictionless checkout with verified buyers</li>
-                    <li>Authentic product reviews and ratings</li>
-                    <li>Secure peer-to-peer transactions</li>
-                </ul>
-            </div>
-            
-            <div class="card" style="border-left: 4px solid var(--secondary);">
-                <h3 class="card-title">Professional Networks</h3>
-                <p>Enable authentic professional connections and secure business communication. Lemmas verify credentials and reputation without exposing sensitive information, creating <strong>trusted professional ecosystems</strong>.</p>
-                <ul style="margin-top: 16px; color: var(--gray-600); padding-left: 20px;">
-                    <li>Verified professional profiles and endorsements</li>
-                    <li>Secure document sharing and collaboration</li>
-                    <li>Authenticated business communications</li>
-                </ul>
-        </div>
-        
-            <div class="card" style="border-left: 4px solid var(--warning-600);">
-                <h3 class="card-title">Healthcare & Compliance</h3>
-                <p>Protect sensitive patient data and ensure regulatory compliance with cryptographic verification. Lemmas enable <strong>secure healthcare communication</strong> while maintaining strict privacy standards.</p>
-                <ul style="margin-top: 16px; color: var(--gray-600); padding-left: 20px;">
-                    <li>HIPAA-compliant patient verification</li>
-                    <li>Secure telemedicine platforms</li>
-                    <li>Authenticated medical record access</li>
-                </ul>
-                    </div>
-            
-            <div class="card" style="border-left: 4px solid var(--success-600);">
-                <h3 class="card-title">Government & Civic</h3>
-                <p>Enable secure digital governance and civic participation. Lemmas provide <strong>verifiable digital identity</strong> for voting, public services, and citizen engagement while preserving anonymity.</p>
-                <ul style="margin-top: 16px; color: var(--gray-600); padding-left: 20px;">
-                    <li>Secure digital voting systems</li>
-                    <li>Authenticated public service access</li>
-                    <li>Privacy-preserving civic engagement</li>
-                </ul>
-                </div>
-            </div>
-            
-        <div style="text-align: center; margin-top: 48px; padding: 32px; background: var(--gray-50); border-radius: 12px;">
-            <h3 style="margin-bottom: 16px; color: var(--gray-900);">Emerging Applications</h3>
-            <p style="color: var(--gray-600); margin-bottom: 20px;">Lemmas are pioneering new frontiers in authenticated communication:</p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; margin-top: 24px;">
-                <div>
-                    <strong style="color: var(--primary);">IoT & Autonomous Devices</strong>
-                    <p style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 8px;">Mesh networks with device authentication</p>
-                </div>
-                    <div>
-                    <strong style="color: var(--secondary);">Enterprise Licensing</strong>
-                    <p style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 8px;">Cryptographic software licensing and access control</p>
-                    </div>
-                <div>
-                    <strong style="color: var(--warning-600);">Decentralized Social</strong>
-                    <p style="font-size: var(--font-size-sm); color: var(--gray-600); margin-top: 8px;">Bot-resistant social networks with verified humans</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Social Proof Section -->
-
 
 <!-- CTA Section -->
-<section class="section" style="background: linear-gradient(135deg, var(--gray-900) 0%, var(--black) 100%); color: var(--white); padding: 100px 0;">
+<section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">
-        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Replace Auth0 in 5 Minutes - FREE Beta</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Get complete email-based IAM with optional bot protection. Completely free during beta phase. No credit card required.</p>
+        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Join the Beta</h2>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Free access to privacy-first authentication. No credit card required.</p>
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-            <a href="/register" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">
-                Join Beta
+            <a href="/login" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">
+                Get Started
             </a>
             <a href="/wallet" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">View Your Wallet</a>
         </div>
         <p style="color: var(--gray-500); font-size: var(--font-size-sm); margin-top: 24px;">
-            5-minute integration • FREE during beta • No credit card required
+            Passwordless • Privacy-first • Works offline
         </p>
     </div>
 </section>
