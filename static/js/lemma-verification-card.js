@@ -460,7 +460,7 @@ class LemmaVerificationCard {
                         Sign In with Lemma
                     </button>
                     
-                    <p style="${theme.footer}">Powered by Lemma • Zero-knowledge verification</p>
+                    <p style="${theme.footer}">Privacy-first • No tracking • Works offline</p>
                 </div>
             </div>
         `;
@@ -494,7 +494,7 @@ class LemmaVerificationCard {
                         Go to Wallet
                     </button>
                     
-                    <p style="${theme.footer}">Powered by Lemma • Verified identity</p>
+                    <p style="${theme.footer}">Secure • Private • Verified</p>
                 </div>
             </div>
         `;
@@ -539,7 +539,7 @@ class LemmaVerificationCard {
                         </button>
                     `}
                     
-                    <p style="${theme.footer}">Lemma Network • Cross-site verification</p>
+                    <p style="${theme.footer}">Fast • Private • Secure</p>
                 </div>
             </div>
         `;
