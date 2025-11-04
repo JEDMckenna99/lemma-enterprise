@@ -76,6 +76,7 @@ class LemmaWallet {
         // Network registry cache
         this.didRegistry = new Map();
         this.revocationBloomFilter = new Set();
+        this.loadCachedBloomFilters(); // Load site-specific filters from localStorage
         
         // Cross-tab synchronization
         this.broadcastChannel = null;
@@ -1177,14 +1178,111 @@ class LemmaWallet {
         }
         
         try {
-            // Simplified revocation sync (can be enhanced later)
+            // Get all unique site IDs from credentials to sync their Bloom filters
+            const credentials = await this.getAllCredentials();
+            const siteIds = new Set();
+            
+            for (const cred of credentials) {
+                const claims = cred.claims || cred.credentialSubject || {};
+                const siteId = claims.siteId || claims.site;
+                if (siteId) {
+                    siteIds.add(siteId);
+                }
+            }
+            
+            if (this.debug) {
+                console.log(`🔄 Syncing Bloom filters for ${siteIds.size} sites:`, Array.from(siteIds));
+            }
+            
+            // Sync Bloom filter for each site separately
+            for (const siteId of siteIds) {
+                await this.syncSiteBloomFilter(siteId);
+            }
+            
             this.networkConfig.lastRevocationSync = now;
             return true;
+            
         } catch (error) {
             if (this.debug) {
                 console.warn('⚠️ Revocation list sync failed:', error);
             }
             return false;
+        }
+    }
+    
+    /**
+     * Load cached site-specific Bloom filters from localStorage
+     */
+    loadCachedBloomFilters() {
+        try {
+            // Find all lemma_bloom_* keys in localStorage
+            const bloomKeys = Object.keys(localStorage).filter(key => key.startsWith('lemma_bloom_'));
+            
+            let totalRevocations = 0;
+            
+            for (const key of bloomKeys) {
+                try {
+                    const cached = JSON.parse(localStorage.getItem(key));
+                    if (cached && cached.data && Array.isArray(cached.data)) {
+                        // Merge site-specific filter into global Set for O(1) lookup
+                        for (const id of cached.data) {
+                            this.revocationBloomFilter.add(id);
+                        }
+                        totalRevocations += cached.data.length;
+                    }
+                } catch (e) {
+                    // Ignore corrupted cache entries
+                    if (this.debug) {
+                        console.warn(`⚠️ Corrupted Bloom filter cache: ${key}`);
+                    }
+                }
+            }
+            
+            if (this.debug && totalRevocations > 0) {
+                console.log(`📊 Loaded ${totalRevocations} revocations from ${bloomKeys.length} site(s)`);
+            }
+            
+        } catch (error) {
+            if (this.debug) {
+                console.warn('⚠️ Failed to load cached Bloom filters:', error);
+            }
+        }
+    }
+    
+    /**
+     * Sync Bloom filter for a specific site
+     */
+    async syncSiteBloomFilter(siteId) {
+        try {
+            const response = await fetch(`/api/revocation/bloom-filter?site_id=${encodeURIComponent(siteId)}`);
+            const data = await response.json();
+            
+            if (data.success && data.revoked_ids) {
+                // Store site-specific Bloom filter in localStorage
+                const cacheKey = `lemma_bloom_${siteId}`;
+                
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    data: data.revoked_ids,
+                    sync: Date.now(),
+                    version: data.version,
+                    siteId: siteId,
+                    isolation: 'site_specific'  // Mark as site-isolated
+                }));
+                
+                // Update in-memory Set (merge all sites into one for quick lookup)
+                for (const id of data.revoked_ids) {
+                    this.revocationBloomFilter.add(id);
+                }
+                
+                if (this.debug) {
+                    console.log(`✅ Synced site-specific Bloom filter for ${siteId}: ${data.revoked_ids.length} revocations`);
+                }
+            }
+            
+        } catch (error) {
+            if (this.debug) {
+                console.warn(`⚠️ Failed to sync Bloom filter for ${siteId}:`, error);
+            }
         }
     }
     

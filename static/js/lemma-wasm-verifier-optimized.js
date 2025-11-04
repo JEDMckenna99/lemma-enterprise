@@ -301,29 +301,39 @@ class LemmaWASMVerifierOptimized {
                 return true;
             }
             
-            const response = await fetch('/api/revocation/bloom-filter');
+            // Site-specific Bloom filter request (defaults to lemma_platform)
+            const siteId = this.options.siteId || 'lemma_platform';
+            const response = await fetch(`/api/revocation/bloom-filter?site_id=${encodeURIComponent(siteId)}`);
             const data = await response.json();
             
             if (data.success && data.revoked_ids) {
                 this.bloomFilter = new Set(data.revoked_ids);
                 this.bloomLastSync = now;
                 
-                // Cache locally
-                localStorage.setItem('lemma_bloom_cache', JSON.stringify({
+                // Cache locally with site-specific key
+                const cacheKey = `lemma_bloom_${siteId}`;
+                localStorage.setItem(cacheKey, JSON.stringify({
                     data: data.revoked_ids,
-                    sync: now
+                    sync: now,
+                    siteId: siteId,
+                    isolation: 'site_specific'
                 }));
+                
+                console.log(`✅ Synced site-specific Bloom filter for ${siteId}: ${data.revoked_ids.length} revocations`);
             }
             
             return true;
             
         } catch (error) {
-            // Try cached
+            // Try cached site-specific filter
             try {
-                const cached = JSON.parse(localStorage.getItem('lemma_bloom_cache') || '{}');
+                const siteId = this.options.siteId || 'lemma_platform';
+                const cacheKey = `lemma_bloom_${siteId}`;
+                const cached = JSON.parse(localStorage.getItem(cacheKey) || '{}');
                 if (cached.data) {
                     this.bloomFilter = new Set(cached.data);
                     this.bloomLastSync = cached.sync;
+                    console.log(`📦 Using cached site-specific Bloom filter for ${siteId}: ${cached.data.length} revocations`);
                     return true;
                 }
             } catch (e) {}

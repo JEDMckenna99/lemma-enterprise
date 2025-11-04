@@ -37,11 +37,12 @@ def get_bloom_filter():
             conn = get_db_connection(site_id=site_id)
             cursor = conn.cursor()
             
-            # Get all revoked credential IDs for this site
+            # Get all revoked credential IDs for THIS SITE ONLY (site-specific isolation)
+            # NOTE: Each site has its own Bloom filter to prevent cross-site information leakage
             cursor.execute("""
                 SELECT credential_id 
                 FROM revocation_list 
-                WHERE site_id = %s OR site_id IS NULL
+                WHERE site_id = %s
             """, (site_id,))
             
             revoked_ids = [row[0] for row in cursor.fetchall()]
@@ -63,15 +64,17 @@ def get_bloom_filter():
         
         response = {
             'success': True,
+            'site_id': site_id,  # CRITICAL: Site-specific Bloom filter
             'revoked_ids': revoked_ids,
             'count': len(revoked_ids),
             'version': int(time.time()),  # Use timestamp as version
             'valid_until': valid_until.isoformat(),
             'sync_interval_days': 7,
-            'message': 'Cache this locally for client-side revocation checks'
+            'isolation': 'site_specific',  # Each site has its own Bloom filter
+            'message': f'Site-specific Bloom filter for {site_id} - Cache locally for client-side revocation checks'
         }
         
-        logger.info(f"Bloom filter requested: {len(revoked_ids)} revocations")
+        logger.info(f"📊 Site-specific Bloom filter for {site_id}: {len(revoked_ids)} revocations")
         
         return jsonify(response), 200
         
