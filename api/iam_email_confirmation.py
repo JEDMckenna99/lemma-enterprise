@@ -293,34 +293,58 @@ def confirm_access():
         logger.info(f"⚡ Issue time: {issue_time_us:.2f}µs")
         logger.info(f"🔐 Credential ID: {permission_lemma['id']}")
         
-        # Track credential issuance in database (for platform stats)
+        # Track credential issuance in database using permission_instances table
         try:
-            from api.database import SessionLocal, SitePermissionGrant
-            db_session = SessionLocal()
-            
-            # Create database record for tracking (even though credential is in wallet)
+            from api.database import get_db_connection
             from datetime import timedelta
             
+            conn = get_db_connection(site_id=site_id)
+            cursor = conn.cursor()
+            
+            # Calculate expiry
             expires_at_value = None
             if expiry_days and expiry_days > 0:
                 expires_at_value = datetime.utcnow() + timedelta(days=expiry_days)
             
-            grant_record = SitePermissionGrant(
-                site_id=site_id,
-                user_did=user_did,
-                permission_id=permission_level,
-                granted_by='email_confirmation',
-                granted_at=datetime.utcnow(),
-                expires_at=expires_at_value,
-                revoked_at=None,
-                is_active=True
-            )
+            # Get or create permission type
+            cursor.execute("""
+                SELECT id FROM permission_types 
+                WHERE site_id = %s AND name = %s
+            """, (site_id, permission_level))
             
-            db_session.add(grant_record)
-            db_session.commit()
-            db_session.close()
+            result = cursor.fetchone()
+            if result:
+                permission_type_id = result[0]
+            else:
+                # Create permission type if doesn't exist
+                cursor.execute("""
+                    INSERT INTO permission_types (site_id, name, type, description, active)
+                    VALUES (%s, %s, 'role', %s, TRUE)
+                    RETURNING id
+                """, (site_id, permission_level, f'{permission_level.title()} access'))
+                permission_type_id = cursor.fetchone()[0]
             
-            logger.info(f"📊 Tracked permission grant in database for stats")
+            # Insert permission instance (tracks the grant)
+            cursor.execute("""
+                INSERT INTO permission_instances 
+                (permission_type_id, site_id, email, credential_did, granted_at, granted_by, expires_at, metadata)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                permission_type_id,
+                site_id,
+                user_email,
+                user_did,
+                datetime.utcnow(),
+                'email_confirmation',
+                expires_at_value,
+                json.dumps({'credential_id': permission_lemma['id'], 'issue_time_us': issue_time_us})
+            ))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            logger.info(f"📊 Tracked permission grant in permission_instances table")
             
         except Exception as e:
             logger.warning(f"⚠️ Failed to track permission in database (non-critical): {e}")

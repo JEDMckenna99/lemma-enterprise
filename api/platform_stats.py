@@ -9,7 +9,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify
 from sqlalchemy import func, and_, or_
 
-from api.database import SessionLocal, Site, SitePermissionGrant
+from api.database import get_db_connection
 from api.usage_tracking import get_monthly_active_users, get_verification_count
 
 logger = logging.getLogger(__name__)
@@ -31,9 +31,9 @@ def get_platform_stats():
             "recent_activity": []          # Last 5 events
         }
     """
-    session = None
+    conn = None
+    cursor = None
     try:
-        session = SessionLocal()
         current_month = datetime.now().strftime('%Y-%m')
         
         # For lemma.id platform, we track users for 'lemma_platform' site
@@ -47,42 +47,45 @@ def get_platform_stats():
         verification_count = get_verification_count(site_id)
         logger.info(f"📊 Verifications for {site_id}: {verification_count}")
         
-        # 3. Get active users count (from database - site_permission_grants table)
-        active_users = session.query(SitePermissionGrant).filter(
-            and_(
-                SitePermissionGrant.site_id == site_id,
-                SitePermissionGrant.revoked_at.is_(None),
-                or_(
-                    SitePermissionGrant.expires_at.is_(None),
-                    SitePermissionGrant.expires_at > datetime.utcnow()
-                )
-            )
-        ).count()
+        # 3. Get active users count (from database - permission_instances table)
+        conn = get_db_connection(site_id=site_id)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT COUNT(*) FROM permission_instances
+            WHERE site_id = %s 
+            AND revoked_at IS NULL
+            AND (expires_at IS NULL OR expires_at > NOW())
+        """, (site_id,))
+        
+        active_users = cursor.fetchone()[0]
         logger.info(f"📊 Active users for {site_id}: {active_users}")
         
         # 4. Get registered sites count (from database - sites table)
-        # Note: Site table is lightweight - no status column, all sites are active
-        registered_sites = session.query(Site).count()
+        cursor.execute("SELECT COUNT(*) FROM sites")
+        registered_sites = cursor.fetchone()[0]
         logger.info(f"📊 Registered sites: {registered_sites}")
         
-        # 5. Get recent activity (last 5 permission grants)
-        recent_permissions = session.query(SitePermissionGrant).filter(
-            SitePermissionGrant.site_id == site_id
-        ).order_by(
-            SitePermissionGrant.granted_at.desc()
-        ).limit(5).all()
+        # 5. Get recent activity (last 5 permission grants from permission_instances)
+        cursor.execute("""
+            SELECT pi.email, pt.name as permission_name, pi.granted_at
+            FROM permission_instances pi
+            JOIN permission_types pt ON pi.permission_type_id = pt.id
+            WHERE pi.site_id = %s
+            ORDER BY pi.granted_at DESC
+            LIMIT 5
+        """, (site_id,))
         
         recent_activity = []
-        for perm in recent_permissions:
-            # Extract email from user_did (format: did:lemma:hash-of-email)
-            user_email = perm.user_did.split(':')[-1][:20] + '...'  # Truncate for privacy
+        for row in cursor.fetchall():
+            email, permission_name, granted_at = row
             
             recent_activity.append({
                 'type': 'permission_granted',
-                'user': user_email,
-                'permission': perm.permission_id,
-                'timestamp': perm.granted_at.isoformat() if perm.granted_at else None,
-                'time_ago': get_time_ago(perm.granted_at) if perm.granted_at else 'Unknown'
+                'user': email if len(email) < 30 else email[:27] + '...',
+                'permission': permission_name,
+                'timestamp': granted_at.isoformat() if granted_at else None,
+                'time_ago': get_time_ago(granted_at) if granted_at else 'Unknown'
             })
         
         logger.info(f"📊 Recent activity: {len(recent_activity)} events")
@@ -114,8 +117,10 @@ def get_platform_stats():
             'recent_activity': []
         }), 500
     finally:
-        if session:
-            session.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 @platform_stats_bp.route('/api/platform/users', methods=['GET'])
@@ -136,36 +141,47 @@ def get_platform_users():
             ]
         }
     """
-    session = None
+    conn = None
+    cursor = None
     try:
-        session = SessionLocal()
         site_id = 'lemma_platform'
         
-        # Get all user permissions for lemma_platform
-        permissions = session.query(SitePermissionGrant).filter(
-            SitePermissionGrant.site_id == site_id
-        ).order_by(
-            SitePermissionGrant.granted_at.desc()
-        ).all()
+        # Get all user permissions for lemma_platform from permission_instances
+        conn = get_db_connection(site_id=site_id)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT 
+                pi.email, 
+                pt.name as permission_name, 
+                pi.granted_at, 
+                pi.expires_at,
+                pi.revoked_at
+            FROM permission_instances pi
+            JOIN permission_types pt ON pi.permission_type_id = pt.id
+            WHERE pi.site_id = %s
+            ORDER BY pi.granted_at DESC
+        """, (site_id,))
         
         users = []
-        for perm in permissions:
+        for row in cursor.fetchall():
+            email, permission_name, granted_at, expires_at, revoked_at = row
+            
             # Determine status
-            if perm.revoked_at:
+            if revoked_at:
                 status = 'revoked'
-            elif perm.expires_at and perm.expires_at < datetime.utcnow():
+            elif expires_at and expires_at < datetime.utcnow():
                 status = 'expired'
             else:
                 status = 'active'
             
             users.append({
-                'user_did': perm.user_did,
-                'email': perm.user_did.split(':')[-1][:40],  # Extract from DID
-                'permission': perm.permission_id,
-                'granted_at': perm.granted_at.isoformat() if perm.granted_at else None,
-                'expires_at': perm.expires_at.isoformat() if perm.expires_at else 'Never',
+                'email': email,
+                'permission': permission_name,
+                'granted_at': granted_at.isoformat() if granted_at else None,
+                'expires_at': expires_at.isoformat() if expires_at else 'Never',
                 'status': status,
-                'time_ago': get_time_ago(perm.granted_at) if perm.granted_at else 'Unknown'
+                'time_ago': get_time_ago(granted_at) if granted_at else 'Unknown'
             })
         
         logger.info(f"📊 Retrieved {len(users)} users for {site_id}")
@@ -184,8 +200,10 @@ def get_platform_users():
             'users': []
         }), 500
     finally:
-        if session:
-            session.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 def get_time_ago(timestamp):
