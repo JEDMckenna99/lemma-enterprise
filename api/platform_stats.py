@@ -61,7 +61,7 @@ def get_platform_stats():
         logger.info(f"📊 Active users for {site_id}: {active_users}")
         
         # 4. Get registered sites count (from database - sites table)
-        # Count all sites (no status filter - just check they exist)
+        # Note: Site table is lightweight - no status column, all sites are active
         registered_sites = session.query(Site).count()
         logger.info(f"📊 Registered sites: {registered_sites}")
         
