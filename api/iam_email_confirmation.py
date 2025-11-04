@@ -293,6 +293,39 @@ def confirm_access():
         logger.info(f"⚡ Issue time: {issue_time_us:.2f}µs")
         logger.info(f"🔐 Credential ID: {permission_lemma['id']}")
         
+        # Track credential issuance in database (for platform stats)
+        try:
+            from api.database import SessionLocal, SitePermissionGrant
+            db_session = SessionLocal()
+            
+            # Create database record for tracking (even though credential is in wallet)
+            from datetime import timedelta
+            
+            expires_at_value = None
+            if expiry_days and expiry_days > 0:
+                expires_at_value = datetime.utcnow() + timedelta(days=expiry_days)
+            
+            grant_record = SitePermissionGrant(
+                site_id=site_id,
+                user_did=user_did,
+                permission_id=permission_level,
+                granted_by='email_confirmation',
+                granted_at=datetime.utcnow(),
+                expires_at=expires_at_value,
+                revoked_at=None,
+                is_active=True
+            )
+            
+            db_session.add(grant_record)
+            db_session.commit()
+            db_session.close()
+            
+            logger.info(f"📊 Tracked permission grant in database for stats")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to track permission in database (non-critical): {e}")
+            # Don't fail the whole flow if tracking fails
+        
         # Render confirmation page with credential
         return render_template('modern/confirm_access.html',
                              permission_lemma=json.dumps(permission_lemma),
