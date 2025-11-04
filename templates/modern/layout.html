@@ -171,22 +171,17 @@
                 {% if session.get('customer_id') %}
                     <!-- Authenticated User Navigation -->
                     {% if session.get('user_role') == 'admin' %}
-                        <a href="/admin" class="nav-link">Admin Dashboard</a>
-                        <a href="/admin/iam" class="nav-link">IAM</a>
-                        <a href="/dashboard" class="nav-link">My Account</a>
-                        <a href="/docs" class="nav-link">Documentation</a>
-                        <a href="/pricing" class="nav-link">Pricing</a>
+                        <a href="/platform" class="nav-link">Platform</a>
+                        <a href="/wallet" class="nav-link">Wallet</a>
+                        <a href="/docs" class="nav-link">Docs</a>
                     {% else %}
-                        <a href="/dashboard" class="nav-link">Dashboard</a>
-                        <a href="/admin/iam" class="nav-link">IAM</a>
-                        <a href="/wallet" class="nav-link">My Wallet</a>
-                        <a href="/playground" class="nav-link">API Playground</a>
-                        <a href="/docs" class="nav-link">Documentation</a>
+                        <a href="/platform" class="nav-link">Platform</a>
+                        <a href="/wallet" class="nav-link">Wallet</a>
+                        <a href="/docs" class="nav-link">Docs</a>
                     {% endif %}
                 {% else %}
                     <!-- Unregistered User Navigation -->
                     <a href="/wallet" class="nav-link">Wallet</a>
-                    <a href="/about" class="nav-link">About</a>
                     <a href="/docs" class="nav-link">Documentation</a>
                     <a href="/pricing" class="nav-link">Pricing</a>
                     <a href="/contact" class="nav-link">Contact</a>

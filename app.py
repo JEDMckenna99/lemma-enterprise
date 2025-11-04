@@ -443,11 +443,12 @@ def create_app():
     # Dashboard routes
     @app.route('/dashboard')
     def customer_dashboard():
-        return render_template('modern/customer_dashboard.html')
+        """Redirect old dashboard to new platform"""
+        return redirect('/platform')
     
     @app.route('/platform')
     def developer_platform():
-        """Developer Platform - Manage IAM integration"""
+        """Developer Platform - Manage IAM integration and usage"""
         logger.info("🚀 Serving developer platform")
         return render_template('developer/platform.html')
     
