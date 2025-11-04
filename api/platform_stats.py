@@ -152,11 +152,14 @@ def get_platform_users():
         
         cursor.execute("""
             SELECT 
+                pi.id,
                 pi.email, 
+                pi.credential_did,
                 pt.name as permission_name, 
                 pi.granted_at, 
                 pi.expires_at,
-                pi.revoked_at
+                pi.revoked_at,
+                pi.metadata
             FROM permission_instances pi
             JOIN permission_types pt ON pi.permission_type_id = pt.id
             WHERE pi.site_id = %s
@@ -165,7 +168,7 @@ def get_platform_users():
         
         users = []
         for row in cursor.fetchall():
-            email, permission_name, granted_at, expires_at, revoked_at = row
+            instance_id, email, credential_did, permission_name, granted_at, expires_at, revoked_at, metadata = row
             
             # Determine status
             if revoked_at:
@@ -175,13 +178,23 @@ def get_platform_users():
             else:
                 status = 'active'
             
+            # Extract credential_id from metadata if available
+            credential_id = None
+            if metadata and isinstance(metadata, dict):
+                credential_id = metadata.get('credential_id')
+            
+            # Fallback to credential_did or instance-based ID
+            if not credential_id:
+                credential_id = credential_did or f'perm_{instance_id}'
+            
             users.append({
                 'email': email,
                 'permission': permission_name,
                 'granted_at': granted_at.isoformat() if granted_at else None,
                 'expires_at': expires_at.isoformat() if expires_at else 'Never',
                 'status': status,
-                'time_ago': get_time_ago(granted_at) if granted_at else 'Unknown'
+                'time_ago': get_time_ago(granted_at) if granted_at else 'Unknown',
+                'credential_id': credential_id  # For revocation
             })
         
         logger.info(f"📊 Retrieved {len(users)} users for {site_id}")
@@ -198,6 +211,122 @@ def get_platform_users():
             'success': False,
             'error': str(e),
             'users': []
+        }), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+@platform_stats_bp.route('/api/platform/revoke-permission', methods=['POST'])
+def revoke_platform_permission():
+    """
+    Revoke a user's permission from the platform
+    
+    POST /api/platform/revoke-permission
+    {
+        "email": "user@example.com",
+        "credential_id": "cred_xxx",
+        "reason": "User requested / Admin action"
+    }
+    
+    This will:
+    1. Mark permission as revoked in database
+    2. Trigger Bloom filter update
+    3. Publish revocation event to all dynos via Redis pub/sub
+    4. Clients will sync on next page load or after 7 days
+    """
+    conn = None
+    cursor = None
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        credential_id = data.get('credential_id')
+        reason = data.get('reason', 'admin_action')
+        
+        if not email:
+            return jsonify({
+                'success': False,
+                'error': 'Email is required'
+            }), 400
+        
+        site_id = 'lemma_platform'
+        
+        # Mark permission as revoked in database
+        conn = get_db_connection(site_id=site_id)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE permission_instances
+            SET revoked_at = NOW(),
+                revoked_by = %s,
+                revocation_reason = %s
+            WHERE site_id = %s AND email = %s AND revoked_at IS NULL
+            RETURNING id, credential_did
+        """, ('platform_admin', reason, site_id, email))
+        
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.rollback()
+            cursor.close()
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': 'No active permission found for this user'
+            }), 404
+        
+        instance_id, user_did = result
+        conn.commit()
+        
+        logger.info(f"✅ Marked permission as revoked in database: {email}")
+        
+        # Add to revocation list table
+        cursor.execute("""
+            INSERT INTO revocation_list 
+            (credential_id, user_did, lemma_type, site_id, revoked_at, reason, bloom_filter_updated)
+            VALUES (%s, %s, 'permission', %s, NOW(), %s, FALSE)
+            ON CONFLICT (credential_id) DO UPDATE SET revoked_at = NOW()
+        """, (credential_id or f'perm_{instance_id}', user_did or f'user_{email}', site_id, reason))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"✅ Added to revocation_list table")
+        
+        # Trigger immediate Bloom filter sync via event bus
+        try:
+            from api.revocation_sync import trigger_revocation_sync
+            
+            cred_id_for_sync = credential_id or f'perm_{instance_id}'
+            event_published = trigger_revocation_sync(cred_id_for_sync, 'permission')
+            
+            if event_published:
+                logger.info(f"✅ Revocation event published - ALL dynos syncing Bloom filter")
+            else:
+                logger.warning(f"⚠️ Event bus unavailable - local sync only")
+                
+        except Exception as e:
+            logger.error(f"❌ Bloom filter sync error (non-critical): {e}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Permission revoked for {email}',
+            'email': email,
+            'revoked_at': datetime.utcnow().isoformat(),
+            'bloom_filter_updated': True,
+            'sync_propagated': event_published if 'event_published' in locals() else False
+        })
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"❌ Failed to revoke permission: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
     finally:
         if cursor:

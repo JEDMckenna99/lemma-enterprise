@@ -28,16 +28,32 @@ def get_bloom_filter():
     """
     try:
         # Get site_id from query param (optional - can filter by site)
-        site_id = request.args.get('site_id')
+        site_id = request.args.get('site_id', 'lemma_platform')
         
-        # For now, return empty set (no revocations yet)
-        # In production, query database for revoked credentials
-        revoked_ids = []
-        
-        # TODO: Get from database
-        # from api.database import RevocationList
-        # revocations = RevocationList.query.filter_by(site_id=site_id).all()
-        # revoked_ids = [r.credential_id for r in revocations]
+        # Query database for revoked credentials
+        try:
+            from api.database import get_db_connection
+            
+            conn = get_db_connection(site_id=site_id)
+            cursor = conn.cursor()
+            
+            # Get all revoked credential IDs for this site
+            cursor.execute("""
+                SELECT credential_id 
+                FROM revocation_list 
+                WHERE site_id = %s OR site_id IS NULL
+            """, (site_id,))
+            
+            revoked_ids = [row[0] for row in cursor.fetchall()]
+            
+            cursor.close()
+            conn.close()
+            
+            logger.info(f"📊 Bloom filter for {site_id}: {len(revoked_ids)} revoked credentials")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to query revocations: {e}")
+            revoked_ids = []  # Fail safe - return empty list
         
         # Return bloom filter data
         import time
