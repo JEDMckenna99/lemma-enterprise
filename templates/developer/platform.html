@@ -854,24 +854,80 @@
         
         // Load overview data
         async function loadOverviewData() {
-            // For now, show placeholder data
-            // In production, fetch from /api/platform/stats
-            
-            document.getElementById('stat-mau').textContent = '0';
-            document.getElementById('stat-mau-change').textContent = 'Beta launch';
-            
-            document.getElementById('stat-verifications').textContent = '0';
-            document.getElementById('stat-users').textContent = '1';
-            document.getElementById('stat-sites').textContent = '1';
-            
-            // Show recent activity placeholder
-            document.getElementById('recent-activity').innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">📋</div>
-                    <div>No recent activity yet</div>
-                    <div style="font-size: 14px; margin-top: 8px;">Activity will appear here as users interact with your integration</div>
-                </div>
-            `;
+            try {
+                console.log('📊 Fetching real platform stats...');
+                
+                const response = await fetch('/api/platform/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.stats;
+                    
+                    // Update stat cards with real data
+                    document.getElementById('stat-mau').textContent = stats.mau.toLocaleString();
+                    document.getElementById('stat-mau-change').textContent = stats.mau > 0 ? 'This month' : 'Beta launch';
+                    
+                    document.getElementById('stat-verifications').textContent = stats.total_verifications.toLocaleString();
+                    document.getElementById('stat-users').textContent = stats.active_users.toLocaleString();
+                    document.getElementById('stat-sites').textContent = stats.registered_sites.toLocaleString();
+                    
+                    console.log('✅ Stats loaded:', stats);
+                    
+                    // Load recent activity
+                    if (data.recent_activity && data.recent_activity.length > 0) {
+                        const activityHTML = data.recent_activity.map(activity => `
+                            <div style="padding: 12px; border-bottom: 1px solid #f3f4f6;">
+                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                    <div>
+                                        <div style="font-size: 14px; color: #111827; margin-bottom: 4px;">
+                                            Permission granted to ${activity.user}
+                                        </div>
+                                        <div style="font-size: 13px; color: #6b7280;">
+                                            Level: ${activity.permission}
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 13px; color: #9ca3af; white-space: nowrap;">
+                                        ${activity.time_ago}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('');
+                        
+                        document.getElementById('recent-activity').innerHTML = activityHTML;
+                    } else {
+                        document.getElementById('recent-activity').innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📋</div>
+                                <div>No recent activity yet</div>
+                                <div style="font-size: 14px; margin-top: 8px;">Activity will appear here as users interact with your integration</div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    console.error('❌ Failed to load stats:', data.error);
+                    throw new Error(data.error);
+                }
+                
+            } catch (error) {
+                console.error('❌ Failed to load platform stats:', error);
+                
+                // Show error state
+                document.getElementById('stat-mau').textContent = 'Error';
+                document.getElementById('stat-mau-change').textContent = 'Failed to load';
+                document.getElementById('stat-verifications').textContent = 'Error';
+                document.getElementById('stat-users').textContent = 'Error';
+                document.getElementById('stat-sites').textContent = 'Error';
+                
+                document.getElementById('recent-activity').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <div>Failed to load activity</div>
+                        <div style="font-size: 14px; margin-top: 8px; color: #ef4444;">
+                            ${error.message}
+                        </div>
+                    </div>
+                `;
+            }
         }
         
         // Navigation
@@ -921,16 +977,68 @@
         
         // Load users data
         async function loadUsersData() {
-            document.getElementById('users-table-container').innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">👥</div>
-                    <div>No users yet</div>
-                    <div style="font-size: 14px; margin-top: 8px;">Issue your first permission to get started</div>
-                    <button class="btn btn-primary" onclick="showIssuePermissionModal()" style="margin-top: 16px;">
-                        Issue Permission
-                    </button>
-                </div>
-            `;
+            try {
+                console.log('👥 Fetching platform users...');
+                
+                const response = await fetch('/api/platform/users');
+                const data = await response.json();
+                
+                if (data.success && data.users.length > 0) {
+                    // Create users table
+                    const tableHTML = `
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Permission</th>
+                                    <th>Status</th>
+                                    <th>Granted</th>
+                                    <th>Expires</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.users.map(user => `
+                                    <tr>
+                                        <td>${user.email}</td>
+                                        <td><span class="badge badge-info">${user.permission}</span></td>
+                                        <td><span class="badge ${user.status === 'active' ? 'badge-success' : 'badge-warning'}">${user.status}</span></td>
+                                        <td style="font-size: 13px; color: #6b7280;">${user.time_ago}</td>
+                                        <td style="font-size: 13px; color: #6b7280;">${user.expires_at}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    document.getElementById('users-table-container').innerHTML = tableHTML;
+                    console.log('✅ Loaded', data.users.length, 'users');
+                    
+                } else {
+                    // Empty state
+                    document.getElementById('users-table-container').innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">👥</div>
+                            <div>No users yet</div>
+                            <div style="font-size: 14px; margin-top: 8px;">Issue your first permission to get started</div>
+                            <button class="btn btn-primary" onclick="showIssuePermissionModal()" style="margin-top: 16px;">
+                                Issue Permission
+                            </button>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('❌ Failed to load users:', error);
+                document.getElementById('users-table-container').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <div>Failed to load users</div>
+                        <div style="font-size: 14px; margin-top: 8px; color: #ef4444;">
+                            ${error.message}
+                        </div>
+                    </div>
+                `;
+            }
         }
         
         // Load API keys data

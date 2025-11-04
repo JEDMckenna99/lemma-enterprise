@@ -301,6 +301,14 @@ def create_app():
         logger.info("✅ Test Credential Endpoint registered")
     except Exception as e:
         logger.error(f"❌ Failed to register Test Credential Endpoint: {e}")
+    
+    # Platform Statistics API
+    try:
+        from api.platform_stats import platform_stats_bp
+        app.register_blueprint(platform_stats_bp)
+        logger.info("✅ Platform Statistics API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Platform Statistics API: {e}")
 
     # Health Monitoring
     try:
