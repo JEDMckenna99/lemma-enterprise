@@ -9,7 +9,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify
 from sqlalchemy import func, and_, or_
 
-from api.database import get_db_session, Site, SitePermissionGrant
+from api.database import SessionLocal, Site, SitePermissionGrant
 from api.usage_tracking import get_monthly_active_users, get_verification_count
 
 logger = logging.getLogger(__name__)
@@ -31,8 +31,9 @@ def get_platform_stats():
             "recent_activity": []          # Last 5 events
         }
     """
+    session = None
     try:
-        session = get_db_session()
+        session = SessionLocal()
         current_month = datetime.now().strftime('%Y-%m')
         
         # For lemma.id platform, we track users for 'lemma_platform' site
@@ -113,6 +114,9 @@ def get_platform_stats():
             },
             'recent_activity': []
         }), 500
+    finally:
+        if session:
+            session.close()
 
 
 @platform_stats_bp.route('/api/platform/users', methods=['GET'])
@@ -133,8 +137,9 @@ def get_platform_users():
             ]
         }
     """
+    session = None
     try:
-        session = get_db_session()
+        session = SessionLocal()
         site_id = 'lemma_platform'
         
         # Get all user permissions for lemma_platform
@@ -179,6 +184,9 @@ def get_platform_users():
             'error': str(e),
             'users': []
         }), 500
+    finally:
+        if session:
+            session.close()
 
 
 def get_time_ago(timestamp):
