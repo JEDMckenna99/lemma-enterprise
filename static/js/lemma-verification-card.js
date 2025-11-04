@@ -488,10 +488,10 @@ class LemmaVerificationCard {
                     ` : ''}
                     
                     <button style="${theme.button.replace('linear-gradient(135deg, #667eea 0%, #764ba2 100%)', '#10b981').replace('background: linear-gradient', 'background: ')}" 
-                            onclick="window.location.href='/wallet'"
+                            onclick="window.location.href='/platform'"
                             onmouseover="this.style.transform='translateY(-1px)'" 
                             onmouseout="this.style.transform='translateY(0)'">
-                        Go to Wallet
+                        Go to Platform
                     </button>
                     
                     <p style="${theme.footer}">Secure • Private • Verified</p>

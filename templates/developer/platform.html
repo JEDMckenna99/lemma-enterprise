@@ -1,0 +1,1036 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Developer Platform - Lemma{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    
+    <!-- Lemma Wallet for permission checking -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1041"></script>
+    
+    <style>
+        :root {
+            --sidebar-width: 240px;
+            --header-height: 64px;
+        }
+        
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f9fafb;
+        }
+        
+        .platform-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        /* Sidebar Navigation */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #ffffff;
+            border-right: 1px solid #e5e7eb;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+        }
+        
+        .sidebar-nav {
+            padding: 16px 0;
+        }
+        
+        .nav-section {
+            margin-bottom: 24px;
+        }
+        
+        .nav-section-title {
+            padding: 8px 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            color: #4b5563;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .nav-item:hover {
+            background: #f3f4f6;
+            color: #667eea;
+        }
+        
+        .nav-item.active {
+            background: #eef2ff;
+            color: #667eea;
+            font-weight: 500;
+            border-right: 2px solid #667eea;
+        }
+        
+        .nav-icon {
+            width: 20px;
+            text-align: center;
+        }
+        
+        /* Main Content Area */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 24px;
+        }
+        
+        .content-header {
+            margin-bottom: 32px;
+        }
+        
+        .content-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #111827;
+            margin: 0 0 8px 0;
+        }
+        
+        .content-subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 0;
+        }
+        
+        /* Stat Cards */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+        
+        .stat-change {
+            font-size: 13px;
+            color: #10b981;
+        }
+        
+        .stat-change.negative {
+            color: #ef4444;
+        }
+        
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 24px;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+            margin: 0;
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 1px solid #667eea;
+        }
+        
+        .btn-secondary:hover {
+            background: #f5f7ff;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+        
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .data-table thead {
+            background: #f9fafb;
+        }
+        
+        .data-table th {
+            text-align: left;
+            padding: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #6b7280;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 14px;
+            color: #111827;
+        }
+        
+        .data-table tbody tr:hover {
+            background: #f9fafb;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+        
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        /* Code Block */
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-x: auto;
+            position: relative;
+        }
+        
+        .code-block .copy-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: #334155;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .code-block .copy-btn:hover {
+            background: #475569;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            margin-bottom: 24px;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #111827;
+            margin: 0 0 8px 0;
+        }
+        
+        .modal-subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 0;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+        
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        
+        .quick-action {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-action:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+        }
+        
+        .quick-action-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+        
+        .quick-action-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #111827;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="platform-container">
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <span style="font-size: 24px;">🔐</span>
+                    <span>Lemma</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <a class="nav-item active" data-section="overview">
+                        <span class="nav-icon">📊</span>
+                        <span>Overview</span>
+                    </a>
+                    <a class="nav-item" data-section="users">
+                        <span class="nav-icon">👥</span>
+                        <span>Users & Permissions</span>
+                    </a>
+                    <a class="nav-item" data-section="api">
+                        <span class="nav-icon">🔑</span>
+                        <span>API & Integration</span>
+                    </a>
+                    <a class="nav-item" data-section="analytics">
+                        <span class="nav-icon">📈</span>
+                        <span>Analytics</span>
+                    </a>
+                    <a class="nav-item" data-section="settings">
+                        <span class="nav-icon">⚙️</span>
+                        <span>Settings</span>
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">Resources</div>
+                    <a class="nav-item" href="/docs" target="_blank">
+                        <span class="nav-icon">📚</span>
+                        <span>Documentation</span>
+                    </a>
+                    <a class="nav-item" href="/wallet">
+                        <span class="nav-icon">💼</span>
+                        <span>Your Wallet</span>
+                    </a>
+                </div>
+                
+                <!-- Admin Section (only if super_admin permission) -->
+                <div class="nav-section" id="admin-section" style="display: none;">
+                    <div class="nav-section-title">Platform Admin</div>
+                    <a class="nav-item" data-section="platform-admin">
+                        <span class="nav-icon">🛡️</span>
+                        <span>Platform Users</span>
+                    </a>
+                </div>
+            </nav>
+        </div>
+        
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Loading State -->
+            <div id="loading-state" class="loading">
+                <div class="spinner"></div>
+                <div>Loading developer platform...</div>
+            </div>
+            
+            <!-- Access Denied State -->
+            <div id="access-denied" style="display: none; text-align: center; padding: 60px 20px;">
+                <div style="font-size: 64px; margin-bottom: 24px;">🔒</div>
+                <h2>Access Denied</h2>
+                <p style="color: #6b7280; margin-bottom: 24px;">
+                    You need a valid Lemma permission credential to access the developer platform.
+                </p>
+                <a href="/login" class="btn btn-primary">Sign In with Lemma</a>
+            </div>
+            
+            <!-- Overview Section -->
+            <div id="section-overview" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Overview</h1>
+                    <p class="content-subtitle">Monitor your Lemma IAM integration and usage</p>
+                </div>
+                
+                <!-- Stat Cards -->
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Monthly Active Users</div>
+                        <div class="stat-value" id="stat-mau">-</div>
+                        <div class="stat-change" id="stat-mau-change">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Verifications</div>
+                        <div class="stat-value" id="stat-verifications">-</div>
+                        <div class="stat-change" id="stat-verifications-change">This month</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Users</div>
+                        <div class="stat-value" id="stat-users">-</div>
+                        <div class="stat-change" id="stat-users-change">Total issued</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Registered Sites</div>
+                        <div class="stat-value" id="stat-sites">-</div>
+                        <div class="stat-change" id="stat-sites-change">Active domains</div>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Quick Actions</h2>
+                    </div>
+                    <div class="quick-actions">
+                        <div class="quick-action" onclick="showIssuePermissionModal()">
+                            <div class="quick-action-icon">➕</div>
+                            <div class="quick-action-title">Issue Permission</div>
+                        </div>
+                        <div class="quick-action" onclick="showSection('api')">
+                            <div class="quick-action-icon">🔑</div>
+                            <div class="quick-action-title">Generate API Key</div>
+                        </div>
+                        <div class="quick-action" onclick="showSection('users')">
+                            <div class="quick-action-icon">👥</div>
+                            <div class="quick-action-title">Manage Users</div>
+                        </div>
+                        <div class="quick-action" onclick="showSection('analytics')">
+                            <div class="quick-action-icon">📈</div>
+                            <div class="quick-action-title">View Analytics</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Recent Activity</h2>
+                        <a href="#" class="btn btn-secondary btn-sm">View All</a>
+                    </div>
+                    <div id="recent-activity">
+                        <div class="loading">Loading recent activity...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Users & Permissions Section -->
+            <div id="section-users" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Users & Permissions</h1>
+                    <p class="content-subtitle">Manage user access and permissions</p>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <input type="text" id="user-search" class="form-input" placeholder="Search by email or domain..." style="width: 300px;">
+                        </div>
+                        <button class="btn btn-primary" onclick="showIssuePermissionModal()">
+                            + Issue Permission
+                        </button>
+                    </div>
+                    
+                    <div id="users-table-container">
+                        <div class="loading">Loading users...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- API & Integration Section -->
+            <div id="section-api" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">API & Integration</h1>
+                    <p class="content-subtitle">SDK setup, API keys, and code examples</p>
+                </div>
+                
+                <!-- API Keys -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">API Keys</h2>
+                        <button class="btn btn-primary btn-sm" onclick="generateAPIKey()">
+                            + Create New Key
+                        </button>
+                    </div>
+                    <div id="api-keys-container">
+                        <div class="loading">Loading API keys...</div>
+                    </div>
+                </div>
+                
+                <!-- Quick Integration -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Quick Integration</h2>
+                    </div>
+                    <p style="margin-bottom: 16px; color: #6b7280;">
+                        Add Lemma authentication to your site in minutes:
+                    </p>
+                    
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode('integration-code')">Copy</button>
+                        <pre id="integration-code">&lt;!-- Add to your HTML head --&gt;
+&lt;script src="https://lemma.id/static/js/lemma-signin-sdk.js"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+  const auth = new LemmaSignIn({
+    siteId: 'yoursite.com',
+    apiKey: '<span id="code-api-key">YOUR_API_KEY</span>',
+    onSignIn: (user) => {
+      console.log('User signed in:', user.email);
+      window.location.href = '/dashboard';
+    }
+  });
+  
+  auth.init();
+&lt;/script&gt;</pre>
+                    </div>
+                    
+                    <p style="margin-top: 16px; font-size: 14px; color: #6b7280;">
+                        <strong>Next:</strong> Check out our <a href="/docs" style="color: #667eea;">full documentation</a> for advanced features.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Analytics Section -->
+            <div id="section-analytics" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Analytics</h1>
+                    <p class="content-subtitle">Usage insights and verification metrics</p>
+                </div>
+                
+                <div class="card">
+                    <p style="text-align: center; padding: 60px 20px; color: #6b7280;">
+                        📈 Analytics charts coming soon!<br>
+                        <span style="font-size: 14px;">Track MAU, verification trends, and performance metrics.</span>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Settings Section -->
+            <div id="section-settings" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Settings</h1>
+                    <p class="content-subtitle">Platform configuration and account management</p>
+                </div>
+                
+                <div class="card">
+                    <p style="text-align: center; padding: 60px 20px; color: #6b7280;">
+                        ⚙️ Settings page coming soon!<br>
+                        <span style="font-size: 14px;">Customize email templates, branding, and more.</span>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Platform Admin Section -->
+            <div id="section-platform-admin" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Platform Administration</h1>
+                    <p class="content-subtitle">Manage all Lemma platform users</p>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">All Platform Users</h2>
+                        <button class="btn btn-primary btn-sm" onclick="showIssueAdminModal()">
+                            + Issue Admin Credential
+                        </button>
+                    </div>
+                    <div id="platform-users-container">
+                        <div class="loading">Loading platform users...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Issue Permission Modal -->
+    <div id="issue-permission-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Issue Permission</h3>
+                <p class="modal-subtitle">Grant access to a user via email confirmation</p>
+            </div>
+            
+            <form id="issue-permission-form" onsubmit="issuePermission(event)">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" class="form-input" id="permission-email" required placeholder="user@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Site</label>
+                    <select class="form-select" id="permission-site" required>
+                        <option value="lemma.id">lemma.id</option>
+                        <option value="custom">Custom site (enter below)</option>
+                    </select>
+                    <input type="text" class="form-input" id="permission-custom-site" placeholder="yoursite.com" style="margin-top: 8px; display: none;">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Permission Level</label>
+                    <select class="form-select" id="permission-level" required>
+                        <option value="beta-user">Beta User</option>
+                        <option value="admin">Admin</option>
+                        <option value="super_admin">Super Admin</option>
+                    </select>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('issue-permission-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Send Email Confirmation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        // Global state
+        let currentSection = 'overview';
+        let userPermission = null;
+        
+        // Initialize platform
+        async function initPlatform() {
+            console.log('🚀 Initializing developer platform...');
+            
+            try {
+                // Check for valid permission credential
+                const hasAccess = await checkAccess();
+                
+                if (!hasAccess) {
+                    document.getElementById('loading-state').style.display = 'none';
+                    document.getElementById('access-denied').style.display = 'block';
+                    return;
+                }
+                
+                // Load platform data
+                await loadOverviewData();
+                
+                // Show platform
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('section-overview').style.display = 'block';
+                
+                console.log('✅ Platform initialized');
+                
+            } catch (error) {
+                console.error('❌ Platform initialization failed:', error);
+                document.getElementById('loading-state').innerHTML = `
+                    <div style="color: #ef4444;">
+                        Failed to load platform. Please refresh the page.
+                    </div>
+                `;
+            }
+        }
+        
+        // Check access (verify Lemma permission)
+        async function checkAccess() {
+            try {
+                // Initialize wallet
+                const wallet = new LemmaIntegratedWallet({ debug: true });
+                await wallet.init();
+                
+                // Get permission credentials
+                const permissions = await wallet.getCredentials('permission');
+                console.log('🔍 Found permission credentials:', permissions.length);
+                
+                // Check for lemma.id or lemma_platform permission
+                const lemmaPermissions = permissions.filter(p => {
+                    const claims = p.claims || p.credentialSubject || {};
+                    const siteId = claims.siteId || claims.site || '';
+                    return siteId === 'lemma.id' || siteId === 'lemma_platform';
+                });
+                
+                if (lemmaPermissions.length === 0) {
+                    console.log('❌ No valid lemma.id permission found');
+                    return false;
+                }
+                
+                // Store permission level
+                const perm = lemmaPermissions[0];
+                const claims = perm.claims || perm.credentialSubject || {};
+                userPermission = claims.permissionId || claims.permission_level || 'beta-user';
+                
+                console.log('✅ Access granted -', userPermission);
+                
+                // Show admin section if super_admin
+                if (userPermission === 'super_admin') {
+                    document.getElementById('admin-section').style.display = 'block';
+                }
+                
+                return true;
+                
+            } catch (error) {
+                console.error('❌ Access check failed:', error);
+                return false;
+            }
+        }
+        
+        // Load overview data
+        async function loadOverviewData() {
+            // For now, show placeholder data
+            // In production, fetch from /api/platform/stats
+            
+            document.getElementById('stat-mau').textContent = '0';
+            document.getElementById('stat-mau-change').textContent = 'Beta launch';
+            
+            document.getElementById('stat-verifications').textContent = '0';
+            document.getElementById('stat-users').textContent = '1';
+            document.getElementById('stat-sites').textContent = '1';
+            
+            // Show recent activity placeholder
+            document.getElementById('recent-activity').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📋</div>
+                    <div>No recent activity yet</div>
+                    <div style="font-size: 14px; margin-top: 8px;">Activity will appear here as users interact with your integration</div>
+                </div>
+            `;
+        }
+        
+        // Navigation
+        function showSection(sectionName) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // Remove active state from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Show selected section
+            document.getElementById('section-' + sectionName).style.display = 'block';
+            
+            // Add active state to nav item
+            document.querySelector(`[data-section="${sectionName}"]`).classList.add('active');
+            
+            // Load section data if needed
+            if (sectionName === 'users') {
+                loadUsersData();
+            } else if (sectionName === 'api') {
+                loadAPIKeysData();
+            }
+            
+            currentSection = sectionName;
+        }
+        
+        // Setup navigation listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const section = item.getAttribute('data-section');
+                    showSection(section);
+                });
+            });
+            
+            // Site selector change
+            document.getElementById('permission-site').addEventListener('change', (e) => {
+                const customInput = document.getElementById('permission-custom-site');
+                customInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
+            });
+        });
+        
+        // Load users data
+        async function loadUsersData() {
+            document.getElementById('users-table-container').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">👥</div>
+                    <div>No users yet</div>
+                    <div style="font-size: 14px; margin-top: 8px;">Issue your first permission to get started</div>
+                    <button class="btn btn-primary" onclick="showIssuePermissionModal()" style="margin-top: 16px;">
+                        Issue Permission
+                    </button>
+                </div>
+            `;
+        }
+        
+        // Load API keys data
+        async function loadAPIKeysData() {
+            document.getElementById('api-keys-container').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🔑</div>
+                    <div>No API keys yet</div>
+                    <div style="font-size: 14px; margin-top: 8px;">Create your first API key to start integrating</div>
+                    <button class="btn btn-primary" onclick="generateAPIKey()" style="margin-top: 16px;">
+                        Create API Key
+                    </button>
+                </div>
+            `;
+        }
+        
+        // Issue permission
+        async function issuePermission(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('permission-email').value;
+            const siteSelect = document.getElementById('permission-site').value;
+            const siteId = siteSelect === 'custom' 
+                ? document.getElementById('permission-custom-site').value 
+                : 'lemma_platform';
+            const siteDomain = siteSelect === 'custom'
+                ? document.getElementById('permission-custom-site').value
+                : 'lemma.id';
+            const permissionLevel = document.getElementById('permission-level').value;
+            
+            console.log('📧 Issuing permission:', { email, siteId, siteDomain, permissionLevel });
+            
+            try {
+                const response = await fetch('/api/v1/iam/request-access', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: siteId,
+                        site_domain: siteDomain,
+                        user_email: email,
+                        permission_level: permissionLevel,
+                        redirect_url: window.location.origin + '/'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✅ Confirmation email sent to ${email}!\n\nThey will receive a link to confirm and get their credential.`);
+                    closeModal('issue-permission-modal');
+                    document.getElementById('issue-permission-form').reset();
+                } else {
+                    alert(`❌ Failed: ${data.message || 'Unknown error'}`);
+                }
+                
+            } catch (error) {
+                console.error('❌ Issue permission failed:', error);
+                alert('Failed to send email. Please try again.');
+            }
+        }
+        
+        // Generate API key
+        async function generateAPIKey() {
+            alert('🔑 API key generation coming soon!\n\nFor now, use your permission credentials for authentication.');
+        }
+        
+        // Modal helpers
+        function showIssuePermissionModal() {
+            document.getElementById('issue-permission-modal').classList.add('show');
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+        
+        // Copy code
+        function copyCode(elementId) {
+            const code = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(code);
+            
+            const btn = event.target;
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+                btn.textContent = 'Copy';
+            }, 2000);
+        }
+        
+        // Close modals on background click
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.remove('show');
+            }
+        });
+        
+        // Initialize on load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPlatform);
+        } else {
+            initPlatform();
+        }
+    </script>
+{% endblock %}
+

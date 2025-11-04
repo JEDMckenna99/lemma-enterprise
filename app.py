@@ -444,7 +444,13 @@ def create_app():
     @app.route('/dashboard')
     def customer_dashboard():
         return render_template('modern/customer_dashboard.html')
-
+    
+    @app.route('/platform')
+    def developer_platform():
+        """Developer Platform - Manage IAM integration"""
+        logger.info("🚀 Serving developer platform")
+        return render_template('developer/platform.html')
+    
     @app.route('/advanced-wallet')
     def advanced_wallet():
         """Advanced wallet with recovery and multi-device features"""
