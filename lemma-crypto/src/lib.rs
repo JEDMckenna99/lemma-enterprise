@@ -40,7 +40,7 @@ pub mod utils;
 pub mod minimal_python;
 
 #[cfg(feature = "wasm")]
-pub mod wasm_bindings;
+pub mod wasm_oprf_minimal;
 
 // Re-export WORKING types
 pub use crate::minimal_core::{MinimalIssuer, MinimalCore, MinimalCredential, MinimalVerificationResult, MinimalError};

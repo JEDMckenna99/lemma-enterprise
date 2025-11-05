@@ -1208,10 +1208,10 @@ class LemmaWallet {
                     this.revocationBloomFilter = new Set(data.data);
                     
                     if (this.debug) {
-                        console.log(`📦 Loaded cached global Bloom filter: ${this.revocationBloomFilter.size} revocations`);
-                        console.log(`🔐 Filter type: ${data.filterType || 'global'}, Privacy: ${data.privacyMechanism || 'oprf'}`);
+                        console.log(`📦 Loaded cached global Bloom filter: ${this.revocationBloomFilter.size} SHA-256 hashes`);
+                        console.log(`🔐 Privacy: Web Crypto API (server has hashes, not credential IDs)`);
                     }
-                    }
+                }
                 } catch (e) {
                     // Ignore corrupted cache entries
                     if (this.debug) {

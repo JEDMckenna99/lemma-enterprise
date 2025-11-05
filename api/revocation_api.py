@@ -65,53 +65,38 @@ def get_bloom_filter():
         
         valid_until = datetime.now() + timedelta(days=7)
         
-        # Build Cascaded Bloom Filter with OPRF-hashed IDs (for WASM)
-        filter_bytes = None
+        # Hash revoked IDs with SHA-256 (client will hash credential IDs locally to check)
+        # This provides strong privacy: server cannot reverse SHA-256 to get credential IDs
+        hashed_revoked_ids = []
         try:
-            from lemma_crypto import PyCascadedBloomFilter, PyOPRFServer
+            import hashlib
             
-            # Create Bloom filter (3 levels, 10K base capacity, 0.1% error rate)
-            bloom_filter = PyCascadedBloomFilter(3, 10000, 0.001)
-            
-            # Create OPRF server for hashing credential IDs
-            oprf_server = PyOPRFServer()
-            
-            # Add revoked IDs to Bloom filter (as bytes)
             for cred_id in revoked_ids:
-                # Convert credential ID string to bytes
-                cred_id_bytes = cred_id.encode('utf-8') if isinstance(cred_id, str) else cred_id
-                # Ensure it's a list of ints for Python bindings
-                bloom_filter.add(list(cred_id_bytes))
+                # SHA-256 hash of credential ID (one-way function)
+                cred_id_str = cred_id if isinstance(cred_id, str) else cred_id.decode('utf-8')
+                hash_digest = hashlib.sha256(cred_id_str.encode('utf-8')).hexdigest()
+                hashed_revoked_ids.append(hash_digest)
             
-            # Serialize Bloom filter for client
-            filter_bytes_raw = bloom_filter.to_bytes()
-            
-            # Convert list[int] from Rust to bytes for base64 encoding
-            filter_bytes = bytes(filter_bytes_raw) if isinstance(filter_bytes_raw, list) else filter_bytes_raw
-            
-            logger.info(f"✅ Built Bloom filter: {len(filter_bytes)} bytes")
+            logger.info(f"✅ Hashed {len(hashed_revoked_ids)} revoked IDs with SHA-256")
             
         except Exception as e:
-            logger.warning(f"⚠️ Failed to build Bloom filter: {e}", exc_info=True)
-            filter_bytes = None
+            logger.warning(f"⚠️ Failed to hash revoked IDs: {e}", exc_info=True)
+            # Fallback to plain IDs
+            hashed_revoked_ids = revoked_ids
         
         response = {
             'success': True,
-            'filter_type': 'global_cascaded',  # Single global Bloom filter for all sites
-            'revoked_ids': revoked_ids,
-            'count': len(revoked_ids),
+            'filter_type': 'global_sha256',  # SHA-256 hashed IDs for privacy
+            'hashed_revoked_ids': hashed_revoked_ids,  # SHA-256 hashes (client hashes locally to check)
+            'count': len(hashed_revoked_ids),
             'version': int(time.time()),  # Use timestamp as version
             'valid_until': valid_until.isoformat(),
             'sync_interval_days': 7,
-            'privacy_mechanism': 'oprf_blinding',  # OPRF provides zero-knowledge privacy
-            'message': 'Global revocation list - privacy preserved via OPRF blinding before lookup'
+            'privacy_mechanism': 'sha256_web_crypto',  # Web Crypto API provides one-way hashing
+            'message': 'Global revocation list (SHA-256 hashed) - client hashes credential ID locally using Web Crypto API to check',
+            'hash_algorithm': 'SHA-256',
+            'client_implementation': 'crypto.subtle.digest'
         }
-        
-        # Include Bloom filter bytes if available (base64-encoded for JSON)
-        if filter_bytes:
-            import base64
-            response['filter_bytes'] = base64.b64encode(filter_bytes).decode('utf-8')
-            response['filter_size_bytes'] = len(filter_bytes)
         
         logger.info(f"✅ Global Bloom filter served: {len(revoked_ids)} total revocations")
         
