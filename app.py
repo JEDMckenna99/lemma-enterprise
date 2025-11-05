@@ -487,10 +487,16 @@ def create_app():
     def admin_dashboard():
         return render_template('admin/admin_dashboard.html')
     
+    @app.route('/admin')
+    def admin_monitoring():
+        """Admin Platform Monitoring - Bloom filter collision tracking, system health"""
+        logger.info("🔧 Serving admin monitoring dashboard")
+        return render_template('admin/platform_monitoring.html')
+    
     @app.route('/admin/iam')
-    def admin_iam_permissions():
-        """IAM Permission Management Dashboard"""
-        return render_template('admin/iam_permissions.html')
+    def admin_iam_redirect():
+        """Redirect legacy /admin/iam to /admin"""
+        return redirect('/admin')
 
     @app.route('/admin/bootstrap')
     def admin_bootstrap():
