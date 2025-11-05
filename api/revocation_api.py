@@ -84,12 +84,15 @@ def get_bloom_filter():
                 bloom_filter.add(list(cred_id_bytes))
             
             # Serialize Bloom filter for client
-            filter_bytes = bloom_filter.to_bytes()
+            filter_bytes_raw = bloom_filter.to_bytes()
+            
+            # Convert list[int] from Rust to bytes for base64 encoding
+            filter_bytes = bytes(filter_bytes_raw) if isinstance(filter_bytes_raw, list) else filter_bytes_raw
             
             logger.info(f"✅ Built Bloom filter: {len(filter_bytes)} bytes")
             
         except Exception as e:
-            logger.warning(f"⚠️ Failed to build Bloom filter: {e}")
+            logger.warning(f"⚠️ Failed to build Bloom filter: {e}", exc_info=True)
             filter_bytes = None
         
         response = {
