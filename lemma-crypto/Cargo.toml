@@ -7,11 +7,6 @@ edition = "2021"
 name = "lemma_crypto"
 crate-type = ["cdylib", "rlib"]
 
-[features]
-default = ["python"]
-python = ["pyo3"]
-wasm = ["wasm-bindgen", "serde-wasm-bindgen", "js-sys", "web-sys", "wasm-bindgen-futures", "console_error_panic_hook"]
-
 [[bin]]
 name = "minimal_test"
 path = "src/bin/minimal_test.rs"
@@ -121,6 +116,7 @@ wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
 
 # Testing
 criterion = { version = "0.5", optional = true }
@@ -148,7 +144,7 @@ image = "0.25"
 # Removed benchmark and binary configurations for clean deployment
 
 [features]
-default = ["native"]
+default = ["python"]
 native = [
   "ring",  # Include ring for native builds only
   "memmap2", 
@@ -168,7 +164,7 @@ native = [
   "ark-std"
 ]
 python = ["pyo3", "pythonize", "native"]
-wasm = ["wasm-bindgen", "js-sys", "web-sys", "serde-wasm-bindgen", "console_error_panic_hook"]
+wasm = ["wasm-bindgen", "js-sys", "web-sys", "serde-wasm-bindgen", "console_error_panic_hook", "wasm-bindgen-futures"]
 wasm-optimized = ["wasm"]  # Optimized WASM (rayon not compatible with wasm32)
 wasm-qr = ["wasm", "qrcode_gen"]
 qr-verification = ["qrcode_gen"]
