@@ -263,6 +263,118 @@ impl PyOPRFKeyManager {
 }
 
 /// Register Python module
+/// Python wrapper for OPRF Server (for server-side evaluation)
+#[pyclass]
+pub struct PyOPRFServer {
+    server: crate::oprf::OPRFServer,
+}
+
+#[pymethods]
+impl PyOPRFServer {
+    #[new]
+    pub fn new() -> Self {
+        Self {
+            server: crate::oprf::OPRFServer::new(),
+        }
+    }
+    
+    /// Evaluate OPRF on a blinded point (server-side)
+    pub fn evaluate(&self, blinded_hex: String) -> PyResult<String> {
+        use crate::oprf::utils::{bytes_to_point, point_to_bytes};
+        
+        let blinded_bytes = hex::decode(&blinded_hex)
+            .map_err(|e| PyRuntimeError::new_err(format!("Invalid hex: {}", e)))?;
+        
+        let blinded_point = bytes_to_point(&blinded_bytes)
+            .map_err(|e| PyRuntimeError::new_err(format!("Invalid blinded point: {}", e)))?;
+        
+        let evaluated_point = self.server.evaluate(&blinded_point);
+        
+        Ok(hex::encode(point_to_bytes(&evaluated_point)))
+    }
+    
+    /// Batch evaluate multiple blinded points
+    pub fn batch_evaluate(&self, blinded_hex_list: Vec<String>) -> PyResult<Vec<String>> {
+        use crate::oprf::utils::{bytes_to_point, point_to_bytes};
+        
+        blinded_hex_list.iter().map(|blinded_hex| {
+            let blinded_bytes = hex::decode(blinded_hex)
+                .map_err(|e| PyRuntimeError::new_err(format!("Invalid hex: {}", e)))?;
+            
+            let blinded_point = bytes_to_point(&blinded_bytes)
+                .map_err(|e| PyRuntimeError::new_err(format!("Invalid blinded point: {}", e)))?;
+            
+            let evaluated_point = self.server.evaluate(&blinded_point);
+            Ok(hex::encode(point_to_bytes(&evaluated_point)))
+        }).collect()
+    }
+}
+
+/// Python wrapper for Cascaded Bloom Filter
+#[pyclass]
+pub struct PyCascadedBloomFilter {
+    filter: crate::bloom::CascadedBloomFilter,
+}
+
+#[pymethods]
+impl PyCascadedBloomFilter {
+    #[new]
+    pub fn new(levels: usize, base_capacity: usize, base_error: f64) -> PyResult<Self> {
+        let filter = crate::bloom::CascadedBloomFilter::new(levels, base_capacity, base_error)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create Bloom filter: {}", e)))?;
+        
+        Ok(Self { filter })
+    }
+    
+    /// Add item to Bloom filter
+    pub fn add(&mut self, item: Vec<u8>) -> PyResult<()> {
+        self.filter.add(&item)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to add item: {}", e)))
+    }
+    
+    /// Check if item is in Bloom filter
+    pub fn contains(&self, item: Vec<u8>) -> bool {
+        let (found, _level) = self.filter.contains(&item);
+        found
+    }
+    
+    /// Serialize to bytes
+    pub fn to_bytes(&self) -> PyResult<Vec<u8>> {
+        self.filter.to_bytes()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to serialize: {}", e)))
+    }
+    
+    /// Deserialize from bytes
+    #[staticmethod]
+    pub fn from_bytes(bytes: Vec<u8>) -> PyResult<Self> {
+        let filter = crate::bloom::CascadedBloomFilter::from_bytes(&bytes)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to deserialize: {}", e)))?;
+        
+        Ok(Self { filter })
+    }
+}
+
+// Helper module for hex encoding
+mod hex {
+    pub fn encode(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| format!("{:02x}", b)).collect()
+    }
+    
+    pub fn decode(s: &str) -> Result<Vec<u8>, String> {
+        if s.len() % 2 != 0 {
+            return Err("Hex string must have even length".to_string());
+        }
+        
+        (0..s.len())
+            .step_by(2)
+            .map(|i| {
+                u8::from_str_radix(&s[i..i + 2], 16)
+                    .map_err(|e| format!("Invalid hex: {}", e))
+            })
+            .collect()
+    }
+}
+
 #[pymodule]
 fn lemma_crypto(_py: Python, m: &PyModule) -> PyResult<()> {
     // Core classes
@@ -272,6 +384,10 @@ fn lemma_crypto(_py: Python, m: &PyModule) -> PyResult<()> {
     
     // OPRF Key Management
     m.add_class::<PyOPRFKeyManager>()?;
+    
+    // OPRF Server & Bloom Filter (for WASM integration)
+    m.add_class::<PyOPRFServer>()?;
+    m.add_class::<PyCascadedBloomFilter>()?;
     
     Ok(())
 }

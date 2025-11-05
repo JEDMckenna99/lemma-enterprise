@@ -309,6 +309,14 @@ def create_app():
         logger.info("✅ Platform Statistics API registered")
     except Exception as e:
         logger.error(f"❌ Failed to register Platform Statistics API: {e}")
+    
+    # OPRF Evaluation API
+    try:
+        from api.oprf_evaluation import oprf_eval_bp
+        app.register_blueprint(oprf_eval_bp)
+        logger.info("✅ OPRF Evaluation API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register OPRF Evaluation API: {e}")
 
     # Health Monitoring
     try:

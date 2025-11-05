@@ -7,6 +7,11 @@ edition = "2021"
 name = "lemma_crypto"
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["python"]
+python = ["pyo3"]
+wasm = ["wasm-bindgen", "serde-wasm-bindgen", "js-sys", "web-sys", "wasm-bindgen-futures", "console_error_panic_hook"]
+
 [[bin]]
 name = "minimal_test"
 path = "src/bin/minimal_test.rs"

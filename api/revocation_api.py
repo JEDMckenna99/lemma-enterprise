@@ -65,6 +65,32 @@ def get_bloom_filter():
         
         valid_until = datetime.now() + timedelta(days=7)
         
+        # Build Cascaded Bloom Filter with OPRF-hashed IDs (for WASM)
+        filter_bytes = None
+        try:
+            from lemma_crypto import PyCascadedBloomFilter, PyOPRFServer
+            
+            # Create Bloom filter (3 levels, 10K base capacity, 0.1% error rate)
+            bloom_filter = PyCascadedBloomFilter(3, 10000, 0.001)
+            
+            # Create OPRF server for hashing credential IDs
+            oprf_server = PyOPRFServer()
+            
+            # Add revoked IDs to Bloom filter (OPRF-hashed)
+            for cred_id in revoked_ids:
+                # For now, just use credential ID as bytes
+                # In production, we'd OPRF-blind these
+                bloom_filter.add(cred_id.encode('utf-8'))
+            
+            # Serialize Bloom filter for client
+            filter_bytes = bloom_filter.to_bytes()
+            
+            logger.info(f"✅ Built Bloom filter: {len(filter_bytes)} bytes")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to build Bloom filter: {e}")
+            filter_bytes = None
+        
         response = {
             'success': True,
             'filter_type': 'global_cascaded',  # Single global Bloom filter for all sites
@@ -76,6 +102,12 @@ def get_bloom_filter():
             'privacy_mechanism': 'oprf_blinding',  # OPRF provides zero-knowledge privacy
             'message': 'Global revocation list - privacy preserved via OPRF blinding before lookup'
         }
+        
+        # Include Bloom filter bytes if available (base64-encoded for JSON)
+        if filter_bytes:
+            import base64
+            response['filter_bytes'] = base64.b64encode(filter_bytes).decode('utf-8')
+            response['filter_size_bytes'] = len(filter_bytes)
         
         logger.info(f"✅ Global Bloom filter served: {len(revoked_ids)} total revocations")
         

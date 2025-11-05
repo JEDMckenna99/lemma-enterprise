@@ -39,7 +39,6 @@ pub mod utils;
 #[cfg(feature = "python")]
 pub mod minimal_python;
 
-// WebAssembly bindings (only if wasm feature enabled)
 #[cfg(feature = "wasm")]
 pub mod wasm_bindings;
 
