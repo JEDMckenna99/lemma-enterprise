@@ -29,7 +29,10 @@ curve25519-dalek = { version = "4.0", features = ["rand_core"] }
 ed25519-dalek = { version = "2.0", features = ["rand_core", "batch"] }
 sha2 = "0.10"
 blake3 = "1.3"
-ring = { version = "0.17", optional = true, default-features = false }  # For secure random (native only, not WASM)
+
+# Native-only dependencies (not compatible with WASM)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ring = { version = "0.17", optional = true, default-features = false }  # For secure random (native only)
 
 # Encryption for browser wallet
 aes-gcm = "0.10"
