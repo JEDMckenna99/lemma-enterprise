@@ -484,14 +484,15 @@ def create_app():
         return render_template('modern/wallet_testing.html')
 
     @app.route('/admin')
-    def admin_dashboard():
-        return render_template('admin/admin_dashboard.html')
-    
-    @app.route('/admin')
     def admin_monitoring():
         """Admin Platform Monitoring - Bloom filter collision tracking, system health"""
         logger.info("🔧 Serving admin monitoring dashboard")
         return render_template('admin/platform_monitoring.html')
+    
+    @app.route('/admin/legacy')
+    def admin_dashboard_legacy():
+        """Legacy admin dashboard (redirected to /admin)"""
+        return redirect('/admin')
     
     @app.route('/admin/iam')
     def admin_iam_redirect():
