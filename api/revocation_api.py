@@ -76,11 +76,12 @@ def get_bloom_filter():
             # Create OPRF server for hashing credential IDs
             oprf_server = PyOPRFServer()
             
-            # Add revoked IDs to Bloom filter (OPRF-hashed)
+            # Add revoked IDs to Bloom filter (as bytes)
             for cred_id in revoked_ids:
-                # For now, just use credential ID as bytes
-                # In production, we'd OPRF-blind these
-                bloom_filter.add(cred_id.encode('utf-8'))
+                # Convert credential ID string to bytes
+                cred_id_bytes = cred_id.encode('utf-8') if isinstance(cred_id, str) else cred_id
+                # Ensure it's a list of ints for Python bindings
+                bloom_filter.add(list(cred_id_bytes))
             
             # Serialize Bloom filter for client
             filter_bytes = bloom_filter.to_bytes()
