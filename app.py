@@ -468,6 +468,11 @@ def create_app():
         logger.info("🚀 Serving developer platform")
         return render_template('developer/platform.html')
     
+    @app.route('/test_web_crypto_revocation.html')
+    def test_web_crypto_revocation():
+        """Test page for Web Crypto API revocation system"""
+        return render_template('test_web_crypto_revocation.html')
+    
     @app.route('/advanced-wallet')
     def advanced_wallet():
         """Advanced wallet with recovery and multi-device features"""
