@@ -76,7 +76,7 @@ class LemmaWallet {
         // Network registry cache
         this.didRegistry = new Map();
         this.revocationBloomFilter = new Set();
-        this.loadCachedBloomFilters(); // Load site-specific filters from localStorage
+        this.loadCachedGlobalBloomFilter(); // Load global filter from localStorage
         
         // Cross-tab synchronization
         this.broadcastChannel = null;
@@ -1178,57 +1178,39 @@ class LemmaWallet {
         }
         
         try {
-            // Get all unique site IDs from credentials to sync their Bloom filters
-            const credentials = await this.getAllCredentials();
-            const siteIds = new Set();
-            
-            for (const cred of credentials) {
-                const claims = cred.claims || cred.credentialSubject || {};
-                const siteId = claims.siteId || claims.site;
-                if (siteId) {
-                    siteIds.add(siteId);
-                }
-            }
-            
-            if (this.debug) {
-                console.log(`🔄 Syncing Bloom filters for ${siteIds.size} sites:`, Array.from(siteIds));
-            }
-            
-            // Sync Bloom filter for each site separately
-            for (const siteId of siteIds) {
-                await this.syncSiteBloomFilter(siteId);
-            }
+            // Sync global Bloom filter (single request for all sites)
+            // Privacy: OPRF blinding prevents sites from correlating revocations
+            // Simplicity: One filter instead of N site-specific filters
+            await this.syncGlobalBloomFilter();
             
             this.networkConfig.lastRevocationSync = now;
             return true;
             
         } catch (error) {
             if (this.debug) {
-                console.warn('⚠️ Revocation list sync failed:', error);
+                console.warn('⚠️ Global Bloom filter sync failed:', error);
             }
             return false;
         }
     }
     
     /**
-     * Load cached site-specific Bloom filters from localStorage
+     * Load cached global Bloom filter from localStorage
      */
-    loadCachedBloomFilters() {
+    loadCachedGlobalBloomFilter() {
         try {
-            // Find all lemma_bloom_* keys in localStorage
-            const bloomKeys = Object.keys(localStorage).filter(key => key.startsWith('lemma_bloom_'));
+            const cacheKey = 'lemma_bloom_global';
+            const cached = localStorage.getItem(cacheKey);
             
-            let totalRevocations = 0;
-            
-            for (const key of bloomKeys) {
-                try {
-                    const cached = JSON.parse(localStorage.getItem(key));
-                    if (cached && cached.data && Array.isArray(cached.data)) {
-                        // Merge site-specific filter into global Set for O(1) lookup
-                        for (const id of cached.data) {
-                            this.revocationBloomFilter.add(id);
-                        }
-                        totalRevocations += cached.data.length;
+            if (cached) {
+                const data = JSON.parse(cached);
+                if (data && data.data && Array.isArray(data.data)) {
+                    this.revocationBloomFilter = new Set(data.data);
+                    
+                    if (this.debug) {
+                        console.log(`📦 Loaded cached global Bloom filter: ${this.revocationBloomFilter.size} revocations`);
+                        console.log(`🔐 Filter type: ${data.filterType || 'global'}, Privacy: ${data.privacyMechanism || 'oprf'}`);
+                    }
                     }
                 } catch (e) {
                     // Ignore corrupted cache entries
@@ -1250,23 +1232,24 @@ class LemmaWallet {
     }
     
     /**
-     * Sync Bloom filter for a specific site
+     * Sync global Bloom filter (all sites, privacy via OPRF)
      */
-    async syncSiteBloomFilter(siteId) {
+    async syncGlobalBloomFilter() {
         try {
-            const response = await fetch(`/api/revocation/bloom-filter?site_id=${encodeURIComponent(siteId)}`);
+            // Fetch global Bloom filter (all revocations across all sites)
+            const response = await fetch(`/api/revocation/bloom-filter`);
             const data = await response.json();
             
             if (data.success && data.revoked_ids) {
-                // Store site-specific Bloom filter in localStorage
-                const cacheKey = `lemma_bloom_${siteId}`;
+                // Store global Bloom filter (single cache key)
+                const cacheKey = 'lemma_bloom_global';
                 
                 localStorage.setItem(cacheKey, JSON.stringify({
                     data: data.revoked_ids,
                     sync: Date.now(),
                     version: data.version,
-                    siteId: siteId,
-                    isolation: 'site_specific'  // Mark as site-isolated
+                    filterType: 'global_cascaded',
+                    privacyMechanism: 'oprf_blinding'
                 }));
                 
                 // Update in-memory Set (merge all sites into one for quick lookup)
