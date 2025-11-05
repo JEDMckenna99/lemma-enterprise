@@ -280,32 +280,51 @@ impl PyOPRFServer {
     
     /// Evaluate OPRF on a blinded point (server-side)
     pub fn evaluate(&self, blinded_hex: String) -> PyResult<String> {
-        use crate::oprf::utils::{bytes_to_point, point_to_bytes};
+        use curve25519_dalek::ristretto::CompressedRistretto;
         
         let blinded_bytes = hex::decode(&blinded_hex)
             .map_err(|e| PyRuntimeError::new_err(format!("Invalid hex: {}", e)))?;
         
-        let blinded_point = bytes_to_point(&blinded_bytes)
-            .map_err(|e| PyRuntimeError::new_err(format!("Invalid blinded point: {}", e)))?;
+        // Parse blinded point from bytes
+        if blinded_bytes.len() != 32 {
+            return Err(PyRuntimeError::new_err("Blinded point must be 32 bytes"));
+        }
         
+        let mut point_bytes = [0u8; 32];
+        point_bytes.copy_from_slice(&blinded_bytes);
+        
+        let compressed = CompressedRistretto(point_bytes);
+        let blinded_point = compressed.decompress()
+            .ok_or_else(|| PyRuntimeError::new_err("Invalid blinded point"))?;
+        
+        // Evaluate OPRF
         let evaluated_point = self.server.evaluate(&blinded_point);
         
-        Ok(hex::encode(point_to_bytes(&evaluated_point)))
+        // Return as hex
+        Ok(hex::encode(&evaluated_point.compress().to_bytes()))
     }
     
     /// Batch evaluate multiple blinded points
     pub fn batch_evaluate(&self, blinded_hex_list: Vec<String>) -> PyResult<Vec<String>> {
-        use crate::oprf::utils::{bytes_to_point, point_to_bytes};
+        use curve25519_dalek::ristretto::CompressedRistretto;
         
         blinded_hex_list.iter().map(|blinded_hex| {
             let blinded_bytes = hex::decode(blinded_hex)
                 .map_err(|e| PyRuntimeError::new_err(format!("Invalid hex: {}", e)))?;
             
-            let blinded_point = bytes_to_point(&blinded_bytes)
-                .map_err(|e| PyRuntimeError::new_err(format!("Invalid blinded point: {}", e)))?;
+            if blinded_bytes.len() != 32 {
+                return Err(PyRuntimeError::new_err("Blinded point must be 32 bytes"));
+            }
+            
+            let mut point_bytes = [0u8; 32];
+            point_bytes.copy_from_slice(&blinded_bytes);
+            
+            let compressed = CompressedRistretto(point_bytes);
+            let blinded_point = compressed.decompress()
+                .ok_or_else(|| PyRuntimeError::new_err("Invalid blinded point"))?;
             
             let evaluated_point = self.server.evaluate(&blinded_point);
-            Ok(hex::encode(point_to_bytes(&evaluated_point)))
+            Ok(hex::encode(&evaluated_point.compress().to_bytes()))
         }).collect()
     }
 }
