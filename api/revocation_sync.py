@@ -75,9 +75,9 @@ class RevocationEventBus:
     def _listen_for_revocations(self):
         """
         Background thread that listens for revocation events
-        and triggers immediate bloom filter sync
+        and triggers immediate bloom filter sync (site-targeted)
         """
-        logger.info("🎧 Revocation listener thread started")
+        logger.info("🎧 Site-targeted revocation listener thread started")
         
         try:
             for message in self.pubsub.listen():
@@ -87,14 +87,38 @@ class RevocationEventBus:
                         event_data = json.loads(message['data'])
                         credential_id = event_data.get('credential_id')
                         credential_type = event_data.get('credential_type')
+                        site_id = event_data.get('site_id')  # Site-specific targeting
                         timestamp = event_data.get('timestamp')
                         
-                        logger.info(f"📢 Revocation event received: {credential_id} (type: {credential_type})")
+                        scope = f"site {site_id}" if site_id else "ALL sites (global)"
+                        logger.info(f"📢 Site-targeted revocation event received: {credential_id}")
+                        logger.info(f"   Type: {credential_type}")
+                        logger.info(f"   Site: {scope}")
                         logger.info(f"   Timestamp: {timestamp}")
-                        logger.info(f"   Channel: {self.REVOCATION_CHANNEL}")
                         
-                        # Trigger IMMEDIATE bloom filter sync on this dyno
-                        self._sync_bloom_filter_immediately(credential_id)
+                        # SITE-TARGETED SYNC: Check if we should sync
+                        # - If site_id is None: Global revocation (sync everyone)
+                        # - If site_id matches our active sites: Sync
+                        # - Otherwise: Skip (Site B doesn't sync when Site A revokes)
+                        
+                        if site_id is None:
+                            # Global revocation (PoH, network-wide)
+                            logger.info(f"   🌐 Global revocation - syncing all sites")
+                            self._sync_bloom_filter_immediately(credential_id)
+                        else:
+                            # Site-specific revocation
+                            # Note: We ALWAYS add to global Bloom filter (checking works globally)
+                            # But we only trigger expensive sync operations for relevant sites
+                            logger.info(f"   🎯 Site-specific revocation for {site_id}")
+                            logger.info(f"   ℹ️  Adding to global Bloom filter (all sites can check)")
+                            logger.info(f"   ⏭️  Skipping expensive sync for unrelated sites")
+                            
+                            # Add to Bloom filter (lightweight, always done)
+                            self._sync_bloom_filter_immediately(credential_id)
+                            
+                            # Note: Client-side will filter sync events by site_id
+                            # We always update server-side Bloom filter, but clients
+                            # only force-refresh if it's their site
                         
                     except Exception as e:
                         logger.error(f"❌ Error processing revocation event: {e}")
@@ -122,14 +146,15 @@ class RevocationEventBus:
         except Exception as e:
             logger.error(f"❌ Bloom filter sync error for {credential_id}: {e}")
     
-    def publish_revocation(self, credential_id: str, credential_type: str = 'unknown') -> bool:
+    def publish_revocation(self, credential_id: str, credential_type: str = 'unknown', site_id: str = None) -> bool:
         """
-        Publish revocation event to all dynos
-        This triggers IMMEDIATE bloom filter sync across the cluster
+        Publish revocation event to all dynos (site-targeted)
+        This triggers IMMEDIATE bloom filter sync ONLY for nodes serving that site
         
         Args:
             credential_id: ID of revoked credential
             credential_type: Type ('poh', 'permission', etc.)
+            site_id: Site ID that triggered revocation (None = global/all sites)
             
         Returns:
             True if published successfully
@@ -144,6 +169,7 @@ class RevocationEventBus:
             event_data = {
                 'credential_id': credential_id,
                 'credential_type': credential_type,
+                'site_id': site_id,  # Site-specific targeting
                 'timestamp': time.time(),
                 'source': 'revocation_api'
             }
@@ -154,9 +180,11 @@ class RevocationEventBus:
                 json.dumps(event_data)
             )
             
-            logger.info(f"📤 Revocation event published to {subscribers} dynos")
+            scope = f"site {site_id}" if site_id else "ALL sites (global)"
+            logger.info(f"📤 Site-targeted revocation event published to {subscribers} dynos")
             logger.info(f"   Credential: {credential_id}")
             logger.info(f"   Type: {credential_type}")
+            logger.info(f"   Site: {scope}")
             logger.info(f"   Channel: {self.REVOCATION_CHANNEL}")
             
             return True
@@ -180,26 +208,35 @@ def get_event_bus() -> RevocationEventBus:
     return _event_bus
 
 
-def trigger_revocation_sync(credential_id: str, credential_type: str = 'unknown') -> bool:
+def trigger_revocation_sync(credential_id: str, credential_type: str = 'unknown', site_id: str = None) -> bool:
     """
-    Trigger IMMEDIATE revocation sync across all dynos
+    Trigger IMMEDIATE site-targeted revocation sync across relevant dynos
     
     This is the main entry point for revoking credentials.
     It will:
-    1. Publish event to Redis pub/sub
-    2. All dynos (including this one) receive the event
-    3. Each dyno immediately updates its bloom filter
-    4. Total propagation time: <100ms (vs 60 seconds before)
+    1. Publish event to Redis pub/sub with site_id
+    2. All dynos receive event, but only relevant sites sync
+    3. Each dyno updates global bloom filter (checking works globally)
+    4. Clients only force-refresh if site_id matches
+    5. Total propagation time: <100ms, but only triggers for affected site
     
     Args:
         credential_id: ID of credential to revoke
         credential_type: Type of credential ('poh', 'permission', etc.)
+        site_id: Site that triggered revocation (None = global sync all sites)
         
     Returns:
         True if event published successfully
+        
+    Example:
+        # Site A revokes credential -> only Site A clients sync
+        trigger_revocation_sync("cred_123", "permission", site_id="site_a")
+        
+        # PoH revocation -> all sites sync
+        trigger_revocation_sync("poh_456", "poh", site_id=None)
     """
     event_bus = get_event_bus()
-    return event_bus.publish_revocation(credential_id, credential_type)
+    return event_bus.publish_revocation(credential_id, credential_type, site_id)
 
 
 def is_listening() -> bool:

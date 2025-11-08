@@ -266,6 +266,65 @@ def render_email_template(template_name: str, **kwargs) -> str:
                 </div>
             </body>
             </html>
+        ''',
+        
+        'beta_access_confirmation': '''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 40px; text-align: center; border-radius: 12px 12px 0 0; }
+                    .badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+                    .content { background: #fff; padding: 40px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px; }
+                    .button { display: inline-block; background: #10b981; color: white !important; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 24px 0; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+                    .button:hover { background: #059669; }
+                    .info-box { background: #ecfdf5; border-left: 4px solid #10b981; padding: 16px; margin: 24px 0; border-radius: 6px; }
+                    .footer { text-align: center; margin-top: 32px; color: #6b7280; font-size: 14px; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="badge">FREE BETA ACCESS</div>
+                    <h1 style="margin: 0; font-size: 32px;">Sign in to Lemma Platform</h1>
+                    <p style="margin: 12px 0 0 0; opacity: 0.95;">Your secure access link is ready</p>
+                </div>
+                <div class="content">
+                    <p>Hi <strong>{user_email}</strong>,</p>
+                    <p>Welcome to the Lemma Platform! You've requested beta access to our developer platform.</p>
+                    <p style="font-size: 16px;"><strong>Click the button below to receive your beta-user credential and access the platform:</strong></p>
+                    <div style="text-align: center; margin: 32px 0;">
+                        <a href="{confirmation_link}" class="button">Get My Beta Access →</a>
+                    </div>
+                    <div class="info-box">
+                        <strong style="color: #047857;">What happens when you click:</strong>
+                        <ul style="margin: 12px 0 8px 0; padding-left: 20px; color: #065f46;">
+                            <li>You'll receive a cryptographic permission credential</li>
+                            <li>It's stored securely in your browser wallet</li>
+                            <li>Authentication happens in 182µs - instant access!</li>
+                            <li>No password needed - Lemma IAM uses email-based auth</li>
+                        </ul>
+                    </div>
+                    <p><strong>Included in FREE Beta:</strong></p>
+                    <ul style="color: #374151;">
+                        <li>Complete IAM system for your applications</li>
+                        <li>Optional bot protection via federated identity</li>
+                        <li>API access & SDK integration</li>
+                        <li>Dashboard & analytics</li>
+                        <li>Full documentation & support</li>
+                    </ul>
+                    <p style="color: #6b7280; font-size: 14px; margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+                        This link expires in 24 hours. If you didn't request beta access, you can safely ignore this email.
+                    </p>
+                </div>
+                <div class="footer">
+                    <p style="font-weight: 600;">Lemma Platform</p>
+                    <p style="font-size: 12px; margin-top: 8px;">Authentication as simple as email • 1,000x faster than Auth0</p>
+                    <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">Powered by Lemma IAM</p>
+                </div>
+            </body>
+            </html>
         '''
     }
     

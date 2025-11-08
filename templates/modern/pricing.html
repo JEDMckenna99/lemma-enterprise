@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Pricing - Lemma IAM | $0.15/MAU | 90% Cheaper Than Auth0{% endblock %}
-{% block description %}Email-based IAM at $0.15/MAU (90% cheaper than Auth0). Add bot protection for +$0.05/MAU. 1,000x faster verification. No credit card required.{% endblock %}
+{% block title %}Pricing - Lemma IAM | FREE Beta | Future: $0.16/MAU{% endblock %}
+{% block description %}Email-based IAM completely FREE during beta phase. Future pricing: $0.16/MAU (67-92% cheaper than Auth0/Okta). Add bot protection for +$0.05/MAU. 1,000x faster verification. No credit card required.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -576,10 +576,10 @@
     <!-- Hero Section -->
     <section class="pricing-hero">
         <div class="pricing-container">
-            <div class="hero-badge">90% Cheaper Than Auth0</div>
-            <h1 class="hero-title">Start at $0.15/MAU</h1>
+            <div class="hero-badge" style="background: linear-gradient(135deg, #10b981, #059669); font-size: var(--font-size-lg); padding: var(--space-3) var(--space-8);">FREE During Beta</div>
+            <h1 class="hero-title">FREE Beta Access</h1>
             <p class="hero-subtitle">
-                Email-based IAM that's 1,000x faster and 90% cheaper. Add bot protection later if needed. No hidden fees, no credit card required.
+                Complete email-based IAM with optional bot protection - completely free during beta phase. Future pricing: $0.16/MAU for IAM, +$0.05/MAU for bot protection. No hidden fees, no credit card required.
             </p>
         </div>
     </section>
@@ -592,7 +592,7 @@
                 <div class="pricing-plans">
                     <!-- Lemma IAM System Plan (MOVED TO TOP) -->
                     <div class="pricing-card featured">
-                        <div class="pricing-badge" style="background: linear-gradient(135deg, var(--primary-500), var(--primary-600));">Most Popular</div>
+                        <div class="pricing-badge" style="background: linear-gradient(135deg, #10b981, #059669);">FREE Beta Access</div>
                         
                         <div class="pricing-header">
                             <h2 class="pricing-title">Lemma IAM System</h2>
@@ -601,15 +601,14 @@
                             </p>
                         </div>
 
-                        <div class="price-display">
+                        <div class="price-display" style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 2px solid #10b981;">
                             <div class="price-main">
-                                <span class="price-currency">$</span>
-                                <span class="price-amount">0.16</span>
-                                <span class="price-unit">per active user per month</span>
+                                <span class="price-amount" style="color: #059669; font-size: 3.5rem;">FREE</span>
+                                <span class="price-unit" style="color: #047857;">during beta phase</span>
                             </div>
                             <div class="price-secondary">
-                                <strong>IAM-only service</strong> - no Fed ID Network included<br>
-                                <small>33% savings vs Auth0 ($0.24/MAU)</small>
+                                <strong style="color: #047857;">Complete IAM system at no cost</strong><br>
+                                <small style="color: #065f46;">Future pricing: $0.16/MAU (67-92% cheaper than Auth0 Pro/Okta)</small>
                             </div>
                         </div>
 
@@ -637,7 +636,7 @@
 
                     <!-- Complete Solution Plan -->
                     <div class="pricing-card featured">
-                        <div class="pricing-badge">🔥 Complete Solution</div>
+                        <div class="pricing-badge" style="background: linear-gradient(135deg, #10b981, #059669);">FREE Beta - Complete Solution</div>
                         
                         <div class="pricing-header">
                             <h2 class="pricing-title">Fed ID + IAM Combined</h2>
@@ -646,19 +645,18 @@
                             </p>
                         </div>
 
-                        <div class="price-display">
+                        <div class="price-display" style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 2px solid #10b981;">
                             <div class="price-main">
-                                <span class="price-currency">$</span>
-                                <span class="price-amount">0.20</span>
-                                <span class="price-unit">per active user per month</span>
+                                <span class="price-amount" style="color: #059669; font-size: 3.5rem;">FREE</span>
+                                <span class="price-unit" style="color: #047857;">during beta phase</span>
                             </div>
                             <div class="price-secondary">
-                                <span class="price-highlight">$0.06 Fed ID + $0.16 IAM = $0.22, but only $0.20!</span><br>
-                                <small>Save $0.02/MAU when you get both services</small>
+                                <strong style="color: #047857;">IAM + Bot Protection at no cost</strong><br>
+                                <small style="color: #065f46;">Future pricing: $0.20/MAU combined (vs $0.22 if purchased separately)</small>
                             </div>
-                            <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--warning-50); border-radius: 8px; border-left: 4px solid var(--warning-500);">
-                                <small style="color: var(--warning-700); font-weight: 600;">
-                                    🎯 Best Value: Get both services for less than buying separately!
+                            <div style="margin-top: var(--space-4); padding: var(--space-3); background: rgba(16, 185, 129, 0.1); border-radius: 8px; border-left: 4px solid #10b981;">
+                                <small style="color: #047857; font-weight: 600;">
+                                    Complete solution free during beta - start building today!
                                 </small>
                             </div>
                         </div>
@@ -706,15 +704,14 @@
                             </p>
                         </div>
 
-                        <div class="price-display">
+                        <div class="price-display" style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 2px solid #10b981;">
                             <div class="price-main">
-                                <span class="price-currency">$</span>
-                                <span class="price-amount">0.05</span>
-                                <span class="price-unit">per active user per month (add-on)</span>
+                                <span class="price-amount" style="color: #059669; font-size: 3.5rem;">FREE</span>
+                                <span class="price-unit" style="color: #047857;">during beta phase</span>
                             </div>
                             <div class="price-secondary">
-                                + <span class="price-highlight">$2.00</span> per new user verification<br>
-                                <small>(one-time Stripe Identity KYC fee)</small>
+                                <strong style="color: #047857;">Bot protection included in beta</strong><br>
+                                <small style="color: #065f46;">Future: +$0.05/MAU add-on + $2 one-time Stripe Identity verification</small>
                             </div>
                         </div>
 
@@ -788,7 +785,11 @@
                 <div class="pricing-sidebar">
                         <!-- Pricing Calculator -->
                     <div class="calculator-widget">
-                        <h3 class="widget-title">💰 Pricing Calculator</h3>
+                        <h3 class="widget-title">💰 Future Pricing Calculator</h3>
+                        <div style="margin-bottom: var(--space-4); padding: var(--space-3); background: linear-gradient(135deg, #10b981, #059669); border-radius: 8px; text-align: center;">
+                            <p style="margin: 0; color: var(--white); font-weight: 700; font-size: var(--font-size-lg);">FREE During Beta</p>
+                            <p style="margin: 4px 0 0 0; color: rgba(255,255,255,0.9); font-size: var(--font-size-sm);">Future pricing shown below</p>
+                        </div>
                         
                         <label style="display: block; margin-bottom: var(--space-2); font-weight: 600; color: var(--gray-700);">
                             Monthly Active Users
@@ -815,24 +816,27 @@
 
                         <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--success-50); border-radius: 8px; text-align: center;">
                             <div style="font-size: var(--font-size-sm); color: var(--success-700); font-weight: 600;">
-                                Save <span id="savingsAmount">$4,800/month</span>
+                                Future savings: <span id="savingsAmount">$280/month</span>
                     </div>
                             <div style="font-size: var(--font-size-xs); color: var(--success-600);">
-                                vs Auth0 pricing
+                                vs Auth0 Pro pricing (currently FREE)
                     </div>
                     </div>
                     </div>
                     
                     <!-- Cost Reduction Table -->
                     <div class="cost-reduction-table">
-                        <h3 class="widget-title">📊 Cost Comparison</h3>
+                        <h3 class="widget-title">📊 Future Cost Comparison</h3>
+                        <div style="margin-bottom: var(--space-3); padding: var(--space-2); background: linear-gradient(135deg, #10b981, #059669); border-radius: 6px; text-align: center;">
+                            <p style="margin: 0; color: var(--white); font-weight: 700; font-size: var(--font-size-base);">Currently FREE</p>
+                        </div>
                         <div id="comparison-subtitle" style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: var(--space-4); text-align: center;">
-                            Cost for <span id="user-count-display">1,000</span> users/month
+                            Future cost for <span id="user-count-display">1,000</span> users/month
                 </div>
 
                         <div class="comparison-row lemma-row">
-                            <div class="provider-name">🚀 Lemma</div>
-                            <div class="cost-cell" id="lemma-cost" style="color: var(--primary-600);">$100</div>
+                            <div class="provider-name">🚀 Lemma (Future)</div>
+                            <div class="cost-cell" id="lemma-cost" style="color: var(--primary-600);">$200</div>
                             <div class="savings-cell" style="color: var(--success-600);">Baseline</div>
                         </div>
                         
@@ -881,23 +885,23 @@
             
             <div class="faq-grid">
                 <div class="faq-item">
-                    <h3 class="faq-question">What are the three pricing options?</h3>
+                    <h3 class="faq-question">Is Lemma really free during beta?</h3>
                     <p class="faq-answer">
-                        <strong>Fed ID Network ($0.06/MAU):</strong> Bot protection, lite KYC, user verification. <strong>IAM System ($0.16/MAU):</strong> Complete Auth0/Duo replacement with permissions and OAuth. <strong>Combined ($0.20/MAU):</strong> Both services together with $0.02/MAU discount.
+                        <strong>Yes, completely free!</strong> All features including IAM system and bot protection are free during the beta phase. No credit card required, no hidden fees. This gives you the opportunity to build and integrate Lemma at no cost while we finalize the platform.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">Can I use just one service or do I need both?</h3>
+                    <h3 class="faq-question">What happens after beta?</h3>
                     <p class="faq-answer">
-                        You can choose any option! <strong>Fed ID Network</strong> is perfect for bot protection and basic verification. <strong>IAM System</strong> replaces Auth0/Duo for user management. <strong>Combined</strong> gives you everything at the best value - save $0.02/MAU vs buying separately.
+                        Future pricing will be: <strong>IAM System ($0.16/MAU)</strong> for complete Auth0/Duo replacement with permissions and OAuth. <strong>Bot Protection (+$0.05/MAU)</strong> for federated identity network. <strong>Combined ($0.20/MAU)</strong> for both services together with discount. Beta users will receive advance notice before any pricing changes.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">How does this compare to Auth0 or Duo?</h3>
+                    <h3 class="faq-question">How does future pricing compare to Auth0 or Okta?</h3>
                     <p class="faq-answer">
-                        Our <strong>Combined solution ($0.20/MAU)</strong> costs 17% less than Auth0 ($0.24/MAU) but includes bot protection + lite KYC that Auth0 doesn't provide. Vs Duo ($3-9/user/month), we're 93-97% cheaper. Plus you get <strong>210,084x faster verification</strong> (2.38µs vs 500ms+) and complete control vs vendor lock-in.
+                        Our future <strong>Combined solution ($0.20/MAU)</strong> will be 58-90% cheaper than Auth0 Pro ($0.48/MAU) and Okta ($2/user/month), while including bot protection + lite KYC that they don't provide. Plus you get <strong>1,000x faster verification</strong> (182µs vs 200ms+) and complete control vs vendor lock-in.
                     </p>
                 </div>
 
@@ -909,16 +913,16 @@
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">When is the $2 Stripe Identity fee charged?</h3>
+                    <h3 class="faq-question">What about the Stripe Identity verification fee?</h3>
                     <p class="faq-answer">
-                        The $2.00 fee is only charged when a user completes their initial Stripe Identity verification. Every user who has not completed a Stripe Identity test will need to do so in order for us to back the identity lemma to high-assurance tests and get the data we need to create an accurate identity lemma. This is a one-time fee per user, not recurring.
+                        During beta, there are no Stripe Identity fees. In the future, the $2.00 fee will only be charged when a user completes their initial Stripe Identity verification for bot protection. This is a one-time fee per user, not recurring. The IAM system works without this verification.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">What's included in the price?</h3>
+                    <h3 class="faq-question">What's included in the free beta?</h3>
                     <p class="faq-answer">
-                        Everything: microsecond verification, bot detection, privacy protection, analytics dashboard, API access, and 24/7 support. No hidden fees or feature restrictions.
+                        Everything: complete IAM system, optional bot protection, microsecond verification, privacy protection, analytics dashboard, API access, and 24/7 support. No hidden fees, no feature restrictions, no credit card required.
                     </p>
                 </div>
 
@@ -930,9 +934,9 @@
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">Can I cancel anytime?</h3>
+                    <h3 class="faq-question">Are there any commitments or contracts?</h3>
                     <p class="faq-answer">
-                        Yes! Cancel anytime with no penalties. You'll only be charged for users verified in the current billing cycle. No long-term contracts or commitments.
+                        No! During beta, use Lemma completely free with no commitments. When pricing begins after beta, you can cancel anytime with no penalties. No long-term contracts required.
                     </p>
                 </div>
 
@@ -958,8 +962,8 @@
                 <div class="faq-item">
                     <h3 class="faq-question">How does this compare to competitors?</h3>
                     <p class="faq-answer">
-                        <strong>Cost:</strong> Lemma IAM costs 96% less than Auth0 + Duo ($5-13/MAU vs $0.20/MAU)<br>
-                        <strong>Speed:</strong> 210,084x faster verification (2.38µs vs 500ms+)<br>
+                        <strong>Cost:</strong> FREE during beta (future: $0.16-$0.20/MAU vs Auth0 Pro $0.48/MAU, Okta $2/MAU)<br>
+                        <strong>Speed:</strong> 1,000x faster verification (182µs vs 200ms+)<br>
                         <strong>Architecture:</strong> Client-side storage vs expensive server-side databases<br>
                         <strong>Privacy:</strong> User-owned data vs centralized data collection<br>
                         <strong>Security:</strong> Cryptographic proofs vs password-based authentication
@@ -1016,9 +1020,9 @@
             updateComparisonTable(userCount, combinedMonthly, auth0Monthly, oktaMonthly, cloudflareMonthly, recaptchaMonthly);
         }
         
-        // Auth0 pricing: B2C Professional plan $0.24/MAU
+        // Auth0 pricing: B2C Professional plan $0.48/MAU (updated 2025 pricing)
         function calculateAuth0Cost(userCount) {
-            return userCount * 0.24; // $0.24 per MAU for Professional plan
+            return userCount * 0.48; // $0.48 per MAU for Professional plan
         }
         
         // Okta pricing: $2/user/month with $500 minimum (Workforce Identity)

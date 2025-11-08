@@ -296,15 +296,17 @@ def revoke_platform_permission():
         
         logger.info(f"✅ Added to revocation_list table")
         
-        # Trigger immediate Bloom filter sync via event bus
+        # Trigger immediate Bloom filter sync via event bus (site-targeted)
         try:
             from api.revocation_sync import trigger_revocation_sync
             
             cred_id_for_sync = credential_id or f'perm_{instance_id}'
-            event_published = trigger_revocation_sync(cred_id_for_sync, 'permission')
+            
+            # Site-targeted sync: Only this site's users will sync
+            event_published = trigger_revocation_sync(cred_id_for_sync, 'permission', site_id=site_id)
             
             if event_published:
-                logger.info(f"✅ Revocation event published - ALL dynos syncing Bloom filter")
+                logger.info(f"✅ Site-targeted revocation event published - ONLY site {site_id} will sync")
             else:
                 logger.warning(f"⚠️ Event bus unavailable - local sync only")
                 

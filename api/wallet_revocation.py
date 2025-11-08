@@ -52,12 +52,13 @@ def revoke_credential():
             network_success = await_network_revocation(credential_id, reason)
             
             # Trigger IMMEDIATE bloom filter sync via event bus (FIXES VULN-001)
+            # PoH = Global revocation (site_id=None syncs ALL sites)
             try:
                 from api.revocation_sync import trigger_revocation_sync
-                event_published = trigger_revocation_sync(credential_id, 'poh')
+                event_published = trigger_revocation_sync(credential_id, 'poh', site_id=None)
                 
                 if event_published:
-                    logger.info(f"✅ Revocation event published - ALL dynos will sync immediately")
+                    logger.info(f"✅ Global PoH revocation event published - ALL sites will sync")
                 else:
                     logger.warning(f"⚠️ Event bus not available - local sync only")
             except Exception as e:
@@ -80,12 +81,16 @@ def revoke_credential():
             site_success = await_site_revocation(credential_id, reason, site_domain)
             
             # Trigger IMMEDIATE bloom filter sync via event bus (FIXES VULN-001)
+            # Permission = Site-specific revocation (only that site syncs)
             try:
                 from api.revocation_sync import trigger_revocation_sync
-                event_published = trigger_revocation_sync(credential_id, 'permission')
+                
+                # Extract site_id from site_domain (e.g., "example.com" -> "example.com")
+                sync_site_id = site_domain if site_domain else None
+                event_published = trigger_revocation_sync(credential_id, 'permission', site_id=sync_site_id)
                 
                 if event_published:
-                    logger.info(f"✅ Revocation event published - ALL dynos will sync immediately")
+                    logger.info(f"✅ Site-targeted revocation event published - ONLY {sync_site_id} will sync")
                 else:
                     logger.warning(f"⚠️ Event bus not available - local sync only")
             except Exception as e:

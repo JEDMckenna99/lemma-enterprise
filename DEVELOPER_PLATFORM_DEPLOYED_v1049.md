@@ -336,3 +336,4 @@ heroku logs --tail -a lemma-enterprise | grep -i "platform\|tracked permission"
 
 **Platform is live and tracking from v1049 forward!** New signups will increment the user count automatically.
 
+
