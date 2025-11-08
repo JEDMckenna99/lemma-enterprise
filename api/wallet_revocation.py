@@ -6,7 +6,7 @@ import time
 import logging
 from flask import Blueprint, request, jsonify, session
 from flask_cors import cross_origin
-from auth.decorators import validate_api_key, rate_limit
+from auth.decorators import require_api_key, rate_limit
 
 # Set up logging
 logger = logging.getLogger(__name__)
