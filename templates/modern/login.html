@@ -5,7 +5,8 @@
 
 {% block head %}
     {{ super() }}
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=991"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1075" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1075" data-cfasync="false"></script>
     <style>
         .login-container {
             max-width: 520px;

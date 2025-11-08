@@ -5,21 +5,22 @@
 
 {% block head %}
     {{ super() }}
-    <!-- Load the unified Lemma Wallet -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1009"></script>
+    <!-- Load the unified Lemma Wallet (disable Cloudflare Rocket Loader) -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1075" data-cfasync="false"></script>
     
     <!-- Encrypted Wallet (PIN-based encryption in localStorage) -->
-    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1009"></script>
+    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1075" data-cfasync="false"></script>
     
     <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1006"></script>
-    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1006"></script>
-    <!-- NOTE: lemma-wallet-with-pin.js auto-init conflicts with wallet page PIN logic - commenting out -->
-    <!-- <script src="{{ url_for('static', filename='js/lemma-wallet-with-pin.js') }}?v=1006"></script> -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1075" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1075" data-cfasync="false"></script>
     
     <!-- Message Constructor & WASM Verifier (for client-side verification) -->
-    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=910"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=910"></script>
+    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1075" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1075" data-cfasync="false"></script>
+    
+    <!-- Session-Free Auth -->
+    <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1075" data-cfasync="false"></script>
     <style>
         .wallet-container {
             max-width: 1100px;
