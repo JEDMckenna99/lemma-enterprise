@@ -260,6 +260,89 @@
                 }
             }
         });
+        
+        // SESSION-FREE: Initialize navigation based on credentials
+        (async function initSessionFreeNav() {
+            try {
+                const wallet = new LemmaWallet({debug: false});
+                await wallet.init();
+                
+                const permissions = await wallet.getCredentials('permission');
+                const lemmaPermissions = permissions.filter(p => {
+                    const claims = p.claims || p.credentialSubject || {};
+                    const siteId = claims.siteId || claims.site || '';
+                    return siteId === 'lemma.id' || siteId === 'lemma_platform';
+                });
+                
+                if (lemmaPermissions.length > 0) {
+                    const cred = lemmaPermissions[0];
+                    const claims = cred.claims || cred.credentialSubject || {};
+                    
+                    // Show authenticated UI
+                    const userDropdown = document.getElementById('user-dropdown');
+                    const authButtons = document.getElementById('auth-buttons');
+                    if (userDropdown) userDropdown.style.display = 'block';
+                    if (authButtons) authButtons.style.display = 'none';
+                    
+                    // Update user info
+                    const emailElem = document.getElementById('dropdown-email');
+                    const roleElem = document.getElementById('dropdown-role');
+                    if (emailElem) emailElem.textContent = claims.email || 'Customer';
+                    if (roleElem) roleElem.textContent = (claims.accountType || 'customer').charAt(0).toUpperCase() + (claims.accountType || 'customer').slice(1);
+                    
+                    // Show admin link if admin
+                    if (claims.permissionId === 'admin_access' || claims.accountType === 'admin') {
+                        const navAdmin = document.getElementById('nav-admin');
+                        const adminDropdown = document.getElementById('admin-dropdown-link');
+                        if (navAdmin) navAdmin.style.display = 'block';
+                        if (adminDropdown) adminDropdown.style.display = 'block';
+                    }
+                    
+                    // Hide pricing for authenticated users
+                    const pricingLink = document.getElementById('nav-pricing');
+                    if (pricingLink) pricingLink.style.display = 'none';
+                    
+                    // Store credential globally for API calls
+                    window.lemmaCredential = cred;
+                    
+                    // Initialize session-free auth with smart caching
+                    const auth = new SessionFreeAuth(wallet, {debug: false});
+                    window.lemmaAuth = auth;
+                }
+            } catch (error) {
+                // Silent fail - show unauthenticated UI
+            }
+        })();
+        
+        // Session-free logout
+        async function handleSessionFreeLogout() {
+            try {
+                const wallet = new LemmaWallet({debug: false});
+                await wallet.init();
+                
+                // Remove lemma.id credentials from wallet
+                const permissions = await wallet.getCredentials('permission');
+                const lemmaPermissions = permissions.filter(p => {
+                    const claims = p.claims || p.credentialSubject || {};
+                    const siteId = claims.siteId || claims.site || '';
+                    return siteId === 'lemma.id' || siteId === 'lemma_platform';
+                });
+                
+                for (const cred of lemmaPermissions) {
+                    await wallet.removeCredential(cred.id);
+                }
+                
+                // Clear global state
+                delete window.lemmaCredential;
+                delete window.lemmaAuth;
+                
+                // Redirect to home
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout failed:', error);
+                window.location.href = '/';
+            }
+        }
     </script>
 </body>
 </html>
