@@ -612,11 +612,8 @@ def login():
         customer.last_login = datetime.utcnow()
         customer.login_count += 1
         
-        # Store customer ID and role in session
-        session['customer_id'] = customer.customer_id
-        session['user_role'] = customer.role
-        
-        # NEW: Check/Issue permission lemma for lemma.id platform access
+        # SESSION-FREE: Issue permission lemma directly to wallet (no server sessions)
+        # Client will cache verification results (5-minute TTL) with event-driven invalidation
         user_did = f"did:lemma:customer:{customer.customer_id}"
         permission_lemma_status = False
         
@@ -699,26 +696,56 @@ def login():
 
 @customer_accounts_bp.route('/api/customer/info')
 def get_customer_info():
-    """Get customer information"""
-    customer_id = session.get('customer_id')
-    if not customer_id:
-        return jsonify({'error': 'Not authenticated'}), 401
+    """Get customer information (session-free: requires credential in request)"""
+    # SESSION-FREE: Extract customer info from credential passed in request
+    # Credential should be verified client-side and included in Authorization header
     
-    customer = customer_manager.get_customer(customer_id)
-    if not customer:
-        return jsonify({'error': 'Customer not found'}), 404
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return jsonify({'error': 'Credential required in Authorization header'}), 401
     
-    return jsonify({
-        'success': True,
-        'customer': asdict(customer)
-    })
+    try:
+        # Parse credential from Bearer token
+        credential_json = auth_header.split(' ', 1)[1]
+        credential = json.loads(credential_json)
+        
+        # Extract customer ID from credential subject
+        subject = credential.get('subject', '')
+        if subject.startswith('did:lemma:customer:'):
+            customer_id = subject.replace('did:lemma:customer:', '')
+        else:
+            return jsonify({'error': 'Invalid credential subject'}), 401
+        
+        customer = customer_manager.get_customer(customer_id)
+        if not customer:
+            return jsonify({'error': 'Customer not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'customer': asdict(customer)
+        })
+    except Exception as e:
+        logger.error(f"Failed to get customer info: {e}")
+        return jsonify({'error': 'Authentication failed'}), 401
 
 @customer_accounts_bp.route('/api/customer/api-keys', methods=['GET', 'POST', 'DELETE'])
 def manage_api_keys():
-    """Manage customer API keys"""
-    customer_id = session.get('customer_id')
-    if not customer_id:
-        return jsonify({'error': 'Not authenticated'}), 401
+    """Manage customer API keys (session-free)"""
+    # SESSION-FREE: Extract customer ID from credential
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return jsonify({'error': 'Credential required'}), 401
+    
+    try:
+        credential_json = auth_header.split(' ', 1)[1]
+        credential = json.loads(credential_json)
+        subject = credential.get('subject', '')
+        customer_id = subject.replace('did:lemma:customer:', '') if subject.startswith('did:lemma:customer:') else None
+        
+        if not customer_id:
+            return jsonify({'error': 'Invalid credential'}), 401
+    except:
+        return jsonify({'error': 'Authentication failed'}), 401
     
     if request.method == 'GET':
         # Get all API keys

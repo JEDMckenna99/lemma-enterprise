@@ -195,10 +195,10 @@
             </div>
 
             <form id="loginForm">
-                <div class="form-group">
-                    <label class="form-label" for="email">
+                    <div class="form-group">
+                        <label class="form-label" for="email">
                         Email Address
-                    </label>
+                        </label>
                     <input 
                         type="email" 
                         id="email" 
@@ -222,7 +222,7 @@
                     <p style="color: #065f46; font-size: var(--font-size-sm);">
                         Click the link in your email to receive your beta-user credential and access the platform.
                     </p>
-                </div>
+            </div>
 
                 <div class="info-box">
                     <strong>How it works:</strong>
@@ -266,43 +266,35 @@
                 });
                 
                 if (lemmaPermissions.length > 0) {
-                    console.log('✅ Valid lemma.id permission found - auto-signing in...');
+                    console.log('Valid lemma.id permission found - verifying with session-free auth...');
                     
-                    // Auto sign-in with existing credential
                     const cred = lemmaPermissions[0];
-                    const claims = cred.claims || cred.credentialSubject || {};
                     
-                    const response = await fetch('/api/auth/lemma-signin', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            user_email: claims.email || 'user@lemma.id',
-                            user_role: claims.accountType || 'customer',
-                            permission_credentials: [cred],
-                            verification_result: {
-                                verified: true, // Client-side check passed
-                                verification_time_us: 0,
-                                method: 'client_wallet_check'
-                            },
-                            auth_method: 'lemma_wallet'
-                        })
-                    });
+                    // SESSION-FREE: Initialize auth system
+                    const auth = new SessionFreeAuth(wallet, { debug: true });
+                    window.lemmaAuth = auth;
                     
-                    const result = await response.json();
-                    if (result.success) {
-                        console.log('✅ Auto-signed in! Redirecting...');
-                        window.location.href = result.redirect_url || '/';
+                    // Verify credential with smart caching
+                    const authenticated = await auth.isAuthenticated(cred);
+                    
+                    if (authenticated) {
+                        console.log('Credential verified! Redirecting to dashboard...');
+                        
+                        // Store credential globally for API calls
+                        window.lemmaCredential = cred;
+                        
+                        // Redirect to dashboard
+                        window.location.href = '/dashboard';
                         return;
                     } else {
-                        console.error('❌ Sign-in failed:', result.error || result.message);
+                        console.log('Credential verification failed (revoked or invalid)');
                     }
                 }
                 
-                console.log('ℹ️ No valid credential - showing login form');
+                console.log('No valid credential - showing login form');
                 
             } catch (error) {
-                console.log('ℹ️ Auto-sign-in check failed (expected for new users):', error.message);
+                console.log('Auto-sign-in check failed (expected for new users):', error.message);
             }
         })();
         
@@ -322,7 +314,7 @@
             // Show loading state
             button.disabled = true;
             buttonText.innerHTML = `
-                <span class="loading-spinner"></span>
+                    <span class="loading-spinner"></span>
                 Sending sign-in link...
             `;
             

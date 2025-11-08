@@ -1,10 +1,12 @@
 """
 Authentication and authorization decorators for Lemma.id platform
+Session-free architecture - all auth via credentials + smart caching
 """
 
 from functools import wraps
 from flask import request, jsonify, g, make_response
 import jwt
+import json
 from typing import Optional
 
 def require_api_key(f):
@@ -30,19 +32,30 @@ def require_api_key(f):
 
 def require_site_admin(f):
     """
-    Decorator to require site admin privileges
-    Supports BOTH session-based auth (web UI) AND API key auth (programmatic)
+    Decorator to require site admin privileges (session-free)
+    Supports credential-based auth (web UI) AND API key auth (programmatic)
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        from flask import session
-        
-        # METHOD 1: Check for session-based admin auth (web UI)
-        if session.get('user_role') == 'admin' or session.get('customer_id'):
-            # User is logged in as admin via web session
-            g.is_admin = True
-            g.admin_email = session.get('customer_email', 'admin@lemma.id')
-            return f(*args, **kwargs)
+        # METHOD 1: Check for credential-based auth (web UI)
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            try:
+                credential_json = auth_header.split(' ', 1)[1]
+                credential = json.loads(credential_json)
+                
+                # Check if it's an admin permission lemma
+                claims = credential.get('claims', {})
+                permission_id = claims.get('permissionId', '')
+                account_type = claims.get('accountType', '')
+                
+                if permission_id == 'admin_access' or account_type == 'admin':
+                    g.is_admin = True
+                    g.admin_email = claims.get('email', 'admin@lemma.id')
+                    g.credential = credential
+                    return f(*args, **kwargs)
+            except:
+                pass
         
         # METHOD 2: Check for API key (programmatic access)
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
@@ -59,7 +72,7 @@ def require_site_admin(f):
             return f(*args, **kwargs)
         
         # No valid auth found
-        return jsonify({'error': 'Admin authentication required (session or API key)'}), 401
+        return jsonify({'error': 'Admin authentication required (credential or API key)'}), 401
     
     return decorated_function
 
@@ -208,8 +221,8 @@ def get_current_user():
 
 def require_permission_lemma(site_id='lemma.id', required_permissions=None):
     """
-    Decorator to require a valid permission lemma for site access
-    Does NOT require identity/PoH lemma - permission lemma only
+    Decorator to require a valid permission lemma for site access (session-free)
+    Credential must be passed in Authorization header
     
     Usage:
         @app.route('/dashboard')
@@ -223,19 +236,30 @@ def require_permission_lemma(site_id='lemma.id', required_permissions=None):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            from flask import session, redirect, url_for, request
+            from flask import redirect, url_for, request
             
-            # Check session for permission lemma
-            permission_verified = session.get('permission_verified', False)
-            permission_site = session.get('permission_site')
-            permission_id = session.get('permission_id')
+            # SESSION-FREE: Check Authorization header for credential
+            auth_header = request.headers.get('Authorization')
             
-            if permission_verified and permission_site == site_id and permission_id in required_permissions:
-                # Valid permission lemma found in session
-                return f(*args, **kwargs)
+            if auth_header and auth_header.startswith('Bearer '):
+                try:
+                    credential_json = auth_header.split(' ', 1)[1]
+                    credential = json.loads(credential_json)
+                    
+                    # Validate credential
+                    claims = credential.get('claims', {})
+                    permission_site = claims.get('siteId')
+                    permission_id = claims.get('permissionId')
+                    
+                    if permission_site == site_id and permission_id in required_permissions:
+                        # Valid permission lemma
+                        g.credential = credential
+                        g.permission_id = permission_id
+                        return f(*args, **kwargs)
+                except:
+                    pass
             
-            # No valid permission - redirect to login
-            session['return_url'] = request.url
+            # No valid credential - redirect to login
             return redirect(url_for('customer_accounts.login'))
         
         return decorated_function

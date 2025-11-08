@@ -166,81 +166,48 @@
                 <span>Lemma</span>
             </a>
             
-            <!-- Centered Navigation Links -->
+            <!-- Centered Navigation Links - Session-free -->
             <div class="nav-center">
-                {% if session.get('customer_id') %}
-                    <!-- Authenticated User Navigation -->
-                    {% if session.get('user_role') == 'admin' %}
-                        <a href="/platform" class="nav-link">Platform</a>
-                        <a href="/wallet" class="nav-link">Wallet</a>
-                        <a href="/docs" class="nav-link">Docs</a>
-                    {% else %}
-                        <a href="/platform" class="nav-link">Platform</a>
-                        <a href="/wallet" class="nav-link">Wallet</a>
-                        <a href="/docs" class="nav-link">Docs</a>
-                    {% endif %}
-                {% else %}
-                    <!-- Unregistered User Navigation -->
-                    <a href="/wallet" class="nav-link">Wallet</a>
-                    <a href="/docs" class="nav-link">Documentation</a>
-                    <a href="/pricing" class="nav-link">Pricing</a>
-                    <a href="/contact" class="nav-link">Contact</a>
-                {% endif %}
+                <!-- Show all navigation (client-side will manage visibility) -->
+                <a href="/platform" class="nav-link" id="nav-platform">Platform</a>
+                <a href="/admin" class="nav-link" id="nav-admin" style="display:none;">Admin Monitor</a>
+                <a href="/wallet" class="nav-link">Wallet</a>
+                <a href="/docs" class="nav-link">Docs</a>
+                <a href="/pricing" class="nav-link" id="nav-pricing">Pricing</a>
             </div>
             
-            <!-- Right Side Navigation -->
+            <!-- Right Side Navigation - Session-free -->
             <div class="nav-right">
-                {% if session.get('customer_id') %}
-                    <!-- Authenticated User Dropdown -->
-                    <div class="user-dropdown">
-                        <button class="user-dropdown-toggle" onclick="toggleUserDropdown()">
-                            <span class="user-avatar">👤</span>
-                            <span class="user-name">Account</span>
-                            <span class="dropdown-arrow">▼</span>
-                        </button>
-                        <div class="user-dropdown-menu" id="userDropdownMenu">
-                            <div class="dropdown-header">
-                                <div class="dropdown-user-info">
-                                    <div class="dropdown-user-name">Customer Account</div>
-                                    <div class="dropdown-user-role">{{ session.get('user_role', 'customer').title() }}</div>
-                                </div>
+                <!-- User dropdown (hidden by default, shown by JS if authenticated) -->
+                <div class="user-dropdown" id="user-dropdown" style="display:none;">
+                    <button class="user-dropdown-toggle" onclick="toggleUserDropdown()">
+                        <span class="user-avatar">👤</span>
+                        <span class="user-name" id="user-display-name">Account</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="user-dropdown-menu" id="userDropdownMenu">
+                        <div class="dropdown-header">
+                            <div class="dropdown-user-info">
+                                <div class="dropdown-user-name" id="dropdown-email">Customer Account</div>
+                                <div class="dropdown-user-role" id="dropdown-role">Customer</div>
                             </div>
-                            <div class="dropdown-divider"></div>
-                            <a href="/wallet" class="dropdown-item">
-                                Wallet
-                            </a>
-                            <a href="/dashboard" class="dropdown-item">
-                                Dashboard
-                            </a>
-                            <a href="/api-keys" class="dropdown-item">
-                                API Keys
-                            </a>
-                            <a href="/admin/iam" class="dropdown-item">
-                                IAM Permissions
-                            </a>
-                            <a href="/billing" class="dropdown-item">
-                                Billing
-                            </a>
-                            {% if session.get('user_role') == 'admin' %}
-                            <div class="dropdown-divider"></div>
-                            <a href="/admin" class="dropdown-item admin-item">
-                                Admin Panel
-                            </a>
-                            <a href="/site-management" class="dropdown-item admin-item">
-                                Site Management
-                            </a>
-                            {% endif %}
-                            <div class="dropdown-divider"></div>
-                            <a href="/logout" class="dropdown-item logout-item">
-                                Sign Out
-                            </a>
                         </div>
+                        <div class="dropdown-divider"></div>
+                        <a href="/wallet" class="dropdown-item">Wallet</a>
+                        <a href="/dashboard" class="dropdown-item">Dashboard</a>
+                        <a href="/api-keys" class="dropdown-item">API Keys</a>
+                        <a href="/billing" class="dropdown-item">Billing</a>
+                        <a href="/admin" class="dropdown-item admin-item" id="admin-dropdown-link" style="display:none;">Admin Tools</a>
+                        <div class="dropdown-divider"></div>
+                        <a href="#" class="dropdown-item logout-item" onclick="handleSessionFreeLogout(); return false;">Sign Out</a>
                     </div>
-                {% else %}
-                    <!-- Unauthenticated User Buttons -->
+                </div>
+                
+                <!-- Auth buttons (shown by default, hidden by JS if authenticated) -->
+                <div id="auth-buttons">
                     <a href="/login" class="btn btn-secondary">Sign In</a>
                     <a href="/register" class="btn btn-primary">Create Account</a>
-                {% endif %}
+                </div>
             </div>
         </nav>
     </header>

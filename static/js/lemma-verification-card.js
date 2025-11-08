@@ -1016,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (config.debug) {
             console.log(`🎯 Auto-initialized verification card ${index + 1}`, config);
         }
-    }
+        }
 });
 
 // Utility function for easy programmatic creation

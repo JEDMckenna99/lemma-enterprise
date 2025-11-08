@@ -325,13 +325,10 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to initialize Health Check: {e}")
 
-    # Set up session configuration
-    app.config['SESSION_COOKIE_SECURE'] = not app.config['DEBUG']
-    app.config['SESSION_COOKIE_HTTPONLY'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    app.config['SESSION_PERMANENT'] = True
-    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
-    app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+    # Session-free architecture: No server-side sessions needed!
+    # Authentication is handled via client-side credential verification
+    # with smart caching (5-minute TTL) and event-driven invalidation
+    # This allows infinite scalability with zero server-side state
 
     # ================================================================================
     # HEALTH CHECK & MONITORING ENDPOINTS
