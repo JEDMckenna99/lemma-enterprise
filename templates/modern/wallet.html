@@ -644,6 +644,28 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     
     try {
+        // Wait for LemmaWallet to be defined (in case scripts are still loading)
+        if (typeof LemmaWallet === 'undefined') {
+            console.warn('⚠️ LemmaWallet not yet loaded, waiting...');
+            await new Promise(resolve => {
+                const checkInterval = setInterval(() => {
+                    if (typeof LemmaWallet !== 'undefined') {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+                // Timeout after 5 seconds
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    resolve();
+                }, 5000);
+            });
+        }
+        
+        if (typeof LemmaWallet === 'undefined') {
+            throw new Error('LemmaWallet class failed to load after 5 seconds');
+        }
+        
         // Initialize the unified Lemma Wallet with all platform features
         walletInitialized = true;
         lemmaWallet = new LemmaWallet({
