@@ -672,25 +672,37 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         // Initialize the unified Lemma Wallet with all platform features
-        walletInitialized = true;
-        lemmaWallet = new LemmaWallet({
-            debug: true,
-            backgroundChecks: true,
-            securityLevel: 'medium',
-            enableAdvancedFeatures: true,
-            enableDeviceSync: true,
-            enableVaultStorage: false, // Disabled - using direct QR sync only
-            networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-            networkAuthKey: 'lemma_network_federated_sync_2024',
-            syncInterval: 30000
-        });
-
-        // Wait for wallet to be ready
-        if (typeof lemmaWallet.init === 'function') {
-            await lemmaWallet.init();
+        // Check if already initialized by layout.html (global singleton pattern)
+        if (window.globalLemmaWallet) {
+            // Reuse existing wallet from layout.html
+            lemmaWallet = window.globalLemmaWallet;
+            walletInitialized = true;
+            console.log('✅ Reusing wallet instance from layout.html');
         } else {
-            // Fallback initialization for integrated wallet
-            console.log('Using integrated wallet initialization');
+            // First initialization (shouldn't happen, but fallback)
+            walletInitialized = true;
+            lemmaWallet = new LemmaWallet({
+                debug: true,
+                backgroundChecks: true,
+                securityLevel: 'medium',
+                enableAdvancedFeatures: true,
+                enableDeviceSync: true,
+                enableVaultStorage: false, // Disabled - using direct QR sync only
+                networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
+                networkAuthKey: 'lemma_network_federated_sync_2024',
+                syncInterval: 30000
+            });
+
+            // Wait for wallet to be ready
+            if (typeof lemmaWallet.init === 'function') {
+                await lemmaWallet.init();
+            } else {
+                // Fallback initialization for integrated wallet
+                console.log('Using integrated wallet initialization');
+            }
+            
+            // Store globally
+            window.globalLemmaWallet = lemmaWallet;
         }
         
         // Get API key from server configuration
