@@ -20,8 +20,10 @@
         }
     </script>
     
-    <!-- Encrypted Wallet (Transparent Encryption) - Load synchronously for session-free architecture -->
-    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1077" data-cfasync="false"></script>
+    <!-- Wallet Scripts - Load synchronously for session-free architecture -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1081&bust={{ range(1, 99999)|random }}" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1081" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1081&bust={{ range(1, 99999)|random }}" data-cfasync="false"></script>
     
     <!-- User Dropdown Styles -->
     <style>
