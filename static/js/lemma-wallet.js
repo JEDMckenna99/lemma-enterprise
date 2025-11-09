@@ -1237,7 +1237,8 @@ class LemmaWallet {
                         console.log(`🔐 Privacy: Web Crypto API (server has hashes, not credential IDs)`);
                     }
                 }
-            } catch (e) {
+            }
+        } catch (e) {
                 // Ignore corrupted cache entries
                 if (this.debug) {
                     console.warn(`⚠️ Corrupted Bloom filter cache: ${e.message}`);
