@@ -4,7 +4,7 @@
 
 {% block head %}
     {{ super() }}
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=991"></script>
+    <!-- Wallet scripts already loaded in layout.html -->
 {% endblock %}
 
 {% block content %}
@@ -132,23 +132,36 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         
         console.log('Credential issued:', result);
         
-        // Initialize wallet
-        let wallet = window.LEMMA_WALLET_INSTANCE || new LemmaWallet({ debug: true });
-        if (!wallet.isReady) {
-            await wallet.init();
+        // Wait for global wallet to be ready
+        let attempts = 0;
+        while (!window.globalLemmaWallet && attempts < 20) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
         }
         
-        // Ensure credential has packageType set
+        if (!window.globalLemmaWallet) {
+            throw new Error('Global wallet not initialized');
+        }
+        
+        const wallet = window.globalLemmaWallet;
+        
+        // Ensure credential has correct format for session-free architecture
         const credentialToStore = {
             ...result.credential,
             packageType: 'permission',  // Explicitly set packageType
-            claims: result.credential.claims || result.credential.credentialSubject
+            type: ['VerifiableCredential', 'PermissionLemma'],
+            claims: {
+                ...result.credential.claims,
+                siteId: site_domain,  // Use domain (lemma.id) not site_id
+                siteDomain: site_domain,
+                permissionId: 'admin_access',  // Set admin_access for session-free auth
+                accountType: 'admin',
+                email: user_email
+            }
         };
         
         console.log('=== STORING CREDENTIAL ===');
         console.log('Credential to store:', credentialToStore);
-        console.log('Wallet instance:', wallet);
-        console.log('Wallet ready:', wallet.isReady);
         
         // Store credential in wallet
         const storeResult = await wallet.storeCredential(credentialToStore);
@@ -190,12 +203,21 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             }
         }, null, 2);
         
+        // Set up SESSION-FREE AUTH
+        window.lemmaCredential = credentialToStore;
+        if (!window.lemmaAuth) {
+            window.lemmaAuth = new SessionFreeAuth(wallet, {debug: true});
+        }
+        
+        console.log('✅ Session-free auth configured');
+        console.log('✅ Credential stored globally:', window.lemmaCredential.id);
+        
         // Show success
         document.getElementById('bootstrap-form').style.display = 'none';
         document.getElementById('status').style.display = 'none';
         document.getElementById('success-actions').style.display = 'block';
         
-        showStatus(`Success! Issued in ${result.issue_time_us.toFixed(2)}µs`, 'success');
+        showStatus(`Success! Issued in ${result.issue_time_us.toFixed(2)}µs - Credential active!`, 'success');
         
     } catch (error) {
         console.error('Bootstrap error:', error);
