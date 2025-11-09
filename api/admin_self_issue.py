@@ -135,15 +135,30 @@ def admin_self_issue():
             custom_claims={
                 'email': user_email,
                 'site_domain': site_domain,
-                'issued_via': 'admin_self_issue'
+                'issued_via': 'admin_self_issue',
+                'accountType': 'admin',  # CRITICAL for session-free auth
+                'permissionId': 'admin_access'  # CRITICAL for navigation
             }
         )
         
+        # CRITICAL: Add W3C type field for credential classification
+        # Rust issuer doesn't include this, so we add it in Python
+        permission_lemma['type'] = ['VerifiableCredential', 'PermissionLemma']
+        permission_lemma['packageType'] = 'permission'  # For wallet filtering
+        
+        # Ensure claims/credentialSubject has packageType
+        if 'credentialSubject' in permission_lemma:
+            permission_lemma['credentialSubject']['packageType'] = 'permission'
+        if 'claims' in permission_lemma:
+            permission_lemma['claims']['packageType'] = 'permission'
+        
         issue_time_us = (time.perf_counter() - start_time) * 1_000_000
         
-        logger.info(f"✅ Self-issued {permission_level} credential for {user_email} on {site_domain}")
+        logger.info(f"✅ Self-issued {permission_level} PERMISSION credential for {user_email} on {site_domain}")
         logger.info(f"⚡ Issue time: {issue_time_us:.2f}µs")
         logger.info(f"🔐 Credential ID: {permission_lemma['id']}")
+        logger.info(f"🔐 Type: {permission_lemma['type']}")
+        logger.info(f"🔐 Package Type: {permission_lemma.get('packageType', 'MISSING!')}")
         logger.info(f"🔐 User DID: {user_did}")
         logger.info(f"🔐 Issuer DID: {manager.issuer_did[:50]}...")
         
