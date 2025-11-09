@@ -12,8 +12,16 @@
     <!-- Clean Design System - Single Source of Truth -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250120-nav-spacing">
     
+    <!-- CRITICAL: Disable Cloudflare Rocket Loader for wallet scripts -->
+    <script data-cfasync="false">
+        // Prevent Cloudflare Rocket Loader from interfering
+        if (window.Rocketloader) {
+            window.Rocketloader = {load: function(){}};
+        }
+    </script>
+    
     <!-- Encrypted Wallet (Transparent Encryption) - Load synchronously for session-free architecture -->
-    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1076" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1077" data-cfasync="false"></script>
     
     <!-- User Dropdown Styles -->
     <style>

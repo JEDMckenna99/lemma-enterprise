@@ -5,8 +5,17 @@
 
 {% block head %}
     {{ super() }}
+    <!-- DISABLE Cloudflare Rocket Loader for this page entirely -->
+    <meta http-equiv="x-dns-prefetch-control" content="off">
+    <script data-cfasync="false">
+        // Disable Rocket Loader completely for this page
+        if (window.Rocketloader) {
+            window.Rocketloader = {load: function(){}};
+        }
+    </script>
+    
     <!-- Load the unified Lemma Wallet (disable Cloudflare Rocket Loader) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1075" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1077" data-cfasync="false"></script>
     
     <!-- Encrypted Wallet (PIN-based encryption in localStorage) -->
     <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1075" data-cfasync="false"></script>
