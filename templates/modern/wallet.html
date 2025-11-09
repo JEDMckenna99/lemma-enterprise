@@ -14,10 +14,7 @@
         }
     </script>
     
-    <!-- Load the unified Lemma Wallet (disable Cloudflare Rocket Loader) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1080&bust={{ range(1, 99999)|random }}" data-cfasync="false"></script>
-    
-    <!-- Encrypted Wallet already loaded in layout.html, don't load again -->
+    <!-- Wallet scripts already loaded in layout.html, don't load again -->
     
     <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
     <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1075" data-cfasync="false"></script>
