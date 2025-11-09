@@ -5,6 +5,40 @@
 
 {% block head %}
     {{ super() }}
+    <script>
+        // SESSION-FREE AUTH CHECK: Verify credential before showing dashboard
+        (async function verifyDashboardAccess() {
+            try {
+                // Wait for global wallet to be ready
+                let attempts = 0;
+                while (!window.globalLemmaWallet && attempts < 20) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                if (!window.globalLemmaWallet || !window.lemmaCredential) {
+                    console.log('No credential found - redirecting to login');
+                    window.location.href = '/login';
+                    return;
+                }
+                
+                // Verify credential is still valid
+                if (window.lemmaAuth) {
+                    const authenticated = await window.lemmaAuth.isAuthenticated(window.lemmaCredential);
+                    if (!authenticated) {
+                        console.log('Credential verification failed - redirecting to login');
+                        window.location.href = '/login';
+                        return;
+                    }
+                }
+                
+                console.log('✅ Dashboard access granted');
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                window.location.href = '/login';
+            }
+        })();
+    </script>
     <style>
         .dashboard-container {
             max-width: 1200px;
