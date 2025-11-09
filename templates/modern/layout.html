@@ -274,8 +274,12 @@
         // SESSION-FREE: Initialize navigation based on credentials
         (async function initSessionFreeNav() {
             try {
-                const wallet = new LemmaWallet({debug: false});
-                await wallet.init();
+                // Create global wallet instance (reused by wallet.html)
+                if (!window.globalLemmaWallet) {
+                    window.globalLemmaWallet = new LemmaWallet({debug: false});
+                    await window.globalLemmaWallet.init();
+                }
+                const wallet = window.globalLemmaWallet;
                 
                 const permissions = await wallet.getCredentials('permission');
                 const lemmaPermissions = permissions.filter(p => {
@@ -327,8 +331,11 @@
         // Session-free logout
         async function handleSessionFreeLogout() {
             try {
-                const wallet = new LemmaWallet({debug: false});
-                await wallet.init();
+                // Reuse global wallet instance
+                const wallet = window.globalLemmaWallet || new LemmaWallet({debug: false});
+                if (!window.globalLemmaWallet) {
+                    await wallet.init();
+                }
                 
                 // Remove lemma.id credentials from wallet
                 const permissions = await wallet.getCredentials('permission');
