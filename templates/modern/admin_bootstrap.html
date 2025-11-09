@@ -146,19 +146,37 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         const wallet = window.globalLemmaWallet;
         
         // Ensure credential has correct format for session-free architecture
+        // CRITICAL: packageType must be at TOP LEVEL (not just in claims)
         const credentialToStore = {
             ...result.credential,
-            packageType: 'permission',  // Explicitly set packageType
+            packageType: 'permission',  // TOP LEVEL - wallet filters on this
             type: ['VerifiableCredential', 'PermissionLemma'],
-            claims: {
-                ...result.credential.claims,
+            credentialSubject: {
+                ...(result.credential.credentialSubject || result.credential.claims || {}),
+                packageType: 'permission',  // Also in credentialSubject
                 siteId: site_domain,  // Use domain (lemma.id) not site_id
                 siteDomain: site_domain,
                 permissionId: 'admin_access',  // Set admin_access for session-free auth
                 accountType: 'admin',
                 email: user_email
+            },
+            // Also set claims for backwards compatibility
+            claims: {
+                ...(result.credential.claims || result.credential.credentialSubject || {}),
+                packageType: 'permission',
+                siteId: site_domain,
+                siteDomain: site_domain,
+                permissionId: 'admin_access',
+                accountType: 'admin',
+                email: user_email
             }
         };
+        
+        console.log('=== CREDENTIAL FORMAT CHECK ===');
+        console.log('TOP LEVEL packageType:', credentialToStore.packageType);
+        console.log('TOP LEVEL type:', credentialToStore.type);
+        console.log('credentialSubject.packageType:', credentialToStore.credentialSubject.packageType);
+        console.log('claims.packageType:', credentialToStore.claims.packageType);
         
         console.log('=== STORING CREDENTIAL ===');
         console.log('Credential to store:', credentialToStore);
