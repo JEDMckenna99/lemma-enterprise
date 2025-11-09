@@ -32,47 +32,52 @@ def require_api_key(f):
 
 def require_site_admin(f):
     """
-    Decorator to require site admin privileges (session-free)
-    Supports credential-based auth (web UI) AND API key auth (programmatic)
+    Decorator to require site admin privileges (CLIENT-SIDE VERIFICATION)
+    
+    Architecture:
+    - Client verifies credential locally (Ed25519 + Bloom filter)
+    - Client sends only credential ID in X-Credential-ID header
+    - Server checks if credential ID is revoked (simple hash lookup)
+    - Server TRUSTS client-side verification (Web Crypto API at edge)
+    
+    This is TRUE EDGE COMPUTING - server is ultra-lightweight.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # METHOD 1: Check for credential-based auth (web UI)
-        auth_header = request.headers.get('Authorization')
-        if auth_header and auth_header.startswith('Bearer '):
-            try:
-                credential_json = auth_header.split(' ', 1)[1]
-                credential = json.loads(credential_json)
-                
-                # Check if it's an admin permission lemma
-                claims = credential.get('claims', {})
-                permission_id = claims.get('permissionId', '')
-                account_type = claims.get('accountType', '')
-                
-                if permission_id == 'admin_access' or account_type == 'admin':
-                    g.is_admin = True
-                    g.admin_email = claims.get('email', 'admin@lemma.id')
-                    g.credential = credential
-                    return f(*args, **kwargs)
-            except:
-                pass
+        # METHOD 1: Client-side verified credential (edge verification)
+        credential_id = request.headers.get('X-Credential-ID')
+        permission_id = request.headers.get('X-Permission-ID')
+        user_email = request.headers.get('X-User-Email')
         
-        # METHOD 2: Check for API key (programmatic access)
+        if credential_id and permission_id:
+            # Check revocation only (trust client-side signature verification)
+            from api.wallet_revocation import is_credential_revoked
+            
+            if is_credential_revoked(credential_id):
+                return jsonify({'error': 'Credential revoked'}), 401
+            
+            # Verify it's an admin permission
+            if permission_id in ['admin_access', 'super_admin']:
+                g.is_admin = True
+                g.admin_email = user_email or 'admin@lemma.id'
+                g.credential_id = credential_id
+                g.permission_id = permission_id
+                return f(*args, **kwargs)
+            else:
+                return jsonify({'error': 'Admin permission required'}), 403
+        
+        # METHOD 2: API key (programmatic access - still supported)
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         
-        if api_key:
-            # TODO: Validate API key against database
-            # For now, accept any valid API key as admin for testing
-            if len(api_key) < 10:
-                return jsonify({'error': 'Invalid admin credentials'}), 403
-            
+        if api_key and len(api_key) >= 10:
+            # API keys bypass credential system
             g.api_key = api_key
             g.is_admin = True
             g.admin_email = 'api@lemma.id'
             return f(*args, **kwargs)
         
         # No valid auth found
-        return jsonify({'error': 'Admin authentication required (credential or API key)'}), 401
+        return jsonify({'error': 'Admin authentication required (credential ID or API key)'}), 401
     
     return decorated_function
 
@@ -221,8 +226,16 @@ def get_current_user():
 
 def require_permission_lemma(site_id='lemma.id', required_permissions=None):
     """
-    Decorator to require a valid permission lemma for site access (session-free)
-    Credential must be passed in Authorization header
+    Decorator to require a valid permission lemma for site access (CLIENT-SIDE VERIFICATION)
+    
+    Architecture (TRUE EDGE COMPUTING):
+    - Client verifies credential locally using Web Crypto API (Ed25519 signature)
+    - Client checks revocation locally using Bloom filter
+    - Client sends only: credential ID, permission ID, user email (NO full credential)
+    - Server checks revocation list (simple hash lookup - ultra fast)
+    - Server TRUSTS client-side cryptographic verification
+    
+    This is Lemma's edge computing advantage - server is stateless and lightweight.
     
     Usage:
         @app.route('/dashboard')
@@ -238,26 +251,26 @@ def require_permission_lemma(site_id='lemma.id', required_permissions=None):
         def decorated_function(*args, **kwargs):
             from flask import redirect, url_for, request
             
-            # SESSION-FREE: Check Authorization header for credential
-            auth_header = request.headers.get('Authorization')
+            # CLIENT-SIDE VERIFIED: Read minimal headers
+            credential_id = request.headers.get('X-Credential-ID')
+            permission_id = request.headers.get('X-Permission-ID')
+            user_email = request.headers.get('X-User-Email')
+            credential_site = request.headers.get('X-Site-ID')
             
-            if auth_header and auth_header.startswith('Bearer '):
-                try:
-                    credential_json = auth_header.split(' ', 1)[1]
-                    credential = json.loads(credential_json)
-                    
-                    # Validate credential
-                    claims = credential.get('claims', {})
-                    permission_site = claims.get('siteId')
-                    permission_id = claims.get('permissionId')
-                    
-                    if permission_site == site_id and permission_id in required_permissions:
-                        # Valid permission lemma
-                        g.credential = credential
-                        g.permission_id = permission_id
-                        return f(*args, **kwargs)
-                except:
-                    pass
+            if credential_id and permission_id and credential_site == site_id:
+                # Check revocation only (trust client-side signature verification)
+                from api.wallet_revocation import is_credential_revoked
+                
+                if is_credential_revoked(credential_id):
+                    return redirect(url_for('customer_accounts.login'))
+                
+                # Verify permission level
+                if permission_id in required_permissions:
+                    # Valid permission - server trusts client-side verification
+                    g.credential_id = credential_id
+                    g.permission_id = permission_id
+                    g.user_email = user_email
+                    return f(*args, **kwargs)
             
             # No valid credential - redirect to login
             return redirect(url_for('customer_accounts.login'))

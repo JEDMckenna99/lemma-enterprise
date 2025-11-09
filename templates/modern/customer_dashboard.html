@@ -6,7 +6,7 @@
 {% block head %}
     {{ super() }}
     <script>
-        // SESSION-FREE AUTH CHECK: Verify credential before showing dashboard
+        // CLIENT-SIDE VERIFICATION (TRUE EDGE COMPUTING)
         (async function verifyDashboardAccess() {
             try {
                 // Wait for global wallet to be ready
@@ -17,27 +17,55 @@
                 }
                 
                 if (!window.globalLemmaWallet || !window.lemmaCredential) {
-                    console.log('No credential found - redirecting to login');
+                    console.log('❌ No credential found - redirecting to login');
                     window.location.href = '/login';
                     return;
                 }
                 
-                // Verify credential is still valid
-                if (window.lemmaAuth) {
-                    const authenticated = await window.lemmaAuth.isAuthenticated(window.lemmaCredential);
-                    if (!authenticated) {
-                        console.log('Credential verification failed - redirecting to login');
-                        window.location.href = '/login';
-                        return;
-                    }
+                // VERIFY LOCALLY using Web Crypto API (edge verification)
+                console.log('🔐 Verifying credential client-side (Web Crypto API)...');
+                const verificationResult = await window.globalLemmaWallet.verifyCredential(window.lemmaCredential);
+                
+                if (!verificationResult.verified) {
+                    console.log('❌ Client-side verification failed:', verificationResult.reason);
+                    window.location.href = '/login';
+                    return;
                 }
                 
-                console.log('✅ Dashboard access granted');
+                console.log('✅ Client-side verification passed (Ed25519 signature valid)');
+                console.log('✅ Dashboard access granted (edge-verified)');
+                
+                // Store verification status
+                window.lemmaVerified = true;
+                
             } catch (error) {
-                console.error('Auth check failed:', error);
+                console.error('❌ Auth check failed:', error);
                 window.location.href = '/login';
             }
         })();
+        
+        // Helper: Make API calls with minimal headers (credential ID only)
+        async function lemmaFetch(url, options = {}) {
+            if (!window.lemmaCredential || !window.lemmaVerified) {
+                throw new Error('Not authenticated - verify credential first');
+            }
+            
+            const claims = window.lemmaCredential.claims || window.lemmaCredential.credentialSubject;
+            
+            // Send ONLY minimal data (no full credential)
+            const headers = {
+                ...options.headers,
+                'X-Credential-ID': window.lemmaCredential.id,
+                'X-Permission-ID': claims.permissionId,
+                'X-User-Email': claims.email,
+                'X-Site-ID': claims.siteId || claims.siteDomain
+            };
+            
+            return fetch(url, { ...options, headers });
+        }
+        
+        // Expose globally for page scripts
+        window.lemmaFetch = lemmaFetch;
     </script>
     <style>
         .dashboard-container {
