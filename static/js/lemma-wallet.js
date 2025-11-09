@@ -1239,19 +1239,9 @@ class LemmaWallet {
                 }
             }
         } catch (e) {
-                // Ignore corrupted cache entries
-                if (this.debug) {
-                    console.warn(`⚠️ Corrupted Bloom filter cache: ${e.message}`);
-                }
-            }
-            
-            if (this.debug && totalRevocations > 0) {
-                console.log(`📊 Loaded ${totalRevocations} revocations from ${bloomKeys.length} site(s)`);
-            }
-            
-        } catch (error) {
+            // Ignore corrupted cache entries
             if (this.debug) {
-                console.warn('⚠️ Failed to load cached Bloom filters:', error);
+                console.warn(`⚠️ Corrupted Bloom filter cache: ${e.message}`);
             }
         }
     }
