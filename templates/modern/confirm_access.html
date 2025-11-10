@@ -4,8 +4,7 @@
 
 {% block head %}
     {{ super() }}
-    <!-- Lemma Wallet for credential storage (includes encrypted wallet) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=991"></script>
+    <!-- Wallet scripts already loaded in layout.html -->
 {% endblock %}
 
 {% block content %}
@@ -89,19 +88,41 @@ async function storeCredentialAndRedirect() {
         
         console.log('✅ LemmaWallet class found');
         
-        // Initialize wallet
-        let wallet = window.LEMMA_WALLET_INSTANCE || new LemmaWallet({ debug: true });
-        console.log('🔧 Wallet instance created, initializing...');
-        
-        if (!wallet.isReady) {
-            await wallet.init();
-            console.log('✅ Wallet initialized');
+        // Wait for global wallet
+        let attempts = 0;
+        while (!window.globalLemmaWallet && attempts < 20) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
         }
         
-        console.log('💾 Calling storeCredential...');
+        if (!window.globalLemmaWallet) {
+            throw new Error('Global wallet not initialized');
+        }
         
-        // Store credential (will encrypt automatically if EncryptedLemmaWallet available)
-        const result = await wallet.storeCredential(credential);
+        const wallet = window.globalLemmaWallet;
+        console.log('✅ Using global wallet instance');
+        
+        // Ensure credential has proper format for session-free architecture
+        const credentialToStore = {
+            ...credential,
+            packageType: 'permission',  // TOP LEVEL for wallet filtering
+            type: credential.type || ['VerifiableCredential', 'PermissionLemma'],
+            credentialSubject: {
+                ...(credential.credentialSubject || credential.claims || {}),
+                packageType: 'permission'
+            }
+        };
+        
+        console.log('💾 Storing credential with format:', credentialToStore.packageType);
+        
+        // Store credential (will encrypt automatically)
+        const result = await wallet.storeCredential(credentialToStore);
+        
+        // Set up session-free auth
+        window.lemmaCredential = credentialToStore;
+        if (!window.lemmaAuth) {
+            window.lemmaAuth = new SessionFreeAuth(wallet, {debug: true});
+        }
         
         console.log('✅ Credential stored successfully:', result);
         console.log('🔍 Verifying storage...');

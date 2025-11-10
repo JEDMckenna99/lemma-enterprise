@@ -282,8 +282,23 @@ def confirm_access():
             user_did,
             permission_level,
             expiry_days=90,
-            custom_claims={'email': user_email, 'site_domain': site_domain}
+            custom_claims={
+                'email': user_email,
+                'site_domain': site_domain,
+                'accountType': 'customer' if permission_level == 'user' else permission_level,
+                'permissionId': f'{permission_level}_access'
+            }
         )
+        
+        # Add W3C type field and packageType (same as admin bootstrap)
+        permission_lemma['type'] = ['VerifiableCredential', 'PermissionLemma']
+        permission_lemma['packageType'] = 'permission'
+        
+        if 'credentialSubject' in permission_lemma:
+            permission_lemma['credentialSubject']['packageType'] = 'permission'
+        if 'claims' in permission_lemma:
+            permission_lemma['claims']['packageType'] = 'permission'
+        
         issue_time_us = (time.perf_counter() - start_time) * 1_000_000
         
         # Clean up pending request (delete from Redis)
