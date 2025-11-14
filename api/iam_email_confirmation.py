@@ -311,7 +311,7 @@ def confirm_access():
         # Track credential issuance in database using permission_instances table
         try:
             from api.database import get_db_connection
-            from datetime import timedelta
+            from datetime import datetime, timedelta
             
             conn = get_db_connection(site_id=site_id)
             cursor = conn.cursor()
