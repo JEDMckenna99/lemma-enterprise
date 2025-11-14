@@ -878,6 +878,19 @@
                 
                 const wallet = window.globalLemmaWallet;
                 
+                // CRITICAL: Wait for wallet to finish loading credentials from storage
+                // The wallet object might exist but init() might still be loading encrypted credentials
+                attempts = 0;
+                while (!wallet.isInitialized && attempts < 30) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                if (!wallet.isInitialized) {
+                    console.log('⚠️ Wallet exists but not fully initialized');
+                    // Continue anyway - might work
+                }
+                
                 // Get permission credentials
                 const permissions = await wallet.getCredentials('permission');
                 console.log('🔍 Found permission credentials:', permissions.length);
