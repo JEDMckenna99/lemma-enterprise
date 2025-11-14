@@ -278,10 +278,12 @@ def confirm_access():
         
         # Issue permission lemma with REAL Ed25519 signature
         start_time = time.perf_counter()
+        expiry_days = 90  # Default expiry for all permissions
+        
         permission_lemma = manager.issue_permission_lemma(
             user_did,
             permission_level,
-            expiry_days=90,
+            expiry_days=expiry_days,
             custom_claims={
                 'email': user_email,
                 'site_domain': site_domain,
