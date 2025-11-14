@@ -5,8 +5,7 @@
 {% block head %}
     {{ super() }}
     
-    <!-- Lemma Wallet for permission checking -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1041"></script>
+    <!-- Lemma Wallet already loaded in layout.html - don't load again -->
     
     <style>
         :root {
