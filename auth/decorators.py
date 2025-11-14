@@ -56,15 +56,16 @@ def require_site_admin(f):
             if is_credential_revoked(credential_id):
                 return jsonify({'error': 'Credential revoked'}), 401
             
-            # Verify it's an admin permission
-            if permission_id in ['admin_access', 'super_admin']:
+            # Verify it's an admin permission (accept common admin permission names)
+            admin_permissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin']
+            if permission_id in admin_permissions or 'admin' in permission_id.lower():
                 g.is_admin = True
                 g.admin_email = user_email or 'admin@lemma.id'
                 g.credential_id = credential_id
                 g.permission_id = permission_id
                 return f(*args, **kwargs)
             else:
-                return jsonify({'error': 'Admin permission required'}), 403
+                return jsonify({'error': f'Admin permission required, got: {permission_id}'}), 403
         
         # METHOD 2: API key (programmatic access - still supported)
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')

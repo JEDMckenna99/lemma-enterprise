@@ -137,7 +137,7 @@ def admin_self_issue():
                 'site_domain': site_domain,
                 'issued_via': 'admin_self_issue',
                 'accountType': 'admin',  # CRITICAL for session-free auth
-                'permissionId': 'admin_access'  # CRITICAL for navigation
+                'permissionId': permission_level  # Use actual permission level (super_admin, admin, etc)
             }
         )
         
