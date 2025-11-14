@@ -304,8 +304,13 @@
                     if (emailElem) emailElem.textContent = claims.email || 'Customer';
                     if (roleElem) roleElem.textContent = (claims.accountType || 'customer').charAt(0).toUpperCase() + (claims.accountType || 'customer').slice(1);
                     
-                    // Show admin link if admin
-                    if (claims.permissionId === 'admin_access' || claims.accountType === 'admin') {
+                    // Show admin link if admin (accept any admin permission)
+                    const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'];
+                    const isAdmin = adminPermissions.includes(claims.permissionId) || 
+                                   claims.accountType === 'admin' || 
+                                   (claims.permissionId && claims.permissionId.toLowerCase().includes('admin'));
+                    
+                    if (isAdmin) {
                         const navAdmin = document.getElementById('nav-admin');
                         const adminDropdown = document.getElementById('admin-dropdown-link');
                         if (navAdmin) navAdmin.style.display = 'block';

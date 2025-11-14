@@ -865,9 +865,19 @@
         // Check access (verify Lemma permission)
         async function checkAccess() {
             try {
-                // Initialize wallet
-                const wallet = new LemmaIntegratedWallet({ debug: true });
-                await wallet.init();
+                // Wait for global wallet (initialized in layout.html)
+                let attempts = 0;
+                while (!window.globalLemmaWallet && attempts < 20) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                if (!window.globalLemmaWallet) {
+                    console.log('❌ Global wallet not initialized');
+                    return false;
+                }
+                
+                const wallet = window.globalLemmaWallet;
                 
                 // Get permission credentials
                 const permissions = await wallet.getCredentials('permission');
@@ -876,12 +886,16 @@
                 // Check for lemma.id or lemma_platform permission
                 const lemmaPermissions = permissions.filter(p => {
                     const claims = p.claims || p.credentialSubject || {};
-                    const siteId = claims.siteId || claims.site || '';
+                    const siteId = claims.siteId || claims.site || claims.siteDomain || '';
                     return siteId === 'lemma.id' || siteId === 'lemma_platform';
                 });
                 
                 if (lemmaPermissions.length === 0) {
                     console.log('❌ No valid lemma.id permission found');
+                    console.log('📋 All permissions:', permissions.map(p => {
+                        const c = p.claims || p.credentialSubject || {};
+                        return { id: p.id, siteId: c.siteId || c.siteDomain, permissionId: c.permissionId };
+                    }));
                     return false;
                 }
                 
@@ -892,9 +906,14 @@
                 
                 console.log('✅ Access granted -', userPermission);
                 
-                // Show admin section if super_admin
-                if (userPermission === 'super_admin') {
-                    document.getElementById('admin-section').style.display = 'block';
+                // Show admin section if any admin permission
+                const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'];
+                const isAdmin = adminPermissions.includes(userPermission) || 
+                               userPermission.toLowerCase().includes('admin');
+                
+                if (isAdmin) {
+                    const adminSection = document.getElementById('admin-section');
+                    if (adminSection) adminSection.style.display = 'block';
                 }
                 
                 return true;
