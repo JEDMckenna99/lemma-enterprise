@@ -161,7 +161,7 @@
 <body>
     <div class="container">
         <h1>🔐 Lemma Simple Auth Demo</h1>
-        <p class="subtitle">Test the simplest authentication system with built-in bot resistance</p>
+        <p class="subtitle">Sign in once per device, stay signed in. Built-in bot resistance. Zero tracking.</p>
         
         <!-- Login Form -->
         <div id="login-section" class="section hidden">
@@ -174,26 +174,41 @@
         
         <!-- Authenticated View -->
         <div id="authenticated-section" class="section hidden">
-            <h2>✅ Authenticated</h2>
+            <h2>✅ You're Signed In!</h2>
+            <p style="color: #28a745; font-weight: bold; margin-bottom: 15px;">
+                This credential will stay valid until it expires (90 days) or an admin revokes it. 
+                No re-login needed!
+            </p>
+            
             <div class="user-info">
                 <p><strong>Email:</strong> <span id="user-email"></span></p>
                 <p><strong>Role:</strong> <span id="user-role"></span></p>
                 <p><strong>Site:</strong> <span id="user-site"></span></p>
             </div>
             
-            <h3>What You Get:</h3>
+            <h3>Why Lemma is Different:</h3>
             <ul class="feature-list">
+                <li><strong>Sign in once per device</strong> - stays valid until expiration</li>
                 <li>Built-in bot resistance (cryptographic nonces)</li>
-                <li>No password management</li>
-                <li>No session tracking</li>
-                <li>Sub-100ms verification</li>
+                <li>No session timeouts or forced logouts</li>
+                <li>Zero server tracking (privacy-first)</li>
                 <li>Works offline (7-day cache)</li>
-                <li>Instant revocation (&lt;100ms)</li>
+                <li>Instant revocation when admin needs it (&lt;100ms)</li>
             </ul>
             
-            <button onclick="testAuthentication()">Test Authentication</button>
+            <button onclick="testAuthentication()">Test Bot Resistance (Nonce)</button>
             <button class="secondary" onclick="getUserInfo()">Get User Info</button>
-            <button class="danger" onclick="logout()">Logout</button>
+            
+            <details style="margin-top: 20px;">
+                <summary style="cursor: pointer; color: #666;">Advanced Options</summary>
+                <div style="padding: 15px; margin-top: 10px; background: #fff; border: 1px solid #ddd; border-radius: 6px;">
+                    <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                        <strong>Remove Credential:</strong> Only needed on shared/public computers. 
+                        For personal devices, credentials naturally persist.
+                    </p>
+                    <button class="danger" onclick="logout()">Remove Credential from This Browser</button>
+                </div>
+            </details>
             
             <div id="auth-test-result"></div>
         </div>
