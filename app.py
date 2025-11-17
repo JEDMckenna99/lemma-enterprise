@@ -480,6 +480,13 @@ def create_app():
         """Manual testing interface for advanced wallet features"""
         return render_template('modern/wallet_testing.html')
 
+    @app.route('/examples/<path:filename>')
+    def serve_examples(filename):
+        """Serve example HTML files for testing and demos"""
+        from flask import send_from_directory
+        logger.info(f"📄 Serving example file: {filename}")
+        return send_from_directory('examples', filename)
+
     @app.route('/admin')
     def admin_monitoring():
         """Admin Platform Monitoring - Bloom filter collision tracking, system health"""
