@@ -895,19 +895,48 @@
                 const permissions = await wallet.getCredentials('permission');
                 console.log('🔍 Found permission credentials:', permissions.length);
                 
-                // Check for lemma.id or lemma_platform permission
+                // Check for lemma.id or lemma_platform permission (FLEXIBLE MATCHING)
                 const lemmaPermissions = permissions.filter(p => {
                     const claims = p.claims || p.credentialSubject || {};
-                    const siteId = claims.siteId || claims.site || claims.siteDomain || '';
-                    return siteId === 'lemma.id' || siteId === 'lemma_platform';
+                    const siteId = claims.siteId || claims.site || claims.site_id || claims.siteDomain || claims.site_domain || '';
+                    const permissionId = claims.permissionId || claims.permission_level || '';
+                    
+                    // Match any of these:
+                    // 1. siteId contains 'lemma'
+                    // 2. Permission is admin-level
+                    const matchesSite = siteId.toLowerCase().includes('lemma') || 
+                                      siteId.toLowerCase().includes('platform');
+                    const isAdmin = permissionId.toLowerCase().includes('admin') || 
+                                  permissionId === 'super_admin' ||
+                                  permissionId === 'admin_access';
+                    
+                    return matchesSite && isAdmin;
                 });
                 
                 if (lemmaPermissions.length === 0) {
-                    console.log('❌ No valid lemma.id permission found');
+                    console.log('❌ No valid lemma.id/platform permission found');
                     console.log('📋 All permissions:', permissions.map(p => {
                         const c = p.claims || p.credentialSubject || {};
-                        return { id: p.id, siteId: c.siteId || c.siteDomain, permissionId: c.permissionId };
+                        return { 
+                            id: p.id, 
+                            siteId: c.siteId || c.siteDomain || c.site_id || c.site_domain, 
+                            permissionId: c.permissionId || c.permission_level 
+                        };
                     }));
+                    
+                    // Show request access button instead of blocking
+                    document.getElementById('loading-state').innerHTML = `
+                        <div style="text-align: center; padding: 60px 20px;">
+                            <div style="font-size: 64px; margin-bottom: 24px;">🔑</div>
+                            <h2>Platform Access Required</h2>
+                            <p style="color: #6b7280; margin-bottom: 24px;">
+                                Request access to the Lemma developer platform
+                            </p>
+                            <button onclick="requestPlatformAccess()" class="btn btn-primary">
+                                Request Platform Access
+                            </button>
+                        </div>
+                    `;
                     return false;
                 }
                 
@@ -1271,6 +1300,59 @@
             setTimeout(() => {
                 btn.textContent = 'Copy';
             }, 2000);
+        }
+        
+        // Request platform access if user doesn't have credentials
+        async function requestPlatformAccess() {
+            try {
+                // Get user email from current session/wallet
+                const wallet = window.globalLemmaWallet;
+                const allCreds = await wallet.getAllCredentials();
+                
+                // Try to extract email from any credential
+                let userEmail = null;
+                for (const cred of allCreds) {
+                    const claims = cred.claims || cred.credentialSubject || {};
+                    if (claims.email) {
+                        userEmail = claims.email;
+                        break;
+                    }
+                }
+                
+                if (!userEmail) {
+                    userEmail = prompt('Enter your email to request platform access:');
+                    if (!userEmail) return;
+                }
+                
+                console.log('📧 Requesting platform access for:', userEmail);
+                
+                // Request access to lemma_platform
+                const response = await fetch('/api/v1/iam/request-access', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        site_id: 'lemma_platform',
+                        site_domain: 'lemma.id',
+                        user_email: userEmail,
+                        permission_level: 'admin_access',
+                        redirect_url: window.location.href
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('✅ Check your email!\n\nClick the confirmation link to get platform access.\n\nAfter confirming, reload this page.');
+                } else {
+                    alert('❌ Error: ' + (result.error || 'Failed to request access'));
+                }
+                
+            } catch (error) {
+                console.error('❌ Request access error:', error);
+                alert('Error requesting access. Please try again.');
+            }
         }
         
         // Close modals on background click
