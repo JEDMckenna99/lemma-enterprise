@@ -487,6 +487,20 @@ def create_app():
         logger.info(f"📄 Serving example file: {filename}")
         return send_from_directory('examples', filename)
 
+    @app.route('/docs/<path:filename>')
+    def serve_docs(filename):
+        """Serve documentation markdown files"""
+        from flask import send_from_directory, Response
+        logger.info(f"📄 Serving documentation: {filename}")
+        try:
+            # Serve markdown files with correct MIME type
+            response = send_from_directory('docs', filename)
+            if filename.endswith('.md'):
+                response.headers['Content-Type'] = 'text/markdown; charset=utf-8'
+            return response
+        except FileNotFoundError:
+            return "Documentation not found", 404
+
     @app.route('/admin')
     def admin_monitoring():
         """Admin Platform Monitoring - Bloom filter collision tracking, system health"""

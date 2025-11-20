@@ -321,23 +321,34 @@
         <div class="sidebar-nav">
             <div class="nav-section">
                 <div class="nav-title">Getting Started</div>
-                <a href="#quick-start" class="nav-link active">Quick Start</a>
+                <a href="#integration-guides" class="nav-link active">Integration Guides</a>
+                <a href="#quick-start" class="nav-link">Quick Start (3-Line)</a>
                 <a href="#installation" class="nav-link">Installation</a>
                 <a href="#authentication" class="nav-link">Authentication</a>
             </div>
             
             <div class="nav-section">
-                <div class="nav-title">Integration</div>
-                <a href="#3-line-setup" class="nav-link">3-Line Setup</a>
-                <a href="#federated-network" class="nav-link">Federated Network</a>
-                <a href="#security-config" class="nav-link">Security Config</a>
+                <div class="nav-title">Integration Guides</div>
+                <a href="#guide-simple-login" class="nav-link">Simple Login (5 min)</a>
+                <a href="#guide-iam-api" class="nav-link">IAM API Reference</a>
+                <a href="#guide-error-codes" class="nav-link">Error Codes</a>
+                <a href="#guide-checklist" class="nav-link">Integration Checklist</a>
+                <a href="#guide-webhooks" class="nav-link">Webhooks</a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-title">Examples</div>
+                <a href="/examples/simple-auth-demo.html" class="nav-link" target="_blank">Simple Auth Demo ↗</a>
+                <a href="/examples/complete-integration-example.html" class="nav-link" target="_blank">Complete Example ↗</a>
+                <a href="#ecommerce" class="nav-link">E-commerce</a>
+                <a href="#gaming" class="nav-link">Gaming</a>
             </div>
             
             <div class="nav-section">
                 <div class="nav-title">API Reference</div>
                 <a href="#javascript-sdk" class="nav-link">JavaScript SDK</a>
                 <a href="#rest-api" class="nav-link">REST API</a>
-                <a href="#webhooks" class="nav-link">Webhooks</a>
+                <a href="#federated-network" class="nav-link">Federated Network</a>
             </div>
             
             <div class="nav-section">
@@ -365,13 +376,332 @@
         <div class="docs-hero">
             <h1 style="font-size: 2.5rem; margin-bottom: var(--space-4);">Developer Documentation</h1>
             <p style="font-size: var(--font-size-lg); opacity: 0.9; max-width: 600px; margin: 0 auto;">
-                Complete guide to integrating Lemma's federated identity verification. From 3-line setup to enterprise deployment.
+                Complete guide to integrating Lemma authentication and IAM. From 5-minute setup to enterprise deployment.
             </p>
             <div style="margin-top: var(--space-6); display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap;">
-                <a href="#quick-start" class="btn btn-primary">Start Building</a>
-                <a href="/playground" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-400);">Try Live Demo</a>
+                <a href="#integration-guides" class="btn btn-primary">Integration Guides</a>
+                <a href="/examples/simple-auth-demo.html" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-400);">Live Demo</a>
             </div>
         </div>
+        
+        <!-- Integration Guides Section -->
+        <section id="integration-guides" class="section-anchor" style="margin-top: var(--space-12);">
+            <a href="#integration-guides" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-6);">📚 Integration Guides</h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-6); margin-bottom: var(--space-12);">
+                <!-- Quick Start Guide -->
+                <div style="background: var(--white); border: 2px solid var(--primary-200); border-radius: 12px; padding: var(--space-6); transition: all 0.3s ease;">
+                    <div style="display: flex; align-items: center; margin-bottom: var(--space-3);">
+                        <h3 style="margin: 0; color: var(--primary-600);">🚀 Quick Start</h3>
+                        <span class="integration-badge" style="margin-left: auto;">5 min</span>
+                    </div>
+                    <p style="color: var(--gray-600); margin-bottom: var(--space-4);">
+                        Add simple email-based authentication to your site. Built-in bot resistance, session-free architecture.
+                    </p>
+                    <a href="#guide-simple-login" style="color: var(--primary-600); text-decoration: none; font-weight: 600;">
+                        Read Guide →
+                    </a>
+                </div>
+                
+                <!-- IAM API Reference -->
+                <div style="background: var(--white); border: 2px solid var(--gray-200); border-radius: 12px; padding: var(--space-6); transition: all 0.3s ease;">
+                    <div style="display: flex; align-items: center; margin-bottom: var(--space-3);">
+                        <h3 style="margin: 0; color: var(--gray-900);">🏢 IAM API Reference</h3>
+                        <span class="status-badge status-stable" style="margin-left: auto;">Stable</span>
+                    </div>
+                    <p style="color: var(--gray-600); margin-bottom: var(--space-4);">
+                        Complete API documentation for permissions, roles, user management, and revocation.
+                    </p>
+                    <a href="#guide-iam-api" style="color: var(--primary-600); text-decoration: none; font-weight: 600;">
+                        Read Guide →
+                    </a>
+                </div>
+                
+                <!-- Error Codes -->
+                <div style="background: var(--white); border: 2px solid var(--gray-200); border-radius: 12px; padding: var(--space-6); transition: all 0.3s ease;">
+                    <div style="display: flex; align-items: center; margin-bottom: var(--space-3);">
+                        <h3 style="margin: 0; color: var(--gray-900);">🔴 Error Codes</h3>
+                    </div>
+                    <p style="color: var(--gray-600); margin-bottom: var(--space-4);">
+                        Complete reference of all error codes with causes and solutions.
+                    </p>
+                    <a href="#guide-error-codes" style="color: var(--primary-600); text-decoration: none; font-weight: 600;">
+                        Read Guide →
+                    </a>
+                </div>
+                
+                <!-- Integration Checklist -->
+                <div style="background: var(--white); border: 2px solid var(--gray-200); border-radius: 12px; padding: var(--space-6); transition: all 0.3s ease;">
+                    <div style="display: flex; align-items: center; margin-bottom: var(--space-3);">
+                        <h3 style="margin: 0; color: var(--gray-900);">✅ Integration Checklist</h3>
+                    </div>
+                    <p style="color: var(--gray-600); margin-bottom: var(--space-4);">
+                        Step-by-step checklist to verify your integration is working correctly.
+                    </p>
+                    <a href="#guide-checklist" style="color: var(--primary-600); text-decoration: none; font-weight: 600;">
+                        Read Guide →
+                    </a>
+                </div>
+                
+                <!-- Webhooks -->
+                <div style="background: var(--white); border: 2px solid var(--gray-200); border-radius: 12px; padding: var(--space-6); transition: all 0.3s ease;">
+                    <div style="display: flex; align-items: center; margin-bottom: var(--space-3);">
+                        <h3 style="margin: 0; color: var(--gray-900);">🔔 Webhooks</h3>
+                        <span class="status-badge status-beta" style="margin-left: auto;">Beta</span>
+                    </div>
+                    <p style="color: var(--gray-600); margin-bottom: var(--space-4);">
+                        Real-time event notifications for authentication, permissions, and security events.
+                    </p>
+                    <a href="#guide-webhooks" style="color: var(--primary-600); text-decoration: none; font-weight: 600;">
+                        Read Guide →
+                    </a>
+                </div>
+                
+                <!-- Complete Example -->
+                <div style="background: var(--white); border: 2px solid var(--success-200); border-radius: 12px; padding: var(--space-6); transition: all 0.3s ease;">
+                    <div style="display: flex; align-items: center; margin-bottom: var(--space-3);">
+                        <h3 style="margin: 0; color: var(--success-600);">💻 Complete Example</h3>
+                        <span class="integration-badge" style="margin-left: auto; background: var(--success);">Copy & Paste</span>
+                    </div>
+                    <p style="color: var(--gray-600); margin-bottom: var(--space-4);">
+                        Full working example - copy, configure API key, and you're done.
+                    </p>
+                    <a href="/examples/complete-integration-example.html" target="_blank" style="color: var(--success-600); text-decoration: none; font-weight: 600;">
+                        View Example ↗
+                    </a>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Guide: Simple Login -->
+        <section id="guide-simple-login" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#guide-simple-login" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-4);">🚀 Simple Login Integration</h2>
+            <p style="color: var(--gray-600); margin-bottom: var(--space-6);">
+                Add email-based authentication in 5 minutes. Built-in bot resistance, no session tracking.
+            </p>
+            
+            <div style="background: var(--primary-50); border-left: 4px solid var(--primary-500); padding: var(--space-4); border-radius: 6px; margin-bottom: var(--space-6);">
+                <p style="margin: 0; color: var(--primary-700);">
+                    <strong>📖 Full Guide:</strong> 
+                    <a href="/docs/QUICK_START_SIMPLE_LOGIN.md" target="_blank" style="color: var(--primary-600); text-decoration: underline;">
+                        docs/QUICK_START_SIMPLE_LOGIN.md
+                    </a>
+                </p>
+            </div>
+            
+            <h3>What You'll Learn:</h3>
+            <ul style="color: var(--gray-700); line-height: 1.8;">
+                <li>Get API key and setup (2 minutes)</li>
+                <li>Add scripts and initialize SDK</li>
+                <li>Implement login flow with email</li>
+                <li>Check authentication and get user info</li>
+                <li>Handle errors and edge cases</li>
+                <li>React and framework integration examples</li>
+            </ul>
+            
+            <h3 style="margin-top: var(--space-6);">Quick Preview:</h3>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">JavaScript</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+const auth = new LemmaAuth({
+    apiKey: 'YOUR_API_KEY',
+    siteId: 'your_site_id'
+});
+
+// Check if user is authenticated
+const isAuth = await auth.isAuthenticated();
+
+if (isAuth) {
+    const user = await auth.getUser();
+    showDashboard(user);
+} else {
+    showLoginForm();
+}
+            </div>
+        </section>
+        
+        <!-- Guide: IAM API Reference -->
+        <section id="guide-iam-api" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#guide-iam-api" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-4);">🏢 IAM API Reference</h2>
+            <p style="color: var(--gray-600); margin-bottom: var(--space-6);">
+                Complete API documentation for Identity & Access Management with permissions, roles, and user management.
+            </p>
+            
+            <div style="background: var(--primary-50); border-left: 4px solid var(--primary-500); padding: var(--space-4); border-radius: 6px; margin-bottom: var(--space-6);">
+                <p style="margin: 0; color: var(--primary-700);">
+                    <strong>📖 Full Guide:</strong> 
+                    <a href="/docs/IAM_API_REFERENCE.md" target="_blank" style="color: var(--primary-600); text-decoration: underline;">
+                        docs/IAM_API_REFERENCE.md
+                    </a>
+                </p>
+            </div>
+            
+            <h3>Core Endpoints:</h3>
+            <div class="api-endpoint">
+                <span class="endpoint-method" style="background: var(--success);">POST</span>
+                <code>/api/v1/iam/request-access</code>
+                <p style="margin: var(--space-2) 0 0; color: var(--gray-600); font-size: var(--font-size-sm);">Send authentication email and issue credential</p>
+            </div>
+            
+            <div class="api-endpoint">
+                <span class="endpoint-method" style="background: var(--success);">POST</span>
+                <code>/api/sdk/verify-permission-lemma</code>
+                <p style="margin: var(--space-2) 0 0; color: var(--gray-600); font-size: var(--font-size-sm);">Verify credential with nonce (bot resistance)</p>
+            </div>
+            
+            <div class="api-endpoint">
+                <span class="endpoint-method" style="background: var(--success);">POST</span>
+                <code>/api/v1/iam/admin/self-issue</code>
+                <p style="margin: var(--space-2) 0 0; color: var(--gray-600); font-size: var(--font-size-sm);">Bootstrap admin credential</p>
+            </div>
+            
+            <div class="api-endpoint">
+                <span class="endpoint-method" style="background: var(--primary-500);">GET</span>
+                <code>/api/platform/users</code>
+                <p style="margin: var(--space-2) 0 0; color: var(--gray-600); font-size: var(--font-size-sm);">List all users with permissions</p>
+            </div>
+            
+            <div class="api-endpoint">
+                <span class="endpoint-method" style="background: var(--success);">POST</span>
+                <code>/api/platform/revoke-permission</code>
+                <p style="margin: var(--space-2) 0 0; color: var(--gray-600); font-size: var(--font-size-sm);">Revoke user access (propagates in &lt;100ms)</p>
+            </div>
+        </section>
+        
+        <!-- Guide: Error Codes -->
+        <section id="guide-error-codes" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#guide-error-codes" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-4);">🔴 Error Codes Reference</h2>
+            <p style="color: var(--gray-600); margin-bottom: var(--space-6);">
+                Every error code explained with causes and solutions. Essential for debugging integrations.
+            </p>
+            
+            <div style="background: var(--primary-50); border-left: 4px solid var(--primary-500); padding: var(--space-4); border-radius: 6px; margin-bottom: var(--space-6);">
+                <p style="margin: 0; color: var(--primary-700);">
+                    <strong>📖 Full Guide:</strong> 
+                    <a href="/docs/ERROR_CODES.md" target="_blank" style="color: var(--primary-600); text-decoration: underline;">
+                        docs/ERROR_CODES.md
+                    </a>
+                </p>
+            </div>
+            
+            <h3>Common Errors:</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--space-4) 0;">
+                <thead>
+                    <tr style="background: var(--gray-50);">
+                        <th style="padding: var(--space-3); text-align: left; border-bottom: 2px solid var(--gray-200);">Error Code</th>
+                        <th style="padding: var(--space-3); text-align: left; border-bottom: 2px solid var(--gray-200);">HTTP</th>
+                        <th style="padding: var(--space-3); text-align: left; border-bottom: 2px solid var(--gray-200);">Quick Fix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);"><code>invalid_api_key</code></td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">401</td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">Check API key in dashboard</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);"><code>nonce_reused</code></td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">403</td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">Generate fresh nonce</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);"><code>credential_expired</code></td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">403</td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">Request new credential</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);"><code>rate_limit_exceeded</code></td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">429</td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">Wait 1 hour, retry</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        
+        <!-- Guide: Integration Checklist -->
+        <section id="guide-checklist" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#guide-checklist" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-4);">✅ Integration Checklist</h2>
+            <p style="color: var(--gray-600); margin-bottom: var(--space-6);">
+                Verify every step of your integration. Use this checklist to ensure everything works correctly.
+            </p>
+            
+            <div style="background: var(--primary-50); border-left: 4px solid var(--primary-500); padding: var(--space-4); border-radius: 6px; margin-bottom: var(--space-6);">
+                <p style="margin: 0; color: var(--primary-700);">
+                    <strong>📖 Full Guide:</strong> 
+                    <a href="/docs/INTEGRATION_CHECKLIST.md" target="_blank" style="color: var(--primary-600); text-decoration: underline;">
+                        docs/INTEGRATION_CHECKLIST.md
+                    </a>
+                </p>
+            </div>
+            
+            <h3>Checklist Phases:</h3>
+            <ul style="color: var(--gray-700); line-height: 1.8;">
+                <li>Phase 1: Setup (account, API keys, scripts)</li>
+                <li>Phase 2: Basic integration (SDK init, auth check)</li>
+                <li>Phase 3: Login flow (email, confirmation, storage)</li>
+                <li>Phase 4: Verification (nonce, persistence)</li>
+                <li>Phase 5: Permission management (grant, check, revoke)</li>
+                <li>Phase 6: Error handling (all scenarios)</li>
+                <li>Phase 7: Cross-browser testing</li>
+                <li>Phase 8: Production readiness</li>
+            </ul>
+        </section>
+        
+        <!-- Guide: Webhooks -->
+        <section id="guide-webhooks" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#guide-webhooks" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-4);">🔔 Webhooks</h2>
+            <p style="color: var(--gray-600); margin-bottom: var(--space-6);">
+                Real-time event notifications. Get instant updates when users authenticate, permissions change, or security events occur.
+            </p>
+            
+            <div style="background: var(--primary-50); border-left: 4px solid var(--primary-500); padding: var(--space-4); border-radius: 6px; margin-bottom: var(--space-6);">
+                <p style="margin: 0; color: var(--primary-700);">
+                    <strong>📖 Full Guide:</strong> 
+                    <a href="/docs/WEBHOOKS_GUIDE.md" target="_blank" style="color: var(--primary-600); text-decoration: underline;">
+                        docs/WEBHOOKS_GUIDE.md
+                    </a>
+                </p>
+            </div>
+            
+            <h3>Available Events:</h3>
+            <ul style="color: var(--gray-700); line-height: 1.8;">
+                <li><code>user.authenticated</code> - User logged in</li>
+                <li><code>permission.granted</code> - Permission issued</li>
+                <li><code>permission.revoked</code> - Access removed (propagates &lt;100ms)</li>
+                <li><code>credential.expired</code> - Credential expired</li>
+                <li><code>security.suspicious_activity</code> - Nonce reuse, replay attempt</li>
+            </ul>
+            
+            <h3 style="margin-top: var(--space-6);">Quick Example:</h3>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">Python</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+@app.route('/webhooks/lemma', methods=['POST'])
+def handle_webhook():
+    payload = request.get_json()
+    signature = request.headers.get('X-Lemma-Signature')
+    
+    # Verify signature
+    if not verify_signature(payload, signature, WEBHOOK_SECRET):
+        return {'error': 'Invalid signature'}, 401
+    
+    # Handle event
+    if payload['type'] == 'permission.revoked':
+        terminate_user_session(payload['data']['email'])
+    
+    return {'success': True}, 200
+            </div>
+        </section>
 
         <!-- Quick Start Section -->
         <section id="quick-start" class="section-anchor">
