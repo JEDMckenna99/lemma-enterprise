@@ -789,6 +789,154 @@ def validate_api_key():
     result = customer_manager.validate_api_key(api_key)
     return jsonify(result)
 
+
+@customer_accounts_bp.route('/api/customer/register-site', methods=['POST'])
+def register_customer_site():
+    """
+    Register a new site for customer + auto-issue admin credential
+    This is the developer platform flow for beta customers
+    """
+    try:
+        # Get customer ID from session or credential
+        customer_id = session.get('customer_id')
+        
+        if not customer_id:
+            return jsonify({'error': 'Not authenticated'}), 401
+        
+        customer = customer_manager.get_customer(customer_id)
+        if not customer:
+            return jsonify({'error': 'Customer not found'}), 404
+        
+        # Get site domain from request
+        data = request.get_json()
+        site_domain = data.get('site_domain', '').strip().lower()
+        
+        if not site_domain:
+            return jsonify({'error': 'site_domain required'}), 400
+        
+        # Clean site domain (remove protocol, trailing slash)
+        site_domain = site_domain.replace('https://', '').replace('http://', '').rstrip('/')
+        
+        # Generate site_id (deterministic from domain)
+        import hashlib
+        site_id = f"site_{hashlib.sha256(site_domain.encode()).hexdigest()[:12]}"
+        
+        # Create site with IAM system (generates Ed25519 keypair)
+        from api.iam_site_manager import get_or_create_site_manager
+        
+        manager = get_or_create_site_manager(site_id, site_domain)
+        
+        if not manager:
+            return jsonify({'error': 'Failed to create site'}), 500
+        
+        # AUTO-ISSUE ADMIN PERMISSION (Better UX than manual bootstrap)
+        user_did = f"did:lemma:customer:{customer_id}"
+        user_email = customer.email
+        
+        # Ensure admin permission exists
+        if 'admin' not in manager.permissions:
+            manager.add_permission({
+                'permission_id': 'admin',
+                'display_name': 'Administrator',
+                'scope': ['*'],
+                'conditions': [],
+                'priority': 100
+            })
+        
+        # Issue admin credential
+        admin_credential = manager.issue_permission_lemma(
+            user_did,
+            'admin',
+            expiry_days=90,
+            custom_claims={
+                'email': user_email,
+                'site_domain': site_domain,
+                'siteId': site_id,
+                'accountType': 'admin',
+                'permissionId': 'admin',
+                'issued_via': 'developer_platform'
+            }
+        )
+        
+        # Add W3C type fields
+        admin_credential['type'] = ['VerifiableCredential', 'PermissionLemma']
+        admin_credential['packageType'] = 'permission'
+        
+        # Store site in customer's account
+        if not hasattr(customer, 'sites') or customer.sites is None:
+            customer.sites = []
+        
+        # Check if site already exists
+        existing = [s for s in customer.sites if s.get('site_id') == site_id]
+        if not existing:
+            customer.sites.append({
+                'site_id': site_id,
+                'site_domain': site_domain,
+                'created_at': datetime.utcnow().isoformat(),
+                'status': 'active',
+                'issuer_did': manager.issuer.get_did()
+            })
+            
+            # Update database
+            try:
+                db = get_db()
+                db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == customer_id).first()
+                if db_customer:
+                    if not db_customer.sites:
+                        db_customer.sites = []
+                    db_customer.sites.append({
+                        'site_id': site_id,
+                        'site_domain': site_domain,
+                        'created_at': datetime.utcnow().isoformat(),
+                        'status': 'active',
+                        'issuer_did': manager.issuer.get_did()
+                    })
+                    db.commit()
+                db.close()
+            except Exception as e:
+                logger.error(f"Failed to save site to database: {e}")
+        
+        logger.info(f"✅ Customer {user_email} registered site {site_domain} with auto-issued admin")
+        
+        return jsonify({
+            'success': True,
+            'site_id': site_id,
+            'site_domain': site_domain,
+            'issuer_did': manager.issuer.get_did(),
+            'admin_credential': admin_credential,  # Auto-issued!
+            'api_key': customer.api_keys[0]['key'] if customer.api_keys else None,
+            'message': f'Site registered. Admin credential issued for {site_domain}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Site registration error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@customer_accounts_bp.route('/api/customer/sites', methods=['GET'])
+def get_customer_sites():
+    """Get all sites registered by customer"""
+    try:
+        customer_id = session.get('customer_id')
+        
+        if not customer_id:
+            return jsonify({'error': 'Not authenticated'}), 401
+        
+        customer = customer_manager.get_customer(customer_id)
+        if not customer:
+            return jsonify({'error': 'Customer not found'}), 404
+        
+        sites = getattr(customer, 'sites', []) or []
+        
+        return jsonify({
+            'success': True,
+            'sites': sites,
+            'count': len(sites)
+        })
+    except Exception as e:
+        logger.error(f"Get sites error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @customer_accounts_bp.route('/issue-admin-lemma', methods=['POST'])
 @cross_origin()
 def issue_admin_lemma():
