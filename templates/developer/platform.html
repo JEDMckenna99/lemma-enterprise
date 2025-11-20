@@ -902,15 +902,19 @@
                     const permissionId = claims.permissionId || claims.permission_level || '';
                     
                     // Match any of these:
-                    // 1. siteId contains 'lemma'
-                    // 2. Permission is admin-level
+                    // 1. siteId contains 'lemma' or 'platform'
+                    // 2. Permission is admin OR beta-user (for developer platform access)
                     const matchesSite = siteId.toLowerCase().includes('lemma') || 
                                       siteId.toLowerCase().includes('platform');
-                    const isAdmin = permissionId.toLowerCase().includes('admin') || 
-                                  permissionId === 'super_admin' ||
-                                  permissionId === 'admin_access';
                     
-                    return matchesSite && isAdmin;
+                    const hasAccess = permissionId.toLowerCase().includes('admin') || 
+                                    permissionId === 'super_admin' ||
+                                    permissionId === 'admin_access' ||
+                                    permissionId === 'beta-user_access' ||
+                                    permissionId === 'beta_user' ||
+                                    permissionId.toLowerCase().includes('beta');
+                    
+                    return matchesSite && hasAccess;
                 });
                 
                 if (lemmaPermissions.length === 0) {
@@ -947,10 +951,11 @@
                 
                 console.log('✅ Access granted -', userPermission);
                 
-                // Show admin section if any admin permission
-                const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'];
+                // Show admin section if any admin permission (beta users get full access during beta)
+                const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin', 'beta-user_access', 'beta_user'];
                 const isAdmin = adminPermissions.includes(userPermission) || 
-                               userPermission.toLowerCase().includes('admin');
+                               userPermission.toLowerCase().includes('admin') ||
+                               userPermission.toLowerCase().includes('beta');
                 
                 if (isAdmin) {
                     const adminSection = document.getElementById('admin-section');
