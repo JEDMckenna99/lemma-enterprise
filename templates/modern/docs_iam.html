@@ -175,8 +175,17 @@
         <!-- Sidebar Navigation -->
         <nav class="docs-nav">
             <div class="nav-section">
+                <div class="nav-title">📚 New Guides</div>
+                <a href="#integration-guides" class="nav-link active">All Guides</a>
+                <a href="/docs/QUICK_START_SIMPLE_LOGIN.md" class="nav-link" target="_blank">Simple Login ↗</a>
+                <a href="/docs/IAM_API_REFERENCE.md" class="nav-link" target="_blank">IAM API Ref ↗</a>
+                <a href="/docs/ERROR_CODES.md" class="nav-link" target="_blank">Error Codes ↗</a>
+                <a href="/examples/complete-integration-example.html" class="nav-link" target="_blank">Complete Example ↗</a>
+            </div>
+            
+            <div class="nav-section">
                 <div class="nav-title">Getting Started</div>
-                <a href="#quickstart" class="nav-link active">Quick Start</a>
+                <a href="#quickstart" class="nav-link">Quick Start</a>
                 <a href="#features" class="nav-link">Key Features</a>
                 <a href="#how-it-works" class="nav-link">How It Works</a>
             </div>
@@ -198,9 +207,9 @@
             </div>
             
             <div class="nav-section">
-                <div class="nav-title">SDKs</div>
-                <a href="#sdk-javascript" class="nav-link">JavaScript</a>
-                <a href="#sdk-python" class="nav-link">Python</a>
+                <div class="nav-title">Examples</div>
+                <a href="/examples/simple-auth-demo.html" class="nav-link" target="_blank">Simple Auth Demo ↗</a>
+                <a href="/examples/complete-integration-example.html" class="nav-link" target="_blank">Complete Example ↗</a>
             </div>
             
             <div class="nav-section">
@@ -212,6 +221,54 @@
 
         <!-- Main Content -->
         <div class="docs-content">
+            <!-- Integration Guides -->
+            <section id="integration-guides" class="docs-section">
+                <h2>📚 Integration Guides</h2>
+                <p style="margin-bottom: 32px;">Complete documentation for integrating Lemma authentication and IAM into your platform.</p>
+                
+                <div style="display: grid; gap: 24px; margin-bottom: 48px;">
+                    <div style="background: var(--white); border: 2px solid var(--primary-200); border-radius: 12px; padding: 24px;">
+                        <h3 style="color: var(--primary-600); margin-bottom: 12px;">🚀 Simple Login (5 minutes)</h3>
+                        <p style="color: var(--gray-600); margin-bottom: 16px;">
+                            Add email-based authentication with built-in bot resistance. Session-free architecture, zero tracking.
+                        </p>
+                        <a href="/docs/QUICK_START_SIMPLE_LOGIN.md" target="_blank" style="color: var(--primary-600); font-weight: 600; text-decoration: none;">
+                            Read Guide → docs/QUICK_START_SIMPLE_LOGIN.md
+                        </a>
+                    </div>
+                    
+                    <div style="background: var(--white); border: 2px solid var(--gray-200); border-radius: 12px; padding: 24px;">
+                        <h3 style="color: var(--gray-900); margin-bottom: 12px;">🏢 IAM API Reference</h3>
+                        <p style="color: var(--gray-600); margin-bottom: 16px;">
+                            Complete API documentation for permissions, roles, user management, and revocation. All endpoints with examples.
+                        </p>
+                        <a href="/docs/IAM_API_REFERENCE.md" target="_blank" style="color: var(--primary-600); font-weight: 600; text-decoration: none;">
+                            Read Guide → docs/IAM_API_REFERENCE.md
+                        </a>
+                    </div>
+                    
+                    <div style="background: var(--white); border: 2px solid var(--gray-200); border-radius: 12px; padding: 24px;">
+                        <h3 style="color: var(--gray-900); margin-bottom: 12px;">🔴 Error Codes Reference</h3>
+                        <p style="color: var(--gray-600); margin-bottom: 16px;">
+                            Every error code with causes and solutions. Essential for debugging integrations.
+                        </p>
+                        <a href="/docs/ERROR_CODES.md" target="_blank" style="color: var(--primary-600); font-weight: 600; text-decoration: none;">
+                            Read Guide → docs/ERROR_CODES.md
+                        </a>
+                    </div>
+                    
+                    <div style="background: var(--white); border: 2px solid var(--success-200); border-radius: 12px; padding: 24px;">
+                        <h3 style="color: var(--success-600); margin-bottom: 12px;">💻 Complete Working Example</h3>
+                        <p style="color: var(--gray-600); margin-bottom: 16px;">
+                            Full HTML example - copy, paste, configure API key, and you're done. Perfect starting point.
+                        </p>
+                        <a href="/examples/complete-integration-example.html" target="_blank" style="color: var(--success-600); font-weight: 600; text-decoration: none;">
+                            View Example → examples/complete-integration-example.html
+                        </a>
+                    </div>
+                </div>
+            </section>
+            
             <!-- Quick Start -->
             <section id="quickstart" class="docs-section">
                 <h2>Quick Start (5 Minutes)</h2>
