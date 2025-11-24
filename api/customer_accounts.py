@@ -26,6 +26,30 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 customer_accounts_bp = Blueprint('customer_accounts', __name__)
 
+
+def _extract_customer_id_from_request() -> Optional[str]:
+    """
+    Attempt to extract customer_id from Authorization bearer credential,
+    falling back to session if available. Returns None if not authenticated.
+    """
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        try:
+            credential_json = auth_header.split(' ', 1)[1]
+            credential = json.loads(credential_json)
+            subject = credential.get('subject', '')
+            if subject.startswith('did:lemma:customer:'):
+                return subject.replace('did:lemma:customer:', '')
+            logger.warning("Invalid credential subject for customer request")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to parse credential from Authorization header: {e}")
+            return None
+    
+    # Fallback to legacy session-based auth (customer dashboard)
+    return session.get('customer_id')
+
+
 class DateTimeEncoder(json.JSONEncoder):
     """Custom JSON encoder for datetime objects"""
     def default(self, obj):
@@ -46,6 +70,7 @@ class Customer:
     status: str  # 'pending', 'active', 'suspended'
     subscription_status: str  # 'none', 'active', 'past_due', 'canceled'
     monthly_usage: Dict[str, int]  # month -> user_count
+    sites: List[Dict[str, Any]]
     billing_email: Optional[str]
     password_hash: Optional[str] = None  # Hashed password for authentication
     role: str = 'customer'  # 'customer' or 'admin'
@@ -57,78 +82,118 @@ class CustomerAccountManager:
     """Manages customer accounts and API keys with PostgreSQL backend"""
     
     def __init__(self):
-        # Initialize database
+        self.customers: Dict[str, Customer] = {}
+        self.email_to_customer: Dict[str, str] = {}
+        self.api_key_to_customer: Dict[str, str] = {}
+        self.db_available = False
+        
         try:
             init_database()
+            self.db_available = True
             logger.info("✅ CustomerAccountManager initialized with PostgreSQL")
+            self._refresh_api_key_cache()
         except Exception as e:
             logger.error(f"❌ Failed to initialize database: {e}")
-            # Fallback to in-memory for development
-            self.customers = {}
-            self.email_to_customer = {}
-            self.api_key_to_customer = {}
+            logger.warning("⚠️ Falling back to in-memory customer store for development")
+    
+    def _refresh_api_key_cache(self):
+        """Populate in-memory API key -> customer mapping"""
+        self.api_key_to_customer = {}
+        
+        if self.db_available:
+            try:
+                db = get_db()
+                # Only load the columns we need
+                db_customers = db.query(DBCustomer.customer_id, DBCustomer.api_keys).all()
+                for customer_id, api_keys in db_customers:
+                    for key_data in api_keys or []:
+                        key_value = key_data.get('key')
+                        if key_value:
+                            self.api_key_to_customer[key_value] = customer_id
+                db.close()
+                logger.info(f"🔐 Cached {len(self.api_key_to_customer)} API keys from database")
+            except Exception as e:
+                logger.error(f"Failed to refresh API key cache: {e}")
+        else:
+            for customer_id, customer in self.customers.items():
+                for key_data in customer.api_keys or []:
+                    key_value = key_data.get('key')
+                    if key_value:
+                        self.api_key_to_customer[key_value] = customer_id
+    
+    def _hydrate_customer(self, db_customer: DBCustomer) -> Customer:
+        """Convert ORM customer to dataclass"""
+        return Customer(
+            customer_id=db_customer.customer_id,
+            email=db_customer.email,
+            name=db_customer.name,
+            company=db_customer.company,
+            stripe_customer_id=db_customer.stripe_customer_id,
+            api_keys=db_customer.api_keys or [],
+            sites=db_customer.sites or [],
+            created_at=db_customer.created_at,
+            status=db_customer.status,
+            subscription_status=db_customer.subscription_status,
+            monthly_usage=db_customer.monthly_usage or {},
+            billing_email=db_customer.billing_email,
+            password_hash=db_customer.password_hash,
+            role=db_customer.role,
+            permissions=db_customer.permissions or [],
+            last_login=db_customer.last_login,
+            login_count=db_customer.login_count
+        )
+    
+    def _store_customer_in_memory(self, customer: Customer):
+        """Persist customer in local dictionaries when DB is unavailable"""
+        if self.db_available:
+            return
+        self.customers[customer.customer_id] = customer
+        self.email_to_customer[customer.email] = customer.customer_id
+        for key_data in customer.api_keys or []:
+            key_value = key_data.get('key')
+            if key_value:
+                self.api_key_to_customer[key_value] = customer.customer_id
+    
+    def cache_customer(self, customer: Customer):
+        """Public helper to cache a customer when operating without a database"""
+        self._store_customer_in_memory(customer)
     
     def get_customer_by_email(self, email: str) -> Optional[Customer]:
         """Get customer by email from database"""
-        try:
-            db = get_db()
-            db_customer = db.query(DBCustomer).filter(DBCustomer.email == email).first()
-            db.close()
-            
-            if db_customer:
-                return Customer(
-                    customer_id=db_customer.customer_id,
-                    email=db_customer.email,
-                    name=db_customer.name,
-                    company=db_customer.company,
-                    stripe_customer_id=db_customer.stripe_customer_id,
-                    api_keys=db_customer.api_keys or [],
-                    created_at=db_customer.created_at,
-                    status=db_customer.status,
-                    subscription_status=db_customer.subscription_status,
-                    monthly_usage=db_customer.monthly_usage or {},
-                    billing_email=db_customer.billing_email,
-                    password_hash=db_customer.password_hash,
-                    role=db_customer.role,
-                    permissions=db_customer.permissions or [],
-                    last_login=db_customer.last_login,
-                    login_count=db_customer.login_count
-                )
-            return None
-        except Exception as e:
-            logger.error(f"Error getting customer by email: {e}")
-            return None
+        if self.db_available:
+            try:
+                db = get_db()
+                db_customer = db.query(DBCustomer).filter(DBCustomer.email == email).first()
+                db.close()
+                
+                if db_customer:
+                    return self._hydrate_customer(db_customer)
+            except Exception as e:
+                logger.error(f"Error getting customer by email: {e}")
+        
+        customer_id = self.email_to_customer.get(email)
+        if customer_id:
+            return self.customers.get(customer_id)
+        return None
     
     def get_customer(self, customer_id: str) -> Optional[Customer]:
         """Get customer by ID from database"""
-        try:
-            db = get_db()
-            db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == customer_id).first()
-            db.close()
-            
-            if db_customer:
-                return Customer(
-                    customer_id=db_customer.customer_id,
-                    email=db_customer.email,
-                    name=db_customer.name,
-                    company=db_customer.company,
-                    stripe_customer_id=db_customer.stripe_customer_id,
-                    api_keys=db_customer.api_keys or [],
-                    created_at=db_customer.created_at,
-                    status=db_customer.status,
-                    subscription_status=db_customer.subscription_status,
-                    monthly_usage=db_customer.monthly_usage or {},
-                    billing_email=db_customer.billing_email,
-                    password_hash=db_customer.password_hash,
-                    role=db_customer.role,
-                    permissions=db_customer.permissions or [],
-                    last_login=db_customer.last_login,
-                    login_count=db_customer.login_count
-                )
-            return None
-        except Exception as e:
-            logger.error(f"Error getting customer by ID: {e}")
-            return None
+        if self.db_available:
+            try:
+                db = get_db()
+                db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == customer_id).first()
+                db.close()
+                
+                if db_customer:
+                    return self._hydrate_customer(db_customer)
+            except Exception as e:
+                logger.error(f"Error getting customer by ID: {e}")
+        
+        return self.customers.get(customer_id)
+
+    def get_customer_by_id(self, customer_id: str) -> Optional[Customer]:
+        """Compatibility helper for modules expecting get_customer_by_id"""
+        return self.get_customer(customer_id)
         
     def generate_api_key(self, prefix: str = "lemma") -> str:
         """Generate a secure API key"""
@@ -184,6 +249,7 @@ class CustomerAccountManager:
             api_key_data = {
                 'key': api_key,
                 'name': 'Default API Key',
+                'site_id': None,
                 'created_at': datetime.utcnow().isoformat(),
                 'last_used': None,
                 'usage_count': 0,
@@ -203,6 +269,7 @@ class CustomerAccountManager:
                 company=company,
                 stripe_customer_id=stripe_customer.id,
                 api_keys=[api_key_data],
+                sites=[],
                 created_at=datetime.utcnow(),
                 status='active',
                 subscription_status='none',
@@ -212,6 +279,7 @@ class CustomerAccountManager:
             )
             
             # Store customer in database
+            db = None
             try:
                 db = get_db()
                 db_customer = DBCustomer(
@@ -220,12 +288,8 @@ class CustomerAccountManager:
                     name=name,
                     company=company,
                     stripe_customer_id=stripe_customer.id,
-                    api_keys=[{
-                        'key': api_key,
-                        'name': 'Default API Key',
-                        'created_at': datetime.utcnow().isoformat(),
-                        'last_used': None
-                    }],
+                    api_keys=[api_key_data],
+                    sites=[],
                     created_at=datetime.utcnow(),
                     status='active',
                     subscription_status='none',
@@ -241,9 +305,13 @@ class CustomerAccountManager:
                 db.close()
             except Exception as e:
                 logger.error(f"Failed to save customer to database: {e}")
-                db.rollback()
-                db.close()
+                if db is not None:
+                    db.rollback()
+                    db.close()
                 raise e
+            
+            self.api_key_to_customer[api_key] = customer_id
+            self._store_customer_in_memory(customer)
             
             logger.info(f"Created customer account: {customer_id} ({email})")
             
@@ -268,38 +336,61 @@ class CustomerAccountManager:
                 'error': 'Failed to create customer account'
             }
     
-    def get_customer(self, customer_id: str) -> Optional[Customer]:
-        """Get customer by ID"""
-        return self.customers.get(customer_id)
-    
-
-    
     def get_customer_by_api_key(self, api_key: str) -> Optional[Customer]:
         """Get customer by API key"""
         customer_id = self.api_key_to_customer.get(api_key)
         if customer_id:
-            return self.customers.get(customer_id)
+            return self.get_customer(customer_id)
+        
+        # Attempt to refresh cache once if DB is available
+        if self.db_available:
+            self._refresh_api_key_cache()
+            customer_id = self.api_key_to_customer.get(api_key)
+            if customer_id:
+                return self.get_customer(customer_id)
+        
         return None
     
-    def generate_additional_api_key(self, customer_id: str, key_name: str) -> Dict[str, Any]:
+    def generate_additional_api_key(self, customer_id: str, key_name: str, site_id: Optional[str] = None) -> Dict[str, Any]:
         """Generate an additional API key for a customer"""
-        customer = self.get_customer(customer_id)
-        if not customer:
-            return {'success': False, 'error': 'Customer not found'}
-        
-        # Generate new API key
         api_key = self.generate_api_key()
         api_key_data = {
             'key': api_key,
             'name': key_name,
+            'site_id': site_id,
             'created_at': datetime.utcnow().isoformat(),
             'last_used': None,
             'usage_count': 0,
             'status': 'active'
         }
         
-        # Add to customer's API keys
-        customer.api_keys.append(api_key_data)
+        if self.db_available:
+            db = None
+            try:
+                db = get_db()
+                db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == customer_id).first()
+                if not db_customer:
+                    return {'success': False, 'error': 'Customer not found'}
+                
+                keys = db_customer.api_keys or []
+                keys.append(api_key_data)
+                db_customer.api_keys = keys
+                db.commit()
+            except Exception as e:
+                logger.error(f"Failed to generate new API key for {customer_id}: {e}")
+                if db is not None:
+                    db.rollback()
+                return {'success': False, 'error': 'Failed to generate API key'}
+            finally:
+                if db is not None:
+                    db.close()
+        else:
+            customer = self.get_customer(customer_id)
+            if not customer:
+                return {'success': False, 'error': 'Customer not found'}
+            customer.api_keys.append(api_key_data)
+            self._store_customer_in_memory(customer)
+        
         self.api_key_to_customer[api_key] = customer_id
         
         logger.info(f"Generated additional API key for customer: {customer_id}")
@@ -312,24 +403,59 @@ class CustomerAccountManager:
     
     def revoke_api_key(self, customer_id: str, api_key: str) -> Dict[str, Any]:
         """Revoke an API key"""
-        customer = self.get_customer(customer_id)
-        if not customer:
-            return {'success': False, 'error': 'Customer not found'}
+        revoked = False
         
-        # Find and revoke the key
-        for key_data in customer.api_keys:
-            if key_data['key'] == api_key:
-                key_data['status'] = 'revoked'
-                key_data['revoked_at'] = datetime.utcnow().isoformat()
+        if self.db_available:
+            db = None
+            try:
+                db = get_db()
+                db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == customer_id).first()
+                if not db_customer:
+                    return {'success': False, 'error': 'Customer not found'}
                 
-                # Remove from active mapping
-                if api_key in self.api_key_to_customer:
-                    del self.api_key_to_customer[api_key]
+                keys = db_customer.api_keys or []
+                for key_data in keys:
+                    if key_data.get('key') == api_key:
+                        key_data['status'] = 'revoked'
+                        key_data['revoked_at'] = datetime.utcnow().isoformat()
+                        revoked = True
+                        break
                 
-                logger.info(f"Revoked API key for customer: {customer_id}")
-                return {'success': True}
+                if not revoked:
+                    return {'success': False, 'error': 'API key not found'}
+                
+                db_customer.api_keys = keys
+                db.commit()
+            except Exception as e:
+                logger.error(f"Failed to revoke API key for {customer_id}: {e}")
+                if db is not None:
+                    db.rollback()
+                return {'success': False, 'error': 'Failed to revoke API key'}
+            finally:
+                if db is not None:
+                    db.close()
+        else:
+            customer = self.get_customer(customer_id)
+            if not customer:
+                return {'success': False, 'error': 'Customer not found'}
+            
+            for key_data in customer.api_keys:
+                if key_data['key'] == api_key:
+                    key_data['status'] = 'revoked'
+                    key_data['revoked_at'] = datetime.utcnow().isoformat()
+                    revoked = True
+                    break
+            
+            if not revoked:
+                return {'success': False, 'error': 'API key not found'}
+            
+            self._store_customer_in_memory(customer)
         
-        return {'success': False, 'error': 'API key not found'}
+        # Remove from active mapping
+        self.api_key_to_customer.pop(api_key, None)
+        
+        logger.info(f"Revoked API key for customer: {customer_id}")
+        return {'success': True}
     
     def validate_api_key(self, api_key: str) -> Dict[str, Any]:
         """Validate an API key and return customer info"""
@@ -697,55 +823,25 @@ def login():
 @customer_accounts_bp.route('/api/customer/info')
 def get_customer_info():
     """Get customer information (session-free: requires credential in request)"""
-    # SESSION-FREE: Extract customer info from credential passed in request
-    # Credential should be verified client-side and included in Authorization header
+    customer_id = _extract_customer_id_from_request()
+    if not customer_id:
+        return jsonify({'error': 'Authentication required'}), 401
     
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        return jsonify({'error': 'Credential required in Authorization header'}), 401
+    customer = customer_manager.get_customer(customer_id)
+    if not customer:
+        return jsonify({'error': 'Customer not found'}), 404
     
-    try:
-        # Parse credential from Bearer token
-        credential_json = auth_header.split(' ', 1)[1]
-        credential = json.loads(credential_json)
-        
-        # Extract customer ID from credential subject
-        subject = credential.get('subject', '')
-        if subject.startswith('did:lemma:customer:'):
-            customer_id = subject.replace('did:lemma:customer:', '')
-        else:
-            return jsonify({'error': 'Invalid credential subject'}), 401
-        
-        customer = customer_manager.get_customer(customer_id)
-        if not customer:
-            return jsonify({'error': 'Customer not found'}), 404
-        
-        return jsonify({
-            'success': True,
-            'customer': asdict(customer)
-        })
-    except Exception as e:
-        logger.error(f"Failed to get customer info: {e}")
-        return jsonify({'error': 'Authentication failed'}), 401
+    return jsonify({
+        'success': True,
+        'customer': asdict(customer)
+    })
 
 @customer_accounts_bp.route('/api/customer/api-keys', methods=['GET', 'POST', 'DELETE'])
 def manage_api_keys():
     """Manage customer API keys (session-free)"""
-    # SESSION-FREE: Extract customer ID from credential
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        return jsonify({'error': 'Credential required'}), 401
-    
-    try:
-        credential_json = auth_header.split(' ', 1)[1]
-        credential = json.loads(credential_json)
-        subject = credential.get('subject', '')
-        customer_id = subject.replace('did:lemma:customer:', '') if subject.startswith('did:lemma:customer:') else None
-        
-        if not customer_id:
-            return jsonify({'error': 'Invalid credential'}), 401
-    except:
-        return jsonify({'error': 'Authentication failed'}), 401
+    customer_id = _extract_customer_id_from_request()
+    if not customer_id:
+        return jsonify({'error': 'Authentication required'}), 401
     
     if request.method == 'GET':
         # Get all API keys
@@ -755,20 +851,22 @@ def manage_api_keys():
         
         return jsonify({
             'success': True,
-            'api_keys': customer.api_keys
+            'api_keys': customer.api_keys,
+            'sites': customer.sites or []
         })
     
     elif request.method == 'POST':
         # Generate new API key
-        data = request.get_json()
+        data = request.get_json() or {}
         key_name = data.get('name', 'API Key')
+        site_id = data.get('site_id')
         
-        result = customer_manager.generate_additional_api_key(customer_id, key_name)
+        result = customer_manager.generate_additional_api_key(customer_id, key_name, site_id=site_id)
         return jsonify(result)
     
     elif request.method == 'DELETE':
         # Revoke API key
-        data = request.get_json()
+        data = request.get_json() or {}
         api_key = data.get('api_key')
         
         if not api_key:
@@ -796,42 +894,43 @@ def register_customer_site():
     Register a new site for customer + auto-issue admin credential
     This is the developer platform flow for beta customers
     """
+    customer_id = _extract_customer_id_from_request()
+    if not customer_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
     try:
-        # Get customer ID from session or credential
-        customer_id = session.get('customer_id')
-        
-        if not customer_id:
-            return jsonify({'error': 'Not authenticated'}), 401
-        
         customer = customer_manager.get_customer(customer_id)
         if not customer:
             return jsonify({'error': 'Customer not found'}), 404
         
-        # Get site domain from request
-        data = request.get_json()
-        site_domain = data.get('site_domain', '').strip().lower()
-        
+        data = request.get_json() or {}
+        site_domain = (data.get('site_domain') or '').strip().lower()
         if not site_domain:
             return jsonify({'error': 'site_domain required'}), 400
         
-        # Clean site domain (remove protocol, trailing slash)
-        site_domain = site_domain.replace('https://', '').replace('http://', '').rstrip('/')
+        # Clean site domain (remove protocol, path, trailing slash)
+        site_domain = site_domain.replace('https://', '').replace('http://', '')
+        site_domain = site_domain.split('/', 1)[0].rstrip('/')
+        if not site_domain:
+            return jsonify({'error': 'Invalid site_domain'}), 400
+        
+        site_label = (data.get('site_label') or site_domain).strip()
+        environment = (data.get('environment') or 'production').lower()
+        if environment not in {'production', 'staging', 'development', 'sandbox'}:
+            environment = 'production'
+        company_name = (data.get('company_name') or customer.company).strip()
+        contact_email = (data.get('contact_email') or customer.email).strip()
+        key_name = (data.get('key_name') or f"{site_label or site_domain} Key").strip() or 'API Key'
         
         # Generate site_id (deterministic from domain)
-        import hashlib
         site_id = f"site_{hashlib.sha256(site_domain.encode()).hexdigest()[:12]}"
         
         # Create site with IAM system (generates Ed25519 keypair)
         from api.iam_site_manager import get_or_create_site_manager
-        
         manager = get_or_create_site_manager(site_id, site_domain)
         
         if not manager:
             return jsonify({'error': 'Failed to create site'}), 500
-        
-        # AUTO-ISSUE ADMIN PERMISSION (Better UX than manual bootstrap)
-        user_did = f"did:lemma:customer:{customer_id}"
-        user_email = customer.email
         
         # Ensure admin permission exists
         if 'admin' not in manager.permissions:
@@ -843,6 +942,9 @@ def register_customer_site():
                 'priority': 100
             })
         
+        user_did = f"did:lemma:customer:{customer_id}"
+        user_email = customer.email
+        
         # Issue admin credential
         admin_credential = manager.issue_permission_lemma(
             user_did,
@@ -851,66 +953,94 @@ def register_customer_site():
             custom_claims={
                 'email': user_email,
                 'site_domain': site_domain,
+                'site_label': site_label,
+                'environment': environment,
                 'siteId': site_id,
                 'accountType': 'admin',
                 'permissionId': 'admin',
                 'issued_via': 'developer_platform'
             }
         )
-        
-        # Add W3C type fields
         admin_credential['type'] = ['VerifiableCredential', 'PermissionLemma']
         admin_credential['packageType'] = 'permission'
         
-        # Store site in customer's account
-        if not hasattr(customer, 'sites') or customer.sites is None:
-            customer.sites = []
-        
-        # Check if site already exists
-        existing = [s for s in customer.sites if s.get('site_id') == site_id]
-        if not existing:
-            customer.sites.append({
-                'site_id': site_id,
+        # Persist site metadata
+        sites = list(customer.sites or [])
+        timestamp = datetime.utcnow().isoformat()
+        site_entry = next((s for s in sites if s.get('site_id') == site_id), None)
+        if site_entry:
+            site_entry.update({
                 'site_domain': site_domain,
-                'created_at': datetime.utcnow().isoformat(),
+                'site_label': site_label,
+                'environment': environment,
+                'company_name': company_name,
+                'contact_email': contact_email,
                 'status': 'active',
+                'updated_at': timestamp,
                 'issuer_did': manager.issuer.get_did()
             })
-            
-            # Update database
+        else:
+            site_entry = {
+                'site_id': site_id,
+                'site_domain': site_domain,
+                'site_label': site_label,
+                'environment': environment,
+                'company_name': company_name,
+                'contact_email': contact_email,
+                'status': 'active',
+                'created_at': timestamp,
+                'updated_at': timestamp,
+                'issuer_did': manager.issuer.get_did()
+            }
+            sites.append(site_entry)
+        
+        customer.sites = sites
+        
+        # Update database record
+        if customer_manager.db_available:
+            db = None
             try:
                 db = get_db()
                 db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == customer_id).first()
                 if db_customer:
-                    if not db_customer.sites:
-                        db_customer.sites = []
-                    db_customer.sites.append({
-                        'site_id': site_id,
-                        'site_domain': site_domain,
-                        'created_at': datetime.utcnow().isoformat(),
-                        'status': 'active',
-                        'issuer_did': manager.issuer.get_did()
-                    })
+                    db_customer.sites = sites
                     db.commit()
-                db.close()
             except Exception as e:
-                logger.error(f"Failed to save site to database: {e}")
+                logger.error(f"Failed to persist site metadata for {customer_id}: {e}")
+                if db is not None:
+                    db.rollback()
+                return jsonify({'error': 'Failed to store site metadata'}), 500
+            finally:
+                if db is not None:
+                    db.close()
+        else:
+            customer_manager.cache_customer(customer)
         
-        logger.info(f"✅ Customer {user_email} registered site {site_domain} with auto-issued admin")
+        # Generate API key tied to this site
+        key_result = customer_manager.generate_additional_api_key(customer_id, key_name, site_id=site_id)
+        if not key_result.get('success'):
+            return jsonify(key_result), 400
+        
+        site_entry['last_api_key_label'] = key_name
+        site_entry['last_api_key_created_at'] = datetime.utcnow().isoformat()
+        
+        logger.info(f"✅ Customer {user_email} registered site {site_domain} ({site_id}) and received API key")
         
         return jsonify({
             'success': True,
             'site_id': site_id,
             'site_domain': site_domain,
+            'site': site_entry,
             'issuer_did': manager.issuer.get_did(),
-            'admin_credential': admin_credential,  # Auto-issued!
-            'api_key': customer.api_keys[0]['key'] if customer.api_keys else None,
-            'message': f'Site registered. Admin credential issued for {site_domain}'
+            'admin_credential': admin_credential,
+            'api_key': key_result.get('api_key'),
+            'key_data': key_result.get('key_data'),
+            'message': f'Site registered. Admin credential issued and API key generated for {site_domain}'
         })
-        
+    
     except Exception as e:
-        logger.error(f"Site registration error: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Site registration error: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to register site'}), 500
 
 
 @customer_accounts_bp.route('/api/customer/sites', methods=['GET'])

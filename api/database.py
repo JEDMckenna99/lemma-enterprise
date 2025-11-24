@@ -109,6 +109,7 @@ class Customer(Base):
     company = Column(String, nullable=False)
     stripe_customer_id = Column(String)
     api_keys = Column(JSON, default=list)
+    sites = Column(JSON, default=list)
     created_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String, default='active')
     subscription_status = Column(String, default='none')

@@ -635,7 +635,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">API Keys</h2>
-                        <button class="btn btn-primary btn-sm" onclick="generateAPIKey()">
+                        <button class="btn btn-primary btn-sm" onclick="showAPIKeyModal()">
                             + Create New Key
                         </button>
                     </div>
@@ -654,7 +654,7 @@
                     </p>
                     
                     <div class="code-block">
-                        <button class="copy-btn" onclick="copyCode('integration-code')">Copy</button>
+                        <button class="copy-btn" onclick="copyCode(event, 'integration-code')">Copy</button>
                         <pre id="integration-code">&lt;!-- Add to your HTML head --&gt;
 &lt;script src="https://lemma.id/static/js/lemma-signin-sdk.js"&gt;&lt;/script&gt;
 
@@ -823,10 +823,88 @@
         </div>
     </div>
     
+    <!-- API Key Generation Modal -->
+    <div id="api-key-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Generate API Key</h3>
+                <p class="modal-subtitle">Register your site URL and issue a Lemma API key</p>
+            </div>
+            
+            <form id="api-key-form" onsubmit="submitAPIKeyForm(event)">
+                <div class="form-group">
+                    <label class="form-label">Site URL</label>
+                    <input type="text" class="form-input" id="api-key-site-domain" required placeholder="https://yoursite.com">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Display Name</label>
+                    <input type="text" class="form-input" id="api-key-site-label" placeholder="Your Site Name">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Environment</label>
+                    <select class="form-select" id="api-key-environment">
+                        <option value="production">Production</option>
+                        <option value="staging">Staging</option>
+                        <option value="development">Development</option>
+                        <option value="sandbox">Sandbox</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">API Key Name</label>
+                    <input type="text" class="form-input" id="api-key-name" placeholder="Production Key">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Contact Email</label>
+                    <input type="email" class="form-input" id="api-key-contact-email" placeholder="you@yoursite.com">
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('api-key-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create API Key</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <script>
         // Global state
         let currentSection = 'overview';
         let userPermission = null;
+        let lemmaPlatformCredentialString = null;
+        
+        function getLemmaAuthHeaders() {
+            if (!lemmaPlatformCredentialString) {
+                return {};
+            }
+            return {
+                'Authorization': `Bearer ${lemmaPlatformCredentialString}`
+            };
+        }
+        
+        function escapeHTML(value) {
+            if (typeof value !== 'string') {
+                return value ?? '';
+            }
+            return value
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        
+        function formatDate(value) {
+            if (!value) return '—';
+            try {
+                return new Date(value).toLocaleString();
+            } catch (e) {
+                return value;
+            }
+        }
         
         // Initialize platform
         async function initPlatform() {
@@ -948,6 +1026,8 @@
                 const perm = lemmaPermissions[0];
                 const claims = perm.claims || perm.credentialSubject || {};
                 userPermission = claims.permissionId || claims.permission_level || 'beta-user';
+                lemmaPlatformCredentialString = JSON.stringify(perm);
+                loadAPIKeysData(false);
                 
                 console.log('✅ Access granted -', userPermission);
                 
@@ -1168,17 +1248,111 @@
         }
         
         // Load API keys data
-        async function loadAPIKeysData() {
-            document.getElementById('api-keys-container').innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">🔑</div>
-                    <div>No API keys yet</div>
-                    <div style="font-size: 14px; margin-top: 8px;">Create your first API key to start integrating</div>
-                    <button class="btn btn-primary" onclick="generateAPIKey()" style="margin-top: 16px;">
-                        Create API Key
-                    </button>
-                </div>
-            `;
+        async function loadAPIKeysData(showLoading = true) {
+            const container = document.getElementById('api-keys-container');
+            if (!container) return;
+            
+            if (showLoading) {
+                container.innerHTML = `<div class="loading">Loading API keys...</div>`;
+            }
+            
+            if (!lemmaPlatformCredentialString) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔑</div>
+                        <div>Wallet authentication required</div>
+                        <div style="font-size: 14px; margin-top: 8px;">Sign in with your Lemma wallet to manage API keys.</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/customer/api-keys', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Unable to load API keys');
+                }
+                
+                const siteMap = {};
+                (data.sites || []).forEach(site => {
+                    if (site && site.site_id) {
+                        siteMap[site.site_id] = site;
+                    }
+                });
+                
+                renderAPIKeys(data.api_keys || [], siteMap);
+            } catch (error) {
+                console.error('❌ Failed to load API keys:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <div>Failed to load API keys</div>
+                        <div style="font-size: 14px; margin-top: 8px; color: #ef4444;">
+                            ${escapeHTML(error.message)}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderAPIKeys(apiKeys, siteMap = {}) {
+            const container = document.getElementById('api-keys-container');
+            if (!container) return;
+            
+            if (!apiKeys || apiKeys.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔑</div>
+                        <div>No API keys yet</div>
+                        <div style="font-size: 14px; margin-top: 8px;">Create your first API key to start integrating</div>
+                        <button class="btn btn-primary" onclick="showAPIKeyModal()" style="margin-top: 16px;">
+                            Create API Key
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = apiKeys.map(key => {
+                const siteInfo = key.site_id ? siteMap[key.site_id] : null;
+                const siteLabel = siteInfo?.site_label || siteInfo?.site_domain || key.site_id || 'Unassigned';
+                const statusValue = key.status || 'active';
+                const statusLabel = statusValue.charAt(0).toUpperCase() + statusValue.slice(1);
+                
+                return `
+                    <div style="border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <div>
+                                <div style="font-weight: 600; font-size: 16px;">${escapeHTML(key.name || 'API Key')}</div>
+                                <div style="font-size: 13px; color: #6b7280;">${escapeHTML(siteLabel)}</div>
+                            </div>
+                            <div>
+                                <span class="badge ${statusValue === 'active' ? 'badge-success' : 'badge-warning'}">${escapeHTML(statusLabel)}</span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 12px; font-family: 'Courier New', monospace; font-size: 13px; color: #374151; word-break: break-all;">
+                            ${escapeHTML(key.key || '—')}
+                        </div>
+                        <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn btn-secondary btn-sm" onclick="copyAPIKey('${key.key}')">Copy</button>
+                            <button class="btn btn-secondary btn-sm" onclick="revokeAPIKey('${key.key}')">Revoke</button>
+                        </div>
+                        <div style="margin-top: 12px; font-size: 12px; color: #6b7280;">
+                            Created ${formatDate(key.created_at)}
+                            ${key.last_used ? ` • Last used ${formatDate(key.last_used)}` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
         
         // Issue permission
@@ -1226,9 +1400,56 @@
             }
         }
         
-        // Generate API key
-        async function generateAPIKey() {
-            alert('🔑 API key generation coming soon!\n\nFor now, use your permission credentials for authentication.');
+        // API key helpers
+        function showAPIKeyModal() {
+            document.getElementById('api-key-modal').classList.add('show');
+        }
+        
+        async function submitAPIKeyForm(event) {
+            event.preventDefault();
+            
+            const siteDomain = document.getElementById('api-key-site-domain').value.trim();
+            const siteLabel = document.getElementById('api-key-site-label').value.trim();
+            const environment = document.getElementById('api-key-environment').value;
+            const keyName = document.getElementById('api-key-name').value.trim();
+            const contactEmail = document.getElementById('api-key-contact-email').value.trim();
+            
+            if (!siteDomain) {
+                alert('Please enter a site URL.');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/customer/register-site', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
+                    body: JSON.stringify({
+                        site_domain: siteDomain,
+                        site_label: siteLabel,
+                        environment,
+                        key_name: keyName,
+                        contact_email: contactEmail
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to generate API key');
+                }
+                
+                alert(`✅ API key created for ${data.site_domain}.\n\nCopy this key now:\n${data.api_key}`);
+                
+                closeModal('api-key-modal');
+                document.getElementById('api-key-form').reset();
+                loadAPIKeysData(false);
+            } catch (error) {
+                console.error('❌ API key generation failed:', error);
+                alert(error.message || 'Failed to generate API key');
+            }
         }
         
         // Modal helpers
@@ -1296,7 +1517,7 @@
         }
         
         // Copy code
-        function copyCode(elementId) {
+        function copyCode(event, elementId) {
             const code = document.getElementById(elementId).textContent;
             navigator.clipboard.writeText(code);
             
@@ -1305,6 +1526,43 @@
             setTimeout(() => {
                 btn.textContent = 'Copy';
             }, 2000);
+        }
+        
+        async function copyAPIKey(apiKey) {
+            try {
+                await navigator.clipboard.writeText(apiKey);
+                alert('API key copied to clipboard.');
+            } catch (error) {
+                alert('Failed to copy API key. Copy it manually instead.');
+            }
+        }
+        
+        async function revokeAPIKey(apiKey) {
+            if (!confirm('Revoke this API key? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/customer/api-keys', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
+                    body: JSON.stringify({ api_key: apiKey })
+                });
+                
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'Failed to revoke API key');
+                }
+                
+                alert('API key revoked successfully.');
+                loadAPIKeysData(false);
+            } catch (error) {
+                console.error('❌ Failed to revoke API key:', error);
+                alert(error.message || 'Failed to revoke API key');
+            }
         }
         
         // Request platform access if user doesn't have credentials
