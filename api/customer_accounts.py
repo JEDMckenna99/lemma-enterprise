@@ -31,6 +31,11 @@ def _extract_customer_id_from_request() -> Optional[str]:
     """
     Attempt to extract customer_id from Authorization bearer credential,
     falling back to session if available. Returns None if not authenticated.
+    
+    Supports multiple credential formats:
+    - did:lemma:customer:{customer_id} - direct customer ID
+    - did:lemma:user:{user_id} - IAM user, lookup by email in claims
+    - Credential with email in claims - lookup customer by email
     """
     auth_header = request.headers.get('Authorization')
     if auth_header and auth_header.startswith('Bearer '):
@@ -38,9 +43,36 @@ def _extract_customer_id_from_request() -> Optional[str]:
             credential_json = auth_header.split(' ', 1)[1]
             credential = json.loads(credential_json)
             subject = credential.get('subject', '')
+            
+            # Direct customer ID format
             if subject.startswith('did:lemma:customer:'):
                 return subject.replace('did:lemma:customer:', '')
-            logger.warning("Invalid credential subject for customer request")
+            
+            # Try to extract email from claims and lookup customer
+            claims = credential.get('claims') or credential.get('credentialSubject') or {}
+            email = claims.get('email')
+            
+            if email:
+                # Lookup customer by email
+                customer = customer_manager.get_customer_by_email(email)
+                if customer:
+                    return customer.customer_id
+                    
+                # If no customer exists, create one for this IAM user
+                # This enables the developer platform flow where users get access via IAM
+                # then can register sites and get API keys
+                logger.info(f"Creating customer record for IAM user: {email}")
+                site_id = claims.get('siteId') or claims.get('site_id') or 'lemma_platform'
+                result = customer_manager.create_customer(
+                    email=email,
+                    name=email.split('@')[0],
+                    company=site_id,
+                    password=None  # No password - IAM-only access
+                )
+                if result.get('success'):
+                    return result.get('customer_id')
+            
+            logger.warning(f"Could not extract customer from credential subject: {subject}")
             return None
         except Exception as e:
             logger.error(f"Failed to parse credential from Authorization header: {e}")
