@@ -915,8 +915,8 @@
                 const hasAccess = await checkAccess();
                 
                 if (!hasAccess) {
-                    document.getElementById('loading-state').style.display = 'none';
-                    document.getElementById('access-denied').style.display = 'block';
+                    // checkAccess() already updated loading-state with "Request Platform Access" button
+                    // Don't hide it - leave it visible so user can request access
                     return;
                 }
                 
