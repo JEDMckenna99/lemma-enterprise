@@ -1570,15 +1570,24 @@
             try {
                 // Get user email from current session/wallet
                 const wallet = window.globalLemmaWallet;
-                const allCreds = await wallet.getAllCredentials();
+                let userEmail = null;
                 
                 // Try to extract email from any credential
-                let userEmail = null;
-                for (const cred of allCreds) {
-                    const claims = cred.claims || cred.credentialSubject || {};
-                    if (claims.email) {
-                        userEmail = claims.email;
-                        break;
+                if (wallet) {
+                    try {
+                        const pohCreds = await wallet.getCredentials('identity') || [];
+                        const permCreds = await wallet.getCredentials('permission') || [];
+                        const allCreds = [...pohCreds, ...permCreds];
+                        
+                        for (const cred of allCreds) {
+                            const claims = cred.claims || cred.credentialSubject || {};
+                            if (claims.email) {
+                                userEmail = claims.email;
+                                break;
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Could not get credentials from wallet:', e);
                     }
                 }
                 
