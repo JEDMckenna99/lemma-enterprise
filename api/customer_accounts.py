@@ -417,10 +417,17 @@ class CustomerAccountManager:
                 if not db_customer:
                     return {'success': False, 'error': 'Customer not found'}
                 
-                keys = db_customer.api_keys or []
+                # Create a new list to ensure SQLAlchemy detects the change
+                keys = list(db_customer.api_keys or [])
                 keys.append(api_key_data)
                 db_customer.api_keys = keys
+                
+                # Flag the column as modified (SQLAlchemy doesn't auto-detect JSON mutations)
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(db_customer, 'api_keys')
+                
                 db.commit()
+                logger.info(f"Stored API key with site_id={site_id} for customer {customer_id}")
             except Exception as e:
                 logger.error(f"Failed to generate new API key for {customer_id}: {e}")
                 if db is not None:
