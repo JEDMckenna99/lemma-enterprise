@@ -1268,15 +1268,20 @@
             }
             
             try {
+                const authHeaders = getLemmaAuthHeaders();
+                console.log('🔐 loadAPIKeysData - Auth headers:', Object.keys(authHeaders));
+                console.log('🔐 loadAPIKeysData - Credential length:', lemmaPlatformCredentialString?.length || 0);
+                
                 const response = await fetch('/api/customer/api-keys', {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
-                        ...getLemmaAuthHeaders()
+                        ...authHeaders
                     }
                 });
                 
                 const data = await response.json();
+                console.log('📡 API keys response:', response.status, data);
                 
                 if (!response.ok || !data.success) {
                     throw new Error(data.error || 'Unable to load API keys');
@@ -1420,11 +1425,19 @@
             }
             
             try {
+                const authHeaders = getLemmaAuthHeaders();
+                console.log('🔐 Auth headers:', Object.keys(authHeaders));
+                console.log('🔐 Credential present:', !!lemmaPlatformCredentialString);
+                
+                if (!lemmaPlatformCredentialString) {
+                    throw new Error('No credential available. Please refresh the page.');
+                }
+                
                 const response = await fetch('/api/customer/register-site', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        ...getLemmaAuthHeaders()
+                        ...authHeaders
                     },
                     body: JSON.stringify({
                         site_domain: siteDomain,
@@ -1436,12 +1449,13 @@
                 });
                 
                 const data = await response.json();
+                console.log('📡 Register site response:', response.status, data);
                 
                 if (!response.ok || !data.success) {
                     throw new Error(data.error || 'Failed to generate API key');
                 }
                 
-                alert(`✅ API key created for ${data.site_domain}.\n\nCopy this key now:\n${data.api_key}`);
+                alert(`API key created for ${data.site_domain}.\n\nCopy this key now:\n${data.api_key}`);
                 
                 closeModal('api-key-modal');
                 document.getElementById('api-key-form').reset();
