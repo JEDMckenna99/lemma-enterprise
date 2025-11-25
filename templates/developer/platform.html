@@ -1915,24 +1915,38 @@
                     throw new Error(result.error || 'Failed to rotate API key');
                 }
                 
-                // Show the new key in the success modal
+                // Show the new key in the success modal (reuse existing modal)
                 const newKey = result.new_api_key;
-                const keyData = result.new_key_data || {};
                 
-                // Update the success modal with the new rotated key
-                const modalContent = document.getElementById('api-key-success-modal');
-                if (modalContent) {
-                    document.getElementById('generated-api-key').textContent = newKey;
-                    document.getElementById('generated-site-id').textContent = siteId;
-                    
-                    // Update copy button
-                    const copyBtn = modalContent.querySelector('button[onclick*="copyGeneratedKey"]');
-                    if (copyBtn) {
-                        copyBtn.onclick = () => copyGeneratedKey(newKey);
-                    }
-                    
-                    modalContent.style.display = 'flex';
+                // Update modal title for rotation context
+                const modalTitle = document.querySelector('#api-key-success-modal .modal-title');
+                if (modalTitle) {
+                    modalTitle.textContent = 'API Key Rotated Successfully';
                 }
+                
+                const modalSubtitle = document.querySelector('#api-key-success-modal .modal-subtitle');
+                if (modalSubtitle) {
+                    modalSubtitle.textContent = 'Your new API key has been generated. The old key has been revoked. Copy it now - it won\'t be shown again in full.';
+                }
+                
+                // Update the modal fields with correct IDs
+                const siteDomainEl = document.getElementById('success-site-domain');
+                if (siteDomainEl) {
+                    siteDomainEl.textContent = siteId;
+                }
+                
+                const apiKeyEl = document.getElementById('success-api-key');
+                if (apiKeyEl) {
+                    apiKeyEl.value = newKey;
+                }
+                
+                const siteIdEl = document.getElementById('success-site-id');
+                if (siteIdEl) {
+                    siteIdEl.value = siteId;
+                }
+                
+                // Show the modal
+                document.getElementById('api-key-success-modal').classList.add('show');
                 
                 showToast('API key rotated successfully. Old key has been revoked.');
                 loadAPIKeysData(false);
