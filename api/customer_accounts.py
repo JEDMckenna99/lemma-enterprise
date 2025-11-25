@@ -958,8 +958,12 @@ def register_customer_site():
         site_id = f"site_{hashlib.sha256(site_domain.encode()).hexdigest()[:12]}"
         
         # Create site with IAM system (generates Ed25519 keypair)
-        from api.iam_site_manager import get_or_create_site_manager
-        manager = get_or_create_site_manager(site_id, site_domain)
+        try:
+            from api.real_iam_manager import RealIAMSubnetManager
+            manager = RealIAMSubnetManager(site_id, site_domain)
+        except Exception as e:
+            logger.error(f"Failed to create IAM manager: {e}")
+            return jsonify({'error': 'Failed to create site IAM system'}), 500
         
         if not manager:
             return jsonify({'error': 'Failed to create site'}), 500
