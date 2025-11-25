@@ -1428,47 +1428,48 @@
                 return;
             }
             
-            container.innerHTML = apiKeys.map(key => {
+            container.innerHTML = apiKeys.map((key, index) => {
                 const siteInfo = key.site_id ? siteMap[key.site_id] : null;
                 const siteLabel = siteInfo?.site_label || siteInfo?.site_domain || 'Unassigned';
                 const siteDomain = siteInfo?.site_domain || key.site_id || '';
                 const statusValue = key.status || 'active';
                 const statusLabel = statusValue.charAt(0).toUpperCase() + statusValue.slice(1);
                 const environment = siteInfo?.environment || 'production';
+                const isLast = index === apiKeys.length - 1;
                 
                 // Mask API key - show only last 8 characters
                 const maskedKey = key.key ? `lemma_${'•'.repeat(24)}${key.key.slice(-8)}` : '—';
                 const fullKey = key.key || '';
                 
                 return `
-                    <div class="api-key-card" style="border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 16px; background: #fff;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                    <div class="api-key-item" style="padding: 16px 0; ${!isLast ? 'border-bottom: 1px solid #f3f4f6;' : ''}">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
                             <div>
-                                <div style="font-weight: 600; font-size: 17px; color: #111827;">${escapeHTML(key.name || 'API Key')}</div>
-                                <div style="font-size: 14px; color: #6b7280; margin-top: 4px;">${escapeHTML(siteLabel)}</div>
+                                <div style="font-weight: 600; font-size: 15px; color: #111827;">${escapeHTML(key.name || 'API Key')}</div>
+                                <div style="font-size: 13px; color: #6b7280; margin-top: 2px;">${escapeHTML(siteLabel)}</div>
                             </div>
-                            <div style="display: flex; gap: 8px; align-items: center;">
-                                <span class="badge" style="background: ${environment === 'production' ? '#dbeafe' : '#fef3c7'}; color: ${environment === 'production' ? '#1d4ed8' : '#92400e'}; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; text-transform: capitalize;">${escapeHTML(environment)}</span>
-                                <span class="badge ${statusValue === 'active' ? 'badge-success' : 'badge-warning'}">${escapeHTML(statusLabel)}</span>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <span style="background: ${environment === 'production' ? '#dbeafe' : environment === 'staging' ? '#fef3c7' : '#f3e8ff'}; color: ${environment === 'production' ? '#1d4ed8' : environment === 'staging' ? '#92400e' : '#7c3aed'}; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; text-transform: capitalize;">${escapeHTML(environment)}</span>
+                                <span class="badge ${statusValue === 'active' ? 'badge-success' : 'badge-warning'}" style="padding: 3px 8px; font-size: 11px;">${escapeHTML(statusLabel)}</span>
                             </div>
                         </div>
                         
-                        <div style="background: #f9fafb; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                        <div style="background: #f9fafb; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-                                <code style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 13px; color: #374151; letter-spacing: 0.3px;">${escapeHTML(maskedKey)}</code>
-                                <button class="btn btn-secondary btn-sm" onclick="copyAPIKey('${escapeHTML(fullKey)}')" style="white-space: nowrap;">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -2px;">
+                                <code style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 12px; color: #374151; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis;">${escapeHTML(maskedKey)}</code>
+                                <button class="btn btn-secondary btn-sm" onclick="copyAPIKey('${escapeHTML(fullKey)}')" style="white-space: nowrap; padding: 6px 10px; font-size: 12px;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
                                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                                         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                                     </svg>
-                                    Copy Key
+                                    Copy
                                 </button>
                             </div>
                         </div>
                         
                         ${siteDomain ? `
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; color: #6b7280;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 12px; color: #6b7280;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <line x1="2" y1="12" x2="22" y2="12"></line>
                                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
@@ -1477,12 +1478,12 @@
                         </div>
                         ` : ''}
                         
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding-top: 12px; border-top: 1px solid #f3f4f6;">
-                            <div style="font-size: 12px; color: #9ca3af;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div style="font-size: 11px; color: #9ca3af;">
                                 Created ${formatDate(key.created_at)}
                                 ${key.last_used ? ` &bull; Last used ${formatDate(key.last_used)}` : ''}
                             </div>
-                            <button class="btn btn-secondary btn-sm" onclick="revokeAPIKey('${escapeHTML(fullKey)}')" style="color: #dc2626; border-color: #fecaca;">
+                            <button class="btn btn-secondary btn-sm" onclick="revokeAPIKey('${escapeHTML(fullKey)}')" style="color: #dc2626; border-color: #fecaca; padding: 4px 10px; font-size: 11px;">
                                 Revoke
                             </button>
                         </div>
