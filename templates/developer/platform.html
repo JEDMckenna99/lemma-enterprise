@@ -683,7 +683,7 @@
 
 &lt;script&gt;
   const auth = new LemmaSignIn({
-    siteId: 'yoursite.com',
+    siteId: '<span id="code-site-id">YOUR_SITE_ID</span>',
     apiKey: '<span id="code-api-key">YOUR_API_KEY</span>',
     onSignIn: (user) => {
       console.log('User signed in:', user.email);
@@ -1432,6 +1432,7 @@
                 const siteInfo = key.site_id ? siteMap[key.site_id] : null;
                 const siteLabel = siteInfo?.site_label || siteInfo?.site_domain || 'Unassigned';
                 const siteDomain = siteInfo?.site_domain || key.site_id || '';
+                const siteId = key.site_id || '';
                 const statusValue = key.status || 'active';
                 const statusLabel = statusValue.charAt(0).toUpperCase() + statusValue.slice(1);
                 const environment = siteInfo?.environment || 'production';
@@ -1454,7 +1455,9 @@
                             </div>
                         </div>
                         
-                        <div style="background: #f9fafb; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
+                        <!-- API Key -->
+                        <div style="background: #f9fafb; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">
+                            <div style="font-size: 10px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">API Key</div>
                             <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
                                 <code style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 12px; color: #374151; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis;">${escapeHTML(maskedKey)}</code>
                                 <button class="btn btn-secondary btn-sm" onclick="copyAPIKey('${escapeHTML(fullKey)}')" style="white-space: nowrap; padding: 6px 10px; font-size: 12px;">
@@ -1466,6 +1469,23 @@
                                 </button>
                             </div>
                         </div>
+                        
+                        <!-- Site ID -->
+                        ${siteId ? `
+                        <div style="background: #f9fafb; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
+                            <div style="font-size: 10px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Site ID</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                                <code style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 12px; color: #374151; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis;">${escapeHTML(siteId)}</code>
+                                <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${escapeHTML(siteId)}', 'Site ID')" style="white-space: nowrap; padding: 6px 10px; font-size: 12px;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+                        ` : ''}
                         
                         ${siteDomain ? `
                         <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 12px; color: #6b7280;">
@@ -1491,11 +1511,20 @@
                 `;
             }).join('');
             
-            // Update the Quick Integration code block with the first API key
-            if (apiKeys.length > 0 && apiKeys[0].key) {
-                const codeApiKeySpan = document.getElementById('code-api-key');
-                if (codeApiKeySpan) {
-                    codeApiKeySpan.textContent = apiKeys[0].key;
+            // Update the Quick Integration code block with the first API key and Site ID
+            if (apiKeys.length > 0) {
+                const firstKey = apiKeys[0];
+                if (firstKey.key) {
+                    const codeApiKeySpan = document.getElementById('code-api-key');
+                    if (codeApiKeySpan) {
+                        codeApiKeySpan.textContent = firstKey.key;
+                    }
+                }
+                if (firstKey.site_id) {
+                    const codeSiteIdSpan = document.getElementById('code-site-id');
+                    if (codeSiteIdSpan) {
+                        codeSiteIdSpan.textContent = firstKey.site_id;
+                    }
                 }
             }
         }
@@ -1743,21 +1772,24 @@
         }
         
         async function copyAPIKey(apiKey) {
+            await copyToClipboard(apiKey, 'API key');
+        }
+        
+        async function copyToClipboard(text, label = 'Text') {
             try {
-                await navigator.clipboard.writeText(apiKey);
-                // Show a toast notification instead of alert
-                showToast('API key copied to clipboard');
+                await navigator.clipboard.writeText(text);
+                showToast(`${label} copied to clipboard`);
             } catch (error) {
                 // Fallback for older browsers
                 const textArea = document.createElement('textarea');
-                textArea.value = apiKey;
+                textArea.value = text;
                 textArea.style.position = 'fixed';
                 textArea.style.left = '-9999px';
                 document.body.appendChild(textArea);
                 textArea.select();
                 try {
                     document.execCommand('copy');
-                    showToast('API key copied to clipboard');
+                    showToast(`${label} copied to clipboard`);
                 } catch (e) {
                     showToast('Failed to copy. Please copy manually.', 'error');
                 }
