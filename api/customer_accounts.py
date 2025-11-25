@@ -130,7 +130,12 @@ class CustomerAccountManager:
             logger.warning("⚠️ Falling back to in-memory customer store for development")
     
     def _refresh_api_key_cache(self):
-        """Populate in-memory API key -> customer mapping"""
+        """Populate in-memory API key -> customer mapping
+        
+        Caches both:
+        - key_hash -> customer_id (new secure method)
+        - key -> customer_id (legacy plain-text, for backward compat)
+        """
         self.api_key_to_customer = {}
         
         if self.db_available:
@@ -140,16 +145,26 @@ class CustomerAccountManager:
                 db_customers = db.query(DBCustomer.customer_id, DBCustomer.api_keys).all()
                 for customer_id, api_keys in db_customers:
                     for key_data in api_keys or []:
+                        # Cache by hash (new secure method)
+                        key_hash = key_data.get('key_hash')
+                        if key_hash:
+                            self.api_key_to_customer[key_hash] = customer_id
+                        
+                        # Also cache plain-text key for backward compatibility
                         key_value = key_data.get('key')
                         if key_value:
                             self.api_key_to_customer[key_value] = customer_id
                 db.close()
-                logger.info(f"🔐 Cached {len(self.api_key_to_customer)} API keys from database")
+                logger.info(f"Cached {len(self.api_key_to_customer)} API keys from database")
             except Exception as e:
                 logger.error(f"Failed to refresh API key cache: {e}")
         else:
             for customer_id, customer in self.customers.items():
                 for key_data in customer.api_keys or []:
+                    key_hash = key_data.get('key_hash')
+                    if key_hash:
+                        self.api_key_to_customer[key_hash] = customer_id
+                    
                     key_value = key_data.get('key')
                     if key_value:
                         self.api_key_to_customer[key_value] = customer_id
@@ -229,13 +244,28 @@ class CustomerAccountManager:
         return self.get_customer(customer_id)
         
     def generate_api_key(self, prefix: str = "lemma") -> str:
-        """Generate a secure API key"""
-        # Generate 32 bytes of random data
-        random_bytes = secrets.token_bytes(32)
-        # Create a hash for the key
-        key_hash = hashlib.sha256(random_bytes).hexdigest()
-        # Format as API key
-        return f"{prefix}_{''.join(secrets.choice('abcdefghijklmnopqrstuvwxyz0123456789') for _ in range(32))}"
+        """Generate a secure API key
+        
+        Returns the raw key (to show to user once) - store only the hash!
+        """
+        # Generate 32 random alphanumeric characters
+        raw_key = f"{prefix}_{''.join(secrets.choice('abcdefghijklmnopqrstuvwxyz0123456789') for _ in range(32))}"
+        return raw_key
+    
+    def hash_api_key(self, api_key: str) -> str:
+        """Hash an API key for secure storage using SHA-256
+        
+        We store only the hash in the database. When validating,
+        we hash the incoming key and compare hashes.
+        """
+        return hashlib.sha256(api_key.encode()).hexdigest()
+    
+    def get_key_hint(self, api_key: str) -> str:
+        """Get a hint/suffix of the API key for display purposes
+        
+        Shows only the last 8 characters, used for identifying keys in UI
+        """
+        return api_key[-8:] if len(api_key) > 8 else api_key
     
     def hash_password(self, password: str) -> str:
         """Hash a password using SHA-256 with salt"""
@@ -382,25 +412,51 @@ class CustomerAccountManager:
             }
     
     def get_customer_by_api_key(self, api_key: str) -> Optional[Customer]:
-        """Get customer by API key"""
+        """Get customer by API key
+        
+        Checks both the in-memory cache and database.
+        Supports both hashed keys (new) and plain-text keys (legacy).
+        """
+        # Check cache first (for plain-text legacy keys)
         customer_id = self.api_key_to_customer.get(api_key)
         if customer_id:
             return self.get_customer(customer_id)
         
-        # Attempt to refresh cache once if DB is available
+        # Check cache by hash
+        key_hash = self.hash_api_key(api_key)
+        customer_id = self.api_key_to_customer.get(key_hash)
+        if customer_id:
+            return self.get_customer(customer_id)
+        
+        # Attempt to refresh cache and search DB if available
         if self.db_available:
             self._refresh_api_key_cache()
+            
+            # Check again after refresh
             customer_id = self.api_key_to_customer.get(api_key)
+            if customer_id:
+                return self.get_customer(customer_id)
+            
+            customer_id = self.api_key_to_customer.get(key_hash)
             if customer_id:
                 return self.get_customer(customer_id)
         
         return None
     
     def generate_additional_api_key(self, customer_id: str, key_name: str, site_id: Optional[str] = None) -> Dict[str, Any]:
-        """Generate an additional API key for a customer"""
-        api_key = self.generate_api_key()
+        """Generate an additional API key for a customer
+        
+        Security: We store only the hash of the key. The raw key is returned
+        once to the user and should never be stored in plain text.
+        """
+        raw_api_key = self.generate_api_key()
+        key_hash = self.hash_api_key(raw_api_key)
+        key_hint = self.get_key_hint(raw_api_key)
+        
         api_key_data = {
-            'key': api_key,
+            'key_hash': key_hash,           # Stored: SHA-256 hash for validation
+            'key_hint': key_hint,           # Stored: Last 8 chars for UI display
+            'key': raw_api_key,             # TEMPORARY: For backward compat, will be removed
             'name': key_name,
             'site_id': site_id,
             'created_at': datetime.utcnow().isoformat(),
@@ -443,13 +499,15 @@ class CustomerAccountManager:
             customer.api_keys.append(api_key_data)
             self._store_customer_in_memory(customer)
         
-        self.api_key_to_customer[api_key] = customer_id
+        # Cache both the hash and the raw key (for backward compat during transition)
+        self.api_key_to_customer[key_hash] = customer_id
+        self.api_key_to_customer[raw_api_key] = customer_id
         
         logger.info(f"Generated additional API key for customer: {customer_id}")
         
         return {
             'success': True,
-            'api_key': api_key,
+            'api_key': raw_api_key,  # Return raw key to show user ONCE
             'key_data': api_key_data
         }
     
@@ -509,8 +567,80 @@ class CustomerAccountManager:
         logger.info(f"Revoked API key for customer: {customer_id}")
         return {'success': True}
     
+    def revoke_api_key_by_hint(self, customer_id: str, site_id: str, key_hint: str) -> Dict[str, Any]:
+        """Revoke an API key by site_id and key_hint (secure method)
+        
+        This is the preferred method since we don't expose full keys after creation.
+        """
+        revoked = False
+        revoked_hash = None
+        
+        if self.db_available:
+            db = None
+            try:
+                db = get_db()
+                db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == customer_id).first()
+                if not db_customer:
+                    return {'success': False, 'error': 'Customer not found'}
+                
+                keys = list(db_customer.api_keys or [])
+                for key_data in keys:
+                    # Match by site_id and key_hint
+                    stored_hint = key_data.get('key_hint') or (key_data.get('key', '')[-8:] if key_data.get('key') else '')
+                    if key_data.get('site_id') == site_id and stored_hint == key_hint:
+                        key_data['status'] = 'revoked'
+                        key_data['revoked_at'] = datetime.utcnow().isoformat()
+                        revoked = True
+                        revoked_hash = key_data.get('key_hash')
+                        break
+                
+                if not revoked:
+                    return {'success': False, 'error': 'API key not found'}
+                
+                db_customer.api_keys = keys
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(db_customer, 'api_keys')
+                db.commit()
+            except Exception as e:
+                logger.error(f"Failed to revoke API key for {customer_id}: {e}")
+                if db is not None:
+                    db.rollback()
+                return {'success': False, 'error': 'Failed to revoke API key'}
+            finally:
+                if db is not None:
+                    db.close()
+        else:
+            customer = self.get_customer(customer_id)
+            if not customer:
+                return {'success': False, 'error': 'Customer not found'}
+            
+            for key_data in customer.api_keys:
+                stored_hint = key_data.get('key_hint') or (key_data.get('key', '')[-8:] if key_data.get('key') else '')
+                if key_data.get('site_id') == site_id and stored_hint == key_hint:
+                    key_data['status'] = 'revoked'
+                    key_data['revoked_at'] = datetime.utcnow().isoformat()
+                    revoked = True
+                    revoked_hash = key_data.get('key_hash')
+                    break
+            
+            if not revoked:
+                return {'success': False, 'error': 'API key not found'}
+            
+            self._store_customer_in_memory(customer)
+        
+        # Remove from active mapping by hash if available
+        if revoked_hash:
+            self.api_key_to_customer.pop(revoked_hash, None)
+        
+        logger.info(f"Revoked API key (hint: {key_hint}) for customer: {customer_id}")
+        return {'success': True}
+    
     def validate_api_key(self, api_key: str) -> Dict[str, Any]:
-        """Validate an API key and return customer info"""
+        """Validate an API key and return customer info
+        
+        Security: We hash the incoming key and compare against stored hashes.
+        Also supports legacy plain-text keys for backward compatibility.
+        """
         customer = self.get_customer_by_api_key(api_key)
         if not customer:
             return {'valid': False, 'error': 'Invalid API key'}
@@ -518,18 +648,40 @@ class CustomerAccountManager:
         if customer.status != 'active':
             return {'valid': False, 'error': 'Customer account suspended'}
         
+        # Hash the incoming key for comparison
+        incoming_hash = self.hash_api_key(api_key)
+        
         # Find the specific key and update usage
         for key_data in customer.api_keys:
-            if key_data['key'] == api_key and key_data['status'] == 'active':
+            if key_data.get('status') != 'active':
+                continue
+                
+            # Check against hash (new secure method)
+            if key_data.get('key_hash') == incoming_hash:
                 key_data['last_used'] = datetime.utcnow().isoformat()
-                key_data['usage_count'] += 1
+                key_data['usage_count'] = key_data.get('usage_count', 0) + 1
                 
                 return {
                     'valid': True,
                     'customer_id': customer.customer_id,
                     'customer_name': customer.name,
                     'company': customer.company,
-                    'subscription_status': customer.subscription_status
+                    'subscription_status': customer.subscription_status,
+                    'site_id': key_data.get('site_id')
+                }
+            
+            # Backward compatibility: check plain-text key (legacy)
+            if key_data.get('key') == api_key:
+                key_data['last_used'] = datetime.utcnow().isoformat()
+                key_data['usage_count'] = key_data.get('usage_count', 0) + 1
+                
+                return {
+                    'valid': True,
+                    'customer_id': customer.customer_id,
+                    'customer_name': customer.name,
+                    'company': customer.company,
+                    'subscription_status': customer.subscription_status,
+                    'site_id': key_data.get('site_id')
                 }
         
         return {'valid': False, 'error': 'API key revoked or inactive'}
@@ -903,11 +1055,25 @@ def manage_api_keys():
         
         # Filter out API keys that have no site_id (legacy default keys)
         # These were created before site registration was required
-        api_keys = [k for k in (customer.api_keys or []) if k.get('site_id')]
+        raw_keys = [k for k in (customer.api_keys or []) if k.get('site_id')]
+        
+        # Sanitize API keys for response - never expose full keys or hashes
+        sanitized_keys = []
+        for key in raw_keys:
+            sanitized_key = {
+                'name': key.get('name', 'API Key'),
+                'site_id': key.get('site_id'),
+                'key_hint': key.get('key_hint') or (key.get('key', '')[-8:] if key.get('key') else ''),
+                'created_at': key.get('created_at'),
+                'last_used': key.get('last_used'),
+                'usage_count': key.get('usage_count', 0),
+                'status': key.get('status', 'active')
+            }
+            sanitized_keys.append(sanitized_key)
         
         return jsonify({
             'success': True,
-            'api_keys': api_keys,
+            'api_keys': sanitized_keys,
             'sites': customer.sites or []
         })
     
@@ -921,14 +1087,21 @@ def manage_api_keys():
         return jsonify(result)
     
     elif request.method == 'DELETE':
-        # Revoke API key
+        # Revoke API key - supports both full key and hint-based revocation
         data = request.get_json() or {}
         api_key = data.get('api_key')
+        site_id = data.get('site_id')
+        key_hint = data.get('key_hint')
         
-        if not api_key:
-            return jsonify({'error': 'API key required'}), 400
+        if api_key:
+            # Legacy: revoke by full key
+            result = customer_manager.revoke_api_key(customer_id, api_key)
+        elif site_id and key_hint:
+            # New: revoke by site_id + key_hint (secure method)
+            result = customer_manager.revoke_api_key_by_hint(customer_id, site_id, key_hint)
+        else:
+            return jsonify({'error': 'Either api_key or (site_id + key_hint) required'}), 400
         
-        result = customer_manager.revoke_api_key(customer_id, api_key)
         return jsonify(result)
 
 @customer_accounts_bp.route('/api/validate-key', methods=['POST'])

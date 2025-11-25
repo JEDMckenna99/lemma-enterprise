@@ -1438,9 +1438,10 @@
                 const environment = siteInfo?.environment || 'production';
                 const isLast = index === apiKeys.length - 1;
                 
-                // Mask API key - show only last 8 characters
-                const maskedKey = key.key ? `lemma_${'•'.repeat(24)}${key.key.slice(-8)}` : '—';
-                const fullKey = key.key || '';
+                // Display masked key using the hint (last 8 chars stored securely on server)
+                const keyHint = key.key_hint || (key.key ? key.key.slice(-8) : '');
+                const maskedKey = keyHint ? `lemma_${'•'.repeat(24)}${keyHint}` : '—';
+                // Note: Full key is only available at creation time, not stored
                 
                 return `
                     <div class="api-key-item" style="padding: 16px 0; ${!isLast ? 'border-bottom: 1px solid #f3f4f6;' : ''}">
@@ -1460,13 +1461,13 @@
                             <div style="font-size: 10px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">API Key</div>
                             <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
                                 <code style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 12px; color: #374151; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis;">${escapeHTML(maskedKey)}</code>
-                                <button class="btn btn-secondary btn-sm" onclick="copyAPIKey('${escapeHTML(fullKey)}')" style="white-space: nowrap; padding: 6px 10px; font-size: 12px;">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
-                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                <span style="font-size: 11px; color: #9ca3af; white-space: nowrap;" title="For security, the full API key is only shown once when created">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 2px;">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                     </svg>
-                                    Copy
-                                </button>
+                                    Secured
+                                </span>
                             </div>
                         </div>
                         
@@ -1503,7 +1504,7 @@
                                 Created ${formatDate(key.created_at)}
                                 ${key.last_used ? ` &bull; Last used ${formatDate(key.last_used)}` : ''}
                             </div>
-                            <button class="btn btn-secondary btn-sm" onclick="revokeAPIKey('${escapeHTML(fullKey)}')" style="color: #dc2626; border-color: #fecaca; padding: 4px 10px; font-size: 11px;">
+                            <button class="btn btn-secondary btn-sm" onclick="revokeAPIKeyByHint('${escapeHTML(siteId)}', '${escapeHTML(keyHint)}')" style="color: #dc2626; border-color: #fecaca; padding: 4px 10px; font-size: 11px;">
                                 Revoke
                             </button>
                         </div>
@@ -1840,6 +1841,34 @@
                         ...getLemmaAuthHeaders()
                     },
                     body: JSON.stringify({ api_key: apiKey })
+                });
+                
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'Failed to revoke API key');
+                }
+                
+                showToast('API key revoked successfully');
+                loadAPIKeysData(false);
+            } catch (error) {
+                console.error('Failed to revoke API key:', error);
+                showToast(error.message || 'Failed to revoke API key', 'error');
+            }
+        }
+        
+        async function revokeAPIKeyByHint(siteId, keyHint) {
+            if (!confirm('Revoke this API key? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/customer/api-keys', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
+                    body: JSON.stringify({ site_id: siteId, key_hint: keyHint })
                 });
                 
                 const result = await response.json();
