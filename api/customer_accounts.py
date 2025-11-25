@@ -67,7 +67,8 @@ def _extract_customer_id_from_request() -> Optional[str]:
                     email=email,
                     name=email.split('@')[0],
                     company=site_id,
-                    password=None  # No password - IAM-only access
+                    password=None,  # No password - IAM-only access
+                    skip_default_api_key=True  # Don't create default key - user should register site first
                 )
                 if result.get('success'):
                     return result.get('customer_id')
@@ -252,8 +253,14 @@ class CustomerAccountManager:
             return False
     
     def create_customer(self, email: str, name: str, company: str, 
-                       billing_email: Optional[str] = None, password: Optional[str] = None) -> Dict[str, Any]:
-        """Create a new customer account"""
+                       billing_email: Optional[str] = None, password: Optional[str] = None,
+                       skip_default_api_key: bool = False) -> Dict[str, Any]:
+        """Create a new customer account
+        
+        Args:
+            skip_default_api_key: If True, don't create a default API key.
+                                  Used for IAM-based access where users should register a site first.
+        """
         try:
             # Check if customer already exists
             existing_customer = self.get_customer_by_email(email)
@@ -276,17 +283,21 @@ class CustomerAccountManager:
                 }
             )
             
-            # Generate initial API key
-            api_key = self.generate_api_key()
-            api_key_data = {
-                'key': api_key,
-                'name': 'Default API Key',
-                'site_id': None,
-                'created_at': datetime.utcnow().isoformat(),
-                'last_used': None,
-                'usage_count': 0,
-                'status': 'active'
-            }
+            # Generate initial API key (unless skipped for IAM-based accounts)
+            api_keys_list = []
+            api_key = None
+            if not skip_default_api_key:
+                api_key = self.generate_api_key()
+                api_key_data = {
+                    'key': api_key,
+                    'name': 'Default API Key',
+                    'site_id': None,
+                    'created_at': datetime.utcnow().isoformat(),
+                    'last_used': None,
+                    'usage_count': 0,
+                    'status': 'active'
+                }
+                api_keys_list = [api_key_data]
             
             # Hash password if provided
             password_hash = None
@@ -300,7 +311,7 @@ class CustomerAccountManager:
                 name=name,
                 company=company,
                 stripe_customer_id=stripe_customer.id,
-                api_keys=[api_key_data],
+                api_keys=api_keys_list,
                 sites=[],
                 created_at=datetime.utcnow(),
                 status='active',
@@ -320,7 +331,7 @@ class CustomerAccountManager:
                     name=name,
                     company=company,
                     stripe_customer_id=stripe_customer.id,
-                    api_keys=[api_key_data],
+                    api_keys=api_keys_list,
                     sites=[],
                     created_at=datetime.utcnow(),
                     status='active',
@@ -342,7 +353,9 @@ class CustomerAccountManager:
                     db.close()
                 raise e
             
-            self.api_key_to_customer[api_key] = customer_id
+            # Map API key to customer if one was created
+            if api_key:
+                self.api_key_to_customer[api_key] = customer_id
             self._store_customer_in_memory(customer)
             
             logger.info(f"Created customer account: {customer_id} ({email})")
@@ -881,9 +894,13 @@ def manage_api_keys():
         if not customer:
             return jsonify({'error': 'Customer not found'}), 404
         
+        # Filter out API keys that have no site_id (legacy default keys)
+        # These were created before site registration was required
+        api_keys = [k for k in (customer.api_keys or []) if k.get('site_id')]
+        
         return jsonify({
             'success': True,
-            'api_keys': customer.api_keys,
+            'api_keys': api_keys,
             'sites': customer.sites or []
         })
     
