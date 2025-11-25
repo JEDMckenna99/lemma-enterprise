@@ -1504,9 +1504,20 @@
                                 Created ${formatDate(key.created_at)}
                                 ${key.last_used ? ` &bull; Last used ${formatDate(key.last_used)}` : ''}
                             </div>
-                            <button class="btn btn-secondary btn-sm" onclick="revokeAPIKeyByHint('${escapeHTML(siteId)}', '${escapeHTML(keyHint)}')" style="color: #dc2626; border-color: #fecaca; padding: 4px 10px; font-size: 11px;">
-                                Revoke
-                            </button>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn btn-secondary btn-sm" onclick="rotateAPIKey('${escapeHTML(siteId)}', '${escapeHTML(keyHint)}')" style="color: #2563eb; border-color: #bfdbfe; padding: 4px 10px; font-size: 11px;" title="Generate a new key and revoke this one">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 2px;">
+                                        <path d="M21 2v6h-6"></path>
+                                        <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                                        <path d="M3 22v-6h6"></path>
+                                        <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                                    </svg>
+                                    Rotate
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="revokeAPIKeyByHint('${escapeHTML(siteId)}', '${escapeHTML(keyHint)}')" style="color: #dc2626; border-color: #fecaca; padding: 4px 10px; font-size: 11px;">
+                                    Revoke
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1881,6 +1892,53 @@
             } catch (error) {
                 console.error('Failed to revoke API key:', error);
                 showToast(error.message || 'Failed to revoke API key', 'error');
+            }
+        }
+        
+        async function rotateAPIKey(siteId, keyHint) {
+            if (!confirm('Rotate this API key?\n\nThis will:\n1. Generate a new API key\n2. Revoke the current key\n\nMake sure to update your application with the new key immediately.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/customer/api-keys/rotate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
+                    body: JSON.stringify({ site_id: siteId, key_hint: keyHint })
+                });
+                
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'Failed to rotate API key');
+                }
+                
+                // Show the new key in the success modal
+                const newKey = result.new_api_key;
+                const keyData = result.new_key_data || {};
+                
+                // Update the success modal with the new rotated key
+                const modalContent = document.getElementById('api-key-success-modal');
+                if (modalContent) {
+                    document.getElementById('generated-api-key').textContent = newKey;
+                    document.getElementById('generated-site-id').textContent = siteId;
+                    
+                    // Update copy button
+                    const copyBtn = modalContent.querySelector('button[onclick*="copyGeneratedKey"]');
+                    if (copyBtn) {
+                        copyBtn.onclick = () => copyGeneratedKey(newKey);
+                    }
+                    
+                    modalContent.style.display = 'flex';
+                }
+                
+                showToast('API key rotated successfully. Old key has been revoked.');
+                loadAPIKeysData(false);
+            } catch (error) {
+                console.error('Failed to rotate API key:', error);
+                showToast(error.message || 'Failed to rotate API key', 'error');
             }
         }
         

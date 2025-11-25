@@ -9,9 +9,12 @@ import secrets
 import hashlib
 import logging
 import json
+import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict, field
+from collections import defaultdict
+from threading import Lock
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
 from flask_cors import cross_origin
 import stripe
@@ -25,6 +28,108 @@ logger = logging.getLogger(__name__)
 
 # Create blueprint
 customer_accounts_bp = Blueprint('customer_accounts', __name__)
+
+
+# =============================================================================
+# RATE LIMITING FOR API KEY VALIDATION
+# =============================================================================
+
+class RateLimiter:
+    """
+    In-memory rate limiter for API key validation attempts.
+    Prevents brute-force attacks on API keys.
+    
+    Configuration:
+    - MAX_ATTEMPTS: Maximum validation attempts per window
+    - WINDOW_SECONDS: Time window for rate limiting
+    - LOCKOUT_SECONDS: How long to lock out after exceeding limit
+    """
+    
+    MAX_ATTEMPTS = 100       # Max attempts per IP per window
+    WINDOW_SECONDS = 60      # 1 minute window
+    LOCKOUT_SECONDS = 300    # 5 minute lockout after exceeding limit
+    
+    # Stricter limits for failed attempts (potential attacks)
+    MAX_FAILED_ATTEMPTS = 10  # Max failed attempts before lockout
+    FAILED_WINDOW_SECONDS = 60
+    
+    def __init__(self):
+        self._attempts: Dict[str, List[float]] = defaultdict(list)
+        self._failed_attempts: Dict[str, List[float]] = defaultdict(list)
+        self._lockouts: Dict[str, float] = {}
+        self._lock = Lock()
+    
+    def _cleanup_old_entries(self, key: str, window: float):
+        """Remove entries older than the window"""
+        now = time.time()
+        cutoff = now - window
+        
+        if key in self._attempts:
+            self._attempts[key] = [t for t in self._attempts[key] if t > cutoff]
+        if key in self._failed_attempts:
+            self._failed_attempts[key] = [t for t in self._failed_attempts[key] if t > cutoff]
+    
+    def is_rate_limited(self, identifier: str) -> tuple[bool, Optional[str]]:
+        """
+        Check if an identifier (IP address) is rate limited.
+        
+        Returns:
+            (is_limited, reason) - True if limited, with explanation
+        """
+        with self._lock:
+            now = time.time()
+            
+            # Check if currently locked out
+            if identifier in self._lockouts:
+                lockout_until = self._lockouts[identifier]
+                if now < lockout_until:
+                    remaining = int(lockout_until - now)
+                    return True, f"Rate limited. Try again in {remaining} seconds."
+                else:
+                    # Lockout expired
+                    del self._lockouts[identifier]
+            
+            self._cleanup_old_entries(identifier, max(self.WINDOW_SECONDS, self.FAILED_WINDOW_SECONDS))
+            
+            # Check total attempts
+            if len(self._attempts.get(identifier, [])) >= self.MAX_ATTEMPTS:
+                self._lockouts[identifier] = now + self.LOCKOUT_SECONDS
+                logger.warning(f"Rate limit exceeded for {identifier} - locking out for {self.LOCKOUT_SECONDS}s")
+                return True, f"Too many requests. Try again in {self.LOCKOUT_SECONDS} seconds."
+            
+            # Check failed attempts (stricter)
+            if len(self._failed_attempts.get(identifier, [])) >= self.MAX_FAILED_ATTEMPTS:
+                self._lockouts[identifier] = now + self.LOCKOUT_SECONDS
+                logger.warning(f"Too many failed attempts for {identifier} - potential attack, locking out")
+                return True, f"Too many failed attempts. Try again in {self.LOCKOUT_SECONDS} seconds."
+            
+            return False, None
+    
+    def record_attempt(self, identifier: str, success: bool):
+        """Record a validation attempt"""
+        with self._lock:
+            now = time.time()
+            self._attempts[identifier].append(now)
+            
+            if not success:
+                self._failed_attempts[identifier].append(now)
+    
+    def get_stats(self, identifier: str) -> Dict[str, Any]:
+        """Get rate limit stats for an identifier"""
+        with self._lock:
+            self._cleanup_old_entries(identifier, max(self.WINDOW_SECONDS, self.FAILED_WINDOW_SECONDS))
+            
+            return {
+                'total_attempts': len(self._attempts.get(identifier, [])),
+                'failed_attempts': len(self._failed_attempts.get(identifier, [])),
+                'max_attempts': self.MAX_ATTEMPTS,
+                'max_failed': self.MAX_FAILED_ATTEMPTS,
+                'is_locked': identifier in self._lockouts
+            }
+
+
+# Global rate limiter instance
+api_key_rate_limiter = RateLimiter()
 
 
 def _extract_customer_id_from_request() -> Optional[str]:
@@ -635,6 +740,91 @@ class CustomerAccountManager:
         logger.info(f"Revoked API key (hint: {key_hint}) for customer: {customer_id}")
         return {'success': True}
     
+    def rotate_api_key(self, customer_id: str, site_id: str, key_hint: str) -> Dict[str, Any]:
+        """
+        Rotate an API key: generate a new key for the same site and revoke the old one.
+        
+        This is a secure way to replace a potentially compromised key without
+        losing the site association and configuration.
+        
+        Args:
+            customer_id: The customer who owns the key
+            site_id: The site the key is associated with
+            key_hint: The hint of the key to rotate (last 8 chars)
+        
+        Returns:
+            Dict with success status and new key details
+        """
+        # First, find the old key to get its name
+        old_key_name = None
+        old_key_found = False
+        
+        if self.db_available:
+            db = None
+            try:
+                db = get_db()
+                db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == customer_id).first()
+                if not db_customer:
+                    return {'success': False, 'error': 'Customer not found'}
+                
+                keys = list(db_customer.api_keys or [])
+                
+                # Find the old key
+                for key_data in keys:
+                    stored_hint = key_data.get('key_hint') or (key_data.get('key', '')[-8:] if key_data.get('key') else '')
+                    if key_data.get('site_id') == site_id and stored_hint == key_hint and key_data.get('status') == 'active':
+                        old_key_name = key_data.get('name', 'API Key')
+                        old_key_found = True
+                        break
+                
+                if not old_key_found:
+                    return {'success': False, 'error': 'Active API key not found for rotation'}
+                
+                db.close()
+            except Exception as e:
+                logger.error(f"Failed to find key for rotation: {e}")
+                if db is not None:
+                    db.close()
+                return {'success': False, 'error': 'Failed to rotate API key'}
+        else:
+            customer = self.get_customer(customer_id)
+            if not customer:
+                return {'success': False, 'error': 'Customer not found'}
+            
+            for key_data in customer.api_keys:
+                stored_hint = key_data.get('key_hint') or (key_data.get('key', '')[-8:] if key_data.get('key') else '')
+                if key_data.get('site_id') == site_id and stored_hint == key_hint and key_data.get('status') == 'active':
+                    old_key_name = key_data.get('name', 'API Key')
+                    old_key_found = True
+                    break
+            
+            if not old_key_found:
+                return {'success': False, 'error': 'Active API key not found for rotation'}
+        
+        # Generate the new key first (so we have it before revoking old one)
+        new_key_name = f"{old_key_name} (rotated {datetime.utcnow().strftime('%Y-%m-%d')})"
+        new_key_result = self.generate_additional_api_key(customer_id, new_key_name, site_id)
+        
+        if not new_key_result.get('success'):
+            return {'success': False, 'error': 'Failed to generate new key during rotation'}
+        
+        # Now revoke the old key
+        revoke_result = self.revoke_api_key_by_hint(customer_id, site_id, key_hint)
+        
+        if not revoke_result.get('success'):
+            # Log but don't fail - new key is already created
+            logger.warning(f"Failed to revoke old key during rotation for {customer_id}, site {site_id}")
+        
+        logger.info(f"Rotated API key for customer {customer_id}, site {site_id}")
+        
+        return {
+            'success': True,
+            'message': 'API key rotated successfully. The old key has been revoked.',
+            'new_api_key': new_key_result.get('api_key'),
+            'new_key_data': new_key_result.get('key_data'),
+            'old_key_revoked': revoke_result.get('success', False)
+        }
+    
     def validate_api_key(self, api_key: str) -> Dict[str, Any]:
         """Validate an API key and return customer info
         
@@ -1104,9 +1294,64 @@ def manage_api_keys():
         
         return jsonify(result)
 
+@customer_accounts_bp.route('/api/customer/api-keys/rotate', methods=['POST'])
+@cross_origin()
+def rotate_api_key():
+    """
+    Rotate an API key: generate a new key and revoke the old one.
+    
+    This is useful when:
+    - A key may have been compromised
+    - Regular security rotation policy
+    - Team member with key access leaves
+    
+    Request body:
+        site_id: The site the key belongs to
+        key_hint: The hint (last 8 chars) of the key to rotate
+    
+    Returns:
+        New API key (shown only once) and confirmation
+    """
+    customer_id = _extract_customer_id_from_request()
+    if not customer_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    data = request.get_json() or {}
+    site_id = data.get('site_id')
+    key_hint = data.get('key_hint')
+    
+    if not site_id or not key_hint:
+        return jsonify({'error': 'site_id and key_hint are required'}), 400
+    
+    result = customer_manager.rotate_api_key(customer_id, site_id, key_hint)
+    
+    if result.get('success'):
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+
 @customer_accounts_bp.route('/api/validate-key', methods=['POST'])
 def validate_api_key():
-    """Validate an API key (for internal use)"""
+    """Validate an API key (for internal use)
+    
+    Rate limited to prevent brute-force attacks.
+    """
+    # Get client identifier for rate limiting (IP address)
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if client_ip and ',' in client_ip:
+        client_ip = client_ip.split(',')[0].strip()
+    
+    # Check rate limit
+    is_limited, reason = api_key_rate_limiter.is_rate_limited(client_ip)
+    if is_limited:
+        logger.warning(f"Rate limited API key validation from {client_ip}")
+        return jsonify({
+            'valid': False, 
+            'error': reason,
+            'rate_limited': True
+        }), 429
+    
     data = request.get_json()
     api_key = data.get('api_key')
     
@@ -1114,6 +1359,10 @@ def validate_api_key():
         return jsonify({'valid': False, 'error': 'API key required'}), 400
     
     result = customer_manager.validate_api_key(api_key)
+    
+    # Record the attempt for rate limiting
+    api_key_rate_limiter.record_attempt(client_ip, result.get('valid', False))
+    
     return jsonify(result)
 
 
