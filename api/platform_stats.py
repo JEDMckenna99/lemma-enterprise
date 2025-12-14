@@ -123,30 +123,114 @@ def get_platform_stats():
             conn.close()
 
 
-@platform_stats_bp.route('/api/platform/users', methods=['GET'])
+@platform_stats_bp.route('/api/platform/users', methods=['GET', 'POST'])
 def get_platform_users():
     """
-    Get all users with permissions for the platform
+    Get all users with permissions for the caller's site
+    
+    - Lemma.id admins see lemma_platform users
+    - Site owners see their own site's users
+    - Looks up site ownership via admin_email
+    
+    POST body (optional):
+    {
+        "user_credential": {...}  // Caller's credential to determine their site
+    }
     
     Returns:
         {
-            "users": [
-                {
-                    "email": str,
-                    "permission": str,
-                    "granted_at": str,
-                    "expires_at": str,
-                    "status": str
-                }
-            ]
+            "users": [...],
+            "site_id": "the_site_id",
+            "site_domain": "the domain"
         }
     """
     conn = None
     cursor = None
     try:
-        site_id = 'lemma_platform'
+        # Determine which site's users to show
+        site_id = 'lemma_platform'  # Default for admins
+        site_domain = 'lemma.id'
+        user_email = None
+        is_lemma_admin = False
         
-        # Get all user permissions for lemma_platform from permission_instances
+        # Get caller's credential to determine their site
+        if request.method == 'POST':
+            data = request.get_json() or {}
+            user_credential = data.get('user_credential')
+            if user_credential:
+                claims = user_credential.get('claims') or user_credential.get('credentialSubject') or {}
+                user_email = claims.get('email')
+                permission_id = claims.get('permissionId') or claims.get('permission_level') or ''
+                
+                # Check if this is a lemma.id admin
+                admin_permissions = ['admin_access', 'super_admin', 'site_admin', 'admin']
+                is_lemma_admin = permission_id in admin_permissions
+        else:
+            # GET request - try to get email from query param
+            user_email = request.args.get('email')
+        
+        # If not a lemma.id admin, look up their site(s)
+        if user_email and not is_lemma_admin:
+            try:
+                # Look up sites where this user is the admin
+                site_conn = get_db_connection()
+                site_cursor = site_conn.cursor()
+                
+                # Check sites table for admin_email match
+                site_cursor.execute("""
+                    SELECT site_id, site_domain, company_name 
+                    FROM sites 
+                    WHERE admin_email = %s
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (user_email,))
+                
+                site_result = site_cursor.fetchone()
+                
+                if site_result:
+                    site_id = site_result[0]
+                    site_domain = site_result[1]
+                    logger.info(f"📊 Showing users for site {site_id} (owner: {user_email})")
+                else:
+                    # Also check site_admins table
+                    site_cursor.execute("""
+                        SELECT site_id 
+                        FROM site_admins 
+                        WHERE admin_email = %s AND is_active = TRUE
+                        ORDER BY added_at DESC
+                        LIMIT 1
+                    """, (user_email,))
+                    
+                    admin_result = site_cursor.fetchone()
+                    if admin_result:
+                        site_id = admin_result[0]
+                        # Get site domain
+                        site_cursor.execute("SELECT site_domain FROM sites WHERE site_id = %s", (site_id,))
+                        domain_result = site_cursor.fetchone()
+                        if domain_result:
+                            site_domain = domain_result[0]
+                        logger.info(f"📊 Showing users for site {site_id} (admin: {user_email})")
+                    else:
+                        logger.info(f"📊 No site found for {user_email}, showing empty list")
+                        site_id = None  # No site, will return empty list
+                
+                site_cursor.close()
+                site_conn.close()
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Could not look up site for {user_email}: {e}")
+        
+        # Get users for the determined site
+        if not site_id:
+            return jsonify({
+                'success': True,
+                'users': [],
+                'total': 0,
+                'site_id': None,
+                'site_domain': None,
+                'message': 'No site registered. Register a site to see your users.'
+            })
+        
         conn = get_db_connection(site_id=site_id)
         cursor = conn.cursor()
         
@@ -197,12 +281,15 @@ def get_platform_users():
                 'credential_id': credential_id  # For revocation
             })
         
-        logger.info(f"📊 Retrieved {len(users)} users for {site_id}")
+        logger.info(f"📊 Retrieved {len(users)} users for {site_id} ({site_domain})")
         
         return jsonify({
             'success': True,
             'users': users,
-            'total': len(users)
+            'total': len(users),
+            'site_id': site_id,
+            'site_domain': site_domain,
+            'is_lemma_admin': is_lemma_admin
         })
         
     except Exception as e:

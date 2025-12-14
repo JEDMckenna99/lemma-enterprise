@@ -1303,17 +1303,48 @@
             });
         });
         
-        // Load users data
+        // Load users data (shows users for the caller's site)
         async function loadUsersData() {
             try {
-                console.log('👥 Fetching platform users...');
+                console.log('👥 Fetching users for your site...');
                 
-                const response = await fetch('/api/platform/users');
+                // Get user's credential to determine their site
+                let userCredential = null;
+                try {
+                    if (lemmaPlatformCredentialString) {
+                        userCredential = JSON.parse(lemmaPlatformCredentialString);
+                    }
+                } catch (e) {
+                    console.warn('Could not parse credential');
+                }
+                
+                // POST request with user credential to determine site
+                const response = await fetch('/api/platform/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_credential: userCredential
+                    })
+                });
                 const data = await response.json();
                 
-                if (data.success && data.users.length > 0) {
+                // Store current site context
+                window.currentSiteId = data.site_id;
+                window.currentSiteDomain = data.site_domain;
+                
+                // Show site context header
+                const siteContext = data.site_domain ? 
+                    `<div style="margin-bottom: 16px; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+                        <span style="font-size: 13px; color: #166534;">
+                            Showing users for: <strong>${data.site_domain}</strong>
+                            ${data.is_lemma_admin ? ' (Admin view)' : ''}
+                        </span>
+                    </div>` : '';
+                
+                if (data.success && data.users && data.users.length > 0) {
                     // Create users table
                     const tableHTML = `
+                        ${siteContext}
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -1349,18 +1380,28 @@
                     `;
                     
                     document.getElementById('users-table-container').innerHTML = tableHTML;
-                    console.log('✅ Loaded', data.users.length, 'users');
+                    console.log('✅ Loaded', data.users.length, 'users for', data.site_domain || 'platform');
                     
-                } else {
-                    // Empty state
+                } else if (data.message) {
+                    // No site registered yet
                     document.getElementById('users-table-container').innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🏢</div>
+                            <div>No Site Registered</div>
+                            <div style="font-size: 14px; margin-top: 8px;">${data.message}</div>
+                            <div style="font-size: 13px; margin-top: 16px; color: #6b7280;">
+                                Go to the <strong>API Keys</strong> section to register your first site.
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Empty state - site exists but no users
+                    document.getElementById('users-table-container').innerHTML = `
+                        ${siteContext}
                         <div class="empty-state">
                             <div class="empty-state-icon">👥</div>
                             <div>No users yet</div>
-                            <div style="font-size: 14px; margin-top: 8px;">Issue your first permission to get started</div>
-                            <button class="btn btn-primary" onclick="showIssuePermissionModal()" style="margin-top: 16px;">
-                                Issue Permission
-                            </button>
+                            <div style="font-size: 14px; margin-top: 8px;">Users will appear here when they authenticate via your site</div>
                         </div>
                     `;
                 }
