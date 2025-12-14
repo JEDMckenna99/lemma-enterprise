@@ -1153,11 +1153,19 @@
                 
                 console.log('✅ Access granted (credential verified, not revoked) -', userPermission);
                 
-                // Show admin section if any admin permission (beta users get full access during beta)
-                const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin', 'beta-user_access', 'beta_user'];
+                // Show admin section ONLY for actual admin permissions
+                // Beta users get platform access but NOT admin features (like revocation)
+                const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'];
                 const isAdmin = adminPermissions.includes(userPermission) || 
-                               userPermission.toLowerCase().includes('admin') ||
-                               userPermission.toLowerCase().includes('beta');
+                               (userPermission.toLowerCase().includes('admin') && 
+                                !userPermission.toLowerCase().includes('beta'));
+                
+                // Store admin status globally for permission checks
+                window.isLemmaAdmin = isAdmin;
+                
+                if (!isAdmin) {
+                    console.log('ℹ️ Beta user access - admin features disabled');
+                }
                 
                 if (isAdmin) {
                     const adminSection = document.getElementById('admin-section');
@@ -1326,11 +1334,13 @@
                                         <td style="font-size: 13px; color: #6b7280;">${user.time_ago}</td>
                                         <td style="font-size: 13px; color: #6b7280;">${user.expires_at}</td>
                                         <td>
-                                            ${user.status === 'active' ? `
-                                                <button class="btn btn-secondary btn-sm" onclick="showRevokeModal('${user.email}', '${user.credential_id || ''}')">
-                                                    Revoke
-                                                </button>
-                                            ` : '<span style="color: #9ca3af; font-size: 13px;">Revoked</span>'}
+                                            ${user.status === 'active' ? (
+                                                window.isLemmaAdmin ? `
+                                                    <button class="btn btn-secondary btn-sm" onclick="showRevokeModal('${user.email}', '${user.credential_id || ''}')">
+                                                        Revoke
+                                                    </button>
+                                                ` : '<span style="color: #9ca3af; font-size: 11px;">-</span>'
+                                            ) : '<span style="color: #9ca3af; font-size: 13px;">Revoked</span>'}
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -1748,6 +1758,11 @@
         }
         
         function showRevokeModal(email, credentialId) {
+            // Double-check admin permission
+            if (!window.isLemmaAdmin) {
+                alert('Permission Denied\n\nOnly administrators can revoke user permissions.');
+                return;
+            }
             document.getElementById('revoke-email').value = email;
             document.getElementById('revoke-credential-id').value = credentialId;
             document.getElementById('revoke-permission-modal').classList.add('show');
@@ -1758,18 +1773,34 @@
         }
         
         // Revoke permission
+        // Revoke permission (ADMIN ONLY - beta users cannot revoke)
         async function revokePermission(event) {
             event.preventDefault();
+            
+            // Check admin permission
+            if (!window.isLemmaAdmin) {
+                alert('Permission Denied\n\nOnly administrators can revoke user permissions.\nBeta users do not have revocation authority.');
+                return;
+            }
             
             const email = document.getElementById('revoke-email').value;
             const credentialId = document.getElementById('revoke-credential-id').value;
             const reason = document.getElementById('revoke-reason').value;
             
-            const confirmed = confirm(`Are you sure you want to revoke access for ${email}?\n\nThis will:\n• Update the Bloom filter\n• Sync to all clients\n• Cannot be undone`);
+            const confirmed = confirm(`Are you sure you want to revoke access for ${email}?\n\nThis will:\n- Update the Bloom filter\n- Sync to all clients\n- Cannot be undone`);
             
             if (!confirmed) return;
             
-            console.log('🚨 Revoking permission:', { email, credentialId, reason });
+            console.log('🚨 Admin revoking permission:', { email, credentialId, reason });
+            
+            // Get admin credential for authorization
+            let adminCredential = null;
+            try {
+                adminCredential = JSON.parse(lemmaPlatformCredentialString);
+            } catch (e) {
+                alert('Could not retrieve admin credential');
+                return;
+            }
             
             try {
                 const response = await fetch('/api/platform/revoke-permission', {
@@ -1778,7 +1809,8 @@
                     body: JSON.stringify({
                         email: email,
                         credential_id: credentialId,
-                        reason: reason
+                        reason: reason,
+                        admin_credential: adminCredential
                     })
                 });
                 

@@ -224,18 +224,23 @@ def revoke_platform_permission():
     """
     Revoke a user's permission from the platform
     
+    REQUIRES: Admin permission (admin_access, super_admin, site_admin)
+    Beta users CANNOT revoke permissions.
+    
     POST /api/platform/revoke-permission
     {
         "email": "user@example.com",
         "credential_id": "cred_xxx",
-        "reason": "User requested / Admin action"
+        "reason": "User requested / Admin action",
+        "admin_credential": {...}  // Admin's credential for authorization
     }
     
     This will:
-    1. Mark permission as revoked in database
-    2. Trigger Bloom filter update
-    3. Publish revocation event to all dynos via Redis pub/sub
-    4. Clients will sync on next page load or after 7 days
+    1. Verify admin has revocation authority
+    2. Mark permission as revoked in database
+    3. Trigger Bloom filter update
+    4. Publish revocation event to all dynos via Redis pub/sub
+    5. Clients will sync on next page load or after 7 days
     """
     conn = None
     cursor = None
@@ -244,6 +249,34 @@ def revoke_platform_permission():
         email = data.get('email')
         credential_id = data.get('credential_id')
         reason = data.get('reason', 'admin_action')
+        admin_credential = data.get('admin_credential')
+        
+        # CRITICAL: Verify caller has admin permission
+        admin_permissions = ['admin_access', 'super_admin', 'site_admin', 'admin', 'superadmin']
+        
+        if not admin_credential:
+            logger.warning(f"🚫 Revocation attempt without admin credential")
+            return jsonify({
+                'success': False,
+                'error': 'Admin credential required for revocation'
+            }), 403
+        
+        # Extract permission from admin credential
+        admin_claims = admin_credential.get('claims') or admin_credential.get('credentialSubject') or {}
+        admin_permission_id = admin_claims.get('permissionId') or admin_claims.get('permission_level') or ''
+        
+        # Check if this is an actual admin (NOT beta-user)
+        is_admin = admin_permission_id in admin_permissions or \
+                   admin_permission_id.lower() in ['admin', 'superadmin', 'super_admin']
+        
+        if not is_admin:
+            logger.warning(f"🚫 Non-admin ({admin_permission_id}) attempted to revoke credential for {email}")
+            return jsonify({
+                'success': False,
+                'error': 'Only administrators can revoke permissions. Beta users cannot revoke.'
+            }), 403
+        
+        logger.info(f"✅ Admin {admin_permission_id} authorized to revoke credential for {email}")
         
         if not email:
             return jsonify({
