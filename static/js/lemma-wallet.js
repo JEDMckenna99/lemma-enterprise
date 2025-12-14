@@ -1217,18 +1217,23 @@ class LemmaWallet {
 
     /**
      * Sync revocation lists from network (cached)
+     * @param {boolean} force - Force sync even if recently synced (for access checks)
      */
-    async syncRevocationLists() {
-        // Skip if sync in progress or too recent
+    async syncRevocationLists(force = false) {
+        // Skip if sync in progress or too recent (unless forced)
         const now = Date.now();
         const timeSinceLastSync = now - this.networkConfig.lastRevocationSync;
         const minSyncInterval = 5 * 60 * 1000; // 5 minutes minimum
         
-        if (timeSinceLastSync < minSyncInterval) {
+        if (!force && timeSinceLastSync < minSyncInterval) {
             return true; // Silent skip to reduce log spam
         }
         
         try {
+            if (force && this.debug) {
+                console.log('🔄 Forcing revocation list sync (access check)');
+            }
+            
             // Sync global Bloom filter (single request for all sites)
             // Privacy: OPRF blinding prevents sites from correlating revocations
             // Simplicity: One filter instead of N site-specific filters

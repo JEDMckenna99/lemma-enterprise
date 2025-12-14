@@ -1109,14 +1109,49 @@
                     return false;
                 }
                 
-                // Store permission level
+                // CRITICAL: Force sync revocation bloom filter FIRST (get latest revocations)
+                // Pass force=true to bypass the 5-minute cache
+                console.log('🔄 Force syncing revocation list before access check...');
+                try {
+                    await wallet.syncRevocationLists(true);  // Force sync
+                } catch (e) {
+                    console.warn('⚠️ Revocation sync failed, continuing with cached data:', e);
+                }
+                
+                // CRITICAL: Verify credential is NOT revoked (checks bloom filter)
                 const perm = lemmaPermissions[0];
+                console.log('🔐 Checking if credential is revoked:', perm.id);
+                
+                const isRevoked = await wallet.isCredentialRevoked(perm);
+                if (isRevoked) {
+                    console.log('🚫 Credential is REVOKED - denying access');
+                    
+                    // Remove the revoked credential from wallet
+                    await wallet.removeCredential(perm.id);
+                    
+                    // Show revoked message
+                    document.getElementById('loading-state').innerHTML = `
+                        <div style="text-align: center; padding: 60px 20px;">
+                            <div style="font-size: 64px; margin-bottom: 24px;">🚫</div>
+                            <h2>Access Revoked</h2>
+                            <p style="color: #6b7280; margin-bottom: 24px;">
+                                Your platform access has been revoked. Please contact support if you believe this is an error.
+                            </p>
+                            <button onclick="requestPlatformAccess()" class="btn btn-primary">
+                                Request New Access
+                            </button>
+                        </div>
+                    `;
+                    return false;
+                }
+                
+                // Store permission level
                 const claims = perm.claims || perm.credentialSubject || {};
                 userPermission = claims.permissionId || claims.permission_level || 'beta-user';
                 lemmaPlatformCredentialString = JSON.stringify(perm);
                 loadAPIKeysData(false);
                 
-                console.log('✅ Access granted -', userPermission);
+                console.log('✅ Access granted (credential verified, not revoked) -', userPermission);
                 
                 // Show admin section if any admin permission (beta users get full access during beta)
                 const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin', 'beta-user_access', 'beta_user'];
