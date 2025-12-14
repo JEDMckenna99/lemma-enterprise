@@ -251,11 +251,12 @@ class RevocationList(Base):
     __tablename__ = 'revocation_list'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lemma_id = Column(String, unique=True, nullable=False)  # Unique lemma identifier
-    lemma_type = Column(String, nullable=False)  # 'poh', 'permission'
+    lemma_id = Column(String, unique=True, nullable=False)  # Unique lemma identifier (primary)
+    credential_id = Column(String)  # Alias for lemma_id (backward compatibility)
+    lemma_type = Column(String, nullable=False, default='permission')  # 'poh', 'permission'
     site_id = Column(String)  # NULL for universal PoH revocations
-    user_did = Column(String, nullable=False)
-    revoked_by = Column(String, nullable=False)  # Who revoked it
+    user_did = Column(String)  # User DID (optional for some revocation types)
+    revoked_by = Column(String)  # Who revoked it
     revoked_at = Column(DateTime, default=datetime.utcnow)
     reason = Column(String)  # Reason for revocation
     bloom_filter_updated = Column(Boolean, default=False)  # For efficient offline checking

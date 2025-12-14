@@ -318,12 +318,32 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register OPRF Evaluation API: {e}")
 
+    # SSE Revocation Events API (real-time revocation notifications)
+    try:
+        from api.revocation_events import revocation_events_bp
+        app.register_blueprint(revocation_events_bp)
+        logger.info("✅ SSE Revocation Events API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register SSE Revocation Events API: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status
         logger.info("✅ Health Check system available")
     except Exception as e:
         logger.error(f"❌ Failed to initialize Health Check: {e}")
+
+    # Initialize Revocation Event Bus (Redis pub/sub listener)
+    # This must be done after all blueprints are registered
+    try:
+        from api.revocation_sync import get_event_bus, is_listening
+        event_bus = get_event_bus()
+        if is_listening():
+            logger.info("✅ Revocation Event Bus initialized (Redis pub/sub listener active)")
+        else:
+            logger.warning("⚠️ Revocation Event Bus initialized (local mode - Redis unavailable)")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not initialize Revocation Event Bus: {e}")
 
     # Session-free architecture: No server-side sessions needed!
     # Authentication is handled via client-side credential verification

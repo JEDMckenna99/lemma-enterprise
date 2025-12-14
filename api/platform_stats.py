@@ -6,7 +6,7 @@ Provides real-time stats for the developer platform
 import os
 import logging
 from datetime import datetime
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from sqlalchemy import func, and_, or_
 
 from api.database import get_db_connection
@@ -283,12 +283,14 @@ def revoke_platform_permission():
         logger.info(f"✅ Marked permission as revoked in database: {email}")
         
         # Add to revocation list table
+        # Note: Table has both lemma_id (unique, required) and credential_id (optional, for compatibility)
+        cred_id_value = credential_id or f'perm_{instance_id}'
         cursor.execute("""
             INSERT INTO revocation_list 
-            (credential_id, user_did, lemma_type, site_id, revoked_at, reason, bloom_filter_updated)
-            VALUES (%s, %s, 'permission', %s, NOW(), %s, FALSE)
-            ON CONFLICT (credential_id) DO UPDATE SET revoked_at = NOW()
-        """, (credential_id or f'perm_{instance_id}', user_did or f'user_{email}', site_id, reason))
+            (lemma_id, credential_id, user_did, lemma_type, site_id, revoked_at, reason, bloom_filter_updated)
+            VALUES (%s, %s, %s, 'permission', %s, NOW(), %s, FALSE)
+            ON CONFLICT (lemma_id) DO UPDATE SET revoked_at = NOW()
+        """, (cred_id_value, cred_id_value, user_did or f'user_{email}', site_id, reason))
         
         conn.commit()
         cursor.close()

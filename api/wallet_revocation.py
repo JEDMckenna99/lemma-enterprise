@@ -181,6 +181,7 @@ def await_site_revocation(credential_id: str, reason: str, site_domain: str = No
             # Create new revocation entry
             revocation = RevocationList(
                 lemma_id=credential_id,
+                credential_id=credential_id,  # Set both for backward compatibility
                 lemma_type='permission',
                 site_id=site_domain or 'unknown',
                 user_did='user_requested',  # Would extract from credential in production

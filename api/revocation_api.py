@@ -88,8 +88,9 @@ def get_bloom_filter():
             # 1. Wallet selective disclosure: Sites only receive credentials for their domain
             # 2. OPRF blinding: Credential IDs blinded before revocation check
             # 3. Zero-knowledge: Sites cannot correlate revocations to other sites
+            # Note: Table uses both 'credential_id' and 'lemma_id' columns for compatibility
             cursor.execute("""
-                SELECT credential_id 
+                SELECT COALESCE(credential_id, lemma_id) as credential_id
                 FROM revocation_list
             """)
             
