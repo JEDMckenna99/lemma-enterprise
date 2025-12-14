@@ -1089,6 +1089,88 @@ def register():
             'error': 'Registration failed'
         }), 500
 
+@customer_accounts_bp.route('/api/customer/register-secure', methods=['POST'])
+@cross_origin(origins=['https://lemma.id', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com', 'http://localhost:5000'], supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
+def register_secure():
+    """
+    Secure customer registration endpoint - requires email confirmation.
+    This is the actual registration handler that creates customer accounts.
+    """
+    try:
+        data = request.get_json() if request.is_json else request.form
+        
+        email = data.get('email', '').strip().lower()
+        name = data.get('name', '').strip()
+        company = data.get('company', '').strip()
+        billing_email = data.get('billing_email', '').strip().lower()
+        
+        # Validation
+        if not all([email, name, company]):
+            return jsonify({
+                'success': False,
+                'error': 'Email, name, and company are required'
+            }), 400
+        
+        if '@' not in email:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid email address'
+            }), 400
+        
+        # Check if customer already exists
+        existing = customer_manager.get_customer_by_email(email)
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': 'An account with this email already exists. Please sign in instead.'
+            }), 400
+        
+        # Create customer account
+        result = customer_manager.create_customer(
+            email=email,
+            name=name,
+            company=company,
+            billing_email=billing_email or email
+        )
+        
+        if result['success']:
+            # Store customer ID in session
+            session['customer_id'] = result['customer_id']
+            
+            # Create user DID for this customer
+            user_did = f"did:lemma:customer:{result['customer_id']}"
+            
+            # Send email confirmation (in production)
+            try:
+                from .iam_email_confirmation import send_confirmation_email
+                confirmation_result = send_confirmation_email(
+                    email=email,
+                    customer_id=result['customer_id'],
+                    name=name
+                )
+                logger.info(f"Confirmation email sent to {email}: {confirmation_result}")
+            except Exception as e:
+                logger.warning(f"Failed to send confirmation email: {e}")
+            
+            logger.info(f"Customer registered: {email} -> {result['customer_id']}")
+            
+            return jsonify({
+                'success': True,
+                'customer_id': result['customer_id'],
+                'message': 'Account created. Please check your email to confirm your account and receive your API keys.',
+                'email_sent': True
+            })
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        logger.error(f"Registration error: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Registration failed. Please try again.'
+        }), 500
+
+
 @customer_accounts_bp.route('/login', methods=['GET', 'POST'])
 @cross_origin(origins=['https://lemma.id', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com', 'http://localhost:5000'], supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
 def login():

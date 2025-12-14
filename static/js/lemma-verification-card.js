@@ -335,14 +335,14 @@ class LemmaVerificationCard {
         this.setupEventListeners();
         
         // Auto-verify if configured
-        if (this.config.autoVerify && !hasCredentials) {
+        if (this.config.autoVerify && !hasValidCredentials) {
             setTimeout(() => this.startVerification(), 1000);
         }
         
         this.state.initialized = true;
         
         if (this.config.debug) {
-            console.log('🎯 Verification card rendered', { hasCredentials, target: targetSelector });
+            console.log('🎯 Verification card rendered', { hasValidCredentials, target: targetSelector });
         }
     }
     
