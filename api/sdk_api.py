@@ -1093,15 +1093,31 @@ def trigger_security_check():
         total_passed = 0
         total_failed = 0
         
+        # Get global verifier for revocation checks (initialized with bloom filter)
+        try:
+            from api.permission_verification import get_global_verifier
+            verifier = get_global_verifier()
+        except Exception as e:
+            logger.warning(f"⚠️ Could not get verifier for revocation check: {e}")
+            verifier = None
+        
         for credential in credentials:
             try:
                 credential_id = credential.get('id', 'unknown')
                 
-                # Simulate fast local checks (would use real bloom filter in production)
+                # Real bloom filter check for revocation
                 check_start = time.perf_counter_ns()
                 
-                # Example check result (in production, would check against real bloom filter)
-                is_revoked = False  # Would check OPRF bloom filter
+                # Check revocation status via bloom filter
+                is_revoked = False
+                if verifier and credential_id != 'unknown':
+                    try:
+                        is_revoked = verifier.is_revoked(credential_id)
+                        if is_revoked:
+                            logger.warning(f"🚫 Credential {credential_id} is REVOKED (bloom filter)")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Revocation check failed for {credential_id}: {e}")
+                        
                 is_expired = credential.get('expires_at', 0) * 1000 < time.time() * 1000
                 
                 check_time_us = (time.perf_counter_ns() - check_start) / 1000

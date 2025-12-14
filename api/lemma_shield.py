@@ -226,6 +226,19 @@ def has_valid_lemma_credential(user_id: str = None) -> Dict[str, Any]:
             if expires_at > 0 and time.time() > expires_at:
                 continue  # Skip expired credentials
             
+            # CRITICAL: Check revocation status via bloom filter
+            credential_id = credential.get('id')
+            if credential_id:
+                try:
+                    from api.permission_verification import get_global_verifier
+                    verifier = get_global_verifier()
+                    if verifier and verifier.is_revoked(credential_id):
+                        logger.warning(f"🚫 Credential {credential_id} is REVOKED - skipping")
+                        continue  # Skip revoked credentials
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not check revocation for {credential_id}: {e}")
+                    # Continue with verification - don't block on revocation check failure
+            
             # Verify with Rust engine if available
             if RUST_ENGINE_AVAILABLE and rust_engine:
                 try:

@@ -153,6 +153,20 @@ class LemmaIAM {
         }
 
         try {
+            // CRITICAL: Check revocation status first
+            const permissionLemmas = userLemmas.permissionLemmas || [];
+            for (const lemma of permissionLemmas) {
+                if (lemma.id && await this.isCredentialRevoked(lemma.id)) {
+                    this.log(`Credential ${lemma.id} is REVOKED - denying access`);
+                    return {
+                        success: false,
+                        hasAccess: false,
+                        revoked: true,
+                        reason: 'credential_revoked'
+                    };
+                }
+            }
+            
             // Create access request
             const accessRequest = {
                 userDid: userLemmas.userDid,
@@ -166,7 +180,7 @@ class LemmaIAM {
             // Use WebAssembly for verification
             const verificationResult = this.lemmaWasm.verify_permission_access(
                 JSON.stringify(accessRequest),
-                JSON.stringify(userLemmas.permissionLemmas || [])
+                JSON.stringify(permissionLemmas)
             );
 
             return {
@@ -179,6 +193,63 @@ class LemmaIAM {
         } catch (error) {
             throw new Error(`Client-side verification failed: ${error.message}`);
         }
+    }
+    
+    /**
+     * Check if a credential is revoked using the bloom filter
+     * @param {string} credentialId - Credential ID to check
+     * @returns {Promise<boolean>} True if revoked
+     */
+    async isCredentialRevoked(credentialId) {
+        try {
+            // Check against cached bloom filter if available
+            if (this._bloomFilter && this._hashedRevocations) {
+                const hash = await this._hashCredentialId(credentialId);
+                return this._hashedRevocations.has(hash);
+            }
+            
+            // Sync bloom filter if not loaded
+            await this.syncRevocationList();
+            
+            if (this._hashedRevocations) {
+                const hash = await this._hashCredentialId(credentialId);
+                return this._hashedRevocations.has(hash);
+            }
+            
+            return false; // Fail-safe: don't block if can't check
+        } catch (error) {
+            this.log('Revocation check failed:', error);
+            return false;
+        }
+    }
+    
+    /**
+     * Sync the revocation bloom filter from server
+     */
+    async syncRevocationList() {
+        try {
+            const response = await fetch('/api/revocation/bloom-filter');
+            const data = await response.json();
+            
+            if (data.success && data.hashed_revoked_ids) {
+                this._hashedRevocations = new Set(data.hashed_revoked_ids);
+                this._bloomFilterVersion = data.version;
+                this.log(`Synced revocation list: ${data.count} revocations`);
+            }
+        } catch (error) {
+            this.log('Failed to sync revocation list:', error);
+        }
+    }
+    
+    /**
+     * Hash credential ID using SHA-256 (same as server)
+     */
+    async _hashCredentialId(credentialId) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(credentialId);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
     /**
