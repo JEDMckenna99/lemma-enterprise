@@ -450,7 +450,7 @@ def verify_access():
     POST /api/v1/auth/verify
     {
         "site_id": "site_123",
-        "user_did": "did:lemma:user456", 
+        "user_did": "did:lemma:ppid_...", 
         "resource": "/admin/users",
         "action": "read",
         "user_lemmas": [...] // User's permission lemmas from wallet

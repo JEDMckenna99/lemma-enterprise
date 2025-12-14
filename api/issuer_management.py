@@ -196,7 +196,12 @@ class LemmaIssuerManager:
         return self._issuers[issuer_key]
     
     def generate_deterministic_user_did(self, user_id: str) -> str:
-        """Generate deterministic user DID (not creating new issuer)"""
+        """
+        Generate deterministic user DID (legacy helper).
+
+        NOTE: This produces a stable identifier and is NOT pairwise.
+        Prefer PPID subjects (see `generate_ppid_did_from_email`) for cross-RP unlinkability.
+        """
         import hashlib
         
         # Create deterministic DID from user ID
@@ -205,6 +210,11 @@ class LemmaIssuerManager:
         # Format as proper DID (note: this is just identifier, not real public key)
         # In production, users would have their own real DIDs with private keys
         return f"did:lemma:user_{user_hash[:56]}"  # 64 chars total for DID format
+
+    def generate_ppid_did_from_email(self, email: str, rp_id: str) -> str:
+        """Generate pairwise subject DID for a user (PPID) from email + relying party id."""
+        from api.ppid import derive_ppid_did
+        return derive_ppid_did(email, rp_id)
 
 # Global issuer manager instance
 issuer_manager = LemmaIssuerManager()

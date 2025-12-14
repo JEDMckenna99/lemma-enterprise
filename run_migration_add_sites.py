@@ -41,3 +41,5 @@ if __name__ == '__main__':
     logger.info("✅ Done! Customers can now register sites via dashboard")
     logger.info("=" * 50)
 
+
+

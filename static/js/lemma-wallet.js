@@ -1077,12 +1077,38 @@ class LemmaWallet {
             
             // SHA-256 hash (one-way function, server cannot reverse)
             const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashBytes = new Uint8Array(hashBuffer);
             
             // Convert to hex string
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            
-            // Check against local Bloom filter (O(1) lookup, zero network calls)
+            const hashHex = Array.from(hashBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // Prefer compact Bloom membership check if available (bloom_v1, sha256_dh32le).
+            if (this.revocationBloomBits && this.revocationBloomMBits && this.revocationBloomK) {
+                const dv = new DataView(hashBuffer);
+                const h1 = dv.getUint32(0, true);
+                const h2raw = dv.getUint32(4, true);
+                const h2 = h2raw !== 0 ? h2raw : 0x5BD1E995;
+                const mBits = this.revocationBloomMBits;
+                const k = this.revocationBloomK;
+
+                let isRevoked = true;
+                for (let i = 0; i < k; i++) {
+                    const idx = (h1 + (i * h2)) % mBits;
+                    const byte = this.revocationBloomBits[idx >> 3];
+                    const bit = (byte >> (idx & 7)) & 1;
+                    if (bit === 0) {
+                        isRevoked = false;
+                        break;
+                    }
+                }
+
+                if (this.debug && isRevoked) {
+                    console.log(`⚠️ Credential ${credentialId} is REVOKED (Bloom match)`);
+                }
+                return isRevoked;
+            }
+
+            // Fallback: exact hashed-set membership (no false positives)
             const isRevoked = this.revocationBloomFilter.has(hashHex);
             
             if (this.debug && isRevoked) {
@@ -1229,12 +1255,30 @@ class LemmaWallet {
             
             if (cached) {
                 const data = JSON.parse(cached);
-                if (data && data.data && Array.isArray(data.data)) {
-                    this.revocationBloomFilter = new Set(data.data);
+                // Backwards-compatible: hashed revocation set (array of SHA-256 hex)
+                if (data && data.hashed_revoked_ids && Array.isArray(data.hashed_revoked_ids)) {
+                    this.revocationBloomFilter = new Set(data.hashed_revoked_ids);
                     
                     if (this.debug) {
                         console.log(`📦 Loaded cached global Bloom filter: ${this.revocationBloomFilter.size} SHA-256 hashes`);
                         console.log(`🔐 Privacy: Web Crypto API (server has hashes, not credential IDs)`);
+                    }
+                }
+
+                // Optional: load compact Bloom bitset (bloom_v1)
+                if (data && data.filter_bytes && data.bloom_filter && data.bloom_filter.format === 'bloom_v1') {
+                    try {
+                        const filterBytes = this._decodeBase64ToBytes(data.filter_bytes);
+                        this.revocationBloomBits = filterBytes;
+                        this.revocationBloomMBits = data.bloom_filter.m_bits;
+                        this.revocationBloomK = data.bloom_filter.k_hashes;
+                        if (this.debug) {
+                            console.log(`🧺 Loaded cached Bloom bitset: ${filterBytes.length} bytes`);
+                        }
+                    } catch (e) {
+                        if (this.debug) {
+                            console.warn(`⚠️ Failed to load cached Bloom bitset: ${e.message}`);
+                        }
                     }
                 }
             }
@@ -1255,33 +1299,62 @@ class LemmaWallet {
             const response = await fetch(`/api/revocation/bloom-filter`);
             const data = await response.json();
             
-            if (data.success && data.revoked_ids) {
-                // Store global Bloom filter (single cache key)
+            if (data.success) {
                 const cacheKey = 'lemma_bloom_global';
-                
-                localStorage.setItem(cacheKey, JSON.stringify({
-                    data: data.revoked_ids,
-                    sync: Date.now(),
-                    version: data.version,
-                    filterType: 'global_cascaded',
-                    privacyMechanism: 'oprf_blinding'
-                }));
-                
-                // Update in-memory Set (merge all sites into one for quick lookup)
-                for (const id of data.revoked_ids) {
-                    this.revocationBloomFilter.add(id);
+
+                // 1) Backwards-compatible hashed revocation set (exact membership)
+                const hashed = data.hashed_revoked_ids || [];
+                if (Array.isArray(hashed) && hashed.length > 0) {
+                    localStorage.setItem(cacheKey, JSON.stringify({
+                        hashed_revoked_ids: hashed,
+                        filter_bytes: data.filter_bytes || null,
+                        bloom_filter: data.bloom_filter || null,
+                        sync: Date.now(),
+                        version: data.version,
+                        filterType: data.filter_type || 'global_sha256',
+                        privacyMechanism: data.privacy_mechanism || 'sha256_web_crypto'
+                    }));
+
+                    for (const h of hashed) {
+                        this.revocationBloomFilter.add(h);
+                    }
                 }
-                
-                if (this.debug) {
-                    console.log(`✅ Synced site-specific Bloom filter for ${siteId}: ${data.revoked_ids.length} revocations`);
+
+                // 2) Optional compact Bloom bitset (fast, small; may have false positives)
+                if (data.filter_bytes && data.bloom_filter && data.bloom_filter.format === 'bloom_v1') {
+                    try {
+                        const filterBytes = this._decodeBase64ToBytes(data.filter_bytes);
+                        this.revocationBloomBits = filterBytes;
+                        this.revocationBloomMBits = data.bloom_filter.m_bits;
+                        this.revocationBloomK = data.bloom_filter.k_hashes;
+                        if (this.debug) {
+                            console.log(`🧺 Synced Bloom bitset: ${filterBytes.length} bytes`);
+                        }
+                    } catch (e) {
+                        if (this.debug) {
+                            console.warn(`⚠️ Failed to load Bloom bitset: ${e.message}`);
+                        }
+                    }
                 }
             }
             
         } catch (error) {
             if (this.debug) {
-                console.warn(`⚠️ Failed to sync Bloom filter for ${siteId}:`, error);
+                console.warn(`⚠️ Failed to sync global revocation filter:`, error);
             }
         }
+    }
+
+    /**
+     * Decode base64 string to Uint8Array
+     */
+    _decodeBase64ToBytes(b64) {
+        const binaryString = atob(b64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes;
     }
     
     /**
@@ -2230,3 +2303,4 @@ window.LemmaWallet = LemmaWallet;
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = LemmaWallet;
 }
+

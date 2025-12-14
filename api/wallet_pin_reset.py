@@ -6,10 +6,10 @@ Handles secure PIN reset via email confirmation
 import os
 import time
 import secrets
-import hashlib
 import logging
 from flask import Blueprint, request, jsonify, session, render_template
 from api.email_service import send_email
+from api.ppid import derive_ppid_did
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +67,9 @@ def request_pin_reset():
         # SECURITY CHECK: Verify a credential exists with this email
         # This prevents attackers from using reset to discover valid emails
         
-        # Generate user DID from email (consistent with admin bootstrap)
-        user_did = f"did:lemma:user_{hashlib.sha256(email.encode()).hexdigest()[:56]}"
+        # Generate pairwise user DID (PPID) for the Lemma wallet relying party
+        # NOTE: PIN reset is scoped to the wallet itself, not a customer site.
+        user_did = derive_ppid_did(email, "lemma.id")
         
         # Check if user has any credentials with this email in the database
         # In a real implementation, check against issued credentials

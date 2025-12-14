@@ -13,6 +13,7 @@ from flask_cors import cross_origin
 
 from api.email_service import send_email, render_email_template
 from api.real_iam_manager import get_site_manager, get_or_create_site_manager
+from api.ppid import derive_ppid_did
 from api.rate_limiter import rate_limit_email_confirmation, check_ip_not_blocked
 
 # Import Redis for persistent token storage
@@ -272,9 +273,9 @@ def confirm_access():
                 'priority': 100
             })
         
-        # Create user DID from email
+        # Create pairwise user DID (PPID) from email + RP (site domain)
         user_email = pending['user_email']
-        user_did = f"did:lemma:user_{hashlib.sha256(user_email.encode()).hexdigest()[:56]}"
+        user_did = derive_ppid_did(user_email, site_domain)
         
         # Issue permission lemma with REAL Ed25519 signature
         start_time = time.perf_counter()

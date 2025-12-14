@@ -5,11 +5,11 @@ Allows site owners to bootstrap their first admin credential using their API key
 
 import os
 import logging
-import hashlib
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 
 from api.real_iam_manager import get_site_manager, get_or_create_site_manager
+from api.ppid import derive_ppid_did
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def admin_self_issue():
         {
             "success": true,
             "credential": { /* Permission Lemma with Ed25519 signature */ },
-            "user_did": "did:lemma:user_...",
+            "user_did": "did:lemma:ppid_...",
             "issuer_did": "did:lemma:...",
             "issue_time_us": 148.23
         }
@@ -121,8 +121,8 @@ def admin_self_issue():
                 'priority': 100 if 'admin' in permission_level else 50
             })
         
-        # Create user DID from email
-        user_did = f"did:lemma:user_{hashlib.sha256(user_email.encode()).hexdigest()[:56]}"
+        # Create pairwise user DID (PPID) from email + RP (site domain)
+        user_did = derive_ppid_did(user_email, site_domain)
         
         # Issue permission lemma with REAL Ed25519 signature
         import time
