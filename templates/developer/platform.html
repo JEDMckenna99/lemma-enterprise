@@ -1180,12 +1180,29 @@
             }
         }
         
-        // Load overview data
+        // Load overview data (shows stats for the caller's site)
         async function loadOverviewData() {
             try {
-                console.log('📊 Fetching real platform stats...');
+                console.log('📊 Fetching stats for your site...');
                 
-                const response = await fetch('/api/platform/stats');
+                // Get user's credential to determine their site
+                let userCredential = null;
+                try {
+                    if (lemmaPlatformCredentialString) {
+                        userCredential = JSON.parse(lemmaPlatformCredentialString);
+                    }
+                } catch (e) {
+                    console.warn('Could not parse credential for stats');
+                }
+                
+                // POST request with user credential to determine site
+                const response = await fetch('/api/platform/stats', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_credential: userCredential
+                    })
+                });
                 const data = await response.json();
                 
                 if (data.success) {
@@ -1200,6 +1217,10 @@
                     document.getElementById('stat-sites').textContent = stats.registered_sites.toLocaleString();
                     
                     console.log('✅ Stats loaded:', stats);
+                    
+                    // Store site context for overview
+                    window.overviewSiteDomain = data.site_domain;
+                    console.log('✅ Stats loaded for', data.site_domain || 'platform');
                     
                     // Load recent activity
                     if (data.recent_activity && data.recent_activity.length > 0) {
@@ -1222,12 +1243,22 @@
                         `).join('');
                         
                         document.getElementById('recent-activity').innerHTML = activityHTML;
+                    } else if (data.message) {
+                        // No site registered
+                        document.getElementById('recent-activity').innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">🏢</div>
+                                <div>No Site Registered</div>
+                                <div style="font-size: 14px; margin-top: 8px;">${data.message}</div>
+                            </div>
+                        `;
                     } else {
+                        // Site exists but no activity
                         document.getElementById('recent-activity').innerHTML = `
                             <div class="empty-state">
                                 <div class="empty-state-icon">📋</div>
                                 <div>No recent activity yet</div>
-                                <div style="font-size: 14px; margin-top: 8px;">Activity will appear here as users interact with your integration</div>
+                                <div style="font-size: 14px; margin-top: 8px;">Activity will appear here as users authenticate via ${data.site_domain || 'your site'}</div>
                             </div>
                         `;
                     }

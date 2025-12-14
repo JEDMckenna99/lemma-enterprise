@@ -17,18 +17,27 @@ logger = logging.getLogger(__name__)
 platform_stats_bp = Blueprint('platform_stats', __name__)
 
 
-@platform_stats_bp.route('/api/platform/stats', methods=['GET'])
+@platform_stats_bp.route('/api/platform/stats', methods=['GET', 'POST'])
 def get_platform_stats():
     """
     Get platform statistics for the developer dashboard
+    
+    Shows stats for the caller's site:
+    - Lemma.id admins see lemma_platform stats
+    - Beta users see their own site's stats
+    
+    POST body (optional):
+    {
+        "user_credential": {...}  // Caller's credential to determine their site
+    }
     
     Returns:
         {
             "mau": int,                    # Monthly active users
             "total_verifications": int,    # Verifications this month
             "active_users": int,           # Total users with active permissions
-            "registered_sites": int,       # Number of sites registered
-            "recent_activity": []          # Last 5 events
+            "registered_sites": int,       # Number of sites registered (for admins only)
+            "recent_activity": []          # Last 5 events for this site
         }
     """
     conn = None
@@ -36,8 +45,88 @@ def get_platform_stats():
     try:
         current_month = datetime.now().strftime('%Y-%m')
         
-        # For lemma.id platform, we track users for 'lemma_platform' site
-        site_id = 'lemma_platform'
+        # Determine which site's stats to show
+        site_id = 'lemma_platform'  # Default for admins
+        site_domain = 'lemma.id'
+        user_email = None
+        is_lemma_admin = False
+        
+        # Get caller's credential to determine their site
+        if request.method == 'POST':
+            data = request.get_json() or {}
+            user_credential = data.get('user_credential')
+            if user_credential:
+                claims = user_credential.get('claims') or user_credential.get('credentialSubject') or {}
+                user_email = claims.get('email')
+                permission_id = claims.get('permissionId') or claims.get('permission_level') or ''
+                
+                # Check if this is a lemma.id admin
+                admin_permissions = ['admin_access', 'super_admin', 'site_admin', 'admin']
+                is_lemma_admin = permission_id in admin_permissions
+        
+        # If not a lemma.id admin, look up their site(s)
+        if user_email and not is_lemma_admin:
+            try:
+                site_conn = get_db_connection()
+                site_cursor = site_conn.cursor()
+                
+                # Check sites table for admin_email match
+                site_cursor.execute("""
+                    SELECT site_id, site_domain 
+                    FROM sites 
+                    WHERE admin_email = %s
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (user_email,))
+                
+                site_result = site_cursor.fetchone()
+                
+                if site_result:
+                    site_id = site_result[0]
+                    site_domain = site_result[1]
+                    logger.info(f"📊 Showing stats for site {site_id} (owner: {user_email})")
+                else:
+                    # Also check site_admins table
+                    site_cursor.execute("""
+                        SELECT site_id 
+                        FROM site_admins 
+                        WHERE admin_email = %s AND is_active = TRUE
+                        ORDER BY added_at DESC
+                        LIMIT 1
+                    """, (user_email,))
+                    
+                    admin_result = site_cursor.fetchone()
+                    if admin_result:
+                        site_id = admin_result[0]
+                        site_cursor.execute("SELECT site_domain FROM sites WHERE site_id = %s", (site_id,))
+                        domain_result = site_cursor.fetchone()
+                        if domain_result:
+                            site_domain = domain_result[0]
+                        logger.info(f"📊 Showing stats for site {site_id} (admin: {user_email})")
+                    else:
+                        # No site registered - return empty stats
+                        site_cursor.close()
+                        site_conn.close()
+                        return jsonify({
+                            'success': True,
+                            'stats': {
+                                'mau': 0,
+                                'total_verifications': 0,
+                                'active_users': 0,
+                                'registered_sites': 0
+                            },
+                            'recent_activity': [],
+                            'site_id': None,
+                            'site_domain': None,
+                            'month': current_month,
+                            'message': 'No site registered yet. Register a site to see your stats.'
+                        })
+                
+                site_cursor.close()
+                site_conn.close()
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Could not look up site for {user_email}: {e}")
         
         # 1. Get MAU (from Redis via usage_tracking)
         mau_count = get_monthly_active_users(site_id)
@@ -61,12 +150,17 @@ def get_platform_stats():
         active_users = cursor.fetchone()[0]
         logger.info(f"📊 Active users for {site_id}: {active_users}")
         
-        # 4. Get registered sites count (from database - sites table)
-        cursor.execute("SELECT COUNT(*) FROM sites")
-        registered_sites = cursor.fetchone()[0]
+        # 4. Get registered sites count (for admins) or just 1 for site owners
+        if is_lemma_admin:
+            cursor.execute("SELECT COUNT(*) FROM sites")
+            registered_sites = cursor.fetchone()[0]
+        else:
+            # Count sites owned by this user
+            cursor.execute("SELECT COUNT(*) FROM sites WHERE admin_email = %s", (user_email,))
+            registered_sites = cursor.fetchone()[0] if user_email else 1
         logger.info(f"📊 Registered sites: {registered_sites}")
         
-        # 5. Get recent activity (last 5 permission grants from permission_instances)
+        # 5. Get recent activity (last 5 permission grants for THIS site)
         cursor.execute("""
             SELECT pi.email, pt.name as permission_name, pi.granted_at
             FROM permission_instances pi
@@ -88,7 +182,7 @@ def get_platform_stats():
                 'time_ago': get_time_ago(granted_at) if granted_at else 'Unknown'
             })
         
-        logger.info(f"📊 Recent activity: {len(recent_activity)} events")
+        logger.info(f"📊 Recent activity for {site_id}: {len(recent_activity)} events")
         
         return jsonify({
             'success': True,
@@ -100,6 +194,8 @@ def get_platform_stats():
             },
             'recent_activity': recent_activity,
             'site_id': site_id,
+            'site_domain': site_domain,
+            'is_lemma_admin': is_lemma_admin,
             'month': current_month
         })
         
