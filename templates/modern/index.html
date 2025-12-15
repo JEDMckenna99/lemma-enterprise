@@ -221,34 +221,70 @@ document.addEventListener('DOMContentLoaded', async function() {
     const hasLemmaEl = document.getElementById('status-has-lemma');
     const primaryBtn = document.getElementById('hero-primary-btn');
     
+    console.log('Lemma sign-in check starting...');
+    
     try {
         // Initialize wallet
-        const wallet = new LemmaWallet({ debug: false });
+        const wallet = new LemmaWallet({ debug: true });
         await wallet.initialize();
         
-        // Get platform credentials
+        // Get ALL credentials first
         const credentials = await wallet.getCredentials();
+        console.log('All credentials found:', credentials.length, credentials);
+        
+        // Look for lemma.id platform credentials (more lenient matching)
         const platformCredentials = credentials.filter(c => {
-            const claims = c.claims || c.credentialSubject || {};
+            const claims = c.claims || c.credentialSubject || c || {};
             const siteDomain = claims.siteDomain || claims.site_domain || '';
-            return siteDomain === 'lemma.id' || claims.siteId === 'lemma_platform';
+            const siteId = claims.siteId || claims.site_id || '';
+            const networkType = claims.networkType || claims.network_type || '';
+            
+            // Match lemma.id credentials
+            const isLemmaPlatform = 
+                siteDomain === 'lemma.id' || 
+                siteId === 'lemma_platform' ||
+                networkType === 'iam_permission';
+            
+            console.log('Credential check:', { siteDomain, siteId, networkType, isLemmaPlatform });
+            return isLemmaPlatform;
         });
         
+        console.log('Platform credentials found:', platformCredentials.length);
+        
         if (platformCredentials.length > 0) {
-            // Force sync revocation list
-            await wallet.syncRevocationLists(true);
+            // Force sync revocation list (but don't fail if it errors)
+            try {
+                await wallet.syncRevocationLists(true);
+            } catch (syncErr) {
+                console.warn('Revocation sync failed, continuing:', syncErr);
+            }
             
             // Check each credential for validity
             for (const cred of platformCredentials) {
-                const isRevoked = await wallet.isCredentialRevoked(cred);
-                if (isRevoked) continue;
+                console.log('Checking credential:', cred.id || cred);
+                
+                // Check revocation (but don't fail if check errors)
+                let isRevoked = false;
+                try {
+                    isRevoked = await wallet.isCredentialRevoked(cred);
+                } catch (revErr) {
+                    console.warn('Revocation check failed, assuming not revoked:', revErr);
+                }
+                if (isRevoked) {
+                    console.log('Credential is revoked, skipping');
+                    continue;
+                }
                 
                 // Check expiry
-                const claims = cred.claims || cred.credentialSubject || {};
+                const claims = cred.claims || cred.credentialSubject || cred || {};
                 const expiresAt = claims.expiresAt ? parseInt(claims.expiresAt) * 1000 : null;
-                if (expiresAt && expiresAt < Date.now()) continue;
+                if (expiresAt && expiresAt < Date.now()) {
+                    console.log('Credential is expired, skipping');
+                    continue;
+                }
                 
                 // Valid credential found!
+                console.log('Valid credential found!', claims);
                 const email = claims.email || 'User';
                 const permissionId = claims.permissionId || claims.permission_level || 'access';
                 const displayName = claims.displayName || permissionId;
@@ -309,12 +345,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         // No valid lemma found
+        console.log('No valid lemma found, showing Join Beta');
         loadingEl.style.display = 'none';
         noLemmaEl.style.display = 'block';
         hasLemmaEl.style.display = 'none';
         
     } catch (error) {
-        console.warn('Credential check failed:', error);
+        console.error('Credential check failed:', error);
+        console.error('Error stack:', error.stack);
         // Show default state on error
         loadingEl.style.display = 'none';
         noLemmaEl.style.display = 'block';
