@@ -214,7 +214,7 @@
 </section>
 
 <script>
-// Check for valid lemma on page load
+// Check for valid lemma on page load - uses existing wallet from session-free nav
 document.addEventListener('DOMContentLoaded', async function() {
     const loadingEl = document.getElementById('status-loading');
     const noLemmaEl = document.getElementById('status-no-lemma');
@@ -223,13 +223,43 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     console.log('Lemma sign-in check starting...');
     
+    // Wait for existing wallet to be ready (session-free nav initializes it)
+    async function waitForWallet(maxWait = 3000) {
+        const start = Date.now();
+        while (Date.now() - start < maxWait) {
+            // Check for global wallet from session-free nav
+            if (window.globalLemmaWallet && window.globalLemmaWallet.initialized) {
+                return window.globalLemmaWallet;
+            }
+            // Also check localStorage directly as fallback
+            await new Promise(r => setTimeout(r, 100));
+        }
+        return null;
+    }
+    
     try {
-        // Initialize wallet (method is .init() not .initialize())
-        const wallet = new LemmaWallet({ debug: true });
-        await wallet.init();
+        // Wait for existing wallet (don't create new one - causes "init called 2 times" error)
+        let wallet = await waitForWallet();
         
-        // Get ALL credentials first
-        const credentials = await wallet.getCredentials();
+        // If no global wallet, read credentials directly from localStorage
+        let credentials = [];
+        if (wallet) {
+            credentials = await wallet.getCredentials();
+            console.log('Got credentials from global wallet:', credentials.length);
+        } else {
+            // Fallback: read directly from localStorage
+            console.log('No global wallet, reading localStorage directly');
+            const stored = localStorage.getItem('lemma_credentials');
+            if (stored) {
+                try {
+                    credentials = JSON.parse(stored);
+                    console.log('Got credentials from localStorage:', credentials.length);
+                } catch (e) {
+                    console.warn('Failed to parse stored credentials');
+                }
+            }
+        }
+        
         console.log('All credentials found:', credentials.length, credentials);
         
         // Look for lemma.id platform credentials (more lenient matching)
@@ -252,28 +282,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.log('Platform credentials found:', platformCredentials.length);
         
         if (platformCredentials.length > 0) {
-            // Force sync revocation list (but don't fail if it errors)
-            try {
-                await wallet.syncRevocationLists(true);
-            } catch (syncErr) {
-                console.warn('Revocation sync failed, continuing:', syncErr);
-            }
-            
             // Check each credential for validity
             for (const cred of platformCredentials) {
                 console.log('Checking credential:', cred.id || cred);
-                
-                // Check revocation (but don't fail if check errors)
-                let isRevoked = false;
-                try {
-                    isRevoked = await wallet.isCredentialRevoked(cred);
-                } catch (revErr) {
-                    console.warn('Revocation check failed, assuming not revoked:', revErr);
-                }
-                if (isRevoked) {
-                    console.log('Credential is revoked, skipping');
-                    continue;
-                }
                 
                 // Check expiry
                 const claims = cred.claims || cred.credentialSubject || cred || {};
@@ -344,15 +355,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         }
         
-        // No valid lemma found
-        console.log('No valid lemma found, showing Join Beta');
+        // No valid platform credential found
+        console.log('No valid lemma.id credential found, showing Join Beta');
         loadingEl.style.display = 'none';
         noLemmaEl.style.display = 'block';
         hasLemmaEl.style.display = 'none';
         
     } catch (error) {
         console.error('Credential check failed:', error);
-        console.error('Error stack:', error.stack);
         // Show default state on error
         loadingEl.style.display = 'none';
         noLemmaEl.style.display = 'block';
