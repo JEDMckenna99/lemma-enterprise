@@ -224,9 +224,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     console.log('Lemma sign-in check starting...');
     
     try {
-        // Initialize wallet
+        // Initialize wallet (method is .init() not .initialize())
         const wallet = new LemmaWallet({ debug: true });
-        await wallet.initialize();
+        await wallet.init();
         
         // Get ALL credentials first
         const credentials = await wallet.getCredentials();
