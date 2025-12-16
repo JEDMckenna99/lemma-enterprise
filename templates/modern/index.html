@@ -143,49 +143,47 @@
                 </div>
                 
                 <!-- No lemma state (shown by default, hidden when lemma found) -->
-                <div id="status-no-lemma" style="display: none; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 32px; border-radius: 12px; box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);">
-                    <p style="margin: 0 0 12px 0; font-size: var(--font-size-2xl); color: var(--white); font-weight: 700; text-align: center;">
+                <div id="status-no-lemma" style="display: none; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); max-width: 360px; margin: 0 auto; text-align: center;">
+                    <p style="margin: 0 0 10px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 700;">
                         Join the Beta
                     </p>
-                    <p style="margin: 0; font-size: var(--font-size-lg); color: var(--white); text-align: center;">
-                        Free access during beta - Help shape the future of authentication
+                    <p style="margin: 0; font-size: var(--font-size-sm); color: var(--white);">
+                        Free access during beta
                     </p>
-                    <p style="margin: 12px 0 0 0; font-size: var(--font-size-sm); color: rgba(255,255,255,0.9); text-align: center;">
+                    <p style="margin: 10px 0 0 0; font-size: var(--font-size-xs); color: rgba(255,255,255,0.8);">
                         Passwordless - Privacy-first - Works offline
                     </p>
                 </div>
                 
                 <!-- Has valid lemma state - Signed In (Green for immediate visual confirmation) -->
-                <div id="status-has-lemma" style="display: none; background: #10b981; padding: 32px; border-radius: 12px; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);">
-                    <!-- Checkmark icon inline -->
-                    <div id="signin-checkmark" style="text-align: center; margin-bottom: 16px; opacity: 0; transform: scale(0.5); transition: all 0.4s ease-out;">
-                        <svg width="56" height="56" viewBox="0 0 56 56" fill="none" style="display: inline-block;">
-                            <circle cx="28" cy="28" r="26" stroke="rgba(255,255,255,0.3)" stroke-width="3" fill="none"/>
-                            <circle id="check-circle" cx="28" cy="28" r="26" stroke="var(--white)" stroke-width="3" fill="none" stroke-dasharray="164" stroke-dashoffset="164" style="transition: stroke-dashoffset 0.5s ease-out 0.2s;"/>
-                            <path id="check-path" d="M17 29L24 36L39 20" stroke="var(--white)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke-dasharray="40" stroke-dashoffset="40" style="transition: stroke-dashoffset 0.3s ease-out 0.5s;"/>
+                <div id="status-has-lemma" style="display: none; background: #10b981; padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3); max-width: 360px; margin: 0 auto; text-align: center;">
+                    <!-- Checkmark icon -->
+                    <div id="signin-checkmark" style="margin-bottom: 12px; opacity: 0; transform: scale(0.5); transition: all 0.4s ease-out;">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="display: inline-block;">
+                            <circle cx="24" cy="24" r="22" stroke="rgba(255,255,255,0.3)" stroke-width="2.5" fill="none"/>
+                            <circle id="check-circle" cx="24" cy="24" r="22" stroke="var(--white)" stroke-width="2.5" fill="none" stroke-dasharray="138" stroke-dashoffset="138" style="transition: stroke-dashoffset 0.5s ease-out 0.2s;"/>
+                            <path id="check-path" d="M14 25L21 32L34 18" stroke="var(--white)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke-dasharray="35" stroke-dashoffset="35" style="transition: stroke-dashoffset 0.3s ease-out 0.5s;"/>
                         </svg>
                     </div>
                     
                     <!-- Signed in header -->
                     <div id="signin-header" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.1s;">
-                        <p style="margin: 0 0 20px 0; font-size: var(--font-size-2xl); color: var(--white); font-weight: 700; text-align: center;">
+                        <p style="margin: 0 0 16px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 700;">
                             You're Signed In
                         </p>
                     </div>
                     
                     <!-- User info -->
-                    <div id="signin-userinfo" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.2s; text-align: center;">
-                        <p id="lemma-user-email" style="margin: 0 0 12px 0; font-size: var(--font-size-lg); color: var(--white); font-weight: 600;">
-                            <!-- Email will be inserted here -->
+                    <div id="signin-userinfo" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.2s;">
+                        <p id="lemma-user-email" style="margin: 0 0 10px 0; font-size: var(--font-size-base); color: var(--white); font-weight: 600;">
                         </p>
-                        <p id="lemma-permission-badge" style="margin: 0; font-size: var(--font-size-base); color: var(--white);">
-                            <!-- Permission badge will be inserted here -->
+                        <p id="lemma-permission-badge" style="margin: 0; font-size: var(--font-size-sm); color: var(--white);">
                         </p>
                     </div>
                     
                     <!-- Footer message -->
                     <div id="signin-details" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.3s;">
-                        <p style="margin: 20px 0 0 0; font-size: var(--font-size-sm); color: rgba(255,255,255,0.8); text-align: center;">
+                        <p style="margin: 16px 0 0 0; font-size: var(--font-size-xs); color: rgba(255,255,255,0.7);">
                             Verified locally - no password, no server call
                         </p>
                     </div>
