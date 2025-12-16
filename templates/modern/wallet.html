@@ -1778,6 +1778,38 @@ function generateQRCodeImage(text, containerId) {
 // Flag to prevent double execution
 let transferProcessed = false;
 
+// Helper function to show transfer status without blocking popups
+function showTransferStatus(type, message) {
+    // Remove any existing status modals
+    const existing = document.querySelector('.transfer-status-modal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.className = 'transfer-status-modal';
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.8); z-index: 10001;
+        display: flex; align-items: center; justify-content: center;
+    `;
+    
+    const isSuccess = type === 'success';
+    modal.innerHTML = `
+        <div style="background: white; padding: 32px; border-radius: 12px; max-width: 400px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 16px;">${isSuccess ? '✅' : '❌'}</div>
+            <h3 style="margin: 0 0 16px 0; color: ${isSuccess ? '#059669' : '#dc2626'};">
+                ${isSuccess ? 'Transfer Successful!' : 'Transfer Failed'}
+            </h3>
+            <p style="color: #666; margin: 0 0 20px 0;">${message}</p>
+            <button onclick="this.closest('.transfer-status-modal').remove(); window.location.href='/wallet';" 
+                    style="padding: 12px 24px; background: ${isSuccess ? '#10b981' : '#6b7280'}; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                ${isSuccess ? 'Continue to Wallet' : 'Close'}
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
 // Function to check and process URL parameters
 async function checkUrlParameters() {
     if (transferProcessed) {
@@ -1797,26 +1829,8 @@ async function checkUrlParameters() {
     console.log('📋 Compressed data:', compressedData ? 'present' : 'not found');
     console.log('📋 Transfer token:', transferToken ? 'present' : 'not found');
     
-    // Mobile debugging with alerts
-    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        const apiBase = window.location.origin;
-            
-        const debugInfo = `🔍 MOBILE DEBUG
-Domain: ${window.location.hostname}
-API Base: ${apiBase}
-URL: ${window.location.href.substring(0, 80)}...
-Params: ${window.location.search}
-Sync: ${syncData ? 'YES' : 'NO'}
-Compressed: ${compressedData ? 'YES' : 'NO'}
-Transfer: ${transferToken ? 'YES' : 'NO'}`;
-        
-        // Show debug alert on mobile after a short delay
-        setTimeout(() => {
-            if (transferToken || syncData || compressedData) {
-                alert(debugInfo);
-            }
-        }, 1000);
-    }
+    // Mobile debugging - disabled for production
+    // Debug info logged to console instead of alerts
     
     // Handle compressed URLs
     if (compressedData && !syncData) {
@@ -1853,10 +1867,8 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
             console.log('🔄 Transfer token detected - initiating wallet transfer...');
             console.log('📋 Raw transfer token:', transferToken.substring(0, 100) + '...');
             
-            // Mobile debugging
-            if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                alert('🔄 STEP 1: TRANSFER DETECTED\n\nTransfer token found in URL.\nProcessing wallet transfer...');
-            }
+            // Mobile debugging - disabled for production
+            console.log('🔄 STEP 1: Transfer token detected, processing...');
             
             const tokenData = JSON.parse(atob(transferToken));
             console.log('📋 Parsed token data:', tokenData);
@@ -1866,10 +1878,8 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
                 console.log('📋 Session ID:', tokenData.session_id);
                 console.log('📋 Transfer key:', tokenData.transfer_key.substring(0, 8) + '...');
                 
-                // Mobile debugging
-                if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                    alert(`🔄 STEP 2: TOKEN PARSED\n\nSession: ${tokenData.session_id}\nKey: ${tokenData.transfer_key.substring(0, 8)}...\n\nRequesting wallet data...`);
-                }
+                // Mobile debugging - disabled for production
+                console.log('🔄 STEP 2: Token parsed, session:', tokenData.session_id);
                 
                 // Request wallet data from transfer session
                 console.log('📤 Requesting wallet data from transfer session...');
@@ -1898,10 +1908,8 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
                 console.log('📥 Wallet response status:', walletResponse.status);
                 console.log('📥 Wallet response headers:', Object.fromEntries(walletResponse.headers.entries()));
                 
-                // Mobile debugging for API response
-                if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                    alert(`🔄 STEP 3: API RESPONSE\n\nStatus: ${walletResponse.status}\nAPI: ${apiBase}\n\n${walletResponse.ok ? 'Processing wallet data...' : 'API call failed!'}`);
-                }
+                // Mobile debugging - disabled for production
+                console.log('🔄 STEP 3: API response status:', walletResponse.status);
                 
                 if (walletResponse.ok) {
                     const walletResult = await walletResponse.json();
@@ -1933,42 +1941,28 @@ Transfer: ${transferToken ? 'YES' : 'NO'}`;
                         
                         console.log(`🎉 Transfer complete: ${storedCount}/${credentials.length} credentials stored`);
                         
-                        // Mobile-friendly success message
-                        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                            alert(`✅ WALLET TRANSFER SUCCESS!\n\n${storedCount} credentials transferred.\n\nTap OK to reload page.`);
-                        } else {
-                            alert(`✅ Wallet Transfer Complete!\\n\\n${storedCount} credentials transferred to this device.\\n\\nYour Lemma wallet is now available.`);
-                        }
-                        window.location.reload();
+                        // Clear URL parameter BEFORE showing success to prevent loop
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        
+                        // Show success and reload
+                        showTransferStatus('success', `${storedCount} credentials transferred successfully!`);
                     } else {
                         console.error('❌ Wallet result error:', walletResult);
-                        alert('❌ Transfer failed: ' + (walletResult.error || 'Wallet data not available'));
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        showTransferStatus('error', walletResult.error || 'Wallet data not available');
                     }
                 } else {
                     const errorText = await walletResponse.text();
                     console.error('❌ Wallet response error:', errorText);
-                    
-                    // Mobile debugging for API error
-                    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                        alert(`❌ STEP 3 FAILED: API ERROR\n\nStatus: ${walletResponse.status}\nError: ${errorText.substring(0, 100)}...\n\nAPI call failed!`);
-                    } else {
-                        alert('❌ Transfer failed: Unable to retrieve wallet data');
-                    }
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    showTransferStatus('error', 'Unable to retrieve wallet data');
                 }
             }
         } catch (error) {
             console.error('❌ Transfer token processing failed:', error);
-            
-            // Mobile-friendly error message
-            if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                alert(`❌ TRANSFER ERROR\n\n${error.message}\n\nCheck if QR code is valid.`);
-            } else {
-                alert('❌ Transfer failed: Invalid transfer token');
-            }
+            window.history.replaceState({}, document.title, window.location.pathname);
+            showTransferStatus('error', 'Invalid transfer token');
         }
-        
-        // Clear the URL parameter
-        window.history.replaceState({}, document.title, window.location.pathname);
         return;
     }
     
