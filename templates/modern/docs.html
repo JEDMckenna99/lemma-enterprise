@@ -718,8 +718,8 @@ def handle_webhook():
                     <button class="copy-button" onclick="copyCode(this)">Copy</button>
                 </div>
 <!-- 1. Load Lemma Identity Network -->
-&lt;script src="https://lemma.id/js/lemma-wallet.js"&gt;&lt;/script&gt;
-&lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/static/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
 
 &lt;!-- 2. Initialize with your API key --&gt;
 &lt;script&gt;
@@ -751,30 +751,21 @@ def handle_webhook():
                     <span class="code-language">HTML</span>
                     <button class="copy-button" onclick="copyCode(this)">Copy</button>
                 </div>
-&lt;script src="https://lemma.id/js/lemma-wallet.js"&gt;&lt;/script&gt;
-&lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/static/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
             </div>
             
-            <h3 style="margin-bottom: var(--space-4); margin-top: var(--space-8);">Option 2: NPM Package</h3>
-            <div class="code-block">
+            <h3 style="margin-bottom: var(--space-4); margin-top: var(--space-8);">Option 2: NPM Package (Coming Soon)</h3>
+            <div style="background: var(--warning-50); border: 1px solid var(--warning-200); border-radius: 8px; padding: var(--space-4); margin-bottom: var(--space-4);">
+                <p style="margin: 0; color: var(--warning-700);">
+                    <strong>Coming Q1 2026:</strong> NPM package for server-side and bundled integrations. For now, use the CDN option above.
+                </p>
+            </div>
+            <div class="code-block" style="opacity: 0.6;">
                 <div class="code-header">
-                    <span class="code-language">bash</span>
-                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                    <span class="code-language">bash (Coming Soon)</span>
                 </div>
 npm install @lemma/verification-sdk
-            </div>
-            
-            <div class="code-block">
-                <div class="code-header">
-                    <span class="code-language">JavaScript</span>
-                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
-                </div>
-import { Lemma, LemmaBotShield } from '@lemma/verification-sdk';
-
-const shield = new LemmaBotShield({
-  apiKey: 'your-api-key',
-  apiBase: 'https://lemma.id'
-});
             </div>
         </section>
 
@@ -826,8 +817,8 @@ const shield = new LemmaBotShield({
                             <span class="code-language">HTML</span>
                             <button class="copy-button" onclick="copyCode(this)">Copy</button>
                         </div>
-&lt;script src="https://lemma.id/js/lemma-wallet.js"&gt;&lt;/script&gt;
-&lt;script src="https://lemma.id/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/static/js/lemma-bot-shield-simple.js"&gt;&lt;/script&gt;
                     </div>
                 </div>
                 
@@ -887,19 +878,18 @@ shield.protect('.premium-content');
                     <span class="code-language">JavaScript</span>
                     <button class="copy-button" onclick="copyCode(this)">Copy</button>
                 </div>
-// Initialize federated wallet
-const wallet = new LemmaFederatedWallet({ 
-  debug: false,
-  networkRegistryUrl: 'https://lemma.id/api/network'
+// Initialize wallet
+const wallet = new LemmaWallet({ 
+  debug: false
 });
 
 await wallet.init();
 
 // Check if user is already verified in the network
-if (await wallet.hasValidCredentials()) {
+if (await wallet.hasValidCredentials('identity')) {
   // User already verified - instant access (offline)
   showProtectedContent();
-  console.log('✅ Network verification: ~5µs');
+  console.log('✅ Network verification: microseconds');
 } else {
   // User needs verification - redirect to Stripe Identity
   window.location.href = '/verify';
@@ -955,36 +945,32 @@ const shield = new LemmaBotShield(config);
                             <th>Method</th>
                             <th>Description</th>
                             <th>Returns</th>
-                            <th>Performance</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
                             <td><code>protect(selector)</code></td>
-                            <td>Protect DOM elements with verification</td>
+                            <td>Protect DOM elements - shows verification widget for unverified users, reveals content for verified users</td>
                             <td><code>Promise&lt;void&gt;</code></td>
-                            <td><span class="response-time">~1µs</span></td>
                         </tr>
                         <tr>
-                            <td><code>verifyUser()</code></td>
-                            <td>Manually trigger user verification</td>
-                            <td><code>Promise&lt;VerificationResult&gt;</code></td>
-                            <td><span class="response-time">~5µs</span></td>
+                            <td><code>initializeFederatedWallet()</code></td>
+                            <td>Initialize the background wallet for credential checking (called automatically)</td>
+                            <td><code>Promise&lt;void&gt;</code></td>
                         </tr>
                         <tr>
-                            <td><code>startBackgroundMonitoring()</code></td>
-                            <td>Enable continuous security monitoring</td>
+                            <td><code>setupCrossTabListeners()</code></td>
+                            <td>Enable cross-tab credential synchronization (called automatically)</td>
                             <td><code>void</code></td>
-                            <td><span class="response-time">~0.1µs</span></td>
-                        </tr>
-                        <tr>
-                            <td><code>getSecurityStatus()</code></td>
-                            <td>Get current security and verification status</td>
-                            <td><code>SecurityStatus</code></td>
-                            <td><span class="response-time">~0.5µs</span></td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            
+            <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: 8px; padding: var(--space-4); margin: var(--space-4) 0;">
+                <p style="margin: 0; color: var(--primary-700);">
+                    <strong>Note:</strong> Most functionality is automatic. Simply call <code>protect(selector)</code> and the SDK handles verification, credential checking, and UI updates.
+                </p>
             </div>
         </section>
 
@@ -1180,24 +1166,34 @@ const shield = new LemmaBotShield({
             
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin: var(--space-6) 0; text-align: center;">
                 <div style="background: var(--success-50); border: 1px solid var(--success-200); border-radius: 8px; padding: var(--space-4);">
-                    <div style="font-size: 2rem; font-weight: 700; color: var(--success-700); margin-bottom: var(--space-2);">~1-50µs</div>
-                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">Authentication Time</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--success-700); margin-bottom: var(--space-2);">31-182µs</div>
+                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">Server Verification</div>
+                    <div style="color: var(--gray-500); font-size: var(--font-size-xs); margin-top: 4px;">Rust Ed25519</div>
                 </div>
                 
                 <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: 8px; padding: var(--space-4);">
-                    <div style="font-size: 2rem; font-weight: 700; color: var(--primary-700); margin-bottom: var(--space-2);">99.9%</div>
-                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">Offline Operation</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--primary-700); margin-bottom: var(--space-2);">&lt;100ms</div>
+                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">Revocation Propagation</div>
+                    <div style="color: var(--gray-500); font-size: var(--font-size-xs); margin-top: 4px;">Bloom Filter + Redis</div>
                 </div>
                 
                 <div style="background: var(--secondary-50); border: 1px solid var(--secondary-200); border-radius: 8px; padding: var(--space-4);">
-                    <div style="font-size: 2rem; font-weight: 700; color: var(--secondary-700); margin-bottom: var(--space-2);">30K+</div>
-                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">Verifications/sec</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--secondary-700); margin-bottom: var(--space-2);">~500ms</div>
+                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">Identity Verification</div>
+                    <div style="color: var(--gray-500); font-size: var(--font-size-xs); margin-top: 4px;">Stripe KYC</div>
                 </div>
                 
                 <div style="background: var(--warning-50); border: 1px solid var(--warning-200); border-radius: 8px; padding: var(--space-4);">
-                    <div style="font-size: 2rem; font-weight: 700; color: var(--warning-700); margin-bottom: var(--space-2);">~2MB</div>
-                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">Bundle Size</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--warning-700); margin-bottom: var(--space-2);">~50KB</div>
+                    <div style="color: var(--gray-700); font-size: var(--font-size-sm);">SDK Size</div>
+                    <div style="color: var(--gray-500); font-size: var(--font-size-xs); margin-top: 4px;">Gzipped</div>
                 </div>
+            </div>
+            
+            <div style="background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; padding: var(--space-4); margin-top: var(--space-4);">
+                <p style="margin: 0; color: var(--gray-700); font-size: var(--font-size-sm);">
+                    <strong>Note:</strong> Current implementation uses server-side Rust verification. Client-side WebAssembly verification (targeting sub-microsecond speeds) is in development for Q1 2026.
+                </p>
             </div>
         </section>
 
@@ -1323,51 +1319,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (mobileToggle && sidebar) {
         mobileToggle.addEventListener('click', () => {
             sidebar.style.display = sidebar.style.display === 'block' ? 'none' : 'block';
-        });
-    }
-});
-</script>
-
-<!-- Swagger UI JavaScript -->
-<script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
-<script>
-// Initialize Swagger UI
-document.addEventListener('DOMContentLoaded', function() {
-    // Only initialize Swagger UI if the container exists
-    const swaggerContainer = document.getElementById('swagger-ui');
-    if (swaggerContainer) {
-        SwaggerUIBundle({
-            url: '/static/openapi.yaml',
-            dom_id: '#swagger-ui',
-            deepLinking: true,
-            presets: [
-                SwaggerUIBundle.presets.apis,
-                SwaggerUIBundle.presets.standalone
-            ],
-            plugins: [
-                SwaggerUIBundle.plugins.DownloadUrl
-            ],
-            layout: "BaseLayout",
-            defaultModelsExpandDepth: 1,
-            defaultModelExpandDepth: 1,
-            docExpansion: "list",
-            tryItOutEnabled: true,
-            filter: true,
-            supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
-            onComplete: function() {
-                console.log('✅ Swagger UI loaded successfully');
-            },
-            onFailure: function(error) {
-                console.error('❌ Swagger UI failed to load:', error);
-                swaggerContainer.innerHTML = `
-                    <div style="background: var(--danger-50); border: 1px solid var(--danger-200); border-radius: 8px; padding: var(--space-4); text-align: center;">
-                        <p style="color: var(--danger-700); margin: 0;">
-                            <strong>⚠️ API Explorer temporarily unavailable</strong><br>
-                            Please refer to the code examples above or contact support.
-                        </p>
-                    </div>
-                `;
-            }
         });
     }
 });
