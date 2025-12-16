@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma Complete Integration Example</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #1a1a2e;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+        }
+        
+        h2 {
+            color: #333;
+            margin: 30px 0 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        h3 {
+            color: #555;
+            margin: 20px 0 10px;
+        }
+        
+        .code-block {
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+        }
+        
+        .code-block .comment {
+            color: #6c7086;
+        }
+        
+        .code-block .keyword {
+            color: #cba6f7;
+        }
+        
+        .code-block .string {
+            color: #a6e3a1;
+        }
+        
+        .code-block .function {
+            color: #89b4fa;
+        }
+        
+        input[type="email"], input[type="text"] {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button.secondary {
+            background: #6c757d;
+        }
+        
+        button.success {
+            background: #10b981;
+        }
+        
+        button.danger {
+            background: #ef4444;
+        }
+        
+        .status-box {
+            padding: 16px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .status-box.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        
+        .status-box.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        
+        .status-box.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+        
+        .status-box.warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            color: white;
+        }
+        
+        .user-avatar {
+            width: 64px;
+            height: 64px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .user-details h3 {
+            color: white;
+            margin: 0 0 5px;
+        }
+        
+        .user-details p {
+            color: rgba(255,255,255,0.8);
+            margin: 0;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .feature-item {
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .feature-item h4 {
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .feature-item p {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        #console-log {
+            background: #0f0f23;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #1a1a3e;
+        }
+        
+        .log-entry.error {
+            color: #ff6b6b;
+        }
+        
+        .log-entry.success {
+            color: #51cf66;
+        }
+        
+        .config-section {
+            background: #f0f4ff;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .config-section label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        
+        .config-section small {
+            display: block;
+            color: #666;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #666;
+            border-radius: 8px 8px 0 0;
+            margin: 0;
+        }
+        
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Lemma Complete Integration Example</h1>
+            <p class="subtitle">Copy this code to add authentication to your site in under 5 minutes</p>
+            
+            <!-- Configuration Section -->
+            <div class="config-section">
+                <h3>Configuration (for testing)</h3>
+                <label for="api-key-input">API Key</label>
+                <small>Get your API key from <a href="https://lemma.id/dashboard" target="_blank">lemma.id/dashboard</a></small>
+                <input type="text" id="api-key-input" placeholder="lemma_api_xxx..." />
+                
+                <label for="site-id-input">Site ID</label>
+                <small>Your site identifier from registration</small>
+                <input type="text" id="site-id-input" placeholder="site_xxx or your_site_name" />
+                
+                <button onclick="initializeSDK()">Initialize SDK</button>
+                <div id="init-status"></div>
+            </div>
+            
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('demo')">Live Demo</button>
+                <button class="tab" onclick="showTab('code')">Integration Code</button>
+                <button class="tab" onclick="showTab('api')">API Reference</button>
+            </div>
+            
+            <!-- Demo Tab -->
+            <div id="tab-demo" class="tab-content active">
+                <!-- Loading State -->
+                <div id="loading-section">
+                    <div class="status-box info">
+                        <p>Configure your API key and Site ID above, then click "Initialize SDK"</p>
+                    </div>
+                </div>
+                
+                <!-- Login Form -->
+                <div id="login-section" class="hidden">
+                    <h2>Login</h2>
+                    <p style="margin-bottom: 20px;">Enter your email to receive a login link. No password needed!</p>
+                    
+                    <input type="email" id="email-input" placeholder="your@email.com" />
+                    <button onclick="sendLoginEmail()">Send Login Email</button>
+                    <div id="login-status"></div>
+                    
+                    <div class="feature-grid">
+                        <div class="feature-item">
+                            <h4>No Passwords</h4>
+                            <p>Email-based authentication eliminates password management</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>Sign In Once</h4>
+                            <p>Credentials persist for 90 days - no repeated logins</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>Bot Resistant</h4>
+                            <p>Cryptographic nonces prevent replay attacks</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>Works Offline</h4>
+                            <p>Client-side verification with 7-day cache</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Authenticated View -->
+                <div id="authenticated-section" class="hidden">
+                    <h2>Authenticated</h2>
+                    
+                    <div class="user-profile">
+                        <div class="user-avatar" id="user-initials">U</div>
+                        <div class="user-details">
+                            <h3 id="user-email-display">user@example.com</h3>
+                            <p>Role: <span id="user-role-display">user</span></p>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <button class="success" onclick="testVerification()">Test Verification (~63us)</button>
+                        <button class="secondary" onclick="checkPermission()">Check Permission</button>
+                        <button class="danger" onclick="logout()">Logout</button>
+                    </div>
+                    
+                    <div id="auth-result"></div>
+                </div>
+            </div>
+            
+            <!-- Code Tab -->
+            <div id="tab-code" class="tab-content">
+                <h2>Integration Code</h2>
+                <p>Copy and paste this code into your website:</p>
+                
+                <h3>Step 1: Add SDK Script</h3>
+                <div class="code-block">
+<pre><span class="comment">&lt;!-- Add before &lt;/body&gt; --&gt;</span>
+<span class="keyword">&lt;script</span> src="<span class="string">https://lemma.id/static/js/lemma-wallet.js</span>"<span class="keyword">&gt;&lt;/script&gt;</span>
+<span class="keyword">&lt;script</span> src="<span class="string">https://lemma.id/static/js/lemma-auth-simple.js</span>"<span class="keyword">&gt;&lt;/script&gt;</span></pre>
+                </div>
+                
+                <h3>Step 2: Initialize Authentication</h3>
+                <div class="code-block">
+<pre><span class="keyword">const</span> auth = <span class="keyword">new</span> <span class="function">LemmaAuth</span>({
+    apiKey: <span class="string">'YOUR_API_KEY'</span>,      <span class="comment">// From lemma.id/dashboard</span>
+    siteId: <span class="string">'YOUR_SITE_ID'</span>,      <span class="comment">// Your site identifier</span>
+    debug: <span class="keyword">true</span>                   <span class="comment">// Enable console logs</span>
+});</pre>
+                </div>
+                
+                <h3>Step 3: Check Authentication</h3>
+                <div class="code-block">
+<pre><span class="comment">// Check if user has valid credential</span>
+<span class="keyword">const</span> isAuth = <span class="keyword">await</span> auth.<span class="function">isAuthenticated</span>();
+
+<span class="keyword">if</span> (isAuth) {
+    <span class="comment">// User is authenticated - show protected content</span>
+    <span class="keyword">const</span> user = <span class="keyword">await</span> auth.<span class="function">getUser</span>();
+    console.<span class="function">log</span>(<span class="string">'Authenticated as:'</span>, user.email);
+    <span class="function">showDashboard</span>();
+} <span class="keyword">else</span> {
+    <span class="comment">// Show login form</span>
+    <span class="function">showLoginForm</span>();
+}</pre>
+                </div>
+                
+                <h3>Step 4: Request Access</h3>
+                <div class="code-block">
+<pre><span class="comment">// Send login email to user</span>
+<span class="keyword">async function</span> <span class="function">requestAccess</span>(email) {
+    <span class="keyword">const</span> result = <span class="keyword">await</span> auth.<span class="function">sendLoginEmail</span>(email);
+    
+    <span class="keyword">if</span> (result.success) {
+        <span class="function">alert</span>(<span class="string">'Check your email to complete login!'</span>);
+    } <span class="keyword">else</span> {
+        <span class="function">alert</span>(<span class="string">'Error: '</span> + result.error);
+    }
+}</pre>
+                </div>
+                
+                <h3>Step 5: Protect Routes (Optional)</h3>
+                <div class="code-block">
+<pre><span class="comment">// Check specific permission</span>
+<span class="keyword">const</span> isAdmin = <span class="keyword">await</span> auth.<span class="function">hasPermission</span>(<span class="string">'admin'</span>);
+
+<span class="keyword">if</span> (!isAdmin) {
+    window.location.href = <span class="string">'/unauthorized'</span>;
+}</pre>
+                </div>
+            </div>
+            
+            <!-- API Tab -->
+            <div id="tab-api" class="tab-content">
+                <h2>LemmaAuth API Reference</h2>
+                
+                <h3>Constructor</h3>
+                <div class="code-block">
+<pre><span class="keyword">new</span> <span class="function">LemmaAuth</span>({
+    apiKey: <span class="string">'string'</span>,        <span class="comment">// Required: Your API key</span>
+    siteId: <span class="string">'string'</span>,        <span class="comment">// Required: Your site ID</span>
+    siteDomain: <span class="string">'string'</span>,    <span class="comment">// Optional: defaults to window.location.hostname</span>
+    debug: <span class="keyword">boolean</span>           <span class="comment">// Optional: enable debug logging</span>
+})</pre>
+                </div>
+                
+                <h3>Methods</h3>
+                
+                <div class="feature-grid">
+                    <div class="feature-item">
+                        <h4>isAuthenticated(skipNonce)</h4>
+                        <p>Returns <code>Promise&lt;boolean&gt;</code>. Pass <code>true</code> to skip nonce verification for faster checks.</p>
+                    </div>
+                    <div class="feature-item">
+                        <h4>getUser()</h4>
+                        <p>Returns <code>Promise&lt;{email, role, authenticated, credential}&gt;</code> or null if not authenticated.</p>
+                    </div>
+                    <div class="feature-item">
+                        <h4>sendLoginEmail(email, options)</h4>
+                        <p>Sends login email. Options: <code>{role, redirectUrl}</code>. Returns <code>{success, message}</code>.</p>
+                    </div>
+                    <div class="feature-item">
+                        <h4>hasPermission(permission)</h4>
+                        <p>Returns <code>Promise&lt;boolean&gt;</code>. Checks if user has specific permission.</p>
+                    </div>
+                    <div class="feature-item">
+                        <h4>logout()</h4>
+                        <p>Clears credentials from browser. Returns <code>Promise&lt;void&gt;</code>.</p>
+                    </div>
+                </div>
+                
+                <h3>Performance</h3>
+                <div class="status-box info">
+                    <p><strong>Client-side verification:</strong> ~63 microseconds (WebCrypto API)</p>
+                    <p><strong>Works offline:</strong> Yes, with 7-day cache</p>
+                    <p><strong>Credential duration:</strong> 90 days</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Console Log -->
+        <div class="card">
+            <h3>Console Log</h3>
+            <div id="console-log"></div>
+            <button class="secondary" onclick="clearLog()" style="margin-top: 15px;">Clear Log</button>
+        </div>
+    </div>
+
+    <!-- Load Lemma Scripts -->
+    <script src="https://lemma.id/static/js/lemma-wallet.js"></script>
+    <script src="https://lemma.id/static/js/lemma-auth-simple.js"></script>
+    
+    <script>
+        // Custom console logger
+        const logContainer = document.getElementById('console-log');
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${typeof message === 'object' ? JSON.stringify(message, null, 2) : message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addLog(args.join(' '), args[0]?.includes?.('Error') ? 'error' : args[0]?.includes?.('Success') ? 'success' : 'info');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addLog(args.join(' '), 'error');
+        };
+        
+        function clearLog() {
+            logContainer.innerHTML = '';
+        }
+        
+        // Tab switching
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+        
+        // Lemma Auth instance
+        let lemmaAuth = null;
+        
+        function initializeSDK() {
+            const apiKey = document.getElementById('api-key-input').value.trim();
+            const siteId = document.getElementById('site-id-input').value.trim();
+            
+            if (!apiKey || !siteId) {
+                showStatus('init-status', 'Please enter both API Key and Site ID', 'error');
+                return;
+            }
+            
+            try {
+                console.log('Initializing LemmaAuth...');
+                
+                lemmaAuth = new LemmaAuth({
+                    apiKey: apiKey,
+                    siteId: siteId,
+                    siteDomain: window.location.hostname,
+                    debug: true
+                });
+                
+                showStatus('init-status', 'SDK initialized successfully!', 'success');
+                console.log('Success: SDK initialized');
+                
+                // Check auth status
+                checkAuthStatus();
+                
+            } catch (error) {
+                console.error('Failed to initialize SDK:', error);
+                showStatus('init-status', 'Failed to initialize: ' + error.message, 'error');
+            }
+        }
+        
+        async function checkAuthStatus() {
+            if (!lemmaAuth) return;
+            
+            try {
+                console.log('Checking authentication status...');
+                
+                const isAuth = await lemmaAuth.isAuthenticated(true);
+                
+                document.getElementById('loading-section').classList.add('hidden');
+                
+                if (isAuth) {
+                    console.log('Success: User is authenticated');
+                    await showAuthenticatedView();
+                } else {
+                    console.log('User not authenticated - showing login');
+                    showLoginView();
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                showLoginView();
+            }
+        }
+        
+        function showLoginView() {
+            document.getElementById('loading-section').classList.add('hidden');
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('authenticated-section').classList.add('hidden');
+        }
+        
+        async function showAuthenticatedView() {
+            const user = await lemmaAuth.getUser();
+            
+            if (user) {
+                document.getElementById('user-email-display').textContent = user.email;
+                document.getElementById('user-role-display').textContent = user.role || 'user';
+                document.getElementById('user-initials').textContent = user.email.charAt(0).toUpperCase();
+                
+                document.getElementById('loading-section').classList.add('hidden');
+                document.getElementById('login-section').classList.add('hidden');
+                document.getElementById('authenticated-section').classList.remove('hidden');
+            }
+        }
+        
+        async function sendLoginEmail() {
+            const email = document.getElementById('email-input').value.trim();
+            
+            if (!email || !email.includes('@')) {
+                showStatus('login-status', 'Please enter a valid email address', 'error');
+                return;
+            }
+            
+            try {
+                console.log('Sending login email to: ' + email);
+                
+                const result = await lemmaAuth.sendLoginEmail(email, { role: 'user' });
+                
+                if (result.success) {
+                    showStatus('login-status', 'Check your email! Click the link to complete login.', 'success');
+                    console.log('Success: Login email sent');
+                } else {
+                    showStatus('login-status', result.error || 'Failed to send email', 'error');
+                    console.error('Failed to send login email');
+                }
+            } catch (error) {
+                console.error('Send email error:', error);
+                showStatus('login-status', 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function testVerification() {
+            if (!lemmaAuth) return;
+            
+            try {
+                console.log('Testing verification with nonce...');
+                
+                const startTime = performance.now();
+                const isAuth = await lemmaAuth.isAuthenticated(false); // With nonce
+                const duration = performance.now() - startTime;
+                
+                if (isAuth) {
+                    showStatus('auth-result', 
+                        `Verification successful in ${duration.toFixed(2)}ms - Bot resistance ACTIVE`, 
+                        'success'
+                    );
+                    console.log(`Success: Verified in ${duration.toFixed(2)}ms`);
+                } else {
+                    showStatus('auth-result', 'Verification failed', 'error');
+                }
+            } catch (error) {
+                console.error('Verification error:', error);
+                showStatus('auth-result', 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function checkPermission() {
+            if (!lemmaAuth) return;
+            
+            try {
+                const isAdmin = await lemmaAuth.hasPermission('admin');
+                showStatus('auth-result', 
+                    isAdmin ? 'You have admin permission' : 'You do not have admin permission', 
+                    isAdmin ? 'success' : 'info'
+                );
+            } catch (error) {
+                console.error('Permission check error:', error);
+            }
+        }
+        
+        async function logout() {
+            if (!lemmaAuth) return;
+            
+            try {
+                console.log('Logging out...');
+                await lemmaAuth.logout();
+                console.log('Success: Logged out');
+                showLoginView();
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+        
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.className = `status-box ${type}`;
+            element.innerHTML = `<p>${message}</p>`;
+            element.style.display = 'block';
+        }
+        
+        // Log initial message
+        console.log('Lemma Complete Integration Example loaded');
+        console.log('Enter your API Key and Site ID to begin');
+    </script>
+</body>
+</html>
+

@@ -16,8 +16,8 @@ Lemma IAM is a **standalone Identity and Access Management system** that provide
 
 | Feature | IAM-Only | Full Platform (PoH + IAM) |
 |---------|----------|---------------------------|
-| **Permission verification** | ✅ 31-94µs | ✅ 31-94µs |
-| **Client-side verification** | ✅ 0.36µs | ✅ 0.36µs |
+| **Permission verification** | ✅ 31-182µs (server) | ✅ 31-182µs (server) |
+| **Client-side verification** | ✅ ~63µs (WebCrypto) | ✅ ~63µs (WebCrypto) |
 | **Real crypto (Ed25519+OPRF)** | ✅ Yes | ✅ Yes |
 | **Stripe Identity required** | ❌ No | ✅ Yes ($2/user) |
 | **Cross-site identity** | ❌ No | ✅ Yes |
