@@ -327,6 +327,183 @@
     </div>
 </section>
 
+<!-- Proof of Humanity Section -->
+<section class="section" id="proof-of-humanity" style="background: linear-gradient(180deg, var(--gray-50) 0%, var(--white) 100%); padding: 80px 0;">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 48px;">
+            <h2 style="margin-bottom: 16px;">Proof of Humanity</h2>
+            <p class="text-gray" style="max-width: 700px; margin: 0 auto;">
+                Verify you're human once, use everywhere. Sybil-resistant credentials that protect against bots and fake accounts.
+            </p>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 48px; max-width: 900px; margin: 0 auto; align-items: center;">
+            <!-- Left: Explanation -->
+            <div>
+                <h3 style="font-size: var(--font-size-xl); margin-bottom: 16px; color: var(--gray-900);">One-Time Verification</h3>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="padding: 12px 0; border-bottom: 1px solid var(--gray-200); display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="color: #10b981; font-size: 20px;">&#10003;</span>
+                        <span><strong>Stripe Identity KYC</strong> - Government ID verification</span>
+                    </li>
+                    <li style="padding: 12px 0; border-bottom: 1px solid var(--gray-200); display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="color: #10b981; font-size: 20px;">&#10003;</span>
+                        <span><strong>Cross-site recognition</strong> - Works on all network sites</span>
+                    </li>
+                    <li style="padding: 12px 0; border-bottom: 1px solid var(--gray-200); display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="color: #10b981; font-size: 20px;">&#10003;</span>
+                        <span><strong>Privacy-preserving</strong> - Sites only know you're human</span>
+                    </li>
+                    <li style="padding: 12px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="color: #10b981; font-size: 20px;">&#10003;</span>
+                        <span><strong>Bot elimination</strong> - 99.9% protection without CAPTCHAs</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <!-- Right: Status Card -->
+            <div id="poh-status-card" style="background: var(--gray-900); border-radius: 16px; padding: 32px; text-align: center;">
+                <!-- Loading state -->
+                <div id="poh-loading" style="display: none;">
+                    <p style="color: var(--gray-400); margin: 0;">Checking humanity status...</p>
+                </div>
+                
+                <!-- Not verified state -->
+                <div id="poh-not-verified">
+                    <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--gray-800); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                    </div>
+                    <h3 style="color: var(--white); margin: 0 0 8px 0; font-size: var(--font-size-lg);">Not Yet Verified</h3>
+                    <p style="color: var(--gray-400); margin: 0 0 24px 0; font-size: var(--font-size-sm);">
+                        Complete a one-time verification to prove you're human
+                    </p>
+                    <button id="start-poh-btn" onclick="startPoHVerification()" style="background: #10b981; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-size: var(--font-size-base); font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                        Verify as Human
+                    </button>
+                    <p style="color: var(--gray-500); margin: 16px 0 0 0; font-size: var(--font-size-xs);">
+                        Free during beta
+                    </p>
+                </div>
+                
+                <!-- Verified state -->
+                <div id="poh-verified" style="display: none;">
+                    <div style="width: 64px; height: 64px; border-radius: 50%; background: #10b981; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                    </div>
+                    <h3 style="color: #10b981; margin: 0 0 8px 0; font-size: var(--font-size-lg);">Human Verified</h3>
+                    <p style="color: var(--gray-400); margin: 0 0 8px 0; font-size: var(--font-size-sm);">
+                        Your humanity credential is active
+                    </p>
+                    <p id="poh-credential-id" style="color: var(--gray-500); margin: 0; font-size: var(--font-size-xs); font-family: monospace;">
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+// Proof of Humanity status check
+async function checkPoHStatus() {
+    const loadingEl = document.getElementById('poh-loading');
+    const notVerifiedEl = document.getElementById('poh-not-verified');
+    const verifiedEl = document.getElementById('poh-verified');
+    
+    // Check for identity credential in wallet
+    if (window.globalLemmaWallet) {
+        try {
+            const credentials = await window.globalLemmaWallet.getCredentials();
+            const identityCred = credentials.find(c => {
+                const claims = c.claims || c.credentialSubject || {};
+                return claims.packageType === 'identity' || claims.isHuman === 'true';
+            });
+            
+            if (identityCred) {
+                notVerifiedEl.style.display = 'none';
+                verifiedEl.style.display = 'block';
+                document.getElementById('poh-credential-id').textContent = identityCred.id ? identityCred.id.substring(0, 20) + '...' : '';
+                return;
+            }
+        } catch (e) {
+            console.warn('PoH check failed:', e);
+        }
+    }
+    
+    // Default: not verified
+    notVerifiedEl.style.display = 'block';
+    verifiedEl.style.display = 'none';
+}
+
+// Start PoH verification
+async function startPoHVerification() {
+    const btn = document.getElementById('start-poh-btn');
+    btn.textContent = 'Starting...';
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch('/api/sdk/start-identity-verification', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer demo-integration-key-12345'
+            },
+            body: JSON.stringify({
+                provider: 'stripe_identity',
+                inline_mode: false,
+                return_url: window.location.origin + '/?poh_return=true'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.url) {
+            window.location.href = result.url;
+        } else {
+            throw new Error(result.message || 'Failed to start verification');
+        }
+    } catch (error) {
+        console.error('PoH verification failed:', error);
+        btn.textContent = 'Verification failed';
+        btn.disabled = false;
+        setTimeout(() => {
+            btn.textContent = 'Verify as Human';
+        }, 3000);
+    }
+}
+
+// Check PoH status after wallet initializes
+setTimeout(checkPoHStatus, 2000);
+
+// Handle return from Stripe Identity
+if (window.location.search.includes('poh_return=true')) {
+    // Complete verification
+    fetch('/api/sdk/complete-identity-verification', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer demo-integration-key-12345'
+        },
+        body: JSON.stringify({ verification_return: true })
+    }).then(r => r.json()).then(result => {
+        if (result.success && result.credential) {
+            // Store in wallet
+            if (window.globalLemmaWallet) {
+                window.globalLemmaWallet.storeCredential(result.credential);
+            }
+            // Update UI
+            setTimeout(checkPoHStatus, 500);
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }).catch(console.error);
+}
+</script>
+
 <!-- CTA Section -->
 <section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">
