@@ -276,7 +276,11 @@
             try {
                 // Create global wallet instance (reused by wallet.html)
                 if (!window.globalLemmaWallet) {
-                    window.globalLemmaWallet = new LemmaWallet({debug: false});
+                    window.globalLemmaWallet = new LemmaWallet({
+                        debug: false,
+                        enableDeviceSync: true,
+                        enableAdvancedFeatures: true
+                    });
                     await window.globalLemmaWallet.init();
                 }
                 const wallet = window.globalLemmaWallet;
@@ -337,7 +341,11 @@
         async function handleSessionFreeLogout() {
             try {
                 // Reuse global wallet instance
-                const wallet = window.globalLemmaWallet || new LemmaWallet({debug: false});
+                const wallet = window.globalLemmaWallet || new LemmaWallet({
+                    debug: false,
+                    enableDeviceSync: true,
+                    enableAdvancedFeatures: true
+                });
                 if (!window.globalLemmaWallet) {
                     await wallet.init();
                 }
