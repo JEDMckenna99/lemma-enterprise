@@ -390,7 +390,7 @@ if (hasAccess) {
                         <li><strong>Email confirmation</strong> → Lemma sends confirmation email</li>
                         <li><strong>Permission lemma issued</strong> → Ed25519-signed credential</li>
                         <li><strong>Stored in browser wallet</strong> → AES-256-GCM encrypted</li>
-                        <li><strong>Verification (client-side)</strong> → 0.36µs WebAssembly</li>
+                        <li><strong>Verification (server-side)</strong> → 31-182µs Rust Ed25519</li>
                         <li><strong>Background checks</strong> → Continuous nonce verification</li>
                         <li><strong>Revocation (if needed)</strong> → OPRF + Bloom filter</li>
                     </ol>
@@ -408,7 +408,7 @@ User → Lemma: Click confirmation
 Lemma → User Browser: Permission lemma (Ed25519 signed)
 User Browser → Local Storage: Store encrypted credential
 User → Your Site: Return with credential
-Your Site → Client (0.36µs): Verify Ed25519 signature
+Your Site → Lemma API (31-182µs): Verify Ed25519 signature
 Client → Your Site: ✅ Access granted
 
 Every 5 minutes (background):
@@ -576,7 +576,7 @@ const lemmaIAM = new LemmaIAM({
     siteId: 'YOUR_SITE_ID'
 });
 
-// Check access (client-side, 0.36µs)
+// Check access (microsecond verification)
 const result = await lemmaIAM.verifyAccess(
     '/admin/users',  // resource
     'read'           // action
@@ -756,7 +756,7 @@ window.addEventListener('DOMContentLoaded', checkAccess);
                 
                 <p style="background: #e0f2fe; padding: 16px; border-left: 4px solid #3b82f6; border-radius: 4px; margin-top: 16px; font-size: 14px;">
                     <strong>ℹ️ Note:</strong> Current implementation uses server-side Rust verification (31-182µs). 
-                    Client-side WebAssembly verification (0.36µs, 500,000x faster) is in development for Q1 2026.
+                    Client-side WebAssembly verification (targeting sub-microsecond speeds) is in development for Q1 2026.
                 </p>
             </section>
 
