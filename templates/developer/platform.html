@@ -1398,9 +1398,9 @@
                                         <td>
                                             ${user.status === 'active' ? (
                                                 window.isLemmaAdmin ? `
-                                                    <button class="btn btn-secondary btn-sm" onclick="showRevokeModal('${user.email}', '${user.credential_id || ''}')">
-                                                        Revoke
-                                                    </button>
+                                                <button class="btn btn-secondary btn-sm" onclick="showRevokeModal('${user.email}', '${user.credential_id || ''}')">
+                                                    Revoke
+                                                </button>
                                                 ` : '<span style="color: #9ca3af; font-size: 11px;">-</span>'
                                             ) : '<span style="color: #9ca3af; font-size: 13px;">Revoked</span>'}
                                         </td>
