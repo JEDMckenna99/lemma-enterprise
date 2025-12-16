@@ -214,161 +214,98 @@
 </section>
 
 <script>
-// Check for valid lemma on page load - uses existing wallet from session-free nav
-document.addEventListener('DOMContentLoaded', async function() {
+// Hero card state - watches for window.lemmaCredential set by session-free nav in layout.html
+(function() {
     const loadingEl = document.getElementById('status-loading');
     const noLemmaEl = document.getElementById('status-no-lemma');
     const hasLemmaEl = document.getElementById('status-has-lemma');
     const primaryBtn = document.getElementById('hero-primary-btn');
     
-    console.log('Lemma sign-in check starting...');
-    
-    // Wait for existing wallet to be ready (session-free nav initializes it)
-    async function waitForWallet(maxWait = 3000) {
-        const start = Date.now();
-        while (Date.now() - start < maxWait) {
-            // Check for global wallet from session-free nav
-            if (window.globalLemmaWallet && window.globalLemmaWallet.initialized) {
-                return window.globalLemmaWallet;
-            }
-            // Also check localStorage directly as fallback
-            await new Promise(r => setTimeout(r, 100));
+    function showSignedIn(cred) {
+        const claims = cred.claims || cred.credentialSubject || {};
+        const email = claims.email || 'User';
+        const permissionId = claims.permissionId || claims.permission_level || 'access';
+        const displayName = claims.displayName || permissionId;
+        const expiresAt = claims.expiresAt ? parseInt(claims.expiresAt) * 1000 : null;
+        
+        // Format expiry
+        let expiryText = 'No expiration';
+        if (expiresAt) {
+            const expiryDate = new Date(expiresAt);
+            const daysLeft = Math.ceil((expiresAt - Date.now()) / (1000 * 60 * 60 * 24));
+            expiryText = `Valid until ${expiryDate.toLocaleDateString()} (${daysLeft} days)`;
         }
-        return null;
+        
+        // Update UI
+        document.getElementById('lemma-user-email').textContent = email;
+        document.getElementById('lemma-permission-badge').innerHTML = `<span style="background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 20px; font-weight: 500;">${displayName}</span>`;
+        document.getElementById('lemma-expiry').textContent = expiryText;
+        
+        // Show valid lemma state
+        loadingEl.style.display = 'none';
+        noLemmaEl.style.display = 'none';
+        hasLemmaEl.style.display = 'block';
+        
+        // Trigger sign-in animation
+        setTimeout(() => {
+            const checkmark = document.getElementById('signin-checkmark');
+            if (checkmark) {
+                checkmark.style.opacity = '1';
+                checkmark.style.top = '-50px';
+            }
+            const circle = document.getElementById('check-circle');
+            const path = document.getElementById('check-path');
+            if (circle) circle.style.strokeDashoffset = '0';
+            if (path) path.style.strokeDashoffset = '0';
+            
+            const header = document.getElementById('signin-header');
+            if (header) {
+                header.style.opacity = '1';
+                header.style.transform = 'translateY(0)';
+            }
+            
+            setTimeout(() => {
+                const userinfo = document.getElementById('signin-userinfo');
+                if (userinfo) {
+                    userinfo.style.opacity = '1';
+                    userinfo.style.transform = 'translateY(0)';
+                }
+            }, 200);
+            
+            setTimeout(() => {
+                const details = document.getElementById('signin-details');
+                if (details) {
+                    details.style.opacity = '1';
+                    details.style.transform = 'translateY(0)';
+                }
+            }, 400);
+        }, 100);
+        
+        // Update button
+        primaryBtn.textContent = 'Go to Platform';
+        primaryBtn.href = '/developer/platform';
     }
     
-    try {
-        // Wait for existing wallet (don't create new one - causes "init called 2 times" error)
-        let wallet = await waitForWallet();
-        
-        // If no global wallet, read credentials directly from localStorage
-        let credentials = [];
-        if (wallet) {
-            credentials = await wallet.getCredentials();
-            console.log('Got credentials from global wallet:', credentials.length);
-        } else {
-            // Fallback: read directly from localStorage
-            console.log('No global wallet, reading localStorage directly');
-            const stored = localStorage.getItem('lemma_credentials');
-            if (stored) {
-                try {
-                    credentials = JSON.parse(stored);
-                    console.log('Got credentials from localStorage:', credentials.length);
-                } catch (e) {
-                    console.warn('Failed to parse stored credentials');
-                }
-            }
-        }
-        
-        console.log('All credentials found:', credentials.length, credentials);
-        
-        // Look for lemma.id platform credentials (more lenient matching)
-        const platformCredentials = credentials.filter(c => {
-            const claims = c.claims || c.credentialSubject || c || {};
-            const siteDomain = claims.siteDomain || claims.site_domain || '';
-            const siteId = claims.siteId || claims.site_id || '';
-            const networkType = claims.networkType || claims.network_type || '';
-            
-            // Match lemma.id credentials
-            const isLemmaPlatform = 
-                siteDomain === 'lemma.id' || 
-                siteId === 'lemma_platform' ||
-                networkType === 'iam_permission';
-            
-            console.log('Credential check:', { siteDomain, siteId, networkType, isLemmaPlatform });
-            return isLemmaPlatform;
-        });
-        
-        console.log('Platform credentials found:', platformCredentials.length);
-        
-        if (platformCredentials.length > 0) {
-            // Check each credential for validity
-            for (const cred of platformCredentials) {
-                console.log('Checking credential:', cred.id || cred);
-                
-                // Check expiry
-                const claims = cred.claims || cred.credentialSubject || cred || {};
-                const expiresAt = claims.expiresAt ? parseInt(claims.expiresAt) * 1000 : null;
-                if (expiresAt && expiresAt < Date.now()) {
-                    console.log('Credential is expired, skipping');
-                    continue;
-                }
-                
-                // Valid credential found!
-                console.log('Valid credential found!', claims);
-                const email = claims.email || 'User';
-                const permissionId = claims.permissionId || claims.permission_level || 'access';
-                const displayName = claims.displayName || permissionId;
-                
-                // Format expiry
-                let expiryText = 'No expiration';
-                if (expiresAt) {
-                    const expiryDate = new Date(expiresAt);
-                    const daysLeft = Math.ceil((expiresAt - Date.now()) / (1000 * 60 * 60 * 24));
-                    expiryText = `Valid until ${expiryDate.toLocaleDateString()} (${daysLeft} days)`;
-                }
-                
-                // Update UI
-                document.getElementById('lemma-user-email').textContent = email;
-                document.getElementById('lemma-permission-badge').innerHTML = `<span style="background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 20px; font-weight: 500;">${displayName}</span>`;
-                document.getElementById('lemma-expiry').textContent = expiryText;
-                
-                // Show valid lemma state
-                loadingEl.style.display = 'none';
-                noLemmaEl.style.display = 'none';
-                hasLemmaEl.style.display = 'block';
-                
-                // Trigger sign-in animation sequence
-                setTimeout(() => {
-                    // Animate checkmark in
-                    const checkmark = document.getElementById('signin-checkmark');
-                    checkmark.style.opacity = '1';
-                    checkmark.style.top = '-50px';
-                    
-                    // Draw the circle and check
-                    document.getElementById('check-circle').style.strokeDashoffset = '0';
-                    document.getElementById('check-path').style.strokeDashoffset = '0';
-                    
-                    // Animate header
-                    document.getElementById('signin-header').style.opacity = '1';
-                    document.getElementById('signin-header').style.transform = 'translateY(0)';
-                    
-                    // Animate user info
-                    setTimeout(() => {
-                        document.getElementById('signin-userinfo').style.opacity = '1';
-                        document.getElementById('signin-userinfo').style.transform = 'translateY(0)';
-                    }, 200);
-                    
-                    // Animate details
-                    setTimeout(() => {
-                        document.getElementById('signin-details').style.opacity = '1';
-                        document.getElementById('signin-details').style.transform = 'translateY(0)';
-                    }, 400);
-                }, 100);
-                
-                // Update button to go to platform
-                primaryBtn.textContent = 'Go to Platform';
-                primaryBtn.href = '/developer/platform';
-                
-                console.log('Instant sign-in completed for', email);
-                return;
-            }
-        }
-        
-        // No valid platform credential found
-        console.log('No valid lemma.id credential found, showing Join Beta');
-        loadingEl.style.display = 'none';
-        noLemmaEl.style.display = 'block';
-        hasLemmaEl.style.display = 'none';
-        
-    } catch (error) {
-        console.error('Credential check failed:', error);
-        // Show default state on error
+    function showJoinBeta() {
         loadingEl.style.display = 'none';
         noLemmaEl.style.display = 'block';
         hasLemmaEl.style.display = 'none';
     }
-});
+    
+    // Poll for window.lemmaCredential (set by initSessionFreeNav in layout.html)
+    let checks = 0;
+    const maxChecks = 30; // 3 seconds max
+    const checkInterval = setInterval(() => {
+        checks++;
+        if (window.lemmaCredential) {
+            clearInterval(checkInterval);
+            showSignedIn(window.lemmaCredential);
+        } else if (checks >= maxChecks) {
+            clearInterval(checkInterval);
+            showJoinBeta();
+        }
+    }, 100);
+})();
 </script>
 
 <!-- How It Works Section -->
