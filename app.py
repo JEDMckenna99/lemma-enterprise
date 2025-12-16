@@ -204,6 +204,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register QR Generator: {e}")
 
+    # SDK Authentication API
+    try:
+        from api.sdk_auth import sdk_auth_bp
+        app.register_blueprint(sdk_auth_bp)
+        logger.info("✅ SDK Auth API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register SDK Auth API: {e}")
+
     # Multi-lemma System
     try:
         from api.multi_lemma_wallet_sync import multi_lemma_sync_bp
@@ -500,6 +508,12 @@ def create_app():
         """Manual testing interface for advanced wallet features"""
         return render_template('modern/wallet_testing.html')
 
+    @app.route('/examples/sdk-test')
+    def sdk_test_page():
+        """SDK Integration Test Page"""
+        logger.info("📄 Serving SDK test page")
+        return render_template('examples/sdk-test.html')
+    
     @app.route('/examples/<path:filename>')
     def serve_examples(filename):
         """Serve example HTML files for testing and demos"""

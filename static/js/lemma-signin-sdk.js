@@ -224,7 +224,7 @@ class LemmaSignIn {
      */
     initiateSignIn() {
         const returnUrl = encodeURIComponent(window.location.href);
-        window.location.href = `${this.config.apiBase}/auth/request?site=${this.config.siteId}&return=${returnUrl}`;
+        window.location.href = `${this.config.apiBase}/auth/sdk-request?site=${this.config.siteId}&return=${returnUrl}`;
     }
     
     /**
