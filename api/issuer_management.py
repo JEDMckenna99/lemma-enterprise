@@ -22,14 +22,29 @@ class LemmaIssuerManager:
         
     def get_federated_issuer(self):
         """Get consistent federated identity issuer"""
+        import os
+        import hashlib
+        
         issuer_key = 'federated_identity'
         
         if issuer_key not in self._issuers:
             try:
                 from lemma_crypto import PyMinimalIssuer
                 
-                # Create persistent federated issuer from environment (shared key)
-                issuer = PyMinimalIssuer.from_env_or_default()
+                # Create persistent federated issuer from environment seed or derive from secret
+                federated_seed_hex = os.environ.get('LEMMA_FEDERATED_ISSUER_SEED')
+                
+                if federated_seed_hex:
+                    # Use configured seed
+                    seed_bytes = bytes.fromhex(federated_seed_hex)
+                    issuer = PyMinimalIssuer.from_seed(list(seed_bytes))
+                    logger.info("✅ Using LEMMA_FEDERATED_ISSUER_SEED for federated issuer")
+                else:
+                    # Derive deterministic seed from API key (ensures consistency)
+                    api_secret = os.environ.get('LEMMA_API_SECRET', 'lemma-federated-network-default-seed-v1')
+                    seed_bytes = hashlib.sha256(api_secret.encode()).digest()
+                    issuer = PyMinimalIssuer.from_seed(list(seed_bytes))
+                    logger.info("✅ Derived federated issuer seed from LEMMA_API_SECRET")
                 
                 self._issuers[issuer_key] = issuer
                 self._issuer_metadata[issuer_key] = {
