@@ -338,7 +338,7 @@ Day 90: Credential expires
 | **Server Tracking** | Full tracking | **Zero tracking** |
 | **Offline Capability** | No | **Yes (7 days)** |
 | **Revocation Speed** | 30-60s | **<100ms** |
-| **Verification Speed** | 200-500ms | **~0.36µs WASM / ~1-5ms JS (offline)** |
+| **Verification Speed** | 200-500ms | **~63µs client-side (3,000-8,000x faster)** |
 | **Cost per Verification** | $0.05 | **$0.00** |
 
 ---
