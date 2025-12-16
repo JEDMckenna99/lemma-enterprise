@@ -1653,29 +1653,41 @@ class LemmaWallet {
         // Removed rate limiting to allow unique QR generation each time
         
         try {
-            const credentials = await this.getCredentials();
+            // Collect ALL credentials (both identity/PoH and permissions)
+            const identityCredentials = await this.getCredentials('identity');
+            const permissionCredentials = await this.getCredentials('permission');
+            const allCredentials = [...identityCredentials, ...permissionCredentials];
+            
+            if (this.debug) {
+                console.log(`📊 Collecting credentials for transfer:`);
+                console.log(`   - Identity/PoH: ${identityCredentials.length}`);
+                console.log(`   - Permissions: ${permissionCredentials.length}`);
+                console.log(`   - Total: ${allCredentials.length}`);
+            }
             
             // Allow QR generation even with empty wallet for initial device setup
             const walletData = {
-                credentials: credentials,
+                credentials: allCredentials,
                 metadata: {
                     exported_at: Date.now(),
                     device_fingerprint: this.getDeviceFingerprint(),
                     export_source: window.location.origin,
-                    credential_count: credentials.length,
-                    wallet_type: credentials.length > 0 ? 'populated' : 'empty'
+                    credential_count: allCredentials.length,
+                    identity_count: identityCredentials.length,
+                    permission_count: permissionCredentials.length,
+                    wallet_type: allCredentials.length > 0 ? 'populated' : 'empty'
                 }
             };
             
             if (this.debug) {
-                console.log(`📊 Generating QR for ${credentials.length > 0 ? 'populated' : 'empty'} wallet (${credentials.length} credentials)`);
+                console.log(`📊 Generating QR for ${allCredentials.length > 0 ? 'populated' : 'empty'} wallet (${allCredentials.length} credentials)`);
             }
             
             const walletJson = JSON.stringify(walletData);
             const walletSize = walletJson.length;
             
             if (this.debug) {
-                console.log(`📊 Wallet size: ${walletSize} bytes (${credentials.length} credentials)`);
+                console.log(`📊 Wallet size: ${walletSize} bytes (${allCredentials.length} credentials)`);
             }
             
             // Use QR trigger approach (small QR, internet transfer)

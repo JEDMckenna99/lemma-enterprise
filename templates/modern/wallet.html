@@ -1637,8 +1637,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update sync info based on credential count
                     const syncInfo = document.getElementById('sync-info');
                     const credentialCount = qrResult.metadata?.credential_count || 0;
+                    const identityCount = qrResult.metadata?.identity_count || 0;
+                    const permissionCount = qrResult.metadata?.permission_count || 0;
+                    
                     if (credentialCount > 0) {
-                        syncInfo.textContent = `Will sync ${credentialCount} credentials`;
+                        let syncText = `Will sync ${credentialCount} credential${credentialCount > 1 ? 's' : ''}`;
+                        if (identityCount > 0 && permissionCount > 0) {
+                            syncText += ` (${identityCount} PoH, ${permissionCount} permission${permissionCount > 1 ? 's' : ''})`;
+                        } else if (identityCount > 0) {
+                            syncText += ' (PoH)';
+                        } else if (permissionCount > 0) {
+                            syncText += ` (${permissionCount} permission${permissionCount > 1 ? 's' : ''})`;
+                        }
+                        syncInfo.textContent = syncText;
                     } else {
                         syncInfo.textContent = 'Will sync empty wallet (for initial setup)';
                         syncInfo.style.color = '#f59e0b'; // Orange for empty wallet
