@@ -156,52 +156,39 @@
                 </div>
                 
                 <!-- Has valid lemma state - Signed In -->
-                <div id="status-has-lemma" style="display: none; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 32px; border-radius: 12px; box-shadow: 0 8px 30px rgba(59, 130, 246, 0.4); position: relative; overflow: hidden;">
+                <div id="status-has-lemma" style="display: none; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 40px 32px; border-radius: 16px; box-shadow: 0 8px 30px rgba(59, 130, 246, 0.4); position: relative; overflow: hidden;">
                     <!-- Animated checkmark -->
                     <div id="signin-checkmark" style="position: absolute; top: -100px; left: 50%; transform: translateX(-50%); opacity: 0; transition: all 0.5s ease-out;">
-                        <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                            <circle cx="40" cy="40" r="38" stroke="rgba(255,255,255,0.3)" stroke-width="4" fill="none"/>
-                            <circle id="check-circle" cx="40" cy="40" r="38" stroke="#10b981" stroke-width="4" fill="none" stroke-dasharray="240" stroke-dashoffset="240" style="transition: stroke-dashoffset 0.6s ease-out 0.3s;"/>
-                            <path id="check-path" d="M24 42L35 53L56 28" stroke="#10b981" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke-dasharray="50" stroke-dashoffset="50" style="transition: stroke-dashoffset 0.4s ease-out 0.7s;"/>
+                        <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+                            <circle cx="36" cy="36" r="34" stroke="rgba(255,255,255,0.2)" stroke-width="3" fill="none"/>
+                            <circle id="check-circle" cx="36" cy="36" r="34" stroke="#10b981" stroke-width="3" fill="none" stroke-dasharray="214" stroke-dashoffset="214" style="transition: stroke-dashoffset 0.6s ease-out 0.3s;"/>
+                            <path id="check-path" d="M22 38L32 48L50 26" stroke="#10b981" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke-dasharray="50" stroke-dashoffset="50" style="transition: stroke-dashoffset 0.4s ease-out 0.7s;"/>
                         </svg>
                     </div>
                     
                     <!-- Signed in header with animation -->
                     <div id="signin-header" style="opacity: 0; transform: translateY(20px); transition: all 0.4s ease-out;">
-                        <p style="margin: 0 0 4px 0; font-size: var(--font-size-sm); color: rgba(255,255,255,0.7); text-align: center; text-transform: uppercase; letter-spacing: 2px;">
-                            Instant Verification
-                        </p>
-                        <p style="margin: 0 0 16px 0; font-size: var(--font-size-3xl); color: var(--white); font-weight: 700; text-align: center;">
+                        <p style="margin: 0 0 20px 0; font-size: var(--font-size-3xl); color: var(--white); font-weight: 700; text-align: center;">
                             You're Signed In
                         </p>
                     </div>
                     
                     <!-- User info -->
-                    <div id="signin-userinfo" style="opacity: 0; transform: translateY(20px); transition: all 0.4s ease-out 0.2s;">
-                        <p id="lemma-user-email" style="margin: 0 0 8px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 600; text-align: center;">
+                    <div id="signin-userinfo" style="opacity: 0; transform: translateY(20px); transition: all 0.4s ease-out 0.2s; text-align: center;">
+                        <p id="lemma-user-email" style="margin: 0 0 12px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 600;">
                             <!-- Email will be inserted here -->
                         </p>
-                        <p id="lemma-permission-badge" style="margin: 0 0 16px 0; font-size: var(--font-size-base); color: var(--white); text-align: center;">
+                        <p id="lemma-permission-badge" style="margin: 0; font-size: var(--font-size-base); color: var(--white);">
                             <!-- Permission badge will be inserted here -->
                         </p>
                     </div>
                     
-                    <!-- Verification details -->
-                    <div id="signin-details" style="opacity: 0; transform: translateY(20px); transition: all 0.4s ease-out 0.4s; background: rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; margin-top: 8px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                            <span style="font-size: var(--font-size-sm); color: rgba(255,255,255,0.8);">
-                                <span style="color: #10b981; font-weight: 600;">63µs</span> local verification
-                            </span>
-                            <span id="lemma-expiry" style="font-size: var(--font-size-sm); color: rgba(255,255,255,0.8);">
-                                <!-- Expiry info will be inserted here -->
-                            </span>
-                        </div>
+                    <!-- Subtle footer message -->
+                    <div id="signin-details" style="opacity: 0; transform: translateY(20px); transition: all 0.4s ease-out 0.4s;">
+                        <p style="margin: 24px 0 0 0; font-size: var(--font-size-sm); color: rgba(255,255,255,0.6); text-align: center;">
+                            Verified locally in your browser - no password, no server call
+                        </p>
                     </div>
-                    
-                    <!-- No password message -->
-                    <p style="margin: 16px 0 0 0; font-size: var(--font-size-sm); color: rgba(255,255,255,0.7); text-align: center;">
-                        No password entered. No server call. Verified locally in your browser.
-                    </p>
                 </div>
             </div>
             
@@ -226,20 +213,10 @@
         const email = claims.email || 'User';
         const permissionId = claims.permissionId || claims.permission_level || 'access';
         const displayName = claims.displayName || permissionId;
-        const expiresAt = claims.expiresAt ? parseInt(claims.expiresAt) * 1000 : null;
-        
-        // Format expiry
-        let expiryText = 'No expiration';
-        if (expiresAt) {
-            const expiryDate = new Date(expiresAt);
-            const daysLeft = Math.ceil((expiresAt - Date.now()) / (1000 * 60 * 60 * 24));
-            expiryText = `Valid until ${expiryDate.toLocaleDateString()} (${daysLeft} days)`;
-        }
         
         // Update UI
         document.getElementById('lemma-user-email').textContent = email;
-        document.getElementById('lemma-permission-badge').innerHTML = `<span style="background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 20px; font-weight: 500;">${displayName}</span>`;
-        document.getElementById('lemma-expiry').textContent = expiryText;
+        document.getElementById('lemma-permission-badge').innerHTML = `<span style="background: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 24px; font-weight: 500; font-size: var(--font-size-sm);">${displayName}</span>`;
         
         // Show valid lemma state
         loadingEl.style.display = 'none';
