@@ -110,6 +110,9 @@ def verify_credential():
     """
     Verify a credential is still valid
     Used by SDK to check credential validity
+    
+    SECURITY: Now includes trusted issuer validation to reject credentials
+    signed by unknown/revoked issuers.
     """
     if request.method == 'OPTIONS':
         return jsonify({'success': True}), 200
@@ -121,30 +124,18 @@ def verify_credential():
         if not credential:
             return jsonify({'valid': False, 'error': 'No credential provided'}), 400
         
-        # Extract claims
+        # Use secure verification with trusted issuer check
+        from .trusted_issuers import verify_credential_with_trust
+        result = verify_credential_with_trust(credential)
+        
         claims = credential.get('claims', credential.get('credentialSubject', {}))
         
-        # Check expiry
-        expires_at = claims.get('expiresAt')
-        if expires_at:
-            import time
-            if int(expires_at) < time.time():
-                return jsonify({'valid': False, 'reason': 'expired'})
-        
-        # Check revocation (if bloom filter available)
-        credential_id = credential.get('id', '')
-        if credential_id:
-            try:
-                from .revocation_api import get_global_verifier
-                verifier = get_global_verifier()
-                if verifier and verifier.is_revoked(credential_id):
-                    return jsonify({'valid': False, 'reason': 'revoked'})
-            except Exception as e:
-                logger.warning(f"Revocation check failed: {e}")
-        
         return jsonify({
-            'valid': True,
-            'claims': claims
+            'valid': result['valid'],
+            'claims': claims if result['valid'] else {},
+            'reason': result.get('reason'),
+            'issuer_trusted': result['issuer_trusted'],
+            'signature_valid': result['signature_valid']
         })
         
     except Exception as e:

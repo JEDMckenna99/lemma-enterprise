@@ -221,6 +221,17 @@ def has_valid_lemma_credential(user_id: str = None) -> Dict[str, Any]:
             if not claims.get('isHuman'):
                 continue  # Skip credentials without human verification
             
+            # SECURITY: Check trusted issuer FIRST
+            issuer_did = credential.get('issuer')
+            if issuer_did:
+                try:
+                    from api.trusted_issuers import is_trusted_issuer
+                    if not is_trusted_issuer(issuer_did):
+                        logger.warning(f"🚫 Credential from UNTRUSTED issuer - skipping: {issuer_did[:50]}...")
+                        continue  # Skip credentials from untrusted issuers
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not check issuer trust: {e}")
+            
             # Check credential expiry
             expires_at = credential.get('expires_at', 0)
             if expires_at > 0 and time.time() > expires_at:
