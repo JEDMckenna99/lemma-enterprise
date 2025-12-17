@@ -116,6 +116,8 @@ class LemmaKMSManager:
             # Encrypt using KMS with encryption context
             # Encryption context provides additional authenticated data (AAD)
             # and is logged in CloudTrail for audit purposes
+            # NOTE: We do NOT include timestamp in encryption context because
+            # the exact same context must be provided during decryption.
             response = self.kms.encrypt(
                 KeyId=self.master_key_id,
                 Plaintext=signing_key_bytes,
@@ -123,8 +125,7 @@ class LemmaKMSManager:
                     'site_id': site_id,
                     'key_type': 'ed25519_signing_key',
                     'purpose': 'lemma_iam_credential_signing',
-                    'version': '1.0',
-                    'timestamp': str(int(datetime.utcnow().timestamp()))
+                    'version': '1.0'
                 }
             )
             
