@@ -82,7 +82,7 @@ def migrate_all_to_kms():
                 print(f"  Creating new site entry...")
                 site = Site(
                     site_id=site_id,
-                    site_name=site_config['name'],
+                    company_name=site_config['name'],
                     site_domain=site_config['domain'],
                     admin_email=site_config['admin_email'],
                     created_at=datetime.utcnow(),

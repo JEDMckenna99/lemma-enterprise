@@ -83,7 +83,7 @@ class LemmaIssuerManager:
             if not site:
                 site = Site(
                     site_id=site_id,
-                    site_name=issuer_name,
+                    company_name=issuer_name,
                     site_domain='lemma.id',
                     admin_email='admin@lemma.id',
                     created_at=datetime.utcnow(),
