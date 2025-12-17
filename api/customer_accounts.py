@@ -137,6 +137,9 @@ def _extract_customer_id_from_request() -> Optional[str]:
     Attempt to extract customer_id from Authorization bearer credential,
     falling back to session if available. Returns None if not authenticated.
     
+    SECURITY: Now validates that the credential's issuer is trusted before
+    extracting customer info. Credentials from old/untrusted issuers are rejected.
+    
     Supports multiple credential formats:
     - did:lemma:customer:{customer_id} - direct customer ID
     - did:lemma:user:{user_id} - IAM user, lookup by email in claims
@@ -147,6 +150,20 @@ def _extract_customer_id_from_request() -> Optional[str]:
         try:
             credential_json = auth_header.split(' ', 1)[1]
             credential = json.loads(credential_json)
+            
+            # SECURITY: Validate issuer is trusted BEFORE processing credential
+            issuer_did = credential.get('issuer')
+            if issuer_did:
+                try:
+                    from api.trusted_issuers import is_trusted_issuer
+                    if not is_trusted_issuer(issuer_did):
+                        logger.warning(f"🚫 REJECTED credential from UNTRUSTED issuer: {issuer_did[:50]}...")
+                        return None
+                except Exception as e:
+                    logger.error(f"Trusted issuer check failed: {e}")
+                    # Fail closed - reject if we can't verify trust
+                    return None
+            
             subject = credential.get('subject', '')
             
             # Direct customer ID format
