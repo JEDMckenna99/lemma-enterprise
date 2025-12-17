@@ -34,6 +34,8 @@ def migrate_all_to_kms():
     db = SessionLocal()
     
     # Sites to migrate
+    # NOTE: site_id must match the format used in issuer_management.py
+    # get_multi_lemma_issuer uses: site_id = f'multi_lemma_{lemma_type}'
     sites_to_migrate = [
         {
             'site_id': 'federated_network',
@@ -50,7 +52,7 @@ def migrate_all_to_kms():
             'admin_email': 'admin@lemma.id'
         },
         {
-            'site_id': 'multi_lemma_qr',
+            'site_id': 'multi_lemma_qr_authentication',
             'name': 'Multi-Lemma QR Authentication',
             'description': 'QR code authentication lemmas',
             'domain': 'lemma.id',
