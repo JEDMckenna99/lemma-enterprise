@@ -80,13 +80,16 @@ def migrate_all_to_kms():
             if not site:
                 # Create new site
                 print(f"  Creating new site entry...")
+                import secrets
                 site = Site(
                     site_id=site_id,
                     company_name=site_config['name'],
                     site_domain=site_config['domain'],
                     admin_email=site_config['admin_email'],
-                    created_at=datetime.utcnow(),
-                    is_active=True
+                    api_key=f"lm_{secrets.token_urlsafe(32)}",
+                    oauth_client_id=f"client_{secrets.token_urlsafe(16)}",
+                    oauth_client_secret=secrets.token_urlsafe(32),
+                    created_at=datetime.utcnow()
                 )
                 db.add(site)
                 db.flush()

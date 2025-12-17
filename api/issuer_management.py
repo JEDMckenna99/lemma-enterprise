@@ -81,13 +81,16 @@ class LemmaIssuerManager:
             
             # Create or update site in database
             if not site:
+                import secrets
                 site = Site(
                     site_id=site_id,
                     company_name=issuer_name,
                     site_domain='lemma.id',
                     admin_email='admin@lemma.id',
-                    created_at=datetime.utcnow(),
-                    is_active=True
+                    api_key=f"lm_{secrets.token_urlsafe(32)}",
+                    oauth_client_id=f"client_{secrets.token_urlsafe(16)}",
+                    oauth_client_secret=secrets.token_urlsafe(32),
+                    created_at=datetime.utcnow()
                 )
                 db.add(site)
             
