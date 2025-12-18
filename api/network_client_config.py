@@ -120,56 +120,68 @@ def check_shared_identity():
 @cross_origin()
 def get_trusted_issuers():
     """
-    Get trusted issuer DIDs from crypto engine for DID registry
+    Get ALL trusted issuer DIDs from KMS-backed database entries.
+    
+    SECURITY: Only KMS-backed issuers are considered trusted.
+    This is the authoritative list that client wallets use to validate credentials.
     """
     try:
-        # Get real issuer DIDs from crypto engine
         trusted_issuers = []
         
         try:
-            # Import crypto engine to get real issuer DIDs
-            from lemma_crypto import PyMinimalIssuer
-            from api.issuer_management import get_issuer_manager
+            # Query database for ALL sites with KMS-encrypted keys
+            from api.database import SessionLocal, Site
             
-            # Get issuer manager
-            issuer_manager = get_issuer_manager()
-            
-            # Get federated issuer (for PoH lemmas)
-            federated_issuer = issuer_manager.get_federated_issuer()
-            trusted_issuers.append({
-                'did': federated_issuer.get_did(),
-                'public_key': federated_issuer.get_public_key_hex(),
-                'name': 'Lemma Federated Identity Network',
-                'issuer_type': 'federated_identity',
-                'trust_score': 0.95
-            })
-            
-            # Get IAM issuer (for permission lemmas)
-            iam_issuer = issuer_manager.get_iam_issuer()
-            trusted_issuers.append({
-                'did': iam_issuer.get_did(),
-                'public_key': iam_issuer.get_public_key_hex(),
-                'name': 'Lemma Platform IAM',
-                'issuer_type': 'platform_iam',
-                'trust_score': 0.98
-            })
-            
-            # Get multi-lemma issuer (for advanced wallet features)
-            multi_lemma_issuer = issuer_manager.get_multi_lemma_issuer()
-            trusted_issuers.append({
-                'did': multi_lemma_issuer.get_did(),
-                'public_key': multi_lemma_issuer.get_public_key_hex(),
-                'name': 'Lemma Multi-Lemma System',
-                'issuer_type': 'multi_lemma',
-                'trust_score': 0.92
-            })
-            
-        except ImportError:
-            logger.warning("⚠️ Crypto engine not available for trusted issuers")
+            db = SessionLocal()
+            try:
+                # Get all sites that have KMS-backed keys (these are the trusted issuers)
+                kms_backed_sites = db.query(Site).filter(
+                    Site.kms_encrypted_signing_key.isnot(None),
+                    Site.issuer_did.isnot(None),
+                    Site.public_key_hex.isnot(None),
+                    Site.key_status == 'active'
+                ).all()
+                
+                logger.info(f"Found {len(kms_backed_sites)} KMS-backed issuers in database")
+                
+                # Map site types to friendly names
+                issuer_type_map = {
+                    'federated_network': ('Lemma Federated Identity Network', 'federated_identity', 0.95),
+                    'lemma.id': ('Lemma Platform IAM', 'platform_iam', 0.98),
+                    'multi_lemma_qr_authentication': ('Lemma QR Authentication', 'multi_lemma', 0.92),
+                    'multi_lemma_delegation': ('Lemma Delegation Service', 'multi_lemma', 0.90),
+                }
+                
+                for site in kms_backed_sites:
+                    default_name = f'Lemma IAM - {site.site_id}'
+                    default_type = 'site_iam'
+                    default_score = 0.90
+                    
+                    name, issuer_type, trust_score = issuer_type_map.get(
+                        site.site_id, 
+                        (default_name, default_type, default_score)
+                    )
+                    
+                    trusted_issuers.append({
+                        'did': site.issuer_did,
+                        'public_key': site.public_key_hex,
+                        'name': name,
+                        'issuer_type': issuer_type,
+                        'site_id': site.site_id,
+                        'trust_score': trust_score
+                    })
+                    
+                    logger.debug(f"  Trusted issuer: {site.site_id} -> {site.issuer_did[:50]}...")
+                    
+            finally:
+                db.close()
+                
+        except ImportError as e:
+            logger.warning(f"Database module not available: {e}")
         except Exception as e:
-            logger.warning(f"⚠️ Could not get real issuer DIDs: {e}")
+            logger.warning(f"Could not load KMS-backed issuers from database: {e}")
         
-        logger.info(f"✅ Providing {len(trusted_issuers)} trusted issuer DIDs")
+        logger.info(f"Providing {len(trusted_issuers)} trusted issuer DIDs")
         return jsonify({
             'success': True,
             'issuers': trusted_issuers,
@@ -177,7 +189,7 @@ def get_trusted_issuers():
         }), 200
         
     except Exception as e:
-        logger.error(f"❌ Trusted issuers error: {e}")
+        logger.error(f"Trusted issuers error: {e}")
         return jsonify({
             'success': False,
             'error': 'issuers_error',

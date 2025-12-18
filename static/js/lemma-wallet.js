@@ -772,6 +772,7 @@ class LemmaWallet {
     
     /**
      * Get credentials synchronously from memory cache
+     * SECURITY: Filters out credentials from untrusted issuers
      */
     getCredentialsSync(packageType = 'identity') {
         const credentials = Array.from(this.memoryCache.values())
@@ -780,6 +781,26 @@ class LemmaWallet {
                 const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
                 const age = Date.now() - cred.storedAt;
                 return age < maxAge;
+            })
+            .filter(cred => {
+                // CRITICAL SECURITY: Validate issuer is in trusted registry
+                const issuerDid = typeof cred.issuer === 'object' ? cred.issuer.id : cred.issuer;
+                
+                if (!issuerDid) {
+                    if (this.debug) {
+                        console.warn(`Credential ${cred.id} has no issuer DID - rejected`);
+                    }
+                    return false;
+                }
+                
+                // Check if issuer is in trusted DID registry
+                const isTrusted = this.didRegistry.has(issuerDid);
+                
+                if (!isTrusted && this.debug) {
+                    console.warn(`Credential ${cred.id} from UNTRUSTED issuer ${issuerDid.substring(0, 50)}... - rejected`);
+                }
+                
+                return isTrusted;
             });
             
         return credentials;
