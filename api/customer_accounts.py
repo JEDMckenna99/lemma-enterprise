@@ -153,16 +153,24 @@ def _extract_customer_id_from_request() -> Optional[str]:
             
             # SECURITY: Validate issuer is trusted BEFORE processing credential
             issuer_did = credential.get('issuer')
+            logger.info(f"🔍 Processing credential with issuer: {issuer_did[:60] if issuer_did else 'NONE'}...")
+            
             if issuer_did:
                 try:
                     from api.trusted_issuers import is_trusted_issuer
-                    if not is_trusted_issuer(issuer_did):
-                        logger.warning(f"🚫 REJECTED credential from UNTRUSTED issuer: {issuer_did[:50]}...")
+                    trusted = is_trusted_issuer(issuer_did)
+                    logger.info(f"🔐 Issuer trusted: {trusted}")
+                    
+                    if not trusted:
+                        logger.warning(f"🚫 REJECTED credential from UNTRUSTED issuer: {issuer_did}")
                         return None
                 except Exception as e:
                     logger.error(f"Trusted issuer check failed: {e}")
                     # Fail closed - reject if we can't verify trust
                     return None
+            else:
+                logger.warning("⚠️ Credential has no issuer field - rejecting")
+                return None
             
             subject = credential.get('subject', '')
             
