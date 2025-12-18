@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Pricing - Lemma | Free IAM | Free PoH Federation | $1.50/MAU Full Verification{% endblock %}
-{% block description %}Lemma IAM is FREE forever. Federate your existing ID verification for FREE. Full Proof-of-Human verification with ID check: $1.50/MAU. 1,000x faster verification. No credit card required.{% endblock %}
+{% block title %}Pricing - Lemma | Free IAM | Free PoH Federation | $1.50 ID Verification{% endblock %}
+{% block description %}Lemma IAM is FREE forever. Federate your existing ID verification for FREE. Full Proof-of-Human verification with ID check: $1.50 one-time per user. 1,000x faster verification. No credit card required.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -579,7 +579,7 @@
             <div class="hero-badge" style="background: linear-gradient(135deg, #10b981, #059669); font-size: var(--font-size-lg); padding: var(--space-3) var(--space-8);">Simple, Transparent Pricing</div>
             <h1 class="hero-title">IAM Free Forever</h1>
             <p class="hero-subtitle">
-                Lemma IAM is completely FREE. Already verify user IDs? Federate for FREE. Need full ID verification? $1.50/MAU. No hidden fees.
+                Lemma IAM is completely FREE. Already verify user IDs? Federate for FREE. Need full ID verification? $1.50 one-time per user. No monthly fees.
             </p>
         </div>
     </section>
@@ -677,7 +677,7 @@
                         </div>
                     </div>
 
-                    <!-- Full PoH Verification - $1.50/MAU -->
+                    <!-- Full PoH Verification - $1.50 one-time -->
                     <div class="pricing-card featured">
                         <div class="pricing-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706);">Full Verification</div>
                         
@@ -692,11 +692,11 @@
                             <div class="price-main">
                                 <span class="price-currency" style="color: #d97706;">$</span>
                                 <span class="price-amount" style="color: #d97706; font-size: 3.5rem;">1.50</span>
-                                <span class="price-unit" style="color: #b45309;">/MAU</span>
+                                <span class="price-unit" style="color: #b45309;">one-time per user</span>
                             </div>
                             <div class="price-secondary">
-                                <strong style="color: #92400e;">Includes full ID verification</strong><br>
-                                <small style="color: #b45309;">Stripe Identity verification included in price</small>
+                                <strong style="color: #92400e;">One-time ID verification fee</strong><br>
+                                <small style="color: #b45309;">No monthly fees - verify once, valid forever</small>
                             </div>
                         </div>
 
@@ -717,7 +717,7 @@
                                 Get Full Verification
                             </button>
                             <p class="cta-tagline">
-                                Complete ID verification included
+                                One-time fee - no recurring charges
                             </p>
                         </div>
                     </div>
@@ -773,7 +773,7 @@
                         <h3 class="widget-title">Cost Calculator</h3>
                         
                         <label style="display: block; margin-bottom: var(--space-2); font-weight: 600; color: var(--gray-700);">
-                            Monthly Active Users
+                            Users to Verify
                         </label>
                         <input type="number" id="userCount" class="calculator-input" value="1000" min="1" onchange="calculateCost()" placeholder="Enter user count">
                         
@@ -789,18 +789,18 @@
                                     <span id="fedIdCost" style="font-weight: 700; color: var(--primary-700);">$0 FREE</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: var(--space-2); background: var(--warning-50); border-radius: 6px; border: 2px solid var(--warning-300);">
-                                    <span style="font-size: var(--font-size-sm); color: var(--warning-700);">Full PoH Verification:</span>
-                                    <span id="combinedCost" style="font-weight: 700; color: var(--warning-700);">$1,500/month</span>
+                                    <span style="font-size: var(--font-size-sm); color: var(--warning-700);">Full PoH ($1.50/user):</span>
+                                    <span id="combinedCost" style="font-weight: 700; color: var(--warning-700);">$1,500 one-time</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--success-50); border-radius: 8px; text-align: center;">
-                            <div style="font-size: var(--font-size-sm); color: var(--success-700); font-weight: 600;">
-                                Savings vs Stripe Identity: <span id="savingsAmount">$500/month</span>
+                        <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--gray-50); border-radius: 8px; text-align: center;">
+                            <div style="font-size: var(--font-size-sm); color: var(--gray-700); font-weight: 600;">
+                                Same price as Stripe Identity
                     </div>
-                            <div style="font-size: var(--font-size-xs); color: var(--success-600);">
-                                (Stripe charges $2/verification)
+                            <div style="font-size: var(--font-size-xs); color: var(--gray-600);">
+                                But includes IAM + cross-site credentials
                             </div>
                     </div>
                     </div>
@@ -809,31 +809,31 @@
                     <div class="cost-reduction-table">
                         <h3 class="widget-title">Cost Comparison</h3>
                         <div id="comparison-subtitle" style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: var(--space-4); text-align: center;">
-                            Cost for <span id="user-count-display">1,000</span> verified users
+                            One-time cost for <span id="user-count-display">1,000</span> users
                 </div>
 
                         <div class="comparison-row lemma-row">
                             <div class="provider-name">Lemma Full PoH</div>
                             <div class="cost-cell" id="lemma-cost" style="color: var(--primary-600);">$1,500</div>
-                            <div class="savings-cell" style="color: var(--success-600);">Baseline</div>
+                            <div class="savings-cell" style="color: var(--success-600);">+ Free IAM</div>
                         </div>
                         
                         <div class="comparison-row">
                             <div class="provider-name">Stripe Identity</div>
-                            <div class="cost-cell" id="stripe-cost">$2,000</div>
-                            <div class="savings-cell" id="stripe-savings" style="color: var(--danger-600);">+33%</div>
+                            <div class="cost-cell" id="stripe-cost">$1,500</div>
+                            <div class="savings-cell" id="stripe-savings" style="color: var(--gray-600);">ID only</div>
                         </div>
                         
                         <div class="comparison-row">
-                            <div class="provider-name">Auth0 + Jumio</div>
-                            <div class="cost-cell" id="auth0-cost">$3,480</div>
-                            <div class="savings-cell" id="auth0-savings" style="color: var(--danger-600);">+132%</div>
+                            <div class="provider-name">Auth0 + ID verify</div>
+                            <div class="cost-cell" id="auth0-cost">$1,980</div>
+                            <div class="savings-cell" id="auth0-savings" style="color: var(--danger-600);">+32%</div>
                         </div>
                         
                         <div class="comparison-row">
                             <div class="provider-name">Okta + ID verify</div>
-                            <div class="cost-cell" id="okta-cost">$4,000</div>
-                            <div class="savings-cell" id="okta-savings" style="color: var(--danger-600);">+167%</div>
+                            <div class="cost-cell" id="okta-cost">$3,500</div>
+                            <div class="savings-cell" id="okta-savings" style="color: var(--danger-600);">+133%</div>
                         </div>
                         
                         <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--success-50); border-radius: 8px; text-align: center;">
@@ -841,7 +841,7 @@
                                 IAM-only is FREE forever
                             </div>
                             <div style="font-size: var(--font-size-xs); color: var(--success-600);">
-                                Pay only for ID verification if needed
+                                $1.50/user only if you need ID verification
                             </div>
                         </div>
                     </div>
@@ -875,14 +875,14 @@
                 <div class="faq-item">
                     <h3 class="faq-question">When should I pay for Full PoH Verification?</h3>
                     <p class="faq-answer">
-                        Pay $1.50/MAU only if you <strong>don't already do ID verification</strong> and want Lemma to handle it. This includes full government ID document verification + liveness detection. If you already verify IDs, use the free federation tier instead.
+                        Pay the $1.50 one-time fee per user only if you <strong>don't already do ID verification</strong> and want Lemma to handle it. This includes full government ID document verification + liveness detection. If you already verify IDs, use the free federation tier instead.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">How does $1.50/MAU compare to Stripe Identity?</h3>
+                    <h3 class="faq-question">How does $1.50 compare to Stripe Identity?</h3>
                     <p class="faq-answer">
-                        Stripe Identity charges $2.00 per verification. At $1.50/MAU, you save 25% PLUS get the full IAM system included, cross-site credential portability, and microsecond verification speeds. Better value, more features.
+                        Same price as Stripe Identity ($1.50 per verification). But with Lemma you ALSO get: free IAM system, cross-site credential portability, microsecond verification, and the user can reuse their credential across the network.
                     </p>
                 </div>
 
@@ -942,7 +942,7 @@
                 <div class="faq-item">
                     <h3 class="faq-question">Are there any contracts or commitments?</h3>
                     <p class="faq-answer">
-                        No! IAM is free with no commitments. For Full PoH at $1.50/MAU, you pay month-to-month based on usage. Cancel anytime with no penalties.
+                        No! IAM is free with no commitments. For Full PoH, you pay $1.50 one-time per user verified - no monthly fees, no recurring charges.
                     </p>
                 </div>
             </div>
@@ -953,91 +953,40 @@
 
 
     <script>
-        // Pricing calculator with new tier structure
+        // Pricing calculator - one-time fees
         function calculateCost() {
             const userCount = parseInt(document.getElementById('userCount').value) || 0;
             
-            // Lemma pricing tiers
-            const iamRate = 0; // IAM is FREE forever
-            const pohFederationRate = 0; // Federation is FREE (sites with existing ID verification)
-            const fullPohRate = 1.50; // $1.50/MAU for full ID verification
+            // Lemma pricing - one-time fees
+            const fullPohRate = 1.50; // $1.50 one-time per user
             
-            // Calculate costs
-            const iamMonthly = 0; // Always free
-            const federationMonthly = 0; // Always free  
-            const fullPohMonthly = userCount * fullPohRate;
+            // Calculate costs (one-time)
+            const fullPohCost = userCount * fullPohRate;
             
-            // Competitor pricing for ID verification
-            const stripeIdentity = userCount * 2.00; // $2 per verification
-            const auth0PlusJumio = (userCount * 0.48) + (userCount * 3.00); // Auth0 + ID verify
-            const oktaPlusIdVerify = Math.max(500, userCount * 2) + (userCount * 2.00); // Okta + ID verify
+            // Competitor pricing (one-time ID verification costs)
+            const stripeIdentity = userCount * 1.50; // $1.50 per verification
+            const auth0PlusIdVerify = (userCount * 0.48) + (userCount * 1.50); // Auth0 monthly + ID verify
+            const oktaPlusIdVerify = Math.max(500, userCount * 2) + (userCount * 1.50); // Okta monthly + ID verify
             
             // Update calculator display
             document.getElementById('iamCost').textContent = '$0 FREE';
             document.getElementById('fedIdCost').textContent = '$0 FREE';
-            document.getElementById('combinedCost').textContent = '$' + fullPohMonthly.toLocaleString() + '/month';
+            document.getElementById('combinedCost').textContent = '$' + fullPohCost.toLocaleString() + ' one-time';
             
             // Update user count display
             document.getElementById('user-count-display').textContent = userCount.toLocaleString();
             
-            // Calculate savings vs Stripe Identity
-            const totalSavings = stripeIdentity - fullPohMonthly;
-            document.getElementById('savingsAmount').textContent = '$' + Math.max(0, totalSavings).toLocaleString() + '/month';
-            
             // Update comparison table
-            updateComparisonTable(userCount, fullPohMonthly, stripeIdentity, auth0PlusJumio, oktaPlusIdVerify);
+            updateComparisonTable(userCount, fullPohCost, stripeIdentity, auth0PlusIdVerify, oktaPlusIdVerify);
         }
         
         // Update comparison table with dynamic pricing
-        function updateComparisonTable(userCount, lemma, stripe, auth0Jumio, oktaIdVerify) {
+        function updateComparisonTable(userCount, lemma, stripe, auth0IdVerify, oktaIdVerify) {
             // Update cost cells
             document.getElementById('lemma-cost').textContent = '$' + lemma.toLocaleString();
             document.getElementById('stripe-cost').textContent = '$' + stripe.toLocaleString();
-            document.getElementById('auth0-cost').textContent = '$' + auth0Jumio.toLocaleString();
+            document.getElementById('auth0-cost').textContent = '$' + auth0IdVerify.toLocaleString();
             document.getElementById('okta-cost').textContent = '$' + oktaIdVerify.toLocaleString();
-            
-            // Calculate and update savings percentages
-            function formatSavings(competitorCost, lemmaCost) {
-                if (lemmaCost === 0) return 'N/A';
-                if (Math.abs(competitorCost - lemmaCost) < 1) return 'Same';
-                
-                const difference = competitorCost - lemmaCost;
-                const percentage = Math.abs((difference / lemmaCost) * 100).toFixed(0);
-                
-                if (difference > 0) {
-                    return '+' + percentage + '%';
-                } else {
-                    return '-' + percentage + '%';
-                }
-            }
-            
-            document.getElementById('stripe-savings').textContent = formatSavings(stripe, lemma);
-            document.getElementById('auth0-savings').textContent = formatSavings(auth0Jumio, lemma);
-            document.getElementById('okta-savings').textContent = formatSavings(oktaIdVerify, lemma);
-            
-            // Update savings colors
-            updateSavingsColor('stripe-savings', stripe, lemma);
-            updateSavingsColor('auth0-savings', auth0Jumio, lemma);
-            updateSavingsColor('okta-savings', oktaIdVerify, lemma);
-        }
-        
-        function updateSavingsColor(elementId, competitorCost, lemmaCost) {
-            const element = document.getElementById(elementId);
-            if (!element) return;
-            
-            const difference = competitorCost - lemmaCost;
-            
-            if (lemmaCost === 0 || Math.abs(difference) < 1) {
-                element.style.color = 'var(--gray-600)';
-            } else if (difference > lemmaCost * 0.5) {
-                element.style.color = 'var(--danger-600)';
-            } else if (difference > lemmaCost * 0.1) {
-                element.style.color = 'var(--warning-600)';
-            } else if (difference < -lemmaCost * 0.1) {
-                element.style.color = 'var(--success-600)';
-            } else {
-                element.style.color = 'var(--gray-600)';
-            }
         }
         
         // Initialize calculator
@@ -1196,8 +1145,8 @@ ${name}`);
                     <tr style="border-bottom: 1px solid var(--gray-200);">
                         <td style="padding: var(--space-4); font-weight: 500;">ID Verification Cost</td>
                         <td style="padding: var(--space-4); text-align: center;">+$3/verify</td>
-                        <td style="padding: var(--space-4); text-align: center;">$2/verify</td>
-                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50);">$1.50/MAU</td>
+                        <td style="padding: var(--space-4); text-align: center;">$1.50/verify</td>
+                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50);">$1.50/user</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--gray-200); background: var(--gray-50);">
                         <td style="padding: var(--space-4); font-weight: 500;"><strong>Built-In Bot Resistance</strong></td>
