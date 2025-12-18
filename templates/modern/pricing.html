@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Pricing - Lemma IAM | FREE Beta | Future: $0.16/MAU{% endblock %}
-{% block description %}Email-based IAM completely FREE during beta phase. Future pricing: $0.16/MAU (67-92% cheaper than Auth0/Okta). Add bot protection for +$0.05/MAU. 1,000x faster verification. No credit card required.{% endblock %}
+{% block title %}Pricing - Lemma | Free IAM | Free PoH Federation | $1.50/MAU Full Verification{% endblock %}
+{% block description %}Lemma IAM is FREE forever. Federate your existing ID verification for FREE. Full Proof-of-Human verification with ID check: $1.50/MAU. 1,000x faster verification. No credit card required.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -576,10 +576,10 @@
     <!-- Hero Section -->
     <section class="pricing-hero">
         <div class="pricing-container">
-            <div class="hero-badge" style="background: linear-gradient(135deg, #10b981, #059669); font-size: var(--font-size-lg); padding: var(--space-3) var(--space-8);">FREE During Beta</div>
-            <h1 class="hero-title">FREE Beta Access</h1>
+            <div class="hero-badge" style="background: linear-gradient(135deg, #10b981, #059669); font-size: var(--font-size-lg); padding: var(--space-3) var(--space-8);">Simple, Transparent Pricing</div>
+            <h1 class="hero-title">IAM Free Forever</h1>
             <p class="hero-subtitle">
-                Complete email-based IAM with optional bot protection - completely free during beta phase. Future pricing: $0.16/MAU for IAM, +$0.05/MAU for bot protection. No hidden fees, no credit card required.
+                Lemma IAM is completely FREE. Already verify user IDs? Federate for FREE. Need full ID verification? $1.50/MAU. No hidden fees.
             </p>
         </div>
     </section>
@@ -590,149 +590,134 @@
             <div class="pricing-grid">
                 <!-- Pricing Plans (Left Side) -->
                 <div class="pricing-plans">
-                    <!-- Lemma IAM System Plan (MOVED TO TOP) -->
+                    <!-- Lemma IAM - FREE FOREVER -->
                     <div class="pricing-card featured">
-                        <div class="pricing-badge" style="background: linear-gradient(135deg, #10b981, #059669);">FREE Beta Access</div>
+                        <div class="pricing-badge" style="background: linear-gradient(135deg, #10b981, #059669);">FREE Forever</div>
                         
                         <div class="pricing-header">
-                            <h2 class="pricing-title">Lemma IAM System</h2>
+                            <h2 class="pricing-title">Lemma IAM</h2>
                             <p class="pricing-description">
-                                <strong>Revolutionary IAM with client-side storage</strong> - permissions stored in user's wallet, not your database. Zero infrastructure costs, infinite scalability.
+                                <strong>Complete authentication system - FREE forever.</strong> Email-based login with cryptographic credentials. Built-in bot friction through email verification and persistent credentials.
                             </p>
                         </div>
 
                         <div class="price-display" style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 2px solid #10b981;">
                             <div class="price-main">
-                                <span class="price-amount" style="color: #059669; font-size: 3.5rem;">FREE</span>
-                                <span class="price-unit" style="color: #047857;">during beta phase</span>
+                                <span class="price-amount" style="color: #059669; font-size: 3.5rem;">$0</span>
+                                <span class="price-unit" style="color: #047857;">forever</span>
                             </div>
                             <div class="price-secondary">
-                                <strong style="color: #047857;">Complete IAM system at no cost</strong><br>
-                                <small style="color: #065f46;">Future pricing: $0.16/MAU (67-92% cheaper than Auth0 Pro/Okta)</small>
+                                <strong style="color: #047857;">No per-user fees. No limits. Free.</strong><br>
+                                <small style="color: #065f46;">Unlimited users, unlimited verifications</small>
                             </div>
                         </div>
 
                         <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--primary-50); border-radius: 12px;">
-                            <h4 style="margin-bottom: var(--space-3); color: var(--primary-800); font-weight: 600;">🚀 Revolutionary IAM Features:</h4>
+                            <h4 style="margin-bottom: var(--space-3); color: var(--primary-800); font-weight: 600;">Included Free:</h4>
                             <ul style="margin: 0; padding-left: var(--space-4); color: var(--primary-700); line-height: 1.8;">
-                                <li><strong>🔑 Client-side permission storage</strong> - user owns their permission data</li>
-                                <li><strong>💰 Zero infrastructure costs</strong> - no scaling database or storage fees</li>
-                                <li><strong>🔒 Ed25519 tamper protection</strong> - cryptographically secure permissions</li>
-                                <li><strong>🌐 "Sign in with Lemma"</strong> OAuth 2.0 integration</li>
-                                <li><strong>⚡ Microsecond verification</strong> - 2.38µs authentication speed</li>
-                                <li><strong>🛡️ Privacy by design</strong> - no central permission honeypot</li>
+                                <li><strong>Email-based authentication</strong> - verified unique emails</li>
+                                <li><strong>Client-side credentials</strong> - user-held, tamper-proof</li>
+                                <li><strong>Built-in bot friction</strong> - email + persistence requirements</li>
+                                <li><strong>Catch-all email blocking</strong> - disrupts bot farms</li>
+                                <li><strong>OAuth 2.0 integration</strong> - "Sign in with Lemma"</li>
+                                <li><strong>Microsecond verification</strong> - no server round-trips</li>
                             </ul>
                         </div>
 
                         <div class="cta-section">
                             <button onclick="window.location.href='/register'" class="cta-button" style="background: linear-gradient(135deg, var(--primary-500), var(--primary-600));">
-                                Start IAM System
+                                Start Free
                             </button>
                             <p class="cta-tagline">
-                                Pure IAM solution • Complete Auth0/Duo replacement
+                                No credit card required - Free forever
                             </p>
                         </div>
                     </div>
 
-                    <!-- Complete Solution Plan -->
-                    <div class="pricing-card featured">
-                        <div class="pricing-badge" style="background: linear-gradient(135deg, #10b981, #059669);">FREE Beta - Complete Solution</div>
+                    <!-- PoH Federation - FREE for sites with existing ID verification -->
+                    <div class="pricing-card">
+                        <div class="pricing-badge" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">FREE Federation</div>
                         
                         <div class="pricing-header">
-                            <h2 class="pricing-title">Fed ID + IAM Combined</h2>
+                            <h2 class="pricing-title">PoH Federation</h2>
                             <p class="pricing-description">
-                                <strong>Best value:</strong> Complete bot protection, lite KYC, user verification PLUS full IAM system with permissions and OAuth.
+                                <strong>Already verify user IDs?</strong> Federate your existing verification for FREE. Your users get Proof-of-Human credentials they can use across the network.
                             </p>
                         </div>
 
-                        <div class="price-display" style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 2px solid #10b981;">
+                        <div class="price-display" style="background: linear-gradient(135deg, #eef2ff, #e0e7ff); border: 2px solid #6366f1;">
                             <div class="price-main">
-                                <span class="price-amount" style="color: #059669; font-size: 3.5rem;">FREE</span>
-                                <span class="price-unit" style="color: #047857;">during beta phase</span>
+                                <span class="price-amount" style="color: #4f46e5; font-size: 3.5rem;">$0</span>
+                                <span class="price-unit" style="color: #6366f1;">for sites with ID verification</span>
                             </div>
                             <div class="price-secondary">
-                                <strong style="color: #047857;">IAM + Bot Protection at no cost</strong><br>
-                                <small style="color: #065f46;">Future pricing: $0.20/MAU combined (vs $0.22 if purchased separately)</small>
-                            </div>
-                            <div style="margin-top: var(--space-4); padding: var(--space-3); background: rgba(16, 185, 129, 0.1); border-radius: 8px; border-left: 4px solid #10b981;">
-                                <small style="color: #047857; font-weight: 600;">
-                                    Complete solution free during beta - start building today!
-                                </small>
+                                <strong style="color: #4338ca;">You verify, we federate - FREE</strong><br>
+                                <small style="color: #4f46e5;">Grow the network together</small>
                             </div>
                         </div>
 
                         <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--gray-900); color: var(--white); border-radius: 12px;">
-                            <h4 style="margin-bottom: var(--space-3); color: var(--white); font-weight: 600;">Everything Included:</h4>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
-                                <div>
-                                    <h5 style="color: var(--success-300); margin-bottom: var(--space-2);">Fed ID Network:</h5>
-                                    <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-300); line-height: 1.6; font-size: var(--font-size-sm);">
-                                        <li>Advanced bot protection</li>
-                                        <li>Lite KYC verification</li>
-                                        <li>Universal user verification</li>
-                                        <li>2.38µs verification speed</li>
-                                    </ul>
-                                </div>
-                                <div>
-                                    <h5 style="color: var(--primary-300); margin-bottom: var(--space-2);">IAM System:</h5>
-                                    <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-300); line-height: 1.6; font-size: var(--font-size-sm);">
-                                        <li>OAuth 2.0 integration</li>
-                                        <li>Complete user management</li>
-                                        <li>Custom permissions & roles</li>
-                                        <li>Full API control</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="cta-section">
-                            <button onclick="window.location.href='/register'" class="cta-button">
-                                Get Complete Solution
-                            </button>
-                            <p class="cta-tagline">
-                                Fed ID + IAM • Best value • Complete platform protection
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Federated Identity Network Plan (MOVED AFTER COMBINED) -->
-                    <div class="pricing-card">
-                        <div class="pricing-header">
-                            <h2 class="pricing-title">Bot Protection Add-On</h2>
-                            <p class="pricing-description">
-                                <strong>Federated identity network for bot protection.</strong> Add to your IAM system or use standalone. Stripe Identity verification for proof of humanity.
-                            </p>
-                        </div>
-
-                        <div class="price-display" style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 2px solid #10b981;">
-                            <div class="price-main">
-                                <span class="price-amount" style="color: #059669; font-size: 3.5rem;">FREE</span>
-                                <span class="price-unit" style="color: #047857;">during beta phase</span>
-                            </div>
-                            <div class="price-secondary">
-                                <strong style="color: #047857;">Bot protection included in beta</strong><br>
-                                <small style="color: #065f46;">Future: +$0.05/MAU add-on + $2 one-time Stripe Identity verification</small>
-                            </div>
-                        </div>
-
-                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--success-50); border-radius: 12px;">
-                            <h4 style="margin-bottom: var(--space-3); color: var(--success-800); font-weight: 600;">Bot Protection Features:</h4>
-                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--success-700); line-height: 1.8;">
-                                <li><strong>Advanced bot protection</strong> - 99.9% bot elimination</li>
-                                <li><strong>Stripe Identity verification</strong> - proof of humanity</li>
-                                <li><strong>Cross-site recognition</strong> - works across all network sites</li>
-                                <li><strong>Privacy-preserving</strong> - OPRF revocation checks</li>
-                                <li><strong>Multi-device sync</strong> - QR code wallet transfer</li>
-                                <li><strong>Offline operation</strong> - 99.9% verifications work offline</li>
+                            <h4 style="margin-bottom: var(--space-3); color: var(--white); font-weight: 600;">How it works:</h4>
+                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-300); line-height: 1.8;">
+                                <li><strong>You already do ID verification</strong> - KYC, Stripe Identity, etc.</li>
+                                <li><strong>We issue PoH credentials</strong> - based on your verification</li>
+                                <li><strong>Users get portable proof</strong> - works across all network sites</li>
+                                <li><strong>You become a trusted issuer</strong> - reputation in the network</li>
+                                <li><strong>Cross-site bot defense</strong> - credentials can't be mass-produced</li>
                             </ul>
                         </div>
 
                         <div class="cta-section">
-                            <button onclick="window.location.href='/register'" class="cta-button" style="background: linear-gradient(135deg, var(--success-500), var(--success-600));">
-                                Add Bot Protection
+                            <button onclick="window.location.href='/register'" class="cta-button" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+                                Federate Your Verification
                             </button>
                             <p class="cta-tagline">
-                                Perfect add-on to IAM • Network-wide bot shield
+                                For sites with existing ID verification
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Full PoH Verification - $1.50/MAU -->
+                    <div class="pricing-card featured">
+                        <div class="pricing-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706);">Full Verification</div>
+                        
+                        <div class="pricing-header">
+                            <h2 class="pricing-title">Full PoH Verification</h2>
+                            <p class="pricing-description">
+                                <strong>Need us to handle ID verification?</strong> Complete Proof-of-Human with ID document verification. Maximum bot protection with verified human uniqueness.
+                            </p>
+                        </div>
+
+                        <div class="price-display" style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 2px solid #f59e0b;">
+                            <div class="price-main">
+                                <span class="price-currency" style="color: #d97706;">$</span>
+                                <span class="price-amount" style="color: #d97706; font-size: 3.5rem;">1.50</span>
+                                <span class="price-unit" style="color: #b45309;">/MAU</span>
+                            </div>
+                            <div class="price-secondary">
+                                <strong style="color: #92400e;">Includes full ID verification</strong><br>
+                                <small style="color: #b45309;">Stripe Identity verification included in price</small>
+                            </div>
+                        </div>
+
+                        <div style="margin: var(--space-6) 0; padding: var(--space-4); background: var(--warning-50); border-radius: 12px;">
+                            <h4 style="margin-bottom: var(--space-3); color: var(--warning-800); font-weight: 600;">Everything included:</h4>
+                            <ul style="margin: 0; padding-left: var(--space-4); color: var(--warning-700); line-height: 1.8;">
+                                <li><strong>Full ID document verification</strong> - government ID check</li>
+                                <li><strong>Liveness detection</strong> - real human confirmation</li>
+                                <li><strong>Proof-of-Human credential</strong> - portable across network</li>
+                                <li><strong>Maximum bot protection</strong> - each bot needs real human</li>
+                                <li><strong>All IAM features included</strong> - email auth, OAuth, etc.</li>
+                                <li><strong>Cross-site recognition</strong> - verify once, use everywhere</li>
+                            </ul>
+                        </div>
+
+                        <div class="cta-section">
+                            <button onclick="window.location.href='/register'" class="cta-button" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                                Get Full Verification
+                            </button>
+                            <p class="cta-tagline">
+                                Complete ID verification included
                             </p>
                         </div>
                     </div>
@@ -785,89 +770,78 @@
                 <div class="pricing-sidebar">
                         <!-- Pricing Calculator -->
                     <div class="calculator-widget">
-                        <h3 class="widget-title">💰 Future Pricing Calculator</h3>
-                        <div style="margin-bottom: var(--space-4); padding: var(--space-3); background: linear-gradient(135deg, #10b981, #059669); border-radius: 8px; text-align: center;">
-                            <p style="margin: 0; color: var(--white); font-weight: 700; font-size: var(--font-size-lg);">FREE During Beta</p>
-                            <p style="margin: 4px 0 0 0; color: rgba(255,255,255,0.9); font-size: var(--font-size-sm);">Future pricing shown below</p>
-                        </div>
+                        <h3 class="widget-title">Cost Calculator</h3>
                         
                         <label style="display: block; margin-bottom: var(--space-2); font-weight: 600; color: var(--gray-700);">
                             Monthly Active Users
                         </label>
                         <input type="number" id="userCount" class="calculator-input" value="1000" min="1" onchange="calculateCost()" placeholder="Enter user count">
                         
-                        <!-- Three pricing options -->
+                        <!-- Three pricing tiers -->
                         <div style="margin: var(--space-4) 0;">
                             <div style="display: flex; flex-direction: column; gap: var(--space-2);">
-                                <div style="display: flex; justify-content: space-between; padding: var(--space-2); background: var(--success-50); border-radius: 6px;">
-                                    <span style="font-size: var(--font-size-sm); color: var(--success-700);">Fed ID Network:</span>
-                                    <span id="fedIdCost" style="font-weight: 600; color: var(--success-700);">$60/month</span>
+                                <div style="display: flex; justify-content: space-between; padding: var(--space-2); background: var(--success-50); border-radius: 6px; border: 2px solid var(--success-300);">
+                                    <span style="font-size: var(--font-size-sm); color: var(--success-700);">Lemma IAM:</span>
+                                    <span id="iamCost" style="font-weight: 700; color: var(--success-700);">$0 FREE</span>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; padding: var(--space-2); background: var(--primary-50); border-radius: 6px;">
-                                    <span style="font-size: var(--font-size-sm); color: var(--primary-700);">IAM System:</span>
-                                    <span id="iamCost" style="font-weight: 600; color: var(--primary-700);">$160/month</span>
+                                <div style="display: flex; justify-content: space-between; padding: var(--space-2); background: var(--primary-50); border-radius: 6px; border: 2px solid var(--primary-300);">
+                                    <span style="font-size: var(--font-size-sm); color: var(--primary-700);">PoH Federation:</span>
+                                    <span id="fedIdCost" style="font-weight: 700; color: var(--primary-700);">$0 FREE</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: var(--space-2); background: var(--warning-50); border-radius: 6px; border: 2px solid var(--warning-300);">
-                                    <span style="font-size: var(--font-size-sm); color: var(--warning-700); font-weight: 600;">Combined (Best Value):</span>
-                                    <span id="combinedCost" style="font-weight: 700; color: var(--warning-700);">$200/month</span>
+                                    <span style="font-size: var(--font-size-sm); color: var(--warning-700);">Full PoH Verification:</span>
+                                    <span id="combinedCost" style="font-weight: 700; color: var(--warning-700);">$1,500/month</span>
                                 </div>
                             </div>
                         </div>
 
                         <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--success-50); border-radius: 8px; text-align: center;">
                             <div style="font-size: var(--font-size-sm); color: var(--success-700); font-weight: 600;">
-                                Future savings: <span id="savingsAmount">$280/month</span>
+                                Savings vs Stripe Identity: <span id="savingsAmount">$500/month</span>
                     </div>
                             <div style="font-size: var(--font-size-xs); color: var(--success-600);">
-                                vs Auth0 Pro pricing (currently FREE)
-                    </div>
+                                (Stripe charges $2/verification)
+                            </div>
                     </div>
                     </div>
                     
                     <!-- Cost Reduction Table -->
                     <div class="cost-reduction-table">
-                        <h3 class="widget-title">📊 Future Cost Comparison</h3>
-                        <div style="margin-bottom: var(--space-3); padding: var(--space-2); background: linear-gradient(135deg, #10b981, #059669); border-radius: 6px; text-align: center;">
-                            <p style="margin: 0; color: var(--white); font-weight: 700; font-size: var(--font-size-base);">Currently FREE</p>
-                        </div>
+                        <h3 class="widget-title">Cost Comparison</h3>
                         <div id="comparison-subtitle" style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: var(--space-4); text-align: center;">
-                            Future cost for <span id="user-count-display">1,000</span> users/month
+                            Cost for <span id="user-count-display">1,000</span> verified users
                 </div>
 
                         <div class="comparison-row lemma-row">
-                            <div class="provider-name">🚀 Lemma (Future)</div>
-                            <div class="cost-cell" id="lemma-cost" style="color: var(--primary-600);">$200</div>
+                            <div class="provider-name">Lemma Full PoH</div>
+                            <div class="cost-cell" id="lemma-cost" style="color: var(--primary-600);">$1,500</div>
                             <div class="savings-cell" style="color: var(--success-600);">Baseline</div>
                         </div>
                         
                         <div class="comparison-row">
-                            <div class="provider-name">Auth0</div>
-                            <div class="cost-cell" id="auth0-cost">$240</div>
-                            <div class="savings-cell" id="auth0-savings" style="color: var(--danger-600);">+20%</div>
+                            <div class="provider-name">Stripe Identity</div>
+                            <div class="cost-cell" id="stripe-cost">$2,000</div>
+                            <div class="savings-cell" id="stripe-savings" style="color: var(--danger-600);">+33%</div>
                         </div>
                         
                         <div class="comparison-row">
-                            <div class="provider-name">Okta</div>
-                            <div class="cost-cell" id="okta-cost">$2,000</div>
-                            <div class="savings-cell" id="okta-savings" style="color: var(--danger-600);">+1,900%</div>
+                            <div class="provider-name">Auth0 + Jumio</div>
+                            <div class="cost-cell" id="auth0-cost">$3,480</div>
+                            <div class="savings-cell" id="auth0-savings" style="color: var(--danger-600);">+132%</div>
                         </div>
                         
                         <div class="comparison-row">
-                            <div class="provider-name">Cloudflare</div>
-                            <div class="cost-cell" id="cloudflare-cost">$200</div>
-                            <div class="savings-cell" id="cloudflare-savings" style="color: var(--danger-600);">+100%</div>
+                            <div class="provider-name">Okta + ID verify</div>
+                            <div class="cost-cell" id="okta-cost">$4,000</div>
+                            <div class="savings-cell" id="okta-savings" style="color: var(--danger-600);">+167%</div>
                         </div>
                         
-                        <div class="comparison-row">
-                            <div class="provider-name">reCAPTCHA</div>
-                            <div class="cost-cell" id="recaptcha-cost">$20</div>
-                            <div class="savings-cell" id="recaptcha-savings" style="color: var(--warning-600);">-80%</div>
-                        </div>
-                        
-                        <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--gray-50); border-radius: 8px; text-align: center;">
-                            <div style="font-size: var(--font-size-xs); color: var(--gray-600);">
-                                <strong>⚡ Performance Bonus:</strong><br>
-                                1000x faster verification (4µs vs 4ms)
+                        <div style="margin-top: var(--space-4); padding: var(--space-3); background: var(--success-50); border-radius: 8px; text-align: center;">
+                            <div style="font-size: var(--font-size-sm); color: var(--success-700); font-weight: 600;">
+                                IAM-only is FREE forever
+                            </div>
+                            <div style="font-size: var(--font-size-xs); color: var(--success-600);">
+                                Pay only for ID verification if needed
                             </div>
                         </div>
                     </div>
@@ -885,88 +859,90 @@
             
             <div class="faq-grid">
                 <div class="faq-item">
-                    <h3 class="faq-question">Is Lemma really free during beta?</h3>
+                    <h3 class="faq-question">Is Lemma IAM really free forever?</h3>
                     <p class="faq-answer">
-                        <strong>Yes, completely free!</strong> All features including IAM system and bot protection are free during the beta phase. No credit card required, no hidden fees. This gives you the opportunity to build and integrate Lemma at no cost while we finalize the platform.
+                        <strong>Yes, completely free forever.</strong> Email-based authentication with cryptographic credentials, OAuth integration, and built-in bot friction - all free with no user limits. No credit card required.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">What happens after beta?</h3>
+                    <h3 class="faq-question">How does PoH Federation work?</h3>
                     <p class="faq-answer">
-                        Future pricing will be: <strong>IAM System ($0.16/MAU)</strong> for complete Auth0/Duo replacement with permissions and OAuth. <strong>Bot Protection (+$0.05/MAU)</strong> for federated identity network. <strong>Combined ($0.20/MAU)</strong> for both services together with discount. Beta users will receive advance notice before any pricing changes.
+                        If you already verify user IDs (KYC, Stripe Identity, etc.), we federate your verification for FREE. Your verified users get Proof-of-Human credentials they can use across the network. You help grow the network, we handle the credential infrastructure.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">How does future pricing compare to Auth0 or Okta?</h3>
+                    <h3 class="faq-question">When should I pay for Full PoH Verification?</h3>
                     <p class="faq-answer">
-                        Our future <strong>Combined solution ($0.20/MAU)</strong> will be 58-90% cheaper than Auth0 Pro ($0.48/MAU) and Okta ($2/user/month), while including bot protection + lite KYC that they don't provide. Plus you get <strong>1,000x faster verification</strong> (182µs vs 200ms+) and complete control vs vendor lock-in.
+                        Pay $1.50/MAU only if you <strong>don't already do ID verification</strong> and want Lemma to handle it. This includes full government ID document verification + liveness detection. If you already verify IDs, use the free federation tier instead.
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">How does $1.50/MAU compare to Stripe Identity?</h3>
+                    <p class="faq-answer">
+                        Stripe Identity charges $2.00 per verification. At $1.50/MAU, you save 25% PLUS get the full IAM system included, cross-site credential portability, and microsecond verification speeds. Better value, more features.
                     </p>
                 </div>
 
                 <div class="faq-item">
                     <h3 class="faq-question">Do users need to verify every time they visit?</h3>
                     <p class="faq-answer">
-                        No! Users verify once and get a cryptographic lemma in their wallet. All subsequent verifications happen in microseconds (2.38µs) without user interaction. Works across all sites in the network with "Sign in with Lemma" OAuth.
+                        No! Users verify once and get a cryptographic credential in their wallet. All subsequent verifications happen in microseconds without user interaction. Works across all sites in the network.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">What about the Stripe Identity verification fee?</h3>
+                    <h3 class="faq-question">What's included in the free IAM tier?</h3>
                     <p class="faq-answer">
-                        During beta, there are no Stripe Identity fees. In the future, the $2.00 fee will only be charged when a user completes their initial Stripe Identity verification for bot protection. This is a one-time fee per user, not recurring. The IAM system works without this verification.
-                    </p>
-                </div>
-
-                <div class="faq-item">
-                    <h3 class="faq-question">What's included in the free beta?</h3>
-                    <p class="faq-answer">
-                        Everything: complete IAM system, optional bot protection, microsecond verification, privacy protection, analytics dashboard, API access, and 24/7 support. No hidden fees, no feature restrictions, no credit card required.
+                        Everything you need: email-based authentication, client-side credentials, OAuth 2.0 ("Sign in with Lemma"), catch-all email blocking, microsecond verification, and built-in bot friction through email + persistence requirements.
                     </p>
                 </div>
 
                 <div class="faq-item">
                     <h3 class="faq-question">How fast is verification?</h3>
                     <p class="faq-answer">
-                        Lemma Shield verifies users in microseconds (4.176µs average) - that's 1000x faster than traditional solutions. 99.9% of verifications work offline.
+                        Lemma verifies credentials in microseconds (~36-47µs) - that's 1000x faster than server-call authentication. Verification happens locally without network round-trips.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">Are there any commitments or contracts?</h3>
+                    <h3 class="faq-question">What's the difference between IAM and PoH?</h3>
                     <p class="faq-answer">
-                        No! During beta, use Lemma completely free with no commitments. When pricing begins after beta, you can cancel anytime with no penalties. No long-term contracts required.
+                        <strong>IAM (Free):</strong> Email-based authentication with bot friction. Good for most sites.<br>
+                        <strong>PoH (Proof-of-Human):</strong> Verified human identity via ID document check. For maximum bot protection where you need to ensure each account is a unique human.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">What IAM features do I get complete control over?</h3>
+                    <h3 class="faq-question">Why is IAM free?</h3>
                     <p class="faq-answer">
-                        <strong>Everything:</strong> Add/remove users, create custom permissions and roles, configure OAuth settings, set up webhooks, customize branding, manage sessions, view analytics, and control all security policies. You have the same control as running your own IAM system.
+                        IAM uses client-side credential storage - users hold their own credentials, not our servers. This means our infrastructure costs are minimal. Free IAM grows the network, which increases the value of PoH credentials.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">🚀 What makes Lemma IAM revolutionary?</h3>
+                    <h3 class="faq-question">Can I start with IAM and upgrade to PoH later?</h3>
                     <p class="faq-answer">
-                        <strong>Client-side permission storage:</strong> User permissions are stored in their browser wallet, not your database. This means:
-                        <br>• <strong>Zero infrastructure costs</strong> - no scaling database fees as you grow
-                        <br>• <strong>Maximum privacy</strong> - users own their permission data
-                        <br>• <strong>No vendor lock-in</strong> - permissions are portable across any deployment
-                        <br>• <strong>Infinite scalability</strong> - costs stay flat while revenue scales linearly
-                        <br>• <strong>Ed25519 tamper protection</strong> - cryptographically secure, can't be modified
+                        Yes! Start with free IAM. If you later need ID verification, you can upgrade to Full PoH ($1.50/MAU) or federate your own verification for free. Your existing users keep their IAM credentials.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">How does this compare to competitors?</h3>
+                    <h3 class="faq-question">What makes Lemma different from Auth0/Okta?</h3>
                     <p class="faq-answer">
-                        <strong>Cost:</strong> FREE during beta (future: $0.16-$0.20/MAU vs Auth0 Pro $0.48/MAU, Okta $2/MAU)<br>
-                        <strong>Speed:</strong> 1,000x faster verification (182µs vs 200ms+)<br>
-                        <strong>Architecture:</strong> Client-side storage vs expensive server-side databases<br>
-                        <strong>Privacy:</strong> User-owned data vs centralized data collection<br>
-                        <strong>Security:</strong> Cryptographic proofs vs password-based authentication
+                        <strong>Cost:</strong> IAM is FREE (vs $0.48-$2/MAU)<br>
+                        <strong>Speed:</strong> 1,000x faster verification (microseconds vs hundreds of milliseconds)<br>
+                        <strong>Architecture:</strong> Client-side credentials vs server-side sessions<br>
+                        <strong>Bot Protection:</strong> Built-in vs requires add-ons
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">Are there any contracts or commitments?</h3>
+                    <p class="faq-answer">
+                        No! IAM is free with no commitments. For Full PoH at $1.50/MAU, you pay month-to-month based on usage. Cancel anytime with no penalties.
                     </p>
                 </div>
             </div>
@@ -977,83 +953,52 @@
 
 
     <script>
-        // Enhanced pricing calculator with flexible pricing options
+        // Pricing calculator with new tier structure
         function calculateCost() {
             const userCount = parseInt(document.getElementById('userCount').value) || 0;
             
-            // Lemma pricing options
-            const fedIdRate = 0.06; // Fed ID Network only
-            const iamRate = 0.16; // IAM System only
-            const combinedRate = 0.20; // Both services (discounted from $0.22)
+            // Lemma pricing tiers
+            const iamRate = 0; // IAM is FREE forever
+            const pohFederationRate = 0; // Federation is FREE (sites with existing ID verification)
+            const fullPohRate = 1.50; // $1.50/MAU for full ID verification
             
-            // Use combined pricing as default for calculator
-            const lemmaMonthlyRate = combinedRate;
-            const lemmaSetupFeePerUser = 2.00; // One-time for new Fed ID users
-            const lemmaMonthlyTotal = userCount * lemmaMonthlyRate;
-            const lemmaSetupTotal = userCount * lemmaSetupFeePerUser;
-            const lemmaTotalFirstMonth = lemmaMonthlyTotal + lemmaSetupTotal;
+            // Calculate costs
+            const iamMonthly = 0; // Always free
+            const federationMonthly = 0; // Always free  
+            const fullPohMonthly = userCount * fullPohRate;
             
-            // Competitor pricing (based on 2025 market rates)
-            const auth0Monthly = calculateAuth0Cost(userCount);
-            const oktaMonthly = calculateOktaCost(userCount);
-            const cloudflareMonthly = calculateCloudflareCost(userCount);
-            const recaptchaMonthly = calculateRecaptchaCost(userCount);
+            // Competitor pricing for ID verification
+            const stripeIdentity = userCount * 2.00; // $2 per verification
+            const auth0PlusJumio = (userCount * 0.48) + (userCount * 3.00); // Auth0 + ID verify
+            const oktaPlusIdVerify = Math.max(500, userCount * 2) + (userCount * 2.00); // Okta + ID verify
             
-            // Calculate all three pricing options
-            const fedIdMonthly = userCount * fedIdRate;
-            const iamMonthly = userCount * iamRate;
-            const combinedMonthly = userCount * combinedRate;
-            
-            // Update calculator display for all three options
-            document.getElementById('fedIdCost').textContent = '$' + fedIdMonthly.toLocaleString() + '/month';
-            document.getElementById('iamCost').textContent = '$' + iamMonthly.toLocaleString() + '/month';
-            document.getElementById('combinedCost').textContent = '$' + combinedMonthly.toLocaleString() + '/month';
+            // Update calculator display
+            document.getElementById('iamCost').textContent = '$0 FREE';
+            document.getElementById('fedIdCost').textContent = '$0 FREE';
+            document.getElementById('combinedCost').textContent = '$' + fullPohMonthly.toLocaleString() + '/month';
             
             // Update user count display
             document.getElementById('user-count-display').textContent = userCount.toLocaleString();
             
-            // Calculate savings vs Auth0 (using combined pricing)
-            const totalSavings = auth0Monthly - combinedMonthly;
+            // Calculate savings vs Stripe Identity
+            const totalSavings = stripeIdentity - fullPohMonthly;
             document.getElementById('savingsAmount').textContent = '$' + Math.max(0, totalSavings).toLocaleString() + '/month';
             
-            // Update comparison table dynamically (using combined pricing)
-            updateComparisonTable(userCount, combinedMonthly, auth0Monthly, oktaMonthly, cloudflareMonthly, recaptchaMonthly);
-        }
-        
-        // Auth0 pricing: B2C Professional plan $0.48/MAU (updated 2025 pricing)
-        function calculateAuth0Cost(userCount) {
-            return userCount * 0.48; // $0.48 per MAU for Professional plan
-        }
-        
-        // Okta pricing: $2/user/month with $500 minimum (Workforce Identity)
-        function calculateOktaCost(userCount) {
-            return Math.max(500, userCount * 2);
-        }
-        
-        // Cloudflare Bot Management: $200/month for Pro plan
-        function calculateCloudflareCost(userCount) {
-            // Bot Management is typically bundled with Pro plan at $200/month
-            return 200;
-        }
-        
-        // reCAPTCHA Enterprise: $1 per 1000 assessments (realistic usage)
-        function calculateRecaptchaCost(userCount) {
-            // Assuming 10 assessments per user per month (multiple forms, logins, etc.)
-            const assessmentsPerMonth = userCount * 10;
-            return Math.max(10, Math.ceil(assessmentsPerMonth / 1000) * 1);
+            // Update comparison table
+            updateComparisonTable(userCount, fullPohMonthly, stripeIdentity, auth0PlusJumio, oktaPlusIdVerify);
         }
         
         // Update comparison table with dynamic pricing
-        function updateComparisonTable(userCount, lemma, auth0, okta, cloudflare, recaptcha) {
+        function updateComparisonTable(userCount, lemma, stripe, auth0Jumio, oktaIdVerify) {
             // Update cost cells
             document.getElementById('lemma-cost').textContent = '$' + lemma.toLocaleString();
-            document.getElementById('auth0-cost').textContent = '$' + auth0.toLocaleString();
-            document.getElementById('okta-cost').textContent = '$' + okta.toLocaleString();
-            document.getElementById('cloudflare-cost').textContent = '$' + cloudflare.toLocaleString();
-            document.getElementById('recaptcha-cost').textContent = '$' + recaptcha.toLocaleString();
+            document.getElementById('stripe-cost').textContent = '$' + stripe.toLocaleString();
+            document.getElementById('auth0-cost').textContent = '$' + auth0Jumio.toLocaleString();
+            document.getElementById('okta-cost').textContent = '$' + oktaIdVerify.toLocaleString();
             
-            // Calculate and update savings percentages (showing how much MORE competitors cost)
+            // Calculate and update savings percentages
             function formatSavings(competitorCost, lemmaCost) {
+                if (lemmaCost === 0) return 'N/A';
                 if (Math.abs(competitorCost - lemmaCost) < 1) return 'Same';
                 
                 const difference = competitorCost - lemmaCost;
@@ -1066,36 +1011,31 @@
                 }
             }
             
-            document.getElementById('auth0-savings').textContent = formatSavings(auth0, lemma);
-            document.getElementById('okta-savings').textContent = formatSavings(okta, lemma);
-            document.getElementById('cloudflare-savings').textContent = formatSavings(cloudflare, lemma);
-            document.getElementById('recaptcha-savings').textContent = formatSavings(recaptcha, lemma);
+            document.getElementById('stripe-savings').textContent = formatSavings(stripe, lemma);
+            document.getElementById('auth0-savings').textContent = formatSavings(auth0Jumio, lemma);
+            document.getElementById('okta-savings').textContent = formatSavings(oktaIdVerify, lemma);
             
             // Update savings colors
-            updateSavingsColor('auth0-savings', auth0, lemma);
-            updateSavingsColor('okta-savings', okta, lemma);
-            updateSavingsColor('cloudflare-savings', cloudflare, lemma);
-            updateSavingsColor('recaptcha-savings', recaptcha, lemma);
+            updateSavingsColor('stripe-savings', stripe, lemma);
+            updateSavingsColor('auth0-savings', auth0Jumio, lemma);
+            updateSavingsColor('okta-savings', oktaIdVerify, lemma);
         }
         
         function updateSavingsColor(elementId, competitorCost, lemmaCost) {
             const element = document.getElementById(elementId);
+            if (!element) return;
+            
             const difference = competitorCost - lemmaCost;
             
-            if (Math.abs(difference) < 1) {
-                // Costs are similar
+            if (lemmaCost === 0 || Math.abs(difference) < 1) {
                 element.style.color = 'var(--gray-600)';
             } else if (difference > lemmaCost * 0.5) {
-                // Competitor is significantly more expensive (good for Lemma)
                 element.style.color = 'var(--danger-600)';
             } else if (difference > lemmaCost * 0.1) {
-                // Competitor is moderately more expensive
                 element.style.color = 'var(--warning-600)';
             } else if (difference < -lemmaCost * 0.1) {
-                // Competitor is less expensive (bad for Lemma)
                 element.style.color = 'var(--success-600)';
             } else {
-                // Similar pricing
                 element.style.color = 'var(--gray-600)';
             }
         }
@@ -1232,7 +1172,7 @@ ${name}`);
                 Lemma vs Traditional Auth Systems
             </h2>
             <p style="font-size: var(--font-size-lg); color: var(--gray-600); max-width: 700px; margin: 0 auto;">
-                See how Lemma's built-in bot resistance and session-free architecture compares
+                See how Lemma's free IAM and optional ID verification compare
             </p>
         </div>
         
@@ -1242,64 +1182,58 @@ ${name}`);
                     <tr style="background: var(--gray-900); color: white;">
                         <th style="padding: var(--space-4); text-align: left; font-weight: 600;">Feature</th>
                         <th style="padding: var(--space-4); text-align: center;">Auth0</th>
-                        <th style="padding: var(--space-4); text-align: center;">Clerk</th>
+                        <th style="padding: var(--space-4); text-align: center;">Stripe Identity</th>
                         <th style="padding: var(--space-4); text-align: center; background: var(--primary-600);">Lemma</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <tr style="border-bottom: 1px solid var(--gray-200); background: var(--success-50);">
+                        <td style="padding: var(--space-4); font-weight: 500;"><strong>IAM Cost</strong></td>
+                        <td style="padding: var(--space-4); text-align: center;">$0.48/MAU</td>
+                        <td style="padding: var(--space-4); text-align: center;">N/A</td>
+                        <td style="padding: var(--space-4); text-align: center; background: var(--success-100); font-weight: 600;"><strong>FREE</strong></td>
+                    </tr>
                     <tr style="border-bottom: 1px solid var(--gray-200);">
-                        <td style="padding: var(--space-4); font-weight: 500;">Email Authentication</td>
-                        <td style="padding: var(--space-4); text-align: center;">✅</td>
-                        <td style="padding: var(--space-4); text-align: center;">✅</td>
-                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50);">✅</td>
+                        <td style="padding: var(--space-4); font-weight: 500;">ID Verification Cost</td>
+                        <td style="padding: var(--space-4); text-align: center;">+$3/verify</td>
+                        <td style="padding: var(--space-4); text-align: center;">$2/verify</td>
+                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50);">$1.50/MAU</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--gray-200); background: var(--gray-50);">
                         <td style="padding: var(--space-4); font-weight: 500;"><strong>Built-In Bot Resistance</strong></td>
-                        <td style="padding: var(--space-4); text-align: center;">❌ <small>(add reCAPTCHA)</small></td>
-                        <td style="padding: var(--space-4); text-align: center;">❌ <small>(add reCAPTCHA)</small></td>
-                        <td style="padding: var(--space-4); text-align: center; background: var(--success-50); font-weight: 600;">✅ <strong>Included</strong></td>
+                        <td style="padding: var(--space-4); text-align: center;">-</td>
+                        <td style="padding: var(--space-4); text-align: center;">-</td>
+                        <td style="padding: var(--space-4); text-align: center; background: var(--success-50); font-weight: 600;">Included (IAM)</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--gray-200);">
-                        <td style="padding: var(--space-4); font-weight: 500;">Replay Attack Protection</td>
-                        <td style="padding: var(--space-4); text-align: center;">❌</td>
-                        <td style="padding: var(--space-4); text-align: center;">❌</td>
-                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50);">✅ <small>(nonces)</small></td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid var(--gray-200); background: var(--gray-50);">
                         <td style="padding: var(--space-4); font-weight: 500;">Verification Speed</td>
                         <td style="padding: var(--space-4); text-align: center;">200-500ms</td>
-                        <td style="padding: var(--space-4); text-align: center;">100-300ms</td>
-                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50); font-weight: 600;"><strong>18µs</strong> <small>(10,000x faster)</small></td>
+                        <td style="padding: var(--space-4); text-align: center;">30-60s</td>
+                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50); font-weight: 600;"><strong>36-47µs</strong></td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--gray-200); background: var(--gray-50);">
+                        <td style="padding: var(--space-4); font-weight: 500;">Cross-Site Portability</td>
+                        <td style="padding: var(--space-4); text-align: center;">-</td>
+                        <td style="padding: var(--space-4); text-align: center;">-</td>
+                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50);">Network-wide</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--gray-200);">
                         <td style="padding: var(--space-4); font-weight: 500;">Session Management</td>
                         <td style="padding: var(--space-4); text-align: center;">Server-side</td>
-                        <td style="padding: var(--space-4); text-align: center;">Server-side</td>
-                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50);"><strong>Session-free</strong></td>
+                        <td style="padding: var(--space-4); text-align: center;">N/A</td>
+                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50);"><strong>Client-side</strong></td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--gray-200); background: var(--gray-50);">
-                        <td style="padding: var(--space-4); font-weight: 500;">User Tracking</td>
-                        <td style="padding: var(--space-4); text-align: center;">Full tracking</td>
-                        <td style="padding: var(--space-4); text-align: center;">Full tracking</td>
-                        <td style="padding: var(--space-4); text-align: center; background: var(--success-50); font-weight: 600;"><strong>Zero tracking</strong></td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid var(--gray-200);">
                         <td style="padding: var(--space-4); font-weight: 500;">Works Offline</td>
-                        <td style="padding: var(--space-4); text-align: center;">❌</td>
-                        <td style="padding: var(--space-4); text-align: center;">❌</td>
-                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50);">✅ <small>(7-day cache)</small></td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid var(--gray-200); background: var(--gray-50);">
-                        <td style="padding: var(--space-4); font-weight: 500;">Revocation Speed</td>
-                        <td style="padding: var(--space-4); text-align: center;">30-60s</td>
-                        <td style="padding: var(--space-4); text-align: center;">30-60s</td>
-                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50); font-weight: 600;"><strong>&lt;100ms</strong> <small>(600x faster)</small></td>
+                        <td style="padding: var(--space-4); text-align: center;">-</td>
+                        <td style="padding: var(--space-4); text-align: center;">-</td>
+                        <td style="padding: var(--space-4); text-align: center; background: var(--success-50);">Yes</td>
                     </tr>
                     <tr style="background: var(--gray-50);">
-                        <td style="padding: var(--space-4); font-weight: 500;">Cost per Verification</td>
-                        <td style="padding: var(--space-4); text-align: center;">$0.05</td>
-                        <td style="padding: var(--space-4); text-align: center;">$0.03</td>
-                        <td style="padding: var(--space-4); text-align: center; background: var(--success-50); font-weight: 600;"><strong>$0.00</strong> <small>(client-side)</small></td>
+                        <td style="padding: var(--space-4); font-weight: 500;">Federation Support</td>
+                        <td style="padding: var(--space-4); text-align: center;">-</td>
+                        <td style="padding: var(--space-4); text-align: center;">-</td>
+                        <td style="padding: var(--space-4); text-align: center; background: var(--success-50); font-weight: 600;"><strong>FREE</strong></td>
                     </tr>
                 </tbody>
             </table>
@@ -1307,10 +1241,10 @@ ${name}`);
         
         <div style="text-align: center; margin-top: var(--space-8);">
             <p style="font-size: var(--font-size-lg); color: var(--gray-700); margin-bottom: var(--space-6);">
-                <strong>Lemma includes features others charge extra for or don't offer at all.</strong>
+                <strong>IAM is free. Only pay for ID verification if you need it.</strong>
             </p>
             <a href="/register" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">
-                Start Using Lemma
+                Start Free
             </a>
         </div>
     </div>
