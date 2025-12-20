@@ -30,11 +30,139 @@ from functools import wraps
 import json
 import requests
 import hashlib
+import os
+from datetime import datetime
 
 # Import decorators
 from auth.decorators import rate_limit, cors_headers
 
 logger = logging.getLogger(__name__)
+
+# ============================================================================
+# ISSUANCE VELOCITY LIMITS - Anti-Bot Farm Protection
+# ============================================================================
+
+_velocity_redis = None
+_velocity_memory = {}
+
+def get_velocity_redis():
+    """Get Redis client for velocity tracking"""
+    global _velocity_redis
+    if _velocity_redis is not None:
+        return _velocity_redis
+    try:
+        import redis
+        redis_url = os.getenv('REDISCLOUD_URL') or os.getenv('REDIS_URL')
+        if redis_url:
+            if redis_url.startswith('rediss://'):
+                _velocity_redis = redis.from_url(redis_url, decode_responses=True, ssl_cert_reqs=None)
+            else:
+                _velocity_redis = redis.from_url(redis_url, decode_responses=True)
+            _velocity_redis.ping()
+            logger.info("Issuance velocity tracking: Redis connected")
+            return _velocity_redis
+    except Exception as e:
+        logger.warning(f"Issuance velocity tracking: Redis unavailable ({e})")
+    return None
+
+def check_issuance_velocity(request) -> tuple:
+    """Check if issuance velocity limits exceeded (anti-bot farm)"""
+    try:
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if ip and ',' in ip:
+            ip = ip.split(',')[0].strip()
+        if not ip:
+            return True, None
+        ip_parts = ip.split('.')
+        ip_prefix = '.'.join(ip_parts[:3]) if len(ip_parts) >= 3 else ip
+        
+        redis_client = get_velocity_redis()
+        if redis_client:
+            hourly_key = f"issuance:velocity:{ip_prefix}:hourly"
+            daily_key = f"issuance:velocity:{ip_prefix}:daily"
+            hourly_count = int(redis_client.get(hourly_key) or 0)
+            daily_count = int(redis_client.get(daily_key) or 0)
+            if hourly_count >= 3:
+                logger.warning(f"Issuance velocity limit exceeded (hourly): {ip_prefix}")
+                return False, "Too many verification attempts. Please try again later."
+            if daily_count >= 5:
+                logger.warning(f"Issuance velocity limit exceeded (daily): {ip_prefix}")
+                return False, "Daily verification limit reached. Please try again tomorrow."
+        else:
+            current_hour = datetime.utcnow().strftime('%Y%m%d%H')
+            hourly_key = f"{ip_prefix}:{current_hour}"
+            if _velocity_memory.get(hourly_key, 0) >= 3:
+                return False, "Too many verification attempts. Please try again later."
+        return True, None
+    except Exception as e:
+        logger.error(f"Issuance velocity check error: {e}")
+        return True, None
+
+def record_issuance_velocity(request):
+    """Record successful issuance for velocity tracking"""
+    try:
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if ip and ',' in ip:
+            ip = ip.split(',')[0].strip()
+        if not ip:
+            return
+        ip_parts = ip.split('.')
+        ip_prefix = '.'.join(ip_parts[:3]) if len(ip_parts) >= 3 else ip
+        
+        redis_client = get_velocity_redis()
+        if redis_client:
+            hourly_key = f"issuance:velocity:{ip_prefix}:hourly"
+            daily_key = f"issuance:velocity:{ip_prefix}:daily"
+            pipe = redis_client.pipeline()
+            pipe.incr(hourly_key)
+            pipe.expire(hourly_key, 3600)
+            pipe.incr(daily_key)
+            pipe.expire(daily_key, 86400)
+            pipe.execute()
+        else:
+            current_hour = datetime.utcnow().strftime('%Y%m%d%H')
+            hourly_key = f"{ip_prefix}:{current_hour}"
+            _velocity_memory[hourly_key] = _velocity_memory.get(hourly_key, 0) + 1
+    except Exception as e:
+        logger.error(f"Record issuance velocity error: {e}")
+
+def get_ip_country(request) -> str:
+    """Get country code from IP (best effort)"""
+    try:
+        cf_country = request.headers.get('CF-IPCountry')
+        if cf_country and cf_country != 'XX':
+            return cf_country
+        return request.headers.get('X-Country-Code', 'UNKNOWN')
+    except:
+        return 'UNKNOWN'
+
+def get_device_class(request) -> str:
+    """Determine device class from user agent"""
+    try:
+        ua = request.headers.get('User-Agent', '').lower()
+        if any(m in ua for m in ['iphone', 'android', 'mobile']):
+            return 'mobile'
+        if any(d in ua for d in ['windows', 'macintosh', 'linux']):
+            return 'desktop'
+        return 'unknown'
+    except:
+        return 'unknown'
+
+def compute_credential_trust_tier(issued_at: int) -> dict:
+    """Compute trust tier based on credential age"""
+    try:
+        age_days = (int(time.time()) - issued_at) / 86400
+        if age_days < 1:
+            return {'trust_tier': 'new', 'age_days': round(age_days, 2), 'scrutiny_level': 'elevated'}
+        elif age_days < 7:
+            return {'trust_tier': 'recent', 'age_days': round(age_days, 1), 'scrutiny_level': 'moderate'}
+        elif age_days < 30:
+            return {'trust_tier': 'established', 'age_days': int(age_days), 'scrutiny_level': 'normal'}
+        else:
+            return {'trust_tier': 'mature', 'age_days': int(age_days), 'scrutiny_level': 'low'}
+    except:
+        return {'trust_tier': 'unknown', 'age_days': 0, 'scrutiny_level': 'elevated'}
+
 
 # Create SDK API blueprint
 sdk_api_bp = Blueprint('sdk_api', __name__)
@@ -840,10 +968,14 @@ def revoke_credential():
                     logger.warning(f"Rust OPRF failed for {credential_id}: {e}")
                     # Fallback to deterministic hash (not privacy-preserving but functional)
                     import hashlib
+import os
+from datetime import datetime
                     oprf_evaluation = f"hash_{hashlib.sha256(credential_id.encode()).hexdigest()}"
             else:
                 # Fallback to deterministic hash (not privacy-preserving but functional)
                 import hashlib
+import os
+from datetime import datetime
                 oprf_evaluation = f"hash_{hashlib.sha256(credential_id.encode()).hexdigest()}"
             
             oprf_end = time.perf_counter_ns()
@@ -859,6 +991,8 @@ def revoke_credential():
             
             # Simulate bloom filter update time (very fast)
             import hashlib
+import os
+from datetime import datetime
             bloom_hash = hashlib.sha256(oprf_evaluation.encode()).hexdigest()
             
             bloom_end = time.perf_counter_ns()

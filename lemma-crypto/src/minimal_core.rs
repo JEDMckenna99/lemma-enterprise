@@ -157,7 +157,7 @@ impl MinimalIssuer {
             issuer: self.did.clone(),
             subject,
             issued_at: current_time,
-            expires_at: Some(current_time + (365 * 24 * 60 * 60)), // 1 year
+            expires_at: Some(current_time + (2 * 365 * 24 * 60 * 60)), // 2 years
             claims,
             proof: None,
         };
