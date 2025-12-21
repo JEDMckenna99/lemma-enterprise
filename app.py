@@ -177,6 +177,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Issuer Registry: {e}")
 
+    # Federated Site API (Managed + Self-Service)
+    try:
+        from api.federated_site_api import federated_site_bp
+        app.register_blueprint(federated_site_bp)
+        logger.info("✅ Federated Site API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Federated Site API: {e}")
+
     try:
         from api.oauth_server import oauth_api
         app.register_blueprint(oauth_api)
