@@ -166,7 +166,16 @@ def create_app():
         app.register_blueprint(passkey_bp)
         logger.info("✅ Passkey Auth registered")
     except Exception as e:
-        logger.error(f"❌ Failed to register Lemma Auth: {e}")
+        logger.error(f"❌ Failed to register Passkey Auth: {e}")
+
+    # Issuer Registry (for wallet-centric architecture)
+    try:
+        from api.issuer_registry import issuer_registry_bp, init_issuer_registry_table
+        app.register_blueprint(issuer_registry_bp)
+        init_issuer_registry_table()
+        logger.info("✅ Issuer Registry registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Issuer Registry: {e}")
 
     try:
         from api.oauth_server import oauth_api

@@ -256,11 +256,19 @@ def passkey_register_complete():
         
         logger.info(f"✅ Passkey registered for {stored['user_email']}")
         
+        # Return public key for local wallet storage (wallet-centric architecture)
         return jsonify({
             'success': True,
             'passkey_id': passkey.id,
             'device_name': passkey.device_name,
-            'message': 'Passkey registered successfully'
+            'credential_id': passkey.credential_id,
+            'public_key': passkey.public_key,  # For local verification
+            'message': 'Passkey registered successfully',
+            'wallet_storage': {
+                'credentialId': passkey.credential_id,
+                'publicKey': passkey.public_key,
+                'algorithm': -7  # ES256, TODO: detect actual algorithm
+            }
         })
         
     except Exception as e:
