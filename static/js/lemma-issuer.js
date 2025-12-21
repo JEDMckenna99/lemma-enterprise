@@ -240,6 +240,47 @@ class LemmaSiteIssuer {
     }
 
     // ========================================
+    // REVOCATION (Network Defense)
+    // ========================================
+
+    /**
+     * Revoke a lemma - adds to global revocation network
+     * This bans the credential across ALL participating sites
+     */
+    async revokeLemma(lemmaId, reason = 'issuer_revoked') {
+        if (!this._initialized) {
+            throw new Error('Issuer not initialized');
+        }
+
+        const response = await fetch(`${this.lemmaApiUrl}/api/v1/revoke`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                issuer_did: this.did,
+                credential_id: lemmaId,
+                reason: reason
+            })
+        });
+
+        return response.json();
+    }
+
+    /**
+     * Check if credentials are revoked (batch)
+     */
+    async checkRevocations(lemmaIds) {
+        const response = await fetch(`${this.lemmaApiUrl}/api/v1/revocation/check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                credential_ids: lemmaIds
+            })
+        });
+
+        return response.json();
+    }
+
+    // ========================================
     // REGISTRY INTEGRATION
     // ========================================
 

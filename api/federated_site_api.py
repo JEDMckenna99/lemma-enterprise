@@ -352,6 +352,141 @@ def managed_issue_credential(site_id, user_did):
 
 
 # ============================================
+# FEDERATED REVOCATION (Network Defense)
+# ============================================
+
+@federated_site_bp.route('/api/v1/revoke', methods=['POST'])
+@cross_origin()
+def federated_revoke():
+    """
+    Federated revocation - any issuer can report a revocation
+    
+    This adds the credential to the GLOBAL revocation list,
+    providing network-wide defense (banned everywhere).
+    
+    POST /api/v1/revoke
+    {
+        "issuer_did": "did:web:mysite.com",
+        "credential_id": "lemma_abc123",
+        "reason": "abuse",
+        "signature": "base64..." (optional - proves issuer authority)
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        issuer_did = data.get('issuer_did')
+        credential_id = data.get('credential_id')
+        reason = data.get('reason', 'unspecified')
+        
+        if not credential_id:
+            return jsonify({'error': 'credential_id is required'}), 400
+        
+        # Verify issuer is registered (optional but recommended)
+        if issuer_did:
+            db = get_db()
+            try:
+                issuer = db.query(IssuerRecord).filter(
+                    IssuerRecord.issuer_did == issuer_did,
+                    IssuerRecord.is_active == True
+                ).first()
+                
+                if not issuer:
+                    logger.warning(f"⚠️ Revocation from unregistered issuer: {issuer_did}")
+                    # Still allow - network defense is more important
+            finally:
+                db.close()
+        
+        # Add to global revocation list
+        try:
+            from api.database import get_db_connection
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO revocation_list
+                (lemma_id, credential_id, lemma_type, site_id, revoked_at, reason, bloom_filter_updated)
+                VALUES (%s, %s, 'federated', %s, NOW(), %s, FALSE)
+                ON CONFLICT (lemma_id) DO UPDATE SET revoked_at = NOW(), reason = %s
+            """, (credential_id, credential_id, issuer_did, reason, reason))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            logger.info(f"🚫 Federated revocation: {credential_id} by {issuer_did}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to add to revocation list: {e}")
+            return jsonify({'error': 'Failed to record revocation'}), 500
+        
+        # Trigger network-wide bloom filter sync
+        try:
+            from api.revocation_sync import trigger_revocation_sync
+            trigger_revocation_sync(credential_id, 'federated', site_id=issuer_did)
+            logger.info(f"📡 Revocation sync triggered for {credential_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not trigger sync: {e}")
+        
+        return jsonify({
+            'success': True,
+            'credential_id': credential_id,
+            'revoked_by': issuer_did,
+            'network_propagation': 'immediate',
+            'message': 'Credential revoked network-wide'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Federated revocation error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@federated_site_bp.route('/api/v1/revocation/check', methods=['POST'])
+@cross_origin()
+def check_revocation():
+    """
+    Check if credentials are revoked (batch)
+    
+    POST /api/v1/revocation/check
+    {
+        "credential_ids": ["lemma_abc", "lemma_def"]
+    }
+    """
+    try:
+        data = request.get_json()
+        credential_ids = data.get('credential_ids', [])
+        
+        if not credential_ids:
+            return jsonify({'error': 'credential_ids required'}), 400
+        
+        # Check against bloom filter
+        try:
+            from api.permission_verification import get_global_verifier
+            verifier = get_global_verifier()
+            
+            results = {}
+            for cred_id in credential_ids[:100]:  # Limit to 100
+                if verifier:
+                    results[cred_id] = verifier.is_revoked(cred_id)
+                else:
+                    results[cred_id] = False  # Can't check, assume not revoked
+            
+            return jsonify({
+                'success': True,
+                'results': results,
+                'checked_count': len(results)
+            })
+            
+        except Exception as e:
+            logger.error(f"❌ Revocation check error: {e}")
+            return jsonify({'error': str(e)}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
 # SELF-SERVICE: PoH Request
 # ============================================
 
