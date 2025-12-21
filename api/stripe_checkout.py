@@ -27,7 +27,7 @@ stripe_checkout_bp = Blueprint('stripe_checkout', __name__)
 SUBSCRIPTION_PLANS = {
     'starter': {
         'name': 'Lemma Shield - Starter',
-        'price_id': 'price_1RtBQFDIouMeOMabSXK43jDW',  # One-time price for now, will update to recurring
+        'price_id': 'price_1RtBQFDIouMeOMabSXK43jDW',
         'amount': 2900,  # $29/month
         'description': 'Perfect for small to medium websites',
         'features': [
@@ -40,7 +40,7 @@ SUBSCRIPTION_PLANS = {
     },
     'professional': {
         'name': 'Lemma Shield - Professional',
-        'price_id': 'price_1RtBQGDIouMeOMabRGaVYg0A',  # One-time price for now, will update to recurring
+        'price_id': 'price_1RtBQGDIouMeOMabRGaVYg0A',
         'amount': 9900,  # $99/month
         'description': 'Advanced features for growing businesses',
         'features': [
@@ -53,7 +53,7 @@ SUBSCRIPTION_PLANS = {
     },
     'enterprise': {
         'name': 'Lemma Shield - Enterprise',
-        'price_id': 'price_1RtBQGDIouMeOMab4DsImBZ3',  # One-time price for now, will update to recurring
+        'price_id': 'price_1RtBQGDIouMeOMab4DsImBZ3',
         'amount': 49900,  # $499/month
         'description': 'Full-scale enterprise protection',
         'features': [
@@ -66,10 +66,13 @@ SUBSCRIPTION_PLANS = {
     }
 }
 
+# Cache for payment links (more reliable than checkout sessions)
+PAYMENT_LINKS_CACHE = {}
+
 @stripe_checkout_bp.route('/api/create-checkout-session', methods=['POST'])
 def create_checkout_session():
     """
-    Create a Stripe Checkout session for subscription
+    Create a Stripe Payment Link for subscription (more reliable than checkout sessions)
     """
     if not STRIPE_AVAILABLE:
         return jsonify({
@@ -81,7 +84,6 @@ def create_checkout_session():
     try:
         data = request.get_json()
         plan_type = data.get('planType')
-        price_id = data.get('priceId')
         
         if not plan_type or plan_type not in SUBSCRIPTION_PLANS:
             return jsonify({
@@ -92,39 +94,57 @@ def create_checkout_session():
         
         plan_config = SUBSCRIPTION_PLANS[plan_type]
         
-        # Create Stripe Checkout Session
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
+        # Use cached payment link if available
+        if plan_type in PAYMENT_LINKS_CACHE:
+            cached = PAYMENT_LINKS_CACHE[plan_type]
+            logger.info(f"✅ Using cached Payment Link for {plan_type} plan")
+            return jsonify({
+                'success': True,
+                'url': cached['url'],
+                'payment_link_id': cached['id']
+            })
+        
+        # Create Stripe Payment Link (more reliable than checkout sessions)
+        payment_link = stripe.PaymentLink.create(
             line_items=[{
                 'price': plan_config['price_id'],
                 'quantity': 1,
             }],
-            mode='payment',  # Will change to 'subscription' once we have recurring prices
-            success_url=request.host_url + 'subscription/success?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url=request.host_url + 'pricing?canceled=true',
+            after_completion={
+                'type': 'redirect',
+                'redirect': {
+                    'url': request.host_url + 'subscription/success?plan=' + plan_type
+                }
+            },
             metadata={
                 'plan_type': plan_type,
                 'plan_name': plan_config['name']
             }
         )
         
-        logger.info(f"✅ Created Stripe Checkout session {checkout_session.id} for {plan_type} plan")
+        # Cache the payment link
+        PAYMENT_LINKS_CACHE[plan_type] = {
+            'id': payment_link.id,
+            'url': payment_link.url
+        }
+        
+        logger.info(f"✅ Created Stripe Payment Link {payment_link.id} for {plan_type} plan")
         
         return jsonify({
             'success': True,
-            'url': checkout_session.url,
-            'session_id': checkout_session.id
+            'url': payment_link.url,
+            'payment_link_id': payment_link.id
         })
         
     except stripe.error.StripeError as e:
-        logger.error(f"❌ Stripe error creating checkout session: {str(e)}")
+        logger.error(f"❌ Stripe error creating payment link: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'stripe_error',
             'message': 'Payment processing error. Please try again.'
         }), 500
     except Exception as e:
-        logger.error(f"❌ Error creating checkout session: {str(e)}")
+        logger.error(f"❌ Error creating payment link: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'internal_error',
