@@ -33,6 +33,47 @@ def create_app():
     app.config['STRIPE_PUBLISHABLE_KEY'] = os.environ.get('STRIPE_PUBLISHABLE_KEY')
     app.config['STRIPE_WEBHOOK_SECRET'] = os.environ.get('STRIPE_WEBHOOK_SECRET')
 
+    # ================================================================================
+    # SECURITY HEADERS - Industry standard protection
+    # ================================================================================
+    @app.after_request
+    def add_security_headers(response):
+        """Add security headers to all responses"""
+        # HSTS - Force HTTPS for 1 year
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
+        
+        # Prevent MIME type sniffing
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        
+        # Prevent clickjacking
+        response.headers['X-Frame-Options'] = 'DENY'
+        
+        # XSS Protection (legacy but still useful)
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        
+        # Referrer Policy - Don't leak URLs to third parties
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        
+        # Permissions Policy - Disable unnecessary browser features
+        response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+        
+        # Content Security Policy - Restrict resource loading
+        csp = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://static.cloudflareinsights.com https://challenges.cloudflare.com https://js.stripe.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' https://lemma.id https://*.stripe.com https://api.stripe.com; "
+            "frame-src 'self' https://*.stripe.com https://challenges.cloudflare.com; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self' https://*.stripe.com"
+        )
+        response.headers['Content-Security-Policy'] = csp
+        
+        return response
+
     # Initialize components
     try:
         # Initialize error monitoring FIRST (catch initialization errors too)
