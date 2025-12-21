@@ -1078,9 +1078,12 @@ function displayPohLemmas(pohCredentials) {
     }
 
     container.innerHTML = pohCredentials.map(lemma => {
-        const issuedDate = new Date(lemma.issued_at * 1000).toLocaleDateString();
-        const expiresDate = lemma.expires_at ? new Date(lemma.expires_at * 1000).toLocaleDateString() : 'Never';
-        const verificationMethod = (lemma.claims || lemma.credentialSubject)?.verificationMethod || 'Unknown';
+        // Handle both W3C (issuanceDate) and legacy (issued_at) formats
+        const issuedTimestamp = lemma.issuanceDate || lemma.issued_at || (lemma.storedAt / 1000);
+        const issuedDate = issuedTimestamp ? new Date(issuedTimestamp * 1000).toLocaleDateString() : 'Unknown';
+        const expiresTimestamp = lemma.expirationDate || lemma.expires_at;
+        const expiresDate = expiresTimestamp ? new Date(expiresTimestamp * 1000).toLocaleDateString() : 'Never';
+        const verificationMethod = (lemma.claims || lemma.credentialSubject)?.verificationMethod || 'stripe_identity';
         
         return `
             <div style="padding: 20px; border-bottom: 1px solid var(--gray-100); display: flex; justify-content: space-between; align-items: center;">
@@ -1147,8 +1150,11 @@ function displayPermissionLemmas(permissionLemmas) {
                     ${siteDisplay}
                 </h4>
                 ${siteLemmas.map(lemma => {
-                    const issuedDate = new Date(lemma.issued_at * 1000).toLocaleDateString();
-                    const expiresDate = lemma.expires_at ? new Date(lemma.expires_at * 1000).toLocaleDateString() : 'Never';
+                    // Handle both W3C (issuanceDate) and legacy (issued_at) formats
+                    const issuedTimestamp = lemma.issuanceDate || lemma.issued_at || (lemma.storedAt / 1000);
+                    const issuedDate = issuedTimestamp ? new Date(issuedTimestamp * 1000).toLocaleDateString() : 'Unknown';
+                    const expiresTimestamp = lemma.expirationDate || lemma.expires_at;
+                    const expiresDate = expiresTimestamp ? new Date(expiresTimestamp * 1000).toLocaleDateString() : 'Never';
                     const permissionId = (lemma.claims || lemma.credentialSubject)?.permissionId || 'Unknown';
                     const accountType = (lemma.claims || lemma.credentialSubject)?.accountType || 'Unknown';
                     
