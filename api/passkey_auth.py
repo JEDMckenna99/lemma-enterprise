@@ -508,6 +508,14 @@ def issue_lemma_with_passkey_proof(user_id: str, user_email: str, user_role: str
         # Embed the passkey proof in the lemma
         lemma_data['passkeyProof'] = passkey_proof
         
+        # Add issuer info for wallet caching (federated architecture)
+        lemma_data['issuerInfo'] = {
+            'did': iam_issuer.get_did(),
+            'publicKey': iam_issuer.get_public_key_hex(),
+            'name': 'Lemma IAM',
+            'verified': True
+        }
+        
         logger.info(f"✅ Lemma with passkey proof issued: {lemma_data['id']}")
         
         return lemma_data

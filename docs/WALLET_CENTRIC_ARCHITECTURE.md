@@ -103,13 +103,76 @@ Wallet session marked as "unlocked" for 8 hours
 
 ### 4. Lemma Services (Server)
 
-**Lemma's role becomes:**
+**Lemma's role in the federated network:**
 
 | Service | Purpose | When Used |
 |---------|---------|-----------|
 | **PoH Issuance** | Issue "isHuman=true" lemmas | User's first verification |
 | **Issuer Registry** | Store/lookup site public keys | Sites registering, cross-site trust |
 | **Revocation Network** | Aggregate and distribute revocations | Bad actor detected |
+
+---
+
+## Federated Model: Who Issues What
+
+The federated model separates **identity verification** from **permissions/roles**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         FEDERATED ISSUER MODEL                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                    LEMMA (Root of Trust)
+                    ┌─────────────────────┐
+                    │                     │
+                    │  Issues:            │
+                    │  • isHuman=true     │  ← "I'm a real person"
+                    │  • passkey verified │  ← "Device is mine"
+                    │  • KYC level        │  ← "Identity verified"
+                    │                     │
+                    └──────────┬──────────┘
+                               │
+                    User stores in wallet
+                               │
+          ┌────────────────────┼────────────────────┐
+          │                    │                    │
+          ▼                    ▼                    ▼
+    ┌───────────┐        ┌───────────┐        ┌───────────┐
+    │  SITE A   │        │  SITE B   │        │  SITE C   │
+    │           │        │           │        │           │
+    │ Issues:   │        │ Issues:   │        │ Issues:   │
+    │ • role    │        │ • member  │        │ • access  │
+    │ • admin   │        │ • premium │        │ • api_key │
+    └───────────┘        └───────────┘        └───────────┘
+```
+
+### Why This Separation Matters
+
+| Lemma Issues | Sites Issue |
+|--------------|-------------|
+| **Human verification** - expensive, one-time | **Roles/permissions** - free, frequent changes |
+| **Device binding** - passkey proof | **Membership tiers** - site-specific |
+| **KYC level** - regulatory compliance | **Access tokens** - resource-specific |
+| **Universal across all sites** | **Only valid for issuing site** |
+
+### Integration with Existing IAM
+
+The existing `issuer_management.py` and KMS-backed issuers **remain unchanged**:
+
+1. **Lemma Server Issues:**
+   - PoH credentials (via `PyMinimalIssuer`)
+   - IAM permissions (via `get_iam_issuer()`)
+   - All KMS-backed for security compliance
+
+2. **Sites Issue (NEW):**
+   - Role/membership lemmas (via `LemmaSiteIssuer`)
+   - Browser-based Ed25519 signing
+   - Registered in `issuer_registry`
+
+3. **Wallet Stores Both:**
+   - Lemma's PoH credential (trust anchor)
+   - Site-specific credentials (permissions)
+   - All verifiable locally
 
 ---
 

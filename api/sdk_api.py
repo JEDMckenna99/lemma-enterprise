@@ -902,6 +902,14 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_re
         except Exception as e:
             logger.warning(f"⚠️ Failed to add enhanced identity credential to network storage: {e}")
         
+        # Add issuer info for wallet caching (federated architecture)
+        credential['issuerInfo'] = {
+            'did': federated_issuer.get_did(),
+            'publicKey': federated_issuer.get_public_key_hex(),
+            'name': 'Lemma Federated Network',
+            'verified': True
+        }
+        
         return credential
         
     except ImportError:

@@ -446,34 +446,111 @@ def verify_dns(domain, token):
 # ============================================
 
 def register_lemma_as_issuer():
-    """Register Lemma itself as a trusted issuer"""
+    """Register Lemma itself as a trusted issuer in the federated network"""
+    try:
+        from .issuer_management import get_issuer_manager
+        
+        issuer_manager = get_issuer_manager()
+        
+        db = get_db()
+        try:
+            # Register both the IAM issuer and federated issuer
+            issuers_to_register = [
+                {
+                    'issuer_func': lambda: issuer_manager.get_iam_issuer('lemma.id'),
+                    'domain': 'lemma.id',
+                    'name': 'Lemma IAM',
+                    'description': 'Official Lemma Identity & Access Management Service - issues PoH credentials'
+                },
+                {
+                    'issuer_func': lambda: issuer_manager.get_federated_issuer(),
+                    'domain': 'federated.lemma.id',
+                    'name': 'Lemma Federated Network',
+                    'description': 'Lemma Federated Identity Network - cross-platform identity'
+                }
+            ]
+            
+            for issuer_config in issuers_to_register:
+                try:
+                    issuer = issuer_config['issuer_func']()
+                    
+                    existing = db.query(IssuerRecord).filter(
+                        IssuerRecord.domain == issuer_config['domain']
+                    ).first()
+                    
+                    if existing:
+                        # Update existing record
+                        existing.public_key = issuer.get_public_key_hex()
+                        existing.issuer_did = issuer.get_did()
+                        existing.updated_at = datetime.utcnow()
+                        logger.info(f"🔄 Updated {issuer_config['name']} in registry")
+                    else:
+                        # Create new record
+                        record = IssuerRecord(
+                            issuer_did=issuer.get_did(),
+                            domain=issuer_config['domain'],
+                            public_key=issuer.get_public_key_hex(),
+                            name=issuer_config['name'],
+                            description=issuer_config['description'],
+                            verified=True,
+                            verification_method='bootstrap'
+                        )
+                        db.add(record)
+                        logger.info(f"✅ Registered {issuer_config['name']} as trusted issuer")
+                        
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not register {issuer_config['name']}: {e}")
+            
+            db.commit()
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Could not register Lemma issuers: {e}")
+
+
+# ============================================
+# WALLET INTEGRATION ENDPOINTS
+# ============================================
+
+@issuer_registry_bp.route('/api/issuers/lemma', methods=['GET'])
+@cross_origin()
+def get_lemma_issuer():
+    """
+    Get Lemma's issuer info for wallet caching
+    This is the primary endpoint for wallets to bootstrap trust
+    
+    GET /api/issuers/lemma
+    """
     try:
         from .issuer_management import get_issuer_manager
         
         issuer_manager = get_issuer_manager()
         iam_issuer = issuer_manager.get_iam_issuer('lemma.id')
         
-        db = get_db()
-        try:
-            existing = db.query(IssuerRecord).filter(
-                IssuerRecord.domain == 'lemma.id'
-            ).first()
-            
-            if not existing:
-                issuer = IssuerRecord(
-                    issuer_did=iam_issuer.get_did(),
-                    domain='lemma.id',
-                    public_key=iam_issuer.get_public_key_hex(),
-                    name='Lemma',
-                    description='Official Lemma Identity Service',
-                    verified=True,
-                    verification_method='bootstrap'
-                )
-                db.add(issuer)
-                db.commit()
-                logger.info("✅ Lemma registered as trusted issuer")
-        finally:
-            db.close()
-            
+        return jsonify({
+            'success': True,
+            'issuer': {
+                'did': iam_issuer.get_did(),
+                'domain': 'lemma.id',
+                'name': 'Lemma',
+                'publicKey': iam_issuer.get_public_key_hex(),
+                'verified': True,
+                'type': 'poh',  # Proof of Human issuer
+                'description': 'Official Lemma Identity Service - issues Proof of Human credentials'
+            },
+            'walletStorage': {
+                'did': iam_issuer.get_did(),
+                'publicKey': iam_issuer.get_public_key_hex(),
+                'name': 'Lemma',
+                'verified': True
+            }
+        })
+        
     except Exception as e:
-        logger.warning(f"⚠️ Could not register Lemma as issuer: {e}")
+        logger.error(f"❌ Get Lemma issuer failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

@@ -164,6 +164,15 @@ def lemma_signin():
                 )
                 
                 permission_lemma_data = json.loads(permission_lemma_json)
+                
+                # Add issuer info for wallet caching (federated architecture)
+                permission_lemma_data['issuerInfo'] = {
+                    'did': iam_issuer.get_did(),
+                    'publicKey': iam_issuer.get_public_key_hex(),
+                    'name': 'Lemma IAM',
+                    'verified': True
+                }
+                
                 logger.info(f"✅ Real IAM permission lemma created: {permission_lemma_data['id']}")
                 
             except Exception as e:
