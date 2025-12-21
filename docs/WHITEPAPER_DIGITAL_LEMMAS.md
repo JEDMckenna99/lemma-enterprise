@@ -1,12 +1,17 @@
 ## Digital Lemmas: An Edge-Verifiable Layer for Internet Identity
 **Author:** Jed McKenna  
 **Issuer:** Lemma ID (`lemma.id`)  
-**Date:** 2025-12-16 (revised)
+**Date:** 2025-12-21 (revised v2 - Federated Architecture)
 
 ## Abstract
 Internet identity relies on trusted institutions to mediate verification. In common deployments, a relying party depends on an online registry, session store, or identity provider to validate users and permissions. This architecture increases latency and availability coupling, concentrates breach risk, and creates a natural correlation point where identity presentations can be observed.
 
-We propose **digital lemmas**: user-held, self-verifying proof objects signed by a single issuer (currently `lemma.id`) using Ed25519. Unlike registry-dependent systems, lemmas enable **direct holder-verifier validation**: lemmas are presented directly by a holder to a verifier, and verification can be performed locally by validating the signature and consulting cached revocation data. The issuer remains central for issuance and revocation, but the **verification hot-path** is designed to run at the verifier (including edge deployments) and/or the user device, reducing online lookup dependency.
+We propose **digital lemmas**: user-held, self-verifying proof objects signed using Ed25519. The system now supports a **federated issuer model** where:
+- **Lemma.id** serves as the root of trust for human verification (Proof-of-Human credentials)
+- **Any participating site** can issue its own lemmas for site-specific claims (roles, permissions, memberships)
+- **User wallets** store and present lemmas from multiple issuers, unlocked locally via passkey
+
+Unlike registry-dependent systems, lemmas enable **direct holder-verifier validation**: lemmas are presented directly by a holder to a verifier, and verification can be performed locally by validating the signature and consulting cached revocation data. The **verification hot-path** is designed to run at the verifier (including edge deployments) and/or the user device, reducing online lookup dependency.
 
 Implementation note: the current deployed system distributes revocation data as a **SHA-256-hashed revocation set** that can be checked locally after syncing. Bloom filters and OPRF-based revocation are compatible extensions, but are not required for basic offline revocation enforcement.
 
@@ -361,8 +366,206 @@ Human verification (“PoH”) is a stronger issuance prerequisite intended to a
 
 This rooting supports anti-sybil and “real person” assurance while preserving issuer-free presentation and minimal disclosure at verification time.
 
-## 14. Conclusion
-We have proposed an edge-verifiable identity layer based on user-held, self-verifying proofs. Digital lemmas enable issuer-free verification at presentation time, enforce revocation via distributed Bloom filters, and reduce cross-site correlation by default through pairwise subject identifiers. The result is a practical path to faster verification, reduced centralized breach concentration, and minimal-disclosure proofs for higher-assurance decisions.
+## 14. Federated Permission System (v2 Architecture)
+
+The v2 architecture introduces a **federated issuer model** where multiple parties can issue lemmas, while maintaining edge-verifiable properties.
+
+### 14.1 Federated Model Overview
+
+The federated model separates **identity verification** from **permissions and roles**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         FEDERATED ISSUER MODEL                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                    LEMMA.ID (Root of Trust)
+                    ┌─────────────────────┐
+                    │  Issues:            │
+                    │  • isHuman=true     │  ← Proof of Human
+                    │  • passkey verified │  ← Device binding
+                    │                     │
+                    │  Maintains:         │
+                    │  • Issuer registry  │  ← Site public keys
+                    │  • Revocation set   │  ← Network-wide bans
+                    └──────────┬──────────┘
+                               │
+                    User stores in wallet
+                               │
+          ┌────────────────────┼────────────────────┐
+          │                    │                    │
+          ▼                    ▼                    ▼
+    ┌───────────┐        ┌───────────┐        ┌───────────┐
+    │  SITE A   │        │  SITE B   │        │  SITE C   │
+    │           │        │           │        │           │
+    │ Issues:   │        │ Issues:   │        │ Issues:   │
+    │ • role    │        │ • member  │        │ • access  │
+    │ • admin   │        │ • premium │        │ • api_key │
+    │           │        │           │        │           │
+    │ Verifies: │        │ Verifies: │        │ Verifies: │
+    │ Any lemma │        │ Any lemma │        │ Any lemma │
+    │ locally   │        │ locally   │        │ locally   │
+    └───────────┘        └───────────┘        └───────────┘
+```
+
+### 14.2 Role Separation
+
+| Lemma.id Issues | Sites Issue |
+|-----------------|-------------|
+| **Human verification** (expensive, one-time) | **Roles/permissions** (free, frequent changes) |
+| **Device binding** (passkey proof) | **Membership tiers** (site-specific) |
+| **KYC level** (regulatory compliance) | **Access tokens** (resource-specific) |
+| Universal across all sites | Only valid for issuing site |
+
+### 14.3 Issuer Registry
+
+The issuer registry is a public directory of participating issuers:
+
+```
+IssuerRegistry:
+  - did: "did:web:lemma.id"
+    publicKey: "ed25519:abc123..."
+    name: "Lemma"
+    verified: true
+    type: "poh"  // Proof of Human issuer
+    
+  - did: "did:web:site-a.com"
+    publicKey: "ed25519:def456..."
+    name: "Site A"
+    verified: true
+    type: "site"
+```
+
+Any verifier can:
+1. Fetch issuer public keys from the registry
+2. Cache them locally
+3. Verify lemmas from any registered issuer without contacting that issuer
+
+### 14.4 Wallet-Based Authentication
+
+The wallet introduces **passkey unlock = authentication**:
+
+| Traditional Flow (Email) | Wallet Flow (Passkey) |
+|--------------------------|----------------------|
+| 1. Enter email | 1. Click "Sign In" |
+| 2. Check inbox | 2. Face ID / Touch ID |
+| 3. Click verify link | **Done** |
+| 4. Get session token | |
+| **Time: 30-60 seconds** | **Time: 1-2 seconds** |
+
+The passkey provides stronger authentication than email:
+- **Phishing-resistant**: cryptographically bound to the specific origin
+- **Hardware-backed**: stored in device secure enclave
+- **Biometric-verified**: requires user physical presence
+- **Replay-proof**: each authentication produces a unique signature
+
+### 14.5 Local Wallet Storage
+
+The wallet stores credentials from multiple issuers:
+
+```javascript
+Wallet:
+  passkey:
+    credentialId: "base64..."
+    publicKey: "base64..."  // For local unlock verification
+    
+  session:
+    isUnlocked: true
+    unlockedAt: 1734820000000
+    expiresAt: 1734848800000  // 8 hours
+    
+  lemmas:
+    - id: "lemma_abc"
+      issuer: "did:web:lemma.id"
+      claims: { isHuman: true }
+      
+    - id: "lemma_def"
+      issuer: "did:web:site-a.com"
+      claims: { role: "admin" }
+      
+  issuers:
+    "did:web:lemma.id": { publicKey: "...", verified: true }
+    "did:web:site-a.com": { publicKey: "...", verified: true }
+```
+
+### 14.6 Site Issuer Flow
+
+Any site can issue lemmas:
+
+```javascript
+// 1. Site generates keypair (browser-side)
+const issuer = new LemmaSiteIssuer({ domain: 'mysite.com' });
+await issuer.init();
+
+// 2. Site registers with Lemma (once)
+await issuer.registerWithLemma();
+
+// 3. Site issues lemmas to users
+const lemma = await issuer.issueLemma(userId, {
+    role: 'premium',
+    permissions: ['api:full']
+});
+
+// 4. User stores in wallet
+await wallet.storeLemma(lemma, issuer.getPublicKeyInfo());
+```
+
+### 14.7 Cross-Site Verification
+
+Any site can verify any issuer's lemmas:
+
+```javascript
+// Site B verifies a lemma from Site A
+const verifier = new LemmaVerifier();
+const result = await verifier.verify(lemma);
+
+// result.valid = true
+// result.issuer = "Site A"
+// result.claims = { role: "premium" }
+```
+
+### 14.8 API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/issuers/register` | POST | Site registers as issuer |
+| `/api/issuers/{did}` | GET | Get issuer's public key |
+| `/api/issuers` | GET | List all registered issuers |
+| `/api/issuers/lemma` | GET | Get Lemma's issuer info (trust bootstrap) |
+| `/api/wallet/auth` | POST | Verify wallet auth proof |
+| `/api/wallet/status` | GET | Check wallet auth status |
+
+### 14.9 Security Properties
+
+The federated model preserves all security properties:
+
+| Property | How Preserved |
+|----------|---------------|
+| **Edge verification** | All lemmas verified locally, regardless of issuer |
+| **Revocation** | Network-wide revocation still applies |
+| **Pairwise identifiers** | Sites generate their own PPIDs |
+| **Signature security** | Ed25519 for all issuers |
+| **Wallet encryption** | Passkey-derived key encrypts local storage |
+
+### 14.10 Benefits of Federation
+
+| Before (Single Issuer) | After (Federated) |
+|------------------------|-------------------|
+| All credentials from Lemma.id | Credentials from many sources |
+| Central bottleneck | Distributed issuance |
+| Limited to PoH claims | Any claim type |
+| Server-dependent session | Local wallet session |
+
+## 15. Conclusion
+We have proposed an edge-verifiable identity layer based on user-held, self-verifying proofs. Digital lemmas enable issuer-free verification at presentation time, enforce revocation via distributed revocation sets, and reduce cross-site correlation by default through pairwise subject identifiers.
+
+The v2 federated architecture extends this foundation with:
+- **Multiple issuers**: sites can issue their own lemmas
+- **Wallet-based auth**: passkey unlock replaces email sessions
+- **Issuer registry**: enables cross-site trust without coordination
+- **Local-first design**: no server calls for unlock, storage, or presentation
+
+The result is a practical path to faster verification, reduced centralized breach concentration, minimal-disclosure proofs, and a scalable federated permission system.
 
 We invite collaboration and external review, including pilot deployments and independent evaluation of the revocation distribution model and privacy properties.
 
