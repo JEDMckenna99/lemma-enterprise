@@ -967,15 +967,9 @@ def revoke_credential():
                 except Exception as e:
                     logger.warning(f"Rust OPRF failed for {credential_id}: {e}")
                     # Fallback to deterministic hash (not privacy-preserving but functional)
-                    import hashlib
-import os
-from datetime import datetime
                     oprf_evaluation = f"hash_{hashlib.sha256(credential_id.encode()).hexdigest()}"
             else:
                 # Fallback to deterministic hash (not privacy-preserving but functional)
-                import hashlib
-import os
-from datetime import datetime
                 oprf_evaluation = f"hash_{hashlib.sha256(credential_id.encode()).hexdigest()}"
             
             oprf_end = time.perf_counter_ns()
@@ -990,9 +984,6 @@ from datetime import datetime
             logger.info(f"🌸 Adding OPRF evaluation to bloom filter: {oprf_evaluation[:32]}...")
             
             # Simulate bloom filter update time (very fast)
-            import hashlib
-import os
-from datetime import datetime
             bloom_hash = hashlib.sha256(oprf_evaluation.encode()).hexdigest()
             
             bloom_end = time.perf_counter_ns()
