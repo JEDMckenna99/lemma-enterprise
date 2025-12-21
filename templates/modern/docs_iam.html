@@ -348,8 +348,8 @@ if (hasAccess) {
                 
                 <div class="feature-grid">
                     <div class="feature-card">
-                        <h3>⚡ 3,000-8,000x Faster</h3>
-                        <p>~63µs client-side verification vs 200-500ms for Auth0. WebCrypto API eliminates server calls.</p>
+                        <h3>⚡ Zero Server Calls</h3>
+                        <p>Sub-millisecond client-side verification using WebCrypto API. No network latency. No session lookups.</p>
                     </div>
                     
                     <div class="feature-card">
@@ -390,7 +390,7 @@ if (hasAccess) {
                         <li><strong>Email confirmation</strong> → Lemma sends confirmation email</li>
                         <li><strong>Permission lemma issued</strong> → Ed25519-signed credential</li>
                         <li><strong>Stored in browser wallet</strong> → AES-256-GCM encrypted</li>
-                        <li><strong>Verification (client-side)</strong> → ~63µs WebCrypto API (hardware-accelerated)</li>
+                        <li><strong>Verification (client-side)</strong> → Sub-millisecond via WebCrypto API (no server calls)</li>
                         <li><strong>Background checks</strong> → Continuous nonce verification</li>
                         <li><strong>Revocation (if needed)</strong> → OPRF + Bloom filter</li>
                     </ol>
@@ -408,7 +408,7 @@ User → Lemma: Click confirmation
 Lemma → User Browser: Permission lemma (Ed25519 signed)
 User Browser → Local Storage: Store encrypted credential
 User → Your Site: Return with credential
-Your Site → Client (local, ~63µs): Verify Ed25519 signature via WebCrypto API
+Your Site → Client (local, no server call): Verify Ed25519 signature via WebCrypto API
 Client → Your Site: ✅ Access granted
 
 Every 5 minutes (background):
@@ -738,8 +738,8 @@ window.addEventListener('DOMContentLoaded', checkAccess);
                     <tbody>
                         <tr>
                             <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">Access Verification</td>
-                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--success); font-weight: 600;">~63µs (WebCrypto)</td>
-                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">200-500ms</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--success); font-weight: 600;">&lt;1ms (local, no server)</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">200-500ms (server call)</td>
                         </tr>
                         <tr>
                             <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);">Speed Improvement</td>
@@ -755,8 +755,8 @@ window.addEventListener('DOMContentLoaded', checkAccess);
                 </table>
                 
                 <p style="background: #e0f2fe; padding: 16px; border-left: 4px solid #3b82f6; border-radius: 4px; margin-top: 16px; font-size: 14px;">
-                    <strong>ℹ️ Note:</strong> Current implementation uses client-side WebCrypto API verification (~63µs, hardware-accelerated). 
-                    Server-side Rust verification (31-182µs) is available for backend integrations. JavaScript fallback (~1-5ms) is used when WebCrypto Ed25519 is unavailable.
+                    <strong>ℹ️ Note:</strong> Verification uses the browser's native WebCrypto API for Ed25519 signatures. 
+                    The key advantage is zero server calls during authentication - verification happens entirely client-side. Server-side Rust verification is also available for backend integrations.
                 </p>
             </section>
 

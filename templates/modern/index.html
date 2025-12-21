@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Lemma IAM - Email-Based Authentication | 1,000x Faster Than Auth0 | FREE Beta{% endblock %}
-{% block description %}Replace Auth0, Okta, and Duo with email-based IAM. 182µs verification (1,000x faster), FREE during beta, no passwords. Optional bot protection add-on. Start using today.{% endblock %}
+{% block title %}Lemma - Passwordless Auth That Verifies Locally | No Server Calls | FREE Beta{% endblock %}
+{% block description %}Email-based authentication with client-side verification. Credentials stored in user's browser, verified locally without server calls. Passwordless, privacy-first, session-free. FREE during beta.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -12,7 +12,7 @@
     <!-- Lemma Wallet for credential checking -->
     <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1036"></script>
     
-    <!-- Local Verification (Web Crypto API - 63µs verification) -->
+    <!-- Local Verification (Web Crypto API - sub-millisecond verification) -->
     <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1036"></script>
     <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1036"></script>
     
@@ -129,9 +129,9 @@
 <section class="hero">
     <div class="container" style="position: relative; z-index: 1;">
         <div style="max-width: 800px; margin: 0 auto; text-align: center;">
-            <h1>Privacy-First Authentication</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 600; margin-bottom: var(--space-6);">1,500x faster verification. Privacy by design. Works alongside your existing auth.</p>
-            <p>Email-based IAM with local verification (63µs). Credentials encrypted in user's browser. Zero server calls during authentication. Maximum privacy, minimal hassle.</p>
+            <h1>Authentication Without the Middleman</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 600; margin-bottom: var(--space-6);">Credentials verified locally, in the browser. No server calls. No passwords. No tracking.</p>
+            <p>Email-based login that issues cryptographic credentials stored in your users' browsers. Verification happens client-side - your servers never touch auth traffic.</p>
             
             <!-- Dynamic card: changes based on user's lemma status -->
             <div id="lemma-status-card" style="margin-top: 32px; border-radius: 12px;">
@@ -290,7 +290,7 @@
     <div class="container">
         <div style="text-align: center; margin-bottom: 64px;">
             <h2>How Lemma Works</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Email-based authentication with local verification. Credentials stay in the user's browser. Zero tracking, zero hassle.</p>
+            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Cryptographic credentials issued via email, stored in the browser, verified without server calls. No sessions. No passwords. No tracking.</p>
         </div>
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px;">
@@ -300,8 +300,8 @@
             </div>
             
             <div class="card">
-                <h3 class="card-title">63µs Verification</h3>
-                <p>1,500x faster than Auth0. Hardware-accelerated Ed25519 verification. Works offline with zero server calls.</p>
+                <h3 class="card-title">Zero Server Calls</h3>
+                <p>Authentication happens in the browser. No API latency. No session lookups. Ed25519 signature verification in sub-milliseconds.</p>
             </div>
             
             <div class="card">
@@ -356,7 +356,7 @@
                     </li>
                     <li style="padding: 12px 0; display: flex; align-items: flex-start; gap: 12px;">
                         <span style="color: #10b981; font-size: 20px;">&#10003;</span>
-                        <span><strong>Bot elimination</strong> - 99.9% protection without CAPTCHAs</span>
+                        <span><strong>Bot resistance</strong> - Cryptographic credentials that can't be forged or replayed</span>
                     </li>
                 </ul>
             </div>

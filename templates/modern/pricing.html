@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
 {% block title %}Pricing - Lemma | Free IAM | Free PoH Federation | $1.50 ID Verification{% endblock %}
-{% block description %}Lemma IAM is FREE forever. Federate your existing ID verification for FREE. Full Proof-of-Human verification with ID check: $1.50 one-time per user. 1,000x faster verification. No credit card required.{% endblock %}
+{% block description %}Lemma IAM is FREE forever. Email-based passwordless auth with client-side verification. No server calls during login. Full Proof-of-Human: $1.50 one-time per user. No credit card required.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -896,14 +896,14 @@
                 <div class="faq-item">
                     <h3 class="faq-question">What's included in the free IAM tier?</h3>
                     <p class="faq-answer">
-                        Everything you need: email-based authentication, client-side credentials, OAuth 2.0 ("Sign in with Lemma"), catch-all email blocking, microsecond verification, and built-in bot friction through email + persistence requirements.
+                        Everything you need: email-based passwordless authentication, client-side credential storage, OAuth 2.0 ("Sign in with Lemma"), catch-all email blocking, local verification without server calls, and built-in bot friction through cryptographic credentials.
                     </p>
                 </div>
 
                 <div class="faq-item">
                     <h3 class="faq-question">How fast is verification?</h3>
                     <p class="faq-answer">
-                        Lemma verifies credentials in microseconds (~36-47µs) - that's 1000x faster than server-call authentication. Verification happens locally without network round-trips.
+                        Lemma verifies credentials in sub-milliseconds using your browser's native Web Crypto API. The key advantage: zero server calls during authentication, eliminating network latency entirely.
                     </p>
                 </div>
 
@@ -933,9 +933,9 @@
                     <h3 class="faq-question">What makes Lemma different from Auth0/Okta?</h3>
                     <p class="faq-answer">
                         <strong>Cost:</strong> IAM is FREE (vs $0.48-$2/MAU)<br>
-                        <strong>Speed:</strong> 1,000x faster verification (microseconds vs hundreds of milliseconds)<br>
-                        <strong>Architecture:</strong> Client-side credentials vs server-side sessions<br>
-                        <strong>Bot Protection:</strong> Built-in vs requires add-ons
+                        <strong>Architecture:</strong> Client-side credentials vs server-side sessions - no auth server calls<br>
+                        <strong>Privacy:</strong> Credentials stored in user's browser, not your database<br>
+                        <strong>Bot Protection:</strong> Built-in cryptographic verification vs add-on CAPTCHAs
                     </p>
                 </div>
 
