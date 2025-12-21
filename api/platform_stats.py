@@ -152,8 +152,8 @@ def get_platform_stats():
         
         # 4. Get registered sites count (for admins) or just 1 for site owners
         if is_lemma_admin:
-        cursor.execute("SELECT COUNT(*) FROM sites")
-        registered_sites = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM sites")
+            registered_sites = cursor.fetchone()[0]
         else:
             # Count sites owned by this user
             cursor.execute("SELECT COUNT(*) FROM sites WHERE admin_email = %s", (user_email,))
