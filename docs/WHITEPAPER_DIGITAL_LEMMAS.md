@@ -6,10 +6,11 @@
 ## Abstract
 Internet identity relies on trusted institutions to mediate verification. In common deployments, a relying party depends on an online registry, session store, or identity provider to validate users and permissions. This architecture increases latency and availability coupling, concentrates breach risk, and creates a natural correlation point where identity presentations can be observed.
 
-We propose **digital lemmas**: user-held, self-verifying proof objects signed using Ed25519. The system now supports a **federated issuer model** where:
-- **Lemma.id** serves as the root of trust for human verification (Proof-of-Human credentials)
+We propose **digital lemmas**: user-held, self-verifying proof objects signed using Ed25519. The system supports a **federated issuer model** where:
+- **User wallets** are the foundation, unlocked locally via passkey (free, no PoH required)
 - **Any participating site** can issue its own lemmas for site-specific claims (roles, permissions, memberships)
-- **User wallets** store and present lemmas from multiple issuers, unlocked locally via passkey
+- **Lemma.id** provides optional Proof-of-Human credentials for sites requiring anti-bot protection
+- The **passkey is the root of trust**, not PoH - wallets work without human verification
 
 Unlike registry-dependent systems, lemmas enable **direct holder-verifier validation**: lemmas are presented directly by a holder to a verifier, and verification can be performed locally by validating the signature and consulting cached revocation data. The **verification hot-path** is designed to run at the verifier (including edge deployments) and/or the user device, reducing online lookup dependency.
 
@@ -357,7 +358,7 @@ The verification layer supports any claim that can be represented as a signed st
 
 Claims that require real-time state (e.g., balances, live risk scores) may still require online policy evaluation, but lemma verification can still reduce the frequency and scope of online lookups.
 
-### 13.1 Proof-of-Human rooting (high level, not currently deployed at lemma.id)
+### 13.1 Proof-of-Human as an Optional Claim (Not Required)
 Human verification (“PoH”) is a stronger issuance prerequisite intended to anchor lemmas to a verified human uniqueness process. At a high level:
 1) the user completes a human verification step with the issuer,
 2) the issuer derives (or enables derivation of) a human-rooted master secret,
@@ -372,7 +373,7 @@ The v2 architecture introduces a **federated issuer model** where multiple parti
 
 ### 14.1 Federated Model Overview
 
-The federated model separates **identity verification** from **permissions and roles**:
+**Key insight:** The **passkey is the root of trust**, not Proof-of-Human. Users can create wallets and receive lemmas without any PoH verification. The federated model separates **identity verification** from **permissions and roles**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐

@@ -260,11 +260,11 @@ class LemmaWallet {
         if (!this.session.isUnlocked) return false;
         if (this.session.expiresAt && this.session.expiresAt < Date.now()) {
             this.session.isUnlocked = false;
-            return false;
-        }
-        return true;
-    }
-
+                    return false;
+                    }
+                    return true;
+                }
+                
     // ========================================
     // AUTH STATE (replaces email-based auth)
     // ========================================
@@ -275,7 +275,7 @@ class LemmaWallet {
      */
     getAuthState() {
         if (!this.session.isUnlocked) {
-            return {
+                return {
                 state: AUTH_STATE.LOCKED,
                 authenticated: false,
                 reason: 'Wallet is locked'
@@ -283,7 +283,7 @@ class LemmaWallet {
         }
 
         if (this.session.expiresAt && this.session.expiresAt < Date.now()) {
-            return {
+                    return {
                 state: AUTH_STATE.LOCKED,
                 authenticated: false,
                 reason: 'Session expired'
@@ -294,8 +294,8 @@ class LemmaWallet {
         const unlockedDate = new Date(this.session.unlockedAt);
         const today = new Date();
         const isToday = unlockedDate.toDateString() === today.toDateString();
-
-        return {
+            
+            return {
             state: isToday ? AUTH_STATE.UNLOCKED_TODAY : AUTH_STATE.UNLOCKED,
             authenticated: true,
             unlockedAt: this.session.unlockedAt,
@@ -573,7 +573,7 @@ class LemmaWallet {
             return { valid: false, reason: `Verification error: ${e.message}` };
         }
 
-            return { 
+            return {
             valid: true,
             issuer: issuer.name,
             verified: issuer.verified,

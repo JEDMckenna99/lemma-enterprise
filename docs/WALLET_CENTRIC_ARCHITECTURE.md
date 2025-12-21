@@ -1,15 +1,26 @@
 # Wallet-Centric Architecture Plan
 
-**Status:** In Progress  
+**Status:** Complete  
 **Date:** 2025-12-21  
-**Version:** v1
+**Version:** v2 (Passkey-Rooted)
 
 ## Overview
 
-Refactoring Lemma to a wallet-centric model where:
-- Passkey unlocks the local wallet (no server call)
-- Sites can issue their own lemmas to the user's wallet
-- Lemma focuses on PoH, revocation network, and issuer registry
+A wallet-centric model where:
+- **Passkey is the root of trust** (free, no PoH required to start)
+- Sites can issue their own lemmas to the user's wallet (free)
+- PoH is **optional** - only needed for anti-bot protection
+- Lemma provides issuer registry and revocation network
+
+## Key Insight: PoH is Optional
+
+| Layer | What It Proves | Cost | Required? |
+|-------|----------------|------|-----------|
+| **Passkey** | "This is my device" | Free | Yes (wallet root) |
+| **Site Lemmas** | "User has role X" | Free | Site-specific |
+| **PoH Lemma** | "This is a real human" | ~$1.50 | Only if site requires |
+
+**The wallet works without PoH.** Users create a wallet with passkey → Sites issue lemmas → Done.
 
 ---
 

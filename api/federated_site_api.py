@@ -413,9 +413,34 @@ def service_comparison():
     GET /api/v1/service-comparison
     """
     return jsonify({
+        'key_insight': {
+            'message': 'The PASSKEY is the root of trust, not PoH',
+            'wallet_cost': 'FREE - users create wallets with passkey only',
+            'poh_required': 'NO - PoH is optional, only needed for anti-bot',
+            'site_issuance': 'FREE - sites issue their own lemmas'
+        },
+        'free_tier': {
+            'name': 'Free (Self-Issued)',
+            'description': 'Sites issue their own lemmas - completely free',
+            'best_for': 'Basic auth, roles, memberships',
+            'cost': '$0',
+            'features': {
+                'wallet_creation': '✅ Free with passkey',
+                'site_issued_lemmas': '✅ Free and unlimited',
+                'local_verification': '✅ ~1ms',
+                'issuer_registry': '✅ Free to register',
+                'poh_required': '❌ No'
+            },
+            'when_to_use': [
+                'Basic login/authentication',
+                'Role-based access control',
+                'Membership verification',
+                'Site-specific permissions'
+            ]
+        },
         'managed_service': {
             'name': 'Managed Service',
-            'description': 'Lemma handles everything - keys, users, credentials',
+            'description': 'Lemma handles keys, users, credentials',
             'best_for': 'Sites that want minimal setup',
             'features': {
                 'key_management': '✅ Lemma generates KMS-backed keys',
@@ -429,50 +454,33 @@ def service_comparison():
                 'starter': '$0.10/MAU',
                 'professional': '$0.05/MAU',
                 'enterprise': 'Contact us'
-            },
-            'setup': {
-                'time': '5 minutes',
-                'steps': [
-                    'Register site',
-                    'Get API key',
-                    'Create permissions',
-                    'Grant to users'
-                ]
             }
         },
-        'self_service': {
-            'name': 'Self-Service (Federated)',
-            'description': 'You control keys and users - pay only for PoH',
-            'best_for': 'Sites with existing user databases',
-            'features': {
-                'key_management': '🔑 You generate in browser',
-                'user_storage': '🔑 Your own database',
-                'credential_issuance': '🔑 Via browser SDK',
-                'dashboard': '❌ Not included',
-                'analytics': '❌ Not included'
-            },
-            'pricing': {
-                'model': 'Per Proof-of-Human verification only',
-                'poh_verification': '$1.50/verification',
-                'credential_issuance': '$0 (your infrastructure)',
-                'verification': '$0 (local)'
-            },
-            'setup': {
-                'time': '30 minutes',
-                'steps': [
-                    'Include SDK in your site',
-                    'Generate keypair',
-                    'Register public key with Lemma',
-                    'Verify domain ownership',
-                    'Issue credentials from your backend/frontend'
-                ]
-            }
+        'poh_addon': {
+            'name': 'Proof-of-Human (Add-on)',
+            'description': 'Anti-bot verification - only if site requires',
+            'best_for': 'Bot protection, sybil resistance',
+            'cost': '$1.50 per verification',
+            'when_needed': [
+                'Anti-bot protection',
+                'Sybil resistance (one-person-one-account)',
+                'High-value transactions',
+                'Regulatory KYC requirements'
+            ],
+            'when_NOT_needed': [
+                'Basic login - use passkey',
+                'Role-based access - site issues lemma',
+                'Membership - site issues lemma',
+                'Permissions - site issues lemma'
+            ]
         },
-        'shared_features': {
-            'wallet_storage': '✅ Users store credentials in wallet',
-            'local_verification': '✅ ~1ms verification time',
-            'cross_site_trust': '✅ Via issuer registry',
-            'revocation': '✅ Network-wide revocation',
-            'poh_network': '✅ Shared defense network'
+        'trust_model': {
+            'root_of_trust': 'PASSKEY (not PoH)',
+            'layers': [
+                {'layer': 'Passkey', 'proves': 'This is my device', 'cost': 'Free', 'required': 'Yes'},
+                {'layer': 'Site Lemmas', 'proves': 'User has role X', 'cost': 'Free', 'required': 'Site decides'},
+                {'layer': 'PoH Lemma', 'proves': 'This is a real human', 'cost': '$1.50', 'required': 'Only if site requires'}
+            ]
         }
     })
+
