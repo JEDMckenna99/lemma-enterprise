@@ -328,6 +328,31 @@ class UserSession(Base):
     user_agent = Column(String)
     is_active = Column(Boolean, default=True)
 
+class Passkey(Base):
+    """WebAuthn passkey credentials for users"""
+    __tablename__ = 'passkeys'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, nullable=False)  # Links to customer_id or user_did
+    credential_id = Column(String, unique=True, nullable=False)  # Base64 encoded
+    public_key = Column(Text, nullable=False)  # COSE format, base64 encoded
+    sign_count = Column(Integer, default=0)
+    
+    # Device/authenticator info
+    device_name = Column(String)  # User-friendly name ("iPhone", "YubiKey")
+    authenticator_type = Column(String)  # 'platform', 'cross-platform'
+    transports = Column(JSON, default=list)  # ['usb', 'nfc', 'ble', 'internal']
+    
+    # Attestation (for hardware verification)
+    attestation_format = Column(String)  # 'packed', 'tpm', 'android-safetynet', 'none'
+    attestation_data = Column(Text)  # Full attestation for high-security verification
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime)
+    is_active = Column(Boolean, default=True)
+
+
 class SiteConfiguration(Base):
     """Site-specific IAM configuration"""
     __tablename__ = 'site_configurations'
