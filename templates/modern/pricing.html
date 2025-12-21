@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Pricing - Lemma | Free IAM | Free PoH Federation | $1.50 ID Verification{% endblock %}
-{% block description %}Lemma IAM is FREE forever. Email-based passwordless auth with client-side verification. No server calls during login. Full Proof-of-Human: $1.50 one-time per user. No credit card required.{% endblock %}
+{% block title %}Pricing - Lemma | Free IAM | Free PoH Federation | $2 ID Verification{% endblock %}
+{% block description %}Lemma IAM is FREE forever. Email-based passwordless auth with client-side verification. No server calls during login. Full Proof-of-Human: $2 one-time per user. No credit card required.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -579,7 +579,7 @@
             <div class="hero-badge" style="background: linear-gradient(135deg, #10b981, #059669); font-size: var(--font-size-lg); padding: var(--space-3) var(--space-8);">Simple, Transparent Pricing</div>
             <h1 class="hero-title">IAM Free Forever</h1>
             <p class="hero-subtitle">
-                Lemma IAM is completely FREE. Already verify user IDs? Federate for FREE. Need full ID verification? $1.50 one-time per user. No monthly fees.
+                Lemma IAM is completely FREE. Already verify user IDs? Federate for FREE. Need full ID verification? $2 one-time per user. No monthly fees.
             </p>
         </div>
     </section>
@@ -677,7 +677,7 @@
                         </div>
                     </div>
 
-                    <!-- Full PoH Verification - $1.50 one-time -->
+                    <!-- Full PoH Verification - $2 one-time -->
                     <div class="pricing-card featured">
                         <div class="pricing-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706);">Full Verification</div>
                         
@@ -691,7 +691,7 @@
                         <div class="price-display" style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 2px solid #f59e0b;">
                             <div class="price-main">
                                 <span class="price-currency" style="color: #d97706;">$</span>
-                                <span class="price-amount" style="color: #d97706; font-size: 3.5rem;">1.50</span>
+                                <span class="price-amount" style="color: #d97706; font-size: 3.5rem;">2</span>
                                 <span class="price-unit" style="color: #b45309;">one-time per user</span>
                             </div>
                             <div class="price-secondary">
@@ -789,7 +789,7 @@
                                     <span id="fedIdCost" style="font-weight: 700; color: var(--primary-700);">$0 FREE</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: var(--space-2); background: var(--warning-50); border-radius: 6px; border: 2px solid var(--warning-300);">
-                                    <span style="font-size: var(--font-size-sm); color: var(--warning-700);">Full PoH ($1.50/user):</span>
+                                    <span style="font-size: var(--font-size-sm); color: var(--warning-700);">Full PoH ($2/user):</span>
                                     <span id="combinedCost" style="font-weight: 700; color: var(--warning-700);">$1,500 one-time</span>
                                 </div>
                             </div>
@@ -841,7 +841,7 @@
                                 IAM-only is FREE forever
                             </div>
                             <div style="font-size: var(--font-size-xs); color: var(--success-600);">
-                                $1.50/user only if you need ID verification
+                                $2/user only if you need ID verification
                             </div>
                         </div>
                     </div>
@@ -875,14 +875,14 @@
                 <div class="faq-item">
                     <h3 class="faq-question">When should I pay for Full PoH Verification?</h3>
                     <p class="faq-answer">
-                        Pay the $1.50 one-time fee per user only if you <strong>don't already do ID verification</strong> and want Lemma to handle it. This includes full government ID document verification + liveness detection. If you already verify IDs, use the free federation tier instead.
+                        Pay the $2 one-time fee per user only if you <strong>don't already do ID verification</strong> and want Lemma to handle it. This includes full government ID document verification + liveness detection. If you already verify IDs, use the free federation tier instead.
                     </p>
                 </div>
 
                 <div class="faq-item">
-                    <h3 class="faq-question">How does $1.50 compare to Stripe Identity?</h3>
+                    <h3 class="faq-question">How does $2 compare to Stripe Identity?</h3>
                     <p class="faq-answer">
-                        Same price as Stripe Identity ($1.50 per verification). But with Lemma you ALSO get: free IAM system, cross-site credential portability, microsecond verification, and the user can reuse their credential across the network.
+                        Just $0.50 more than Stripe Identity alone ($1.50). But with Lemma you ALSO get: free IAM system, cross-site credential portability, local verification, and the user can reuse their credential across the network.
                     </p>
                 </div>
 
@@ -925,7 +925,7 @@
                 <div class="faq-item">
                     <h3 class="faq-question">Can I start with IAM and upgrade to PoH later?</h3>
                     <p class="faq-answer">
-                        Yes! Start with free IAM. If you later need ID verification, you can upgrade to Full PoH ($1.50/MAU) or federate your own verification for free. Your existing users keep their IAM credentials.
+                        Yes! Start with free IAM. If you later need ID verification, you can upgrade to Full PoH ($2/user) or federate your own verification for free. Your existing users keep their IAM credentials.
                     </p>
                 </div>
 
@@ -942,7 +942,7 @@
                 <div class="faq-item">
                     <h3 class="faq-question">Are there any contracts or commitments?</h3>
                     <p class="faq-answer">
-                        No! IAM is free with no commitments. For Full PoH, you pay $1.50 one-time per user verified - no monthly fees, no recurring charges.
+                        No! IAM is free with no commitments. For Full PoH, you pay $2 one-time per user verified - no monthly fees, no recurring charges.
                     </p>
                 </div>
             </div>
@@ -958,15 +958,15 @@
             const userCount = parseInt(document.getElementById('userCount').value) || 0;
             
             // Lemma pricing - one-time fees
-            const fullPohRate = 1.50; // $1.50 one-time per user
+            const fullPohRate = 2.00; // $2 one-time per user
             
             // Calculate costs (one-time)
             const fullPohCost = userCount * fullPohRate;
             
             // Competitor pricing (one-time ID verification costs)
-            const stripeIdentity = userCount * 1.50; // $1.50 per verification
-            const auth0PlusIdVerify = (userCount * 0.48) + (userCount * 1.50); // Auth0 monthly + ID verify
-            const oktaPlusIdVerify = Math.max(500, userCount * 2) + (userCount * 1.50); // Okta monthly + ID verify
+            const stripeIdentity = userCount * 1.50; // Stripe Identity alone: $1.50 per verification
+            const auth0PlusIdVerify = (userCount * 0.48) + (userCount * 1.50); // Auth0 + Stripe Identity
+            const oktaPlusIdVerify = Math.max(500, userCount * 2) + (userCount * 1.50); // Okta + Stripe Identity
             
             // Update calculator display
             document.getElementById('iamCost').textContent = '$0 FREE';
@@ -1146,7 +1146,7 @@ ${name}`);
                         <td style="padding: var(--space-4); font-weight: 500;">ID Verification Cost</td>
                         <td style="padding: var(--space-4); text-align: center;">+$3/verify</td>
                         <td style="padding: var(--space-4); text-align: center;">$1.50/verify</td>
-                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50);">$1.50/user</td>
+                        <td style="padding: var(--space-4); text-align: center; background: var(--primary-50);">$2/user</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--gray-200); background: var(--gray-50);">
                         <td style="padding: var(--space-4); font-weight: 500;"><strong>Built-In Bot Resistance</strong></td>
