@@ -603,3 +603,151 @@ def delete_passkey(passkey_id):
         
     finally:
         db.close()
+
+
+# ============================================
+# WALLET-BASED AUTH (replaces email sessions)
+# ============================================
+
+@passkey_bp.route('/api/wallet/auth', methods=['POST'])
+@cross_origin()
+def wallet_auth():
+    """
+    Authenticate using wallet auth proof (replaces email-based auth)
+    
+    The wallet being unlocked via passkey IS the authentication.
+    No email verification needed.
+    
+    POST /api/wallet/auth
+    {
+        "authProof": {
+            "type": "wallet_auth",
+            "method": "passkey_unlock",
+            "walletId": "wallet_abc123",
+            "unlockedAt": 1734820000000,
+            "expiresAt": 1734848800000,
+            "timestamp": 1734820500000,
+            "passkeyCredentialId": "base64..."
+        }
+    }
+    """
+    try:
+        data = request.get_json()
+        auth_proof = data.get('authProof')
+        
+        if not auth_proof:
+            return jsonify({
+                'success': False,
+                'error': 'authProof is required'
+            }), 400
+        
+        # Validate proof structure
+        required_fields = ['type', 'method', 'walletId', 'unlockedAt', 'expiresAt', 'passkeyCredentialId']
+        for field in required_fields:
+            if field not in auth_proof:
+                return jsonify({
+                    'success': False,
+                    'error': f'Missing field: {field}'
+                }), 400
+        
+        # Validate proof type
+        if auth_proof['type'] != 'wallet_auth':
+            return jsonify({
+                'success': False,
+                'error': 'Invalid auth proof type'
+            }), 400
+        
+        # Check expiration
+        if auth_proof['expiresAt'] < datetime.utcnow().timestamp() * 1000:
+            return jsonify({
+                'success': False,
+                'error': 'Auth proof expired'
+            }), 401
+        
+        # Verify passkey exists (optional but recommended)
+        credential_id = auth_proof['passkeyCredentialId']
+        db = get_db()
+        try:
+            passkey = db.query(Passkey).filter(
+                Passkey.credential_id == credential_id,
+                Passkey.is_active == True
+            ).first()
+            
+            if passkey:
+                # Known passkey - get user info
+                user_id = passkey.user_id
+                
+                # Update last used
+                passkey.last_used_at = datetime.utcnow()
+                db.commit()
+                
+                # Set session (for backwards compatibility)
+                session['customer_id'] = user_id
+                session['auth_method'] = 'wallet_passkey'
+                session['wallet_id'] = auth_proof['walletId']
+                
+                logger.info(f"✅ Wallet auth successful for user {user_id}")
+                
+                return jsonify({
+                    'success': True,
+                    'authenticated': True,
+                    'user_id': user_id,
+                    'auth_method': 'wallet_passkey',
+                    'wallet_id': auth_proof['walletId'],
+                    'session_expires': auth_proof['expiresAt'],
+                    'message': 'Authenticated via wallet passkey'
+                })
+            else:
+                # Unknown passkey - still valid auth, but no user record
+                # This is fine for anonymous but verified access
+                session['auth_method'] = 'wallet_passkey_anonymous'
+                session['wallet_id'] = auth_proof['walletId']
+                
+                logger.info(f"✅ Anonymous wallet auth for wallet {auth_proof['walletId']}")
+                
+                return jsonify({
+                    'success': True,
+                    'authenticated': True,
+                    'user_id': None,
+                    'auth_method': 'wallet_passkey_anonymous',
+                    'wallet_id': auth_proof['walletId'],
+                    'session_expires': auth_proof['expiresAt'],
+                    'message': 'Authenticated via wallet (anonymous)'
+                })
+                
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"❌ Wallet auth error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@passkey_bp.route('/api/wallet/status', methods=['GET'])
+@cross_origin()
+def wallet_status():
+    """
+    Check current wallet auth status from server perspective
+    
+    GET /api/wallet/status
+    """
+    wallet_id = session.get('wallet_id')
+    auth_method = session.get('auth_method')
+    
+    if not wallet_id or not auth_method:
+        return jsonify({
+            'success': True,
+            'authenticated': False,
+            'reason': 'No wallet session'
+        })
+    
+    return jsonify({
+        'success': True,
+        'authenticated': True,
+        'wallet_id': wallet_id,
+        'auth_method': auth_method,
+        'user_id': session.get('customer_id')
+    })

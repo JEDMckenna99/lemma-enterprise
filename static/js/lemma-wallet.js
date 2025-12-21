@@ -14,6 +14,13 @@ const WALLET_DB_NAME = 'LemmaWallet';
 const WALLET_DB_VERSION = 1;
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
 
+// Auth states
+const AUTH_STATE = {
+    LOCKED: 'locked',
+    UNLOCKED: 'unlocked',
+    UNLOCKED_TODAY: 'unlocked_today'  // Unlocked via passkey today
+};
+
 // ============================================
 // WALLET CLASS
 // ============================================
@@ -226,9 +233,9 @@ class LemmaWallet {
             id: 'current',
             ...this.session
         });
-
-        return {
-            success: true,
+            
+            return { 
+                success: true, 
             expiresAt: this.session.expiresAt,
             expiresIn: SESSION_DURATION_MS
         };
@@ -256,6 +263,96 @@ class LemmaWallet {
             return false;
         }
         return true;
+    }
+
+    // ========================================
+    // AUTH STATE (replaces email-based auth)
+    // ========================================
+
+    /**
+     * Get current authentication state
+     * This can be used as the primary auth method instead of email
+     */
+    getAuthState() {
+        if (!this.session.isUnlocked) {
+            return {
+                state: AUTH_STATE.LOCKED,
+                authenticated: false,
+                reason: 'Wallet is locked'
+            };
+        }
+
+        if (this.session.expiresAt && this.session.expiresAt < Date.now()) {
+            return {
+                state: AUTH_STATE.LOCKED,
+                authenticated: false,
+                reason: 'Session expired'
+            };
+        }
+
+        // Check if unlocked today (same calendar day)
+        const unlockedDate = new Date(this.session.unlockedAt);
+        const today = new Date();
+        const isToday = unlockedDate.toDateString() === today.toDateString();
+
+        return {
+            state: isToday ? AUTH_STATE.UNLOCKED_TODAY : AUTH_STATE.UNLOCKED,
+            authenticated: true,
+            unlockedAt: this.session.unlockedAt,
+            expiresAt: this.session.expiresAt,
+            unlockedToday: isToday,
+            timeRemaining: this.session.expiresAt - Date.now()
+        };
+    }
+
+    /**
+     * Get an auth proof that can be sent to servers
+     * This replaces the need for email-based session tokens
+     */
+    async getAuthProof() {
+        if (!this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to get auth proof');
+        }
+
+        const passkey = await this._get('passkey', 'primary');
+        if (!passkey) {
+            throw new Error('No passkey registered');
+        }
+
+        // Create a timestamped proof of wallet unlock
+        const proof = {
+            type: 'wallet_auth',
+            method: 'passkey_unlock',
+            walletId: (await this._get('passkey', 'walletId'))?.value,
+            unlockedAt: this.session.unlockedAt,
+            expiresAt: this.session.expiresAt,
+            timestamp: Date.now(),
+            // Include passkey credential ID for verification
+            passkeyCredentialId: passkey.credentialId
+        };
+
+        return proof;
+    }
+
+    /**
+     * Check if user is authenticated (wallet unlocked via passkey today)
+     * Use this as the primary auth check instead of email sessions
+     */
+    isAuthenticated() {
+        const authState = this.getAuthState();
+        return authState.authenticated && authState.unlockedToday;
+    }
+
+    /**
+     * Require authentication - unlock if needed
+     * Returns auth proof that can be sent to servers
+     */
+    async requireAuth() {
+        if (!this.isAuthenticated()) {
+            // Need to unlock
+            await this.unlock();
+        }
+        return this.getAuthProof();
     }
 
     // ========================================
@@ -476,7 +573,7 @@ class LemmaWallet {
             return { valid: false, reason: `Verification error: ${e.message}` };
         }
 
-        return {
+            return { 
             valid: true,
             issuer: issuer.name,
             verified: issuer.verified,
@@ -523,8 +620,8 @@ class LemmaWallet {
         // This is simplified - full implementation would parse CBOR
         const publicKeyBytes = attestationResponse.getPublicKey();
         const algorithm = attestationResponse.getPublicKeyAlgorithm();
-        
-        return {
+            
+            return {
             publicKey: this._bufferToBase64url(publicKeyBytes),
             algorithm: algorithm
         };
@@ -660,8 +757,8 @@ class LemmaWallet {
         const passkey = await this._get('passkey', 'primary');
         const lemmas = await this._getAll('lemmas');
         const issuers = await this._getAll('issuers');
-
-        return {
+            
+            return {
             hasPasskey: !!passkey,
             isUnlocked: this.isUnlocked(),
             session: this.session,
@@ -677,14 +774,14 @@ class LemmaWallet {
         if (!this.isUnlocked()) {
             throw new Error('Wallet must be unlocked to export');
         }
-
+        
         return {
             lemmas: await this._getAll('lemmas'),
             issuers: await this._getAll('issuers'),
             exportedAt: Date.now()
         };
     }
-
+    
     /**
      * Import wallet data (from backup)
      */
