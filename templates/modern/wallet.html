@@ -410,11 +410,33 @@
             background: #dc2626;
             transform: translateY(-1px);
         }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--gray-200);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
     </style>
 {% endblock %}
 
 {% block content %}
 <div class="wallet-container">
+    <!-- Main Credential List - For unlock flow and initial display -->
+    <div id="credential-list" style="min-height: 200px;">
+        <div style="padding: 48px; text-align: center; color: var(--gray-500);">
+            <div class="loading-spinner" style="width: 32px; height: 32px; border: 3px solid var(--gray-200); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div>
+            <div style="font-weight: 500;">Loading wallet...</div>
+        </div>
+    </div>
+
     <!-- Wallet Header -->
     <header class="wallet-header" style="display: none;">
         <h1>Your Lemma Wallet</h1>
@@ -1244,6 +1266,17 @@ async function loadWalletData() {
             console.warn('Wallet not initialized yet');
             return;
         }
+
+        // Hide unlock flow, show main wallet content
+        const credentialList = document.getElementById('credential-list');
+        const walletHeader = document.querySelector('.wallet-header');
+        const walletMain = document.querySelector('.wallet-main');
+        
+        if (credentialList) credentialList.style.display = 'none';
+        if (walletHeader) walletHeader.style.display = 'block';
+        if (walletMain) walletMain.style.display = 'grid';
+        
+        console.log('📦 Loading wallet data...');
 
         // Get credentials by type from wallet
         console.log('🔍 DEBUG: Getting credentials from wallet...');
