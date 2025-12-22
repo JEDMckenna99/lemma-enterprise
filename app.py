@@ -168,6 +168,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Passkey Auth: {e}")
 
+    # Wallet-First Authentication (no email required)
+    try:
+        from api.wallet_first_auth import wallet_first_bp
+        app.register_blueprint(wallet_first_bp)
+        logger.info("✅ Wallet-First Auth registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Wallet-First Auth: {e}")
+
     # Issuer Registry (for wallet-centric architecture)
     try:
         from api.issuer_registry import issuer_registry_bp, init_issuer_registry_table

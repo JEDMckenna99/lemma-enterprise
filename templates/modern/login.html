@@ -1,19 +1,16 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Sign In - Lemma Platform | FREE Beta{% endblock %}
-{% block description %}Access the Lemma developer platform with email-based authentication. No passwords, just secure cryptographic credentials.{% endblock %}
+{% block title %}Sign In - Lemma Platform | Passkey Authentication{% endblock %}
+{% block description %}Access the Lemma developer platform with passkey authentication. No passwords, no emails - just your device biometrics.{% endblock %}
 
 {% block head %}
     {{ super() }}
-    <!-- DISABLE Cloudflare Rocket Loader for this page entirely -->
     <script data-cfasync="false">
-        // Disable Rocket Loader completely
         if (window.Rocketloader) {
             window.Rocketloader = {load: function(){}};
         }
     </script>
     
-    <!-- Wallet scripts already loaded in layout.html, don't load again -->
     <style>
         .login-container {
             max-width: 520px;
@@ -29,6 +26,7 @@
             box-shadow: 
                 0 4px 6px -1px rgba(0, 0, 0, 0.1),
                 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            position: relative;
         }
 
         .login-card::before {
@@ -39,6 +37,7 @@
             right: 0;
             height: 4px;
             background: linear-gradient(90deg, #10b981, #059669);
+            border-radius: 24px 24px 0 0;
         }
 
         .login-header {
@@ -47,15 +46,15 @@
         }
 
         .login-icon {
-            width: 64px;
-            height: 64px;
+            width: 80px;
+            height: 80px;
             background: linear-gradient(135deg, #10b981, #059669);
-            border-radius: 20px;
+            border-radius: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto var(--space-4);
-            font-size: 28px;
+            margin: 0 auto var(--space-6);
+            font-size: 36px;
             box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
         }
 
@@ -83,109 +82,123 @@
             margin-bottom: var(--space-4);
         }
 
-        .form-group {
-            margin-bottom: var(--space-6);
-        }
-
-        .form-label {
-            display: block;
-            font-weight: 600;
-            color: var(--gray-700);
-            margin-bottom: var(--space-2);
-            font-size: var(--font-size-base);
-        }
-
-        .form-input {
-            width: 100%;
-            padding: var(--space-4);
-            border: 2px solid var(--gray-200);
-            border-radius: 12px;
-            font-size: var(--font-size-lg);
-            transition: all 0.3s ease;
-            background: var(--white);
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: #10b981;
-            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
-        }
-
-        .lemma-auth-button {
+        .passkey-button {
             width: 100%;
             background: linear-gradient(135deg, #10b981, #059669);
             color: white;
             border: none;
             border-radius: 16px;
-            padding: var(--space-5);
-            font-size: var(--font-size-lg);
+            padding: var(--space-6);
+            font-size: var(--font-size-xl);
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-3);
         }
 
-        .lemma-auth-button:hover:not(:disabled) {
+        .passkey-button:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 16px 40px rgba(16, 185, 129, 0.4);
             background: linear-gradient(135deg, #059669, #047857);
         }
 
-        .lemma-auth-button:disabled {
+        .passkey-button:disabled {
             opacity: 0.7;
             cursor: not-allowed;
+        }
+
+        .passkey-icon {
+            font-size: 28px;
+        }
+
+        .status-message {
+            padding: var(--space-4);
+            border-radius: 12px;
+            margin-top: var(--space-4);
+            text-align: center;
+            display: none;
+        }
+
+        .status-message.show {
+            display: block;
+        }
+
+        .status-message.success {
+            background: #ecfdf5;
+            border: 2px solid #10b981;
+            color: #065f46;
+        }
+
+        .status-message.error {
+            background: #fef2f2;
+            border: 2px solid #ef4444;
+            color: #991b1b;
+        }
+
+        .status-message.info {
+            background: #eff6ff;
+            border: 2px solid #3b82f6;
+            color: #1e40af;
         }
 
         .info-box {
             background: var(--gray-50);
             border: 1px solid var(--gray-200);
             border-radius: 12px;
-            padding: var(--space-4);
+            padding: var(--space-5);
             margin-top: var(--space-6);
-            font-size: var(--font-size-sm);
+            font-size: var(--font-size-base);
             color: var(--gray-600);
         }
 
-        .success-message {
-            background: #ecfdf5;
-            border: 2px solid #10b981;
-            border-radius: 12px;
-            padding: var(--space-6);
-            margin-top: var(--space-6);
-            display: none;
+        .info-box ul {
+            margin: var(--space-3) 0 0 var(--space-4);
+            padding: 0;
         }
 
-        .success-message.show {
-            display: block;
-        }
-
-        .error-message {
-            background: #fef2f2;
-            border: 2px solid #ef4444;
-            border-radius: 12px;
-            padding: var(--space-4);
-            margin-top: var(--space-4);
-            color: #991b1b;
-            display: none;
-        }
-
-        .error-message.show {
-            display: block;
+        .info-box li {
+            margin-bottom: var(--space-2);
         }
 
         .loading-spinner {
             display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
             border-top-color: white;
             animation: spin 1s ease-in-out infinite;
-            margin-right: var(--space-2);
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        .wallet-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+            padding: var(--space-3);
+            background: var(--gray-50);
+            border-radius: 8px;
+            margin-bottom: var(--space-6);
+            font-size: var(--font-size-sm);
+            color: var(--gray-600);
+        }
+
+        .wallet-status.ready {
+            background: #ecfdf5;
+            color: #065f46;
+        }
+
+        .wallet-status.locked {
+            background: #fef3c7;
+            color: #92400e;
         }
     </style>
 {% endblock %}
@@ -194,182 +207,277 @@
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
-                <div class="beta-badge">FREE Beta Access</div>
+                <div class="beta-badge">Passkey Authentication</div>
                 <div class="login-icon">🔐</div>
-                <h1 class="login-title">Sign In with Lemma</h1>
+                <h1 class="login-title">Sign In with Passkey</h1>
                 <p class="login-subtitle">
-                    Email-based authentication powered by Lemma IAM. No passwords needed.
+                    Authenticate with your device's biometrics. No passwords, no emails.
                 </p>
             </div>
 
-            <form id="loginForm">
-                    <div class="form-group">
-                        <label class="form-label" for="email">
-                        Email Address
-                        </label>
-                    <input 
-                        type="email" 
-                        id="email" 
-                        name="email" 
-                        class="form-input" 
-                        required 
-                        placeholder="your@email.com"
-                        autocomplete="email">
-                </div>
-
-                <button type="submit" class="lemma-auth-button" id="submitBtn">
-                    <span id="buttonText">Sign in with Lemma</span>
-                </button>
-
-                <div class="error-message" id="errorMessage"></div>
-                <div class="success-message" id="successMessage">
-                    <h3 style="color: #047857; margin-bottom: var(--space-2);">Check your email!</h3>
-                    <p style="color: #065f46; margin-bottom: var(--space-3);">
-                        We've sent a sign-in link to <strong id="emailDisplay"></strong>
-                    </p>
-                    <p style="color: #065f46; font-size: var(--font-size-sm);">
-                        Click the link in your email to receive your beta-user credential and access the platform.
-                    </p>
+            <div class="wallet-status" id="walletStatus">
+                <span>🔍</span> Checking wallet status...
             </div>
 
-                <div class="info-box">
-                    <strong>How it works:</strong>
-                    <ol style="margin: var(--space-2) 0 0 var(--space-4); padding: 0;">
-                        <li>Enter your email address</li>
-                        <li>We'll send you a secure sign-in link</li>
-                        <li>Click the link to receive your permission credential</li>
-                        <li>Access granted - no password needed!</li>
-                    </ol>
-                </div>
+            <button class="passkey-button" id="signInButton" disabled>
+                <span class="passkey-icon">👆</span>
+                <span id="buttonText">Loading...</span>
+            </button>
 
-                <div style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--gray-200); text-align: center;">
-                    <p style="font-size: var(--font-size-sm); color: var(--gray-600); margin-bottom: var(--space-2);">
-                        Already have a credential on another device?
-                    </p>
-                    <a href="/wallet" style="color: #10b981; text-decoration: none; font-weight: 600; font-size: var(--font-size-sm);">
-                        Transfer credential from another device →
-                    </a>
-                </div>
-            </form>
+            <div class="status-message" id="statusMessage"></div>
+
+            <div class="info-box">
+                <strong>🛡️ How Passkey Authentication Works:</strong>
+                <ul>
+                    <li><strong>No passwords</strong> - Use your fingerprint, face, or device PIN</li>
+                    <li><strong>No emails</strong> - Instant authentication, no waiting</li>
+                    <li><strong>Phishing-proof</strong> - Credentials are bound to this device</li>
+                    <li><strong>Your data, your wallet</strong> - Credentials stored locally in your browser</li>
+                </ul>
+            </div>
+
+            <div style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--gray-200); text-align: center;">
+                <a href="/wallet" style="color: #10b981; text-decoration: none; font-weight: 600; font-size: var(--font-size-sm);">
+                    Manage your wallet →
+                </a>
+            </div>
         </div>
     </div>
 
     <script>
-        // AUTO-SIGN-IN: Check for existing valid permission credential on page load
-        (async function checkAutoSignIn() {
+        // ============================================
+        // WALLET-FIRST AUTHENTICATION FLOW
+        // ============================================
+        
+        let wallet = null;
+        let walletInfo = null;
+
+        async function initializeWallet() {
             try {
-                // Initialize wallet
-                const wallet = new LemmaWallet({debug: true});
+                // Wait for global wallet to be ready
+                let attempts = 0;
+                while (!window.globalLemmaWallet && attempts < 30) {
+                    await new Promise(r => setTimeout(r, 100));
+                    attempts++;
+                }
+                
+                wallet = window.globalLemmaWallet || new LemmaWallet();
                 await wallet.init();
+                walletInfo = await wallet.getWalletInfo();
                 
-                // Check for permission credentials
+                console.log('📦 Wallet info:', walletInfo);
+                return true;
+            } catch (e) {
+                console.error('Failed to init wallet:', e);
+                return false;
+            }
+        }
+
+        function updateStatus(type, message) {
+            const el = document.getElementById('statusMessage');
+            el.className = 'status-message show ' + type;
+            el.innerHTML = message;
+        }
+
+        function updateWalletStatus(hasWallet, isUnlocked, hasPasskey) {
+            const el = document.getElementById('walletStatus');
+            
+            if (!hasWallet) {
+                el.className = 'wallet-status';
+                el.innerHTML = '<span>📦</span> New user - wallet will be created';
+            } else if (!hasPasskey) {
+                el.className = 'wallet-status locked';
+                el.innerHTML = '<span>🔓</span> Wallet found - passkey setup needed';
+            } else if (!isUnlocked) {
+                el.className = 'wallet-status locked';
+                el.innerHTML = '<span>🔒</span> Wallet locked - passkey unlock required';
+            } else {
+                el.className = 'wallet-status ready';
+                el.innerHTML = '<span>✅</span> Wallet unlocked and ready';
+            }
+        }
+
+        function updateButton(text, enabled = true, loading = false) {
+            const btn = document.getElementById('signInButton');
+            const textEl = document.getElementById('buttonText');
+            btn.disabled = !enabled;
+            
+            if (loading) {
+                textEl.innerHTML = '<span class="loading-spinner"></span> ' + text;
+            } else {
+                textEl.textContent = text;
+            }
+        }
+
+        async function checkExistingCredentials() {
+            try {
                 const permissions = await wallet.getCredentials('permission');
-                console.log('🔍 Found', permissions.length, 'permission credential(s)');
-                
-                // Filter for lemma.id permissions (accept lemma.id OR lemma_platform)
-                const lemmaPermissions = permissions.filter(p => {
+                const lemmaPerms = permissions.filter(p => {
                     const claims = p.claims || p.credentialSubject || {};
                     const siteId = claims.siteId || claims.site || '';
                     return siteId === 'lemma.id' || siteId === 'lemma_platform';
                 });
                 
-                if (lemmaPermissions.length > 0) {
-                    console.log('Valid lemma.id permission found - verifying with session-free auth...');
-                    
-                    const cred = lemmaPermissions[0];
-                    
-                    // SESSION-FREE: Initialize auth system
-                    const auth = new SessionFreeAuth(wallet, { debug: true });
-                    window.lemmaAuth = auth;
-                    
-                    // Verify credential with smart caching
-                    const authenticated = await auth.isAuthenticated(cred);
-                    
-                    if (authenticated) {
-                        console.log('Credential verified! Redirecting to dashboard...');
-                        
-                        // Store credential globally for API calls
-                        window.lemmaCredential = cred;
-                        
-                        // Redirect to dashboard
-                        window.location.href = '/dashboard';
-                        return;
-                    } else {
-                        console.log('Credential verification failed (revoked or invalid)');
-                    }
+                if (lemmaPerms.length > 0) {
+                    console.log('✅ Found existing lemma.id permission');
+                    updateStatus('success', '✅ Already signed in! Redirecting...');
+                    setTimeout(() => window.location.href = '/dashboard', 1000);
+                    return true;
+                }
+                return false;
+            } catch (e) {
+                console.log('No existing credentials:', e.message);
+                return false;
+            }
+        }
+
+        async function setupPasskeyAndIssue() {
+            try {
+                updateButton('Setting up passkey...', false, true);
+                updateStatus('info', '👆 Please authenticate with your device');
+                
+                // Register passkey for wallet
+                await wallet.registerPasskey();
+                console.log('✅ Passkey registered');
+                
+                // Now issue permission
+                return await issuePermission();
+                
+            } catch (e) {
+                console.error('Passkey setup failed:', e);
+                updateStatus('error', '❌ Passkey setup cancelled or failed. Please try again.');
+                updateButton('Try Again', true);
+                return false;
+            }
+        }
+
+        async function unlockAndIssue() {
+            try {
+                updateButton('Unlocking wallet...', false, true);
+                updateStatus('info', '👆 Please authenticate with your device');
+                
+                // Unlock with passkey
+                const unlocked = await wallet.unlock();
+                
+                if (!unlocked) {
+                    throw new Error('Unlock failed');
                 }
                 
-                console.log('No valid credential - showing login form');
+                console.log('✅ Wallet unlocked');
                 
-            } catch (error) {
-                console.log('Auto-sign-in check failed (expected for new users):', error.message);
+                // Check for existing permission first
+                const hasExisting = await checkExistingCredentials();
+                if (hasExisting) return true;
+                
+                // Issue permission
+                return await issuePermission();
+                
+            } catch (e) {
+                console.error('Unlock failed:', e);
+                updateStatus('error', '❌ Passkey authentication cancelled or failed. Please try again.');
+                updateButton('Try Again', true);
+                return false;
             }
-        })();
-        
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const button = document.getElementById('submitBtn');
-            const buttonText = document.getElementById('buttonText');
-            const email = document.getElementById('email').value;
-            const errorMessage = document.getElementById('errorMessage');
-            const successMessage = document.getElementById('successMessage');
-            
-            // Clear previous messages
-            errorMessage.classList.remove('show');
-            successMessage.classList.remove('show');
-            
-            // Show loading state
-            button.disabled = true;
-            buttonText.innerHTML = `
-                    <span class="loading-spinner"></span>
-                Sending sign-in link...
-            `;
-            
+        }
+
+        async function issuePermission() {
             try {
-                const response = await fetch('/api/v1/iam/request-access', {
+                updateButton('Issuing permission...', false, true);
+                updateStatus('info', '📝 Creating your access credential...');
+                
+                // Get wallet ID
+                const walletId = wallet.session?.walletId || 'wallet_' + Date.now();
+                
+                // Request permission from server
+                const response = await fetch('/api/wallet-auth/issue', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ 
-                        site_id: 'lemma_platform',
-                        site_domain: 'lemma.id',
-                        user_email: email,
-                        permission_level: 'beta-user',
-                        redirect_url: window.location.origin + '/'
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: 'lemma.id',
+                        wallet_id: walletId
                     })
                 });
                 
                 const result = await response.json();
                 
-                if (result.success) {
-                    // Show success message
-                    document.getElementById('emailDisplay').textContent = email;
-                    successMessage.classList.add('show');
-                    buttonText.textContent = 'Email sent!';
-                    
-                    // Reset form but keep button disabled
-                    document.getElementById('email').value = '';
-                    
-                } else {
-                    // Show error
-                    errorMessage.textContent = result.error || 'Failed to send sign-in link. Please try again.';
-                    errorMessage.classList.add('show');
-                    button.disabled = false;
-                    buttonText.textContent = 'Sign in with Lemma';
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to issue permission');
                 }
                 
-            } catch (error) {
-                console.error('Request error:', error);
-                errorMessage.textContent = 'Network error. Please check your connection and try again.';
-                errorMessage.classList.add('show');
-                button.disabled = false;
-                buttonText.textContent = 'Sign in with Lemma';
+                console.log('📝 Permission issued:', result.permission_lemma);
+                
+                // Store in wallet
+                await wallet.storeCredential(result.permission_lemma);
+                console.log('✅ Permission stored in wallet');
+                
+                updateStatus('success', `✅ Welcome${result.user.isNew ? ' to Lemma' : ' back'}! Redirecting...`);
+                
+                setTimeout(() => window.location.href = '/dashboard', 1500);
+                return true;
+                
+            } catch (e) {
+                console.error('Issue failed:', e);
+                updateStatus('error', '❌ Failed to create permission: ' + e.message);
+                updateButton('Try Again', true);
+                return false;
             }
-        });
+        }
+
+        async function handleSignIn() {
+            // Refresh wallet info
+            walletInfo = await wallet.getWalletInfo();
+            
+            if (!walletInfo.hasPasskey) {
+                // New user or no passkey - setup passkey first
+                return await setupPasskeyAndIssue();
+            } else if (!walletInfo.isUnlocked) {
+                // Has passkey but locked - unlock
+                return await unlockAndIssue();
+            } else {
+                // Already unlocked - just issue
+                return await issuePermission();
+            }
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
         
-        // Auto-focus email input
-        document.getElementById('email').focus();
+        document.addEventListener('DOMContentLoaded', async function() {
+            const btn = document.getElementById('signInButton');
+            
+            // Initialize wallet
+            const walletReady = await initializeWallet();
+            
+            if (!walletReady) {
+                updateStatus('error', '❌ Failed to initialize wallet. Please refresh the page.');
+                return;
+            }
+            
+            // Update UI based on wallet state
+            updateWalletStatus(
+                walletInfo.lemmaCount > 0 || walletInfo.hasPasskey,
+                walletInfo.isUnlocked,
+                walletInfo.hasPasskey
+            );
+            
+            // Check for existing credentials (if wallet is unlocked)
+            if (walletInfo.isUnlocked) {
+                const hasCredential = await checkExistingCredentials();
+                if (hasCredential) return;
+            }
+            
+            // Set button text based on state
+            if (!walletInfo.hasPasskey) {
+                updateButton('Create Wallet & Sign In', true);
+            } else if (!walletInfo.isUnlocked) {
+                updateButton('Unlock & Sign In', true);
+            } else {
+                updateButton('Get Access', true);
+            }
+            
+            // Attach click handler
+            btn.addEventListener('click', handleSignIn);
+        });
     </script>
 {% endblock %}

@@ -177,9 +177,21 @@ class LemmaWallet {
 
         await this._put('passkey', passkeyRecord);
 
+        // Auto-unlock after registration (user just authenticated)
+        const now = Date.now();
+        this.session = {
+            isUnlocked: true,
+            unlockedAt: now,
+            expiresAt: now + SESSION_DURATION_MS,
+            walletId: walletId.value
+        };
+        await this._put('session', { id: 'current', ...this.session });
+        console.log('✅ Wallet auto-unlocked after passkey registration');
+
         return {
             success: true,
-            credentialId: passkeyRecord.credentialId
+            credentialId: passkeyRecord.credentialId,
+            walletId: walletId.value
         };
     }
 
@@ -229,12 +241,17 @@ class LemmaWallet {
             throw new Error('Passkey verification failed');
         }
 
+        // Get wallet ID
+        const walletIdRecord = await this._get('passkey', 'walletId');
+        const walletId = walletIdRecord?.value || 'wallet_' + Date.now();
+
         // Unlock the wallet
         const now = Date.now();
         this.session = {
             isUnlocked: true,
             unlockedAt: now,
-            expiresAt: now + SESSION_DURATION_MS
+            expiresAt: now + SESSION_DURATION_MS,
+            walletId: walletId
         };
 
         // Persist session
@@ -242,11 +259,14 @@ class LemmaWallet {
             id: 'current',
             ...this.session
         });
+        
+        console.log('✅ Wallet unlocked successfully');
             
             return { 
                 success: true, 
             expiresAt: this.session.expiresAt,
-            expiresIn: SESSION_DURATION_MS
+            expiresIn: SESSION_DURATION_MS,
+            walletId: walletId
         };
     }
 
