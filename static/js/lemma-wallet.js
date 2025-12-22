@@ -816,27 +816,31 @@ class LemmaWallet {
 }
 
 // ============================================
-// GLOBAL INSTANCE
+// GLOBAL EXPORTS
 // ============================================
 
-const lemmaWallet = new LemmaWallet();
-
-// Auto-initialize
+// Export CLASS (constructor) to window.LemmaWallet
+// Export INSTANCE to window.lemmaWallet (lowercase)
 if (typeof window !== 'undefined') {
-    window.LemmaWallet = lemmaWallet;
-    window.LemmaWalletClass = LemmaWallet;
+    window.LemmaWallet = LemmaWallet;  // The CLASS (constructor)
+    window.LemmaWalletClass = LemmaWallet;  // Alias for backwards compatibility
     
-    // Initialize on load
+    // Create singleton instance
+    const lemmaWalletInstance = new LemmaWallet();
+    window.lemmaWallet = lemmaWalletInstance;  // The INSTANCE (lowercase)
+    window.globalLemmaWallet = lemmaWalletInstance;  // For templates that use this
+    
+    // Auto-initialize on load
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => lemmaWallet.init());
+        document.addEventListener('DOMContentLoaded', () => lemmaWalletInstance.init());
     } else {
-        lemmaWallet.init();
+        lemmaWalletInstance.init();
     }
 }
 
 // Export for modules
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { LemmaWallet, lemmaWallet };
+    module.exports = { LemmaWallet };
 }
 
 })(); // End of IIFE
