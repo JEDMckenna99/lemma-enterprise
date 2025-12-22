@@ -14,11 +14,14 @@
  * - Scales infinitely (no session state)
  */
 
-// Guard against double-loading (Cloudflare Rocket Loader, duplicate script tags)
-if (typeof window !== 'undefined' && window._SessionFreeAuthLoaded) {
-    console.log('⚠️ SessionFreeAuth already loaded, skipping duplicate');
-} else {
-if (typeof window !== 'undefined') window._SessionFreeAuthLoaded = true;
+// IIFE to avoid global scope pollution (fixes Cloudflare Rocket Loader issues)
+(function() {
+'use strict';
+
+// Guard against double-loading
+if (typeof window !== 'undefined' && window.SessionFreeAuth) {
+    return; // Already loaded
+}
 
 class SessionFreeAuth {
     constructor(wallet, options = {}) {
@@ -305,10 +308,15 @@ class SessionFreeAuth {
     }
 }
 
+// Export to window
+if (typeof window !== 'undefined') {
+    window.SessionFreeAuth = SessionFreeAuth;
+}
+
 // Export for module usage
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {SessionFreeAuth};
 }
 
-} // End of double-load guard
+})(); // End of IIFE
 

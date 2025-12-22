@@ -6,11 +6,14 @@
  * that users store in their Lemma wallet.
  */
 
+// IIFE to avoid global scope pollution (fixes Cloudflare Rocket Loader issues)
+(function() {
+'use strict';
+
 // Guard against double-loading
-if (typeof window !== 'undefined' && window._LemmaSiteIssuerLoaded) {
-    console.log('⚠️ LemmaSiteIssuer already loaded, skipping duplicate');
-} else {
-if (typeof window !== 'undefined') window._LemmaSiteIssuerLoaded = true;
+if (typeof window !== 'undefined' && window.LemmaSiteIssuer) {
+    return; // Already loaded
+}
 
 // ============================================
 // SITE ISSUER CLASS
@@ -560,4 +563,4 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = { LemmaSiteIssuer, LemmaVerifier };
 }
 
-} // End of double-load guard
+})(); // End of IIFE
