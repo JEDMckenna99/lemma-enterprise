@@ -89,11 +89,12 @@ def issue_permission_lemma(user_id: str, site_id: str = 'lemma.id', permissions:
         issuer_manager = get_issuer_manager()
         iam_issuer = issuer_manager.get_iam_issuer(site_id)
         
-        # Build claims
+        # Build claims - Rust expects all values to be strings
+        perm_list = permissions or ['read', 'write']
         claims = {
             'type': 'permission',
             'siteId': site_id,
-            'permissions': permissions or ['read', 'write'],
+            'permissions': ','.join(perm_list),  # Convert list to comma-separated string
             'issuedAt': datetime.utcnow().isoformat() + 'Z',
             'expiresAt': (datetime.utcnow() + timedelta(days=30)).isoformat() + 'Z'
         }
