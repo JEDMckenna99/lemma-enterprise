@@ -17,12 +17,12 @@
     <!-- Wallet scripts already loaded in layout.html, don't load again -->
     
     <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1102" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1102" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1103" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1103" data-cfasync="false"></script>
     
     <!-- Message Constructor & WASM Verifier (for client-side verification) -->
-    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1102" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1102" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1103" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1103" data-cfasync="false"></script>
     
     <!-- Session-Free Auth already loaded in layout.html -->
     <style>
@@ -668,11 +668,15 @@ document.addEventListener('DOMContentLoaded', async function() {
             walletMain.style.display = 'block';
         }
         
-        // Load and display wallet data (both PoH and permission lemmas)
-        await loadWalletData();
+        // Check if wallet needs passkey unlock
+        await checkAndUnlockWallet();
         
-        // Set up periodic refresh
-        setInterval(loadWalletData, 30000); // Refresh every 30 seconds
+        // Set up periodic refresh (only if unlocked)
+        setInterval(async () => {
+            if (lemmaWallet && lemmaWallet.isUnlocked && lemmaWallet.isUnlocked()) {
+                await loadWalletData();
+            }
+        }, 30000);
         
     } catch (error) {
         console.error('Failed to initialize Lemma Federated Wallet:', error);
@@ -689,6 +693,176 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 });
+
+// ========================================
+// PASSKEY UNLOCK FLOW
+// ========================================
+
+async function checkAndUnlockWallet() {
+    const listContainer = document.getElementById('credential-list');
+    
+    try {
+        // Check if wallet has a passkey registered
+        const walletStatus = await lemmaWallet.getWalletInfo();
+        console.log('🔐 Wallet status:', walletStatus);
+        
+        if (walletStatus.hasPasskey) {
+            // Wallet has passkey - check if already unlocked
+            if (walletStatus.isUnlocked) {
+                console.log('✅ Wallet already unlocked');
+                await loadWalletData();
+                return;
+            }
+            
+            // Show unlock prompt
+            if (listContainer) {
+                listContainer.innerHTML = `
+                    <div style="padding: 48px; text-align: center;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🔐</div>
+                        <h3 style="margin-bottom: 12px; color: var(--gray-800);">Wallet Locked</h3>
+                        <p style="color: var(--gray-600); margin-bottom: 24px;">
+                            Use your passkey to unlock and view your credentials
+                        </p>
+                        <button onclick="unlockWalletWithPasskey()" class="btn-primary" style="
+                            padding: 16px 32px;
+                            font-size: 1.1rem;
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 8px;
+                        ">
+                            🔓 Unlock with Passkey
+                        </button>
+                    </div>
+                `;
+            }
+        } else {
+            // No passkey registered - offer to set one up or continue without
+            console.log('ℹ️ No passkey registered - loading wallet without passkey protection');
+            await loadWalletData();
+            
+            // Show optional passkey setup notice
+            showPasskeySetupNotice();
+        }
+    } catch (error) {
+        console.error('❌ Wallet status check failed:', error);
+        // Fallback: try loading without unlock
+        await loadWalletData();
+    }
+}
+
+async function unlockWalletWithPasskey() {
+    const listContainer = document.getElementById('credential-list');
+    
+    try {
+        // Show unlocking state
+        if (listContainer) {
+            listContainer.innerHTML = `
+                <div style="padding: 48px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+                    <h3 style="margin-bottom: 12px; color: var(--gray-800);">Unlocking...</h3>
+                    <p style="color: var(--gray-600);">
+                        Please complete biometric verification
+                    </p>
+                </div>
+            `;
+        }
+        
+        // Call wallet unlock (triggers biometric prompt)
+        console.log('🔐 Requesting passkey unlock...');
+        await lemmaWallet.unlock();
+        console.log('✅ Wallet unlocked successfully!');
+        
+        // Load credentials
+        await loadWalletData();
+        
+    } catch (error) {
+        console.error('❌ Unlock failed:', error);
+        
+        if (listContainer) {
+            listContainer.innerHTML = `
+                <div style="padding: 48px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+                    <h3 style="margin-bottom: 12px; color: var(--error);">Unlock Failed</h3>
+                    <p style="color: var(--gray-600); margin-bottom: 24px;">
+                        ${error.message || 'Could not verify your passkey'}
+                    </p>
+                    <button onclick="unlockWalletWithPasskey()" class="btn-primary">
+                        Try Again
+                    </button>
+                    <button onclick="loadWalletData()" class="btn-secondary" style="margin-left: 12px;">
+                        Continue Without Unlock
+                    </button>
+                </div>
+            `;
+        }
+    }
+}
+
+function showPasskeySetupNotice() {
+    // Add a subtle notice to set up passkey protection
+    const container = document.querySelector('.wallet-container');
+    if (container && !document.getElementById('passkey-setup-notice')) {
+        const notice = document.createElement('div');
+        notice.id = 'passkey-setup-notice';
+        notice.innerHTML = `
+            <div style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 16px 24px;
+                border-radius: 12px;
+                margin-bottom: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 12px;
+            ">
+                <div>
+                    <strong>🔐 Protect your wallet with Passkey</strong>
+                    <p style="margin: 4px 0 0; opacity: 0.9; font-size: 0.9rem;">
+                        Add biometric protection to secure your credentials
+                    </p>
+                </div>
+                <button onclick="setupPasskeyProtection()" style="
+                    background: white;
+                    color: #667eea;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    cursor: pointer;
+                ">
+                    Set Up Now
+                </button>
+            </div>
+        `;
+        container.insertBefore(notice, container.firstChild);
+    }
+}
+
+async function setupPasskeyProtection() {
+    try {
+        console.log('🔐 Setting up passkey protection...');
+        const result = await lemmaWallet.registerPasskey();
+        console.log('✅ Passkey registered:', result);
+        
+        // Remove the notice
+        const notice = document.getElementById('passkey-setup-notice');
+        if (notice) notice.remove();
+        
+        alert('✅ Passkey protection enabled! Your wallet is now secured with biometric authentication.');
+        
+        // Reload to show locked state
+        window.location.reload();
+    } catch (error) {
+        console.error('❌ Passkey setup failed:', error);
+        alert('Failed to set up passkey: ' + error.message);
+    }
+}
+
+// ========================================
+// WALLET DATA LOADING
+// ========================================
 
 async function loadWalletData() {
     try {
