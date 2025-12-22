@@ -776,6 +776,70 @@ class LemmaWallet {
         };
     }
 
+    // ========================================
+    // BACKWARDS COMPATIBILITY (for old templates)
+    // ========================================
+
+    /**
+     * Store credential (backwards compatible alias for storeLemma)
+     * Does NOT require unlock for backwards compatibility with existing flows
+     */
+    async storeCredential(credential) {
+        await this.init();
+        
+        // Normalize credential format
+        const lemma = {
+            id: credential.id || `cred_${Date.now()}`,
+            issuer: credential.issuer || 'did:web:lemma.id',
+            signature: credential.signature || credential.proof?.proofValue || 'legacy',
+            claims: credential.claims || credential.credentialSubject || {},
+            type: credential.type || ['VerifiableCredential'],
+            packageType: credential.packageType || 'permission',
+            ...credential,
+            storedAt: Date.now()
+        };
+        
+        await this._put('lemmas', lemma);
+        console.log('✅ Credential stored (backwards compat):', lemma.id);
+        return { success: true, id: lemma.id };
+    }
+
+    /**
+     * Get credentials (backwards compatible alias for getLemmas)
+     * @param {string} type - Optional filter by packageType ('permission', 'identity', etc)
+     */
+    async getCredentials(type = null) {
+        await this.init();
+        const lemmas = await this._getAll('lemmas');
+        
+        if (type) {
+            return lemmas.filter(l => {
+                const pkgType = l.packageType || l.claims?.type || l.type?.[1];
+                return pkgType === type || 
+                       (type === 'permission' && (pkgType === 'permission' || pkgType === 'PermissionLemma')) ||
+                       (type === 'identity' && (pkgType === 'identity' || pkgType === 'IdentityCredential'));
+            });
+        }
+        
+        return lemmas;
+    }
+
+    /**
+     * Remove credential (backwards compatible alias)
+     */
+    async removeCredential(credentialId) {
+        await this.init();
+        await this._delete('lemmas', credentialId);
+        return { success: true };
+    }
+
+    /**
+     * Property for backwards compatibility with isReady checks
+     */
+    get isReady() {
+        return this._initialized;
+    }
+
     /**
      * Export wallet data (for backup)
      */
