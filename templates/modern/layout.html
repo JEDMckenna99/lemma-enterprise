@@ -21,9 +21,9 @@
     </script>
     
     <!-- Wallet Scripts - Load synchronously for session-free architecture -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1103&bust={{ range(1, 99999)|random }}" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1103" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1103&bust={{ range(1, 99999)|random }}" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1104&bust={{ range(1, 99999)|random }}" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1104" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1104&bust={{ range(1, 99999)|random }}" data-cfasync="false"></script>
     
     <!-- User Dropdown Styles -->
     <style>
@@ -270,6 +270,33 @@
             }
         });
         
+        // AUTO-ATTACH WALLET AUTH TO ALL API REQUESTS
+        // This makes wallet unlock = signed in across the platform
+        (function() {
+            const originalFetch = window.fetch;
+            window.fetch = async function(url, options = {}) {
+                // Only modify requests to our API
+                if (url.startsWith('/api/') || url.includes('lemma.id/api/')) {
+                    try {
+                        const wallet = window.globalLemmaWallet || window.lemmaWallet;
+                        if (wallet && typeof wallet.isUnlocked === 'function' && wallet.isUnlocked()) {
+                            const authProof = await wallet.getAuthProof();
+                            options.headers = options.headers || {};
+                            if (options.headers instanceof Headers) {
+                                options.headers.set('X-Wallet-Auth', JSON.stringify(authProof));
+                            } else {
+                                options.headers['X-Wallet-Auth'] = JSON.stringify(authProof);
+                            }
+                        }
+                    } catch (e) {
+                        // Silent fail - don't break requests if auth fails
+                    }
+                }
+                return originalFetch.call(this, url, options);
+            };
+            console.log('🔐 Wallet auth auto-attach enabled');
+        })();
+
         // SESSION-FREE: Initialize navigation based on credentials
         (async function initSessionFreeNav() {
             try {
