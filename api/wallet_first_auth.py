@@ -84,9 +84,10 @@ def issue_permission_lemma(user_id: str, site_id: str = 'lemma.id', permissions:
     Issue a permission lemma for direct wallet storage
     """
     try:
-        # Import the IAM issuer
-        from .iam_issuer import get_iam_issuer
-        iam_issuer = get_iam_issuer()
+        # Import the IAM issuer (same issuer used across the platform)
+        from api.issuer_management import get_issuer_manager
+        issuer_manager = get_issuer_manager()
+        iam_issuer = issuer_manager.get_iam_issuer(site_id)
         
         # Build claims
         claims = {
