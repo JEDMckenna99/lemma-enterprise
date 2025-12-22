@@ -603,44 +603,42 @@ let shieldApiKey = 'lemma_platform_production_key_2024'; // Global API key varia
 let walletInitialized = false; // Prevent multiple wallet initializations
 
 document.addEventListener('DOMContentLoaded', async function() {
-    // EMERGENCY: Multiple prevention layers
-    if (window.LEMMA_WALLET_INITIALIZED || walletInitialized || window.lemmaWallet) {
-        console.warn('⚠️ EMERGENCY: Blocking wallet initialization - already exists');
-        return;
-    }
-    
     try {
-        // Wait for LemmaWallet to be defined (in case scripts are still loading)
-        if (typeof LemmaWallet === 'undefined') {
-            console.warn('⚠️ LemmaWallet not yet loaded, waiting...');
-            await new Promise(resolve => {
-                const checkInterval = setInterval(() => {
-                    if (typeof LemmaWallet !== 'undefined') {
+        // Use existing wallet if available (from layout.html)
+        if (window.globalLemmaWallet || window.lemmaWallet) {
+            lemmaWallet = window.globalLemmaWallet || window.lemmaWallet;
+            walletInitialized = true;
+            console.log('✅ Using existing wallet instance from layout.html');
+            
+            // Make sure it's initialized
+            if (lemmaWallet.init && !lemmaWallet._initialized) {
+                await lemmaWallet.init();
+            }
+            
+            // Continue to checkAndUnlockWallet below
+        } else {
+            // Wait for LemmaWallet to be defined (in case scripts are still loading)
+            if (typeof LemmaWallet === 'undefined') {
+                console.warn('⚠️ LemmaWallet not yet loaded, waiting...');
+                await new Promise(resolve => {
+                    const checkInterval = setInterval(() => {
+                        if (typeof LemmaWallet !== 'undefined') {
+                            clearInterval(checkInterval);
+                            resolve();
+                        }
+                    }, 100);
+                    setTimeout(() => {
                         clearInterval(checkInterval);
                         resolve();
-                    }
-                }, 100);
-                // Timeout after 5 seconds
-                setTimeout(() => {
-                    clearInterval(checkInterval);
-                    resolve();
-                }, 5000);
-            });
-        }
-        
-        if (typeof LemmaWallet === 'undefined') {
-            throw new Error('LemmaWallet class failed to load after 5 seconds');
-        }
-        
-        // Initialize the unified Lemma Wallet with all platform features
-        // Check if already initialized by layout.html (global singleton pattern)
-        if (window.globalLemmaWallet) {
-            // Reuse existing wallet from layout.html
-            lemmaWallet = window.globalLemmaWallet;
-            walletInitialized = true;
-            console.log('✅ Reusing wallet instance from layout.html');
-        } else {
-            // First initialization (shouldn't happen, but fallback)
+                    }, 5000);
+                });
+            }
+            
+            if (typeof LemmaWallet === 'undefined') {
+                throw new Error('LemmaWallet class failed to load after 5 seconds');
+            }
+            
+            // First initialization (fallback if layout.html didn't load wallet)
             walletInitialized = true;
             lemmaWallet = new LemmaWallet({
                 debug: true,
@@ -648,7 +646,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 securityLevel: 'medium',
                 enableAdvancedFeatures: true,
                 enableDeviceSync: true,
-                enableVaultStorage: false, // Disabled - using direct QR sync only
+                enableVaultStorage: false,
                 networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
                 networkAuthKey: 'lemma_network_federated_sync_2024',
                 syncInterval: 30000
@@ -657,14 +655,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Wait for wallet to be ready
             if (typeof lemmaWallet.init === 'function') {
                 await lemmaWallet.init();
-            } else {
-                // Fallback initialization for integrated wallet
-                console.log('Using integrated wallet initialization');
             }
             
             // Store globally
             window.globalLemmaWallet = lemmaWallet;
         }
+        
+        console.log('📦 Wallet ready, checking unlock status...');
         
         // Get API key from server configuration
         shieldApiKey = 'lemma_platform_production_key_2024'; // Default fallback
