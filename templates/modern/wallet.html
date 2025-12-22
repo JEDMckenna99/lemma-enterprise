@@ -24,8 +24,7 @@
     <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1075" data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1075" data-cfasync="false"></script>
     
-    <!-- Session-Free Auth -->
-    <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1075" data-cfasync="false"></script>
+    <!-- Session-Free Auth already loaded in layout.html -->
     <style>
         .wallet-container {
             max-width: 1100px;
@@ -2248,6 +2247,12 @@ if (typeof window.originalLoadWalletData === 'undefined') {
         await loadEnhancedWalletData();
     };
 }
+
+// PIN PROTECTION COMPLETELY REMOVED - User request
+
+</script>
+{% endblock %}
+
 
 // PIN PROTECTION COMPLETELY REMOVED - User request
 

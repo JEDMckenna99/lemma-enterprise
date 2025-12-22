@@ -206,3 +206,23 @@ def get_subscription_status():
 def get_plan_config(plan_type: str) -> Dict[str, Any]:
     """Get configuration for a specific plan"""
     return SUBSCRIPTION_PLANS.get(plan_type, {})
+    """
+    Get current user's subscription status
+    """
+    subscription = session.get('subscription')
+    
+    if not subscription:
+        return jsonify({
+            'success': True,
+            'subscription': None,
+            'message': 'No active subscription'
+        })
+    
+    return jsonify({
+        'success': True,
+        'subscription': subscription
+    })
+
+def get_plan_config(plan_type: str) -> Dict[str, Any]:
+    """Get configuration for a specific plan"""
+    return SUBSCRIPTION_PLANS.get(plan_type, {})

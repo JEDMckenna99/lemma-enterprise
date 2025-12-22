@@ -6,6 +6,12 @@
  * that users store in their Lemma wallet.
  */
 
+// Guard against double-loading
+if (typeof window !== 'undefined' && window._LemmaSiteIssuerLoaded) {
+    console.log('⚠️ LemmaSiteIssuer already loaded, skipping duplicate');
+} else {
+if (typeof window !== 'undefined') window._LemmaSiteIssuerLoaded = true;
+
 // ============================================
 // SITE ISSUER CLASS
 // ============================================
@@ -553,3 +559,5 @@ if (typeof window !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { LemmaSiteIssuer, LemmaVerifier };
 }
+
+} // End of double-load guard

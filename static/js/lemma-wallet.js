@@ -6,6 +6,12 @@
  * Lemmas can be presented to any site for local verification.
  */
 
+// Guard against double-loading (Cloudflare Rocket Loader, duplicate script tags)
+if (typeof window !== 'undefined' && window._LemmaWalletLoaded) {
+    console.log('⚠️ LemmaWallet already loaded, skipping duplicate');
+} else {
+if (typeof window !== 'undefined') window._LemmaWalletLoaded = true;
+
 // ============================================
 // CONSTANTS
 // ============================================
@@ -829,3 +835,5 @@ if (typeof window !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { LemmaWallet, lemmaWallet };
 }
+
+} // End of double-load guard
