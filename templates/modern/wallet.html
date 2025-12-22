@@ -17,12 +17,12 @@
     <!-- Wallet scripts already loaded in layout.html, don't load again -->
     
     <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1104" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1104" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1105" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1105" data-cfasync="false"></script>
     
     <!-- Message Constructor & WASM Verifier (for client-side verification) -->
-    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1104" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1104" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1105" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1105" data-cfasync="false"></script>
     
     <!-- Session-Free Auth already loaded in layout.html -->
     <style>
@@ -736,12 +736,37 @@ async function checkAndUnlockWallet() {
                 `;
             }
         } else {
-            // No passkey registered - offer to set one up or continue without
-            console.log('ℹ️ No passkey registered - loading wallet without passkey protection');
-            await loadWalletData();
+            // No passkey registered - show prominent setup option
+            console.log('ℹ️ No passkey registered - showing setup option');
             
-            // Show optional passkey setup notice
-            showPasskeySetupNotice();
+            if (listContainer) {
+                listContainer.innerHTML = `
+                    <div style="padding: 48px; text-align: center;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🔐</div>
+                        <h3 style="margin-bottom: 12px; color: var(--gray-800);">Secure Your Wallet</h3>
+                        <p style="color: var(--gray-600); margin-bottom: 24px; max-width: 400px; margin-left: auto; margin-right: auto;">
+                            Set up passkey protection to secure your credentials with biometric authentication (Face ID, fingerprint, or Windows Hello).
+                        </p>
+                        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                            <button onclick="setupPasskeyProtection()" class="btn-primary" style="
+                                padding: 16px 32px;
+                                font-size: 1.1rem;
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 8px;
+                            ">
+                                🔐 Set Up Passkey
+                            </button>
+                            <button onclick="skipPasskeySetup()" class="btn-secondary" style="
+                                padding: 16px 32px;
+                                font-size: 1rem;
+                            ">
+                                Skip for Now
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
         }
     } catch (error) {
         console.error('❌ Wallet status check failed:', error);
@@ -840,8 +865,29 @@ function showPasskeySetupNotice() {
     }
 }
 
+async function skipPasskeySetup() {
+    console.log('⏭️ Skipping passkey setup - loading wallet without protection');
+    await loadWalletData();
+    showPasskeySetupNotice(); // Show banner at top for later
+}
+
 async function setupPasskeyProtection() {
+    const listContainer = document.getElementById('credential-list');
+    
     try {
+        // Show setup in progress
+        if (listContainer) {
+            listContainer.innerHTML = `
+                <div style="padding: 48px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+                    <h3 style="margin-bottom: 12px; color: var(--gray-800);">Setting Up Passkey...</h3>
+                    <p style="color: var(--gray-600);">
+                        Please complete biometric verification when prompted
+                    </p>
+                </div>
+            `;
+        }
+        
         console.log('🔐 Setting up passkey protection...');
         const result = await lemmaWallet.registerPasskey();
         console.log('✅ Passkey registered:', result);
@@ -852,11 +898,32 @@ async function setupPasskeyProtection() {
         
         alert('✅ Passkey protection enabled! Your wallet is now secured with biometric authentication.');
         
-        // Reload to show locked state
+        // Reload to show locked state (which will then prompt for unlock)
         window.location.reload();
     } catch (error) {
         console.error('❌ Passkey setup failed:', error);
-        alert('Failed to set up passkey: ' + error.message);
+        
+        if (listContainer) {
+            listContainer.innerHTML = `
+                <div style="padding: 48px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+                    <h3 style="margin-bottom: 12px; color: var(--error);">Setup Failed</h3>
+                    <p style="color: var(--gray-600); margin-bottom: 24px;">
+                        ${error.message || 'Could not set up passkey'}
+                    </p>
+                    <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                        <button onclick="setupPasskeyProtection()" class="btn-primary">
+                            Try Again
+                        </button>
+                        <button onclick="skipPasskeySetup()" class="btn-secondary">
+                            Skip for Now
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else {
+            alert('Failed to set up passkey: ' + error.message);
+        }
     }
 }
 
