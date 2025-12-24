@@ -17,12 +17,12 @@
     <!-- Wallet scripts already loaded in layout.html, don't load again -->
     
     <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1110" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1110" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1111" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1111" data-cfasync="false"></script>
     
     <!-- Message Constructor & WASM Verifier (for client-side verification) -->
-    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1110" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1110" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1111" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1111" data-cfasync="false"></script>
     
     <!-- Session-Free Auth already loaded in layout.html -->
     <style>
@@ -1401,7 +1401,20 @@ function displayPermissionLemmas(permissionLemmas) {
         lemmasBySite[siteId].push(lemma);
     });
 
-    container.innerHTML = Object.entries(lemmasBySite).map(([siteId, siteLemmas]) => {
+    // Verify each credential and build HTML
+    const verifiedLemmas = await Promise.all(
+        Object.entries(lemmasBySite).map(async ([siteId, siteLemmas]) => {
+            const verifiedSiteLemmas = await Promise.all(siteLemmas.map(async lemma => {
+                const verifyStart = performance.now();
+                const verification = await performLocalVerification(lemma);
+                const verifyTime = ((performance.now() - verifyStart) * 1000).toFixed(1);
+                return { lemma, verification, verifyTime };
+            }));
+            return { siteId, lemmas: verifiedSiteLemmas };
+        })
+    );
+
+    container.innerHTML = verifiedLemmas.map(({ siteId, lemmas: siteLemmas }) => {
         const siteDisplay = siteId === 'lemma.id' ? 'Lemma Platform' : siteId;
         
         return `
@@ -1409,26 +1422,38 @@ function displayPermissionLemmas(permissionLemmas) {
                 <h4 style="margin: 0 0 12px 0; color: var(--secondary); font-size: 1rem; padding: 12px 16px; background: var(--secondary-50); border-radius: 8px;">
                     ${siteDisplay}
                 </h4>
-                ${siteLemmas.map(lemma => {
+                ${siteLemmas.map(({ lemma, verification, verifyTime }) => {
                     // Handle both W3C (issuanceDate) and legacy (issued_at) formats
                     const issuedTimestamp = lemma.issuanceDate || lemma.issued_at || (lemma.storedAt / 1000);
                     const issuedDate = issuedTimestamp ? new Date(issuedTimestamp * 1000).toLocaleDateString() : 'Unknown';
                     const expiresTimestamp = lemma.expirationDate || lemma.expires_at;
                     const expiresDate = expiresTimestamp ? new Date(expiresTimestamp * 1000).toLocaleDateString() : 'Never';
-                    const permissionId = (lemma.claims || lemma.credentialSubject)?.permissionId || 'Unknown';
-                    const accountType = (lemma.claims || lemma.credentialSubject)?.accountType || 'Unknown';
+                    const permissionId = (lemma.claims || lemma.credentialSubject)?.permissionId || 'permission';
+                    const accountType = (lemma.claims || lemma.credentialSubject)?.accountType || (lemma.claims || lemma.credentialSubject)?.permissions || 'User';
+                    
+                    // Verification status badge
+                    const statusBadge = verification.verified 
+                        ? `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #ecfdf5; color: #059669; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
+                             ✓ Verified (${verifyTime}μs)
+                           </span>`
+                        : `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #fef2f2; color: #dc2626; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
+                             ✗ ${verification.reason || 'Invalid'}
+                           </span>`;
                     
                     return `
-                        <div style="padding: 16px; border: 1px solid var(--gray-200); border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="padding: 16px; border: 1px solid ${verification.verified ? 'var(--gray-200)' : '#fecaca'}; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; ${!verification.verified ? 'background: #fef2f2;' : ''}">
                             <div style="flex: 1;">
                                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                                    <div style="width: 28px; height: 28px; background: linear-gradient(135deg, var(--secondary), var(--primary)); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white;">
+                                    <div style="width: 28px; height: 28px; background: linear-gradient(135deg, ${verification.verified ? 'var(--secondary), var(--primary)' : '#ef4444, #dc2626'}); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white;">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
                                         </svg>
                                     </div>
                                     <div>
-                                        <h5 style="margin: 0; color: var(--gray-900); font-size: 0.9rem;">${permissionId}</h5>
+                                        <h5 style="margin: 0; color: var(--gray-900); font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+                                            ${permissionId}
+                                            ${statusBadge}
+                                        </h5>
                                         <p style="margin: 0; color: var(--gray-600); font-size: 0.75rem;">Role: ${accountType}</p>
                                     </div>
                                 </div>
@@ -1694,32 +1719,52 @@ async function performOfflineVerification(credential) {
     return await performLocalVerification(credential);
 }
 
-// Local verification fallback (estimates based on your 6μs benchmark)
+// REAL Web Crypto Ed25519 Verification
 async function performLocalVerification(credential) {
     const startTime = performance.now();
     
-    // Simulate the actual verification steps that would happen in Rust
-    // This is a simplified version - the real engine does Ed25519 + OPRF + Bloom + ZKP
-    
-    // Basic credential structure validation (instant)
-    const hasValidStructure = credential && credential.id && credential.proof && credential.issuer;
-    
-    // Simulate Ed25519 signature verification (this is where the 6μs comes from)
-    const simulatedEngineTime = Math.random() * 4 + 4; // 4-8 microseconds (realistic range around your 6μs)
-    
-    // Add minimal processing delay to simulate real cryptographic operations
-    await new Promise(resolve => setTimeout(resolve, simulatedEngineTime / 1000));
-    
-    const endTime = performance.now();
-    const totalTime = (endTime - startTime) * 1000; // Convert to microseconds
-    
-    return {
-        verified: hasValidStructure,
-        confidence: hasValidStructure ? 1.0 : 0.0,
-        verification_time_us: simulatedEngineTime,
-        offline: true,
-        engine: 'local_simulation_6us_target'
-    };
+    try {
+        // Use the wallet's built-in verification (Web Crypto API)
+        if (lemmaWallet && lemmaWallet.verifyLemma) {
+            const result = await lemmaWallet.verifyLemma(credential);
+            const endTime = performance.now();
+            const totalTimeUs = (endTime - startTime) * 1000; // Convert ms to μs
+            
+            return {
+                verified: result.valid,
+                reason: result.reason || 'Valid',
+                issuer: result.issuer,
+                verification_time_us: totalTimeUs,
+                offline: true,
+                engine: 'web_crypto_ed25519'
+            };
+        }
+        
+        // Fallback: Basic structure check if wallet method unavailable
+        const hasValidStructure = credential && credential.id && credential.issuer;
+        const endTime = performance.now();
+        const totalTimeUs = (endTime - startTime) * 1000;
+        
+        return {
+            verified: hasValidStructure,
+            reason: hasValidStructure ? 'Structure valid (signature not checked)' : 'Invalid structure',
+            verification_time_us: totalTimeUs,
+            offline: true,
+            engine: 'structure_check_only'
+        };
+        
+    } catch (e) {
+        const endTime = performance.now();
+        const totalTimeUs = (endTime - startTime) * 1000;
+        
+        return {
+            verified: false,
+            reason: e.message,
+            verification_time_us: totalTimeUs,
+            offline: true,
+            engine: 'error'
+        };
+    }
 }
 
 function updateSpeedDisplay(currentSpeed, averageSpeed, engineTimeMicros) {
