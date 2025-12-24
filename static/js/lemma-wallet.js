@@ -670,13 +670,59 @@ class LemmaWallet {
     // ========================================
     // LOCAL VERIFICATION
     // ========================================
+    
+    // Cache for credentials whose signatures have been verified
+    _verifiedSignatures = new Set();
 
     /**
-     * Verify a lemma locally using cached issuer public key
-     * Checks: signature, expiration, revocation (all local)
+     * Quick verify - checks only expiration and revocation (skips signature if already verified)
+     * Use this for repeated checks on the same credential
+     * ~50μs vs ~1000μs for full verification
      */
-    async verifyLemma(lemma) {
+    async quickVerify(lemma) {
         await this.init();
+        
+        const startTime = performance.now();
+        
+        // 1. Check revocation (local cache)
+        const revocationStatus = await this.isRevoked(lemma.id);
+        if (revocationStatus.revoked) {
+            return { valid: false, reason: 'Revoked', quickVerify: true };
+        }
+        
+        // 2. Check expiration
+        const expiredCheck = this._checkExpiration(lemma);
+        if (!expiredCheck.valid) {
+            return { valid: false, reason: 'Expired', quickVerify: true };
+        }
+        
+        // 3. Check if signature was previously verified
+        const signatureVerified = this._verifiedSignatures.has(lemma.id);
+        
+        if (!signatureVerified) {
+            // Need full verification - signature not yet checked
+            return await this.verifyLemma(lemma);
+        }
+        
+        const verifyTime = ((performance.now() - startTime) * 1000).toFixed(1);
+        
+        return {
+            valid: true,
+            quickVerify: true,
+            signatureCached: true,
+            verifyTimeUs: verifyTime,
+            revocationUnchecked: revocationStatus.unchecked
+        };
+    }
+
+    /**
+     * Full verify - includes Ed25519 signature verification
+     * Result is cached so subsequent quickVerify calls skip crypto
+     */
+    async verifyLemma(lemma, forceSignatureCheck = false) {
+        await this.init();
+        
+        const startTime = performance.now();
 
         // 1. Check revocation (local cache)
         const revocationStatus = await this.isRevoked(lemma.id);
@@ -684,24 +730,38 @@ class LemmaWallet {
             return { valid: false, reason: 'Revoked' };
         }
 
-        // 2. Get public key - either from stored issuer, embedded info, or DID itself
+        // 2. Check expiration
+        const expiredCheck = this._checkExpiration(lemma);
+        if (!expiredCheck.valid) {
+            return { valid: false, reason: 'Expired' };
+        }
+        
+        // 3. Check if we can skip signature verification
+        if (!forceSignatureCheck && this._verifiedSignatures.has(lemma.id)) {
+            const verifyTime = ((performance.now() - startTime) * 1000).toFixed(1);
+            return {
+                valid: true,
+                signatureCached: true,
+                verifyTimeUs: verifyTime,
+                revocationUnchecked: revocationStatus.unchecked
+            };
+        }
+
+        // 4. Get public key
         let publicKey = null;
         let issuerName = lemma.issuer;
         let issuerVerified = false;
         
-        // Try stored issuer first
         const storedIssuer = await this.getIssuer(lemma.issuer);
         if (storedIssuer?.publicKey) {
             publicKey = storedIssuer.publicKey;
             issuerName = storedIssuer.name || lemma.issuer;
             issuerVerified = storedIssuer.verified || false;
         }
-        // Try embedded issuer info
         else if (lemma.issuerInfo?.publicKey) {
             publicKey = lemma.issuerInfo.publicKey;
             issuerName = lemma.issuerInfo.name || lemma.issuer;
             issuerVerified = lemma.issuerInfo.verified || false;
-            // Cache for next time
             await this.addIssuer({
                 did: lemma.issuer,
                 publicKey: publicKey,
@@ -709,13 +769,12 @@ class LemmaWallet {
                 verified: issuerVerified
             });
         }
-        // Extract from DID format: did:lemma:{public_key_hex}
         else if (lemma.issuer && lemma.issuer.startsWith('did:lemma:')) {
             const didParts = lemma.issuer.split(':');
             if (didParts.length === 3 && /^[0-9a-fA-F]{64}$/.test(didParts[2])) {
-                publicKey = didParts[2]; // The hex public key
+                publicKey = didParts[2];
                 issuerName = lemma.issuer;
-                issuerVerified = true; // DID-embedded keys are self-verifying
+                issuerVerified = true;
             }
         }
         
@@ -723,41 +782,62 @@ class LemmaWallet {
             return { valid: false, reason: 'No public key available' };
         }
 
-        // 3. Check expiration
-        const expiresAt = lemma.expiresAt || lemma.expirationDate || lemma.expires_at;
-        if (expiresAt) {
-            let expiryTime;
-            if (typeof expiresAt === 'string') {
-                expiryTime = new Date(expiresAt).getTime();
-            } else if (typeof expiresAt === 'number') {
-                expiryTime = expiresAt < 4102444800 ? expiresAt * 1000 : expiresAt;
-            } else {
-                expiryTime = Date.now() + 1;
-            }
-            
-            if (expiryTime < Date.now()) {
-                return { valid: false, reason: 'Expired' };
-            }
-        }
-
-        // 4. Verify Ed25519 signature
+        // 5. Verify Ed25519 signature
         try {
             const isValid = await this._verifyLemmaSignature(lemma, publicKey);
             if (!isValid) {
                 return { valid: false, reason: 'Invalid signature' };
             }
+            
+            // Cache successful verification
+            this._verifiedSignatures.add(lemma.id);
+            
         } catch (e) {
             console.warn('Signature verification error:', e.message);
             return { valid: false, reason: 'Verification error: ' + e.message };
         }
+
+        const verifyTime = ((performance.now() - startTime) * 1000).toFixed(1);
 
         return {
             valid: true,
             issuer: issuerName,
             verified: issuerVerified,
             claims: lemma.claims || lemma.credentialSubject,
-            revocationUnchecked: revocationStatus.unchecked
+            revocationUnchecked: revocationStatus.unchecked,
+            verifyTimeUs: verifyTime,
+            signatureCached: false
         };
+    }
+    
+    /**
+     * Helper to check expiration
+     */
+    _checkExpiration(lemma) {
+        const expiresAt = lemma.expiresAt || lemma.expirationDate || lemma.expires_at;
+        if (!expiresAt) return { valid: true };
+        
+        let expiryTime;
+        if (typeof expiresAt === 'string') {
+            expiryTime = new Date(expiresAt).getTime();
+        } else if (typeof expiresAt === 'number') {
+            expiryTime = expiresAt < 4102444800 ? expiresAt * 1000 : expiresAt;
+        } else {
+            return { valid: true };
+        }
+        
+        return { valid: expiryTime >= Date.now() };
+    }
+    
+    /**
+     * Clear verification cache (use if credential might have been modified)
+     */
+    clearVerificationCache(credentialId = null) {
+        if (credentialId) {
+            this._verifiedSignatures.delete(credentialId);
+        } else {
+            this._verifiedSignatures.clear();
+        }
     }
 
     // ========================================
