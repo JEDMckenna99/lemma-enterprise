@@ -17,12 +17,12 @@
     <!-- Wallet scripts already loaded in layout.html, don't load again -->
     
     <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1109" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1109" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1110" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1110" data-cfasync="false"></script>
     
     <!-- Message Constructor & WASM Verifier (for client-side verification) -->
-    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1109" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1109" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1110" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1110" data-cfasync="false"></script>
     
     <!-- Session-Free Auth already loaded in layout.html -->
     <style>
@@ -681,13 +681,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Shield disabled on wallet page - users need direct access to view credentials
         console.log('ℹ️ Shield protection disabled on wallet page (low-risk, need wallet access)');
         
-        // Show the wallet UI immediately (no Shield blocking)
-        const walletMain = document.querySelector('.wallet-main');
-        if (walletMain) {
-            walletMain.style.display = 'block';
-        }
-        
-        // Check if wallet needs passkey unlock
+        // DON'T show wallet UI until user unlocks with passkey
+        // checkAndUnlockWallet will show appropriate UI based on state
         await checkAndUnlockWallet();
         
         // Set up periodic refresh (only if unlocked)
@@ -719,6 +714,13 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 async function checkAndUnlockWallet() {
     const listContainer = document.getElementById('credential-list');
+    const walletHeader = document.querySelector('.wallet-header');
+    const walletMain = document.querySelector('.wallet-main');
+    
+    // Always start with content hidden
+    if (walletHeader) walletHeader.style.display = 'none';
+    if (walletMain) walletMain.style.display = 'none';
+    if (listContainer) listContainer.style.display = 'block';
     
     try {
         // Check if wallet has a passkey registered
@@ -733,24 +735,32 @@ async function checkAndUnlockWallet() {
                 return;
             }
             
-            // Show unlock prompt
+            // Show unlock prompt (wallet content stays hidden)
             if (listContainer) {
                 listContainer.innerHTML = `
-                    <div style="padding: 48px; text-align: center;">
-                        <div style="font-size: 48px; margin-bottom: 16px;">🔐</div>
-                        <h3 style="margin-bottom: 12px; color: var(--gray-800);">Wallet Locked</h3>
-                        <p style="color: var(--gray-600); margin-bottom: 24px;">
-                            Use your passkey to unlock and view your credentials
+                    <div style="padding: 64px 24px; text-align: center; max-width: 400px; margin: 0 auto;">
+                        <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 36px;">
+                            🔐
+                        </div>
+                        <h2 style="margin-bottom: 12px; color: var(--gray-900); font-size: 1.5rem;">Wallet Locked</h2>
+                        <p style="color: var(--gray-600); margin-bottom: 32px; line-height: 1.6;">
+                            Your credentials are protected. Authenticate with your passkey to view and manage your wallet.
                         </p>
                         <button onclick="unlockWalletWithPasskey()" class="btn-primary" style="
                             padding: 16px 32px;
                             font-size: 1.1rem;
                             display: inline-flex;
                             align-items: center;
-                            gap: 8px;
+                            gap: 12px;
+                            width: 100%;
+                            justify-content: center;
                         ">
-                            🔓 Unlock with Passkey
+                            <span style="font-size: 20px;">👆</span>
+                            Unlock with Passkey
                         </button>
+                        <p style="margin-top: 16px; font-size: 0.85rem; color: var(--gray-500);">
+                            Uses Face ID, fingerprint, or device PIN
+                        </p>
                     </div>
                 `;
             }
@@ -760,21 +770,26 @@ async function checkAndUnlockWallet() {
             
             if (listContainer) {
                 listContainer.innerHTML = `
-                    <div style="padding: 48px; text-align: center;">
-                        <div style="font-size: 48px; margin-bottom: 16px;">🔐</div>
-                        <h3 style="margin-bottom: 12px; color: var(--gray-800);">Secure Your Wallet</h3>
-                        <p style="color: var(--gray-600); margin-bottom: 24px; max-width: 400px; margin-left: auto; margin-right: auto;">
-                            Set up passkey protection to secure your credentials with biometric authentication (Face ID, fingerprint, or Windows Hello).
+                    <div style="padding: 64px 24px; text-align: center; max-width: 450px; margin: 0 auto;">
+                        <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 36px;">
+                            🛡️
+                        </div>
+                        <h2 style="margin-bottom: 12px; color: var(--gray-900); font-size: 1.5rem;">Secure Your Wallet</h2>
+                        <p style="color: var(--gray-600); margin-bottom: 32px; line-height: 1.6;">
+                            Protect your credentials with biometric authentication. Set up a passkey using Face ID, fingerprint, or Windows Hello.
                         </p>
-                        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
                             <button onclick="setupPasskeyProtection()" class="btn-primary" style="
                                 padding: 16px 32px;
                                 font-size: 1.1rem;
                                 display: inline-flex;
                                 align-items: center;
-                                gap: 8px;
+                                gap: 12px;
+                                width: 100%;
+                                justify-content: center;
                             ">
-                                🔐 Set Up Passkey
+                                <span style="font-size: 20px;">🔐</span>
+                                Set Up Passkey Protection
                             </button>
                             <button onclick="skipPasskeySetup()" class="btn-secondary" style="
                                 padding: 16px 32px;
