@@ -838,12 +838,61 @@ class LemmaWallet {
         }
     }
 
-    async _verifyLemmaSignature(lemma, publicKeyB64) {
+    async _verifyLemmaSignature(lemma, publicKey) {
         // Ed25519 signature verification
         // Uses Web Crypto API (Ed25519 support varies by browser)
         try {
-            const publicKeyBuffer = this._base64urlToBuffer(publicKeyB64);
-            const signatureBuffer = this._base64urlToBuffer(lemma.signature);
+            // Detect and convert public key format
+            // Ed25519 public key is always 32 bytes (256 bits)
+            let publicKeyBuffer;
+            if (typeof publicKey === 'string') {
+                if (/^[0-9a-fA-F]{64}$/.test(publicKey)) {
+                    // Hex format (64 hex chars = 32 bytes)
+                    publicKeyBuffer = new Uint8Array(32);
+                    for (let i = 0; i < 32; i++) {
+                        publicKeyBuffer[i] = parseInt(publicKey.substr(i * 2, 2), 16);
+                    }
+                } else if (publicKey.length >= 40 && publicKey.length <= 50) {
+                    // Base64 or Base64url (32 bytes = ~43 chars in base64)
+                    publicKeyBuffer = this._base64urlToBuffer(publicKey);
+                } else {
+                    // Try base64url as fallback
+                    publicKeyBuffer = this._base64urlToBuffer(publicKey);
+                }
+            } else if (publicKey instanceof Uint8Array) {
+                publicKeyBuffer = publicKey;
+            } else {
+                throw new Error('Unknown public key format');
+            }
+            
+            // Validate key length
+            if (publicKeyBuffer.length !== 32) {
+                console.warn(`Ed25519 key wrong length: ${publicKeyBuffer.length} bytes (expected 32)`);
+                // Try to extract 32 bytes if possible
+                if (publicKeyBuffer.length > 32) {
+                    publicKeyBuffer = publicKeyBuffer.slice(0, 32);
+                } else {
+                    throw new Error(`Invalid Ed25519 key length: ${publicKeyBuffer.length}`);
+                }
+            }
+            
+            // Detect and convert signature format
+            let signatureBuffer;
+            const sig = lemma.signature;
+            if (typeof sig === 'string') {
+                if (/^[0-9a-fA-F]{128}$/.test(sig)) {
+                    // Hex format (128 hex chars = 64 bytes)
+                    signatureBuffer = new Uint8Array(64);
+                    for (let i = 0; i < 64; i++) {
+                        signatureBuffer[i] = parseInt(sig.substr(i * 2, 2), 16);
+                    }
+                } else {
+                    // Base64/Base64url
+                    signatureBuffer = this._base64urlToBuffer(sig);
+                }
+            } else {
+                signatureBuffer = new Uint8Array(sig);
+            }
             
             // Create message to verify (canonical form without signature)
             const { signature, ...lemmaWithoutSig } = lemma;
