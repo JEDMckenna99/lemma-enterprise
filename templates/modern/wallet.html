@@ -17,12 +17,12 @@
     <!-- Wallet scripts already loaded in layout.html, don't load again -->
     
     <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1119" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1119" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1120" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1120" data-cfasync="false"></script>
     
     <!-- Message Constructor & WASM Verifier (for client-side verification) -->
-    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1119" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1119" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1120" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1120" data-cfasync="false"></script>
     
     <!-- Session-Free Auth already loaded in layout.html -->
     <style>
@@ -1662,7 +1662,7 @@ async function testVerificationSpeed() {
     speedDisplay.textContent = '⏱️';
     
     try {
-        // Test pure offline Rust engine verification speed
+        // Test pure offline Web Crypto verification speed
         if (lemmaWallet && lemmaWallet.isReady) {
             const credentials = await lemmaWallet.getCredentials();
             
@@ -1690,7 +1690,7 @@ async function testVerificationSpeed() {
                 updateSpeedDisplay(durationMs, average, engineTime);
                 updateLastCheckTime();
                 
-                console.log(`⚡ Rust Engine Verification: ${engineTime.toFixed(1)}μs (${durationMs.toFixed(3)}ms)`);
+                console.log(`⚡ Web Crypto Ed25519 Verification: ${engineTime.toFixed(1)}μs (${durationMs.toFixed(3)}ms)`);
                 
             } else {
                 throw new Error('No credentials available for speed testing');
@@ -1710,7 +1710,7 @@ async function testVerificationSpeed() {
     }
 }
 
-// Direct offline verification using the Rust engine
+// Direct offline verification using Web Crypto Ed25519
 async function performOfflineVerification(credential) {
     const startTime = performance.now();
     
@@ -1775,7 +1775,7 @@ function updateSpeedDisplay(currentSpeed, averageSpeed, engineTimeMicros) {
     let color = 'var(--success)'; // Default to green for sub-millisecond performance
     
     if (engineTimeMicros) {
-        // Show the actual Rust engine verification time
+        // Show the actual Web Crypto verification time
         if (engineTimeMicros < 10) {
             displayText = `${engineTimeMicros.toFixed(1)}μs`;
             color = 'var(--success)'; // Excellent - under 10μs
@@ -1822,7 +1822,7 @@ function updateSpeedDisplay(currentSpeed, averageSpeed, engineTimeMicros) {
             speedDisplay.title = `Average: ${avgEngine.toFixed(1)}μs (${speedTestHistory.length} tests)`;
         }
     } else if (engineTimeMicros) {
-        speedDisplay.title = `Pure Rust engine verification time: ${engineTimeMicros.toFixed(1)}μs`;
+        speedDisplay.title = `Web Crypto Ed25519 verification: ${engineTimeMicros.toFixed(1)}μs`;
     }
 }
 
