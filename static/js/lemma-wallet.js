@@ -854,42 +854,56 @@ class LemmaWallet {
         }
     }
 
+    // Cache for imported CryptoKeys (avoids re-import overhead)
+    _cryptoKeyCache = new Map();
+    
     async _verifyLemmaSignature(lemma, publicKey) {
-        // Ed25519 signature verification
-        // MUST match the Rust engine's signing message construction:
-        // SHA-256(id + issuer + subject + issued_at(LE) + expires_at(LE) + sorted_claims)
+        // Ed25519 signature verification with key caching
+        // MUST match the Rust engine's signing message construction
         try {
-            // Detect and convert public key format
-            let publicKeyBuffer;
-            if (typeof publicKey === 'string') {
-                if (/^[0-9a-fA-F]{64}$/.test(publicKey)) {
-                    // Hex format (64 hex chars = 32 bytes)
-                    publicKeyBuffer = new Uint8Array(32);
-                    for (let i = 0; i < 32; i++) {
-                        publicKeyBuffer[i] = parseInt(publicKey.substr(i * 2, 2), 16);
+            // Get or create cached CryptoKey
+            let cryptoKey = this._cryptoKeyCache.get(publicKey);
+            
+            if (!cryptoKey) {
+                // Detect and convert public key format
+                let publicKeyBuffer;
+                if (typeof publicKey === 'string') {
+                    if (/^[0-9a-fA-F]{64}$/.test(publicKey)) {
+                        // Hex format (64 hex chars = 32 bytes)
+                        publicKeyBuffer = new Uint8Array(32);
+                        for (let i = 0; i < 32; i++) {
+                            publicKeyBuffer[i] = parseInt(publicKey.substr(i * 2, 2), 16);
+                        }
+                    } else {
+                        publicKeyBuffer = this._base64urlToBuffer(publicKey);
                     }
+                } else if (publicKey instanceof Uint8Array) {
+                    publicKeyBuffer = publicKey;
                 } else {
-                    publicKeyBuffer = this._base64urlToBuffer(publicKey);
+                    throw new Error('Unknown public key format');
                 }
-            } else if (publicKey instanceof Uint8Array) {
-                publicKeyBuffer = publicKey;
-            } else {
-                throw new Error('Unknown public key format');
+                
+                if (publicKeyBuffer.length !== 32) {
+                    throw new Error(`Invalid Ed25519 key length: ${publicKeyBuffer.length}`);
+                }
+
+                cryptoKey = await crypto.subtle.importKey(
+                    'raw',
+                    publicKeyBuffer,
+                    { name: 'Ed25519' },
+                    false,
+                    ['verify']
+                );
+                
+                // Cache for future verifications
+                this._cryptoKeyCache.set(publicKey, cryptoKey);
             }
-            
-            if (publicKeyBuffer.length !== 32) {
-                throw new Error(`Invalid Ed25519 key length: ${publicKeyBuffer.length}`);
-            }
-            
-            console.log('🔐 Public key (hex):', Array.from(publicKeyBuffer).map(b => b.toString(16).padStart(2, '0')).join(''));
             
             // Get signature from proof object (W3C format)
             const sig = lemma.proof?.signatureValue || lemma.signature;
             if (!sig) {
                 throw new Error('No signature found in credential');
             }
-            
-            console.log('🔐 Signature from credential:', sig);
             
             // Detect and convert signature format
             let signatureBuffer;
@@ -907,33 +921,15 @@ class LemmaWallet {
                 signatureBuffer = new Uint8Array(sig);
             }
             
-            console.log('🔐 Signature bytes (first 16):', Array.from(signatureBuffer.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(''));
-            
             // Create the SAME message the Rust engine signs
-            // This is a SHA-256 hash of specific fields in specific order
             const message = await this._createVerificationMessage(lemma);
-            
-            console.log('🔐 Message hash to verify:', Array.from(message).map(b => b.toString(16).padStart(2, '0')).join(''));
 
-            const cryptoKey = await crypto.subtle.importKey(
-                'raw',
-                publicKeyBuffer,
-                { name: 'Ed25519' },
-                false,
-                ['verify']
-            );
-            
-            console.log('🔐 CryptoKey imported successfully');
-
-            const result = await crypto.subtle.verify(
+            return await crypto.subtle.verify(
                 'Ed25519',
                 cryptoKey,
                 signatureBuffer,
                 message
             );
-            
-            console.log('🔐 Verification result:', result);
-            return result;
         } catch (e) {
             console.error('Lemma verification error:', e);
             return false;
@@ -947,54 +943,35 @@ class LemmaWallet {
         const encoder = new TextEncoder();
         const parts = [];
         
-        // Debug logging
-        console.log('🔍 Creating verification message for:', {
-            id: credential.id,
-            issuer: credential.issuer,
-            subject: credential.subject,
-            issuanceDate: credential.issuanceDate,
-            expirationDate: credential.expirationDate
-        });
-        
-        // 1. Credential ID (string bytes)
+        // 1. Credential ID
         parts.push(encoder.encode(credential.id));
         
-        // 2. Issuer DID (string bytes)
+        // 2. Issuer DID
         parts.push(encoder.encode(credential.issuer));
         
-        // 3. Subject (string bytes)
+        // 3. Subject
         parts.push(encoder.encode(credential.subject));
         
-        // 4. Issued at - Rust uses issuanceDate (u64 Unix timestamp)
-        // Priority: issuanceDate (Rust W3C format) > issued_at > issuedAt
+        // 4. Issued at (u64 little-endian)
         const issuedAtRaw = credential.issuanceDate ?? credential.issued_at ?? credential.issuedAt;
-        const issuedAt = this._getTimestampU64(issuedAtRaw);
-        console.log('🔍 issued_at:', issuedAtRaw, '→', issuedAt);
-        parts.push(this._u64ToLittleEndian(issuedAt));
+        parts.push(this._u64ToLittleEndian(this._getTimestampU64(issuedAtRaw)));
         
-        // 5. Expires at - Rust uses expirationDate (u64, optional)
+        // 5. Expires at (u64 little-endian, optional)
         const expiresAtRaw = credential.expirationDate ?? credential.expires_at ?? credential.expiresAt;
         if (expiresAtRaw !== undefined && expiresAtRaw !== null) {
-            const expiresAt = this._getTimestampU64(expiresAtRaw);
-            console.log('🔍 expires_at:', expiresAtRaw, '→', expiresAt);
-            parts.push(this._u64ToLittleEndian(expiresAt));
+            parts.push(this._u64ToLittleEndian(this._getTimestampU64(expiresAtRaw)));
         }
         
-        // 6. Claims in sorted order (key bytes + JSON value bytes)
-        // Rust uses credentialSubject, JavaScript might store as claims
+        // 6. Claims in sorted order
         const claims = credential.credentialSubject || credential.claims || {};
         const sortedKeys = Object.keys(claims).sort();
-        console.log('🔍 Claims keys (sorted):', sortedKeys);
         
         for (const key of sortedKeys) {
             parts.push(encoder.encode(key));
-            // Rust's serde_json::to_string wraps strings in quotes
-            const valueJson = JSON.stringify(claims[key]);
-            console.log(`🔍 Claim ${key}:`, valueJson);
-            parts.push(encoder.encode(valueJson));
+            parts.push(encoder.encode(JSON.stringify(claims[key])));
         }
         
-        // Concatenate all parts
+        // Concatenate and hash
         const totalLength = parts.reduce((sum, arr) => sum + arr.length, 0);
         const combined = new Uint8Array(totalLength);
         let offset = 0;
@@ -1003,13 +980,7 @@ class LemmaWallet {
             offset += part.length;
         }
         
-        // SHA-256 hash
-        const hashBuffer = await crypto.subtle.digest('SHA-256', combined);
-        const hashArray = new Uint8Array(hashBuffer);
-        console.log('🔍 Message hash (first 8 bytes):', 
-            Array.from(hashArray.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(''));
-        
-        return hashArray;
+        return new Uint8Array(await crypto.subtle.digest('SHA-256', combined));
     }
     
     _getTimestampU64(value) {
