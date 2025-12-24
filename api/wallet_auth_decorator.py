@@ -274,3 +274,4 @@ def get_wallet_auth_script():
 })();
 </script>
 '''
+

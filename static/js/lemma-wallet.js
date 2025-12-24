@@ -684,21 +684,43 @@ class LemmaWallet {
             return { valid: false, reason: 'Revoked' };
         }
 
-        // 2. Get issuer's public key
-        const issuer = await this.getIssuer(lemma.issuer);
-        if (!issuer) {
-            // Try to use embedded issuer info
-            if (lemma.issuerInfo?.publicKey) {
-                // Cache for next time
-                await this.addIssuer({
-                    did: lemma.issuer,
-                    publicKey: lemma.issuerInfo.publicKey,
-                    name: lemma.issuerInfo.name || lemma.issuer,
-                    verified: lemma.issuerInfo.verified || false
-                });
-            } else {
-                return { valid: false, reason: 'Unknown issuer' };
+        // 2. Get public key - either from stored issuer, embedded info, or DID itself
+        let publicKey = null;
+        let issuerName = lemma.issuer;
+        let issuerVerified = false;
+        
+        // Try stored issuer first
+        const storedIssuer = await this.getIssuer(lemma.issuer);
+        if (storedIssuer?.publicKey) {
+            publicKey = storedIssuer.publicKey;
+            issuerName = storedIssuer.name || lemma.issuer;
+            issuerVerified = storedIssuer.verified || false;
+        }
+        // Try embedded issuer info
+        else if (lemma.issuerInfo?.publicKey) {
+            publicKey = lemma.issuerInfo.publicKey;
+            issuerName = lemma.issuerInfo.name || lemma.issuer;
+            issuerVerified = lemma.issuerInfo.verified || false;
+            // Cache for next time
+            await this.addIssuer({
+                did: lemma.issuer,
+                publicKey: publicKey,
+                name: issuerName,
+                verified: issuerVerified
+            });
+        }
+        // Extract from DID format: did:lemma:{public_key_hex}
+        else if (lemma.issuer && lemma.issuer.startsWith('did:lemma:')) {
+            const didParts = lemma.issuer.split(':');
+            if (didParts.length === 3 && /^[0-9a-fA-F]{64}$/.test(didParts[2])) {
+                publicKey = didParts[2]; // The hex public key
+                issuerName = lemma.issuer;
+                issuerVerified = true; // DID-embedded keys are self-verifying
             }
+        }
+        
+        if (!publicKey) {
+            return { valid: false, reason: 'No public key available' };
         }
 
         // 3. Check expiration
@@ -706,14 +728,11 @@ class LemmaWallet {
         if (expiresAt) {
             let expiryTime;
             if (typeof expiresAt === 'string') {
-                // ISO date string like "2027-12-22T00:00:00Z"
                 expiryTime = new Date(expiresAt).getTime();
             } else if (typeof expiresAt === 'number') {
-                // Could be seconds or milliseconds - check magnitude
-                // If less than year 2100 in seconds (~4102444800), assume seconds
                 expiryTime = expiresAt < 4102444800 ? expiresAt * 1000 : expiresAt;
             } else {
-                expiryTime = Date.now() + 1; // Unknown format, assume valid
+                expiryTime = Date.now() + 1;
             }
             
             if (expiryTime < Date.now()) {
@@ -721,25 +740,22 @@ class LemmaWallet {
             }
         }
 
-        // 4. Verify signature (optional - may fail if issuer key not available)
-        const issuerData = issuer || await this.getIssuer(lemma.issuer);
-        if (issuerData?.publicKey) {
-            try {
-                const isValid = await this._verifyLemmaSignature(lemma, issuerData.publicKey);
-                if (!isValid) {
-                    return { valid: false, reason: 'Invalid signature' };
-                }
-            } catch (e) {
-                // Signature verification failed - might be format issue
-                console.warn('Signature verification skipped:', e.message);
+        // 4. Verify Ed25519 signature
+        try {
+            const isValid = await this._verifyLemmaSignature(lemma, publicKey);
+            if (!isValid) {
+                return { valid: false, reason: 'Invalid signature' };
             }
+        } catch (e) {
+            console.warn('Signature verification error:', e.message);
+            return { valid: false, reason: 'Verification error: ' + e.message };
         }
 
         return {
             valid: true,
-            issuer: issuerData?.name || lemma.issuer,
-            verified: issuerData?.verified || false,
-            claims: lemma.claims,
+            issuer: issuerName,
+            verified: issuerVerified,
+            claims: lemma.claims || lemma.credentialSubject,
             revocationUnchecked: revocationStatus.unchecked
         };
     }
@@ -840,10 +856,10 @@ class LemmaWallet {
 
     async _verifyLemmaSignature(lemma, publicKey) {
         // Ed25519 signature verification
-        // Uses Web Crypto API (Ed25519 support varies by browser)
+        // MUST match the Rust engine's signing message construction:
+        // SHA-256(id + issuer + subject + issued_at(LE) + expires_at(LE) + sorted_claims)
         try {
             // Detect and convert public key format
-            // Ed25519 public key is always 32 bytes (256 bits)
             let publicKeyBuffer;
             if (typeof publicKey === 'string') {
                 if (/^[0-9a-fA-F]{64}$/.test(publicKey)) {
@@ -852,11 +868,7 @@ class LemmaWallet {
                     for (let i = 0; i < 32; i++) {
                         publicKeyBuffer[i] = parseInt(publicKey.substr(i * 2, 2), 16);
                     }
-                } else if (publicKey.length >= 40 && publicKey.length <= 50) {
-                    // Base64 or Base64url (32 bytes = ~43 chars in base64)
-                    publicKeyBuffer = this._base64urlToBuffer(publicKey);
                 } else {
-                    // Try base64url as fallback
                     publicKeyBuffer = this._base64urlToBuffer(publicKey);
                 }
             } else if (publicKey instanceof Uint8Array) {
@@ -865,20 +877,18 @@ class LemmaWallet {
                 throw new Error('Unknown public key format');
             }
             
-            // Validate key length
             if (publicKeyBuffer.length !== 32) {
-                console.warn(`Ed25519 key wrong length: ${publicKeyBuffer.length} bytes (expected 32)`);
-                // Try to extract 32 bytes if possible
-                if (publicKeyBuffer.length > 32) {
-                    publicKeyBuffer = publicKeyBuffer.slice(0, 32);
-                } else {
-                    throw new Error(`Invalid Ed25519 key length: ${publicKeyBuffer.length}`);
-                }
+                throw new Error(`Invalid Ed25519 key length: ${publicKeyBuffer.length}`);
+            }
+            
+            // Get signature from proof object (W3C format)
+            const sig = lemma.proof?.signatureValue || lemma.signature;
+            if (!sig) {
+                throw new Error('No signature found in credential');
             }
             
             // Detect and convert signature format
             let signatureBuffer;
-            const sig = lemma.signature;
             if (typeof sig === 'string') {
                 if (/^[0-9a-fA-F]{128}$/.test(sig)) {
                     // Hex format (128 hex chars = 64 bytes)
@@ -887,16 +897,15 @@ class LemmaWallet {
                         signatureBuffer[i] = parseInt(sig.substr(i * 2, 2), 16);
                     }
                 } else {
-                    // Base64/Base64url
                     signatureBuffer = this._base64urlToBuffer(sig);
                 }
             } else {
                 signatureBuffer = new Uint8Array(sig);
             }
             
-            // Create message to verify (canonical form without signature)
-            const { signature, ...lemmaWithoutSig } = lemma;
-            const message = new TextEncoder().encode(JSON.stringify(lemmaWithoutSig));
+            // Create the SAME message the Rust engine signs
+            // This is a SHA-256 hash of specific fields in specific order
+            const message = await this._createVerificationMessage(lemma);
 
             const cryptoKey = await crypto.subtle.importKey(
                 'raw',
@@ -916,6 +925,103 @@ class LemmaWallet {
             console.error('Lemma verification error:', e);
             return false;
         }
+    }
+    
+    async _createVerificationMessage(credential) {
+        // Must EXACTLY match Rust's create_verification_message()
+        // SHA-256 hash of: id + issuer + subject + issued_at(LE u64) + expires_at(LE u64) + sorted_claims
+        
+        const encoder = new TextEncoder();
+        const parts = [];
+        
+        // Debug logging
+        console.log('🔍 Creating verification message for:', {
+            id: credential.id,
+            issuer: credential.issuer,
+            subject: credential.subject,
+            issuanceDate: credential.issuanceDate,
+            expirationDate: credential.expirationDate
+        });
+        
+        // 1. Credential ID (string bytes)
+        parts.push(encoder.encode(credential.id));
+        
+        // 2. Issuer DID (string bytes)
+        parts.push(encoder.encode(credential.issuer));
+        
+        // 3. Subject (string bytes)
+        parts.push(encoder.encode(credential.subject));
+        
+        // 4. Issued at - Rust uses issuanceDate (u64 Unix timestamp)
+        // Priority: issuanceDate (Rust W3C format) > issued_at > issuedAt
+        const issuedAtRaw = credential.issuanceDate ?? credential.issued_at ?? credential.issuedAt;
+        const issuedAt = this._getTimestampU64(issuedAtRaw);
+        console.log('🔍 issued_at:', issuedAtRaw, '→', issuedAt);
+        parts.push(this._u64ToLittleEndian(issuedAt));
+        
+        // 5. Expires at - Rust uses expirationDate (u64, optional)
+        const expiresAtRaw = credential.expirationDate ?? credential.expires_at ?? credential.expiresAt;
+        if (expiresAtRaw !== undefined && expiresAtRaw !== null) {
+            const expiresAt = this._getTimestampU64(expiresAtRaw);
+            console.log('🔍 expires_at:', expiresAtRaw, '→', expiresAt);
+            parts.push(this._u64ToLittleEndian(expiresAt));
+        }
+        
+        // 6. Claims in sorted order (key bytes + JSON value bytes)
+        // Rust uses credentialSubject, JavaScript might store as claims
+        const claims = credential.credentialSubject || credential.claims || {};
+        const sortedKeys = Object.keys(claims).sort();
+        console.log('🔍 Claims keys (sorted):', sortedKeys);
+        
+        for (const key of sortedKeys) {
+            parts.push(encoder.encode(key));
+            // Rust's serde_json::to_string wraps strings in quotes
+            const valueJson = JSON.stringify(claims[key]);
+            console.log(`🔍 Claim ${key}:`, valueJson);
+            parts.push(encoder.encode(valueJson));
+        }
+        
+        // Concatenate all parts
+        const totalLength = parts.reduce((sum, arr) => sum + arr.length, 0);
+        const combined = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const part of parts) {
+            combined.set(part, offset);
+            offset += part.length;
+        }
+        
+        // SHA-256 hash
+        const hashBuffer = await crypto.subtle.digest('SHA-256', combined);
+        const hashArray = new Uint8Array(hashBuffer);
+        console.log('🔍 Message hash (first 8 bytes):', 
+            Array.from(hashArray.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(''));
+        
+        return hashArray;
+    }
+    
+    _getTimestampU64(value) {
+        // Convert various timestamp formats to Unix seconds (u64)
+        if (typeof value === 'number') {
+            // If it's already a number, check if it's seconds or milliseconds
+            return value < 10000000000 ? value : Math.floor(value / 1000);
+        }
+        if (typeof value === 'string') {
+            // ISO date string
+            const ms = new Date(value).getTime();
+            return Math.floor(ms / 1000);
+        }
+        return 0;
+    }
+    
+    _u64ToLittleEndian(value) {
+        // Convert a number to 8-byte little-endian Uint8Array
+        const buffer = new Uint8Array(8);
+        let remaining = BigInt(value);
+        for (let i = 0; i < 8; i++) {
+            buffer[i] = Number(remaining & 0xFFn);
+            remaining >>= 8n;
+        }
+        return buffer;
     }
 
     // IndexedDB helpers
