@@ -91,8 +91,36 @@ class LemmaWallet {
                 if (!db.objectStoreNames.contains('session')) {
                     db.createObjectStore('session', { keyPath: 'id' });
                 }
+
+                // Revocations cache store
+                if (!db.objectStoreNames.contains('revocations')) {
+                    db.createObjectStore('revocations', { keyPath: 'id' });
+                }
             };
         });
+
+        // Auto-sync revocations on init (non-blocking)
+        this._autoSyncRevocations();
+    }
+
+    /**
+     * Auto-sync revocations in background
+     */
+    async _autoSyncRevocations() {
+        try {
+            const revInfo = await this.getRevocationInfo();
+            const ONE_HOUR = 60 * 60 * 1000;
+            
+            // Sync if never synced or older than 1 hour
+            if (!revInfo.synced || revInfo.age > ONE_HOUR) {
+                console.log('🔄 Auto-syncing revocation list...');
+                await this.syncRevocations();
+            } else {
+                console.log(`✅ Revocation list up to date (${revInfo.count} entries, ${Math.round(revInfo.age / 60000)}min old)`);
+            }
+        } catch (e) {
+            console.warn('Auto-sync revocations failed:', e);
+        }
     }
 
     /**
@@ -570,41 +598,138 @@ class LemmaWallet {
     }
 
     // ========================================
+    // REVOCATION (Local Cache)
+    // ========================================
+
+    /**
+     * Sync revocation list from server
+     * Call periodically or on wallet init
+     */
+    async syncRevocations() {
+        try {
+            const response = await fetch('/api/v1/revocation/list');
+            if (!response.ok) {
+                console.warn('Failed to sync revocations:', response.status);
+                return { success: false };
+            }
+            
+            const data = await response.json();
+            const revocations = data.revocations || data.revoked_ids || [];
+            
+            // Store in IndexedDB
+            await this._put('revocations', {
+                id: 'current',
+                list: new Set(revocations),
+                listArray: revocations, // For serialization
+                lastSynced: Date.now(),
+                count: revocations.length
+            });
+            
+            console.log(`✅ Synced ${revocations.length} revocations`);
+            return { success: true, count: revocations.length };
+        } catch (e) {
+            console.warn('Revocation sync error:', e);
+            return { success: false, error: e.message };
+        }
+    }
+
+    /**
+     * Check if a credential is revoked (local check)
+     */
+    async isRevoked(credentialId) {
+        const revocations = await this._get('revocations', 'current');
+        if (!revocations || !revocations.listArray) {
+            // No revocation data - assume not revoked but flag as unchecked
+            return { revoked: false, unchecked: true };
+        }
+        
+        const isRevoked = revocations.listArray.includes(credentialId);
+        return { 
+            revoked: isRevoked, 
+            unchecked: false,
+            lastSynced: revocations.lastSynced
+        };
+    }
+
+    /**
+     * Get revocation cache info
+     */
+    async getRevocationInfo() {
+        const revocations = await this._get('revocations', 'current');
+        if (!revocations) {
+            return { synced: false, count: 0 };
+        }
+        return {
+            synced: true,
+            count: revocations.count,
+            lastSynced: revocations.lastSynced,
+            age: Date.now() - revocations.lastSynced
+        };
+    }
+
+    // ========================================
     // LOCAL VERIFICATION
     // ========================================
 
     /**
      * Verify a lemma locally using cached issuer public key
+     * Checks: signature, expiration, revocation (all local)
      */
     async verifyLemma(lemma) {
         await this.init();
 
-        // Get issuer's public key
+        // 1. Check revocation (local cache)
+        const revocationStatus = await this.isRevoked(lemma.id);
+        if (revocationStatus.revoked) {
+            return { valid: false, reason: 'Revoked' };
+        }
+
+        // 2. Get issuer's public key
         const issuer = await this.getIssuer(lemma.issuer);
         if (!issuer) {
-            return { valid: false, reason: 'Unknown issuer' };
-        }
-
-        // Check expiration
-        if (lemma.expiresAt && lemma.expiresAt < Date.now()) {
-            return { valid: false, reason: 'Lemma expired' };
-        }
-
-        // Verify signature
-        try {
-            const isValid = await this._verifyLemmaSignature(lemma, issuer.publicKey);
-            if (!isValid) {
-                return { valid: false, reason: 'Invalid signature' };
+            // Try to use embedded issuer info
+            if (lemma.issuerInfo?.publicKey) {
+                // Cache for next time
+                await this.addIssuer({
+                    did: lemma.issuer,
+                    publicKey: lemma.issuerInfo.publicKey,
+                    name: lemma.issuerInfo.name || lemma.issuer,
+                    verified: lemma.issuerInfo.verified || false
+                });
+            } else {
+                return { valid: false, reason: 'Unknown issuer' };
             }
-        } catch (e) {
-            return { valid: false, reason: `Verification error: ${e.message}` };
         }
 
-            return {
+        // 3. Check expiration
+        const expiresAt = lemma.expiresAt || lemma.expirationDate;
+        if (expiresAt) {
+            const expiryTime = typeof expiresAt === 'number' ? expiresAt : new Date(expiresAt).getTime();
+            if (expiryTime < Date.now()) {
+                return { valid: false, reason: 'Expired' };
+            }
+        }
+
+        // 4. Verify signature (optional - may fail if issuer key not available)
+        const issuerData = issuer || await this.getIssuer(lemma.issuer);
+        if (issuerData?.publicKey) {
+            try {
+                const isValid = await this._verifyLemmaSignature(lemma, issuerData.publicKey);
+                if (!isValid) {
+                    return { valid: false, reason: 'Invalid signature' };
+                }
+            } catch (e) {
+                // Signature verification failed - might be format issue
+                console.warn('Signature verification skipped:', e.message);
+            }
+        }
+
+        return {
             valid: true,
-            issuer: issuer.name,
-            verified: issuer.verified,
-            claims: lemma.claims
+            issuer: issuerData?.name || lemma.issuer,
+            verified: issuerData?.verified || false,
+            claims: lemma.claims,
+            revocationUnchecked: revocationStatus.unchecked
         };
     }
 

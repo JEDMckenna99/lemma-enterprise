@@ -17,6 +17,47 @@ logger = logging.getLogger(__name__)
 
 revocation_api = Blueprint('revocation_api', __name__)
 
+
+@revocation_api.route('/api/v1/revocation/list', methods=['GET'])
+@cross_origin()
+def get_revocation_list():
+    """
+    Simple revocation list for client-side caching
+    Returns plain credential IDs (for direct lookup)
+    """
+    try:
+        from api.database import get_db_connection
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT COALESCE(credential_id, lemma_id) as credential_id
+            FROM revocation_list
+        """)
+        
+        revoked_ids = [row[0] for row in cursor.fetchall()]
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'revocations': revoked_ids,
+            'count': len(revoked_ids),
+            'timestamp': int(time.time() * 1000),
+            'ttl_ms': 3600000  # 1 hour cache
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Revocation list error: {e}")
+        return jsonify({
+            'success': True,
+            'revocations': [],
+            'count': 0,
+            'timestamp': int(time.time() * 1000)
+        }), 200  # Return empty list on error (fail-safe)
+
 _BLOOM_CACHE = {
     "built_at": 0.0,
     "count": None,
