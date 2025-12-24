@@ -17,12 +17,12 @@
     <!-- Wallet scripts already loaded in layout.html, don't load again -->
     
     <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1108" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1108" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1109" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1109" data-cfasync="false"></script>
     
     <!-- Message Constructor & WASM Verifier (for client-side verification) -->
-    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1108" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1108" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1109" data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1109" data-cfasync="false"></script>
     
     <!-- Session-Free Auth already loaded in layout.html -->
     <style>
@@ -1210,50 +1210,22 @@ async function debugWalletStorage() {
         return;
     }
     
-    console.log(`📊 Memory cache size: ${lemmaWallet.memoryCache.size}`);
-    console.log(`📊 Trusted DIDs: ${lemmaWallet.didRegistry.size}`);
+    // Get wallet info
+    const walletInfo = await lemmaWallet.getWalletInfo();
+    console.log('📊 Wallet info:', walletInfo);
     
-    // List all trusted DIDs
-    for (const [did, info] of lemmaWallet.didRegistry) {
-        console.log(`  - ${did} (${info.issuerInfo?.name})`);
-    }
+    // Get all credentials
+    const allCredentials = await lemmaWallet.getCredentials();
+    console.log(`📊 Total credentials: ${allCredentials.length}`);
     
-    // List all credentials in memory
-    console.log('\n📋 All credentials in memory:');
-    let count = 0;
-    for (const [id, cred] of lemmaWallet.memoryCache) {
-        count++;
-        console.log(`  ${count}. ${id}`);
-        console.log(`     Type: ${cred.packageType}`);
-        console.log(`     Email: ${cred.claims?.email || 'none'}`);
-        console.log(`     Permission: ${cred.claims?.permissionId || 'none'}`);
-        console.log(`     Is Human: ${cred.claims?.isHuman || 'none'}`);
-    }
-    
-    // Test credential retrieval
-    const identityCredentials = await lemmaWallet.getCredentials('identity');
-    const permissionCredentials = await lemmaWallet.getCredentials('permission');
-    
-    console.log(`\n📊 Retrieval test:`);
-    console.log(`  Identity: ${identityCredentials.length}`);
-    console.log(`  Permission: ${permissionCredentials.length}`);
-    
-    // Check localStorage directly
-    console.log('\n📊 Raw localStorage check:');
-    const rawStorage = localStorage.getItem('lemma_credentials');
-    if (rawStorage) {
-        try {
-            const parsed = JSON.parse(rawStorage);
-            console.log(`  localStorage has ${parsed.length} credentials`);
-            parsed.forEach((cred, i) => {
-                console.log(`    ${i + 1}. ${cred.packageType} - ${cred.id}`);
-            });
-        } catch (e) {
-            console.log('  localStorage data corrupted');
-        }
-    } else {
-        console.log('  No localStorage data found');
-    }
+    // List all credentials
+    console.log('\n📋 All credentials in wallet:');
+    allCredentials.forEach((cred, i) => {
+        console.log(`  ${i + 1}. ${cred.id}`);
+        console.log(`     Type: ${cred.packageType || cred.type}`);
+        console.log(`     Issuer: ${cred.issuer}`);
+        console.log(`     Claims:`, cred.claims || cred.credentialSubject);
+    });
 }
 
 // Enhanced Wallet Data Loading - Shows both PoH and Permission Lemmas
@@ -1275,18 +1247,21 @@ async function loadWalletData() {
         
         console.log('📦 Loading wallet data...');
 
-        // Get credentials by type from wallet
-        console.log('🔍 DEBUG: Getting credentials from wallet...');
-        console.log('🔍 DEBUG: Memory cache size:', lemmaWallet.memoryCache.size);
-        console.log('🔍 DEBUG: Memory cache contents:', Array.from(lemmaWallet.memoryCache.values()).map(c => ({
-            id: c.id,
-            packageType: c.packageType,
-            networkType: c.claims?.networkType || c.credentialSubject?.networkType,
-            siteId: c.claims?.siteId || c.credentialSubject?.siteId
-        })));
+        // Get all credentials from wallet
+        const allCredentials = await lemmaWallet.getCredentials();
+        console.log('🔍 DEBUG: All credentials from wallet:', allCredentials);
         
-        const pohCredentials = await lemmaWallet.getCredentials('identity');
-        const permissionCredentials = await lemmaWallet.getCredentials('permission');
+        // Filter by type
+        const pohCredentials = allCredentials.filter(c => {
+            const pkgType = c.packageType || c.type?.[1] || '';
+            return pkgType === 'identity' || pkgType === 'IdentityCredential' || 
+                   pkgType === 'poh' || pkgType === 'ProofOfHuman';
+        });
+        
+        const permissionCredentials = allCredentials.filter(c => {
+            const pkgType = c.packageType || c.type?.[1] || '';
+            return pkgType === 'permission' || pkgType === 'PermissionLemma';
+        });
         
         console.log('📊 Wallet contents:', {
             poh: pohCredentials.length,
