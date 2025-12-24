@@ -881,11 +881,15 @@ class LemmaWallet {
                 throw new Error(`Invalid Ed25519 key length: ${publicKeyBuffer.length}`);
             }
             
+            console.log('🔐 Public key (hex):', Array.from(publicKeyBuffer).map(b => b.toString(16).padStart(2, '0')).join(''));
+            
             // Get signature from proof object (W3C format)
             const sig = lemma.proof?.signatureValue || lemma.signature;
             if (!sig) {
                 throw new Error('No signature found in credential');
             }
+            
+            console.log('🔐 Signature from credential:', sig);
             
             // Detect and convert signature format
             let signatureBuffer;
@@ -903,9 +907,13 @@ class LemmaWallet {
                 signatureBuffer = new Uint8Array(sig);
             }
             
+            console.log('🔐 Signature bytes (first 16):', Array.from(signatureBuffer.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(''));
+            
             // Create the SAME message the Rust engine signs
             // This is a SHA-256 hash of specific fields in specific order
             const message = await this._createVerificationMessage(lemma);
+            
+            console.log('🔐 Message hash to verify:', Array.from(message).map(b => b.toString(16).padStart(2, '0')).join(''));
 
             const cryptoKey = await crypto.subtle.importKey(
                 'raw',
@@ -914,13 +922,18 @@ class LemmaWallet {
                 false,
                 ['verify']
             );
+            
+            console.log('🔐 CryptoKey imported successfully');
 
-            return await crypto.subtle.verify(
+            const result = await crypto.subtle.verify(
                 'Ed25519',
                 cryptoKey,
                 signatureBuffer,
                 message
             );
+            
+            console.log('🔐 Verification result:', result);
+            return result;
         } catch (e) {
             console.error('Lemma verification error:', e);
             return false;
