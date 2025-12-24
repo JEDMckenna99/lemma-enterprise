@@ -1290,7 +1290,7 @@ async function loadWalletData() {
         displayPohLemmas(pohCredentials);
         
         // Display permission credentials
-        displayPermissionLemmas(permissionCredentials);
+        await displayPermissionLemmas(permissionCredentials);
         
         // Show/hide join network section based on PoH credentials
         const joinSection = document.getElementById('join-network-section');
@@ -1375,7 +1375,7 @@ function displayPohLemmas(pohCredentials) {
 }
 
 // Display Permission Lemmas (Site-Specific Access)
-function displayPermissionLemmas(permissionLemmas) {
+async function displayPermissionLemmas(permissionLemmas) {
     const container = document.getElementById('permission-credentials-list');
     
     if (permissionLemmas.length === 0) {
