@@ -20,7 +20,7 @@ if (typeof window !== 'undefined' && window.LemmaWallet) {
 // ============================================
 
 const WALLET_DB_NAME = 'LemmaWallet';
-const WALLET_DB_VERSION = 1;
+const WALLET_DB_VERSION = 2;  // Incremented to add revocations store
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
 
 // Auth states
