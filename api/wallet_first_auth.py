@@ -298,3 +298,89 @@ def verify_wallet_session():
             'success': False,
             'error': str(e)
         }), 500
+
+
+@wallet_first_bp.route('/api/wallet-auth/debug-hash', methods=['POST'])
+@cross_origin()
+def debug_credential_hash():
+    """
+    Debug endpoint: returns the expected hash for a credential
+    Use this to compare with client-side hash calculation
+    """
+    try:
+        data = request.get_json() or {}
+        credential = data.get('credential')
+        
+        if not credential:
+            return jsonify({'success': False, 'error': 'No credential provided'}), 400
+        
+        from lemma_crypto import PyMinimalVerifier
+        import hashlib
+        import struct
+        
+        # Recreate the signing message the same way Rust does
+        hasher = hashlib.sha256()
+        
+        # 1. ID
+        hasher.update(credential['id'].encode('utf-8'))
+        
+        # 2. Issuer
+        hasher.update(credential['issuer'].encode('utf-8'))
+        
+        # 3. Subject
+        hasher.update(credential['subject'].encode('utf-8'))
+        
+        # 4. issued_at (little-endian u64)
+        issued_at = credential.get('issuanceDate', 0)
+        hasher.update(struct.pack('<Q', issued_at))
+        
+        # 5. expires_at (little-endian u64, if present)
+        expires_at = credential.get('expirationDate')
+        if expires_at is not None:
+            hasher.update(struct.pack('<Q', expires_at))
+        
+        # 6. Claims in sorted order
+        claims = credential.get('credentialSubject', credential.get('claims', {}))
+        sorted_keys = sorted(claims.keys())
+        
+        claim_details = []
+        for key in sorted_keys:
+            value = claims[key]
+            # Rust uses serde_json::to_string which wraps strings in quotes
+            import json
+            value_json = json.dumps(value)
+            hasher.update(key.encode('utf-8'))
+            hasher.update(value_json.encode('utf-8'))
+            claim_details.append({
+                'key': key,
+                'value_json': value_json,
+                'key_bytes': key.encode('utf-8').hex(),
+                'value_bytes': value_json.encode('utf-8').hex()
+            })
+        
+        expected_hash = hasher.hexdigest()
+        
+        return jsonify({
+            'success': True,
+            'expected_hash': expected_hash,
+            'debug': {
+                'id': credential['id'],
+                'issuer': credential['issuer'],
+                'subject': credential['subject'],
+                'issuanceDate': issued_at,
+                'issuanceDate_bytes': struct.pack('<Q', issued_at).hex(),
+                'expirationDate': expires_at,
+                'expirationDate_bytes': struct.pack('<Q', expires_at).hex() if expires_at else None,
+                'claims_keys': sorted_keys,
+                'claims_details': claim_details
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Debug hash failed: {e}")
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
