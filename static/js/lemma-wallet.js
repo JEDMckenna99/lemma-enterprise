@@ -702,9 +702,20 @@ class LemmaWallet {
         }
 
         // 3. Check expiration
-        const expiresAt = lemma.expiresAt || lemma.expirationDate;
+        const expiresAt = lemma.expiresAt || lemma.expirationDate || lemma.expires_at;
         if (expiresAt) {
-            const expiryTime = typeof expiresAt === 'number' ? expiresAt : new Date(expiresAt).getTime();
+            let expiryTime;
+            if (typeof expiresAt === 'string') {
+                // ISO date string like "2027-12-22T00:00:00Z"
+                expiryTime = new Date(expiresAt).getTime();
+            } else if (typeof expiresAt === 'number') {
+                // Could be seconds or milliseconds - check magnitude
+                // If less than year 2100 in seconds (~4102444800), assume seconds
+                expiryTime = expiresAt < 4102444800 ? expiresAt * 1000 : expiresAt;
+            } else {
+                expiryTime = Date.now() + 1; // Unknown format, assume valid
+            }
+            
             if (expiryTime < Date.now()) {
                 return { valid: false, reason: 'Expired' };
             }
