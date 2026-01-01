@@ -79,9 +79,18 @@ def get_or_create_user(email: str = None, passkey_credential_id: str = None) -> 
         db.close()
 
 
-def issue_permission_lemma(user_id: str, site_id: str = 'lemma.id', permissions: list = None) -> dict:
+def issue_permission_lemma(user_id: str, site_id: str = 'lemma.id', permissions: list = None, 
+                          granted_by: str = 'system', track_in_db: bool = True) -> dict:
     """
-    Issue a permission lemma for direct wallet storage
+    Issue a permission lemma for direct wallet storage.
+    Also tracks the grant in the database for admin management and revocation.
+    
+    Args:
+        user_id: User's DID
+        site_id: Site issuing the permission
+        permissions: List of permission strings
+        granted_by: Who granted this (for audit)
+        track_in_db: Whether to store in user_permissions table (default True)
     """
     try:
         # Import the IAM issuer (same issuer used across the platform)
@@ -91,12 +100,15 @@ def issue_permission_lemma(user_id: str, site_id: str = 'lemma.id', permissions:
         
         # Build claims - Rust expects all values to be strings
         perm_list = permissions or ['read', 'write']
+        issued_at = datetime.utcnow()
+        expires_at = issued_at + timedelta(days=30)
+        
         claims = {
             'type': 'permission',
             'siteId': site_id,
             'permissions': ','.join(perm_list),  # Convert list to comma-separated string
-            'issuedAt': datetime.utcnow().isoformat() + 'Z',
-            'expiresAt': (datetime.utcnow() + timedelta(days=30)).isoformat() + 'Z'
+            'issuedAt': issued_at.isoformat() + 'Z',
+            'expiresAt': expires_at.isoformat() + 'Z'
         }
         
         # Issue the credential
@@ -112,12 +124,74 @@ def issue_permission_lemma(user_id: str, site_id: str = 'lemma.id', permissions:
             'verified': True
         }
         
+        # Track the grant in database for admin management and revocation
+        if track_in_db:
+            try:
+                _track_permission_grant(
+                    site_id=site_id,
+                    user_did=user_id,
+                    permission_id=','.join(perm_list),
+                    credential_id=credential.get('id', ''),
+                    granted_by=granted_by,
+                    expires_at=expires_at
+                )
+            except Exception as db_err:
+                logger.warning(f"⚠️ Failed to track permission in DB (credential still issued): {db_err}")
+        
         logger.info(f"✅ Permission lemma issued for {user_id} on {site_id}")
         return credential
         
     except Exception as e:
         logger.error(f"❌ Failed to issue permission lemma: {e}")
         raise
+
+
+def _track_permission_grant(site_id: str, user_did: str, permission_id: str, 
+                           credential_id: str, granted_by: str, expires_at: datetime):
+    """
+    Track permission grant in database for admin management, revocation, and billing.
+    This is separate from the credential itself (which is in the user's wallet).
+    """
+    from .database import get_db
+    from sqlalchemy import text
+    import hashlib
+    
+    db = get_db()
+    try:
+        # Create fingerprint from credential ID
+        fingerprint = hashlib.sha256(credential_id.encode()).hexdigest()[:64]
+        
+        # Insert or update permission grant using PostgreSQL upsert
+        db.execute(text("""
+            INSERT INTO user_permissions 
+            (site_id, user_did, permission_id, credential_fingerprint, granted_by, expires_at, granted_at)
+            VALUES (:site_id, :user_did, :permission_id, :fingerprint, :granted_by, :expires_at, CURRENT_TIMESTAMP)
+            ON CONFLICT ON CONSTRAINT unique_user_site_permission 
+            DO UPDATE SET 
+                credential_fingerprint = EXCLUDED.credential_fingerprint,
+                granted_by = EXCLUDED.granted_by,
+                expires_at = EXCLUDED.expires_at,
+                granted_at = CURRENT_TIMESTAMP,
+                revoked_at = NULL,
+                revoked_by = NULL
+        """), {
+            'site_id': site_id,
+            'user_did': user_did,
+            'permission_id': permission_id,
+            'fingerprint': fingerprint,
+            'granted_by': granted_by,
+            'expires_at': expires_at
+        })
+        db.commit()
+        
+        logger.debug(f"📝 Tracked permission grant: {user_did[:30]}... → {permission_id} on {site_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Database tracking failed: {e}")
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 @wallet_first_bp.route('/api/wallet-auth/issue', methods=['POST'])
