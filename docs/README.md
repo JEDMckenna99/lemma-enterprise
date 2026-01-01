@@ -1,218 +1,64 @@
-# 📚 Lemma Documentation
+# Lemma Documentation
 
-## 🎯 **Quick Navigation**
+## 📖 Core Documentation
 
-### **🚀 NEW: Advanced Wallet Recovery System**
-- **[Advanced Wallet Architecture](ADVANCED_WALLET_ARCHITECTURE.md)** - Enterprise-grade wallet recovery with multi-device sync
-- **[Wallet Recovery Flows](WALLET_RECOVERY_FLOWS.md)** - Complete technical flow documentation  
-- **[Sybil Prevention Guide](SYBIL_PREVENTION_GUIDE.md)** - One-human-one-account enforcement
-- **[Lemma vs Traditional Systems](LEMMA_VS_TRADITIONAL_SYSTEMS_COMPARISON.md)** - Comprehensive comparison analysis
-- **[Quick Comparison Table](QUICK_COMPARISON_TABLE.md)** - At-a-glance comparison summary
-- **Live Testing**: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/wallet-testing
-- **Performance**: 94µs verification with advanced features (12.1% overhead for 1000x functionality)
+### Foundation
+- **[Whitepaper: Digital Lemmas](WHITEPAPER_DIGITAL_LEMMAS.md)** - Complete technical specification of the edge-verifiable identity layer
 
-### **📱 NEW: QR Code Wallet Sync (PRODUCTION DEPLOYED)**
-- **✅ BREAKTHROUGH**: **Instant wallet synchronization** between devices using **secure QR codes**
-- **🔐 Security**: Temporary encrypted sessions with 5-minute auto-expiration
-- **📱 Mobile-Optimized**: Safari Web Inspector compatible with real-time debugging
-- **⚡ Performance**: Sub-second wallet transfer with **singleton session storage**
-- **🛡️ Privacy**: End-to-end encryption, server never sees wallet contents
-- **🔄 Universal**: Works between Mac/PC ↔ iPhone/Android seamlessly
-- **Live Demo**: https://lemma.id/wallet → "Generate QR Sync" → Scan with mobile
-- **Technical**: Solved module reloading issues with singleton pattern architecture
+### Developer Guides
+- **[Quick Start: Simple Login](QUICK_START_SIMPLE_LOGIN.md)** - Add login in 5 minutes
+- **[Simple Integration Guide](SIMPLE_INTEGRATION_GUIDE.md)** - Step-by-step integration
+- **[IAM-Only Integration Guide](IAM_ONLY_INTEGRATION_GUIDE.md)** - IAM without Proof-of-Human
+- **[Permission Lemmas Developer Guide](PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md)** - Complete IAM developer reference
 
-### **🔐 Permission Lemmas IAM**
-- **[Permission Lemmas IAM Developer Guide](PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md)** - Complete Auth0/Duo replacement with microsecond verification
-- **Live API**: https://lemma-enterprise-0f6ba17076c1.herokuapp.com
-- **Performance**: 2.38µs access verification (210,084x faster than Auth0)
+### API Reference
+- **[IAM API Reference](IAM_API_REFERENCE.md)** - All API endpoints documented
+- **[Error Codes](ERROR_CODES.md)** - Error handling reference
 
-### **🏗️ Core Architecture**
-- **[Protocol Design](protocol/PROTOCOL_DESIGN.md)** - Universal verification protocol specification
-- **[Cryptographic Architecture](crypto/CRYPTOGRAPHIC_ARCHITECTURE.md)** - OPRF, Bloom filters, Ed25519, ZKP
-- **[Rust Crypto Engine Spec](rust_crypto/RUST_CRYPTO_ENGINE_SPEC.md)** - Implementation details
+### Security
+- **[Threat Model](security/THREAT_MODEL.md)** - Security analysis and mitigations
+- **[Security Review Package](security/SECURITY_REVIEW_PACKAGE.md)** - Comprehensive security documentation
 
-### **🔒 Security & Verification**
-- **[Security Review Package](security/SECURITY_REVIEW_PACKAGE.md)** - Comprehensive security analysis
-- **[Threat Model](security/THREAT_MODEL.md)** - Attack vectors and mitigations
-- **[Formal Verification Protocol](protocol/FORMAL_VERIFICATION_PROTOCOL.md)** - Mathematical proofs
-- **[Offline Verification Proof](verification/OFFLINE_VERIFICATION_PROOF.md)** - >99.9% offline operation
+### Protocol
+- **[Protocol Design](protocol/PROTOCOL_DESIGN.md)** - Core verification protocol specification
 
-### **⚡ Performance & Benchmarks**
-- **[Performance Validation Report](performance/PERFORMANCE_VALIDATION_REPORT.md)** - Production benchmarks
-- **[Verification vs Authentication](VERIFICATION_VS_AUTHENTICATION.md)** - Technical comparison
-
-## 🚀 **Feature Documentation**
-
-### **📱 QR Code Wallet Sync System**
-Revolutionary device-to-device wallet synchronization using secure QR codes with enterprise-grade security.
-
-**Architecture Overview:**
-```
-🖥️ Primary Device (Mac/PC)           📱 Mobile Device (iPhone/Android)
-├── Generate transfer session         ├── Scan QR code 
-├── Encrypt wallet data              ├── Parse transfer token
-├── Create QR with session token     ├── Request wallet data via API
-└── Display scannable QR code        └── Decrypt and import credentials
-
-🔐 Secure Transfer Session (Server):
-├── Singleton session storage        ├── 5-minute auto-expiration
-├── End-to-end encryption           ├── No server access to wallet data
-└── Automatic cleanup after use     └── Thread-safe concurrent access
-```
-
-**Key Technical Achievements:**
-- **✅ Module Reloading Fix**: Solved Python module import issues with singleton pattern
-- **✅ Mobile JavaScript**: Fixed Safari parameter detection with dual-trigger system
-- **✅ Session Persistence**: Implemented singleton storage preventing session loss
-- **✅ API Flow**: Complete create-session → set-wallet → get-wallet pipeline
-- **✅ Security**: Temporary sessions with automatic expiration and cleanup
-
-**Performance Metrics:**
-- **Session Creation**: ~2ms average response time
-- **QR Generation**: Custom server-side with compression for large wallets
-- **Mobile Detection**: Instant URL parameter parsing on iOS Safari
-- **Transfer Speed**: Sub-second complete wallet synchronization
-- **Success Rate**: 100% transfer success after singleton implementation
-
-### **Permission Lemmas IAM System**
-Complete Identity and Access Management solution with microsecond-level verification.
-
-**Key Features:**
-- 🏢 **Site Registration**: Companies register and get API keys + OAuth credentials
-- 🔐 **Permission Management**: Define custom permissions (admin, editor, viewer, etc.)
-- ⚡ **Access Verification**: 2.38µs verification time on live cloud infrastructure
-- 🔑 **"Sign in with Lemma"**: Complete OAuth 2.0 server for federated authentication
-- 💰 **Two-Tier Pricing**: PoH Network ($0.05/MAU) + Site IAM ($0.15/MAU) = 96% savings vs Auth0+Duo
-- 🛡️ **Background Wallet**: Store PoH + site-specific permission lemmas
-
-**Live Endpoints:**
-```
-POST /api/v1/sites/register              # Site registration
-POST /api/v1/sites/{id}/permissions      # Permission management
-POST /api/v1/auth/verify                 # Access verification (CORE)
-GET  /api/v1/oauth/authorize             # OAuth authorization
-POST /api/v1/oauth/token                 # Token exchange
-```
-
-### **Universal Verification Engine**
-Cryptographic verification system with proven microsecond performance.
-
-**Performance Results:**
-- **Production Heroku**: 4.176µs universal verification
-- **Permission Lemmas**: 2.38µs IAM verification
-- **WebAssembly**: 0.36µs client-side verification
-- **Throughput**: 239,446 verifications/second
-
-### **Federated Identity Network**
-Cross-site verification with network effects and privacy preservation.
-
-**Components:**
-- **Proof of Humanity (PoH)**: Universal human verification
-- **Cross-Site Sharing**: Verify once, access everywhere
-- **Privacy Preservation**: Zero-knowledge proofs with selective disclosure
-- **Offline Operation**: >99.9% offline rate with local verification
-
-## 📊 **Business Model Documentation**
-
-### **Revenue Streams**
-
-1. **Permission Lemmas IAM** (Primary - NEW)
-   - Target: Companies needing Auth0/Duo replacement
-   - Pricing: $0.20/MAU total (PoH + IAM)
-   - Savings: 96% cost reduction vs competitors
-
-2. **Federated Identity Network** (Foundation)
-   - Target: Websites needing bot protection
-   - Pricing: $0.05/MAU for PoH network access
-   - Value: Verify once, access everywhere
-
-3. **Enterprise Licensing** (Secondary)
-   - Target: Industry-specific implementations
-   - Pricing: $200K-2M/year + usage fees
-   - Value: White-label deployment
-
-4. **Autonomous Device Networks** (Emerging)
-   - Target: IoT manufacturers, industrial automation
-   - Pricing: Device-based licensing
-   - Value: Internet-independent coordination
-
-### **Competitive Advantages**
-
-| Aspect | Traditional (Auth0+Duo) | Lemma Permission Lemmas |
-|--------|------------------------|-------------------------|
-| **Cost** | $5-13/MAU | **$0.20/MAU** (96% savings) |
-| **Speed** | 500ms-2s | **2.38µs** (210,084x faster) |
-| **Features** | Basic IAM | **Complete IAM + PoH + OAuth** |
-| **Integration** | Weeks of setup | **1-minute API integration** |
-| **User Experience** | Separate logins | **Unified wallet** |
-
-## 🛠️ **Developer Resources**
-
-### **Quick Start Guides**
-- **[5-Minute IAM Setup](PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md#quick-start-5-minutes)** - Complete Auth0 replacement
-- **[OAuth Integration](PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md#oauth-20-integration---sign-in-with-lemma)** - "Sign in with Lemma"
-- **[API Reference](PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md#complete-api-reference)** - All endpoints documented
-
-### **SDK Integration**
-- **JavaScript/TypeScript**: `npm install @lemma/iam-sdk`
-- **Python**: `pip install lemma-iam`
-- **React**: `npm install @lemma/react-iam`
-- **Node.js**: Express middleware included
-
-### **Live Testing**
-- **API Base URL**: https://lemma-enterprise-0f6ba17076c1.herokuapp.com
-- **Health Check**: https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/health
-- **Interactive Demo**: Available in developer guide
-
-## 🎯 **Implementation Roadmap**
-
-### **Phase 1: Foundation** ✅ COMPLETED
-- Universal verification engine
-- Rust crypto implementation
-- WebAssembly client-side verification
-- Performance optimization (4.176µs achieved)
-
-### **Phase 2: Permission Lemmas IAM** ✅ COMPLETED
-- Site registration and management
-- Permission definition system
-- Access verification (2.38µs achieved)
-- OAuth 2.0 server implementation
-- Background wallet integration
-- **LIVE ON HEROKU** ⭐
-
-### **Phase 3: Enterprise Scaling** 🚧 IN PROGRESS
-- Customer onboarding automation
-- Advanced analytics dashboard
-- Enterprise-grade monitoring
-- Multi-region deployment
-
-### **Phase 4: Market Expansion** 📋 PLANNED
-- Industry-specific packages
-- Partner ecosystem development
-- Global network scaling
-- Advanced privacy features
-
-## 📞 **Support & Community**
-
-### **Getting Help**
-- **Documentation**: Start with the developer guide above
-- **Live API**: Test endpoints at the Heroku deployment
-- **Issues**: Report bugs and feature requests
-- **Community**: Join developer discussions
-
-### **Contributing**
-- **Code**: Submit PRs for improvements
-- **Documentation**: Help improve guides and examples
-- **Testing**: Report issues with live deployment
-- **Feedback**: Share integration experiences
+### Operations
+- **[KMS Setup Guide](KMS_SETUP_GUIDE.md)** - AWS KMS configuration for key management
 
 ---
 
-## 🎉 **Ready to Get Started?**
+## 🚀 Getting Started
 
-1. **For IAM Replacement**: Start with [Permission Lemmas IAM Developer Guide](PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md)
-2. **For Technical Deep-Dive**: Read [Protocol Design](protocol/PROTOCOL_DESIGN.md)
-3. **For Security Analysis**: Review [Security Review Package](security/SECURITY_REVIEW_PACKAGE.md)
-4. **For Performance Details**: Check [Performance Validation Report](performance/PERFORMANCE_VALIDATION_REPORT.md)
+1. **New to Lemma?** Start with the [Whitepaper](WHITEPAPER_DIGITAL_LEMMAS.md)
+2. **Integrating?** Follow the [Quick Start Guide](QUICK_START_SIMPLE_LOGIN.md)
+3. **Building IAM?** See the [Permission Lemmas Developer Guide](PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md)
+4. **Security review?** Check the [Threat Model](security/THREAT_MODEL.md)
 
-**Live API Ready**: https://lemma-enterprise-0f6ba17076c1.herokuapp.com 🚀
+---
+
+## 📂 Documentation Structure
+
+```
+docs/
+├── WHITEPAPER_DIGITAL_LEMMAS.md    # Technical foundation
+├── QUICK_START_SIMPLE_LOGIN.md     # 5-minute quickstart
+├── SIMPLE_INTEGRATION_GUIDE.md     # Integration walkthrough
+├── IAM_ONLY_INTEGRATION_GUIDE.md   # IAM-specific integration
+├── PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md  # Full IAM reference
+├── IAM_API_REFERENCE.md            # API documentation
+├── ERROR_CODES.md                  # Error handling
+├── KMS_SETUP_GUIDE.md              # Key management setup
+├── protocol/
+│   └── PROTOCOL_DESIGN.md          # Protocol specification
+└── security/
+    ├── THREAT_MODEL.md             # Security analysis
+    └── SECURITY_REVIEW_PACKAGE.md  # Security overview
+```
+
+---
+
+## 🔗 Live Resources
+
+- **API**: https://lemma.id
+- **Dashboard**: https://lemma.id/platform
+- **Wallet**: https://lemma.id/wallet
