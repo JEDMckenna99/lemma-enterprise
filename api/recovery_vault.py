@@ -755,8 +755,9 @@ def vault_transfer_complete():
         try:
             from lemma_crypto import HPKERewrapper, DevicePublicKey
             
-            # Initialize HPKE rewrapper (would use HSM key in production)
-            server_private_key = b"server_hpke_key_1234567890123456789012345678901234567890"[:32]
+            # Initialize HPKE rewrapper with key from config
+            from .config import get_hpke_server_key
+            server_private_key = get_hpke_server_key()
             rewrapper = HPKERewrapper(list(server_private_key))
             
             # Validate new device public key

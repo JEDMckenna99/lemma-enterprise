@@ -27,14 +27,19 @@ def _get_root_ppid_key() -> bytes:
     """
     Root secret used to derive per-user master secrets.
 
-    In production, set `LEMMA_PPID_ROOT_KEY` to a high-entropy secret (32+ bytes),
-    stored in your platform secret manager (e.g., Heroku config vars / KMS).
+    Uses centralized config which loads from LEMMA_PPID_ROOT_KEY environment variable.
+    In production, this MUST be set to a high-entropy secret (32+ bytes).
     """
-    key = os.environ.get("LEMMA_PPID_ROOT_KEY")
-    if key and len(key) >= 32:
-        return key.encode("utf-8")
-    # Development fallback only (NOT for production)
-    return b"lemma_dev_ppid_root_key_change_me_32bytes_min"
+    try:
+        from .config import get_ppid_root_key
+        return get_ppid_root_key().encode("utf-8")
+    except Exception:
+        # Fallback for standalone usage or testing
+        key = os.environ.get("LEMMA_PPID_ROOT_KEY")
+        if key and len(key) >= 32:
+            return key.encode("utf-8")
+        # Development fallback only (NOT for production)
+        return b"lemma_dev_ppid_root_key_change_me_32bytes_min"
 
 
 def normalize_email(email: str) -> str:

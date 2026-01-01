@@ -13,7 +13,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Secret key for HMAC (should be from config in production)
-HMAC_SECRET = "lemma-billing-secret-key-2024"
+import os
+
+def _get_billing_hmac_secret():
+    """Get billing HMAC secret from environment"""
+    from api.config import get_billing_hmac_secret
+    return get_billing_hmac_secret()
 
 def log_permission_operation(site_id: str, operation_type: str, count: int = 1, user_did: Optional[str] = None):
     """
@@ -33,7 +38,7 @@ def log_permission_operation(site_id: str, operation_type: str, count: int = 1, 
         if user_did:
             # Use HMAC-SHA256 for privacy-preserving user identification
             user_hash = hmac.new(
-                HMAC_SECRET.encode(),
+                _get_billing_hmac_secret().encode(),
                 f"{site_id}:{user_did}".encode(),
                 hashlib.sha256
             ).hexdigest()[:16]  # First 16 chars for storage efficiency

@@ -4,6 +4,7 @@
 
 ### Foundation
 - **[Whitepaper: Digital Lemmas](WHITEPAPER_DIGITAL_LEMMAS.md)** - Complete technical specification of the edge-verifiable identity layer
+- **[Architecture: Wallet-First](ARCHITECTURE_WALLET_FIRST.md)** - Understanding wallet-first vs OAuth authentication
 
 ### Developer Guides
 - **[Quick Start: Simple Login](QUICK_START_SIMPLE_LOGIN.md)** - Add login in 5 minutes
@@ -30,9 +31,10 @@
 ## 🚀 Getting Started
 
 1. **New to Lemma?** Start with the [Whitepaper](WHITEPAPER_DIGITAL_LEMMAS.md)
-2. **Integrating?** Follow the [Quick Start Guide](QUICK_START_SIMPLE_LOGIN.md)
-3. **Building IAM?** See the [Permission Lemmas Developer Guide](PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md)
-4. **Security review?** Check the [Threat Model](security/THREAT_MODEL.md)
+2. **Understanding the architecture?** Read [Wallet-First vs OAuth](ARCHITECTURE_WALLET_FIRST.md)
+3. **Integrating?** Follow the [Quick Start Guide](QUICK_START_SIMPLE_LOGIN.md)
+4. **Building IAM?** See the [Permission Lemmas Developer Guide](PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md)
+5. **Security review?** Check the [Threat Model](security/THREAT_MODEL.md)
 
 ---
 
@@ -41,6 +43,7 @@
 ```
 docs/
 ├── WHITEPAPER_DIGITAL_LEMMAS.md    # Technical foundation
+├── ARCHITECTURE_WALLET_FIRST.md    # Wallet-first vs OAuth architecture
 ├── QUICK_START_SIMPLE_LOGIN.md     # 5-minute quickstart
 ├── SIMPLE_INTEGRATION_GUIDE.md     # Integration walkthrough
 ├── IAM_ONLY_INTEGRATION_GUIDE.md   # IAM-specific integration

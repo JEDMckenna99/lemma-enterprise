@@ -19,9 +19,10 @@ class WalletRetrievalManager:
     """Manages the connection between PoH verification and wallet retrieval"""
     
     def __init__(self):
-        # In production, these would be in HSM/KMS
-        self.issuer_secret_salt = b"lemma_issuer_salt_production_hsm_2024_32bytes_secret_material"[:32]
-        self.r_vault = b"lemma_vault_secret_production_hsm_2024_32bytes_vault_pepper"[:32]
+        # Load secrets from config (which reads from environment variables)
+        from .config import get_wallet_salt, get_hpke_server_key
+        self.issuer_secret_salt = get_wallet_salt()
+        self.r_vault = get_hpke_server_key()  # Reuse HPKE key for vault
         
         logger.info("🔐 Wallet Retrieval Manager initialized")
     

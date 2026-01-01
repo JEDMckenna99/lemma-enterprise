@@ -1,12 +1,23 @@
 """
 Complete OAuth 2.0 Server for "Sign in with Lemma"
-Provides OAuth authentication for customer sites using permission lemmas
+
+ARCHITECTURE NOTE:
+- OAuth is for API/server-to-server authorization (e.g., "let this app access my data")
+- For USER LOGIN, use wallet-first authentication (see wallet_first_auth.py)
+- This OAuth server integrates with wallet-first by redirecting to wallet unlock
+
+OAuth Flow with Wallet Integration:
+1. Site redirects to /oauth/authorize
+2. User unlocks wallet with passkey
+3. User consents (or auto-consent if already has permission)
+4. Site receives authorization code
+5. Site exchanges code for access token (for API calls)
 """
 
 import jwt
 import secrets
 import hashlib
-from flask import Blueprint, request, jsonify, redirect, render_template, session
+from flask import Blueprint, request, jsonify, redirect, render_template, session, url_for
 from flask_cors import cross_origin
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
@@ -15,17 +26,106 @@ import logging
 
 from .database_models import db, ActivityType
 from .billing_integration import billing_manager
+from .config import get_oauth_jwt_secret, get_redis_url, is_production
 
 oauth_api = Blueprint('oauth_api', __name__)
 logger = logging.getLogger(__name__)
 
+# ============================================
+# REDIS-BACKED STORAGE (with in-memory fallback)
+# ============================================
+
+def get_token_storage():
+    """Get Redis client or fall back to in-memory dict"""
+    redis_url = get_redis_url()
+    if redis_url:
+        try:
+            import redis
+            return redis.from_url(redis_url)
+        except Exception as e:
+            logger.warning(f"Redis unavailable, using memory: {e}")
+    return None
+
+# In-memory fallback (for development/single-dyno)
+_memory_auth_codes = {}
+_memory_access_tokens = {}
+
+def store_auth_code(code: str, data: dict, ttl_seconds: int = 600):
+    """Store authorization code with TTL"""
+    redis = get_token_storage()
+    if redis:
+        import json
+        redis.setex(f"oauth:auth:{code}", ttl_seconds, json.dumps(data, default=str))
+    else:
+        data['_expires'] = datetime.utcnow() + timedelta(seconds=ttl_seconds)
+        _memory_auth_codes[code] = data
+
+def get_auth_code(code: str) -> Optional[dict]:
+    """Retrieve and validate authorization code"""
+    redis = get_token_storage()
+    if redis:
+        import json
+        data = redis.get(f"oauth:auth:{code}")
+        if data:
+            return json.loads(data)
+        return None
+    else:
+        data = _memory_auth_codes.get(code)
+        if data and data.get('_expires', datetime.min) > datetime.utcnow():
+            return data
+        return None
+
+def delete_auth_code(code: str):
+    """Delete used authorization code"""
+    redis = get_token_storage()
+    if redis:
+        redis.delete(f"oauth:auth:{code}")
+    else:
+        _memory_auth_codes.pop(code, None)
+
+def store_access_token(token_hash: str, data: dict, ttl_seconds: int = 3600):
+    """Store access token metadata"""
+    redis = get_token_storage()
+    if redis:
+        import json
+        redis.setex(f"oauth:token:{token_hash}", ttl_seconds, json.dumps(data, default=str))
+    else:
+        data['_expires'] = datetime.utcnow() + timedelta(seconds=ttl_seconds)
+        _memory_access_tokens[token_hash] = data
+
+def get_access_token_data(token_hash: str) -> Optional[dict]:
+    """Retrieve access token metadata"""
+    redis = get_token_storage()
+    if redis:
+        import json
+        data = redis.get(f"oauth:token:{token_hash}")
+        if data:
+            return json.loads(data)
+        return None
+    else:
+        data = _memory_access_tokens.get(token_hash)
+        if data and data.get('_expires', datetime.min) > datetime.utcnow():
+            return data
+        return None
+
+
 class OAuthServer:
-    """Complete OAuth 2.0 server implementation"""
+    """
+    OAuth 2.0 server implementation with wallet-first integration.
+    
+    For user login, redirects to wallet unlock flow.
+    Issues JWT access tokens for API authorization.
+    """
     
     def __init__(self):
-        self.jwt_secret = "lemma_oauth_secret_key_2024"  # In production, use environment variable
-        self.authorization_codes = {}  # In production, use Redis/database
-        self.access_tokens = {}        # In production, use Redis/database
+        self._jwt_secret = None  # Lazy loaded from config
+    
+    @property
+    def jwt_secret(self):
+        """Lazy load JWT secret from config"""
+        if self._jwt_secret is None:
+            self._jwt_secret = get_oauth_jwt_secret()
+        return self._jwt_secret
     
     def validate_client(self, client_id: str, redirect_uri: str) -> Optional[Dict]:
         """Validate OAuth client and redirect URI"""
@@ -40,18 +140,25 @@ class OAuthServer:
             if not site or site.oauth_client_id != client_id:
                 return None
             
-            # Validate redirect URI (in production, store allowed URIs in database)
-            # For now, allow any HTTPS URI for the site's domain
+            # Validate redirect URI
             parsed_uri = urllib.parse.urlparse(redirect_uri)
-            if not (parsed_uri.scheme == 'https' or 
-                   (parsed_uri.scheme == 'http' and parsed_uri.hostname in ['localhost', '127.0.0.1'])):
+            
+            # In production, only allow HTTPS
+            # In development, also allow localhost HTTP
+            is_https = parsed_uri.scheme == 'https'
+            is_localhost = parsed_uri.scheme == 'http' and parsed_uri.hostname in ['localhost', '127.0.0.1']
+            
+            if not (is_https or (not is_production() and is_localhost)):
+                logger.warning(f"Invalid redirect URI scheme: {redirect_uri}")
                 return None
             
             return {
                 'site_id': site_id,
                 'site': site,
                 'client_id': client_id,
-                'redirect_uri': redirect_uri
+                'redirect_uri': redirect_uri,
+                'site_name': getattr(site, 'company_name', site_id),
+                'site_domain': getattr(site, 'site_domain', site_id)
             }
             
         except Exception as e:
@@ -59,45 +166,51 @@ class OAuthServer:
             return None
     
     def generate_authorization_code(self, client_info: Dict, scope: str, state: str) -> str:
-        """Generate OAuth authorization code"""
+        """Generate OAuth authorization code and store with TTL"""
         auth_code = f"lemma_auth_{secrets.token_urlsafe(32)}"
         
         # Store authorization request (expires in 10 minutes)
-        self.authorization_codes[auth_code] = {
+        auth_data = {
             'site_id': client_info['site_id'],
+            'site_name': client_info.get('site_name', client_info['site_id']),
             'client_id': client_info['client_id'],
             'redirect_uri': client_info['redirect_uri'],
             'scope': scope,
             'state': state,
-            'created_at': datetime.utcnow(),
-            'expires_at': datetime.utcnow() + timedelta(minutes=10),
-            'user_did': None  # Set after user authorization
+            'created_at': datetime.utcnow().isoformat(),
+            'user_did': None,  # Set after user authorization
+            'user_email': None,
+            'authorized': False
         }
         
+        store_auth_code(auth_code, auth_data, ttl_seconds=600)
         return auth_code
     
-    def authorize_user(self, auth_code: str, user_did: str) -> bool:
-        """Authorize user for OAuth request"""
+    def authorize_user(self, auth_code: str, user_did: str, user_email: str = None) -> bool:
+        """Mark authorization code as approved by user"""
         try:
-            if auth_code not in self.authorization_codes:
+            auth_request = get_auth_code(auth_code)
+            if not auth_request:
                 return False
             
-            auth_request = self.authorization_codes[auth_code]
-            
-            # Check expiry
-            if datetime.utcnow() > auth_request['expires_at']:
-                del self.authorization_codes[auth_code]
-                return False
-            
-            # Set user DID
+            # Update with user info
             auth_request['user_did'] = user_did
+            auth_request['user_email'] = user_email
+            auth_request['authorized'] = True
+            auth_request['authorized_at'] = datetime.utcnow().isoformat()
+            
+            # Re-store with remaining TTL
+            store_auth_code(auth_code, auth_request, ttl_seconds=300)
             
             # Track billing activity
-            billing_manager.track_user_activity(
-                site_id=auth_request['site_id'],
-                user_id=user_did,
-                activity_type='poh_verification'
-            )
+            try:
+                billing_manager.track_user_activity(
+                    site_id=auth_request['site_id'],
+                    user_id=user_did,
+                    activity_type='oauth_authorization'
+                )
+            except Exception as e:
+                logger.warning(f"Billing tracking failed: {e}")
             
             return True
             
@@ -105,31 +218,32 @@ class OAuthServer:
             logger.error(f"User authorization error: {e}")
             return False
     
+    def get_pending_authorization(self, auth_code: str) -> Optional[Dict]:
+        """Get pending authorization for consent page"""
+        return get_auth_code(auth_code)
+    
     def exchange_code_for_token(self, code: str, client_id: str, client_secret: str) -> Optional[Dict]:
         """Exchange authorization code for access token"""
         try:
-            # Validate authorization code
-            if code not in self.authorization_codes:
-                return None
-            
-            auth_request = self.authorization_codes[code]
-            
-            # Check expiry
-            if datetime.utcnow() > auth_request['expires_at']:
-                del self.authorization_codes[code]
+            auth_request = get_auth_code(code)
+            if not auth_request:
+                logger.error("Authorization code not found or expired")
                 return None
             
             # Validate client
             if auth_request['client_id'] != client_id:
+                logger.error("Client ID mismatch")
                 return None
             
             # Validate client secret
             site = db.get_site(auth_request['site_id'])
             if not site or site.oauth_client_secret != client_secret:
+                logger.error("Invalid client secret")
                 return None
             
             # Check if user authorized
-            if not auth_request.get('user_did'):
+            if not auth_request.get('authorized') or not auth_request.get('user_did'):
+                logger.error("User has not authorized this request")
                 return None
             
             # Generate access token (JWT)
@@ -138,6 +252,7 @@ class OAuthServer:
                 'site_id': auth_request['site_id'],
                 'client_id': client_id,
                 'user_did': auth_request['user_did'],
+                'user_email': auth_request.get('user_email'),
                 'scope': auth_request['scope'],
                 'iat': int(now.timestamp()),
                 'exp': int((now + timedelta(hours=1)).timestamp()),
@@ -149,19 +264,20 @@ class OAuthServer:
             if isinstance(access_token, bytes):
                 access_token = access_token.decode('utf-8')
             
-            # Store token info
+            # Store token metadata
             token_hash = hashlib.sha256(access_token.encode()).hexdigest()
-            self.access_tokens[token_hash] = {
+            store_access_token(token_hash, {
                 'site_id': auth_request['site_id'],
                 'user_did': auth_request['user_did'],
+                'user_email': auth_request.get('user_email'),
                 'scope': auth_request['scope'],
-                'created_at': datetime.utcnow(),
-                'expires_at': datetime.utcnow() + timedelta(hours=1),
-                'last_used': datetime.utcnow()
-            }
+                'created_at': datetime.utcnow().isoformat()
+            }, ttl_seconds=3600)
             
-            # Clean up authorization code
-            del self.authorization_codes[code]
+            # Delete used authorization code
+            delete_auth_code(code)
+            
+            logger.info(f"✅ OAuth token issued for {auth_request['user_did']} on {auth_request['site_id']}")
             
             return {
                 'access_token': access_token,
@@ -178,7 +294,7 @@ class OAuthServer:
     def validate_access_token(self, token: str) -> Optional[Dict]:
         """Validate access token"""
         try:
-            # Decode JWT (disable validations that can cause timing issues)
+            # Decode JWT
             payload = jwt.decode(token, self.jwt_secret, algorithms=['HS256'], 
                                options={"verify_iat": False, "verify_aud": False})
             
@@ -188,30 +304,22 @@ class OAuthServer:
                 logger.error("Token expired")
                 return None
             
-            # Get token info
-            token_hash = hashlib.sha256(token.encode()).hexdigest()
-            token_info = self.access_tokens.get(token_hash)
-            
-            if token_info:
-                # Update last used
-                token_info['last_used'] = datetime.utcnow()
-            
             return {
                 'site_id': payload['site_id'],
                 'user_did': payload['user_did'],
+                'user_email': payload.get('user_email'),
                 'scope': payload['scope'],
                 'client_id': payload['client_id']
             }
             
-        except jwt.ExpiredSignatureError as e:
-            logger.error(f"Token expired: {e}")
+        except jwt.ExpiredSignatureError:
+            logger.error("Token expired")
             return None
         except jwt.InvalidTokenError as e:
             logger.error(f"Invalid token: {e}")
             return None
         except Exception as e:
             logger.error(f"Token validation error: {e}")
-            print(f"DEBUG: Token validation error: {e}")  # Debug print
             return None
     
     def get_user_info(self, token_info: Dict) -> Dict:
@@ -255,9 +363,16 @@ oauth_server = OAuthServer()
 @oauth_api.route('/oauth/authorize', methods=['GET'])
 def authorize():
     """
-    OAuth authorization endpoint
+    OAuth authorization endpoint - redirects to wallet-first consent flow
     
     GET /oauth/authorize?response_type=code&client_id=lemma_oauth_site123&redirect_uri=https://site.com/callback&scope=profile&state=xyz
+    
+    Flow:
+    1. Validate client
+    2. Generate auth code
+    3. Redirect to /oauth/consent (wallet-first UI)
+    4. User unlocks wallet + approves
+    5. Redirect back to client with code
     """
     try:
         # Get parameters
@@ -269,33 +384,150 @@ def authorize():
         
         # Validate required parameters
         if response_type != 'code':
-            return jsonify({'error': 'unsupported_response_type'}), 400
+            return jsonify({'error': 'unsupported_response_type', 
+                          'error_description': 'Only authorization code flow is supported'}), 400
         
         if not client_id or not redirect_uri:
-            return jsonify({'error': 'invalid_request'}), 400
+            return jsonify({'error': 'invalid_request',
+                          'error_description': 'client_id and redirect_uri are required'}), 400
         
         # Validate client
         client_info = oauth_server.validate_client(client_id, redirect_uri)
         if not client_info:
-            return jsonify({'error': 'invalid_client'}), 400
+            return jsonify({'error': 'invalid_client',
+                          'error_description': 'Unknown client or invalid redirect URI'}), 400
         
-        # Generate authorization code
+        # Generate authorization code (pending user approval)
         auth_code = oauth_server.generate_authorization_code(client_info, scope, state)
         
-        # In a real implementation, this would show a user consent page
-        # For demo purposes, we'll auto-approve with a test user
-        test_user_did = "did:lemma:demo_user_12345"
+        # Redirect to wallet-first consent page
+        consent_url = url_for('oauth_api.oauth_consent', 
+                             auth_code=auth_code, 
+                             _external=True)
         
-        if oauth_server.authorize_user(auth_code, test_user_did):
-            # Redirect back to client with authorization code
-            callback_url = f"{redirect_uri}?code={auth_code}&state={state}"
-            return redirect(callback_url)
-        else:
-            return jsonify({'error': 'authorization_failed'}), 500
+        logger.info(f"🔐 OAuth flow started for {client_info['site_name']} → consent page")
+        return redirect(consent_url)
             
     except Exception as e:
         logger.error(f"Authorization error: {e}")
-        return jsonify({'error': 'server_error'}), 500
+        return jsonify({'error': 'server_error', 
+                       'error_description': str(e)}), 500
+
+
+@oauth_api.route('/oauth/consent', methods=['GET'])
+def oauth_consent():
+    """
+    Wallet-first OAuth consent page
+    Shows what permissions the site is requesting and requires wallet unlock
+    """
+    auth_code = request.args.get('auth_code')
+    
+    if not auth_code:
+        return render_template('oauth/error.html', 
+                             error='Missing authorization code'), 400
+    
+    # Get pending authorization
+    auth_request = oauth_server.get_pending_authorization(auth_code)
+    if not auth_request:
+        return render_template('oauth/error.html',
+                             error='Authorization request expired or invalid'), 400
+    
+    # Parse scopes for display
+    scopes = auth_request.get('scope', 'profile').split()
+    scope_descriptions = {
+        'profile': 'View your basic profile information',
+        'permissions': 'Access your permissions for this site',
+        'email': 'View your email address',
+        'openid': 'Verify your identity'
+    }
+    
+    scope_list = [{'name': s, 'description': scope_descriptions.get(s, s)} for s in scopes]
+    
+    return render_template('oauth/consent.html',
+                          auth_code=auth_code,
+                          site_name=auth_request.get('site_name', 'Unknown Site'),
+                          site_id=auth_request['site_id'],
+                          scopes=scope_list,
+                          redirect_uri=auth_request['redirect_uri'])
+
+
+@oauth_api.route('/oauth/consent/approve', methods=['POST'])
+@cross_origin()
+def oauth_consent_approve():
+    """
+    API endpoint called by consent page after wallet unlock
+    Approves the OAuth request and redirects back to client
+    """
+    try:
+        data = request.get_json()
+        auth_code = data.get('auth_code')
+        user_did = data.get('user_did')
+        user_email = data.get('user_email')
+        
+        if not auth_code or not user_did:
+            return jsonify({'error': 'Missing auth_code or user_did'}), 400
+        
+        # Get pending authorization
+        auth_request = oauth_server.get_pending_authorization(auth_code)
+        if not auth_request:
+            return jsonify({'error': 'Authorization request expired'}), 400
+        
+        # Approve the authorization
+        if not oauth_server.authorize_user(auth_code, user_did, user_email):
+            return jsonify({'error': 'Failed to authorize'}), 500
+        
+        # Build callback URL
+        callback_url = f"{auth_request['redirect_uri']}?code={auth_code}"
+        if auth_request.get('state'):
+            callback_url += f"&state={auth_request['state']}"
+        
+        logger.info(f"✅ OAuth consent approved for {user_did} → {auth_request['site_name']}")
+        
+        return jsonify({
+            'success': True,
+            'redirect_url': callback_url
+        })
+        
+    except Exception as e:
+        logger.error(f"Consent approval error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@oauth_api.route('/oauth/consent/deny', methods=['POST'])
+@cross_origin()
+def oauth_consent_deny():
+    """
+    API endpoint called when user denies consent
+    """
+    try:
+        data = request.get_json()
+        auth_code = data.get('auth_code')
+        
+        if not auth_code:
+            return jsonify({'error': 'Missing auth_code'}), 400
+        
+        auth_request = oauth_server.get_pending_authorization(auth_code)
+        if not auth_request:
+            return jsonify({'error': 'Authorization request expired'}), 400
+        
+        # Delete the pending authorization
+        delete_auth_code(auth_code)
+        
+        # Build error callback
+        callback_url = f"{auth_request['redirect_uri']}?error=access_denied"
+        if auth_request.get('state'):
+            callback_url += f"&state={auth_request['state']}"
+        
+        logger.info(f"❌ OAuth consent denied → {auth_request['site_name']}")
+        
+        return jsonify({
+            'success': True,
+            'redirect_url': callback_url
+        })
+        
+    except Exception as e:
+        logger.error(f"Consent denial error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @oauth_api.route('/oauth/token', methods=['POST'])
 @cross_origin()

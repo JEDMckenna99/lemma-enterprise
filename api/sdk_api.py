@@ -168,8 +168,13 @@ def compute_credential_trust_tier(issued_at: int) -> dict:
 sdk_api_bp = Blueprint('sdk_api', __name__)
 
 # Network Registry Configuration
+from .config import get_network_auth_key
+
 NETWORK_REGISTRY_URL = "http://localhost:5000"  # In production, this would be the registry service URL
-NETWORK_AUTH_KEY = "lemma_network_master_key_2024"  # In production, use secure key management
+
+def _get_network_auth_key():
+    """Get network auth key from config"""
+    return get_network_auth_key()
 
 def distribute_did_to_network(did: str, public_key: str, issuer_info: dict) -> bool:
     """
@@ -181,7 +186,7 @@ def distribute_did_to_network(did: str, public_key: str, issuer_info: dict) -> b
         response = requests.post(
             f"{NETWORK_REGISTRY_URL}/api/network/register-did",
             headers={
-                'Authorization': f'Network {NETWORK_AUTH_KEY}',
+                'Authorization': f'Network {_get_network_auth_key()}',
                 'Content-Type': 'application/json'
             },
             json={
@@ -214,7 +219,7 @@ def distribute_revocation_to_network(credential_id: str, oprf_evaluation: str, b
         response = requests.post(
             f"{NETWORK_REGISTRY_URL}/api/network/register-revocation",
             headers={
-                'Authorization': f'Network {NETWORK_AUTH_KEY}',
+                'Authorization': f'Network {_get_network_auth_key()}',
                 'Content-Type': 'application/json'
             },
             json={
