@@ -25,8 +25,17 @@ import urllib.parse
 import logging
 
 from .database_models import db, ActivityType
-from .billing_integration import billing_manager
 from .config import get_oauth_jwt_secret, get_redis_url, is_production
+
+# Import billing manager with fallback
+try:
+    from .automated_billing import billing_manager
+except ImportError:
+    # Create a stub if billing module not available
+    class BillingManagerStub:
+        def track_user_activity(self, **kwargs):
+            pass
+    billing_manager = BillingManagerStub()
 
 oauth_api = Blueprint('oauth_api', __name__)
 logger = logging.getLogger(__name__)
