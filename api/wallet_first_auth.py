@@ -19,14 +19,36 @@ logger = logging.getLogger(__name__)
 wallet_first_bp = Blueprint('wallet_first', __name__)
 
 
-def get_or_create_user(email: str = None, passkey_credential_id: str = None) -> dict:
+def get_or_create_user(user_did: str = None, email: str = None, 
+                       passkey_credential_id: str = None, wallet_id: str = None) -> dict:
     """
-    Get or create a user based on email or passkey credential
+    Get or create a user - DID-first, email optional
+    
+    Priority:
+    1. Look up by DID (primary identifier)
+    2. Look up by passkey credential ID
+    3. Look up by email (fallback)
+    4. Create new user with DID
+    
     Returns user info for lemma issuance
     """
     db = get_db()
     try:
-        # Try to find by passkey first (preferred for wallet-first flow)
+        # 1. Try to find by DID first (primary identifier)
+        if user_did:
+            customer = db.query(Customer).filter(
+                Customer.customer_did == user_did
+            ).first()
+            if customer:
+                return {
+                    'user_id': customer.customer_did,
+                    'email': customer.email,
+                    'display_name': getattr(customer, 'display_name', None),
+                    'role': 'admin' if customer.email and 'jedmckenna' in customer.email else 'customer',
+                    'existing': True
+                }
+        
+        # 2. Try to find by passkey (links to DID)
         if passkey_credential_id:
             passkey = db.query(Passkey).filter(
                 Passkey.credential_id == passkey_credential_id,
@@ -34,6 +56,7 @@ def get_or_create_user(email: str = None, passkey_credential_id: str = None) -> 
             ).first()
             
             if passkey:
+                # Passkey.user_id should be a DID
                 customer = db.query(Customer).filter(
                     Customer.customer_did == passkey.user_id
                 ).first()
@@ -41,35 +64,46 @@ def get_or_create_user(email: str = None, passkey_credential_id: str = None) -> 
                     return {
                         'user_id': customer.customer_did,
                         'email': customer.email,
+                        'display_name': getattr(customer, 'display_name', None),
                         'role': 'admin' if customer.email and 'jedmckenna' in customer.email else 'customer',
                         'existing': True
                     }
         
-        # Try to find by email
+        # 3. Try to find by email (fallback for legacy users)
         if email:
             customer = db.query(Customer).filter(Customer.email == email.lower()).first()
             if customer:
                 return {
-                    'user_id': customer.customer_did,
+                    'user_id': customer.customer_did or f"did:lemma:user:{customer.customer_id}",
                     'email': customer.email,
+                    'display_name': getattr(customer, 'display_name', None),
                     'role': 'admin' if 'jedmckenna' in email else 'customer',
                     'existing': True
                 }
         
-        # Create new user
-        user_id = f"did:lemma:user_{secrets.token_hex(8)}"
+        # 4. Create new user with DID as primary identifier
+        new_did = user_did or f"did:lemma:user:{secrets.token_hex(16)}"
         
-        if email:
-            result = customer_manager.create_customer(
-                email=email,
-                name=f"Wallet User",
-                company="Personal"
-            )
-            if result.get('success'):
-                user_id = result['customer']['customer_did']
+        # Use the new get_or_create_by_did method
+        result = customer_manager.get_or_create_by_did(
+            user_did=new_did,
+            email=email,  # Optional
+            wallet_id=wallet_id
+        )
         
+        if result.get('success'):
+            customer_obj = result.get('customer')
+            return {
+                'user_id': new_did,
+                'email': email,
+                'display_name': getattr(customer_obj, 'display_name', None) if customer_obj else None,
+                'role': 'customer',
+                'existing': not result.get('created', True)
+            }
+        
+        # Fallback: return minimal user info without DB record
         return {
-            'user_id': user_id,
+            'user_id': new_did,
             'email': email,
             'role': 'customer',
             'existing': False
@@ -199,13 +233,15 @@ def _track_permission_grant(site_id: str, user_did: str, permission_id: str,
 def issue_to_wallet():
     """
     Issue a permission lemma directly to the user's wallet
+    DID-first: user_did is the primary identifier, email is optional
     
     POST /api/wallet-auth/issue
     {
         "site_id": "lemma.id",  // Site requesting permission
+        "user_did": "did:lemma:user:...",  // Primary identifier (optional, generated if not provided)
         "wallet_id": "...",     // User's wallet ID
         "passkey_credential_id": "...",  // Optional: link to existing user
-        "email": "user@example.com"  // Optional: for new users
+        "email": "user@example.com"  // Optional: for notifications only
     }
     
     Returns the lemma for client-side wallet storage
@@ -213,21 +249,25 @@ def issue_to_wallet():
     try:
         data = request.get_json() or {}
         site_id = data.get('site_id', 'lemma.id')
+        user_did = data.get('user_did')  # Primary identifier
         wallet_id = data.get('wallet_id')
         passkey_credential_id = data.get('passkey_credential_id')
-        email = data.get('email')
+        email = data.get('email')  # Optional
         
-        # Get or create user
+        # Get or create user - DID-first, email optional
         user = get_or_create_user(
+            user_did=user_did,
             email=email,
-            passkey_credential_id=passkey_credential_id
+            passkey_credential_id=passkey_credential_id,
+            wallet_id=wallet_id
         )
         
         # Issue permission lemma
         permission_lemma = issue_permission_lemma(
             user_id=user['user_id'],
             site_id=site_id,
-            permissions=['read', 'write', 'dashboard']
+            permissions=['read', 'write', 'dashboard'],
+            granted_by='wallet_auth'
         )
         
         # Set session for backwards compatibility

@@ -100,13 +100,18 @@ def get_db_connection(site_id=None):
     return conn
 
 class Customer(Base):
-    """Customer account model"""
+    """
+    Customer account model (for billing/business customers)
+    Note: For permission system users, see PlatformUser model
+    """
     __tablename__ = 'customers'
     
     customer_id = Column(String, primary_key=True)
-    email = Column(String, unique=True, nullable=False)
-    name = Column(String, nullable=False)
-    company = Column(String, nullable=False)
+    customer_did = Column(String, unique=True)  # DID identifier (primary for wallet-first)
+    email = Column(String, unique=True, nullable=True)  # Now optional - for notifications only
+    name = Column(String, nullable=True)  # Optional
+    company = Column(String, nullable=True)  # Optional
+    display_name = Column(String)  # User-friendly name for UI
     stripe_customer_id = Column(String)
     api_keys = Column(JSON, default=list)
     sites = Column(JSON, default=list)
@@ -120,6 +125,48 @@ class Customer(Base):
     permissions = Column(JSON, default=list)
     last_login = Column(DateTime)
     login_count = Column(Integer, default=0)
+    wallet_id = Column(String)  # Link to browser wallet
+
+
+class PlatformUser(Base):
+    """
+    Users for the permission system (identified by DID, email optional)
+    Separate from Customer which is for billing/business accounts
+    """
+    __tablename__ = 'platform_users'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_did = Column(String, unique=True, nullable=False)  # Primary identifier
+    
+    # Optional identity info
+    email = Column(String)  # Optional, for notifications only
+    display_name = Column(String)  # Optional, for UI
+    
+    # Wallet linkage  
+    wallet_id = Column(String)  # Browser wallet ID
+    passkey_credential_id = Column(String)  # Primary passkey credential
+    
+    # Account state
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_seen = Column(DateTime)
+    status = Column(String, default='active')  # active, suspended, deleted
+    
+    # Metadata
+    auth_method = Column(String, default='passkey')  # passkey, email_link, oauth
+    verification_level = Column(String, default='base')  # base, email_verified, human_verified
+
+
+class PlatformUserSite(Base):
+    """Link table: which users have access to which sites"""
+    __tablename__ = 'platform_user_sites'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_did = Column(String, nullable=False)  # References platform_users.user_did
+    site_id = Column(String, nullable=False)  # Site they have access to
+    role = Column(String, default='user')  # user, admin, owner
+    joined_at = Column(DateTime, default=datetime.utcnow)
+    invited_by = Column(String)  # Who invited them
+    status = Column(String, default='active')  # active, pending, revoked
 
 class Site(Base):
     """Site model for IAM"""

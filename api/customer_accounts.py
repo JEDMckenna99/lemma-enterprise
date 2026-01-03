@@ -224,9 +224,9 @@ class DateTimeEncoder(json.JSONEncoder):
 class Customer:
     """Customer account data structure"""
     customer_id: str
-    email: str
-    name: str
-    company: str
+    email: Optional[str]  # Now optional - for notifications only
+    name: Optional[str]  # Now optional
+    company: Optional[str]  # Now optional
     stripe_customer_id: Optional[str]
     api_keys: List[Dict[str, Any]]
     created_at: datetime
@@ -240,6 +240,10 @@ class Customer:
     permissions: List[str] = field(default_factory=list)
     last_login: Optional[datetime] = None
     login_count: int = 0
+    # New DID-first fields
+    customer_did: Optional[str] = None  # Primary identifier for wallet-first
+    display_name: Optional[str] = None  # User-friendly name for UI
+    wallet_id: Optional[str] = None  # Link to browser wallet
 
 class CustomerAccountManager:
     """Manages customer accounts and API keys with PostgreSQL backend"""
@@ -318,7 +322,11 @@ class CustomerAccountManager:
             role=db_customer.role,
             permissions=db_customer.permissions or [],
             last_login=db_customer.last_login,
-            login_count=db_customer.login_count
+            login_count=db_customer.login_count,
+            # New DID-first fields
+            customer_did=getattr(db_customer, 'customer_did', None),
+            display_name=getattr(db_customer, 'display_name', None),
+            wallet_id=getattr(db_customer, 'wallet_id', None)
         )
     
     def _store_customer_in_memory(self, customer: Customer):
@@ -326,7 +334,8 @@ class CustomerAccountManager:
         if self.db_available:
             return
         self.customers[customer.customer_id] = customer
-        self.email_to_customer[customer.email] = customer.customer_id
+        if customer.email:  # Email is now optional
+            self.email_to_customer[customer.email] = customer.customer_id
         for key_data in customer.api_keys or []:
             key_value = key_data.get('key')
             if key_value:
@@ -338,6 +347,8 @@ class CustomerAccountManager:
     
     def get_customer_by_email(self, email: str) -> Optional[Customer]:
         """Get customer by email from database"""
+        if not email:
+            return None
         if self.db_available:
             try:
                 db = get_db()
@@ -353,6 +364,98 @@ class CustomerAccountManager:
         if customer_id:
             return self.customers.get(customer_id)
         return None
+    
+    def get_customer_by_did(self, user_did: str) -> Optional[Customer]:
+        """
+        Get customer by DID (primary identifier for wallet-first flow)
+        This is the preferred lookup method for the permission system
+        """
+        if not user_did:
+            return None
+        if self.db_available:
+            try:
+                db = get_db()
+                db_customer = db.query(DBCustomer).filter(DBCustomer.customer_did == user_did).first()
+                db.close()
+                
+                if db_customer:
+                    return self._hydrate_customer(db_customer)
+            except Exception as e:
+                logger.error(f"Error getting customer by DID: {e}")
+        
+        # Fall back to in-memory lookup
+        for cust in self.customers.values():
+            if getattr(cust, 'customer_did', None) == user_did:
+                return cust
+        return None
+    
+    def get_or_create_by_did(self, user_did: str, email: str = None, 
+                            display_name: str = None, wallet_id: str = None) -> Dict[str, Any]:
+        """
+        Get or create a customer by DID (wallet-first flow)
+        Email is optional and used only for notifications
+        
+        Returns: {'success': bool, 'customer': Customer, 'created': bool}
+        """
+        # First try to find by DID
+        existing = self.get_customer_by_did(user_did)
+        if existing:
+            return {
+                'success': True,
+                'customer': existing,
+                'customer_id': existing.customer_id,
+                'customer_did': existing.customer_did,
+                'created': False
+            }
+        
+        # If email provided, check if there's an existing customer with that email
+        # and link them to this DID
+        if email:
+            email_customer = self.get_customer_by_email(email)
+            if email_customer:
+                # Update existing customer with DID
+                try:
+                    if self.db_available:
+                        db = get_db()
+                        db.query(DBCustomer).filter(
+                            DBCustomer.customer_id == email_customer.customer_id
+                        ).update({
+                            'customer_did': user_did,
+                            'wallet_id': wallet_id,
+                            'display_name': display_name or email_customer.display_name
+                        })
+                        db.commit()
+                        db.close()
+                    email_customer.customer_did = user_did
+                    email_customer.wallet_id = wallet_id
+                    return {
+                        'success': True,
+                        'customer': email_customer,
+                        'customer_id': email_customer.customer_id,
+                        'customer_did': user_did,
+                        'created': False,
+                        'linked': True  # Linked email to DID
+                    }
+                except Exception as e:
+                    logger.error(f"Error linking DID to existing customer: {e}")
+        
+        # Create new customer with DID as primary identifier
+        customer_id = f"cust_{secrets.token_hex(8)}"
+        
+        result = self.create_customer(
+            email=email,  # Optional
+            name=display_name or "Wallet User",
+            company="",  # No longer required
+            customer_did=user_did,
+            wallet_id=wallet_id,
+            skip_default_api_key=True  # Don't create API key for permission users
+        )
+        
+        if result.get('success'):
+            result['created'] = True
+            result['customer_did'] = user_did
+        
+        return result
     
     def get_customer(self, customer_id: str) -> Optional[Customer]:
         """Get customer by ID from database"""
@@ -412,36 +515,66 @@ class CustomerAccountManager:
         except ValueError:
             return False
     
-    def create_customer(self, email: str, name: str, company: str, 
+    def create_customer(self, email: str = None, name: str = None, company: str = None, 
                        billing_email: Optional[str] = None, password: Optional[str] = None,
-                       skip_default_api_key: bool = False) -> Dict[str, Any]:
+                       skip_default_api_key: bool = False,
+                       customer_did: str = None, wallet_id: str = None,
+                       display_name: str = None) -> Dict[str, Any]:
         """Create a new customer account
         
         Args:
-            skip_default_api_key: If True, don't create a default API key.
-                                  Used for IAM-based access where users should register a site first.
+            email: Optional - for notifications only (wallet-first flow)
+            name: Optional - display name
+            company: Optional - company name
+            billing_email: Optional - for billing notifications
+            password: Optional - for password-based auth (legacy)
+            skip_default_api_key: If True, don't create a default API key
+            customer_did: Primary identifier for wallet-first flow
+            wallet_id: Browser wallet ID
+            display_name: User-friendly display name
         """
         try:
-            # Check if customer already exists
-            existing_customer = self.get_customer_by_email(email)
-            if existing_customer:
-                return {
-                    'success': False,
-                    'error': 'Customer with this email already exists'
-                }
+            # Check if customer already exists by DID first (preferred)
+            if customer_did:
+                existing_customer = self.get_customer_by_did(customer_did)
+                if existing_customer:
+                    return {
+                        'success': False,
+                        'error': 'Customer with this DID already exists'
+                    }
+            
+            # Then check by email if provided
+            if email:
+                existing_customer = self.get_customer_by_email(email)
+                if existing_customer:
+                    return {
+                        'success': False,
+                        'error': 'Customer with this email already exists'
+                    }
             
             # Generate customer ID
             customer_id = f"cus_{''.join(secrets.choice('abcdefghijklmnopqrstuvwxyz0123456789') for _ in range(16))}"
             
-            # Create Stripe customer
-            stripe_customer = stripe.Customer.create(
-                email=email,
-                name=name,
-                metadata={
-                    'company': company,
-                    'lemma_customer_id': customer_id
-                }
-            )
+            # Generate DID if not provided
+            if not customer_did:
+                customer_did = f"did:lemma:user:{secrets.token_hex(16)}"
+            
+            # Create Stripe customer only if email is provided (for billing)
+            stripe_customer_id = None
+            if email:
+                try:
+                    stripe_customer = stripe.Customer.create(
+                        email=email,
+                        name=name or display_name or "Wallet User",
+                        metadata={
+                            'company': company or '',
+                            'lemma_customer_id': customer_id,
+                            'lemma_did': customer_did
+                        }
+                    )
+                    stripe_customer_id = stripe_customer.id
+                except Exception as stripe_err:
+                    logger.warning(f"Stripe customer creation skipped: {stripe_err}")
             
             # Generate initial API key (unless skipped for IAM-based accounts)
             api_keys_list = []
@@ -467,10 +600,13 @@ class CustomerAccountManager:
             # Create customer record
             customer = Customer(
                 customer_id=customer_id,
+                customer_did=customer_did,
                 email=email,
-                name=name,
+                name=name or display_name,
                 company=company,
-                stripe_customer_id=stripe_customer.id,
+                display_name=display_name,
+                wallet_id=wallet_id,
+                stripe_customer_id=stripe_customer_id,
                 api_keys=api_keys_list,
                 sites=[],
                 created_at=datetime.utcnow(),
@@ -487,10 +623,13 @@ class CustomerAccountManager:
                 db = get_db()
                 db_customer = DBCustomer(
                     customer_id=customer_id,
+                    customer_did=customer_did,
                     email=email,
-                    name=name,
+                    name=name or display_name,
                     company=company,
-                    stripe_customer_id=stripe_customer.id,
+                    display_name=display_name,
+                    wallet_id=wallet_id,
+                    stripe_customer_id=stripe_customer_id,
                     api_keys=api_keys_list,
                     sites=[],
                     created_at=datetime.utcnow(),
@@ -518,13 +657,15 @@ class CustomerAccountManager:
                 self.api_key_to_customer[api_key] = customer_id
             self._store_customer_in_memory(customer)
             
-            logger.info(f"Created customer account: {customer_id} ({email})")
+            logger.info(f"Created customer account: {customer_id} (DID: {customer_did[:30]}..., email: {email or 'none'})")
             
             return {
                 'success': True,
                 'customer_id': customer_id,
-                'stripe_customer_id': stripe_customer.id,
+                'customer_did': customer_did,
+                'stripe_customer_id': stripe_customer_id,
                 'api_key': api_key,
+                'customer': customer,
                 'customer_data': asdict(customer)
             }
             
