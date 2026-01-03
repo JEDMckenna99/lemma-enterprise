@@ -19,22 +19,25 @@ logger = logging.getLogger(__name__)
 wallet_first_bp = Blueprint('wallet_first', __name__)
 
 
-def get_or_create_user(user_did: str = None, email: str = None, 
-                       passkey_credential_id: str = None, wallet_id: str = None) -> dict:
+def get_or_create_user(user_did: str = None, passkey_credential_id: str = None, 
+                       wallet_id: str = None) -> dict:
     """
-    Get or create a user - DID-first, email optional
+    Get or create a user by DID (passkey-derived identifier)
+    
+    Identity chain:
+    - Passkey credential → unlocks wallet → wallet contains DID
+    - DID is the ONLY identifier used for permission issuance
     
     Priority:
     1. Look up by DID (primary identifier)
-    2. Look up by passkey credential ID
-    3. Look up by email (fallback)
-    4. Create new user with DID
+    2. Look up by passkey credential ID (derives DID)
+    3. Create new user with DID
     
-    Returns user info for lemma issuance
+    Returns user info for permission lemma issuance
     """
     db = get_db()
     try:
-        # 1. Try to find by DID first (primary identifier)
+        # 1. Try to find by DID (primary identifier)
         if user_did:
             customer = db.query(Customer).filter(
                 Customer.customer_did == user_did
@@ -42,13 +45,11 @@ def get_or_create_user(user_did: str = None, email: str = None,
             if customer:
                 return {
                     'user_id': customer.customer_did,
-                    'email': customer.email,
                     'display_name': getattr(customer, 'display_name', None),
-                    'role': 'admin' if customer.email and 'jedmckenna' in customer.email else 'customer',
                     'existing': True
                 }
         
-        # 2. Try to find by passkey (links to DID)
+        # 2. Try to find by passkey credential ID (links to DID)
         if passkey_credential_id:
             passkey = db.query(Passkey).filter(
                 Passkey.credential_id == passkey_credential_id,
@@ -56,38 +57,30 @@ def get_or_create_user(user_did: str = None, email: str = None,
             ).first()
             
             if passkey:
-                # Passkey.user_id should be a DID
+                # Passkey.user_id IS the DID
                 customer = db.query(Customer).filter(
                     Customer.customer_did == passkey.user_id
                 ).first()
                 if customer:
                     return {
                         'user_id': customer.customer_did,
-                        'email': customer.email,
                         'display_name': getattr(customer, 'display_name', None),
-                        'role': 'admin' if customer.email and 'jedmckenna' in customer.email else 'customer',
+                        'existing': True
+                    }
+                else:
+                    # Passkey exists but no customer record - use passkey's user_id as DID
+                    return {
+                        'user_id': passkey.user_id,
+                        'display_name': None,
                         'existing': True
                     }
         
-        # 3. Try to find by email (fallback for legacy users)
-        if email:
-            customer = db.query(Customer).filter(Customer.email == email.lower()).first()
-            if customer:
-                return {
-                    'user_id': customer.customer_did or f"did:lemma:user:{customer.customer_id}",
-                    'email': customer.email,
-                    'display_name': getattr(customer, 'display_name', None),
-                    'role': 'admin' if 'jedmckenna' in email else 'customer',
-                    'existing': True
-                }
-        
-        # 4. Create new user with DID as primary identifier
+        # 3. Create new user with DID as primary identifier
         new_did = user_did or f"did:lemma:user:{secrets.token_hex(16)}"
         
-        # Use the new get_or_create_by_did method
+        # Store minimal user record for permission tracking
         result = customer_manager.get_or_create_by_did(
             user_did=new_did,
-            email=email,  # Optional
             wallet_id=wallet_id
         )
         
@@ -95,17 +88,15 @@ def get_or_create_user(user_did: str = None, email: str = None,
             customer_obj = result.get('customer')
             return {
                 'user_id': new_did,
-                'email': email,
                 'display_name': getattr(customer_obj, 'display_name', None) if customer_obj else None,
-                'role': 'customer',
                 'existing': not result.get('created', True)
             }
         
         # Fallback: return minimal user info without DB record
+        # Permission can still be issued - wallet holds the proof
         return {
             'user_id': new_did,
-            'email': email,
-            'role': 'customer',
+            'display_name': None,
             'existing': False
         }
         
@@ -233,31 +224,29 @@ def _track_permission_grant(site_id: str, user_did: str, permission_id: str,
 def issue_to_wallet():
     """
     Issue a permission lemma directly to the user's wallet
-    DID-first: user_did is the primary identifier, email is optional
+    
+    Identity: DID (from passkey-unlocked wallet) is the ONLY identifier
     
     POST /api/wallet-auth/issue
     {
-        "site_id": "lemma.id",  // Site requesting permission
-        "user_did": "did:lemma:user:...",  // Primary identifier (optional, generated if not provided)
-        "wallet_id": "...",     // User's wallet ID
-        "passkey_credential_id": "...",  // Optional: link to existing user
-        "email": "user@example.com"  // Optional: for notifications only
+        "site_id": "lemma.id",              // Site requesting permission
+        "user_did": "did:lemma:user:...",   // User's DID (from wallet)
+        "wallet_id": "...",                 // Browser wallet ID
+        "passkey_credential_id": "..."      // Passkey that unlocked the wallet
     }
     
-    Returns the lemma for client-side wallet storage
+    Returns the permission lemma for client-side wallet storage
     """
     try:
         data = request.get_json() or {}
         site_id = data.get('site_id', 'lemma.id')
-        user_did = data.get('user_did')  # Primary identifier
+        user_did = data.get('user_did')  # Primary identifier from wallet
         wallet_id = data.get('wallet_id')
         passkey_credential_id = data.get('passkey_credential_id')
-        email = data.get('email')  # Optional
         
-        # Get or create user - DID-first, email optional
+        # Get or create user by DID (the only identifier)
         user = get_or_create_user(
             user_did=user_did,
-            email=email,
             passkey_credential_id=passkey_credential_id,
             wallet_id=wallet_id
         )
@@ -280,12 +269,12 @@ def issue_to_wallet():
         return jsonify({
             'success': True,
             'user': {
-                'id': user['user_id'],
-                'email': user.get('email'),
+                'did': user['user_id'],
+                'displayName': user.get('display_name'),
                 'isNew': not user['existing']
             },
             'permission_lemma': permission_lemma,
-            'message': 'Permission issued successfully. Store in your wallet.'
+            'message': 'Permission issued to wallet.'
         })
         
     except Exception as e:
@@ -360,19 +349,20 @@ def register_and_issue():
 @cross_origin()
 def verify_wallet_session():
     """
-    Verify a wallet auth proof and establish session
-    Called when wallet is unlocked to authenticate
+    Verify wallet unlock and establish session
+    Called when passkey unlocks wallet to authenticate user
     
     POST /api/wallet-auth/verify-session
     {
-        "wallet_id": "...",
-        "passkey_credential_id": "...",
-        "unlocked_at": 1234567890,
-        "permissions": ["lemma.id:read", "lemma.id:write"]
+        "user_did": "did:lemma:user:...",   // User's DID from wallet
+        "wallet_id": "...",                 // Browser wallet ID
+        "passkey_credential_id": "...",     // Passkey that unlocked wallet
+        "permissions": ["lemma.id:read"]    // Permissions from wallet
     }
     """
     try:
         data = request.get_json() or {}
+        user_did = data.get('user_did')
         wallet_id = data.get('wallet_id')
         passkey_credential_id = data.get('passkey_credential_id')
         permissions = data.get('permissions', [])
@@ -383,13 +373,17 @@ def verify_wallet_session():
                 'error': 'Wallet ID required'
             }), 400
         
-        # Find user by passkey
-        user = get_or_create_user(passkey_credential_id=passkey_credential_id)
+        # Find user by DID or passkey
+        user = get_or_create_user(
+            user_did=user_did,
+            passkey_credential_id=passkey_credential_id,
+            wallet_id=wallet_id
+        )
         
-        # Check for lemma.id permission
+        # Check for lemma.id permission in wallet
         has_lemma_permission = any('lemma.id' in p for p in permissions)
         
-        # Set session
+        # Set session (for backwards compatibility with existing routes)
         session['customer_id'] = user['user_id']
         session['auth_method'] = 'wallet_passkey'
         session['wallet_id'] = wallet_id
@@ -399,8 +393,8 @@ def verify_wallet_session():
             'success': True,
             'authenticated': True,
             'user': {
-                'id': user['user_id'],
-                'email': user.get('email'),
+                'did': user['user_id'],
+                'displayName': user.get('display_name'),
                 'hasLemmaPermission': has_lemma_permission
             },
             'needsPermission': not has_lemma_permission

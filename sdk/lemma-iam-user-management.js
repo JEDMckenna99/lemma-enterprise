@@ -87,8 +87,11 @@ class LemmaIAMUserManager {
                     <!-- Add User Section -->
                     <div class="lemma-iam-section">
                         <h3>Add New User</h3>
+                        <p style="color: #666; margin-bottom: 12px; font-size: 0.9rem;">
+                            Users are identified by their DID (from their passkey-unlocked wallet)
+                        </p>
                         <div class="add-user-form">
-                            <input type="email" id="newUserEmail" placeholder="User email address" class="lemma-input">
+                            <input type="text" id="newUserDID" placeholder="User DID (did:lemma:user:...)" class="lemma-input">
                             <select id="newUserRole" class="lemma-select">
                                 <option value="user">User</option>
                                 <option value="moderator">Moderator</option>
@@ -98,6 +101,9 @@ class LemmaIAMUserManager {
                                 Add User
                             </button>
                         </div>
+                        <p style="color: #888; margin-top: 12px; font-size: 0.8rem;">
+                            Or <a href="#" onclick="this.parentNode.parentNode.userManager.inviteUser(); return false;">generate an invite link</a> for new users
+                        </p>
                     </div>
 
                     <!-- Users List -->
@@ -250,9 +256,11 @@ class LemmaIAMUserManager {
                 flex-direction: column;
             }
 
-            .user-email {
+            .user-did {
                 font-weight: 600;
                 color: #111827;
+                font-family: monospace;
+                font-size: 0.85rem;
                 margin-bottom: 2px;
             }
 
@@ -465,22 +473,22 @@ class LemmaIAMUserManager {
         container.innerHTML = this.state.users.map(user => `
             <div class="user-item">
                 <div class="user-info">
-                    <div class="user-email">${user.email}</div>
+                    <div class="user-did" title="${user.user_did}">${user.display_name || user.user_did.substring(0, 35) + '...'}</div>
                     <div class="user-meta">
                         Added ${new Date(user.added_at).toLocaleDateString()} by ${user.added_by}
-                        ${user.last_login ? `• Last login: ${new Date(user.last_login).toLocaleDateString()}` : ''}
+                        ${user.last_seen ? `• Last seen: ${new Date(user.last_seen).toLocaleDateString()}` : ''}
                     </div>
                 </div>
                 <div class="user-role">${user.role}</div>
                 <div class="user-status status-${user.status}">${user.status}</div>
                 <div class="user-actions">
-                    <button class="btn-small btn-grant" onclick="this.closest('.lemma-iam-container').userManager.grantPermission('${user.user_did}', '${user.email}')">
+                    <button class="btn-small btn-grant" onclick="this.closest('.lemma-iam-container').userManager.grantPermission('${user.user_did}')">
                         Grant Access
                     </button>
-                    <button class="btn-small btn-revoke" onclick="this.closest('.lemma-iam-container').userManager.revokePermission('${user.user_did}', '${user.email}')">
+                    <button class="btn-small btn-revoke" onclick="this.closest('.lemma-iam-container').userManager.revokePermission('${user.user_did}')">
                         Revoke Access
                     </button>
-                    <button class="btn-small btn-remove" onclick="this.closest('.lemma-iam-container').userManager.removeUser('${user.user_did}', '${user.email}')">
+                    <button class="btn-small btn-remove" onclick="this.closest('.lemma-iam-container').userManager.removeUser('${user.user_did}')">
                         Remove
                     </button>
                 </div>
@@ -511,11 +519,16 @@ class LemmaIAMUserManager {
     }
 
     async addUser() {
-        const email = document.getElementById('newUserEmail').value.trim();
+        const userDID = document.getElementById('newUserDID').value.trim();
         const role = document.getElementById('newUserRole').value;
 
-        if (!email) {
-            alert('Please enter a user email address');
+        if (!userDID) {
+            alert('Please enter a user DID (did:lemma:user:...)');
+            return;
+        }
+
+        if (!userDID.startsWith('did:lemma:')) {
+            alert('Invalid DID format. Should start with did:lemma:');
             return;
         }
 
@@ -527,7 +540,7 @@ class LemmaIAMUserManager {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    email: email,
+                    user_did: userDID,
                     role: role
                 })
             });
@@ -536,13 +549,13 @@ class LemmaIAMUserManager {
             
             if (result.success) {
                 // Clear form
-                document.getElementById('newUserEmail').value = '';
+                document.getElementById('newUserDID').value = '';
                 document.getElementById('newUserRole').value = 'user';
                 
                 // Refresh users list
                 await this.loadUsers();
                 
-                alert(`User ${email} added successfully as ${role}`);
+                alert(`User ${userDID.substring(0, 30)}... added as ${role}`);
             } else {
                 alert('Failed to add user: ' + result.error);
             }
@@ -553,7 +566,43 @@ class LemmaIAMUserManager {
         }
     }
 
-    async grantPermission(userDid, userEmail) {
+    /**
+     * Generate an invite link for new users
+     * Users visit the link, create a wallet/passkey, and get permission issued
+     */
+    async inviteUser() {
+        const role = document.getElementById('newUserRole').value;
+        
+        try {
+            const response = await fetch(`${this.config.apiBase}/api/v1/sites/${this.config.siteId}/invite`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.config.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    role: role,
+                    expires_in: 86400 * 7  // 7 days
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.success && result.invite_url) {
+                // Copy to clipboard
+                navigator.clipboard.writeText(result.invite_url);
+                alert(`Invite link copied to clipboard!\n\n${result.invite_url}\n\nShare this with the user. They'll create a wallet and receive ${role} permissions.`);
+            } else {
+                alert('Failed to create invite: ' + (result.error || 'Unknown error'));
+            }
+
+        } catch (error) {
+            console.error('Failed to create invite:', error);
+            alert('Failed to create invite link');
+        }
+    }
+
+    async grantPermission(userDid) {
         const permissionId = prompt('Enter permission ID to grant (e.g., "admin", "moderator", "editor"):', 'user');
         if (!permissionId) return;
 
@@ -573,7 +622,7 @@ class LemmaIAMUserManager {
             const result = await response.json();
             
             if (result.success) {
-                alert(`Permission "${permissionId}" granted to ${userEmail}. Permission lemma has been issued to their wallet.`);
+                alert(`Permission "${permissionId}" granted. Permission lemma issued to user's wallet.`);
                 await this.loadUsers(); // Refresh
             } else {
                 alert('Failed to grant permission: ' + result.error);
@@ -585,16 +634,17 @@ class LemmaIAMUserManager {
         }
     }
 
-    async revokePermission(userDid, userEmail) {
+    async revokePermission(userDid) {
         const permissionId = prompt('Enter permission ID to revoke:', 'user');
         if (!permissionId) return;
 
-        if (!confirm(`Are you sure you want to revoke "${permissionId}" permission from ${userEmail} for ${this.config.siteId}?\n\nThis will ONLY remove their access to this specific site. Their PoH lemma and permissions for other sites will remain intact.`)) {
+        const shortDid = userDid.substring(0, 30) + '...';
+        if (!confirm(`Revoke "${permissionId}" from ${shortDid} for ${this.config.siteId}?\n\nThis removes access to THIS site only.`)) {
             return;
         }
 
         try {
-            // Call API to revoke permission (triggers client-side lemma removal)
+            // Call API to revoke permission (adds to revocation list)
             const response = await fetch(`${this.config.apiBase}/api/v1/sites/${this.config.siteId}/users/${userDid}/permissions/${permissionId}`, {
                 method: 'DELETE',
                 headers: {
@@ -626,7 +676,7 @@ class LemmaIAMUserManager {
                     }
                 }
                 
-                alert(`Permission "${permissionId}" revoked from ${userEmail} for ${this.config.siteId}.\n\nTheir access to this site has been removed. Their PoH lemma and other site permissions remain intact.`);
+                alert(`Permission "${permissionId}" revoked for ${this.config.siteId}.`);
                 await this.loadUsers(); // Refresh
             } else {
                 alert('Failed to revoke permission: ' + result.error);
@@ -638,8 +688,9 @@ class LemmaIAMUserManager {
         }
     }
 
-    async removeUser(userDid, userEmail) {
-        if (!confirm(`Are you sure you want to remove ${userEmail} from this site? This will revoke all their permissions and cannot be undone.`)) {
+    async removeUser(userDid) {
+        const shortDid = userDid.substring(0, 30) + '...';
+        if (!confirm(`Remove ${shortDid} from this site?\n\nThis revokes all their permissions and cannot be undone.`)) {
             return;
         }
 
@@ -655,7 +706,7 @@ class LemmaIAMUserManager {
             const result = await response.json();
             
             if (result.success) {
-                alert(`User ${userEmail} removed successfully. All their permissions have been revoked.`);
+                alert(`User removed. All their permissions for this site have been revoked.`);
                 await this.loadUsers(); // Refresh
             } else {
                 alert('Failed to remove user: ' + result.error);
