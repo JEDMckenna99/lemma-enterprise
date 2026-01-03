@@ -1,6 +1,16 @@
 """
 Wallet-First Authentication API
-Direct issuance to browser wallet with passkey unlock - no email required
+================================
+
+Issues permission lemmas directly to passkey-unlocked wallets.
+
+IDENTITY MODEL (from whitepaper):
+- User identified by PPID (Pairwise Pseudonymous Identifier)
+- PPID = HMAC(wallet_secret, site_id) - DIFFERENT per site
+- Sites CANNOT correlate users across sites (privacy)
+- Same user at same site = same PPID (account continuity)
+
+NO EMAIL REQUIRED - passkey/wallet is the root of trust.
 """
 
 import os
@@ -13,43 +23,71 @@ from flask_cors import cross_origin
 
 from .database import get_db, Customer, Passkey
 from .customer_accounts import customer_manager
+from .ppid import derive_ppid_from_passkey, derive_ppid_from_wallet_secret, canonicalize_rp_id
 
 logger = logging.getLogger(__name__)
 
 wallet_first_bp = Blueprint('wallet_first', __name__)
 
 
-def get_or_create_user(user_did: str = None, passkey_credential_id: str = None, 
-                       wallet_id: str = None) -> dict:
+def derive_user_ppid(site_id: str, wallet_secret: str = None, passkey_credential_id: str = None) -> str:
     """
-    Get or create a user by DID (passkey-derived identifier)
+    Derive the user's PPID (Pairwise Pseudonymous Identifier) for a specific site.
     
-    Identity chain:
-    - Passkey credential → unlocks wallet → wallet contains DID
-    - DID is the ONLY identifier used for permission issuance
+    PPID = did:lemma:ppid_<HMAC(master_secret, site_id)>
     
-    Priority:
-    1. Look up by DID (primary identifier)
-    2. Look up by passkey credential ID (derives DID)
-    3. Create new user with DID
+    Each site gets a DIFFERENT identifier for the same user.
+    This prevents cross-site tracking while maintaining account continuity.
     
-    Returns user info for permission lemma issuance
+    Args:
+        site_id: The site domain/identifier
+        wallet_secret: Wallet's master secret (preferred)
+        passkey_credential_id: Passkey credential ID (fallback)
+        
+    Returns:
+        Pairwise subject DID: did:lemma:ppid_<hash>
     """
+    site = canonicalize_rp_id(site_id)
+    
+    # Prefer wallet secret (client-side derived)
+    if wallet_secret:
+        return derive_ppid_from_wallet_secret(wallet_secret, site)
+    
+    # Fallback to passkey-based derivation (server-side)
+    if passkey_credential_id:
+        return derive_ppid_from_passkey(passkey_credential_id, site)
+    
+    # Last resort: generate random (not recommended - loses continuity)
+    logger.warning("⚠️ No wallet_secret or passkey - generating random PPID")
+    random_secret = secrets.token_hex(32)
+    return derive_ppid_from_wallet_secret(random_secret, site)
+
+
+def get_or_create_user_for_site(site_id: str, wallet_secret: str = None, 
+                                passkey_credential_id: str = None) -> dict:
+    """
+    Get or create a user record for permission tracking at a specific site.
+    
+    The user is identified by their PPID (site-specific, derived from wallet).
+    
+    Args:
+        site_id: The site requesting the permission
+        wallet_secret: Wallet's master secret
+        passkey_credential_id: Passkey credential ID
+        
+    Returns:
+        User info with site-specific PPID
+    """
+    # Derive the PPID for this site
+    ppid = derive_user_ppid(site_id, wallet_secret, passkey_credential_id)
+    
     db = get_db()
     try:
-        # 1. Try to find by DID (primary identifier)
-        if user_did:
-            customer = db.query(Customer).filter(
-                Customer.customer_did == user_did
-            ).first()
-            if customer:
-                return {
-                    'user_id': customer.customer_did,
-                    'display_name': getattr(customer, 'display_name', None),
-                    'existing': True
-                }
+        # Check if we have a record for this PPID
+        # Note: PPIDs are site-specific, so we track per (site_id, ppid)
+        # For now, we just track by ppid since it's already site-specific
         
-        # 2. Try to find by passkey credential ID (links to DID)
+        # Try to find existing user with this passkey
         if passkey_credential_id:
             passkey = db.query(Passkey).filter(
                 Passkey.credential_id == passkey_credential_id,
@@ -57,46 +95,16 @@ def get_or_create_user(user_did: str = None, passkey_credential_id: str = None,
             ).first()
             
             if passkey:
-                # Passkey.user_id IS the DID
-                customer = db.query(Customer).filter(
-                    Customer.customer_did == passkey.user_id
-                ).first()
-                if customer:
-                    return {
-                        'user_id': customer.customer_did,
-                        'display_name': getattr(customer, 'display_name', None),
-                        'existing': True
-                    }
-                else:
-                    # Passkey exists but no customer record - use passkey's user_id as DID
-                    return {
-                        'user_id': passkey.user_id,
-                        'display_name': None,
-                        'existing': True
-                    }
+                return {
+                    'ppid': ppid,
+                    'passkey_user_id': passkey.user_id,
+                    'existing': True
+                }
         
-        # 3. Create new user with DID as primary identifier
-        new_did = user_did or f"did:lemma:user:{secrets.token_hex(16)}"
-        
-        # Store minimal user record for permission tracking
-        result = customer_manager.get_or_create_by_did(
-            user_did=new_did,
-            wallet_id=wallet_id
-        )
-        
-        if result.get('success'):
-            customer_obj = result.get('customer')
-            return {
-                'user_id': new_did,
-                'display_name': getattr(customer_obj, 'display_name', None) if customer_obj else None,
-                'existing': not result.get('created', True)
-            }
-        
-        # Fallback: return minimal user info without DB record
-        # Permission can still be issued - wallet holds the proof
+        # New user for this site
         return {
-            'user_id': new_did,
-            'display_name': None,
+            'ppid': ppid,
+            'passkey_user_id': None,
             'existing': False
         }
         
@@ -104,24 +112,26 @@ def get_or_create_user(user_did: str = None, passkey_credential_id: str = None,
         db.close()
 
 
-def issue_permission_lemma(user_id: str, site_id: str = 'lemma.id', permissions: list = None, 
+def issue_permission_lemma(subject_ppid: str, site_id: str = 'lemma.id', permissions: list = None, 
                           granted_by: str = 'system', track_in_db: bool = True) -> dict:
     """
     Issue a permission lemma for direct wallet storage.
-    Also tracks the grant in the database for admin management and revocation.
+    
+    The lemma's SUBJECT is the user's PPID (site-specific identifier).
+    The lemma's ISSUER is the site's DID (Ed25519 keypair).
     
     Args:
-        user_id: User's DID
+        subject_ppid: User's PPID for this site (did:lemma:ppid_xxx)
         site_id: Site issuing the permission
         permissions: List of permission strings
         granted_by: Who granted this (for audit)
-        track_in_db: Whether to store in user_permissions table (default True)
+        track_in_db: Whether to store in user_permissions table
     """
     try:
-        # Import the IAM issuer (same issuer used across the platform)
+        # Import the IAM issuer (site's Ed25519 keypair)
         from api.issuer_management import get_issuer_manager
         issuer_manager = get_issuer_manager()
-        iam_issuer = issuer_manager.get_iam_issuer(site_id)
+        site_issuer = issuer_manager.get_iam_issuer(site_id)
         
         # Build claims - Rust expects all values to be strings
         perm_list = permissions or ['read', 'write']
@@ -131,30 +141,33 @@ def issue_permission_lemma(user_id: str, site_id: str = 'lemma.id', permissions:
         claims = {
             'type': 'permission',
             'siteId': site_id,
-            'permissions': ','.join(perm_list),  # Convert list to comma-separated string
+            'permissions': ','.join(perm_list),
             'issuedAt': issued_at.isoformat() + 'Z',
             'expiresAt': expires_at.isoformat() + 'Z'
         }
         
-        # Issue the credential
-        credential_json = iam_issuer.issue_credential(user_id, claims)
+        # Issue the credential with PPID as subject
+        # subject = user's PPID (site-specific)
+        # issuer = site's DID
+        credential_json = site_issuer.issue_credential(subject_ppid, claims)
         credential = json.loads(credential_json)
         
         # Add metadata for wallet storage
         credential['packageType'] = 'permission'
         credential['issuerInfo'] = {
-            'did': iam_issuer.get_did(),
-            'publicKey': iam_issuer.get_public_key_hex(),
-            'name': 'Lemma IAM',
+            'did': site_issuer.get_did(),
+            'publicKey': site_issuer.get_public_key_hex(),
+            'name': f'{site_id} IAM',
             'verified': True
         }
         
         # Track the grant in database for admin management and revocation
+        # Note: We track by PPID (site-specific) not a global user ID
         if track_in_db:
             try:
                 _track_permission_grant(
                     site_id=site_id,
-                    user_did=user_id,
+                    user_did=subject_ppid,  # PPID is the user identifier for this site
                     permission_id=','.join(perm_list),
                     credential_id=credential.get('id', ''),
                     granted_by=granted_by,
@@ -163,7 +176,7 @@ def issue_permission_lemma(user_id: str, site_id: str = 'lemma.id', permissions:
             except Exception as db_err:
                 logger.warning(f"⚠️ Failed to track permission in DB (credential still issued): {db_err}")
         
-        logger.info(f"✅ Permission lemma issued for {user_id} on {site_id}")
+        logger.info(f"✅ Permission lemma issued: subject={subject_ppid[:40]}... site={site_id}")
         return credential
         
     except Exception as e:
@@ -223,65 +236,73 @@ def _track_permission_grant(site_id: str, user_did: str, permission_id: str,
 @cross_origin()
 def issue_to_wallet():
     """
-    Issue a permission lemma directly to the user's wallet
+    Issue a permission lemma directly to the user's wallet.
     
-    Identity: DID (from passkey-unlocked wallet) is the ONLY identifier
+    IDENTITY MODEL:
+    - User identified by PPID (Pairwise Pseudonymous Identifier)
+    - PPID = HMAC(wallet_secret, site_id) - DIFFERENT per site
+    - This prevents cross-site user tracking
     
     POST /api/wallet-auth/issue
     {
-        "site_id": "lemma.id",              // Site requesting permission
-        "user_did": "did:lemma:user:...",   // User's DID (from wallet)
-        "wallet_id": "...",                 // Browser wallet ID
-        "passkey_credential_id": "..."      // Passkey that unlocked the wallet
+        "site_id": "example.com",           // Site requesting permission
+        "wallet_secret": "hex...",          // Wallet's master secret (for PPID derivation)
+        "passkey_credential_id": "..."      // Passkey that unlocked the wallet (fallback)
     }
     
-    Returns the permission lemma for client-side wallet storage
+    Returns:
+    - permission_lemma: Signed credential with subject=PPID
+    - ppid: The user's PPID for this site
     """
     try:
         data = request.get_json() or {}
         site_id = data.get('site_id', 'lemma.id')
-        user_did = data.get('user_did')  # Primary identifier from wallet
-        wallet_id = data.get('wallet_id')
+        wallet_secret = data.get('wallet_secret')  # For PPID derivation
         passkey_credential_id = data.get('passkey_credential_id')
         
-        # Get or create user by DID (the only identifier)
-        user = get_or_create_user(
-            user_did=user_did,
-            passkey_credential_id=passkey_credential_id,
-            wallet_id=wallet_id
-        )
+        if not wallet_secret and not passkey_credential_id:
+            return jsonify({
+                'success': False,
+                'error': 'Either wallet_secret or passkey_credential_id required for PPID derivation'
+            }), 400
         
-        # Issue permission lemma
+        # Derive PPID for this site (site-specific user identifier)
+        ppid = derive_user_ppid(site_id, wallet_secret, passkey_credential_id)
+        
+        # Check if this is an existing user for this site
+        user_info = get_or_create_user_for_site(site_id, wallet_secret, passkey_credential_id)
+        
+        # Issue permission lemma with PPID as subject
         permission_lemma = issue_permission_lemma(
-            user_id=user['user_id'],
+            subject_ppid=ppid,
             site_id=site_id,
-            permissions=['read', 'write', 'dashboard'],
+            permissions=['read', 'write', 'access'],
             granted_by='wallet_auth'
         )
         
         # Set session for backwards compatibility
-        session['customer_id'] = user['user_id']
+        session['customer_id'] = ppid
         session['auth_method'] = 'wallet_passkey'
-        session['wallet_id'] = wallet_id
+        session['site_id'] = site_id
         
-        logger.info(f"✅ Issued permission to wallet for {user['user_id']}")
+        logger.info(f"✅ Issued permission to wallet: ppid={ppid[:40]}... site={site_id}")
         
         return jsonify({
             'success': True,
-            'user': {
-                'did': user['user_id'],
-                'displayName': user.get('display_name'),
-                'isNew': not user['existing']
-            },
+            'ppid': ppid,  # User's identifier for THIS site only
+            'site_id': site_id,
+            'is_new_user': not user_info['existing'],
             'permission_lemma': permission_lemma,
-            'message': 'Permission issued to wallet.'
+            'message': 'Permission lemma issued. Store in wallet.'
         })
         
     except Exception as e:
         logger.error(f"❌ Wallet issue failed: {e}")
+        import traceback
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'traceback': traceback.format_exc()
         }), 500
 
 
@@ -289,59 +310,58 @@ def issue_to_wallet():
 @cross_origin()
 def register_and_issue():
     """
-    Combined endpoint: Register passkey + Issue permission in one step
-    For new users who don't have a wallet yet
+    Combined endpoint: Register passkey + Issue permission in one step.
     
     POST /api/wallet-auth/register-and-issue
     {
-        "site_id": "lemma.id",
-        "passkey_credential": {...},  // WebAuthn registration response
-        "wallet_id": "..."
+        "site_id": "example.com",
+        "wallet_secret": "hex...",          // Wallet's master secret
+        "passkey_credential_id": "..."      // New passkey credential ID
     }
     """
     try:
         data = request.get_json() or {}
         site_id = data.get('site_id', 'lemma.id')
-        wallet_id = data.get('wallet_id')
-        passkey_credential = data.get('passkey_credential')
+        wallet_secret = data.get('wallet_secret')
+        passkey_credential_id = data.get('passkey_credential_id')
         
-        # Verify we have a passkey credential
-        if not passkey_credential:
+        if not wallet_secret and not passkey_credential_id:
             return jsonify({
                 'success': False,
-                'error': 'Passkey credential required'
+                'error': 'Either wallet_secret or passkey_credential_id required'
             }), 400
         
-        # Create user
-        user_id = f"did:lemma:user_{secrets.token_hex(8)}"
+        # Derive PPID for this site
+        ppid = derive_user_ppid(site_id, wallet_secret, passkey_credential_id)
         
-        # Issue permission
+        # Issue permission lemma with PPID as subject
         permission_lemma = issue_permission_lemma(
-            user_id=user_id,
+            subject_ppid=ppid,
             site_id=site_id,
-            permissions=['read', 'write', 'dashboard']
+            permissions=['read', 'write', 'access']
         )
         
         # Set session
-        session['customer_id'] = user_id
+        session['customer_id'] = ppid
         session['auth_method'] = 'wallet_passkey'
-        session['wallet_id'] = wallet_id
+        session['site_id'] = site_id
         
         return jsonify({
             'success': True,
-            'user': {
-                'id': user_id,
-                'isNew': True
-            },
+            'ppid': ppid,
+            'site_id': site_id,
+            'is_new_user': True,
             'permission_lemma': permission_lemma,
-            'message': 'Account created and permission issued!'
+            'message': 'Wallet registered and permission issued!'
         })
         
     except Exception as e:
         logger.error(f"❌ Register and issue failed: {e}")
+        import traceback
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'traceback': traceback.format_exc()
         }), 500
 
 
@@ -349,55 +369,49 @@ def register_and_issue():
 @cross_origin()
 def verify_wallet_session():
     """
-    Verify wallet unlock and establish session
-    Called when passkey unlocks wallet to authenticate user
+    Verify wallet unlock and check permissions for a site.
     
     POST /api/wallet-auth/verify-session
     {
-        "user_did": "did:lemma:user:...",   // User's DID from wallet
-        "wallet_id": "...",                 // Browser wallet ID
+        "site_id": "example.com",           // Site checking permission
+        "wallet_secret": "hex...",          // For PPID derivation
         "passkey_credential_id": "...",     // Passkey that unlocked wallet
-        "permissions": ["lemma.id:read"]    // Permissions from wallet
+        "permissions": ["example.com:read"] // Permissions from wallet
     }
     """
     try:
         data = request.get_json() or {}
-        user_did = data.get('user_did')
-        wallet_id = data.get('wallet_id')
+        site_id = data.get('site_id', 'lemma.id')
+        wallet_secret = data.get('wallet_secret')
         passkey_credential_id = data.get('passkey_credential_id')
         permissions = data.get('permissions', [])
         
-        if not wallet_id:
+        if not wallet_secret and not passkey_credential_id:
             return jsonify({
                 'success': False,
-                'error': 'Wallet ID required'
+                'error': 'Either wallet_secret or passkey_credential_id required'
             }), 400
         
-        # Find user by DID or passkey
-        user = get_or_create_user(
-            user_did=user_did,
-            passkey_credential_id=passkey_credential_id,
-            wallet_id=wallet_id
-        )
+        # Derive PPID for this site
+        ppid = derive_user_ppid(site_id, wallet_secret, passkey_credential_id)
         
-        # Check for lemma.id permission in wallet
-        has_lemma_permission = any('lemma.id' in p for p in permissions)
+        # Check if user has permission for this site
+        site_canonical = canonicalize_rp_id(site_id)
+        has_site_permission = any(site_canonical in p for p in permissions)
         
-        # Set session (for backwards compatibility with existing routes)
-        session['customer_id'] = user['user_id']
+        # Set session (for backwards compatibility)
+        session['customer_id'] = ppid
         session['auth_method'] = 'wallet_passkey'
-        session['wallet_id'] = wallet_id
+        session['site_id'] = site_id
         session['authenticated'] = True
         
         return jsonify({
             'success': True,
             'authenticated': True,
-            'user': {
-                'did': user['user_id'],
-                'displayName': user.get('display_name'),
-                'hasLemmaPermission': has_lemma_permission
-            },
-            'needsPermission': not has_lemma_permission
+            'ppid': ppid,
+            'site_id': site_id,
+            'has_permission': has_site_permission,
+            'needs_permission': not has_site_permission
         })
         
     except Exception as e:
