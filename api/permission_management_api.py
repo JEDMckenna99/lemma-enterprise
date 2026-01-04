@@ -318,18 +318,21 @@ def get_site_users(site_id):
         
         db = get_db()
         try:
+            # Note: Table uses user_did column for PPID (no global identifiers)
+            # user_email column exists but should NOT be returned for privacy
             result = db.execute(text("""
-                SELECT user_ppid, display_name, role, status, added_by, added_at, last_seen
+                SELECT user_did, display_name, user_role, user_status, added_by, added_at, last_login
                 FROM site_users
-                WHERE site_id = :site_id AND status != 'removed'
+                WHERE site_id = :site_id AND (user_status IS NULL OR user_status != 'removed')
                 ORDER BY added_at DESC
             """), {'site_id': site_id}).fetchall()
             
             users = []
             for row in result:
+                user_did = row[0]
                 users.append({
-                    'user_did': row[0],  # PPID - site-specific identifier
-                    'display_name': row[1] or f"User {row[0][:16]}...",
+                    'user_did': user_did,  # PPID - site-specific identifier (NO EMAIL)
+                    'display_name': row[1] or f"User {user_did[:20]}..." if user_did else 'Unknown',
                     'role': row[2] or 'user',
                     'status': row[3] or 'active',
                     'added_by': row[4] or 'admin',
@@ -450,9 +453,9 @@ def add_site_user(site_id):
         try:
             # Check if user already exists for this site
             existing = db.execute(text("""
-                SELECT user_ppid FROM site_users 
-                WHERE site_id = :site_id AND user_ppid = :user_ppid
-            """), {'site_id': site_id, 'user_ppid': user_did}).fetchone()
+                SELECT user_did FROM site_users 
+                WHERE site_id = :site_id AND user_did = :user_did
+            """), {'site_id': site_id, 'user_did': user_did}).fetchone()
             
             if existing:
                 return jsonify({
@@ -460,13 +463,13 @@ def add_site_user(site_id):
                     'error': 'User already exists for this site'
                 }), 400
             
-            # Insert new user
+            # Insert new user (NO EMAIL - PPID only for privacy)
             db.execute(text("""
-                INSERT INTO site_users (site_id, user_ppid, display_name, role, status, added_by, added_at)
-                VALUES (:site_id, :user_ppid, :display_name, :role, 'active', 'api', :added_at)
+                INSERT INTO site_users (site_id, user_did, display_name, user_role, user_status, added_by, added_at)
+                VALUES (:site_id, :user_did, :display_name, :role, 'active', 'api', :added_at)
             """), {
                 'site_id': site_id,
-                'user_ppid': user_did,
+                'user_did': user_did,
                 'display_name': display_name,
                 'role': role,
                 'added_at': datetime.utcnow()
