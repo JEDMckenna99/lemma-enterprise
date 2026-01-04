@@ -88,10 +88,10 @@ class LemmaIAMUserManager {
                     <div class="lemma-iam-section">
                         <h3>Add New User</h3>
                         <p style="color: #666; margin-bottom: 12px; font-size: 0.9rem;">
-                            Users are identified by their DID (from their passkey-unlocked wallet)
+                            Users are identified by their PPID (site-specific pairwise identifier from their wallet)
                         </p>
                         <div class="add-user-form">
-                            <input type="text" id="newUserDID" placeholder="User DID (did:lemma:user:...)" class="lemma-input">
+                            <input type="text" id="newUserDID" placeholder="User PPID (did:lemma:ppid_...)" class="lemma-input">
                             <select id="newUserRole" class="lemma-select">
                                 <option value="user">User</option>
                                 <option value="moderator">Moderator</option>
@@ -102,7 +102,7 @@ class LemmaIAMUserManager {
                             </button>
                         </div>
                         <p style="color: #888; margin-top: 12px; font-size: 0.8rem;">
-                            Or <a href="#" onclick="this.parentNode.parentNode.userManager.inviteUser(); return false;">generate an invite link</a> for new users
+                            Or <a href="#" onclick="this.parentNode.parentNode.userManager.inviteUser(); return false;">generate an invite link</a> for new users who don't have wallets yet
                         </p>
                     </div>
 
@@ -519,16 +519,17 @@ class LemmaIAMUserManager {
     }
 
     async addUser() {
-        const userDID = document.getElementById('newUserDID').value.trim();
+        const userPPID = document.getElementById('newUserDID').value.trim();
         const role = document.getElementById('newUserRole').value;
 
-        if (!userDID) {
-            alert('Please enter a user DID (did:lemma:user:...)');
+        if (!userPPID) {
+            alert('Please enter a user PPID (did:lemma:ppid_...)');
             return;
         }
 
-        if (!userDID.startsWith('did:lemma:')) {
-            alert('Invalid DID format. Should start with did:lemma:');
+        // Validate PPID format (site-specific pairwise identifier)
+        if (!userPPID.startsWith('did:lemma:ppid_')) {
+            alert('Invalid PPID format. Must be did:lemma:ppid_... (pairwise identifier from wallet)');
             return;
         }
 
@@ -540,7 +541,7 @@ class LemmaIAMUserManager {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    user_did: userDID,
+                    user_did: userPPID,
                     role: role
                 })
             });
@@ -555,14 +556,14 @@ class LemmaIAMUserManager {
                 // Refresh users list
                 await this.loadUsers();
                 
-                alert(`User ${userDID.substring(0, 30)}... added as ${role}`);
+                alert(`User ${userPPID.substring(0, 35)}... added as ${role}`);
             } else {
-                alert('Failed to add user: ' + result.error);
+                alert('Failed to add user: ' + (result.error || result.message));
             }
 
         } catch (error) {
             console.error('Failed to add user:', error);
-            alert('Failed to add user');
+            alert('Failed to add user: ' + error.message);
         }
     }
 

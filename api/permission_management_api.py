@@ -295,68 +295,203 @@ def revoke_user_permission_site_specific(site_id, user_did, permission_id):
 @cross_origin()
 @require_api_key
 def get_site_users(site_id):
-    """Get all users for a site (admin only)"""
+    """
+    Get all users for a site (admin only).
+    
+    AUTHORIZATION: Caller must be admin of the site (verified via API key ownership).
+    PRIVACY: Returns PPIDs only, no emails or global identifiers.
+    """
     try:
-        # Mock user data for now (in production, this would be a lightweight database)
-        users = [
-            {
-                'user_did': f'did:lemma:user:{site_id}:user1',
-                'email': 'john@company.com',
-                'role': 'admin',
-                'status': 'active',
-                'added_by': 'site_admin',
-                'added_at': '2024-01-15T10:00:00Z',
-                'last_login': '2024-01-20T14:30:00Z'
-            },
-            {
-                'user_did': f'did:lemma:user:{site_id}:user2',
-                'email': 'jane@company.com', 
-                'role': 'user',
-                'status': 'active',
-                'added_by': 'site_admin',
-                'added_at': '2024-01-16T11:00:00Z',
-                'last_login': '2024-01-21T09:15:00Z'
-            }
-        ]
-
-        return jsonify({
-            'success': True,
-            'users': users,
-            'total_users': len(users)
-        })
+        # Verify the API key belongs to this site
+        api_key = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if not _verify_site_ownership(api_key, site_id):
+            logger.warning(f"🚫 Unauthorized access attempt to site {site_id} users")
+            return jsonify({
+                'success': False,
+                'error': 'unauthorized',
+                'message': 'You do not have admin access to this site'
+            }), 403
+        
+        # Query site_users table for users of this site
+        from .database import get_db
+        from sqlalchemy import text
+        
+        db = get_db()
+        try:
+            result = db.execute(text("""
+                SELECT user_ppid, display_name, role, status, added_by, added_at, last_seen
+                FROM site_users
+                WHERE site_id = :site_id AND status != 'removed'
+                ORDER BY added_at DESC
+            """), {'site_id': site_id}).fetchall()
+            
+            users = []
+            for row in result:
+                users.append({
+                    'user_did': row[0],  # PPID - site-specific identifier
+                    'display_name': row[1] or f"User {row[0][:16]}...",
+                    'role': row[2] or 'user',
+                    'status': row[3] or 'active',
+                    'added_by': row[4] or 'admin',
+                    'added_at': row[5].isoformat() if row[5] else None,
+                    'last_seen': row[6].isoformat() if row[6] else None
+                })
+            
+            logger.info(f"✅ Returned {len(users)} users for site {site_id}")
+            return jsonify({
+                'success': True,
+                'users': users,
+                'total_users': len(users)
+            })
+            
+        except Exception as db_err:
+            # Table may not exist yet - return empty list
+            logger.warning(f"⚠️ Could not query site_users (may not exist): {db_err}")
+            return jsonify({
+                'success': True,
+                'users': [],
+                'total_users': 0,
+                'note': 'No users added yet'
+            })
+        finally:
+            db.close()
 
     except Exception as e:
         logger.error(f"Get site users error: {e}")
         return jsonify({'error': str(e)}), 500
 
+
+def _verify_site_ownership(api_key: str, site_id: str) -> bool:
+    """Verify the API key belongs to the site owner."""
+    from .database import get_db
+    from sqlalchemy import text
+    
+    if not api_key:
+        return False
+    
+    db = get_db()
+    try:
+        # Check if this API key belongs to this site
+        result = db.execute(text("""
+            SELECT site_id FROM sites 
+            WHERE api_key = :api_key AND site_id = :site_id
+        """), {'api_key': api_key, 'site_id': site_id}).fetchone()
+        
+        if result:
+            return True
+        
+        # Also check site_admins table for delegated admin access
+        result = db.execute(text("""
+            SELECT sa.site_id 
+            FROM site_admins sa
+            JOIN customers c ON sa.customer_id = c.customer_id
+            WHERE c.api_key = :api_key AND sa.site_id = :site_id AND sa.is_active = TRUE
+        """), {'api_key': api_key, 'site_id': site_id}).fetchone()
+        
+        return result is not None
+        
+    except Exception as e:
+        logger.warning(f"⚠️ Site ownership check failed: {e}")
+        return False
+    finally:
+        db.close()
+
 @permission_api.route('/api/v1/sites/<site_id>/users', methods=['POST'])
 @cross_origin()
 @require_api_key
 def add_site_user(site_id):
-    """Add new user to site"""
+    """
+    Add new user to site by PPID.
+    
+    The user must already have a wallet and their PPID for this site.
+    Use invite links for new users who don't have wallets yet.
+    
+    POST /api/v1/sites/{site_id}/users
+    {
+        "user_did": "did:lemma:ppid_...",  // User's PPID for THIS site
+        "role": "user|moderator|admin",
+        "display_name": "Optional display name"
+    }
+    """
     try:
-        data = request.get_json()
-        email = data.get('email')
-        role = data.get('role', 'user')
-
-        if not email:
-            return jsonify({'error': 'Email is required'}), 400
-
-        # Create user DID
-        user_did = f'did:lemma:user:{site_id}:{secrets.token_hex(8)}'
-
-        # In production, this would add to site's user database
-        # For now, we'll just return success
+        # Verify site ownership
+        api_key = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if not _verify_site_ownership(api_key, site_id):
+            return jsonify({
+                'success': False,
+                'error': 'unauthorized',
+                'message': 'You do not have admin access to this site'
+            }), 403
         
-        logger.info(f"Added user {email} to site {site_id} with role {role}")
+        data = request.get_json()
+        user_did = data.get('user_did')
+        role = data.get('role', 'user')
+        display_name = data.get('display_name')
 
-        return jsonify({
-            'success': True,
-            'user_did': user_did,
-            'email': email,
-            'role': role,
-            'message': f'User {email} added to site {site_id}'
-        })
+        if not user_did:
+            return jsonify({
+                'success': False,
+                'error': 'user_did is required (format: did:lemma:ppid_...)'
+            }), 400
+
+        # Validate PPID format
+        if not user_did.startswith('did:lemma:ppid_'):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid PPID format. Must be did:lemma:ppid_...'
+            }), 400
+
+        # Add to site_users table
+        from .database import get_db
+        from sqlalchemy import text
+        from datetime import datetime
+        
+        db = get_db()
+        try:
+            # Check if user already exists for this site
+            existing = db.execute(text("""
+                SELECT user_ppid FROM site_users 
+                WHERE site_id = :site_id AND user_ppid = :user_ppid
+            """), {'site_id': site_id, 'user_ppid': user_did}).fetchone()
+            
+            if existing:
+                return jsonify({
+                    'success': False,
+                    'error': 'User already exists for this site'
+                }), 400
+            
+            # Insert new user
+            db.execute(text("""
+                INSERT INTO site_users (site_id, user_ppid, display_name, role, status, added_by, added_at)
+                VALUES (:site_id, :user_ppid, :display_name, :role, 'active', 'api', :added_at)
+            """), {
+                'site_id': site_id,
+                'user_ppid': user_did,
+                'display_name': display_name,
+                'role': role,
+                'added_at': datetime.utcnow()
+            })
+            db.commit()
+            
+            logger.info(f"✅ Added user {user_did[:40]}... to site {site_id} with role {role}")
+
+            return jsonify({
+                'success': True,
+                'user_did': user_did,
+                'role': role,
+                'display_name': display_name,
+                'message': f'User added to site {site_id}'
+            })
+            
+        except Exception as db_err:
+            db.rollback()
+            logger.error(f"❌ Database error adding user: {db_err}")
+            return jsonify({
+                'success': False,
+                'error': f'Database error: {db_err}'
+            }), 500
+        finally:
+            db.close()
 
     except Exception as e:
         logger.error(f"Add site user error: {e}")
