@@ -20,7 +20,7 @@ if (typeof window !== 'undefined' && window.LemmaWallet) {
 // ============================================
 
 const WALLET_DB_NAME = 'LemmaWallet';
-const WALLET_DB_VERSION = 2;  // Incremented to add revocations store
+const WALLET_DB_VERSION = 3;  // v3: Added wallet_secret for PPID derivation
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
 
 // Auth states
@@ -95,6 +95,12 @@ class LemmaWallet {
                 // Revocations cache store
                 if (!db.objectStoreNames.contains('revocations')) {
                     db.createObjectStore('revocations', { keyPath: 'id' });
+                }
+
+                // Wallet secrets store (for PPID derivation)
+                // Stores the master secret used to derive site-specific PPIDs
+                if (!db.objectStoreNames.contains('secrets')) {
+                    db.createObjectStore('secrets', { keyPath: 'id' });
                 }
             };
         });
@@ -205,13 +211,32 @@ class LemmaWallet {
 
         await this._put('passkey', passkeyRecord);
 
+        // Generate wallet secret for PPID derivation (if not already exists)
+        let walletSecret = await this._get('secrets', 'master');
+        if (!walletSecret) {
+            // Generate 32-byte random secret
+            const secretBytes = crypto.getRandomValues(new Uint8Array(32));
+            const secretHex = Array.from(secretBytes)
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+            
+            walletSecret = {
+                id: 'master',
+                secret: secretHex,
+                createdAt: Date.now()
+            };
+            await this._put('secrets', walletSecret);
+            console.log('🔐 Generated wallet secret for PPID derivation');
+        }
+
         // Auto-unlock after registration (user just authenticated)
         const now = Date.now();
         this.session = {
             isUnlocked: true,
             unlockedAt: now,
             expiresAt: now + SESSION_DURATION_MS,
-            walletId: walletId.value
+            walletId: walletId.value,
+            walletSecret: walletSecret.secret  // Include in session for easy access
         };
         await this._put('session', { id: 'current', ...this.session });
         console.log('✅ Wallet auto-unlocked after passkey registration');
@@ -219,7 +244,8 @@ class LemmaWallet {
         return {
             success: true,
             credentialId: passkeyRecord.credentialId,
-            walletId: walletId.value
+            walletId: walletId.value,
+            walletSecret: walletSecret.secret  // Return for immediate use
         };
     }
 
@@ -271,13 +297,33 @@ class LemmaWallet {
         const walletIdRecord = await this._get('passkey', 'walletId');
         const walletId = walletIdRecord?.value || 'wallet_' + Date.now();
 
+        // Get wallet secret for PPID derivation
+        let walletSecretRecord = await this._get('secrets', 'master');
+        
+        // Generate wallet secret if missing (for wallets created before v3)
+        if (!walletSecretRecord) {
+            const secretBytes = crypto.getRandomValues(new Uint8Array(32));
+            const secretHex = Array.from(secretBytes)
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+            
+            walletSecretRecord = {
+                id: 'master',
+                secret: secretHex,
+                createdAt: Date.now()
+            };
+            await this._put('secrets', walletSecretRecord);
+            console.log('🔐 Generated wallet secret for legacy wallet');
+        }
+
         // Unlock the wallet
         const now = Date.now();
         this.session = {
             isUnlocked: true,
             unlockedAt: now,
             expiresAt: now + SESSION_DURATION_MS,
-            walletId: walletId
+            walletId: walletId,
+            walletSecret: walletSecretRecord.secret
         };
 
         // Persist session
@@ -288,11 +334,12 @@ class LemmaWallet {
         
         console.log('✅ Wallet unlocked successfully');
             
-            return { 
-                success: true, 
+        return { 
+            success: true, 
             expiresAt: this.session.expiresAt,
             expiresIn: SESSION_DURATION_MS,
-            walletId: walletId
+            walletId: walletId,
+            walletSecret: walletSecretRecord.secret
         };
     }
 
@@ -1130,8 +1177,46 @@ class LemmaWallet {
     }
 
     // ========================================
-    // WALLET INFO
+    // WALLET INFO & SECRET ACCESS
     // ========================================
+
+    /**
+     * Get the wallet secret for PPID derivation.
+     * PPID = HMAC(wallet_secret, site_id) - different for each site.
+     * 
+     * @returns {string|null} 64-char hex string, or null if not available
+     */
+    async getWalletSecret() {
+        await this.init();
+        
+        if (!this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to get wallet secret');
+        }
+        
+        // Check session first (fastest)
+        if (this.session.walletSecret) {
+            return this.session.walletSecret;
+        }
+        
+        // Load from storage
+        const secretRecord = await this._get('secrets', 'master');
+        if (secretRecord?.secret) {
+            // Cache in session
+            this.session.walletSecret = secretRecord.secret;
+            return secretRecord.secret;
+        }
+        
+        return null;
+    }
+
+    /**
+     * Get passkey credential ID (for server-side PPID derivation fallback)
+     */
+    async getPasskeyCredentialId() {
+        await this.init();
+        const passkey = await this._get('passkey', 'primary');
+        return passkey?.credentialId || null;
+    }
 
     async getWalletInfo() {
         await this.init();
@@ -1139,13 +1224,16 @@ class LemmaWallet {
         const passkey = await this._get('passkey', 'primary');
         const lemmas = await this._getAll('lemmas');
         const issuers = await this._getAll('issuers');
+        const secretRecord = await this._get('secrets', 'master');
             
-            return {
+        return {
             hasPasskey: !!passkey,
+            hasWalletSecret: !!secretRecord?.secret,
             isUnlocked: this.isUnlocked(),
             session: this.session,
             lemmaCount: lemmas.length,
-            issuerCount: issuers.length
+            issuerCount: issuers.length,
+            passkeyCredentialId: passkey?.credentialId || null
         };
     }
 

@@ -31,3 +31,4 @@ COMMENT ON COLUMN platform_users.user_did IS 'User PPID for lemma.id platform - 
 INSERT INTO system_config (config_key, config_value, description, is_public)
 VALUES ('ppid_migration_date', NOW()::TEXT, 'Date of migration to PPID-based user identification', FALSE)
 ON CONFLICT (config_key) DO UPDATE SET config_value = NOW()::TEXT, updated_at = NOW();
+

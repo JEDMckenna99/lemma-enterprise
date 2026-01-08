@@ -385,16 +385,37 @@
                 updateButton('Issuing permission...', false, true);
                 updateStatus('info', '📝 Creating your access credential...');
                 
-                // Get wallet ID
-                const walletId = wallet.session?.walletId || 'wallet_' + Date.now();
+                // Get wallet secret for PPID derivation
+                // PPID = HMAC(wallet_secret, site_id) - site-specific identifier
+                let walletSecret = null;
+                let passkeyCredentialId = null;
+                
+                try {
+                    walletSecret = await wallet.getWalletSecret();
+                    console.log('🔐 Got wallet secret for PPID derivation');
+                } catch (e) {
+                    console.warn('Could not get wallet secret, using passkey fallback:', e.message);
+                }
+                
+                // Fallback: use passkey credential ID for server-side PPID derivation
+                if (!walletSecret) {
+                    passkeyCredentialId = await wallet.getPasskeyCredentialId();
+                    console.log('🔐 Using passkey credential ID for PPID derivation');
+                }
+                
+                if (!walletSecret && !passkeyCredentialId) {
+                    throw new Error('No wallet secret or passkey available for authentication');
+                }
                 
                 // Request permission from server
+                // Server derives PPID from wallet_secret (preferred) or passkey_credential_id (fallback)
                 const response = await fetch('/api/wallet-auth/issue', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         site_id: 'lemma.id',
-                        wallet_id: walletId
+                        wallet_secret: walletSecret,
+                        passkey_credential_id: passkeyCredentialId
                     })
                 });
                 
@@ -404,13 +425,14 @@
                     throw new Error(result.error || 'Failed to issue permission');
                 }
                 
-                console.log('📝 Permission issued:', result.permission_lemma);
+                console.log('📝 Permission issued with PPID:', result.ppid);
+                console.log('📝 Permission lemma:', result.permission_lemma);
                 
                 // Store in wallet
                 await wallet.storeCredential(result.permission_lemma);
                 console.log('✅ Permission stored in wallet');
                 
-                updateStatus('success', `✅ Welcome${result.user.isNew ? ' to Lemma' : ' back'}! Redirecting...`);
+                updateStatus('success', `✅ Welcome${result.is_new_user ? ' to Lemma' : ' back'}! Redirecting...`);
                 
                 setTimeout(() => window.location.href = '/dashboard', 1500);
                 return true;
