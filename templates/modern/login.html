@@ -297,6 +297,14 @@
             }
         }
 
+        // Parse URL parameters for redirect flow
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectUrl = urlParams.get('redirect') || '/dashboard';
+        const targetSite = urlParams.get('site') || 'lemma_platform';
+        const targetPermission = urlParams.get('permission') || 'developer';
+        
+        console.log('🔗 Login parameters:', { redirectUrl, targetSite, targetPermission });
+        
         function updateButton(text, enabled = true, loading = false) {
             const btn = document.getElementById('signInButton');
             const textEl = document.getElementById('buttonText');
@@ -321,7 +329,7 @@
                 if (lemmaPerms.length > 0) {
                     console.log('✅ Found existing lemma.id permission');
                     updateStatus('success', '✅ Already signed in! Redirecting...');
-                    setTimeout(() => window.location.href = '/dashboard', 1000);
+                    setTimeout(() => window.location.href = redirectUrl, 1000);
                     return true;
                 }
                 return false;
@@ -413,7 +421,8 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        site_id: 'lemma.id',
+                        site_id: targetSite,
+                        permission_level: targetPermission,
                         wallet_secret: walletSecret,
                         passkey_credential_id: passkeyCredentialId
                     })
@@ -434,7 +443,7 @@
                 
                 updateStatus('success', `✅ Welcome${result.is_new_user ? ' to Lemma' : ' back'}! Redirecting...`);
                 
-                setTimeout(() => window.location.href = '/dashboard', 1500);
+                setTimeout(() => window.location.href = redirectUrl, 1500);
                 return true;
                 
             } catch (e) {

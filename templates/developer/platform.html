@@ -1198,17 +1198,18 @@
                         };
                     }));
                     
-                    // Show request access button instead of blocking
+                    // Show login button - users need to authenticate via wallet
                     document.getElementById('loading-state').innerHTML = `
                         <div style="text-align: center; padding: 60px 20px;">
-                            <div style="font-size: 64px; margin-bottom: 24px;">🔑</div>
-                            <h2>Platform Access Required</h2>
+                            <div style="font-size: 64px; margin-bottom: 24px;">🔐</div>
+                            <h2>Developer Platform Access</h2>
                             <p style="color: #6b7280; margin-bottom: 24px;">
-                                Request access to the Lemma developer platform
+                                Sign in with your Lemma wallet to access the developer platform.<br>
+                                <span style="font-size: 14px;">You'll get instant access to register sites and manage API keys.</span>
                             </p>
-                            <button onclick="requestPlatformAccess()" class="btn btn-primary">
-                                Request Platform Access
-                            </button>
+                            <a href="/login?redirect=/platform&site=lemma_platform&permission=developer" class="btn btn-primary">
+                                Sign In with Lemma Wallet
+                            </a>
                         </div>
                     `;
                     return false;
@@ -1242,9 +1243,9 @@
                             <p style="color: #6b7280; margin-bottom: 24px;">
                                 Your platform access has been revoked. Please contact support if you believe this is an error.
                             </p>
-                            <button onclick="requestPlatformAccess()" class="btn btn-primary">
-                                Request New Access
-                            </button>
+                            <a href="/login?redirect=/platform&site=lemma_platform&permission=developer" class="btn btn-primary">
+                                Sign In Again
+                            </a>
                         </div>
                     `;
                     return false;
@@ -2200,68 +2201,6 @@
             } catch (error) {
                 console.error('Failed to rotate API key:', error);
                 showToast(error.message || 'Failed to rotate API key', 'error');
-            }
-        }
-        
-        // Request platform access if user doesn't have credentials
-        async function requestPlatformAccess() {
-            try {
-                // Get user email from current session/wallet
-                const wallet = window.globalLemmaWallet;
-                let userEmail = null;
-                
-                // Try to extract email from any credential
-                if (wallet) {
-                    try {
-                        const pohCreds = await wallet.getCredentials('identity') || [];
-                        const permCreds = await wallet.getCredentials('permission') || [];
-                        const allCreds = [...pohCreds, ...permCreds];
-                        
-                        for (const cred of allCreds) {
-                            const claims = cred.claims || cred.credentialSubject || {};
-                            if (claims.email) {
-                                userEmail = claims.email;
-                                break;
-                            }
-                        }
-                    } catch (e) {
-                        console.log('Could not get credentials from wallet:', e);
-                    }
-                }
-                
-                if (!userEmail) {
-                    userEmail = prompt('Enter your email to request platform access:');
-                    if (!userEmail) return;
-                }
-                
-                console.log('📧 Requesting platform access for:', userEmail);
-                
-                // Request access to lemma_platform
-                const response = await fetch('/api/v1/iam/request-access', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        site_id: 'lemma_platform',
-                        site_domain: 'lemma.id',
-                        user_email: userEmail,
-                        permission_level: 'admin_access',
-                        redirect_url: window.location.href
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert('✅ Check your email!\n\nClick the confirmation link to get platform access.\n\nAfter confirming, reload this page.');
-                } else {
-                    alert('❌ Error: ' + (result.error || 'Failed to request access'));
-                }
-                
-            } catch (error) {
-                console.error('❌ Request access error:', error);
-                alert('Error requesting access. Please try again.');
             }
         }
         
