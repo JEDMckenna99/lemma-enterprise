@@ -335,17 +335,17 @@ class LemmaIAM {
                         const permissions = this._extractPermissions(permission);
                         const hasAccess = this._checkAccess(permissions, resource, action);
                         
-                        return {
+                    return {
                             success: true,
                             hasAccess: hasAccess,
                             method: 'local',
                             verificationTime: performance.now() - startTime,
                             offline: true
-                        };
+                    };
                     }
                 }
             }
-            
+
             // Fallback to server verification
             return await this._verifyAccessServer(resource, action, startTime);
             
@@ -381,7 +381,7 @@ class LemmaIAM {
 
     async _verifyAccessServer(resource, action, startTime) {
         if (!this.accessToken && !this.apiKey) {
-            return { 
+            return {
                 success: false, 
                 hasAccess: false, 
                 error: 'No authentication available' 
@@ -403,7 +403,7 @@ class LemmaIAM {
         });
 
         const result = await response.json();
-        
+
         return {
             success: true,
             hasAccess: result.has_access,
@@ -497,7 +497,7 @@ class LemmaIAM {
             return { success: true };
         } catch (error) {
             return { success: false, error: error.message };
-        }
+            }
     }
 
     // ============================================

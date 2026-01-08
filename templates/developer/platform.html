@@ -1131,6 +1131,67 @@
             }
         }
         
+        // Auto-issue developer permission if wallet exists
+        async function autoIssueDeveloperPermission(wallet) {
+            try {
+                // Get wallet secret for PPID derivation
+                let walletSecret = null;
+                let passkeyCredentialId = null;
+                
+                try {
+                    walletSecret = await wallet.getWalletSecret();
+                    console.log('🔐 Got wallet secret for PPID derivation');
+                } catch (e) {
+                    console.warn('Could not get wallet secret:', e.message);
+                }
+                
+                if (!walletSecret) {
+                    try {
+                        passkeyCredentialId = await wallet.getPasskeyCredentialId();
+                        console.log('🔐 Using passkey credential ID');
+                    } catch (e) {
+                        console.warn('Could not get passkey:', e.message);
+                    }
+                }
+                
+                if (!walletSecret && !passkeyCredentialId) {
+                    console.log('❌ No wallet secret or passkey - cannot auto-issue');
+                    return false;
+                }
+                
+                // Request developer permission from server
+                const response = await fetch('/api/wallet-auth/issue', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: 'lemma_platform',
+                        permission_level: 'developer',
+                        wallet_secret: walletSecret,
+                        passkey_credential_id: passkeyCredentialId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (!result.success) {
+                    console.error('❌ Auto-issue failed:', result.error);
+                    return false;
+                }
+                
+                console.log('✅ Developer permission issued:', result.ppid);
+                
+                // Store in wallet
+                await wallet.storeCredential(result.permission_lemma);
+                console.log('✅ Permission stored in wallet');
+                
+                return true;
+                
+            } catch (error) {
+                console.error('❌ Auto-issue error:', error);
+                return false;
+            }
+        }
+        
         // Check access (verify Lemma permission)
         async function checkAccess() {
             try {
@@ -1178,8 +1239,10 @@
                                       siteId.toLowerCase().includes('platform');
                     
                     const hasAccess = permissionId.toLowerCase().includes('admin') || 
+                                    permissionId.toLowerCase().includes('developer') ||
                                     permissionId === 'super_admin' ||
                                     permissionId === 'admin_access' ||
+                                    permissionId === 'developer_access' ||
                                     permissionId === 'beta-user_access' ||
                                     permissionId === 'beta_user' ||
                                     permissionId.toLowerCase().includes('beta');
@@ -1198,17 +1261,32 @@
                         };
                     }));
                     
-                    // Show login button - users need to authenticate via wallet
+                    // Wallet exists - try to auto-issue developer permission
+                    console.log('🔐 Wallet exists, auto-issuing developer permission...');
                     document.getElementById('loading-state').innerHTML = `
                         <div style="text-align: center; padding: 60px 20px;">
-                            <div style="font-size: 64px; margin-bottom: 24px;">🔐</div>
-                            <h2>Developer Platform Access</h2>
+                            <div class="spinner"></div>
+                            <div style="margin-top: 16px; color: #6b7280;">Setting up developer access...</div>
+                        </div>
+                    `;
+                    
+                    const issued = await autoIssueDeveloperPermission(wallet);
+                    if (issued) {
+                        // Reload to verify the new credential
+                        return await checkAccess();
+                    }
+                    
+                    // If auto-issue failed, show setup wallet message
+                    document.getElementById('loading-state').innerHTML = `
+                        <div style="text-align: center; padding: 60px 20px;">
+                            <div style="font-size: 64px; margin-bottom: 24px;">💼</div>
+                            <h2>Set Up Your Wallet</h2>
                             <p style="color: #6b7280; margin-bottom: 24px;">
-                                Sign in with your Lemma wallet to access the developer platform.<br>
-                                <span style="font-size: 14px;">You'll get instant access to register sites and manage API keys.</span>
+                                Create a passkey to access the developer platform.<br>
+                                <span style="font-size: 14px;">One-time setup, then instant access everywhere.</span>
                             </p>
-                            <a href="/login?redirect=/platform&site=lemma_platform&permission=developer" class="btn btn-primary">
-                                Sign In with Lemma Wallet
+                            <a href="/wallet" class="btn btn-primary">
+                                Set Up Wallet
                             </a>
                         </div>
                     `;
@@ -1230,22 +1308,20 @@
                 
                 const isRevoked = await wallet.isCredentialRevoked(perm);
                 if (isRevoked) {
-                    console.log('🚫 Credential is REVOKED - denying access');
+                    console.log('🚫 Credential is REVOKED - removing and denying access');
                     
                     // Remove the revoked credential from wallet
                     await wallet.removeCredential(perm.id);
                     
-                    // Show revoked message
+                    // Show revoked message (admin revocation is intentional, don't auto-reissue)
                     document.getElementById('loading-state').innerHTML = `
                         <div style="text-align: center; padding: 60px 20px;">
                             <div style="font-size: 64px; margin-bottom: 24px;">🚫</div>
                             <h2>Access Revoked</h2>
                             <p style="color: #6b7280; margin-bottom: 24px;">
-                                Your platform access has been revoked. Please contact support if you believe this is an error.
+                                Your platform access has been revoked by an administrator.<br>
+                                <span style="font-size: 14px;">Please contact support if you believe this is an error.</span>
                             </p>
-                            <a href="/login?redirect=/platform&site=lemma_platform&permission=developer" class="btn btn-primary">
-                                Sign In Again
-                            </a>
                         </div>
                     `;
                     return false;

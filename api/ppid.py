@@ -36,11 +36,11 @@ def _get_root_ppid_key() -> bytes:
         return get_ppid_root_key().encode("utf-8")
     except Exception:
         # Fallback for standalone usage or testing
-        key = os.environ.get("LEMMA_PPID_ROOT_KEY")
-        if key and len(key) >= 32:
-            return key.encode("utf-8")
-        # Development fallback only (NOT for production)
-        return b"lemma_dev_ppid_root_key_change_me_32bytes_min"
+    key = os.environ.get("LEMMA_PPID_ROOT_KEY")
+    if key and len(key) >= 32:
+        return key.encode("utf-8")
+    # Development fallback only (NOT for production)
+    return b"lemma_dev_ppid_root_key_change_me_32bytes_min"
 
 
 def canonicalize_rp_id(rp_id: str) -> str:

@@ -335,7 +335,7 @@ class CustomerAccountManager:
             return
         self.customers[customer.customer_id] = customer
         if customer.email:  # Email is now optional
-            self.email_to_customer[customer.email] = customer.customer_id
+        self.email_to_customer[customer.email] = customer.customer_id
         for key_data in customer.api_keys or []:
             key_value = key_data.get('key')
             if key_value:
@@ -545,12 +545,12 @@ class CustomerAccountManager:
             
             # Then check by email if provided
             if email:
-                existing_customer = self.get_customer_by_email(email)
-                if existing_customer:
-                    return {
-                        'success': False,
-                        'error': 'Customer with this email already exists'
-                    }
+            existing_customer = self.get_customer_by_email(email)
+            if existing_customer:
+                return {
+                    'success': False,
+                    'error': 'Customer with this email already exists'
+                }
             
             # Generate customer ID
             customer_id = f"cus_{''.join(secrets.choice('abcdefghijklmnopqrstuvwxyz0123456789') for _ in range(16))}"
@@ -563,15 +563,15 @@ class CustomerAccountManager:
             stripe_customer_id = None
             if email:
                 try:
-                    stripe_customer = stripe.Customer.create(
-                        email=email,
+            stripe_customer = stripe.Customer.create(
+                email=email,
                         name=name or display_name or "Wallet User",
-                        metadata={
+                metadata={
                             'company': company or '',
                             'lemma_customer_id': customer_id,
                             'lemma_did': customer_did
-                        }
-                    )
+                }
+            )
                     stripe_customer_id = stripe_customer.id
                 except Exception as stripe_err:
                     logger.warning(f"Stripe customer creation skipped: {stripe_err}")

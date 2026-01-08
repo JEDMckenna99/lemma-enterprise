@@ -213,11 +213,11 @@ class OAuthServer:
             
             # Track billing activity
             try:
-                billing_manager.track_user_activity(
-                    site_id=auth_request['site_id'],
-                    user_id=user_did,
+            billing_manager.track_user_activity(
+                site_id=auth_request['site_id'],
+                user_id=user_did,
                     activity_type='oauth_authorization'
-                )
+            )
             except Exception as e:
                 logger.warning(f"Billing tracking failed: {e}")
             
