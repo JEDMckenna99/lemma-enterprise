@@ -5,7 +5,8 @@
 {% block head %}
     {{ super() }}
     
-    <!-- Lemma Wallet already loaded in layout.html - don't load again -->
+    <!-- Lemma Sign-In SDK - handles authentication -->
+    <script src="{{ url_for('static', filename='js/lemma-signin-sdk.js') }}?v=2"></script>
     
     <style>
         :root {
@@ -1068,15 +1069,6 @@
         let userPermission = null;
         let lemmaPlatformCredentialString = null;
         
-        function getLemmaAuthHeaders() {
-            if (!lemmaPlatformCredentialString) {
-                return {};
-            }
-            return {
-                'Authorization': `Bearer ${lemmaPlatformCredentialString}`
-            };
-        }
-        
         function escapeHTML(value) {
             if (typeof value !== 'string') {
                 return value ?? '';
@@ -1098,185 +1090,51 @@
             }
         }
         
-        // Initialize platform
+        // Lemma Sign-In SDK instance
+        let lemmaAuth = null;
+        
+        // Initialize platform using Lemma SDK
         async function initPlatform() {
-            console.log('🚀 Initializing developer platform...');
+            console.log('🚀 Initializing developer platform with Lemma SDK...');
             
-            try {
-                // Check for valid permission credential
-                const hasAccess = await checkAccess();
+            // Initialize Lemma Sign-In SDK
+            lemmaAuth = new LemmaSignIn({
+                siteId: 'lemma_platform',
+                permissionLevel: 'developer',
+                autoIssue: true,
+                debug: true,
                 
-                if (!hasAccess) {
-                    // checkAccess() already updated loading-state with "Request Platform Access" button
-                    // Don't hide it - leave it visible so user can request access
-                    return;
-                }
-                
-                // Load platform data
-                await loadOverviewData();
-                
-                // Show platform
-                document.getElementById('loading-state').style.display = 'none';
-                document.getElementById('section-overview').style.display = 'block';
-                
-                console.log('✅ Platform initialized');
-                
-            } catch (error) {
-                console.error('❌ Platform initialization failed:', error);
-                document.getElementById('loading-state').innerHTML = `
-                    <div style="color: #ef4444;">
-                        Failed to load platform. Please refresh the page.
-                    </div>
-                `;
-            }
-        }
-        
-        // Auto-issue developer permission if wallet exists
-        async function autoIssueDeveloperPermission(wallet) {
-            try {
-                // Get wallet secret for PPID derivation
-                let walletSecret = null;
-                let passkeyCredentialId = null;
-                
-                try {
-                    walletSecret = await wallet.getWalletSecret();
-                    console.log('🔐 Got wallet secret for PPID derivation');
-                } catch (e) {
-                    console.warn('Could not get wallet secret:', e.message);
-                }
-                
-                if (!walletSecret) {
-                    try {
-                        passkeyCredentialId = await wallet.getPasskeyCredentialId();
-                        console.log('🔐 Using passkey credential ID');
-                    } catch (e) {
-                        console.warn('Could not get passkey:', e.message);
-                    }
-                }
-                
-                if (!walletSecret && !passkeyCredentialId) {
-                    console.log('❌ No wallet secret or passkey - cannot auto-issue');
-                    return false;
-                }
-                
-                // Request developer permission from server
-                const response = await fetch('/api/wallet-auth/issue', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        site_id: 'lemma_platform',
-                        permission_level: 'developer',
-                        wallet_secret: walletSecret,
-                        passkey_credential_id: passkeyCredentialId
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (!result.success) {
-                    console.error('❌ Auto-issue failed:', result.error);
-                    return false;
-                }
-                
-                console.log('✅ Developer permission issued:', result.ppid);
-                
-                // Store in wallet
-                await wallet.storeCredential(result.permission_lemma);
-                console.log('✅ Permission stored in wallet');
-                
-                return true;
-                
-            } catch (error) {
-                console.error('❌ Auto-issue error:', error);
-                return false;
-            }
-        }
-        
-        // Check access (verify Lemma permission)
-        async function checkAccess() {
-            try {
-                // Wait for global wallet (initialized in layout.html)
-                let attempts = 0;
-                while (!window.globalLemmaWallet && attempts < 20) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    attempts++;
-                }
-                
-                if (!window.globalLemmaWallet) {
-                    console.log('❌ Global wallet not initialized');
-                    return false;
-                }
-                
-                const wallet = window.globalLemmaWallet;
-                
-                // CRITICAL: Wait for wallet to finish loading credentials from storage
-                // The wallet object might exist but init() might still be loading encrypted credentials
-                attempts = 0;
-                while (!wallet.isInitialized && attempts < 30) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    attempts++;
-                }
-                
-                if (!wallet.isInitialized) {
-                    console.log('⚠️ Wallet exists but not fully initialized');
-                    // Continue anyway - might work
-                }
-                
-                // Get permission credentials
-                const permissions = await wallet.getCredentials('permission');
-                console.log('🔍 Found permission credentials:', permissions.length);
-                
-                // Check for lemma.id or lemma_platform permission (FLEXIBLE MATCHING)
-                const lemmaPermissions = permissions.filter(p => {
-                    const claims = p.claims || p.credentialSubject || {};
-                    const siteId = claims.siteId || claims.site || claims.site_id || claims.siteDomain || claims.site_domain || '';
-                    const permissionId = claims.permissionId || claims.permission_level || '';
+                // Called when user is signed in (existing or newly issued credential)
+                onSignIn: (user) => {
+                    console.log('✅ Signed in via Lemma SDK:', user.ppid?.slice(0, 30) + '...');
                     
-                    // Match any of these:
-                    // 1. siteId contains 'lemma' or 'platform'
-                    // 2. Permission is admin OR beta-user (for developer platform access)
-                    const matchesSite = siteId.toLowerCase().includes('lemma') || 
-                                      siteId.toLowerCase().includes('platform');
+                    // Store credential for API calls
+                    userPermission = user.permissionId || 'developer';
+                    lemmaPlatformCredentialString = lemmaAuth.getCredentialString();
                     
-                    const hasAccess = permissionId.toLowerCase().includes('admin') || 
-                                    permissionId.toLowerCase().includes('developer') ||
-                                    permissionId === 'super_admin' ||
-                                    permissionId === 'admin_access' ||
-                                    permissionId === 'developer_access' ||
-                                    permissionId === 'beta-user_access' ||
-                                    permissionId === 'beta_user' ||
-                                    permissionId.toLowerCase().includes('beta');
+                    // Check admin status
+                    const adminPermissions = ['admin_access', 'super_admin', 'admin', 'site_admin'];
+                    const isAdmin = adminPermissions.includes(userPermission) || 
+                                   userPermission.toLowerCase().includes('admin');
+                    window.isLemmaAdmin = isAdmin;
                     
-                    return matchesSite && hasAccess;
-                });
-                
-                if (lemmaPermissions.length === 0) {
-                    console.log('❌ No valid lemma.id/platform permission found');
-                    console.log('📋 All permissions:', permissions.map(p => {
-                        const c = p.claims || p.credentialSubject || {};
-                        return { 
-                            id: p.id, 
-                            siteId: c.siteId || c.siteDomain || c.site_id || c.site_domain, 
-                            permissionId: c.permissionId || c.permission_level 
-                        };
-                    }));
-                    
-                    // Wallet exists - try to auto-issue developer permission
-                    console.log('🔐 Wallet exists, auto-issuing developer permission...');
-                    document.getElementById('loading-state').innerHTML = `
-                        <div style="text-align: center; padding: 60px 20px;">
-                            <div class="spinner"></div>
-                            <div style="margin-top: 16px; color: #6b7280;">Setting up developer access...</div>
-                        </div>
-                    `;
-                    
-                    const issued = await autoIssueDeveloperPermission(wallet);
-                    if (issued) {
-                        // Reload to verify the new credential
-                        return await checkAccess();
+                    if (isAdmin) {
+                        const adminSection = document.getElementById('admin-section');
+                        if (adminSection) adminSection.style.display = 'block';
                     }
                     
-                    // If auto-issue failed, show setup wallet message
+                    // Load platform data
+                    loadOverviewData();
+                    loadAPIKeysData(false);
+                    
+                    // Show platform
+                    document.getElementById('loading-state').style.display = 'none';
+                    document.getElementById('section-overview').style.display = 'block';
+                },
+                
+                // Called when user has no wallet
+                onNoWallet: () => {
+                    console.log('❌ No wallet - show setup prompt');
                     document.getElementById('loading-state').innerHTML = `
                         <div style="text-align: center; padding: 60px 20px;">
                             <div style="font-size: 64px; margin-bottom: 24px;">💼</div>
@@ -1290,76 +1148,45 @@
                             </a>
                         </div>
                     `;
-                    return false;
-                }
+                },
                 
-                // CRITICAL: Force sync revocation bloom filter FIRST (get latest revocations)
-                // Pass force=true to bypass the 5-minute cache
-                console.log('🔄 Force syncing revocation list before access check...');
-                try {
-                    await wallet.syncRevocationLists(true);  // Force sync
-                } catch (e) {
-                    console.warn('⚠️ Revocation sync failed, continuing with cached data:', e);
-                }
-                
-                // CRITICAL: Verify credential is NOT revoked (checks bloom filter)
-                const perm = lemmaPermissions[0];
-                console.log('🔐 Checking if credential is revoked:', perm.id);
-                
-                const isRevoked = await wallet.isCredentialRevoked(perm);
-                if (isRevoked) {
-                    console.log('🚫 Credential is REVOKED - removing and denying access');
-                    
-                    // Remove the revoked credential from wallet
-                    await wallet.removeCredential(perm.id);
-                    
-                    // Show revoked message (admin revocation is intentional, don't auto-reissue)
+                // Loading state callback
+                onLoading: (message) => {
                     document.getElementById('loading-state').innerHTML = `
                         <div style="text-align: center; padding: 60px 20px;">
-                            <div style="font-size: 64px; margin-bottom: 24px;">🚫</div>
-                            <h2>Access Revoked</h2>
-                            <p style="color: #6b7280; margin-bottom: 24px;">
-                                Your platform access has been revoked by an administrator.<br>
-                                <span style="font-size: 14px;">Please contact support if you believe this is an error.</span>
-                            </p>
+                            <div class="spinner"></div>
+                            <div style="margin-top: 16px; color: #6b7280;">${message}</div>
                         </div>
                     `;
-                    return false;
+                },
+                
+                // Error callback
+                onError: (error) => {
+                    console.error('❌ Lemma SDK error:', error);
+                    document.getElementById('loading-state').innerHTML = `
+                        <div style="text-align: center; padding: 60px 20px; color: #ef4444;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                            <div>Authentication failed. Please refresh the page.</div>
+                            <div style="font-size: 14px; margin-top: 8px;">${error.message || error}</div>
+                        </div>
+                    `;
                 }
-                
-                // Store permission level
-                const claims = perm.claims || perm.credentialSubject || {};
-                userPermission = claims.permissionId || claims.permission_level || 'beta-user';
-                lemmaPlatformCredentialString = JSON.stringify(perm);
-                loadAPIKeysData(false);
-                
-                console.log('✅ Access granted (credential verified, not revoked) -', userPermission);
-                
-                // Show admin section ONLY for actual admin permissions
-                // Beta users get platform access but NOT admin features (like revocation)
-                const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'];
-                const isAdmin = adminPermissions.includes(userPermission) || 
-                               (userPermission.toLowerCase().includes('admin') && 
-                                !userPermission.toLowerCase().includes('beta'));
-                
-                // Store admin status globally for permission checks
-                window.isLemmaAdmin = isAdmin;
-                
-                if (!isAdmin) {
-                    console.log('ℹ️ Beta user access - admin features disabled');
-                }
-                
-                if (isAdmin) {
-                    const adminSection = document.getElementById('admin-section');
-                    if (adminSection) adminSection.style.display = 'block';
-                }
-                
-                return true;
-                
-            } catch (error) {
-                console.error('❌ Access check failed:', error);
-                return false;
+            });
+            
+            // Initialize SDK - it handles everything automatically
+            await lemmaAuth.init();
+        }
+        
+        // Helper: Get auth headers for API calls (uses SDK)
+        function getLemmaAuthHeaders() {
+            if (lemmaAuth && lemmaAuth.isSignedIn()) {
+                return lemmaAuth.getAuthHeaders();
             }
+            // Fallback to stored credential string
+            if (lemmaPlatformCredentialString) {
+                return { 'Authorization': `Bearer ${lemmaPlatformCredentialString}` };
+            }
+            return {};
         }
         
         // Load overview data (shows stats for the caller's site)
