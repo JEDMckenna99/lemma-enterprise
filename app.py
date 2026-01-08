@@ -408,6 +408,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register SSE Revocation Events API: {e}")
 
+    # Permission Type Management API (developer dashboard)
+    try:
+        from api.permission_type_api import permission_type_api
+        app.register_blueprint(permission_type_api)
+        logger.info("✅ Permission Type Management API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Permission Type API: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status
@@ -539,6 +547,18 @@ def create_app():
     def setup_pin():
         """One-time PIN setup for existing wallet"""
         return render_template('setup_pin_protection.html')
+
+    @app.route('/permission-types')
+    def permission_types():
+        """Developer permission type management"""
+        logger.info("📋 Serving permission types management page")
+        return render_template('modern/permission_types.html')
+
+    @app.route('/site-management')
+    def site_management():
+        """Site user management"""
+        logger.info("👥 Serving site management page")
+        return render_template('modern/site_management.html')
 
     @app.route('/qr-reader')
     def qr_reader():

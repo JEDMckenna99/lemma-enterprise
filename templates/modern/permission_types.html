@@ -1,0 +1,704 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Permission Types - Lemma IAM{% endblock %}
+{% block description %}Define and manage permission types for your site using Lemma IAM system.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=992"></script>
+    <style>
+        .page-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+        
+        .page-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 8px;
+        }
+        
+        .page-subtitle {
+            font-size: 1.1rem;
+            color: var(--gray-600);
+        }
+        
+        .card {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin: 0;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+        
+        .btn-secondary {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: 1px solid var(--gray-300);
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.875rem;
+        }
+        
+        .site-selector {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 16px;
+            align-items: center;
+        }
+        
+        .site-selector select {
+            padding: 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        
+        .permission-grid {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .permission-item {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto auto;
+            gap: 16px;
+            align-items: center;
+            padding: 16px;
+            background: var(--gray-50);
+            border-radius: 12px;
+            border: 1px solid var(--gray-200);
+        }
+        
+        .permission-info {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .permission-name {
+            font-weight: 600;
+            color: var(--gray-900);
+            font-family: monospace;
+            font-size: 1rem;
+        }
+        
+        .permission-desc {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            margin-top: 4px;
+        }
+        
+        .permission-type {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
+        .type-role { background: #dbeafe; color: #1e40af; }
+        .type-subscription { background: #dcfce7; color: #166534; }
+        .type-time-bound { background: #fef3c7; color: #92400e; }
+        .type-scope { background: #f3e8ff; color: #7c3aed; }
+        
+        .scopes-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        
+        .scope-tag {
+            padding: 2px 8px;
+            background: var(--gray-200);
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-family: monospace;
+            color: var(--gray-700);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--gray-500);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-weight: 500;
+            color: var(--gray-700);
+            margin-bottom: 8px;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+        }
+        
+        .form-textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 1rem;
+            min-height: 80px;
+            resize: vertical;
+        }
+        
+        .form-hint {
+            font-size: 0.8rem;
+            color: var(--gray-500);
+            margin-top: 4px;
+        }
+        
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .template-item {
+            padding: 12px;
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        
+        .template-item:hover {
+            border-color: var(--primary);
+            background: var(--gray-50);
+        }
+        
+        .template-item.selected {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+        
+        .template-name {
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+        
+        .template-type {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1 class="page-title">Permission Types</h1>
+        <p class="page-subtitle">
+            Define what permissions your site offers to users
+        </p>
+    </div>
+
+    <!-- Site Selection -->
+    <div class="card">
+        <h3 style="margin: 0 0 16px 0; color: var(--gray-900);">Select Your Site</h3>
+        <div class="site-selector">
+            <select id="siteSelector">
+                <option value="">Loading your sites...</option>
+            </select>
+            <button class="btn btn-primary" onclick="loadPermissionTypes()">
+                Load Permissions
+            </button>
+        </div>
+    </div>
+
+    <!-- Permission Types -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Permission Types</h3>
+            <button class="btn btn-primary" onclick="showAddModal()" id="addPermissionBtn" disabled>
+                + Add Permission Type
+            </button>
+        </div>
+        
+        <div id="permissionsList">
+            <div class="empty-state">
+                <h3>Select a site above to manage permission types</h3>
+                <p>You can define custom permissions like "viewer", "editor", "admin", etc.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates Section -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Permission Templates</h3>
+        </div>
+        <p style="color: var(--gray-600); margin-bottom: 16px;">
+            Use these standard templates as a starting point for your permission types.
+        </p>
+        <div id="templatesList">
+            <div class="template-grid" id="templatesGrid">
+                <!-- Loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal" id="permissionModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="modalTitle">Add Permission Type</h3>
+            <button class="btn btn-secondary btn-small" onclick="closeModal()">✕</button>
+        </div>
+        
+        <form id="permissionForm" onsubmit="savePermission(event)">
+            <div class="form-group">
+                <label class="form-label">Name *</label>
+                <input type="text" id="permName" class="form-input" placeholder="e.g., editor" required pattern="[a-z0-9_-]+">
+                <div class="form-hint">Lowercase letters, numbers, underscores, hyphens only</div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Type *</label>
+                <select id="permType" class="form-select" required>
+                    <option value="role">Role (e.g., viewer, admin)</option>
+                    <option value="subscription">Subscription (e.g., premium)</option>
+                    <option value="time-bound">Time-bound (e.g., trial)</option>
+                    <option value="scope">Scope (granular access)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea id="permDescription" class="form-textarea" placeholder="What this permission grants..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Scopes</label>
+                <input type="text" id="permScopes" class="form-input" placeholder="content:read, content:write">
+                <div class="form-hint">Comma-separated list of scopes this permission includes</div>
+            </div>
+            
+            <div class="form-group" id="durationGroup" style="display: none;">
+                <label class="form-label">Duration (days)</label>
+                <input type="number" id="permDuration" class="form-input" placeholder="e.g., 14">
+                <div class="form-hint">For time-bound permissions only</div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Save Permission Type</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let currentSiteId = null;
+let currentSiteApiKey = null;
+let permissionTypes = [];
+let editingPermission = null;
+
+// Load user's sites on page load
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadUserSites();
+    await loadTemplates();
+    
+    // Show/hide duration field based on type
+    document.getElementById('permType').addEventListener('change', function() {
+        document.getElementById('durationGroup').style.display = 
+            this.value === 'time-bound' ? 'block' : 'none';
+    });
+});
+
+async function loadUserSites() {
+    try {
+        // Initialize wallet
+        let wallet = window.globalLemmaWallet;
+        if (!wallet) {
+            const { LemmaWallet } = await import('/static/js/lemma-wallet.js');
+            wallet = new LemmaWallet();
+        }
+        await wallet.init();
+        
+        // Get permission lemmas that include site admin access
+        const permissions = await wallet.getCredentials('permission');
+        const sites = [];
+        
+        for (const perm of permissions) {
+            const claims = perm.claims || perm.credentialSubject || {};
+            const siteId = claims.siteId || claims.site;
+            if (siteId && siteId !== 'lemma_platform') {
+                // Check if this is an admin permission
+                const permLevel = claims.permissionId || claims.permissions || '';
+                if (permLevel.includes('admin') || permLevel.includes('site_admin')) {
+                    sites.push({
+                        siteId: siteId,
+                        domain: claims.siteDomain || siteId,
+                        apiKey: claims.apiKey // Might be stored in claim
+                    });
+                }
+            }
+        }
+        
+        // Also fetch from server to get API keys
+        try {
+            const response = await fetch('/api/customer/sites');
+            const data = await response.json();
+            if (data.success && data.sites) {
+                for (const site of data.sites) {
+                    if (!sites.find(s => s.siteId === site.site_id)) {
+                        sites.push({
+                            siteId: site.site_id,
+                            domain: site.site_domain,
+                            apiKey: site.api_key
+                        });
+                    } else {
+                        // Update API key
+                        const existing = sites.find(s => s.siteId === site.site_id);
+                        existing.apiKey = site.api_key;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not fetch sites from server:', e);
+        }
+        
+        const selector = document.getElementById('siteSelector');
+        selector.innerHTML = sites.length > 0
+            ? sites.map(s => `<option value="${s.siteId}" data-api-key="${s.apiKey || ''}">${s.domain} (${s.siteId})</option>`).join('')
+            : '<option value="">No sites found - register a site first</option>';
+        
+        if (sites.length > 0) {
+            currentSiteId = sites[0].siteId;
+            currentSiteApiKey = sites[0].apiKey;
+        }
+        
+    } catch (error) {
+        console.error('Failed to load sites:', error);
+        document.getElementById('siteSelector').innerHTML = '<option value="">Error loading sites</option>';
+    }
+}
+
+async function loadTemplates() {
+    try {
+        const response = await fetch('/api/v1/permission-templates');
+        const data = await response.json();
+        
+        if (data.success && data.templates) {
+            const grid = document.getElementById('templatesGrid');
+            grid.innerHTML = data.templates.map(t => `
+                <div class="template-item" onclick="useTemplate('${t.name}', '${t.type}', '${t.description}', '${(t.config.scopes || []).join(',')}', ${t.config.duration_days || 'null'})">
+                    <div class="template-name">${t.name}</div>
+                    <div class="template-type">${t.type}</div>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Failed to load templates:', error);
+    }
+}
+
+function useTemplate(name, type, description, scopes, duration) {
+    showAddModal();
+    document.getElementById('permName').value = name;
+    document.getElementById('permType').value = type;
+    document.getElementById('permDescription').value = description;
+    document.getElementById('permScopes').value = scopes;
+    if (duration) {
+        document.getElementById('permDuration').value = duration;
+        document.getElementById('durationGroup').style.display = 'block';
+    }
+}
+
+async function loadPermissionTypes() {
+    const selector = document.getElementById('siteSelector');
+    const selectedOption = selector.options[selector.selectedIndex];
+    
+    currentSiteId = selector.value;
+    currentSiteApiKey = selectedOption?.dataset?.apiKey;
+    
+    if (!currentSiteId) {
+        alert('Please select a site');
+        return;
+    }
+    
+    if (!currentSiteApiKey) {
+        alert('No API key found for this site. Please check your site configuration.');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/v1/sites/${currentSiteId}/permission-types`, {
+            headers: {
+                'Authorization': `Bearer ${currentSiteApiKey}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            permissionTypes = data.permission_types;
+            renderPermissionTypes();
+            document.getElementById('addPermissionBtn').disabled = false;
+        } else {
+            alert('Failed to load permissions: ' + (data.error || data.message));
+        }
+        
+    } catch (error) {
+        console.error('Failed to load permission types:', error);
+        alert('Failed to load permission types');
+    }
+}
+
+function renderPermissionTypes() {
+    const container = document.getElementById('permissionsList');
+    
+    if (permissionTypes.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <h3>No permission types defined</h3>
+                <p>Create your first permission type or use a template above.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="permission-grid">
+            ${permissionTypes.map(p => `
+                <div class="permission-item">
+                    <div class="permission-info">
+                        <div class="permission-name">${p.name}</div>
+                        <div class="permission-desc">${p.description || 'No description'}</div>
+                    </div>
+                    <div class="permission-type type-${p.type}">${p.type}</div>
+                    <div class="scopes-list">
+                        ${(p.config?.scopes || []).slice(0, 3).map(s => `<span class="scope-tag">${s}</span>`).join('')}
+                        ${(p.config?.scopes || []).length > 3 ? `<span class="scope-tag">+${p.config.scopes.length - 3}</span>` : ''}
+                    </div>
+                    <button class="btn btn-secondary btn-small" onclick="editPermission('${p.name}')">Edit</button>
+                    <button class="btn btn-danger btn-small" onclick="deletePermission('${p.name}')">Delete</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function showAddModal() {
+    editingPermission = null;
+    document.getElementById('modalTitle').textContent = 'Add Permission Type';
+    document.getElementById('permissionForm').reset();
+    document.getElementById('durationGroup').style.display = 'none';
+    document.getElementById('permissionModal').classList.add('show');
+}
+
+function editPermission(name) {
+    const perm = permissionTypes.find(p => p.name === name);
+    if (!perm) return;
+    
+    editingPermission = name;
+    document.getElementById('modalTitle').textContent = 'Edit Permission Type';
+    document.getElementById('permName').value = perm.name;
+    document.getElementById('permName').disabled = true; // Can't change name
+    document.getElementById('permType').value = perm.type;
+    document.getElementById('permDescription').value = perm.description || '';
+    document.getElementById('permScopes').value = (perm.config?.scopes || []).join(', ');
+    
+    if (perm.type === 'time-bound' && perm.config?.duration_days) {
+        document.getElementById('permDuration').value = perm.config.duration_days;
+        document.getElementById('durationGroup').style.display = 'block';
+    }
+    
+    document.getElementById('permissionModal').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('permissionModal').classList.remove('show');
+    document.getElementById('permName').disabled = false;
+}
+
+async function savePermission(event) {
+    event.preventDefault();
+    
+    const name = document.getElementById('permName').value.trim().toLowerCase();
+    const type = document.getElementById('permType').value;
+    const description = document.getElementById('permDescription').value.trim();
+    const scopesStr = document.getElementById('permScopes').value.trim();
+    const duration = document.getElementById('permDuration').value;
+    
+    const scopes = scopesStr ? scopesStr.split(',').map(s => s.trim()).filter(s => s) : [];
+    
+    const config = { scopes };
+    if (type === 'time-bound' && duration) {
+        config.duration_days = parseInt(duration);
+    }
+    
+    const method = editingPermission ? 'PUT' : 'POST';
+    const url = editingPermission 
+        ? `/api/v1/sites/${currentSiteId}/permission-types/${editingPermission}`
+        : `/api/v1/sites/${currentSiteId}/permission-types`;
+    
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Authorization': `Bearer ${currentSiteApiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: name,
+                type: type,
+                description: description,
+                config: config
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            closeModal();
+            await loadPermissionTypes();
+            alert(editingPermission ? 'Permission type updated!' : 'Permission type created!');
+        } else {
+            alert('Error: ' + (data.error || data.message));
+        }
+        
+    } catch (error) {
+        console.error('Failed to save permission:', error);
+        alert('Failed to save permission type');
+    }
+}
+
+async function deletePermission(name) {
+    if (!confirm(`Delete permission type "${name}"?\n\nThis won't revoke existing permissions, but you won't be able to issue new ones with this type.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/v1/sites/${currentSiteId}/permission-types/${name}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${currentSiteApiKey}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            await loadPermissionTypes();
+            alert('Permission type deleted');
+        } else {
+            alert('Error: ' + (data.error || data.message));
+        }
+        
+    } catch (error) {
+        console.error('Failed to delete permission:', error);
+        alert('Failed to delete permission type');
+    }
+}
+</script>
+{% endblock %}
