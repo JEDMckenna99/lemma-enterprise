@@ -236,8 +236,22 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const wallet = window.globalLemmaWallet;
         
+        if (!wallet) {
+            showAdminAccessDenied('Wallet not available');
+            return;
+        }
+        
+        // Wait for layout.html to finish credential check (prevent race condition)
+        if (!window.lemmaCredential) {
+            let credAttempts = 0;
+            while (!window.lemmaCredential && credAttempts < 20) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                credAttempts++;
+            }
+        }
+        
         // Check for credential set by layout.html (standard SDK pattern)
-        if (!wallet || !window.lemmaCredential) {
+        if (!window.lemmaCredential) {
             showAdminAccessDenied('No credential found');
             return;
         }

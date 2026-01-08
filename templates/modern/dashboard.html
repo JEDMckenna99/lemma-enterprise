@@ -475,8 +475,29 @@ const lemmaWallet = new LemmaIntegratedWallet({
 
                 const wallet = window.globalLemmaWallet;
                 
+                if (!wallet) {
+                    console.log('❌ Wallet not available');
+                    document.getElementById('access-check').innerHTML = `
+                        <div style="color: var(--error);">
+                            <h2>Access Required</h2>
+                            <p>You need to be logged in to access this dashboard.</p>
+                            <p><a href="/login">Login</a> or <a href="/wallet">check your wallet</a>.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Wait for layout.html to finish credential check (prevent race condition)
+                if (!window.lemmaCredential) {
+                    let credAttempts = 0;
+                    while (!window.lemmaCredential && credAttempts < 20) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        credAttempts++;
+                    }
+                }
+                
                 // Check for credential set by layout.html (standard SDK pattern)
-                if (!wallet || !window.lemmaCredential) {
+                if (!window.lemmaCredential) {
                     console.log('❌ No credential from layout.html');
                     document.getElementById('access-check').innerHTML = `
                         <div style="color: var(--error);">
