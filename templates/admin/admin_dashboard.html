@@ -219,75 +219,64 @@
 </style>
 
 <script>
-// Admin Dashboard with Permission Lemma Access Control
+// ==========================================
+// STANDARD LEMMA SDK AUTH (same as all sites)
+// Admin pages require admin_access permission
+// ==========================================
 let adminData = null;
-let walletInstance = null;
 
 document.addEventListener('DOMContentLoaded', async function() {
     try {
-        // Initialize wallet to check permission lemmas
-        walletInstance = new LemmaIntegratedWallet({ 
-            debug: true,
-            networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-            networkAuthKey: 'lemma_network_federated_sync_2024',
-            enableAdvancedFeatures: true,
-            enableRecovery: true,
-            vaultUrl: '/vault',
-            enableSybilPrevention: true
-        });
-        await walletInstance.init();
-
-        // Check for admin_access permission lemma
-        const permissionLemmas = await walletInstance.getCredentials('permission');
-        console.log('🔍 Admin dashboard checking permission lemmas:', permissionLemmas);
-        
-        const hasAdminAccess = permissionLemmas.some(lemma => {
-            const isLemmaId = lemma.claims?.siteId === 'lemma.id';
-            const hasAdminPermission = lemma.claims?.permissionId === 'admin_access';
-            
-            console.log(`📊 Checking admin lemma ${lemma.id}:`, {
-                siteId: lemma.claims?.siteId,
-                permissionId: lemma.claims?.permissionId,
-                email: lemma.claims?.email,
-                isLemmaId,
-                hasAdminPermission
-            });
-            
-            return isLemmaId && hasAdminPermission;
-        });
-
-        if (hasAdminAccess) {
-            // User has admin permission, show dashboard
-            console.log('✅ Admin dashboard access granted - user has admin permission lemma');
-            document.getElementById('admin-access-check').style.display = 'none';
-            document.getElementById('admin-dashboard').style.display = 'block';
-            await loadAdminDashboard();
-        } else {
-            // No admin permission, show access denied with debug info
-            console.log('❌ Admin dashboard access denied - no valid admin permission lemma found');
-            console.log('📊 Available permission lemmas:', permissionLemmas.map(l => ({
-                id: l.id,
-                siteId: l.claims?.siteId,
-                permissionId: l.claims?.permissionId,
-                email: l.claims?.email
-            })));
-            
-            document.getElementById('admin-access-check').innerHTML = `
-                <div style="color: var(--error); text-align: center; padding: 40px;">
-                    <h2>Admin Access Required</h2>
-                    <p>You need an admin_access permission lemma for lemma.id to access this dashboard.</p>
-                    <p>Found ${permissionLemmas.length} permission lemma(s) but none have admin_access for lemma.id.</p>
-                    <div style="margin-top: 20px;">
-                        <a href="/login" style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 5px; display: inline-block;">
-                            🔐 Login for Admin Access
-                        </a>
-                        <button onclick="location.reload()" style="background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; margin: 5px; cursor: pointer;">
-                            🔄 Refresh & Retry
-                        </button>
-                    </div>
-                </div>
-            `;
+        // Wait for global wallet (initialized in layout.html)
+        let attempts = 0;
+        while (!window.globalLemmaWallet && attempts < 30) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
         }
+
+        const wallet = window.globalLemmaWallet;
+        
+        // Check for credential set by layout.html (standard SDK pattern)
+        if (!wallet || !window.lemmaCredential) {
+            showAdminAccessDenied('No credential found');
+            return;
+        }
+        
+        // Verify credential using standard SDK method
+        const verificationResult = await wallet.verifyCredential(window.lemmaCredential);
+        if (!verificationResult.verified) {
+            console.log('❌ Credential verification failed');
+            showAdminAccessDenied('Verification failed');
+            return;
+        }
+        
+        // Check revocation using standard SDK method
+        const isRevoked = await wallet.isCredentialRevoked(window.lemmaCredential);
+        if (isRevoked) {
+            console.log('🚫 Credential revoked');
+            await wallet.removeCredential(window.lemmaCredential.id);
+            showAdminAccessDenied('Credential revoked');
+            return;
+        }
+        
+        // Check for admin permission (additional check for admin pages)
+        const claims = window.lemmaCredential.claims || window.lemmaCredential.credentialSubject || {};
+        const permissionId = claims.permissionId || claims.permission_level || '';
+        const isAdmin = permissionId === 'admin_access' || 
+                       permissionId === 'super_admin' || 
+                       permissionId.toLowerCase().includes('admin');
+        
+        if (!isAdmin) {
+            console.log('❌ Not an admin permission:', permissionId);
+            showAdminAccessDenied('Admin permission required');
+            return;
+        }
+
+        // Admin access granted via standard SDK
+        console.log('✅ Admin dashboard access granted (standard SDK auth)');
+        document.getElementById('admin-access-check').style.display = 'none';
+        document.getElementById('admin-dashboard').style.display = 'block';
+        await loadAdminDashboard();
 
     } catch (error) {
         console.error('Admin dashboard initialization error:', error);
@@ -299,6 +288,21 @@ document.addEventListener('DOMContentLoaded', async function() {
         `;
     }
 });
+
+function showAdminAccessDenied(reason) {
+    document.getElementById('admin-access-check').innerHTML = `
+        <div style="color: var(--error); text-align: center; padding: 40px;">
+            <h2>Admin Access Required</h2>
+            <p>You need admin_access permission for lemma.id to access this dashboard.</p>
+            <p style="font-size: 0.9rem; color: var(--gray-500);">${reason}</p>
+            <div style="margin-top: 20px;">
+                <a href="/login" style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 5px; display: inline-block;">
+                    🔐 Login
+                </a>
+            </div>
+        </div>
+    `;
+}
 
 // Load admin dashboard data
 async function loadAdminDashboard() {

@@ -349,49 +349,78 @@
 </div>
 
 <script>
-// Permission Configuration Manager
-let configInstance = null;
+// ==========================================
+// STANDARD LEMMA SDK AUTH (same as all sites)
+// Admin pages require admin_access permission
+// ==========================================
 
 document.addEventListener('DOMContentLoaded', async function() {
     try {
-        // Initialize wallet for admin access control
-        configInstance = new LemmaIntegratedWallet({ 
-            debug: true,
-            networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-            networkAuthKey: 'lemma_network_federated_sync_2024',
-            enableAdvancedFeatures: true,
-            enableRecovery: true,
-            vaultUrl: '/vault',
-            enableSybilPrevention: true
-        });
-        await configInstance.init();
-
-        // Check for admin access
-        const permissionLemmas = await configInstance.getCredentials('permission');
-        const hasAdminAccess = permissionLemmas.some(lemma => 
-            lemma.claims?.siteId === 'lemma.id' && lemma.claims?.permissionId === 'admin_access'
-        );
-
-        if (hasAdminAccess) {
-            document.getElementById('config-access-check').style.display = 'none';
-            document.getElementById('permission-configuration').style.display = 'block';
-            await loadConfigurationData();
-        } else {
-            document.getElementById('config-access-check').innerHTML = `
-                <div style="color: var(--error); text-align: center; padding: 40px;">
-                    <h2>Admin Access Required</h2>
-                    <p>You need admin_access permission lemma to configure permissions.</p>
-                    <a href="/admin" style="background: var(--primary); color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-                        ← Back to Admin Dashboard
-                    </a>
-                </div>
-            `;
+        // Wait for global wallet (initialized in layout.html)
+        let attempts = 0;
+        while (!window.globalLemmaWallet && attempts < 30) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
         }
+
+        const wallet = window.globalLemmaWallet;
+        
+        // Check for credential set by layout.html (standard SDK pattern)
+        if (!wallet || !window.lemmaCredential) {
+            showConfigAccessDenied('No credential found');
+            return;
+        }
+        
+        // Verify credential using standard SDK method
+        const verificationResult = await wallet.verifyCredential(window.lemmaCredential);
+        if (!verificationResult.verified) {
+            showConfigAccessDenied('Verification failed');
+            return;
+        }
+        
+        // Check revocation using standard SDK method
+        const isRevoked = await wallet.isCredentialRevoked(window.lemmaCredential);
+        if (isRevoked) {
+            await wallet.removeCredential(window.lemmaCredential.id);
+            showConfigAccessDenied('Credential revoked');
+            return;
+        }
+        
+        // Check for admin permission
+        const claims = window.lemmaCredential.claims || window.lemmaCredential.credentialSubject || {};
+        const permissionId = claims.permissionId || claims.permission_level || '';
+        const isAdmin = permissionId === 'admin_access' || 
+                       permissionId === 'super_admin' || 
+                       permissionId.toLowerCase().includes('admin');
+        
+        if (!isAdmin) {
+            showConfigAccessDenied('Admin permission required');
+            return;
+        }
+
+        // Admin access granted via standard SDK
+        console.log('✅ Permission configuration access granted (standard SDK auth)');
+        document.getElementById('config-access-check').style.display = 'none';
+        document.getElementById('permission-configuration').style.display = 'block';
+        await loadConfigurationData();
 
     } catch (error) {
         console.error('Permission configuration initialization error:', error);
     }
 });
+
+function showConfigAccessDenied(reason) {
+    document.getElementById('config-access-check').innerHTML = `
+        <div style="color: var(--error); text-align: center; padding: 40px;">
+            <h2>Admin Access Required</h2>
+            <p>You need admin_access permission to configure permissions.</p>
+            <p style="font-size: 0.9rem; color: var(--gray-500);">${reason}</p>
+            <a href="/admin" style="background: var(--primary); color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+                ← Back to Admin Dashboard
+            </a>
+        </div>
+    `;
+}
 
 // Load configuration data
 async function loadConfigurationData() {

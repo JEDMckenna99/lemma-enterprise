@@ -64,30 +64,22 @@
 </div>
 
 <script>
+// ==========================================
+// STANDARD LEMMA SDK AUTH (same as all sites)
+// ==========================================
 document.addEventListener('DOMContentLoaded', async function() {
     try {
-        // Check for customer access permission
-        const { LemmaWallet } = await import('/static/js/lemma-wallet.js');
-        const wallet = new LemmaWallet({ 
-            debug: true,
-            enableAdvancedFeatures: true,
-            enableRecovery: true,
-            vaultUrl: '/vault',
-            enableSybilPrevention: true
-        });
-        await wallet.init();
+        // Wait for global wallet (initialized in layout.html)
+        let attempts = 0;
+        while (!window.globalLemmaWallet && attempts < 30) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
 
-        const permissionLemmas = await wallet.getCredentials('permission');
-        const hasAccess = permissionLemmas.some(lemma => 
-            lemma.claims?.siteId === 'lemma.id' && 
-            (lemma.claims?.permissionId === 'customer_access' || lemma.claims?.permissionId === 'admin_access')
-        );
-
-        if (hasAccess) {
-            document.getElementById('access-check').style.display = 'none';
-            document.getElementById('billing-interface').style.display = 'block';
-            await loadBillingData();
-        } else {
+        const wallet = window.globalLemmaWallet;
+        
+        // Check for credential set by layout.html (standard SDK pattern)
+        if (!wallet || !window.lemmaCredential) {
             document.getElementById('access-check').innerHTML = `
                 <div style="color: var(--error);">
                     <h2>Access Required</h2>
@@ -95,7 +87,30 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <a href="/login" style="color: var(--primary);">Login</a>
                 </div>
             `;
+            return;
         }
+        
+        // Verify credential using standard SDK method
+        const verificationResult = await wallet.verifyCredential(window.lemmaCredential);
+        if (!verificationResult.verified) {
+            console.log('❌ Credential verification failed');
+            window.location.href = '/login';
+            return;
+        }
+        
+        // Check revocation using standard SDK method
+        const isRevoked = await wallet.isCredentialRevoked(window.lemmaCredential);
+        if (isRevoked) {
+            await wallet.removeCredential(window.lemmaCredential.id);
+            window.location.href = '/login';
+            return;
+        }
+
+        // Access granted via standard SDK
+        console.log('✅ Billing access granted (standard SDK auth)');
+        document.getElementById('access-check').style.display = 'none';
+        document.getElementById('billing-interface').style.display = 'block';
+        await loadBillingData();
 
     } catch (error) {
         console.error('Failed to check permissions:', error);

@@ -81,10 +81,31 @@ userManager.renderUserManagement('user-management-container');
 </div>
 
 <script>
+// ==========================================
+// STANDARD LEMMA SDK AUTH (same as all sites)
+// ==========================================
 let currentUserManager = null;
 
 document.addEventListener('DOMContentLoaded', async function() {
     try {
+        // Wait for global wallet (initialized in layout.html)
+        let attempts = 0;
+        while (!window.globalLemmaWallet && attempts < 30) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+
+        if (!window.globalLemmaWallet) {
+            console.log('❌ Wallet not available');
+            document.getElementById('userManagementContainer').innerHTML = `
+                <div style="padding: 60px; text-align: center; color: var(--gray-500);">
+                    <h3>Wallet Required</h3>
+                    <p>Please <a href="/wallet">set up your wallet</a> to manage sites.</p>
+                </div>
+            `;
+            return;
+        }
+        
         // Load user's sites (sites where they have admin access)
         await loadUserSites();
         
@@ -95,16 +116,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 async function loadUserSites() {
     try {
-        // Initialize wallet to check permission lemmas
-        const { LemmaWallet } = await import('/static/js/lemma-wallet.js');
-        const wallet = new LemmaWallet({ 
-            debug: true,
-            enableAdvancedFeatures: true,
-            enableRecovery: true,
-            vaultUrl: '/vault',
-            enableSybilPrevention: true
-        });
-        await wallet.init();
+        // Use global wallet (standard SDK pattern)
+        const wallet = window.globalLemmaWallet;
 
         // Get permission lemmas to find sites where user has admin access
         const permissionLemmas = await wallet.getCredentials('permission');

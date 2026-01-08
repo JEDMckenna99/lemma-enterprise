@@ -458,73 +458,58 @@ const lemmaWallet = new LemmaIntegratedWallet({
     </div>
 
     <script>
-        // Permission-based access control and dashboard functionality
+        // ==========================================
+        // STANDARD LEMMA SDK AUTH (same as all sites)
+        // ==========================================
         let customerData = null;
-        let walletInstance = null;
         const currentMonth = new Date().toISOString().slice(0, 7);
 
         document.addEventListener('DOMContentLoaded', async function() {
             try {
-                // Initialize integrated wallet to check permission lemmas
-                walletInstance = new LemmaIntegratedWallet({ 
-                    debug: true,
-                    networkRegistryUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/network/sync',
-                    networkAuthKey: 'lemma_network_federated_sync_2024',
-                    enableAdvancedFeatures: true,
-                    enableRecovery: true,
-                    vaultUrl: '/vault',
-                    enableSybilPrevention: true
-                });
-                await walletInstance.init();
+                // Wait for global wallet (initialized in layout.html)
+                let attempts = 0;
+                while (!window.globalLemmaWallet && attempts < 30) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
 
-                // Check for any valid permission lemma for lemma.id
-                const permissionLemmas = await walletInstance.getCredentials('permission');
-                console.log('🔍 Dashboard checking permission lemmas:', permissionLemmas);
+                const wallet = window.globalLemmaWallet;
                 
-                const hasLemmaAccess = permissionLemmas.some(lemma => {
-                    const isLemmaId = lemma.claims?.siteId === 'lemma.id';
-                    const hasValidPermission = lemma.claims?.permissionId === 'customer_access' || 
-                                             lemma.claims?.permissionId === 'admin_access';
-                    
-                    console.log(`📊 Checking lemma ${lemma.id}:`, {
-                        siteId: lemma.claims?.siteId,
-                        permissionId: lemma.claims?.permissionId,
-                        email: lemma.claims?.email,
-                        isLemmaId,
-                        hasValidPermission
-                    });
-                    
-                    return isLemmaId && hasValidPermission;
-                });
-
-                if (hasLemmaAccess) {
-                    // User has permission, load dashboard
-                    console.log('✅ Dashboard access granted - user has valid permission lemma');
-                    document.getElementById('access-check').style.display = 'none';
-                    document.getElementById('customer-dashboard').style.display = 'block';
-                    await loadDashboardData();
-                } else {
-                    // No permission, show access denied with debug info
-                    console.log('❌ Dashboard access denied - no valid permission lemma found');
-                    console.log('📊 Available permission lemmas:', permissionLemmas.map(l => ({
-                        id: l.id,
-                        siteId: l.claims?.siteId,
-                        permissionId: l.claims?.permissionId,
-                        email: l.claims?.email
-                    })));
-                    
+                // Check for credential set by layout.html (standard SDK pattern)
+                if (!wallet || !window.lemmaCredential) {
+                    console.log('❌ No credential from layout.html');
                     document.getElementById('access-check').innerHTML = `
                         <div style="color: var(--error);">
-                            <h2>Access Denied</h2>
-                            <p>You need a valid permission lemma for lemma.id to access this dashboard.</p>
-                            <p>Found ${permissionLemmas.length} permission lemma(s) but none match lemma.id site.</p>
-                            <p><a href="/login">Login</a> to get your permission lemma or <a href="/wallet">check your wallet</a>.</p>
-                            <button onclick="location.reload()" style="margin: 10px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px;">
-                                🔄 Refresh & Retry
-                            </button>
+                            <h2>Access Required</h2>
+                            <p>You need to be logged in to access this dashboard.</p>
+                            <p><a href="/login">Login</a> or <a href="/wallet">check your wallet</a>.</p>
                         </div>
                     `;
+                    return;
                 }
+                
+                // Verify credential using standard SDK method
+                const verificationResult = await wallet.verifyCredential(window.lemmaCredential);
+                if (!verificationResult.verified) {
+                    console.log('❌ Credential verification failed');
+                    window.location.href = '/login';
+                    return;
+                }
+                
+                // Check revocation using standard SDK method
+                const isRevoked = await wallet.isCredentialRevoked(window.lemmaCredential);
+                if (isRevoked) {
+                    console.log('🚫 Credential revoked');
+                    await wallet.removeCredential(window.lemmaCredential.id);
+                    window.location.href = '/login';
+                    return;
+                }
+
+                // Access granted via standard SDK
+                console.log('✅ Dashboard access granted (standard SDK auth)');
+                document.getElementById('access-check').style.display = 'none';
+                document.getElementById('customer-dashboard').style.display = 'block';
+                await loadDashboardData();
 
             } catch (error) {
                 console.error('Dashboard initialization error:', error);
