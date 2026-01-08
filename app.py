@@ -548,17 +548,6 @@ def create_app():
         """One-time PIN setup for existing wallet"""
         return render_template('setup_pin_protection.html')
 
-    @app.route('/permission-types')
-    def permission_types():
-        """Developer permission type management"""
-        logger.info("📋 Serving permission types management page")
-        return render_template('modern/permission_types.html')
-
-    @app.route('/site-management')
-    def site_management():
-        """Site user management"""
-        logger.info("👥 Serving site management page")
-        return render_template('modern/site_management.html')
 
     @app.route('/qr-reader')
     def qr_reader():

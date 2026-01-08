@@ -499,7 +499,11 @@
                     </a>
                     <a class="nav-item" data-section="users">
                         <span class="nav-icon">👥</span>
-                        <span>Users & Permissions</span>
+                        <span>Site Users</span>
+                    </a>
+                    <a class="nav-item" data-section="permissions">
+                        <span class="nav-icon">🛡️</span>
+                        <span>Permission Types</span>
                     </a>
                     <a class="nav-item" data-section="api">
                         <span class="nav-icon">🔑</span>
@@ -643,6 +647,57 @@
                     
                     <div id="users-table-container">
                         <div class="loading">Loading users...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Permission Types Section -->
+            <div id="section-permissions" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Permission Types</h1>
+                    <p class="content-subtitle">Define what permissions your site offers to users</p>
+                </div>
+                
+                <!-- Site Selection for Permissions -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Select Site</h2>
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <select id="permission-types-site-selector" class="form-select" style="flex: 1; max-width: 400px;">
+                            <option value="">Loading your sites...</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadPermissionTypes()">Load Permissions</button>
+                    </div>
+                </div>
+                
+                <!-- Permission Types List -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Permission Types</h2>
+                        <button class="btn btn-primary btn-sm" onclick="showAddPermissionTypeModal()" id="add-perm-type-btn" disabled>
+                            + Add Permission Type
+                        </button>
+                    </div>
+                    <div id="permission-types-container">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🛡️</div>
+                            <div>Select a site above to manage permission types</div>
+                            <div style="font-size: 14px; margin-top: 8px;">Define custom permissions like "viewer", "editor", "admin", etc.</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Permission Templates -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Templates</h2>
+                    </div>
+                    <p style="color: #6b7280; margin-bottom: 16px; font-size: 14px;">
+                        Click a template to use it as a starting point for your permission types.
+                    </p>
+                    <div id="permission-templates-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;">
+                        <!-- Loaded dynamically -->
                     </div>
                 </div>
             </div>
@@ -891,6 +946,56 @@
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('api-key-modal')">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="api-key-submit-btn">Register Site</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Add/Edit Permission Type Modal -->
+    <div id="permission-type-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="perm-type-modal-title">Add Permission Type</h3>
+                <p class="modal-subtitle">Define a new permission type for your site</p>
+            </div>
+            
+            <form id="permission-type-form" onsubmit="savePermissionType(event)">
+                <div class="form-group">
+                    <label class="form-label">Name <span style="color: #ef4444;">*</span></label>
+                    <input type="text" id="perm-type-name" class="form-input" placeholder="e.g., editor" required pattern="[a-z0-9_-]+">
+                    <small style="color: #6b7280; font-size: 12px;">Lowercase letters, numbers, underscores, hyphens only</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Type <span style="color: #ef4444;">*</span></label>
+                    <select id="perm-type-type" class="form-select" required>
+                        <option value="role">Role (e.g., viewer, admin)</option>
+                        <option value="subscription">Subscription (e.g., premium)</option>
+                        <option value="time-bound">Time-bound (e.g., trial)</option>
+                        <option value="scope">Scope (granular access)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea id="perm-type-description" class="form-input" style="min-height: 80px; resize: vertical;" placeholder="What this permission grants..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Scopes</label>
+                    <input type="text" id="perm-type-scopes" class="form-input" placeholder="content:read, content:write">
+                    <small style="color: #6b7280; font-size: 12px;">Comma-separated list of scopes</small>
+                </div>
+                
+                <div class="form-group" id="perm-type-duration-group" style="display: none;">
+                    <label class="form-label">Duration (days)</label>
+                    <input type="number" id="perm-type-duration" class="form-input" placeholder="e.g., 14">
+                    <small style="color: #6b7280; font-size: 12px;">For time-bound permissions only</small>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('permission-type-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Permission Type</button>
                 </div>
             </form>
         </div>
@@ -1312,6 +1417,9 @@
                 loadUsersData();
             } else if (sectionName === 'api') {
                 loadAPIKeysData();
+            } else if (sectionName === 'permissions') {
+                loadPermTypeSiteSelector();
+                loadPermissionTemplates();
             }
             
             currentSection = sectionName;
@@ -2156,6 +2264,308 @@
                 alert('Error requesting access. Please try again.');
             }
         }
+        
+        // ==========================================
+        // PERMISSION TYPES MANAGEMENT
+        // ==========================================
+        
+        let currentPermTypeSiteId = null;
+        let currentPermTypeSiteApiKey = null;
+        let currentPermissionTypes = [];
+        let editingPermTypeName = null;
+        
+        // Load site selector for permission types
+        async function loadPermTypeSiteSelector() {
+            try {
+                const authHeaders = getLemmaAuthHeaders();
+                const response = await fetch('/api/customer/api-keys', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...authHeaders
+                    }
+                });
+                
+                const data = await response.json();
+                const selector = document.getElementById('permission-types-site-selector');
+                
+                if (data.success && data.sites && data.sites.length > 0) {
+                    selector.innerHTML = data.sites.map(site => 
+                        `<option value="${site.site_id}" data-api-key="${site.api_key || ''}">${site.site_domain || site.site_id}</option>`
+                    ).join('');
+                    
+                    // Set initial site
+                    currentPermTypeSiteId = data.sites[0].site_id;
+                    currentPermTypeSiteApiKey = data.sites[0].api_key;
+                } else {
+                    selector.innerHTML = '<option value="">No sites found - register a site first</option>';
+                }
+            } catch (error) {
+                console.error('Failed to load sites for permission types:', error);
+            }
+        }
+        
+        // Load permission templates
+        async function loadPermissionTemplates() {
+            try {
+                const response = await fetch('/api/v1/permission-templates');
+                const data = await response.json();
+                
+                if (data.success && data.templates) {
+                    const grid = document.getElementById('permission-templates-grid');
+                    grid.innerHTML = data.templates.map(t => `
+                        <div onclick="usePermissionTemplate('${t.name}', '${t.type}', '${t.description}', '${(t.config.scopes || []).join(',')}', ${t.config.duration_days || 'null'})"
+                             style="padding: 16px; border: 2px solid #e5e7eb; border-radius: 8px; cursor: pointer; text-align: center; transition: all 0.2s;"
+                             onmouseover="this.style.borderColor='#667eea'; this.style.background='#f5f7ff';"
+                             onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+                            <div style="font-weight: 600; color: #111827;">${t.name}</div>
+                            <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">${t.type}</div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load permission templates:', error);
+            }
+        }
+        
+        function usePermissionTemplate(name, type, description, scopes, duration) {
+            showAddPermissionTypeModal();
+            document.getElementById('perm-type-name').value = name;
+            document.getElementById('perm-type-type').value = type;
+            document.getElementById('perm-type-description').value = description;
+            document.getElementById('perm-type-scopes').value = scopes;
+            if (duration) {
+                document.getElementById('perm-type-duration').value = duration;
+                document.getElementById('perm-type-duration-group').style.display = 'block';
+            }
+        }
+        
+        // Load permission types for selected site
+        async function loadPermissionTypes() {
+            const selector = document.getElementById('permission-types-site-selector');
+            const selectedOption = selector.options[selector.selectedIndex];
+            
+            currentPermTypeSiteId = selector.value;
+            currentPermTypeSiteApiKey = selectedOption?.dataset?.apiKey;
+            
+            if (!currentPermTypeSiteId) {
+                showToast('Please select a site', 'error');
+                return;
+            }
+            
+            if (!currentPermTypeSiteApiKey) {
+                showToast('No API key found for this site', 'error');
+                return;
+            }
+            
+            const container = document.getElementById('permission-types-container');
+            container.innerHTML = '<div class="loading">Loading permission types...</div>';
+            
+            try {
+                const response = await fetch(`/api/v1/sites/${currentPermTypeSiteId}/permission-types`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentPermTypeSiteApiKey}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentPermissionTypes = data.permission_types;
+                    renderPermissionTypes();
+                    document.getElementById('add-perm-type-btn').disabled = false;
+                } else {
+                    throw new Error(data.error || 'Failed to load permissions');
+                }
+                
+            } catch (error) {
+                console.error('Failed to load permission types:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <div>Failed to load permission types</div>
+                        <div style="font-size: 14px; margin-top: 8px; color: #ef4444;">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderPermissionTypes() {
+            const container = document.getElementById('permission-types-container');
+            
+            if (currentPermissionTypes.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🛡️</div>
+                        <div>No permission types defined</div>
+                        <div style="font-size: 14px; margin-top: 8px;">Create your first permission type or use a template below.</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            const typeColors = {
+                'role': { bg: '#dbeafe', text: '#1e40af' },
+                'subscription': { bg: '#dcfce7', text: '#166534' },
+                'time-bound': { bg: '#fef3c7', text: '#92400e' },
+                'scope': { bg: '#f3e8ff', text: '#7c3aed' }
+            };
+            
+            container.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Scopes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${currentPermissionTypes.map(p => {
+                            const colors = typeColors[p.type] || { bg: '#f3f4f6', text: '#374151' };
+                            const scopes = p.config?.scopes || [];
+                            return `
+                                <tr>
+                                    <td><code style="font-weight: 600;">${p.name}</code></td>
+                                    <td>
+                                        <span style="background: ${colors.bg}; color: ${colors.text}; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500;">
+                                            ${p.type}
+                                        </span>
+                                    </td>
+                                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${p.description || '-'}</td>
+                                    <td style="font-size: 12px; color: #6b7280;">
+                                        ${scopes.slice(0, 2).join(', ')}${scopes.length > 2 ? ` +${scopes.length - 2}` : ''}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-secondary btn-sm" onclick="editPermissionType('${p.name}')" style="margin-right: 6px;">Edit</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="deletePermissionType('${p.name}')" style="color: #dc2626; border-color: #fecaca;">Delete</button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        function showAddPermissionTypeModal() {
+            editingPermTypeName = null;
+            document.getElementById('perm-type-modal-title').textContent = 'Add Permission Type';
+            document.getElementById('permission-type-form').reset();
+            document.getElementById('perm-type-name').disabled = false;
+            document.getElementById('perm-type-duration-group').style.display = 'none';
+            document.getElementById('permission-type-modal').classList.add('show');
+        }
+        
+        function editPermissionType(name) {
+            const perm = currentPermissionTypes.find(p => p.name === name);
+            if (!perm) return;
+            
+            editingPermTypeName = name;
+            document.getElementById('perm-type-modal-title').textContent = 'Edit Permission Type';
+            document.getElementById('perm-type-name').value = perm.name;
+            document.getElementById('perm-type-name').disabled = true;
+            document.getElementById('perm-type-type').value = perm.type;
+            document.getElementById('perm-type-description').value = perm.description || '';
+            document.getElementById('perm-type-scopes').value = (perm.config?.scopes || []).join(', ');
+            
+            if (perm.type === 'time-bound' && perm.config?.duration_days) {
+                document.getElementById('perm-type-duration').value = perm.config.duration_days;
+                document.getElementById('perm-type-duration-group').style.display = 'block';
+            } else {
+                document.getElementById('perm-type-duration-group').style.display = 'none';
+            }
+            
+            document.getElementById('permission-type-modal').classList.add('show');
+        }
+        
+        async function savePermissionType(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('perm-type-name').value.trim().toLowerCase();
+            const type = document.getElementById('perm-type-type').value;
+            const description = document.getElementById('perm-type-description').value.trim();
+            const scopesStr = document.getElementById('perm-type-scopes').value.trim();
+            const duration = document.getElementById('perm-type-duration').value;
+            
+            const scopes = scopesStr ? scopesStr.split(',').map(s => s.trim()).filter(s => s) : [];
+            
+            const config = { scopes };
+            if (type === 'time-bound' && duration) {
+                config.duration_days = parseInt(duration);
+            }
+            
+            const method = editingPermTypeName ? 'PUT' : 'POST';
+            const url = editingPermTypeName 
+                ? `/api/v1/sites/${currentPermTypeSiteId}/permission-types/${editingPermTypeName}`
+                : `/api/v1/sites/${currentPermTypeSiteId}/permission-types`;
+            
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Authorization': `Bearer ${currentPermTypeSiteApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        type: type,
+                        description: description,
+                        config: config
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    closeModal('permission-type-modal');
+                    await loadPermissionTypes();
+                    showToast(editingPermTypeName ? 'Permission type updated!' : 'Permission type created!');
+                } else {
+                    showToast('Error: ' + (data.error || data.message), 'error');
+                }
+                
+            } catch (error) {
+                console.error('Failed to save permission type:', error);
+                showToast('Failed to save permission type', 'error');
+            }
+        }
+        
+        async function deletePermissionType(name) {
+            if (!confirm(`Delete permission type "${name}"?\n\nThis won't revoke existing permissions, but you won't be able to issue new ones with this type.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/sites/${currentPermTypeSiteId}/permission-types/${name}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${currentPermTypeSiteApiKey}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    await loadPermissionTypes();
+                    showToast('Permission type deleted');
+                } else {
+                    showToast('Error: ' + (data.error || data.message), 'error');
+                }
+                
+            } catch (error) {
+                console.error('Failed to delete permission type:', error);
+                showToast('Failed to delete permission type', 'error');
+            }
+        }
+        
+        // Show/hide duration field based on type selection
+        document.getElementById('perm-type-type')?.addEventListener('change', function() {
+            document.getElementById('perm-type-duration-group').style.display = 
+                this.value === 'time-bound' ? 'block' : 'none';
+        });
         
         // Close modals on background click
         document.addEventListener('click', (e) => {
