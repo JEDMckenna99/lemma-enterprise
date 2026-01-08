@@ -20,7 +20,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 
-from .auth.decorators import require_api_key
+from auth.decorators import require_api_key
 
 logger = logging.getLogger(__name__)
 
