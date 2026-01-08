@@ -5,6 +5,10 @@ Permission Type Management API
 Allows site admins to define and manage permission types for their sites.
 This is the developer-facing API for configuring what permissions their site offers.
 
+Supports two authentication methods:
+1. API Key in Authorization header (for SDK/server-to-server calls)
+2. Credential in Authorization header (for platform UI)
+
 Endpoints:
 - GET  /api/v1/sites/{site_id}/permission-types         - List permission types
 - POST /api/v1/sites/{site_id}/permission-types         - Create permission type
@@ -20,32 +24,72 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 
-from auth.decorators import require_api_key
-
 logger = logging.getLogger(__name__)
 
 permission_type_api = Blueprint('permission_type_api', __name__)
 
 
-def _verify_site_admin(api_key: str, site_id: str) -> bool:
-    """Verify the API key has admin access to this site."""
+def _verify_site_access(site_id: str) -> bool:
+    """
+    Verify the request has admin access to this site.
+    
+    Supports:
+    1. API Key authentication (Bearer lemma_xxx)
+    2. Credential authentication (Bearer {json credential})
+    """
     from .database import get_db
     from sqlalchemy import text
     
-    if not api_key:
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
         return False
+    
+    token = auth_header.replace('Bearer ', '')
     
     db = get_db()
     try:
-        # Check if API key belongs to this site
-        result = db.execute(text("""
-            SELECT site_id FROM sites 
-            WHERE api_key = :api_key AND site_id = :site_id
-        """), {'api_key': api_key, 'site_id': site_id}).fetchone()
+        # Method 1: API Key authentication
+        if token.startswith('lemma_'):
+            result = db.execute(text("""
+                SELECT site_id FROM sites 
+                WHERE api_key = :api_key AND site_id = :site_id
+            """), {'api_key': token, 'site_id': site_id}).fetchone()
+            return result is not None
         
-        return result is not None
+        # Method 2: Credential authentication (JSON)
+        try:
+            credential = json.loads(token)
+            claims = credential.get('claims') or credential.get('credentialSubject') or {}
+            email = claims.get('email')
+            
+            if not email:
+                return False
+            
+            # Check if this email owns this site
+            result = db.execute(text("""
+                SELECT site_id FROM sites 
+                WHERE site_id = :site_id AND admin_email = :email
+            """), {'site_id': site_id, 'email': email}).fetchone()
+            
+            if result:
+                return True
+            
+            # Also check if they have a customer record with this site
+            from .customer_accounts import customer_manager
+            customer = customer_manager.get_customer_by_email(email)
+            if customer:
+                sites = getattr(customer, 'sites', []) or []
+                for site in sites:
+                    if site.get('site_id') == site_id:
+                        return True
+            
+            return False
+            
+        except json.JSONDecodeError:
+            return False
+        
     except Exception as e:
-        logger.warning(f"Site admin check failed: {e}")
+        logger.warning(f"Site access check failed: {e}")
         return False
     finally:
         db.close()
@@ -53,7 +97,6 @@ def _verify_site_admin(api_key: str, site_id: str) -> bool:
 
 @permission_type_api.route('/api/v1/sites/<site_id>/permission-types', methods=['GET'])
 @cross_origin()
-@require_api_key
 def list_permission_types(site_id):
     """
     List all permission types for a site.
@@ -61,13 +104,12 @@ def list_permission_types(site_id):
     Returns both custom types and available templates.
     """
     try:
-        api_key = request.headers.get('Authorization', '').replace('Bearer ', '')
-        if not _verify_site_admin(api_key, site_id):
+        if not _verify_site_access(site_id):
             return jsonify({
                 'success': False,
                 'error': 'unauthorized',
                 'message': 'You do not have admin access to this site'
-            }), 403
+            }), 401
         
         from .database import get_db
         from sqlalchemy import text
@@ -110,7 +152,6 @@ def list_permission_types(site_id):
 
 @permission_type_api.route('/api/v1/sites/<site_id>/permission-types', methods=['POST'])
 @cross_origin()
-@require_api_key
 def create_permission_type(site_id):
     """
     Create a new permission type for a site.
@@ -127,12 +168,11 @@ def create_permission_type(site_id):
     }
     """
     try:
-        api_key = request.headers.get('Authorization', '').replace('Bearer ', '')
-        if not _verify_site_admin(api_key, site_id):
+        if not _verify_site_access(site_id):
             return jsonify({
                 'success': False,
                 'error': 'unauthorized'
-            }), 403
+            }), 401
         
         data = request.get_json() or {}
         name = data.get('name', '').strip().lower()
@@ -215,13 +255,11 @@ def create_permission_type(site_id):
 
 @permission_type_api.route('/api/v1/sites/<site_id>/permission-types/<name>', methods=['GET'])
 @cross_origin()
-@require_api_key
 def get_permission_type(site_id, name):
     """Get a specific permission type."""
     try:
-        api_key = request.headers.get('Authorization', '').replace('Bearer ', '')
-        if not _verify_site_admin(api_key, site_id):
-            return jsonify({'success': False, 'error': 'unauthorized'}), 403
+        if not _verify_site_access(site_id):
+            return jsonify({'success': False, 'error': 'unauthorized'}), 401
         
         from .database import get_db
         from sqlalchemy import text
@@ -263,7 +301,6 @@ def get_permission_type(site_id, name):
 
 @permission_type_api.route('/api/v1/sites/<site_id>/permission-types/<name>', methods=['PUT'])
 @cross_origin()
-@require_api_key
 def update_permission_type(site_id, name):
     """
     Update a permission type.
@@ -276,9 +313,8 @@ def update_permission_type(site_id, name):
     }
     """
     try:
-        api_key = request.headers.get('Authorization', '').replace('Bearer ', '')
-        if not _verify_site_admin(api_key, site_id):
-            return jsonify({'success': False, 'error': 'unauthorized'}), 403
+        if not _verify_site_access(site_id):
+            return jsonify({'success': False, 'error': 'unauthorized'}), 401
         
         data = request.get_json() or {}
         
@@ -349,7 +385,6 @@ def update_permission_type(site_id, name):
 
 @permission_type_api.route('/api/v1/sites/<site_id>/permission-types/<name>', methods=['DELETE'])
 @cross_origin()
-@require_api_key
 def delete_permission_type(site_id, name):
     """
     Delete a permission type (soft delete - sets active=false).
@@ -357,9 +392,8 @@ def delete_permission_type(site_id, name):
     Note: This doesn't revoke existing permissions of this type.
     """
     try:
-        api_key = request.headers.get('Authorization', '').replace('Bearer ', '')
-        if not _verify_site_admin(api_key, site_id):
-            return jsonify({'success': False, 'error': 'unauthorized'}), 403
+        if not _verify_site_access(site_id):
+            return jsonify({'success': False, 'error': 'unauthorized'}), 401
         
         from .database import get_db
         from sqlalchemy import text

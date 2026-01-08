@@ -962,7 +962,7 @@
             <form id="permission-type-form" onsubmit="savePermissionType(event)">
                 <div class="form-group">
                     <label class="form-label">Name <span style="color: #ef4444;">*</span></label>
-                    <input type="text" id="perm-type-name" class="form-input" placeholder="e.g., editor" required pattern="[a-z0-9_-]+">
+                    <input type="text" id="perm-type-name" class="form-input" placeholder="e.g., editor" required pattern="[a-z0-9_\-]+">
                     <small style="color: #6b7280; font-size: 12px;">Lowercase letters, numbers, underscores, hyphens only</small>
                 </div>
                 
@@ -2274,34 +2274,68 @@
         let currentPermissionTypes = [];
         let editingPermTypeName = null;
         
-        // Load site selector for permission types
+        // Load site selector for permission types (uses credential auth, not API key)
         async function loadPermTypeSiteSelector() {
             try {
-                const authHeaders = getLemmaAuthHeaders();
-                const response = await fetch('/api/customer/api-keys', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...authHeaders
+                // Get user's credential to determine their sites
+                let userCredential = null;
+                try {
+                    if (lemmaPlatformCredentialString) {
+                        userCredential = JSON.parse(lemmaPlatformCredentialString);
                     }
+                } catch (e) {
+                    console.warn('Could not parse credential');
+                }
+                
+                // Fetch sites from the platform users endpoint (same as users section)
+                const response = await fetch('/api/platform/stats', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_credential: userCredential })
                 });
                 
                 const data = await response.json();
                 const selector = document.getElementById('permission-types-site-selector');
                 
-                if (data.success && data.sites && data.sites.length > 0) {
-                    selector.innerHTML = data.sites.map(site => 
-                        `<option value="${site.site_id}" data-api-key="${site.api_key || ''}">${site.site_domain || site.site_id}</option>`
+                // Also try to get sites from the API keys endpoint
+                const authHeaders = getLemmaAuthHeaders();
+                let sites = [];
+                
+                try {
+                    const keysResponse = await fetch('/api/customer/api-keys', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...authHeaders
+                        }
+                    });
+                    const keysData = await keysResponse.json();
+                    if (keysData.success && keysData.sites) {
+                        sites = keysData.sites;
+                    }
+                } catch (e) {
+                    console.warn('Could not load from api-keys:', e);
+                }
+                
+                // Fallback: use site from stats if no sites from api-keys
+                if (sites.length === 0 && data.site_id) {
+                    sites = [{ site_id: data.site_id, site_domain: data.site_domain }];
+                }
+                
+                if (sites.length > 0) {
+                    selector.innerHTML = sites.map(site => 
+                        `<option value="${site.site_id}">${site.site_domain || site.site_id}</option>`
                     ).join('');
                     
                     // Set initial site
-                    currentPermTypeSiteId = data.sites[0].site_id;
-                    currentPermTypeSiteApiKey = data.sites[0].api_key;
+                    currentPermTypeSiteId = sites[0].site_id;
                 } else {
                     selector.innerHTML = '<option value="">No sites found - register a site first</option>';
                 }
             } catch (error) {
                 console.error('Failed to load sites for permission types:', error);
+                document.getElementById('permission-types-site-selector').innerHTML = 
+                    '<option value="">Error loading sites</option>';
             }
         }
         
@@ -2340,21 +2374,13 @@
             }
         }
         
-        // Load permission types for selected site
+        // Load permission types for selected site (uses credential auth)
         async function loadPermissionTypes() {
             const selector = document.getElementById('permission-types-site-selector');
-            const selectedOption = selector.options[selector.selectedIndex];
-            
             currentPermTypeSiteId = selector.value;
-            currentPermTypeSiteApiKey = selectedOption?.dataset?.apiKey;
             
             if (!currentPermTypeSiteId) {
                 showToast('Please select a site', 'error');
-                return;
-            }
-            
-            if (!currentPermTypeSiteApiKey) {
-                showToast('No API key found for this site', 'error');
                 return;
             }
             
@@ -2362,9 +2388,13 @@
             container.innerHTML = '<div class="loading">Loading permission types...</div>';
             
             try {
+                // Use credential-based authentication
+                const authHeaders = getLemmaAuthHeaders();
+                
                 const response = await fetch(`/api/v1/sites/${currentPermTypeSiteId}/permission-types`, {
                     headers: {
-                        'Authorization': `Bearer ${currentPermTypeSiteApiKey}`
+                        'Content-Type': 'application/json',
+                        ...authHeaders
                     }
                 });
                 
@@ -2375,7 +2405,7 @@
                     renderPermissionTypes();
                     document.getElementById('add-perm-type-btn').disabled = false;
                 } else {
-                    throw new Error(data.error || 'Failed to load permissions');
+                    throw new Error(data.error || data.message || 'Failed to load permissions');
                 }
                 
             } catch (error) {
@@ -2503,11 +2533,14 @@
                 : `/api/v1/sites/${currentPermTypeSiteId}/permission-types`;
             
             try {
+                // Use credential-based authentication
+                const authHeaders = getLemmaAuthHeaders();
+                
                 const response = await fetch(url, {
                     method: method,
                     headers: {
-                        'Authorization': `Bearer ${currentPermTypeSiteApiKey}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        ...authHeaders
                     },
                     body: JSON.stringify({
                         name: name,
@@ -2539,10 +2572,14 @@
             }
             
             try {
+                // Use credential-based authentication
+                const authHeaders = getLemmaAuthHeaders();
+                
                 const response = await fetch(`/api/v1/sites/${currentPermTypeSiteId}/permission-types/${name}`, {
                     method: 'DELETE',
                     headers: {
-                        'Authorization': `Bearer ${currentPermTypeSiteApiKey}`
+                        'Content-Type': 'application/json',
+                        ...authHeaders
                     }
                 });
                 
