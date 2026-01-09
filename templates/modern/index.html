@@ -133,16 +133,17 @@
             <p>Email-based login that issues cryptographic credentials stored in your users' browsers. Verification happens client-side - your servers never touch auth traffic.</p>
             
             <!-- Dynamic card: changes based on user's lemma status -->
-            <div id="lemma-status-card" style="margin-top: 32px; border-radius: 12px;">
-                <!-- Loading state -->
-                <div id="status-loading" style="background: var(--gray-100); padding: 32px; border-radius: 12px;">
+            <!-- Fixed min-height prevents CLS when state changes -->
+            <div id="lemma-status-card" style="margin-top: 32px; border-radius: 12px; min-height: 120px;">
+                <!-- Loading state - matches final height to prevent shift -->
+                <div id="status-loading" style="background: var(--gray-100); padding: 28px 40px; border-radius: 12px; max-width: 360px; margin: 0 auto; min-height: 120px; display: flex; align-items: center; justify-content: center;">
                     <p style="margin: 0; font-size: var(--font-size-lg); color: var(--gray-600); text-align: center;">
                         Checking credentials...
                     </p>
                 </div>
                 
                 <!-- No lemma state (shown by default, hidden when lemma found) -->
-                <div id="status-no-lemma" style="display: none; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); max-width: 360px; margin: 0 auto; text-align: center;">
+                <div id="status-no-lemma" style="display: none; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); max-width: 360px; margin: 0 auto; text-align: center; min-height: 120px;">
                     <p style="margin: 0 0 10px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 700;">
                         Join the Beta
                     </p>
@@ -155,7 +156,7 @@
                 </div>
                 
                 <!-- Has valid lemma state - Signed In (Green for immediate visual confirmation) -->
-                <div id="status-has-lemma" style="display: none; background: #10b981; padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3); max-width: 360px; margin: 0 auto; text-align: center;">
+                <div id="status-has-lemma" style="display: none; background: #10b981; padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3); max-width: 360px; margin: 0 auto; text-align: center; min-height: 120px;">
                     <!-- Checkmark icon -->
                     <div id="signin-checkmark" style="margin-bottom: 12px; opacity: 0; transform: scale(0.5); transition: all 0.4s ease-out;">
                         <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="display: inline-block;">

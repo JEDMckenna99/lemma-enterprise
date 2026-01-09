@@ -15,16 +15,29 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
-    <!-- Critical CSS inlined for faster LCP -->
+    <!-- Critical CSS inlined for faster LCP + CLS prevention -->
     <style>
         /* Critical CSS - renders above-the-fold content immediately */
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        :root{--primary:#667eea;--gray-900:#1e293b;--gray-700:#475569;--gray-400:#cbd5e1;--gray-200:#f1f5f9;--white:#fff;--font-family:"Inter",-apple-system,BlinkMacSystemFont,sans-serif;--font-size-base:17px;--font-size-xl:22px;--font-size-4xl:48px;--container-max-width:1200px}
+        :root{--primary:#667eea;--gray-900:#1e293b;--gray-700:#475569;--gray-400:#cbd5e1;--gray-200:#f1f5f9;--gray-100:#f8fafc;--white:#fff;--font-family:"Inter",-apple-system,BlinkMacSystemFont,sans-serif;--font-size-base:17px;--font-size-xl:22px;--font-size-4xl:48px;--container-max-width:1200px}
         html{font-size:var(--font-size-base);line-height:1.6}
         body{font-family:var(--font-family);color:var(--gray-700);background-color:var(--white)}
         h1{color:var(--gray-900);font-weight:600;line-height:1.25;margin-bottom:16px;font-size:var(--font-size-4xl)}
-        .nav-header{background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--gray-200);padding:16px 0;position:sticky;top:0;z-index:100}
-        .nav-container{display:flex;align-items:center;justify-content:space-between;max-width:var(--container-max-width);margin:0 auto;padding:0 24px}
+        /* Nav with fixed height to prevent CLS */
+        .nav-header{background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--gray-200);padding:16px 0;position:sticky;top:0;z-index:100;height:76px}
+        .nav-container{display:flex;align-items:center;justify-content:space-between;max-width:var(--container-max-width);margin:0 auto;padding:0 24px;height:44px}
+        /* Nav logo with explicit sizing */
+        .nav-logo{display:flex;align-items:center;gap:12px;font-size:22px;font-weight:700;color:var(--gray-900);text-decoration:none;min-width:125px}
+        .nav-logo-icon{width:36px;height:36px;flex-shrink:0}
+        /* Nav links with min-width */
+        .nav-center{display:flex;gap:40px;align-items:center;flex:1;justify-content:flex-start;margin-left:60px}
+        .nav-link{color:var(--gray-700);text-decoration:none;font-weight:500;font-size:17px;padding:8px 4px;white-space:nowrap}
+        /* Nav right with fixed width */
+        .nav-right{display:flex;gap:16px;align-items:center;margin-left:auto;flex-shrink:0;min-width:90px;justify-content:flex-end}
+        /* Button with explicit sizing */
+        .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;border-radius:8px;font-weight:500;font-size:17px;text-decoration:none;border:1px solid transparent;cursor:pointer;white-space:nowrap}
+        .btn-primary{background:linear-gradient(135deg,var(--primary) 0%,#764ba2 100%);color:var(--white)}
+        /* Hero */
         .hero{background:linear-gradient(135deg,var(--gray-900) 0%,#0f172a 100%);color:var(--white);padding:80px 0 100px;text-align:center;position:relative}
         .hero h1{color:var(--white);font-size:clamp(32px,5vw,56px);font-weight:700;margin-bottom:24px;letter-spacing:-.02em;line-height:1.1}
         .container{max-width:var(--container-max-width);margin:0 auto;padding:0 24px}
@@ -193,9 +206,9 @@
     <!-- Navigation Header -->
     <header class="nav-header">
         <nav class="nav-container">
-            <!-- Brand Link with Logo -->
+            <!-- Brand Link with Logo - explicit dimensions prevent CLS -->
             <a href="/" class="nav-logo">
-                <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" class="nav-logo-icon">
+                <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma" class="nav-logo-icon" width="36" height="36">
                 <span>Lemma</span>
             </a>
             
