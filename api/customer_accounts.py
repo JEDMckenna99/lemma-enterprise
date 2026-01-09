@@ -335,7 +335,7 @@ class CustomerAccountManager:
             return
         self.customers[customer.customer_id] = customer
         if customer.email:  # Email is now optional
-        self.email_to_customer[customer.email] = customer.customer_id
+            self.email_to_customer[customer.email] = customer.customer_id
         for key_data in customer.api_keys or []:
             key_value = key_data.get('key')
             if key_value:
