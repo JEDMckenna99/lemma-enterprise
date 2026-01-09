@@ -430,6 +430,67 @@
                     // Initialize session-free auth with smart caching
                     const auth = new SessionFreeAuth(wallet, {debug: false});
                     window.lemmaAuth = auth;
+                } else {
+                    // NO CREDENTIAL FOUND - Check if we can auto-issue
+                    // This handles recovery when credential was revoked but wallet is still valid
+                    if (wallet.isUnlocked()) {
+                        if (localStorage.getItem('lemma_debug_auth') === 'true') {
+                            console.log('🔐 Auth: Wallet unlocked but no credential, attempting auto-issue...');
+                        }
+                        
+                        try {
+                            // Get wallet identifiers for auto-issue
+                            let walletSecret = null;
+                            let passkeyCredentialId = null;
+                            
+                            try {
+                                walletSecret = await wallet.getWalletSecret();
+                            } catch (e) { /* ok if unavailable */ }
+                            
+                            try {
+                                passkeyCredentialId = await wallet.getPasskeyCredentialId();
+                            } catch (e) { /* ok if unavailable */ }
+                            
+                            if (walletSecret || passkeyCredentialId) {
+                                // Auto-issue credential via API
+                                const response = await fetch('/api/wallet-auth/issue', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        site_id: 'lemma.id',
+                                        wallet_secret: walletSecret,
+                                        passkey_credential_id: passkeyCredentialId
+                                    })
+                                });
+                                
+                                const result = await response.json();
+                                
+                                if (result.success && result.permission_lemma) {
+                                    console.log('🔐 Auth: Auto-issued new credential');
+                                    
+                                    // Store in wallet
+                                    await wallet.storeCredential(result.permission_lemma);
+                                    
+                                    // Set global credential
+                                    window.lemmaCredential = result.permission_lemma;
+                                    
+                                    // Show authenticated UI
+                                    const userDropdown = document.getElementById('user-dropdown');
+                                    const authButtons = document.getElementById('auth-buttons');
+                                    if (userDropdown) userDropdown.style.display = 'block';
+                                    if (authButtons) authButtons.style.display = 'none';
+                                    
+                                    // Initialize session-free auth
+                                    const auth = new SessionFreeAuth(wallet, {debug: false});
+                                    window.lemmaAuth = auth;
+                                }
+                            }
+                        } catch (autoIssueError) {
+                            if (localStorage.getItem('lemma_debug_auth') === 'true') {
+                                console.warn('🔐 Auth: Auto-issue failed:', autoIssueError.message);
+                            }
+                        }
+                    }
                 }
             } catch (error) {
                 // Log error for debugging (not completely silent)
