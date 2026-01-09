@@ -1191,22 +1191,40 @@
                     </div>
                 `;
                 
-                // Get wallet secret or passkey for authentication
-                let walletSecret = null;
+                // First check if wallet has a passkey (can be checked without unlock)
                 let passkeyCredentialId = null;
-                
                 try {
-                    walletSecret = await wallet.getWalletSecret();
+                    passkeyCredentialId = await wallet.getPasskeyCredentialId();
+                    console.log('📱 Found passkey credential ID:', passkeyCredentialId ? 'yes' : 'no');
                 } catch (e) {
-                    console.warn('No wallet secret:', e.message);
+                    console.warn('No passkey:', e.message);
                 }
                 
-                if (!walletSecret) {
+                // If wallet is not unlocked but has passkey, try to unlock it
+                if (!wallet.isUnlocked() && passkeyCredentialId) {
+                    console.log('🔓 Wallet locked, attempting passkey unlock...');
+                    document.getElementById('loading-state').innerHTML = `
+                        <div style="text-align: center; padding: 60px 20px;">
+                            <div class="spinner"></div>
+                            <div style="margin-top: 16px; color: #6b7280;">Unlocking wallet with passkey...</div>
+                        </div>
+                    `;
                     try {
-                        passkeyCredentialId = await wallet.getPasskeyCredentialId();
+                        await wallet.unlock();
+                        console.log('✅ Wallet unlocked via passkey');
                     } catch (e) {
-                        console.warn('No passkey:', e.message);
+                        console.warn('Passkey unlock failed:', e.message);
+                        // Continue anyway - maybe we can still issue with just the passkey ID
                     }
+                }
+                
+                // Get wallet secret (now that wallet should be unlocked)
+                let walletSecret = null;
+                try {
+                    walletSecret = await wallet.getWalletSecret();
+                    console.log('🔑 Got wallet secret:', walletSecret ? 'yes' : 'no');
+                } catch (e) {
+                    console.warn('No wallet secret:', e.message);
                 }
                 
                 if (!walletSecret && !passkeyCredentialId) {
