@@ -1,6 +1,15 @@
 /* Lemma Design System - Clean & Minimal */
 /* Nuclear Reset - Single Source of Truth */
 
+/* === 0. FONT LOADING OPTIMIZATION === */
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap; /* Prevents invisible text during font load */
+    src: local('Inter');
+}
+
 /* === 1. CSS RESET === */
 *, *::before, *::after {
     box-sizing: border-box;

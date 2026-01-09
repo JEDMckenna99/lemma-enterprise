@@ -9,8 +9,30 @@
     <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" type="image/svg+xml">
     
-    <!-- Clean Design System - Single Source of Truth -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250120-nav-spacing">
+    <!-- Preload critical resources for faster LCP -->
+    <link rel="preload" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1121" as="script">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Critical CSS inlined for faster LCP -->
+    <style>
+        /* Critical CSS - renders above-the-fold content immediately */
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        :root{--primary:#667eea;--gray-900:#1e293b;--gray-700:#475569;--gray-400:#cbd5e1;--gray-200:#f1f5f9;--white:#fff;--font-family:"Inter",-apple-system,BlinkMacSystemFont,sans-serif;--font-size-base:17px;--font-size-xl:22px;--font-size-4xl:48px;--container-max-width:1200px}
+        html{font-size:var(--font-size-base);line-height:1.6}
+        body{font-family:var(--font-family);color:var(--gray-700);background-color:var(--white)}
+        h1{color:var(--gray-900);font-weight:600;line-height:1.25;margin-bottom:16px;font-size:var(--font-size-4xl)}
+        .nav-header{background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--gray-200);padding:16px 0;position:sticky;top:0;z-index:100}
+        .nav-container{display:flex;align-items:center;justify-content:space-between;max-width:var(--container-max-width);margin:0 auto;padding:0 24px}
+        .hero{background:linear-gradient(135deg,var(--gray-900) 0%,#0f172a 100%);color:var(--white);padding:80px 0 100px;text-align:center;position:relative}
+        .hero h1{color:var(--white);font-size:clamp(32px,5vw,56px);font-weight:700;margin-bottom:24px;letter-spacing:-.02em;line-height:1.1}
+        .container{max-width:var(--container-max-width);margin:0 auto;padding:0 24px}
+    </style>
+    
+    <!-- Full Design System - loads asynchronously after critical CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121"></noscript>
     
     <!-- CRITICAL: Disable Cloudflare Rocket Loader for wallet scripts -->
     <script data-cfasync="false">
@@ -20,10 +42,11 @@
         }
     </script>
     
-    <!-- Wallet Scripts - Load synchronously for session-free architecture -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1120&bust={{ range(1, 99999)|random }}" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1120" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1120&bust={{ range(1, 99999)|random }}" data-cfasync="false"></script>
+    <!-- Wallet Scripts - Load with defer to not block rendering -->
+    <!-- Note: Using defer instead of sync loading improves LCP significantly -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1121" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1121" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1121" defer data-cfasync="false"></script>
     
     <!-- User Dropdown Styles -->
     <style>
@@ -298,7 +321,15 @@
         })();
 
         // SESSION-FREE: Initialize navigation based on credentials
-        (async function initSessionFreeNav() {
+        // Wrapped to handle deferred script loading
+        async function initSessionFreeNav() {
+            // Wait for LemmaWallet to be available (handles defer loading)
+            if (typeof LemmaWallet === 'undefined') {
+                // Retry in 50ms if wallet script hasn't loaded yet
+                setTimeout(initSessionFreeNav, 50);
+                return;
+            }
+            
             try {
                 // Create global wallet instance (reused by wallet.html)
                 if (!window.globalLemmaWallet) {
@@ -361,7 +392,14 @@
             } catch (error) {
                 // Silent fail - show unauthenticated UI
             }
-        })();
+        }
+        
+        // Start initialization after DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSessionFreeNav);
+        } else {
+            initSessionFreeNav();
+        }
         
         // Session-free logout
         async function handleSessionFreeLogout() {

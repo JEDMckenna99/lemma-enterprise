@@ -9,15 +9,14 @@
     <meta name="cloudflare-no-rocket-loader" content="true">
     <meta name="cf-2fa-verify" content="false">
     
-    <!-- Lemma Wallet for credential checking -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1036"></script>
+    <!-- Note: lemma-wallet.js is already loaded in layout.html - no duplicate needed -->
     
-    <!-- Local Verification (Web Crypto API - sub-millisecond verification) -->
-    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1036"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1036"></script>
+    <!-- Local Verification Scripts - defer to improve LCP -->
+    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1121" defer></script>
+    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1121" defer></script>
     
-    <!-- Bot Shield Assets (from Heroku app with session management fixes) -->
-    <script src="/static/js/lemma-bot-shield-simple.js?v=659"></script>
+    <!-- Bot Shield Assets - defer to improve LCP -->
+    <script src="/static/js/lemma-bot-shield-simple.js?v=1121" defer></script>
     
     <!-- Disable service worker to prevent resource blocking -->
     <script data-cfasync="false">
@@ -200,88 +199,114 @@
 
 <script>
 // Hero card state - watches for window.lemmaCredential set by session-free nav in layout.html
+// Uses requestIdleCallback for non-blocking initialization (improves LCP)
 (function() {
-    const loadingEl = document.getElementById('status-loading');
-    const noLemmaEl = document.getElementById('status-no-lemma');
-    const hasLemmaEl = document.getElementById('status-has-lemma');
-    const primaryBtn = document.getElementById('hero-primary-btn');
-    
-    function showSignedIn(cred) {
-        const claims = cred.claims || cred.credentialSubject || {};
-        const email = claims.email || 'User';
-        const permissionId = claims.permissionId || claims.permission_level || 'access';
-        const displayName = claims.displayName || permissionId;
+    function initHeroCard() {
+        const loadingEl = document.getElementById('status-loading');
+        const noLemmaEl = document.getElementById('status-no-lemma');
+        const hasLemmaEl = document.getElementById('status-has-lemma');
+        const primaryBtn = document.getElementById('hero-primary-btn');
         
-        // Update UI
-        document.getElementById('lemma-user-email').textContent = email;
-        document.getElementById('lemma-permission-badge').innerHTML = `<span style="background: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 24px; font-weight: 500; font-size: var(--font-size-sm);">${displayName}</span>`;
-        
-        // Show valid lemma state
-        loadingEl.style.display = 'none';
-        noLemmaEl.style.display = 'none';
-        hasLemmaEl.style.display = 'block';
-        
-        // Trigger sign-in animation
-        setTimeout(() => {
-            // Animate checkmark (scale in)
-            const checkmark = document.getElementById('signin-checkmark');
-            if (checkmark) {
-                checkmark.style.opacity = '1';
-                checkmark.style.transform = 'scale(1)';
-            }
-            
-            // Draw circle and check
-            const circle = document.getElementById('check-circle');
-            const path = document.getElementById('check-path');
-            if (circle) circle.style.strokeDashoffset = '0';
-            if (path) path.style.strokeDashoffset = '0';
-            
-            // Animate header
-            const header = document.getElementById('signin-header');
-            if (header) {
-                header.style.opacity = '1';
-                header.style.transform = 'translateY(0)';
-            }
-            
-            // Animate user info
-            const userinfo = document.getElementById('signin-userinfo');
-            if (userinfo) {
-                userinfo.style.opacity = '1';
-                userinfo.style.transform = 'translateY(0)';
-            }
-            
-            // Animate details
-            const details = document.getElementById('signin-details');
-            if (details) {
-                details.style.opacity = '1';
-                details.style.transform = 'translateY(0)';
-            }
-        }, 50);
-        
-        // Update button
-        primaryBtn.textContent = 'Go to Platform';
-        primaryBtn.href = '/developer/platform';
-    }
-    
-    function showJoinBeta() {
-        loadingEl.style.display = 'none';
-        noLemmaEl.style.display = 'block';
-        hasLemmaEl.style.display = 'none';
-    }
-    
-    // Poll for window.lemmaCredential (set by initSessionFreeNav in layout.html)
-    let checks = 0;
-    const maxChecks = 30; // 3 seconds max
-    const checkInterval = setInterval(() => {
-        checks++;
-        if (window.lemmaCredential) {
-            clearInterval(checkInterval);
-            showSignedIn(window.lemmaCredential);
-        } else if (checks >= maxChecks) {
-            clearInterval(checkInterval);
-            showJoinBeta();
+        if (!loadingEl) {
+            // Elements not ready yet, retry
+            requestAnimationFrame(initHeroCard);
+            return;
         }
-    }, 100);
+        
+        function showSignedIn(cred) {
+            const claims = cred.claims || cred.credentialSubject || {};
+            const email = claims.email || 'User';
+            const permissionId = claims.permissionId || claims.permission_level || 'access';
+            const displayName = claims.displayName || permissionId;
+            
+            // Update UI
+            document.getElementById('lemma-user-email').textContent = email;
+            document.getElementById('lemma-permission-badge').innerHTML = `<span style="background: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 24px; font-weight: 500; font-size: var(--font-size-sm);">${displayName}</span>`;
+            
+            // Show valid lemma state
+            loadingEl.style.display = 'none';
+            noLemmaEl.style.display = 'none';
+            hasLemmaEl.style.display = 'block';
+            
+            // Trigger sign-in animation
+            setTimeout(() => {
+                // Animate checkmark (scale in)
+                const checkmark = document.getElementById('signin-checkmark');
+                if (checkmark) {
+                    checkmark.style.opacity = '1';
+                    checkmark.style.transform = 'scale(1)';
+                }
+                
+                // Draw circle and check
+                const circle = document.getElementById('check-circle');
+                const path = document.getElementById('check-path');
+                if (circle) circle.style.strokeDashoffset = '0';
+                if (path) path.style.strokeDashoffset = '0';
+                
+                // Animate header
+                const header = document.getElementById('signin-header');
+                if (header) {
+                    header.style.opacity = '1';
+                    header.style.transform = 'translateY(0)';
+                }
+                
+                // Animate user info
+                const userinfo = document.getElementById('signin-userinfo');
+                if (userinfo) {
+                    userinfo.style.opacity = '1';
+                    userinfo.style.transform = 'translateY(0)';
+                }
+                
+                // Animate details
+                const details = document.getElementById('signin-details');
+                if (details) {
+                    details.style.opacity = '1';
+                    details.style.transform = 'translateY(0)';
+                }
+            }, 50);
+            
+            // Update button
+            primaryBtn.textContent = 'Go to Platform';
+            primaryBtn.href = '/developer/platform';
+        }
+        
+        function showJoinBeta() {
+            loadingEl.style.display = 'none';
+            noLemmaEl.style.display = 'block';
+            hasLemmaEl.style.display = 'none';
+        }
+        
+        // Poll for window.lemmaCredential (set by initSessionFreeNav in layout.html)
+        let checks = 0;
+        const maxChecks = 30; // 3 seconds max
+        const checkInterval = setInterval(() => {
+            checks++;
+            if (window.lemmaCredential) {
+                clearInterval(checkInterval);
+                showSignedIn(window.lemmaCredential);
+            } else if (checks >= maxChecks) {
+                clearInterval(checkInterval);
+                showJoinBeta();
+            }
+        }, 100);
+    }
+    
+    // Start after DOM is ready - use requestIdleCallback for non-blocking
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(initHeroCard);
+            } else {
+                setTimeout(initHeroCard, 0);
+            }
+        });
+    } else {
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(initHeroCard);
+        } else {
+            setTimeout(initHeroCard, 0);
+        }
+    }
 })();
 </script>
 
