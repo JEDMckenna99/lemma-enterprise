@@ -563,15 +563,15 @@ class CustomerAccountManager:
             stripe_customer_id = None
             if email:
                 try:
-            stripe_customer = stripe.Customer.create(
-                email=email,
+                    stripe_customer = stripe.Customer.create(
+                        email=email,
                         name=name or display_name or "Wallet User",
-                metadata={
+                        metadata={
                             'company': company or '',
                             'lemma_customer_id': customer_id,
                             'lemma_did': customer_did
-                }
-            )
+                        }
+                    )
                     stripe_customer_id = stripe_customer.id
                 except Exception as stripe_err:
                     logger.warning(f"Stripe customer creation skipped: {stripe_err}")

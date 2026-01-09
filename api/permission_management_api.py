@@ -478,13 +478,13 @@ def add_site_user(site_id):
             
             logger.info(f"✅ Added user {user_did[:40]}... to site {site_id} with role {role}")
 
-        return jsonify({
-            'success': True,
-            'user_did': user_did,
-            'role': role,
+            return jsonify({
+                'success': True,
+                'user_did': user_did,
+                'role': role,
                 'display_name': display_name,
                 'message': f'User added to site {site_id}'
-        })
+            })
             
         except Exception as db_err:
             db.rollback()
