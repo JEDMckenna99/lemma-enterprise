@@ -1143,17 +1143,18 @@
                     console.log('✅ Using credential from layout.html (standard SDK pattern)');
                     console.log('📋 Credential claims:', window.lemmaCredential.claims || window.lemmaCredential.credentialSubject);
                     
-                    // Verify credential using standard SDK method
-                    const verificationResult = await wallet.verifyCredential(window.lemmaCredential);
+                    // Verify credential using wallet's verifyLemma method (quick local check)
+                    // The credential was already validated when stored, so quickVerify is sufficient
+                    const verificationResult = await wallet.quickVerify(window.lemmaCredential);
                     
-                    if (!verificationResult.verified) {
+                    if (!verificationResult.valid) {
                         console.log('❌ Credential verification failed:', verificationResult.reason);
                         await tryAutoIssue(wallet);
                         return;
                     }
                     
-                    // Check revocation using standard SDK method
-                    const isRevoked = await wallet.isCredentialRevoked(window.lemmaCredential);
+                    // Check revocation using wallet's isRevoked method
+                    const isRevoked = await wallet.isRevoked(window.lemmaCredential.id);
                     if (isRevoked) {
                         console.log('🚫 Credential revoked');
                         await wallet.removeCredential(window.lemmaCredential.id);

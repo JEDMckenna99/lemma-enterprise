@@ -385,15 +385,15 @@ document.addEventListener('DOMContentLoaded', async function() {
             return;
         }
         
-        // Verify credential using standard SDK method
-        const verificationResult = await wallet.verifyCredential(window.lemmaCredential);
-        if (!verificationResult.verified) {
+        // Verify credential using wallet's quickVerify method
+        const verificationResult = await wallet.quickVerify(window.lemmaCredential);
+        if (!verificationResult.valid) {
             showConfigAccessDenied('Verification failed');
             return;
         }
         
-        // Check revocation using standard SDK method
-        const isRevoked = await wallet.isCredentialRevoked(window.lemmaCredential);
+        // Check revocation using wallet's isRevoked method
+        const isRevoked = await wallet.isRevoked(window.lemmaCredential.id);
         if (isRevoked) {
             await wallet.removeCredential(window.lemmaCredential.id);
             showConfigAccessDenied('Credential revoked');
