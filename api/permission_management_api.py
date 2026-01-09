@@ -341,11 +341,11 @@ def get_site_users(site_id):
                 })
             
             logger.info(f"✅ Returned {len(users)} users for site {site_id}")
-        return jsonify({
-            'success': True,
-            'users': users,
-            'total_users': len(users)
-        })
+            return jsonify({
+                'success': True,
+                'users': users,
+                'total_users': len(users)
+            })
             
         except Exception as db_err:
             # Table may not exist yet - return empty list

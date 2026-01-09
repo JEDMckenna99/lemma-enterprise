@@ -545,12 +545,12 @@ class CustomerAccountManager:
             
             # Then check by email if provided
             if email:
-            existing_customer = self.get_customer_by_email(email)
-            if existing_customer:
-                return {
-                    'success': False,
-                    'error': 'Customer with this email already exists'
-                }
+                existing_customer = self.get_customer_by_email(email)
+                if existing_customer:
+                    return {
+                        'success': False,
+                        'error': 'Customer with this email already exists'
+                    }
             
             # Generate customer ID
             customer_id = f"cus_{''.join(secrets.choice('abcdefghijklmnopqrstuvwxyz0123456789') for _ in range(16))}"
