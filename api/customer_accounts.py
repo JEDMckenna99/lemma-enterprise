@@ -1672,8 +1672,8 @@ def register_customer_site():
         environment = (data.get('environment') or 'production').lower()
         if environment not in {'production', 'staging', 'development', 'sandbox'}:
             environment = 'production'
-        company_name = (data.get('company_name') or customer.company).strip()
-        contact_email = (data.get('contact_email') or customer.email).strip()
+        company_name = (data.get('company_name') or customer.company or '').strip()
+        contact_email = (data.get('contact_email') or customer.email or '').strip()
         key_name = (data.get('key_name') or f"{site_label or site_domain} Key").strip() or 'API Key'
         
         # Generate site_id (deterministic from domain)
@@ -1701,7 +1701,7 @@ def register_customer_site():
             })
         
         user_did = f"did:lemma:customer:{customer_id}"
-        user_email = customer.email
+        user_email = customer.email or ''
         
         # Issue admin credential
         admin_credential = manager.issue_permission_lemma(
@@ -1709,7 +1709,7 @@ def register_customer_site():
             'admin',
             expiry_days=90,
             custom_claims={
-                'email': user_email,
+                'email': user_email or None,  # Exclude if empty
                 'site_domain': site_domain,
                 'site_label': site_label,
                 'environment': environment,
@@ -1782,7 +1782,7 @@ def register_customer_site():
         site_entry['last_api_key_label'] = key_name
         site_entry['last_api_key_created_at'] = datetime.utcnow().isoformat()
         
-        logger.info(f"✅ Customer {user_email} registered site {site_domain} ({site_id}) and received API key")
+        logger.info(f"✅ Customer {user_email or customer_id} registered site {site_domain} ({site_id}) and received API key")
         
         return jsonify({
             'success': True,
