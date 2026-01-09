@@ -1154,8 +1154,8 @@
                     }
                     
                     // Check revocation using wallet's isRevoked method
-                    const isRevoked = await wallet.isRevoked(window.lemmaCredential.id);
-                    if (isRevoked) {
+                    const revocationResult = await wallet.isRevoked(window.lemmaCredential.id);
+                    if (revocationResult.revoked) {
                         console.log('🚫 Credential revoked');
                         await wallet.removeCredential(window.lemmaCredential.id);
                         showRevoked();
