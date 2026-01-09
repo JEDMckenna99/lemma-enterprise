@@ -173,13 +173,41 @@ def _extract_customer_id_from_request() -> Optional[str]:
                 return None
             
             subject = credential.get('subject', '')
+            claims = credential.get('claims') or credential.get('credentialSubject') or {}
             
             # Direct customer ID format
             if subject.startswith('did:lemma:customer:'):
                 return subject.replace('did:lemma:customer:', '')
             
+            # PPID format (wallet-first auth) - lookup/create by DID
+            if subject.startswith('did:lemma:ppid_'):
+                # Look up existing customer by their DID
+                customer = customer_manager.get_customer_by_did(subject)
+                if customer:
+                    logger.info(f"✅ Found customer by PPID: {customer.customer_id}")
+                    return customer.customer_id
+                
+                # Create new customer for this PPID (wallet-first flow)
+                # Only for lemma.id platform credentials
+                site_id = claims.get('siteId') or claims.get('site_id')
+                if site_id in ('lemma.id', 'lemma_platform'):
+                    logger.info(f"Creating customer record for PPID: {subject[:40]}...")
+                    result = customer_manager.create_customer(
+                        email=None,  # No email - wallet-first
+                        name=f"Wallet User",
+                        company=None,
+                        password=None,
+                        customer_did=subject,  # Store PPID as customer DID
+                        skip_default_api_key=True
+                    )
+                    if result.get('success'):
+                        logger.info(f"✅ Created customer {result.get('customer_id')} for PPID")
+                        return result.get('customer_id')
+                
+                logger.warning(f"Could not create customer for PPID: {subject[:40]}")
+                return None
+            
             # Try to extract email from claims and lookup customer
-            claims = credential.get('claims') or credential.get('credentialSubject') or {}
             email = claims.get('email')
             
             if email:
