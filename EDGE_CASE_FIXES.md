@@ -182,7 +182,30 @@ const DEBUG_AUTH = localStorage.getItem('lemma_debug_auth') === 'true';
 | 2026-01-01 | LemmaCredentialUtils loaded | ✅ | Verified via browser eval |
 | 2026-01-01 | layout.html uses utils | ✅ | Falls back if utils not ready |
 | 2026-01-01 | Debug mode works | ✅ | localStorage lemma_debug_auth |
-| 2026-01-01 | End-user test | ⏳ | User needs to test with their wallet |
+| 2026-01-01 | **Edge case tests (11/11)** | ✅ | All passed |
+
+### Automated Test Results (11/11 passed)
+
+| Test | Input | Expected | Result |
+|------|-------|----------|--------|
+| security_fakeAdmin | `not-admin-really` | `isAdmin: false` | ✅ PASS |
+| security_realAdmin | `admin_access` | `isAdmin: true` | ✅ PASS |
+| multipleCredentials_filterExpired | 1 expired + 1 valid | Select valid | ✅ PASS |
+| expirationFormat_iso | `2026-02-07T21:38:26.667Z` | Parse correctly | ✅ PASS |
+| expirationFormat_unixSeconds | `1770500306` | Convert to ms | ✅ PASS |
+| expirationFormat_unixMs | `1770500306667` | Keep as ms | ✅ PASS |
+| siteIdFormat (5 variants) | Various field names | `isLemmaSite: true` | ✅ PASS |
+
+### User Credential Test
+
+Your credential format is now supported:
+```json
+{
+  "permissions": "read,write,access",  // ✅ Recognized
+  "siteId": "lemma.id",               // ✅ Recognized  
+  "type": "permission"                // ✅ Recognized
+}
+```
 
 **To test in your browser:**
 1. Open browser console
