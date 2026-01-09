@@ -178,7 +178,17 @@ const DEBUG_AUTH = localStorage.getItem('lemma_debug_auth') === 'true';
 
 | Date | Test | Result | Notes |
 |------|------|--------|-------|
-| | | | |
+| 2026-01-01 | Deploy credential utils | ✅ | Deployed to Heroku |
+| 2026-01-01 | LemmaCredentialUtils loaded | ✅ | Verified via browser eval |
+| 2026-01-01 | layout.html uses utils | ✅ | Falls back if utils not ready |
+| 2026-01-01 | Debug mode works | ✅ | localStorage lemma_debug_auth |
+| 2026-01-01 | End-user test | ⏳ | User needs to test with their wallet |
+
+**To test in your browser:**
+1. Open browser console
+2. Run: `localStorage.setItem('lemma_debug_auth', 'true')`
+3. Refresh the page
+4. Check console for `🔐 Auth:` logs
 
 ---
 
@@ -186,4 +196,4 @@ const DEBUG_AUTH = localStorage.getItem('lemma_debug_auth') === 'true';
 
 | Date | Changes Deployed | Verified |
 |------|------------------|----------|
-| | | |
+| 2026-01-01 | Phase 1-4 fixes | ✅ Utils deployed |
