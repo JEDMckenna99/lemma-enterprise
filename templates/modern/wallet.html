@@ -16,13 +16,25 @@
     
     <!-- Wallet scripts already loaded in layout.html, don't load again -->
     
-    <!-- PIN Protection for Wallet Page (Optional Premium Feature) -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1120" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1120" data-cfasync="false"></script>
+    <!-- PIN Protection & Verifier Scripts - defer to improve LCP -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1122" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1122" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1122" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1122" defer data-cfasync="false"></script>
     
-    <!-- Message Constructor & WASM Verifier (for client-side verification) -->
-    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1120" data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1120" data-cfasync="false"></script>
+    <!-- Critical CSS for wallet page - inline for faster LCP -->
+    <style>
+        /* Critical wallet styles - prevent CLS */
+        .wallet-container{max-width:1100px;margin:0 auto;padding:40px 24px;min-height:600px}
+        .wallet-header{margin-bottom:32px;text-align:center;min-height:120px}
+        .wallet-header h1{font-size:2.25rem;font-weight:600;color:var(--gray-900);margin-bottom:8px;line-height:1.2}
+        .wallet-main{display:grid;grid-template-columns:1fr;gap:32px;margin-bottom:32px}
+        .section-title{font-size:1.4rem;font-weight:600;color:var(--gray-900);margin-bottom:16px}
+        .wallet-card{background:var(--white);border:1px solid var(--gray-200);border-radius:16px;padding:24px;min-height:200px}
+        .credential-list{min-height:100px}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .loading-spinner{display:inline-block;width:32px;height:32px;border:3px solid var(--gray-200);border-top-color:var(--primary);border-radius:50%;animation:spin 1s linear infinite}
+    </style>
     
     <!-- Session-Free Auth already loaded in layout.html -->
     <style>
@@ -429,21 +441,23 @@
 
 {% block content %}
 <div class="wallet-container">
+    <!-- Wallet Header - Always visible for stable LCP -->
+    <header class="wallet-header">
+        <h1>Your Lemma Wallet</h1>
+        <p>Manage your federated identity credentials and access the decentralized network</p>
+    </header>
+    
     <!-- Main Credential List - For unlock flow and initial display -->
-    <div id="credential-list" style="min-height: 200px;">
+    <div id="credential-list" style="min-height: 300px;">
         <div style="padding: 48px; text-align: center; color: var(--gray-500);">
-            <div class="loading-spinner" style="width: 32px; height: 32px; border: 3px solid var(--gray-200); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div>
+            <div class="loading-spinner" style="margin: 0 auto 16px;"></div>
             <div style="font-weight: 500;">Loading wallet...</div>
         </div>
     </div>
 
-    <!-- Wallet Header -->
-    <header class="wallet-header" style="display: none;">
-        <h1>Your Lemma Wallet</h1>
-        <p>Manage your federated identity credentials and access the decentralized network</p>
-        
-        <!-- Speed Tracker -->
-        <div style="margin-top: 24px; padding: 16px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(255, 255, 255, 0.8)); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 12px; max-width: 400px; margin-left: auto; margin-right: auto;">
+    <!-- Speed Tracker - Hidden until wallet loads -->
+    <div id="wallet-speed-tracker" style="display: none; text-align: center; margin-bottom: 32px;">
+        <div style="padding: 16px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(255, 255, 255, 0.8)); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 12px; max-width: 400px; margin-left: auto; margin-right: auto;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px;">
                 <div style="width: 32px; height: 32px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px;">⚡</div>
                 <div>
@@ -459,7 +473,7 @@
                 </div>
             </div>
         </div>
-    </header>
+    </div>
 
     <!-- Main Wallet Layout - Protected by Bot Shield -->
     <div class="wallet-main" style="display: none;">
@@ -716,11 +730,13 @@ async function checkAndUnlockWallet() {
     const listContainer = document.getElementById('credential-list');
     const walletHeader = document.querySelector('.wallet-header');
     const walletMain = document.querySelector('.wallet-main');
+    const speedTracker = document.getElementById('wallet-speed-tracker');
     
-    // Always start with content hidden
-    if (walletHeader) walletHeader.style.display = 'none';
+    // Keep header visible for stable LCP, hide wallet main until loaded
+    // Header stays visible to prevent CLS
     if (walletMain) walletMain.style.display = 'none';
     if (listContainer) listContainer.style.display = 'block';
+    if (speedTracker) speedTracker.style.display = 'none';
     
     try {
         // Check if wallet has a passkey registered
@@ -988,18 +1004,19 @@ async function loadWalletData() {
         // Show/hide sections based on credential status
         const joinNetworkSection = document.getElementById('join-network-section');
         const walletMainSection = document.querySelector('.wallet-main');
-        const walletHeaderSection = document.querySelector('.wallet-header');
+        const speedTracker = document.getElementById('wallet-speed-tracker');
+        // Note: wallet-header stays visible at all times for stable LCP
         
         if (activeCredentials.length === 0) {
-            // User has no credentials - show only join section, hide everything else
+            // User has no credentials - show join section
             if (joinNetworkSection) joinNetworkSection.style.display = 'block';
             if (walletMainSection) walletMainSection.style.display = 'none';
-            if (walletHeaderSection) walletHeaderSection.style.display = 'none';
+            if (speedTracker) speedTracker.style.display = 'none';
         } else {
-            // User has credentials - show main wallet and header, hide join section
+            // User has credentials - show main wallet content
             if (joinNetworkSection) joinNetworkSection.style.display = 'none';
             if (walletMainSection) walletMainSection.style.display = 'block';
-            if (walletHeaderSection) walletHeaderSection.style.display = 'block';
+            if (speedTracker) speedTracker.style.display = 'block';
         }
         
         // Update network status if element exists
@@ -1255,10 +1272,12 @@ async function loadWalletData() {
         const credentialList = document.getElementById('credential-list');
         const walletHeader = document.querySelector('.wallet-header');
         const walletMain = document.querySelector('.wallet-main');
+        const speedTracker = document.getElementById('wallet-speed-tracker');
         
         if (credentialList) credentialList.style.display = 'none';
-        if (walletHeader) walletHeader.style.display = 'block';
+        // Header stays visible (already shown for LCP)
         if (walletMain) walletMain.style.display = 'grid';
+        if (speedTracker) speedTracker.style.display = 'block';
         
         console.log('📦 Loading wallet data...');
 
