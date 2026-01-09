@@ -60,6 +60,7 @@
     <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1121" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1121" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1121" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=1" defer data-cfasync="false"></script>
     
     <!-- User Dropdown Styles -->
     <style>
@@ -355,16 +356,42 @@
                 }
                 const wallet = window.globalLemmaWallet;
                 
+                // Get all permission credentials
                 const permissions = await wallet.getCredentials('permission');
+                
+                // Use credential utils if available, otherwise fallback
+                const utils = window.LemmaCredentialUtils;
+                
+                // Filter for lemma.id credentials (handles multiple siteId formats)
                 const lemmaPermissions = permissions.filter(p => {
+                    if (utils) {
+                        const normalized = utils.normalizeCredentialClaims(p);
+                        return normalized.isLemmaSite;
+                    }
+                    // Fallback if utils not loaded yet
                     const claims = p.claims || p.credentialSubject || {};
-                    const siteId = claims.siteId || claims.site || '';
-                    return siteId === 'lemma.id' || siteId === 'lemma_platform';
+                    const siteId = (claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
+                    return siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma');
                 });
                 
-                if (lemmaPermissions.length > 0) {
-                    const cred = lemmaPermissions[0];
+                // Select best valid credential (non-expired, longest-lived)
+                let cred = null;
+                if (utils) {
+                    const validCreds = utils.selectBestCredentials(lemmaPermissions);
+                    cred = validCreds.length > 0 ? validCreds[0] : null;
+                } else if (lemmaPermissions.length > 0) {
+                    cred = lemmaPermissions[0];
+                }
+                
+                if (cred) {
+                    // Use normalized claims for consistent access
+                    const normalized = utils ? utils.normalizeCredentialClaims(cred) : null;
                     const claims = cred.claims || cred.credentialSubject || {};
+                    
+                    // Debug logging (enable with localStorage.setItem('lemma_debug_auth', 'true'))
+                    if (localStorage.getItem('lemma_debug_auth') === 'true') {
+                        console.log('🔐 Auth: Found credential', { id: cred.id, normalized });
+                    }
                     
                     // Show authenticated UI
                     const userDropdown = document.getElementById('user-dropdown');
@@ -373,16 +400,18 @@
                     if (authButtons) authButtons.style.display = 'none';
                     
                     // Update user info
+                    const email = normalized?.email || claims.email || 'Customer';
+                    const accountType = normalized?.accountType || claims.accountType || 'customer';
                     const emailElem = document.getElementById('dropdown-email');
                     const roleElem = document.getElementById('dropdown-role');
-                    if (emailElem) emailElem.textContent = claims.email || 'Customer';
-                    if (roleElem) roleElem.textContent = (claims.accountType || 'customer').charAt(0).toUpperCase() + (claims.accountType || 'customer').slice(1);
+                    if (emailElem) emailElem.textContent = email;
+                    if (roleElem) roleElem.textContent = accountType.charAt(0).toUpperCase() + accountType.slice(1);
                     
-                    // Show admin link if admin (accept any admin permission)
-                    const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'];
-                    const isAdmin = adminPermissions.includes(claims.permissionId) || 
-                                   claims.accountType === 'admin' || 
-                                   (claims.permissionId && claims.permissionId.toLowerCase().includes('admin'));
+                    // Check admin permission (SECURE: no loose .includes('admin') check)
+                    const isAdmin = normalized ? normalized.isAdmin : (
+                        ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'].includes(claims.permissionId) ||
+                        claims.accountType === 'admin'
+                    );
                     
                     if (isAdmin) {
                         const navAdmin = document.getElementById('nav-admin');
@@ -403,7 +432,11 @@
                     window.lemmaAuth = auth;
                 }
             } catch (error) {
-                // Silent fail - show unauthenticated UI
+                // Log error for debugging (not completely silent)
+                console.warn('🔐 Auth init warning:', error.message);
+                if (localStorage.getItem('lemma_debug_auth') === 'true') {
+                    console.error('🔐 Auth init error details:', error);
+                }
             }
         }
         
