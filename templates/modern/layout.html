@@ -47,6 +47,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121"></noscript>
     
+    {% block wallet_scripts %}
     <!-- CRITICAL: Disable Cloudflare Rocket Loader for wallet scripts -->
     <script data-cfasync="false">
         // Prevent Cloudflare Rocket Loader from interfering
@@ -61,6 +62,7 @@
     <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1121" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1121" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=1" defer data-cfasync="false"></script>
+    {% endblock %}
     
     <!-- User Dropdown Styles -->
     <style>
@@ -282,6 +284,7 @@
     
     {% block scripts %}{% endblock %}
     
+    {% block auth_scripts %}
     <!-- User Dropdown JavaScript -->
     <script>
         function toggleUserDropdown() {
@@ -545,5 +548,6 @@
             }
         }
     </script>
+    {% endblock %}
 </body>
 </html>
