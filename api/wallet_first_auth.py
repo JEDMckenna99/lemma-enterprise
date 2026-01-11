@@ -256,7 +256,18 @@ def issue_to_wallet():
     """
     try:
         data = request.get_json() or {}
-        site_id = data.get('site_id', 'lemma.id')
+        
+        # Validate site_id - allow lemma.id default for backwards compatibility
+        from .validation import validate_site_id, ValidationError
+        try:
+            site_id = validate_site_id(data.get('site_id'), required=False, allow_lemma_default=True)
+        except ValidationError as ve:
+            return jsonify({
+                'success': False,
+                'error': 'validation_error',
+                'message': str(ve)
+            }), 400
+        
         wallet_secret = data.get('wallet_secret')  # For PPID derivation
         passkey_credential_id = data.get('passkey_credential_id')
         

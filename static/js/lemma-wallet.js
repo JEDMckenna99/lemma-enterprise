@@ -651,13 +651,36 @@ class LemmaWallet {
     /**
      * Sync revocation list from server
      * Call periodically or on wallet init
+     * 
+     * OFFLINE RESILIENCE: If network is unavailable, gracefully falls back
+     * to cached data. User is NOT locked out when offline.
      */
     async syncRevocations() {
+        // Check if we're offline first
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            console.log('📴 Offline - using cached revocation list');
+            const cached = await this.getRevocationInfo();
+            return { 
+                success: false, 
+                offline: true, 
+                cached: cached.synced,
+                cacheAge: cached.age 
+            };
+        }
+        
         try {
-            const response = await fetch('/api/v1/revocation/list');
+            // Use AbortController for timeout (5 second max)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            const response = await fetch('/api/v1/revocation/list', {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            
             if (!response.ok) {
                 console.warn('Failed to sync revocations:', response.status);
-                return { success: false };
+                return { success: false, httpError: response.status };
             }
             
             const data = await response.json();
@@ -675,11 +698,30 @@ class LemmaWallet {
             console.log(`✅ Synced ${revocations.length} revocations`);
             return { success: true, count: revocations.length };
         } catch (e) {
-            console.warn('Revocation sync error:', e);
-            return { success: false, error: e.message };
+            // Network error - check if we have cached data
+            const cached = await this.getRevocationInfo();
+            if (cached.synced) {
+                console.log(`📴 Network error - using cached revocations (${cached.count} entries, ${Math.round(cached.age / 60000)}min old)`);
+                return { 
+                    success: false, 
+                    offline: true, 
+                    cached: true,
+                    cacheAge: cached.age,
+                    error: e.message 
+                };
+            }
+            console.warn('Revocation sync error (no cache):', e);
+            return { success: false, offline: true, cached: false, error: e.message };
         }
     }
-
+    
+    /**
+     * Check if the wallet is in offline mode
+     */
+    isOffline() {
+        return typeof navigator !== 'undefined' && !navigator.onLine;
+    }
+    
     /**
      * Check if a credential is revoked (local check)
      */
@@ -691,13 +733,13 @@ class LemmaWallet {
         }
         
         const isRevoked = revocations.listArray.includes(credentialId);
-        return { 
+        return {
             revoked: isRevoked, 
             unchecked: false,
             lastSynced: revocations.lastSynced
         };
     }
-
+    
     /**
      * Get revocation cache info
      */
@@ -839,7 +881,7 @@ class LemmaWallet {
             // Cache successful verification
             this._verifiedSignatures.add(lemma.id);
             
-        } catch (e) {
+                    } catch (e) {
             console.warn('Signature verification error:', e.message);
             return { valid: false, reason: 'Verification error: ' + e.message };
         }
@@ -1000,13 +1042,13 @@ class LemmaWallet {
                         publicKeyBuffer = new Uint8Array(32);
                         for (let i = 0; i < 32; i++) {
                             publicKeyBuffer[i] = parseInt(publicKey.substr(i * 2, 2), 16);
-                        }
-                    } else {
+                }
+            } else {
                         publicKeyBuffer = this._base64urlToBuffer(publicKey);
                     }
                 } else if (publicKey instanceof Uint8Array) {
                     publicKeyBuffer = publicKey;
-                } else {
+        } else {
                     throw new Error('Unknown public key format');
                 }
                 
@@ -1226,7 +1268,7 @@ class LemmaWallet {
         const issuers = await this._getAll('issuers');
         const secretRecord = await this._get('secrets', 'master');
             
-        return {
+            return {
             hasPasskey: !!passkey,
             hasWalletSecret: !!secretRecord?.secret,
             isUnlocked: this.isUnlocked(),
