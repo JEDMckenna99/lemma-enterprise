@@ -3,40 +3,28 @@
 {% block title %}Lemma Federated Wallet{% endblock %}
 {% block description %}Access your Lemma credentials and manage your federated identity across the network.{% endblock %}
 
+{# Skip redundant preloads from layout - wallet handles its own scripts #}
+{% block preload_scripts %}{% endblock %}
+
 {% block head %}
-    {{ super() }}
-    <!-- DISABLE Cloudflare Rocket Loader for this page entirely -->
-    <meta http-equiv="x-dns-prefetch-control" content="off">
-    <script data-cfasync="false">
-        // Disable Rocket Loader completely for this page
-        if (window.Rocketloader) {
-            window.Rocketloader = {load: function(){}};
-        }
-    </script>
-    
-    <!-- Wallet scripts already loaded in layout.html, don't load again -->
-    
-    <!-- PIN Protection & Verifier Scripts - defer to improve LCP -->
-    <script src="{{ url_for('static', filename='js/lemma-wallet-pin.js') }}?v=1122" defer data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-pin-ui.js') }}?v=1122" defer data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-message-construction.js') }}?v=1122" defer data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wasm-verifier-optimized.js') }}?v=1122" defer data-cfasync="false"></script>
-    
-    <!-- Critical CSS for wallet page - inline for faster LCP -->
-    <style>
-        /* Critical wallet styles - prevent CLS with fixed dimensions */
-        .wallet-container{max-width:1100px;margin:0 auto;padding:40px 24px;min-height:600px}
-        .wallet-header{margin-bottom:32px;text-align:center;min-height:80px}
-        .wallet-header h1{font-size:2.25rem;font-weight:600;color:var(--gray-900);margin-bottom:8px;line-height:1.2}
-        .wallet-header p{font-size:1rem;color:var(--gray-600);max-width:500px;margin:0 auto;line-height:1.5}
-        .wallet-main{display:grid;grid-template-columns:1fr;gap:32px;margin-bottom:32px}
-        .section-title{font-size:1.4rem;font-weight:600;color:var(--gray-900);margin-bottom:16px}
-        .wallet-card{background:var(--white);border:1px solid var(--gray-200);border-radius:16px;padding:24px;min-height:150px}
-        .credential-list{min-height:80px}
-        /* Remove spinner - show content instantly */
-        .wallet-ready-state{padding:24px;text-align:center;color:var(--gray-500)}
-        .wallet-ready-state .icon{font-size:32px;margin-bottom:8px}
-    </style>
+{{ super() }}
+<!-- Critical CSS for wallet page - inline for faster LCP -->
+<style>
+/* Critical above-fold styles - minimal for fast LCP */
+.wallet-container{max-width:1100px;margin:0 auto;padding:40px 24px}
+.wallet-header{margin-bottom:32px;text-align:center}
+.wallet-header h1{font-size:2.25rem;font-weight:600;color:#111827;margin:0 0 8px;line-height:1.2}
+.wallet-header p{font-size:1rem;color:#6b7280;max-width:500px;margin:0 auto;line-height:1.5}
+.section-title{font-size:1.25rem;font-weight:600;color:#111827;margin:0 0 16px}
+.wallet-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:24px}
+.credential-list{min-height:60px}
+/* Initial state placeholder */
+.wallet-init{text-align:center;padding:48px 24px}
+.wallet-init-icon{font-size:48px;margin-bottom:16px}
+.wallet-init-title{font-weight:600;color:#111827;margin-bottom:8px}
+.wallet-init-desc{color:#6b7280;font-size:0.9rem}
+</style>
+
     
     <!-- Non-critical wallet styles -->
     <style>
@@ -402,11 +390,12 @@
         <p>Manage your federated identity credentials and access the decentralized network</p>
     </header>
     
-    <!-- Main Credential List - For unlock flow and initial display -->
-    <div id="credential-list" style="min-height: 200px;">
-        <div class="wallet-ready-state">
-            <div class="icon">🔐</div>
-            <div style="font-weight: 500;">Initializing wallet...</div>
+    <!-- Main Credential List - Static initial state for fast LCP -->
+    <div id="credential-list">
+        <div class="wallet-card wallet-init">
+            <div class="wallet-init-icon">🔐</div>
+            <div class="wallet-init-title">Your Lemma Wallet</div>
+            <div class="wallet-init-desc">Securely manage your credentials</div>
         </div>
     </div>
 
