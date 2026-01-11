@@ -1,6 +1,6 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Setup Guide - {{ customer.domain if customer else 'Lemma' }}{% endblock %}
+{% block title %}Setup Guide - Lemma{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -8,6 +8,7 @@
     .setup-hero{background:linear-gradient(135deg,var(--primary) 0%,#764ba2 100%);color:var(--white);padding:60px 20px;text-align:center}
     .setup-hero h1{font-size:36px;margin:0 0 12px;font-weight:700}
     .setup-hero p{font-size:18px;opacity:.9;margin:0}
+    .setup-hero #hero-subtitle{min-height:27px}
     .setup-container{max-width:900px;margin:0 auto;padding:40px 20px}
     .setup-card{background:var(--white);border:1px solid var(--gray-200);border-radius:12px;margin-bottom:24px;overflow:hidden}
     .setup-card-header{background:var(--gray-50);padding:16px 24px;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:12px}
@@ -24,8 +25,10 @@
     .domain-highlight{color:#fbbf24;font-weight:600}
     .info-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin:16px 0}
     .info-box.success{background:#ecfdf5;border-color:#a7f3d0}
+    .info-box.warning{background:#fffbeb;border-color:#fcd34d}
     .info-box p{margin:0;font-size:14px;color:#1e40af}
     .info-box.success p{color:#065f46}
+    .info-box.warning p{color:#92400e}
     .tab-buttons{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
     .tab-btn{padding:8px 16px;border:1px solid var(--gray-300);background:var(--white);border-radius:6px;cursor:pointer;font-size:14px;transition:all 0.2s}
     .tab-btn:hover{border-color:var(--primary)}
@@ -34,10 +37,11 @@
     .tab-content.active{display:block}
     .config-input{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
     .config-input label{font-weight:500;color:var(--gray-700);min-width:100px}
-    .config-input input{flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--gray-300);border-radius:6px;font-size:14px}
-    .config-input input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(102,126,234,0.1)}
+    .config-input input,.config-input select{flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--gray-300);border-radius:6px;font-size:14px}
+    .config-input input:focus,.config-input select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(102,126,234,0.1)}
     .generate-btn{background:var(--primary);color:var(--white);border:none;padding:12px 24px;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s}
     .generate-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(102,126,234,0.3)}
+    .generate-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none}
     .checklist{list-style:none;padding:0;margin:0}
     .checklist li{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-100)}
     .checklist li:last-child{border-bottom:none}
@@ -47,93 +51,379 @@
     .test-result{margin-top:12px;padding:12px;border-radius:6px;font-size:14px;display:none}
     .test-result.success{display:block;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
     .test-result.error{display:block;background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+    .loading-state{text-align:center;padding:60px 20px;color:var(--gray-500)}
+    .loading-spinner{width:40px;height:40px;border:3px solid var(--gray-200);border-top-color:var(--primary);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .site-selector{margin-bottom:20px;padding:16px;background:var(--gray-50);border-radius:8px}
+    .site-selector label{display:block;margin-bottom:8px;font-weight:500}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="setup-hero">
     <h1>🚀 Setup Your Integration</h1>
-    <p>{% if customer %}Ready-to-use code for <strong>{{ customer.domain }}</strong>{% else %}Get personalized code in seconds{% endif %}</p>
+    <p id="hero-subtitle">Loading your personalized code...</p>
 </div>
 
 <div class="setup-container">
-    {% if not customer %}
-    <!-- Registration Form for new users -->
-    <div class="setup-card">
-        <div class="setup-card-header">
-            <span class="step-number">1</span>
-            <h2>Register Your Site</h2>
-        </div>
-        <div class="setup-card-body">
-            <p style="color:var(--gray-600);margin-bottom:20px">Enter your domain to get your personalized integration code:</p>
-            
-            <form id="registerForm" action="/api/v1/sites/register" method="POST">
-                <div class="config-input">
-                    <label for="domain">Domain:</label>
-                    <input type="text" id="domain" name="site_domain" placeholder="yoursite.com" required>
-                </div>
-                <div class="config-input">
-                    <label for="email">Email:</label>
-                    <input type="email" id="email" name="admin_email" placeholder="you@yoursite.com" required>
-                </div>
-                <button type="submit" class="generate-btn">Get My Code →</button>
-            </form>
-        </div>
+    <!-- Loading State -->
+    <div id="loading-state" class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Checking authentication...</p>
     </div>
-    {% else %}
-    
-    <!-- Step 1: Add Script -->
-    <div class="setup-card">
-        <div class="setup-card-header">
-            <span class="step-number">1</span>
-            <h2>Add Lemma Wallet Script</h2>
-        </div>
-        <div class="setup-card-body">
-            <p style="color:var(--gray-600);margin-bottom:16px">Add this single script tag to your HTML:</p>
-            
-            <div class="code-block">
-                <div class="code-header">
-                    <span>HTML</span>
-                    <button class="copy-btn" onclick="copyCode(this, 'script-tag')">Copy</button>
-                </div>
-                <div class="code-content">
-                    <pre id="script-tag">&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;</pre>
-                </div>
+
+    <!-- Not Authenticated State -->
+    <div id="not-auth-state" style="display:none">
+        <div class="setup-card">
+            <div class="setup-card-header">
+                <h2>🔐 Sign In Required</h2>
             </div>
-            
-            <div class="info-box success">
-                <p>✅ That's it for setup! No API key needed in the script tag.</p>
+            <div class="setup-card-body">
+                <p style="color:var(--gray-600);margin-bottom:20px">Sign in to get personalized integration code for your registered sites.</p>
+                
+                <div class="info-box warning">
+                    <p>💡 <strong>New to Lemma?</strong> Go to the <a href="/platform">Developer Platform</a> to register your first site and get an API key.</p>
+                </div>
+                
+                <button onclick="handleSignIn()" class="generate-btn" id="signin-btn">Sign In with Passkey →</button>
             </div>
         </div>
     </div>
 
-    <!-- Step 2: Authentication Code -->
-    <div class="setup-card">
-        <div class="setup-card-header">
-            <span class="step-number">2</span>
-            <h2>Add Authentication Code</h2>
-        </div>
-        <div class="setup-card-body">
-            <p style="color:var(--gray-600);margin-bottom:16px">Copy this complete authentication code for <span class="domain-highlight">{{ customer.domain }}</span>:</p>
-            
-            <div class="tab-buttons">
-                <button class="tab-btn active" onclick="showTab('complete')">Complete Example</button>
-                <button class="tab-btn" onclick="showTab('minimal')">Minimal</button>
-                <button class="tab-btn" onclick="showTab('react')">React</button>
+    <!-- No Sites State -->
+    <div id="no-sites-state" style="display:none">
+        <div class="setup-card">
+            <div class="setup-card-header">
+                <h2>📋 Register a Site First</h2>
             </div>
-            
-            <!-- Complete Example -->
-            <div id="tab-complete" class="tab-content active">
+            <div class="setup-card-body">
+                <p style="color:var(--gray-600);margin-bottom:20px">You don't have any registered sites yet. Register your first site to get personalized integration code.</p>
+                
+                <a href="/platform" class="generate-btn" style="display:inline-block;text-decoration:none">Go to Developer Platform →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Authenticated State with Sites -->
+    <div id="auth-state" style="display:none">
+        <!-- Site Selector (if multiple sites) -->
+        <div id="site-selector-container" class="site-selector" style="display:none">
+            <label for="site-select">Select Site:</label>
+            <select id="site-select" onchange="updateCodeForSite()">
+                <!-- Populated by JS -->
+            </select>
+        </div>
+
+        <!-- Step 1: Add Script -->
+        <div class="setup-card">
+            <div class="setup-card-header">
+                <span class="step-number">1</span>
+                <h2>Add Lemma Wallet Script</h2>
+            </div>
+            <div class="setup-card-body">
+                <p style="color:var(--gray-600);margin-bottom:16px">Add this single script tag to your HTML:</p>
+                
                 <div class="code-block">
                     <div class="code-header">
-                        <span>JavaScript - Complete Auth Flow</span>
-                        <button class="copy-btn" onclick="copyCode(this, 'code-complete')">Copy</button>
+                        <span>HTML</span>
+                        <button class="copy-btn" onclick="copyCode(this, 'script-tag')">Copy</button>
                     </div>
                     <div class="code-content">
-                        <pre id="code-complete">// Lemma Wallet-First Authentication for {{ customer.domain }}
+                        <pre id="script-tag">&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;</pre>
+                    </div>
+                </div>
+                
+                <div class="info-box success">
+                    <p>✅ That's it for setup! No API key needed in the script tag.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Authentication Code -->
+        <div class="setup-card">
+            <div class="setup-card-header">
+                <span class="step-number">2</span>
+                <h2>Add Authentication Code</h2>
+            </div>
+            <div class="setup-card-body">
+                <p style="color:var(--gray-600);margin-bottom:16px">Copy this complete authentication code for <span class="domain-highlight" id="current-domain">your-site.com</span>:</p>
+                
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="showTab('complete')">Complete Example</button>
+                    <button class="tab-btn" onclick="showTab('minimal')">Minimal</button>
+                    <button class="tab-btn" onclick="showTab('react')">React</button>
+                </div>
+                
+                <!-- Complete Example -->
+                <div id="tab-complete" class="tab-content active">
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span>JavaScript - Complete Auth Flow</span>
+                            <button class="copy-btn" onclick="copyCode(this, 'code-complete')">Copy</button>
+                        </div>
+                        <div class="code-content">
+                            <pre id="code-complete">// Loading...</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Minimal Example -->
+                <div id="tab-minimal" class="tab-content">
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span>JavaScript - Minimal (15 lines)</span>
+                            <button class="copy-btn" onclick="copyCode(this, 'code-minimal')">Copy</button>
+                        </div>
+                        <div class="code-content">
+                            <pre id="code-minimal">// Loading...</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- React Example -->
+                <div id="tab-react" class="tab-content">
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span>React - useLemmaAuth Hook</span>
+                            <button class="copy-btn" onclick="copyCode(this, 'code-react')">Copy</button>
+                        </div>
+                        <div class="code-content">
+                            <pre id="code-react">// Loading...</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Test -->
+        <div class="setup-card">
+            <div class="setup-card-header">
+                <span class="step-number">3</span>
+                <h2>Test Your Integration</h2>
+            </div>
+            <div class="setup-card-body">
+                <p style="color:var(--gray-600);margin-bottom:16px">Verify everything is working:</p>
+                
+                <ul class="checklist">
+                    <li>
+                        <span class="check-icon">✓</span>
+                        <div>
+                            <strong>Script loads</strong>
+                            <p style="margin:4px 0 0;font-size:13px;color:var(--gray-500)">Check browser console for "LemmaWallet" object</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="check-icon">✓</span>
+                        <div>
+                            <strong>Passkey prompt appears</strong>
+                            <p style="margin:4px 0 0;font-size:13px;color:var(--gray-500)">Browser should show biometric/PIN prompt</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="check-icon">✓</span>
+                        <div>
+                            <strong>Credential stored</strong>
+                            <p style="margin:4px 0 0;font-size:13px;color:var(--gray-500)">After sign-in, wallet.isAuthenticated() returns true</p>
+                        </div>
+                    </li>
+                </ul>
+                
+                <div style="margin-top:20px">
+                    <button class="test-btn" onclick="testIntegration()">🧪 Test API Connection</button>
+                    <div id="test-result" class="test-result"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- What's Different -->
+        <div class="setup-card">
+            <div class="setup-card-header">
+                <h2>💡 What Makes This Different</h2>
+            </div>
+            <div class="setup-card-body">
+                <div style="display:grid;gap:16px">
+                    <div style="display:flex;gap:12px;align-items:flex-start">
+                        <span style="font-size:24px">🔐</span>
+                        <div>
+                            <strong>No passwords</strong>
+                            <p style="margin:4px 0 0;font-size:14px;color:var(--gray-600)">Users authenticate with passkey (Touch ID, Face ID, Windows Hello)</p>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:12px;align-items:flex-start">
+                        <span style="font-size:24px">📱</span>
+                        <div>
+                            <strong>No server sessions</strong>
+                            <p style="margin:4px 0 0;font-size:14px;color:var(--gray-600)">Credentials stored in user's browser wallet, verified locally</p>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:12px;align-items:flex-start">
+                        <span style="font-size:24px">⚡</span>
+                        <div>
+                            <strong>Microsecond verification</strong>
+                            <p style="margin:4px 0 0;font-size:14px;color:var(--gray-600)">Ed25519 signatures verified client-side in ~30µs</p>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:12px;align-items:flex-start">
+                        <span style="font-size:24px">🔒</span>
+                        <div>
+                            <strong>Privacy-preserving</strong>
+                            <p style="margin:4px 0 0;font-size:14px;color:var(--gray-600)">Sites can't track users across domains (PPID unlinkability)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Support -->
+        <div class="setup-card" style="background:linear-gradient(135deg,#eff6ff,#f5f3ff);border-color:#c7d2fe">
+            <div class="setup-card-body">
+                <h3 style="margin:0 0 12px;color:var(--gray-900)">Need Help?</h3>
+                <p style="margin:0 0 16px;color:var(--gray-600)">Our team is here to help you integrate:</p>
+                <div style="display:flex;gap:16px;flex-wrap:wrap">
+                    <a href="/docs" style="color:var(--primary);text-decoration:none;font-weight:500">📚 Full Documentation</a>
+                    <a href="mailto:support@lemma.id" style="color:var(--primary);text-decoration:none;font-weight:500">📧 support@lemma.id</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Global state
+let currentSite = null;
+let allSites = [];
+let wallet = null;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', initSetupPage);
+
+async function initSetupPage() {
+    try {
+        // Wait for wallet to be available
+        if (typeof LemmaWallet === 'undefined') {
+            await new Promise(resolve => {
+                const check = setInterval(() => {
+                    if (typeof LemmaWallet !== 'undefined') {
+                        clearInterval(check);
+                        resolve();
+                    }
+                }, 100);
+                setTimeout(() => { clearInterval(check); resolve(); }, 3000);
+            });
+        }
+
+        if (typeof LemmaWallet === 'undefined') {
+            showNotAuthState();
+            return;
+        }
+
+        wallet = new LemmaWallet({ debug: false });
+        await wallet.init();
+
+        // Check if authenticated
+        if (!wallet.isAuthenticated()) {
+            showNotAuthState();
+            return;
+        }
+
+        // Get credential for auth header
+        const credential = await wallet.getCredential('permission', 'lemma.id');
+        if (!credential) {
+            const altCredential = await wallet.getCredential('permission', 'lemma_platform');
+            if (!altCredential) {
+                showNotAuthState();
+                return;
+            }
+        }
+
+        // Fetch sites from API
+        await loadSites();
+
+    } catch (error) {
+        console.error('Setup page init error:', error);
+        showNotAuthState();
+    }
+}
+
+function getLemmaAuthHeaders() {
+    try {
+        const credentialStr = localStorage.getItem('lemma_platform_credential');
+        if (credentialStr) {
+            return { 'Authorization': 'Bearer ' + credentialStr };
+        }
+    } catch (e) {}
+    return {};
+}
+
+async function loadSites() {
+    try {
+        const response = await fetch('/api/customer/api-keys', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getLemmaAuthHeaders()
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Failed to load sites');
+        }
+
+        allSites = data.sites || [];
+
+        if (allSites.length === 0) {
+            showNoSitesState();
+            return;
+        }
+
+        // Set first site as current
+        currentSite = allSites[0];
+
+        // Populate site selector if multiple sites
+        if (allSites.length > 1) {
+            const select = document.getElementById('site-select');
+            select.innerHTML = allSites.map((site, i) => 
+                `<option value="${i}">${site.site_id || site.domain}</option>`
+            ).join('');
+            document.getElementById('site-selector-container').style.display = 'block';
+        }
+
+        // Update code and show auth state
+        updateCodeForSite();
+        showAuthState();
+
+    } catch (error) {
+        console.error('Error loading sites:', error);
+        showNoSitesState();
+    }
+}
+
+function updateCodeForSite() {
+    const selectEl = document.getElementById('site-select');
+    if (selectEl && allSites.length > 1) {
+        currentSite = allSites[parseInt(selectEl.value)];
+    }
+
+    const domain = currentSite?.site_id || currentSite?.domain || 'your-site.com';
+    
+    // Update hero subtitle
+    document.getElementById('hero-subtitle').innerHTML = `Ready-to-use code for <strong>${domain}</strong>`;
+    
+    // Update current domain display
+    document.getElementById('current-domain').textContent = domain;
+
+    // Generate code examples
+    generateCodeExamples(domain);
+}
+
+function generateCodeExamples(domain) {
+    // Complete example
+    document.getElementById('code-complete').textContent = `// Lemma Wallet-First Authentication for ${domain}
 // Passkey unlocks wallet → Credentials stored locally → No passwords!
 
-const SITE_ID = '{{ customer.domain }}';
+const SITE_ID = '${domain}';
 
 // Initialize wallet
 const wallet = new LemmaWallet({ debug: true });
@@ -197,20 +487,20 @@ async function handleSignIn() {
 }
 
 function showSignInButton() {
-    document.getElementById('auth-container').innerHTML = `
-        &lt;button onclick="handleSignIn()" class="signin-btn"&gt;
+    document.getElementById('auth-container').innerHTML = \`
+        <button onclick="handleSignIn()" class="signin-btn">
             Sign in with Passkey
-        &lt;/button&gt;
-    `;
+        </button>
+    \`;
 }
 
 function showApp(userClaims) {
-    document.getElementById('auth-container').innerHTML = `
-        &lt;div class="welcome"&gt;
-            &lt;p&gt;Welcome back!&lt;/p&gt;
-            &lt;button onclick="handleSignOut()"&gt;Sign Out&lt;/button&gt;
-        &lt;/div&gt;
-    `;
+    document.getElementById('auth-container').innerHTML = \`
+        <div class="welcome">
+            <p>Welcome back!</p>
+            <button onclick="handleSignOut()">Sign Out</button>
+        </div>
+    \`;
     // Your app code here...
 }
 
@@ -226,25 +516,15 @@ async function handleSignOut() {
 }
 
 // Start authentication check
-initAuth();</pre>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Minimal Example -->
-            <div id="tab-minimal" class="tab-content">
-                <div class="code-block">
-                    <div class="code-header">
-                        <span>JavaScript - Minimal (15 lines)</span>
-                        <button class="copy-btn" onclick="copyCode(this, 'code-minimal')">Copy</button>
-                    </div>
-                    <div class="code-content">
-                        <pre id="code-minimal">// Minimal Lemma auth for {{ customer.domain }}
+initAuth();`;
+
+    // Minimal example
+    document.getElementById('code-minimal').textContent = `// Minimal Lemma auth for ${domain}
 const wallet = new LemmaWallet();
 await wallet.init();
 
 if (wallet.isAuthenticated()) {
-    const cred = await wallet.getCredential('permission', '{{ customer.domain }}');
+    const cred = await wallet.getCredential('permission', '${domain}');
     if (cred) showApp(); else requestPermission();
 } else {
     showSignIn();
@@ -257,27 +537,17 @@ async function signIn() {
     const res = await fetch('https://lemma.id/api/wallet-auth/issue', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ site_id: '{{ customer.domain }}', wallet_secret: secret })
+        body: JSON.stringify({ site_id: '${domain}', wallet_secret: secret })
     });
     const data = await res.json();
     if (data.success) { await wallet.storeCredential(data.permission_lemma); location.reload(); }
-}</pre>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- React Example -->
-            <div id="tab-react" class="tab-content">
-                <div class="code-block">
-                    <div class="code-header">
-                        <span>React - useLemmaAuth Hook</span>
-                        <button class="copy-btn" onclick="copyCode(this, 'code-react')">Copy</button>
-                    </div>
-                    <div class="code-content">
-                        <pre id="code-react">// React hook for Lemma auth - {{ customer.domain }}
+}`;
+
+    // React example
+    document.getElementById('code-react').textContent = `// React hook for Lemma auth - ${domain}
 import { useState, useEffect } from 'react';
 
-const SITE_ID = '{{ customer.domain }}';
+const SITE_ID = '${domain}';
 
 export function useLemmaAuth() {
     const [wallet, setWallet] = useState(null);
@@ -339,126 +609,87 @@ export function useLemmaAuth() {
 function App() {
     const { isAuthenticated, user, loading, signIn, signOut } = useLemmaAuth();
     
-    if (loading) return &lt;div&gt;Loading...&lt;/div&gt;;
+    if (loading) return <div>Loading...</div>;
     
     if (!isAuthenticated) {
-        return &lt;button onClick={signIn}&gt;Sign in with Passkey&lt;/button&gt;;
+        return <button onClick={signIn}>Sign in with Passkey</button>;
     }
     
     return (
-        &lt;div&gt;
-            &lt;p&gt;Welcome!&lt;/p&gt;
-            &lt;button onClick={signOut}&gt;Sign Out&lt;/button&gt;
-        &lt;/div&gt;
+        <div>
+            <p>Welcome!</p>
+            <button onClick={signOut}>Sign Out</button>
+        </div>
     );
-}</pre>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+}`;
+}
 
-    <!-- Step 3: Test -->
-    <div class="setup-card">
-        <div class="setup-card-header">
-            <span class="step-number">3</span>
-            <h2>Test Your Integration</h2>
-        </div>
-        <div class="setup-card-body">
-            <p style="color:var(--gray-600);margin-bottom:16px">Verify everything is working:</p>
-            
-            <ul class="checklist">
-                <li>
-                    <span class="check-icon">✓</span>
-                    <div>
-                        <strong>Script loads</strong>
-                        <p style="margin:4px 0 0;font-size:13px;color:var(--gray-500)">Check browser console for "LemmaWallet" object</p>
-                    </div>
-                </li>
-                <li>
-                    <span class="check-icon">✓</span>
-                    <div>
-                        <strong>Passkey prompt appears</strong>
-                        <p style="margin:4px 0 0;font-size:13px;color:var(--gray-500)">Browser should show biometric/PIN prompt</p>
-                    </div>
-                </li>
-                <li>
-                    <span class="check-icon">✓</span>
-                    <div>
-                        <strong>Credential stored</strong>
-                        <p style="margin:4px 0 0;font-size:13px;color:var(--gray-500)">After sign-in, wallet.isAuthenticated() returns true</p>
-                    </div>
-                </li>
-            </ul>
-            
-            <div style="margin-top:20px">
-                <button class="test-btn" onclick="testIntegration()">🧪 Test API Connection</button>
-                <div id="test-result" class="test-result"></div>
-            </div>
-        </div>
-    </div>
+function showNotAuthState() {
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('not-auth-state').style.display = 'block';
+    document.getElementById('hero-subtitle').textContent = 'Sign in to get personalized code';
+}
 
-    <!-- What's Different -->
-    <div class="setup-card">
-        <div class="setup-card-header">
-            <h2>💡 What Makes This Different</h2>
-        </div>
-        <div class="setup-card-body">
-            <div style="display:grid;gap:16px">
-                <div style="display:flex;gap:12px;align-items:flex-start">
-                    <span style="font-size:24px">🔐</span>
-                    <div>
-                        <strong>No passwords</strong>
-                        <p style="margin:4px 0 0;font-size:14px;color:var(--gray-600)">Users authenticate with passkey (Touch ID, Face ID, Windows Hello)</p>
-                    </div>
-                </div>
-                <div style="display:flex;gap:12px;align-items:flex-start">
-                    <span style="font-size:24px">📱</span>
-                    <div>
-                        <strong>No server sessions</strong>
-                        <p style="margin:4px 0 0;font-size:14px;color:var(--gray-600)">Credentials stored in user's browser wallet, verified locally</p>
-                    </div>
-                </div>
-                <div style="display:flex;gap:12px;align-items:flex-start">
-                    <span style="font-size:24px">⚡</span>
-                    <div>
-                        <strong>Microsecond verification</strong>
-                        <p style="margin:4px 0 0;font-size:14px;color:var(--gray-600)">Ed25519 signatures verified client-side in ~30µs</p>
-                    </div>
-                </div>
-                <div style="display:flex;gap:12px;align-items:flex-start">
-                    <span style="font-size:24px">🔒</span>
-                    <div>
-                        <strong>Privacy-preserving</strong>
-                        <p style="margin:4px 0 0;font-size:14px;color:var(--gray-600)">Sites can't track users across domains (PPID unlinkability)</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+function showNoSitesState() {
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('no-sites-state').style.display = 'block';
+    document.getElementById('hero-subtitle').textContent = 'Register a site to get started';
+}
 
-    <!-- Support -->
-    <div class="setup-card" style="background:linear-gradient(135deg,#eff6ff,#f5f3ff);border-color:#c7d2fe">
-        <div class="setup-card-body">
-            <h3 style="margin:0 0 12px;color:var(--gray-900)">Need Help?</h3>
-            <p style="margin:0 0 16px;color:var(--gray-600)">Our team is here to help you integrate:</p>
-            <div style="display:flex;gap:16px;flex-wrap:wrap">
-                <a href="/docs" style="color:var(--primary);text-decoration:none;font-weight:500">📚 Full Documentation</a>
-                <a href="mailto:support@lemma.id" style="color:var(--primary);text-decoration:none;font-weight:500">📧 support@lemma.id</a>
-            </div>
-        </div>
-    </div>
-    
-    {% endif %}
-</div>
+function showAuthState() {
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('auth-state').style.display = 'block';
+}
 
-<script>
+async function handleSignIn() {
+    const btn = document.getElementById('signin-btn');
+    btn.disabled = true;
+    btn.textContent = 'Signing in...';
+
+    try {
+        if (!wallet) {
+            wallet = new LemmaWallet({ debug: false });
+            await wallet.init();
+        }
+
+        const info = await wallet.getWalletInfo();
+        if (info.hasPasskey) {
+            await wallet.unlock();
+        } else {
+            await wallet.registerPasskey();
+        }
+
+        // Get credential for lemma.id platform
+        const walletSecret = await wallet.getWalletSecret();
+        const response = await fetch('/api/wallet-auth/issue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                site_id: 'lemma.id',
+                wallet_secret: walletSecret
+            })
+        });
+
+        const result = await response.json();
+        if (result.success && result.permission_lemma) {
+            await wallet.storeCredential(result.permission_lemma);
+            localStorage.setItem('lemma_platform_credential', JSON.stringify(result.permission_lemma));
+            window.location.reload();
+        } else {
+            throw new Error(result.error || 'Failed to get credential');
+        }
+    } catch (error) {
+        console.error('Sign-in error:', error);
+        btn.disabled = false;
+        btn.textContent = 'Sign In with Passkey →';
+        alert('Sign-in failed: ' + error.message);
+    }
+}
+
 function showTab(tabId) {
-    // Update buttons
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     event.target.classList.add('active');
     
-    // Update content
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     document.getElementById('tab-' + tabId).classList.add('active');
 }
