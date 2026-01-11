@@ -292,53 +292,92 @@
 // Global state
 let currentSite = null;
 let allSites = [];
-let wallet = null;
+let lemmaPlatformCredentialString = null;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', initSetupPage);
 
 async function initSetupPage() {
+    console.log('🔧 Docs setup page initializing...');
+    
+    // Wait for layout.html to set window.lemmaCredential (same pattern as Platform page)
+    const maxWait = 5000;
+    const startTime = Date.now();
+    
+    while (!window.lemmaCredential && (Date.now() - startTime) < maxWait) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    if (window.lemmaCredential) {
+        console.log('✅ Got credential from layout.html');
+        lemmaPlatformCredentialString = JSON.stringify(window.lemmaCredential);
+        await loadSites();
+        return;
+    }
+    
+    // Fallback: Try to get credential from wallet directly (like Platform's tryAutoIssue)
+    console.log('ℹ️ No credential from layout, trying wallet...');
+    
     try {
-        // Wait for wallet to be available
         if (typeof LemmaWallet === 'undefined') {
-            await new Promise(resolve => {
-                const check = setInterval(() => {
-                    if (typeof LemmaWallet !== 'undefined') {
-                        clearInterval(check);
-                        resolve();
-                    }
-                }, 100);
-                setTimeout(() => { clearInterval(check); resolve(); }, 3000);
-            });
-        }
-
-        if (typeof LemmaWallet === 'undefined') {
+            console.log('❌ LemmaWallet not available');
             showNotAuthState();
             return;
         }
-
-        wallet = new LemmaWallet({ debug: false });
+        
+        const wallet = new LemmaWallet({ debug: false });
         await wallet.init();
-
-        // Check if authenticated
-        if (!wallet.isAuthenticated()) {
+        
+        if (!wallet.isAuthenticated() && !wallet.isUnlocked()) {
+            console.log('❌ Wallet not authenticated or unlocked');
             showNotAuthState();
             return;
         }
-
-        // Get credential for auth header
-        const credential = await wallet.getCredential('permission', 'lemma.id');
+        
+        // Try to get existing lemma.id credential
+        let credential = await wallet.getCredential('permission', 'lemma.id');
         if (!credential) {
-            const altCredential = await wallet.getCredential('permission', 'lemma_platform');
-            if (!altCredential) {
-                showNotAuthState();
-                return;
+            credential = await wallet.getCredential('permission', 'lemma_platform');
+        }
+        
+        if (credential) {
+            console.log('✅ Found existing credential in wallet');
+            lemmaPlatformCredentialString = JSON.stringify(credential);
+            window.lemmaCredential = credential;
+            await loadSites();
+            return;
+        }
+        
+        // No credential but wallet is ready - try auto-issue
+        if (wallet.isUnlocked()) {
+            console.log('🔐 Wallet unlocked, attempting auto-issue...');
+            try {
+                const walletSecret = await wallet.getWalletSecret();
+                const response = await fetch('/api/wallet-auth/issue', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: 'lemma.id',
+                        wallet_secret: walletSecret
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success && result.permission_lemma) {
+                    await wallet.storeCredential(result.permission_lemma);
+                    window.lemmaCredential = result.permission_lemma;
+                    lemmaPlatformCredentialString = JSON.stringify(result.permission_lemma);
+                    console.log('✅ Auto-issued credential');
+                    await loadSites();
+                    return;
+                }
+            } catch (e) {
+                console.warn('Auto-issue failed:', e);
             }
         }
-
-        // Fetch sites from API
-        await loadSites();
-
+        
+        showNotAuthState();
+        
     } catch (error) {
         console.error('Setup page init error:', error);
         showNotAuthState();
@@ -346,13 +385,12 @@ async function initSetupPage() {
 }
 
 function getLemmaAuthHeaders() {
-    try {
-        const credentialStr = localStorage.getItem('lemma_platform_credential');
-        if (credentialStr) {
-            return { 'Authorization': 'Bearer ' + credentialStr };
-        }
-    } catch (e) {}
-    return {};
+    if (!lemmaPlatformCredentialString) {
+        return {};
+    }
+    return {
+        'Authorization': `Bearer ${lemmaPlatformCredentialString}`
+    };
 }
 
 async function loadSites() {
@@ -647,10 +685,8 @@ async function handleSignIn() {
     btn.textContent = 'Signing in...';
 
     try {
-        if (!wallet) {
-            wallet = new LemmaWallet({ debug: false });
-            await wallet.init();
-        }
+        const wallet = new LemmaWallet({ debug: false });
+        await wallet.init();
 
         const info = await wallet.getWalletInfo();
         if (info.hasPasskey) {
@@ -673,7 +709,8 @@ async function handleSignIn() {
         const result = await response.json();
         if (result.success && result.permission_lemma) {
             await wallet.storeCredential(result.permission_lemma);
-            localStorage.setItem('lemma_platform_credential', JSON.stringify(result.permission_lemma));
+            window.lemmaCredential = result.permission_lemma;
+            // Reload to let layout.html handle the auth state properly
             window.location.reload();
         } else {
             throw new Error(result.error || 'Failed to get credential');
