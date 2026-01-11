@@ -7,27 +7,25 @@
 {% block preload_scripts %}{% endblock %}
 
 {% block head %}
-{{ super() }}
-<!-- Critical CSS for wallet page - inline for faster LCP -->
+<!-- Critical CSS only - minimal for fast LCP -->
 <style>
-/* Critical above-fold styles - minimal for fast LCP */
 .wallet-container{max-width:1100px;margin:0 auto;padding:40px 24px}
 .wallet-header{margin-bottom:32px;text-align:center}
-.wallet-header h1{font-size:2.25rem;font-weight:600;color:#111827;margin:0 0 8px;line-height:1.2}
-.wallet-header p{font-size:1rem;color:#6b7280;max-width:500px;margin:0 auto;line-height:1.5}
-.section-title{font-size:1.25rem;font-weight:600;color:#111827;margin:0 0 16px}
+.wallet-header h1{font-size:2.25rem;font-weight:600;color:#111827;margin:0 0 8px}
+.wallet-header p{font-size:1rem;color:#6b7280;max-width:500px;margin:0 auto}
 .wallet-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:24px}
-.credential-list{min-height:60px}
-/* Initial state placeholder */
 .wallet-init{text-align:center;padding:48px 24px}
 .wallet-init-icon{font-size:48px;margin-bottom:16px}
 .wallet-init-title{font-weight:600;color:#111827;margin-bottom:8px}
 .wallet-init-desc{color:#6b7280;font-size:0.9rem}
 </style>
+{% endblock %}
 
-    
-    <!-- Non-critical wallet styles -->
-    <style>
+{% block content %}
+<!-- Non-critical CSS - loaded after LCP element -->
+<style>
+.section-title{font-size:1.25rem;font-weight:600;color:#111827;margin:0 0 16px}
+.credential-list{min-height:60px}
         .wallet-status {
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: var(--white);
@@ -380,11 +378,9 @@
         }
 
     </style>
-{% endblock %}
 
-{% block content %}
 <div class="wallet-container">
-    <!-- Wallet Header - Always visible for stable LCP -->
+    <!-- LCP Element: Header renders first -->
     <header class="wallet-header">
         <h1>Your Lemma Wallet</h1>
         <p>Manage your federated identity credentials and access the decentralized network</p>
