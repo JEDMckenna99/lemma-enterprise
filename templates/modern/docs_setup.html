@@ -300,12 +300,20 @@ document.addEventListener('DOMContentLoaded', initSetupPage);
 async function initSetupPage() {
     console.log('🔧 Docs setup page initializing...');
     
-    // Wait for layout.html to set window.lemmaCredential (same pattern as Platform page)
-    const maxWait = 5000;
+    // Check immediately if credential is already set by layout.html
+    if (window.lemmaCredential) {
+        console.log('✅ Got credential from layout.html (instant)');
+        lemmaPlatformCredentialString = JSON.stringify(window.lemmaCredential);
+        await loadSites();
+        return;
+    }
+    
+    // Brief wait for layout.html to finish auth (usually <500ms)
+    const maxWait = 1500;
     const startTime = Date.now();
     
     while (!window.lemmaCredential && (Date.now() - startTime) < maxWait) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
     }
     
     if (window.lemmaCredential) {
