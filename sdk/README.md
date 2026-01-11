@@ -1,404 +1,590 @@
-# @lemma/verification-sdk
+# Lemma SDK
 
-> Zero-config credential verification with 32.8µs performance
+> Passkey-protected wallet authentication with microsecond credential verification
 
 [![npm version](https://badge.fury.io/js/%40lemma%2Fverification-sdk.svg)](https://badge.fury.io/js/%40lemma%2Fverification-sdk)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## 🎯 **What is Lemma?**
+
+Lemma is a **wallet-first authentication system** where:
+
+- **Passkey (biometric)** unlocks the wallet locally - no server call
+- **Credentials** are stored in the user's browser wallet
+- **Verification** happens client-side in microseconds
+- **Sites cannot track users** across different sites (PPID privacy)
+
+**No passwords. No sessions. No server-side state.**
+
+---
+
 ## 🚀 **Quick Start**
 
-### Installation
-```bash
-npm install @lemma/verification-sdk
+### Option 1: Script Tag (Recommended)
+
+```html
+<!-- Add to your page -->
+<script src="https://lemma.id/static/js/lemma-wallet.js"></script>
+
+<script>
+// Initialize wallet
+const wallet = new LemmaWallet({ debug: true });
+await wallet.init();
+
+// Check if user is authenticated
+if (wallet.isAuthenticated()) {
+    // User has unlocked wallet today - they're signed in!
+    const credential = await wallet.getCredential('permission', 'yoursite.com');
+    console.log('Welcome back!', credential.claims.email);
+} else {
+    // Show sign-in button
+    document.getElementById('signin-btn').style.display = 'block';
+}
+</script>
 ```
 
-### Basic Usage
+### Option 2: NPM Package
+
+```bash
+npm install @lemma/wallet-sdk
+```
+
 ```javascript
-import { Lemma } from '@lemma/verification-sdk';
+import { LemmaWallet } from '@lemma/wallet-sdk';
 
-const lemma = new Lemma({
-  apiKey: 'your-api-key'
+const wallet = new LemmaWallet({ debug: true });
+await wallet.init();
+```
+
+---
+
+## 🔐 **Authentication Flow**
+
+### How Wallet-First Auth Works
+
+```
+1. First Visit (New User)
+   ├── User clicks "Sign in with Lemma"
+   ├── Browser prompts for passkey (Touch ID, Face ID, etc.)
+   ├── Passkey registered → Wallet created
+   ├── Site issues permission credential → Stored in wallet
+   └── User is authenticated ✅
+
+2. Return Visits (Existing User)
+   ├── Page loads
+   ├── Check: wallet.isAuthenticated()
+   ├── If unlocked today → Instant access ✅ (no prompt!)
+   ├── If not unlocked → Browser prompts passkey
+   └── User is authenticated ✅
+
+3. Different Site (Same User)
+   ├── User visits newsite.com
+   ├── wallet.unlock() → Same passkey
+   ├── newsite.com issues ITS OWN permission
+   └── Sites CANNOT correlate users (different PPIDs)
+```
+
+---
+
+## 📦 **LemmaWallet Class**
+
+The wallet is the core of Lemma authentication.
+
+### Constructor
+
+```javascript
+const wallet = new LemmaWallet({
+    debug: false,              // Enable console logging
+    enableDeviceSync: true,    // Allow multi-device sync
+    enableAdvancedFeatures: true
 });
+```
 
-// Verify any credential
-const result = await lemma.verify(credentialData);
-console.log('Verified:', result.verified);
+### Initialization
+
+```javascript
+// Always call init() first
+await wallet.init();
+```
+
+### Core Methods
+
+#### `registerPasskey(): Promise<RegistrationResult>`
+
+Register a new passkey and create the wallet. Call this for first-time users.
+
+```javascript
+const result = await wallet.registerPasskey();
+
+// Result:
+{
+    success: true,
+    credentialId: "base64url-credential-id",
+    walletId: "wallet_abc123",
+    walletSecret: "hex-string-for-ppid-derivation"
+}
+```
+
+#### `unlock(): Promise<UnlockResult>`
+
+Unlock the wallet using passkey. Browser prompts for biometric verification.
+
+```javascript
+const result = await wallet.unlock();
+
+// Result:
+{
+    success: true,
+    walletId: "wallet_abc123",
+    walletSecret: "hex-string",
+    sessionExpiry: 1704067200000  // Unix timestamp
+}
+```
+
+#### `isUnlocked(): boolean`
+
+Check if wallet is currently unlocked.
+
+```javascript
+if (wallet.isUnlocked()) {
+    // Wallet is open - can access credentials
+}
+```
+
+#### `isAuthenticated(): boolean`
+
+Check if user has unlocked wallet today (primary auth check).
+
+```javascript
+if (wallet.isAuthenticated()) {
+    // User is "signed in" - unlocked wallet today
+    showApp();
+} else {
+    // Need to unlock or register
+    showSignInButton();
+}
+```
+
+#### `getAuthState(): AuthState`
+
+Get detailed authentication state.
+
+```javascript
+const state = wallet.getAuthState();
+
+// Returns:
+{
+    authenticated: true,
+    unlockedToday: true,
+    sessionExpiry: 1704067200000,
+    hasPasskey: true
+}
+```
+
+---
+
+## 🎫 **Credential Management**
+
+### Store Credential
+
+```javascript
+// Store a permission credential from a site
+await wallet.storeCredential(permissionLemma);
+```
+
+### Get Credential
+
+```javascript
+// Get credential for a specific site
+const credential = await wallet.getCredential('permission', 'example.com');
+
+if (credential) {
+    console.log('Email:', credential.claims.email);
+    console.log('Permission:', credential.claims.permissionId);
+}
+```
+
+### Get All Credentials
+
+```javascript
+const allCredentials = await wallet.getCredentials('permission');
+// Returns array of all permission credentials
+```
+
+### Check Valid Credential
+
+```javascript
+const hasAccess = await wallet.hasValidCredential('example.com', 'permission');
+if (hasAccess) {
+    // User has valid, non-expired permission for this site
+}
+```
+
+---
+
+## 🌐 **Site Integration**
+
+### Request Permission from Lemma
+
+When a user doesn't have a credential for your site, request one:
+
+```javascript
+async function requestSiteAccess() {
+    const wallet = new LemmaWallet();
+    await wallet.init();
+    
+    // Ensure wallet is unlocked
+    if (!wallet.isUnlocked()) {
+        await wallet.unlock();
+    }
+    
+    // Get wallet identifiers for permission request
+    const walletSecret = await wallet.getWalletSecret();
+    
+    // Request permission from Lemma API
+    const response = await fetch('https://lemma.id/api/wallet-auth/issue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            site_id: 'yoursite.com',
+            wallet_secret: walletSecret
+        })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+        // Store the permission in wallet
+        await wallet.storeCredential(result.permission_lemma);
+        console.log('Access granted!');
+    }
+}
+```
+
+### Complete Authentication Flow
+
+```javascript
+async function authenticateUser() {
+    const wallet = new LemmaWallet({ debug: true });
+    await wallet.init();
+    
+    // Step 1: Check if already authenticated
+    if (wallet.isAuthenticated()) {
+        const credential = await wallet.getCredential('permission', 'yoursite.com');
+        if (credential) {
+            return { authenticated: true, user: credential.claims };
+        }
+    }
+    
+    // Step 2: Check if has passkey (returning user)
+    const info = await wallet.getWalletInfo();
+    
+    if (info.hasPasskey) {
+        // Returning user - unlock wallet
+        await wallet.unlock();
+    } else {
+        // New user - register passkey
+        await wallet.registerPasskey();
+    }
+    
+    // Step 3: Check for site permission
+    let credential = await wallet.getCredential('permission', 'yoursite.com');
+    
+    if (!credential) {
+        // Request permission from Lemma
+        const walletSecret = await wallet.getWalletSecret();
+        const response = await fetch('https://lemma.id/api/wallet-auth/issue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                site_id: 'yoursite.com',
+                wallet_secret: walletSecret
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            await wallet.storeCredential(result.permission_lemma);
+            credential = result.permission_lemma;
+        }
+    }
+    
+    return { 
+        authenticated: true, 
+        user: credential?.claims || credential?.credentialSubject 
+    };
+}
+```
+
+---
+
+## 🔒 **Privacy: PPID (Pairwise Pseudonymous Identifiers)**
+
+Lemma uses PPIDs to prevent cross-site user tracking.
+
+### How It Works
+
+```
+User's wallet_secret: "abc123..."
+
+Site A (example.com):
+  PPID = HMAC(wallet_secret, "example.com")
+  → did:lemma:ppid_7f8a9b2c...
+
+Site B (another.com):
+  PPID = HMAC(wallet_secret, "another.com")  
+  → did:lemma:ppid_3d4e5f6a...
+
+Sites CANNOT correlate these identifiers!
+Same user appears as different identity to each site.
+```
+
+### Privacy Properties
+
+- **Unlinkability**: Sites cannot determine if two PPIDs belong to same user
+- **Consistency**: Same user at same site always gets same PPID
+- **No Central Tracking**: Lemma server doesn't store user-site mappings
+
+---
+
+## ⚡ **Credential Verification**
+
+Verify credentials locally in microseconds.
+
+### Basic Verification
+
+```javascript
+import { LemmaVerifier } from '@lemma/wallet-sdk';
+
+const verifier = new LemmaVerifier();
+
+const result = await verifier.verify(credentialJSON);
+
+console.log('Valid:', result.verified);
 console.log('Time:', result.timing.verification + 'µs');
 ```
 
-### 🌐 **3-Line Federation Join** (Recommended)
-```html
-<!-- 1. Join the federated network -->
-<script src="https://lemma.id/join?site=yoursite.com"></script>
+### Verification with Revocation Check
 
-<!-- 2. Protect any content -->
-<div data-lemma-protect>Members-only content here</div>
-
-<!-- 3. That's it! Cross-site verification enabled -->
-```
-
-**Benefits:**
-- ✅ **Verify once, access everywhere** - Users verified on any Lemma site can access your content
-- ✅ **Microsecond performance** - 1-50µs verification with Rust cryptography
-- ✅ **Zero setup** - Automatic federation join and configuration
-- ✅ **Bot protection** - Cryptographic human verification
-
-### Zero-Config HTML Integration
-```html
-<!-- Single script tag -->
-<script src="https://cdn.lemma.id/lemma-auto.js" data-api-key="your-key"></script>
-
-<!-- Add verification buttons -->
-<button data-lemma-verify="qr-scan">Verify Credential</button>
-<div data-lemma-result></div>
-```
-
-## 🎯 **Two-Process Architecture**
-
-### 🔐 **VERIFICATION** (API - One-Time Identity Creation)
-- **Purpose**: Create new identity credentials via Stripe KYC
-- **Frequency**: Once per user (or when credentials expire)
-- **Location**: Server-side API calls
-- **Performance**: ~500ms (includes KYC validation)
-- **Endpoints**: `/api/sdk/start-identity-verification`, `/api/sdk/complete-identity-verification`
-
-### ⚡ **AUTHENTICATION** (SDK - Ongoing Access Control)
-- **Purpose**: Validate existing credentials for instant access
-- **Frequency**: Every page load, background checks, cross-site access
-- **Location**: Client-side Rust/WASM SDK
-- **Performance**: ~1-50µs (offline cryptographic validation)
-- **Benefits**: Zero network calls, microsecond response times
-
-## 🎯 **SDK Features**
-
-- **⚡ Ultra-fast Authentication**: 1-50µs credential validation
-- **🔒 Offline-first**: Zero network calls during authentication
-- **📱 Universal**: Works with all credential types and devices
-- **🎨 Zero-config**: Single script tag integration
-- **🔧 TypeScript**: Full type support and IntelliSense
-- **📊 Monitoring**: Built-in performance metrics
-- **🔄 Resilient**: Automatic retry and error handling
-
-## 📚 **API Reference**
-
-### Constructor
 ```javascript
-const lemma = new Lemma(config);
-```
+// Sync revocation list (do this periodically)
+await wallet.syncRevocations();
 
-#### Configuration Options
-```typescript
-interface LemmaConfig {
-  apiKey?: string;           // Your API key
-  wasmPath?: string;         // Custom WASM path
-  debug?: boolean;           // Enable debug logging
-  retryAttempts?: number;    // Retry attempts (default: 3)
-  timeout?: number;          // Timeout in ms (default: 10000)
-  theme?: 'light' | 'dark';  // UI theme
-  language?: string;         // Language code
-  autoInit?: boolean;        // Auto-initialize (default: true)
+// Verify with revocation check
+const credential = await wallet.getCredential('permission', 'example.com');
+const isValid = await wallet.verifyCredential(credential);
+
+if (isValid) {
+    // Credential is valid AND not revoked
 }
 ```
 
-## 🔐 **VERIFICATION Methods** (Identity Creation)
+---
 
-### `startVerification(options): Promise<VerificationSession>`
-Start Stripe Identity KYC verification process.
+## 🔄 **Offline Support**
 
-```javascript
-const session = await lemma.startVerification({
-  returnUrl: 'https://yoursite.com/verified'
-});
-// Redirect user to session.url for KYC
-```
+Lemma works offline after initial setup.
 
-### `completeVerification(sessionId): Promise<IdentityCredential>`
-Complete verification and receive identity credential.
+### Offline Capabilities
 
-```javascript
-const credential = await lemma.completeVerification(sessionId);
-// credential now contains signed identity lemma
-```
+- ✅ Wallet unlock (passkey is local)
+- ✅ Credential verification (Ed25519 signatures)
+- ✅ Revocation check (cached Bloom filter)
+- ⚠️ New permission requests (need network)
 
-## ⚡ **AUTHENTICATION Methods** (Offline Validation)
-
-#### `authenticate(credentialData: string): Promise<AuthenticationResult>`
-Authenticate existing credentials offline using WebAssembly.
+### Check Online Status
 
 ```javascript
-const result = await lemma.authenticate(credentialJSON);
-console.log('Authenticated:', result.verified);
-console.log('Time:', result.timing.authentication + 'µs');
-```
+if (wallet.isOffline()) {
+    console.log('Offline mode - using cached data');
+}
 
-### `checkCredentials(): Promise<AuthenticationResult>`
-Check locally stored credentials for current user.
-
-```javascript
-const result = await lemma.checkCredentials();
-if (result.hasValidCredentials) {
-  console.log('User is authenticated');
+// Revocation sync gracefully handles offline
+const syncResult = await wallet.syncRevocations();
+if (syncResult.offline) {
+    console.log('Using cached revocations, age:', syncResult.cacheAge);
 }
 ```
 
-### `verify(credentialData: string): Promise<VerificationResult>`
-Legacy method - now aliased to `authenticate()` for backward compatibility.
+---
 
-#### `scanQR(options?: QRScanOptions): Promise<QRScanResult>`
-Scan and verify a QR code.
+## 📱 **Multi-Device Support**
+
+### QR Code Device Sync
+
+Transfer wallet to a new device:
 
 ```javascript
-const result = await lemma.scanQR();
+// On primary device - generate transfer QR
+const session = await wallet.createTransferSession();
+showQRCode(session.qr_code);
+
+// On new device - scan and import
+const newWallet = new LemmaWallet();
+await newWallet.importFromTransfer(scannedData);
 ```
 
-#### `on(event: string, callback: Function): void`
-Listen to SDK events.
+---
+
+## 🛡️ **Security Model**
+
+### What Lemma Protects Against
+
+| Threat | Protection |
+|--------|------------|
+| **Password theft** | No passwords - passkey only |
+| **Session hijacking** | No sessions - credential in wallet |
+| **Cross-site tracking** | PPID unlinkability |
+| **Credential replay** | Fresh nonce per verification |
+| **Phishing** | Passkey bound to domain |
+| **Credential forgery** | Ed25519 signatures (2^128 security) |
+
+### What Users Control
+
+- Their wallet (stored in THEIR browser)
+- Which devices have wallets
+- When to revoke (delete wallet data)
+
+### What Sites Control
+
+- Permission issuance for their domain
+- Permission revocation (<100ms propagation)
+- Custom claims in credentials
+
+---
+
+## 📊 **Performance**
+
+| Operation | Time |
+|-----------|------|
+| Passkey unlock | ~300ms (biometric prompt) |
+| Credential verification | 32.8µs |
+| Revocation check | <1µs |
+| Offline verification | ~35µs total |
+
+---
+
+## 🎯 **API Reference**
+
+### Wallet API Endpoints
+
+#### `POST /api/wallet-auth/issue`
+
+Issue permission credential to wallet.
 
 ```javascript
-lemma.on('verification-complete', (result) => {
-  console.log('Verification completed:', result);
-});
-```
+// Request
+{
+    "site_id": "example.com",
+    "wallet_secret": "hex-string",
+    "passkey_credential_id": "base64url" // fallback
+}
 
-### Events
-
-| Event | Description | Data |
-|-------|-------------|------|
-| `ready` | SDK initialized | `void` |
-| `verification-start` | Verification started | `void` |
-| `verification-complete` | Verification completed | `VerificationResult` |
-| `verification-error` | Verification failed | `Error` |
-| `scan-start` | QR scan started | `void` |
-| `scan-complete` | QR scan completed | `QRScanResult` |
-| `scan-error` | QR scan failed | `Error` |
-
-## 🎨 **Examples**
-
-### Basic Verification
-```javascript
-import { Lemma } from '@lemma/verification-sdk';
-
-const lemma = new Lemma({ apiKey: 'your-key' });
-
-// Wait for SDK to be ready
-lemma.on('ready', async () => {
-  const credential = {
-    credentialType: 'identity',
-    isHuman: true,
-    verificationLevel: 'high'
-  };
-  
-  const result = await lemma.verify(JSON.stringify(credential));
-  
-  if (result.verified) {
-    console.log('✅ Credential verified in', result.timing.verification + 'µs');
-  } else {
-    console.log('❌ Verification failed');
-  }
-});
-```
-
-### QR Code Scanning
-```javascript
-const lemma = new Lemma({ apiKey: 'your-key' });
-
-// Scan QR code with camera
-const result = await lemma.scanQR();
-console.log('QR data:', result.data);
-console.log('Verification:', result.verificationResult);
-```
-
-### Performance Monitoring
-```javascript
-const lemma = new Lemma({ apiKey: 'your-key', debug: true });
-
-// Get performance metrics
-const metrics = lemma.getPerformanceMetrics();
-console.log('Average time:', metrics.averageVerificationTime + 'µs');
-console.log('Cache hit rate:', metrics.cacheHitRate * 100 + '%');
-```
-
-### Error Handling
-```javascript
-const lemma = new Lemma({ apiKey: 'your-key' });
-
-lemma.on('error', (event) => {
-  console.error('SDK Error:', event.data.message);
-});
-
-try {
-  const result = await lemma.verify(credentialData);
-} catch (error) {
-  if (error.code === 'VERIFICATION_ERROR') {
-    console.log('Verification failed:', error.message);
-  }
+// Response
+{
+    "success": true,
+    "ppid": "did:lemma:ppid_abc123...",
+    "site_id": "example.com",
+    "permission_lemma": { /* signed credential */ }
 }
 ```
 
-## 🔧 **Advanced Usage**
+#### `POST /api/wallet-auth/verify-session`
 
-### Custom Configuration
+Verify wallet session and permissions.
+
 ```javascript
-const lemma = new Lemma({
-  apiKey: 'your-key',
-  wasmPath: 'https://your-cdn.com/pkg/',
-  debug: true,
-  retryAttempts: 5,
-  timeout: 15000,
-  theme: 'dark'
-});
-```
-
-### Event-Driven Architecture
-```javascript
-const lemma = new Lemma({ apiKey: 'your-key' });
-
-lemma.on('verification-start', () => {
-  showLoadingSpinner();
-});
-
-lemma.on('verification-complete', (result) => {
-  hideLoadingSpinner();
-  displayResult(result);
-});
-
-lemma.on('verification-error', (error) => {
-  hideLoadingSpinner();
-  showError(error.message);
-});
-```
-
-### Cache Management
-```javascript
-const lemma = new Lemma({ apiKey: 'your-key' });
-
-// Clear cache
-lemma.clearCache();
-
-// Check cache size
-console.log('Cache size:', lemma.getCacheSize());
-
-// Disable caching
-lemma.setCacheEnabled(false);
-```
-
-## 📱 **Integration Examples**
-
-### E-commerce Checkout
-```javascript
-// Age verification for restricted products
-const identityResult = await lemma.verify(identityCredential);
-if (identityResult.verified && identityResult.claims.age >= 21) {
-  // Allow purchase
+// Request
+{
+    "site_id": "example.com",
+    "wallet_secret": "hex-string",
+    "permissions": ["example.com:read", "example.com:write"]
 }
 
-// Product authenticity verification
-const productResult = await lemma.verify(productCredential);
-if (productResult.verified) {
-  // Display authenticity badge
+// Response
+{
+    "success": true,
+    "authenticated": true,
+    "ppid": "did:lemma:ppid_abc123...",
+    "has_permission": true
 }
 ```
 
-### Event Ticketing
+---
+
+## 🐛 **Troubleshooting**
+
+### Passkey Registration Failed
+
 ```javascript
-// Ticket verification at entry
-const ticketResult = await lemma.verify(ticketCredential);
-if (ticketResult.verified) {
-  const claims = ticketResult.claims;
-  console.log('Event:', claims.eventName);
-  console.log('Seat:', claims.seatNumber);
-  // Allow entry
+// Check WebAuthn support
+if (!window.PublicKeyCredential) {
+    console.log('WebAuthn not supported');
+}
+
+// Ensure HTTPS (required for WebAuthn)
+if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+    console.log('HTTPS required for passkeys');
 }
 ```
 
-### Document Verification
+### Wallet Not Persisting
+
 ```javascript
-// Identity document verification
-const docResult = await lemma.verify(documentCredential);
-if (docResult.verified) {
-  const claims = docResult.claims;
-  console.log('Name:', claims.name);
-  console.log('Country:', claims.country);
-  // Process identity
+// Check IndexedDB availability
+if (!window.indexedDB) {
+    console.log('IndexedDB not available');
 }
+
+// Check if private browsing (some browsers block storage)
 ```
+
+### Credential Verification Fails
+
+```javascript
+// Enable debug mode
+const wallet = new LemmaWallet({ debug: true });
+
+// Check credential structure
+const credential = await wallet.getCredential('permission', 'site.com');
+console.log('Credential:', JSON.stringify(credential, null, 2));
+
+// Verify issuer is trusted
+const issuers = await wallet.getIssuers();
+console.log('Trusted issuers:', issuers);
+```
+
+---
 
 ## 🌍 **Browser Support**
 
-| Browser | Version | Support |
-|---------|---------|---------|
+| Browser | Version | Passkey Support |
+|---------|---------|-----------------|
 | Chrome | 80+ | ✅ Full |
 | Firefox | 75+ | ✅ Full |
 | Safari | 14+ | ✅ Full |
 | Edge | 80+ | ✅ Full |
-| Opera | 67+ | ✅ Full |
 
-## 📊 **Performance**
-
-- **Verification Time**: 32.8µs (cached) / 150µs (uncached)
-- **Throughput**: 30,000+ verifications/second
-- **Network Calls**: 0 (offline verification)
-- **Memory Usage**: <50MB
-- **Bundle Size**: ~2MB (including WASM)
-
-## 🔐 **Security**
-
-- **Ed25519 Signatures**: Cryptographic authenticity
-- **OPRF Evaluation**: Privacy-preserving verification
-- **Bloom Filter Revocation**: Efficient offline revocation
-- **WebAssembly Isolation**: Sandboxed execution
-
-## 🐛 **Troubleshooting**
-
-### Common Issues
-
-**WebAssembly failed to load**
-```javascript
-// Ensure you're using HTTPS or localhost
-// Check browser console for detailed errors
-```
-
-**QR Scanner not working**
-```javascript
-// Grant camera permissions
-// Use HTTPS (required for camera access)
-```
-
-**Verification timeout**
-```javascript
-// Increase timeout in configuration
-const lemma = new Lemma({
-  apiKey: 'your-key',
-  timeout: 20000 // 20 seconds
-});
-```
-
-## 📄 **License**
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-## 🤝 **Contributing**
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 🔗 **Links**
-
-- [Documentation](https://docs.lemma.id)
-- [Live Examples](https://lemma.id/examples)
-- [GitHub Repository](https://github.com/lemma-verification/sdk)
-- [npm Package](https://www.npmjs.com/package/@lemma/verification-sdk)
-
-## 💬 **Support**
-
-- [GitHub Issues](https://github.com/lemma-verification/sdk/issues)
-- [Discord Community](https://discord.gg/lemma)
-- [Email Support](mailto:support@lemma.id)
+**Note**: WebAuthn (passkeys) requires HTTPS except on localhost.
 
 ---
 
-**Made with ❤️ by the Lemma team** 
+## 📖 **Additional Resources**
+
+- [Architecture: Wallet-First](https://lemma.id/docs/architecture)
+- [IAM API Reference](https://lemma.id/docs/api)
+- [Live Demo](https://lemma.id)
+- [Whitepaper](https://lemma.id/docs/whitepaper)
+
+---
+
+## 💬 **Support**
+
+- **Documentation**: https://lemma.id/docs
+- **Email**: support@lemma.id
+- **GitHub Issues**: https://github.com/lemma-id/sdk/issues
+
+---
+
+**Made with ❤️ by the Lemma team**

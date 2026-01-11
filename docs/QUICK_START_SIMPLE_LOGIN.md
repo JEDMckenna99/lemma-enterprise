@@ -1,371 +1,395 @@
 # Quick Start: Add Login in 5 Minutes
 
-Lemma provides email-based authentication with built-in bot resistance. **Sign in once per device, stay signed in.**
+Lemma provides passkey-protected wallet authentication. **No passwords. No sessions. Users stay signed in.**
 
 ---
 
 ## 🎯 **What Makes Lemma Different**
 
-### **Traditional Login Systems:**
-- ❌ Session expires every 30 minutes
-- ❌ Must logout to "secure" your account
-- ❌ Server tracks all your sessions
-- ❌ Re-login on every device frequently
+| Traditional Auth | Lemma |
+|------------------|-------|
+| ❌ Passwords to remember | ✅ Passkey (biometric) |
+| ❌ Session expires every 30 min | ✅ Credential persists 90 days |
+| ❌ Server tracks all sessions | ✅ Zero server state |
+| ❌ Re-login on every device | ✅ Wallet syncs across devices |
+| ❌ Add reCAPTCHA for bots | ✅ Cryptographic bot resistance built-in |
 
-### **Lemma:**
-- ✅ **Sign in once per device, stay signed in**
-- ✅ No session timeouts (credentials persist until expiration)
-- ✅ Zero server tracking (session-free architecture)
-- ✅ Built-in bot resistance (cryptographic nonces)
-- ✅ Works offline (7-day cache)
-- ✅ Instant revocation when needed (<100ms)
-
-**Your credential is like a physical ID card - YOU control it in YOUR browser.**
+**Your credential is like a physical ID card stored in YOUR browser.**
 
 ---
 
-## 🚀 **Step 1: Get Your API Key**
-
-1. Sign up at [lemma.id/register](https://lemma.id/register)
-2. Copy your API key from the dashboard
-
----
-
-## 🚀 **Step 2: Add Lemma to Your Site**
+## 🚀 **Step 1: Add Lemma Scripts**
 
 ```html
 <!-- Add before </body> -->
 <script src="https://lemma.id/static/js/lemma-wallet.js"></script>
-<script src="https://lemma.id/static/js/lemma-auth-simple.js"></script>
 ```
 
 ---
 
-## 🚀 **Step 3: Initialize Authentication**
+## 🚀 **Step 2: Initialize Wallet**
 
 ```javascript
-const auth = new LemmaAuth({
-    apiKey: 'your_api_key_here',
-    siteId: 'your_site_id',
-    debug: true  // Shows console logs
-});
+// Initialize once per page
+const wallet = new LemmaWallet({ debug: true });
+await wallet.init();
 ```
 
 ---
 
-## 🚀 **Step 4: Check Authentication**
+## 🚀 **Step 3: Check Authentication**
 
 ```javascript
-// Check if user has valid credential
-const isAuthenticated = await auth.isAuthenticated();
-
-if (isAuthenticated) {
-    // User has valid credential - show your app
-    const user = await auth.getUser();
-    console.log('Authenticated as:', user.email);
-    showDashboard();
+// Check if user has unlocked wallet today
+if (wallet.isAuthenticated()) {
+    // User is "signed in"
+    const credential = await wallet.getCredential('permission', 'yoursite.com');
+    
+    if (credential) {
+        const claims = credential.claims || credential.credentialSubject;
+        console.log('Welcome back!', claims.email || 'User');
+        showApp();
+    } else {
+        // Has wallet, needs permission for this site
+        await requestSitePermission();
+    }
 } else {
-    // No credential - show email input
-    showLoginForm();
+    // Not authenticated - show sign-in button
+    showSignInButton();
 }
 ```
 
 ---
 
-## 🚀 **Step 5: Request Access**
+## 🚀 **Step 4: Handle Sign-In**
 
 ```javascript
-// Send authentication email
-async function requestAccess(email) {
-    const result = await auth.sendLoginEmail(email);
+async function handleSignIn() {
+    const wallet = new LemmaWallet({ debug: true });
+    await wallet.init();
+    
+    // Check if returning user (has passkey)
+    const info = await wallet.getWalletInfo();
+    
+    if (info.hasPasskey) {
+        // Returning user - unlock existing wallet
+        await wallet.unlock();
+    } else {
+        // New user - register passkey
+        await wallet.registerPasskey();
+    }
+    
+    // Request permission for this site
+    await requestSitePermission();
+    
+    // Reload to show authenticated state
+    window.location.reload();
+}
+
+async function requestSitePermission() {
+    const walletSecret = await wallet.getWalletSecret();
+    
+    const response = await fetch('https://lemma.id/api/wallet-auth/issue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            site_id: window.location.hostname,
+            wallet_secret: walletSecret
+        })
+    });
+    
+    const result = await response.json();
     
     if (result.success) {
-        alert('Check your email to complete authentication!');
-    } else {
-        alert('Error: ' + result.error);
+        await wallet.storeCredential(result.permission_lemma);
+        console.log('Permission granted!');
     }
 }
+```
+
+---
+
+## 🚀 **Step 5: Add UI**
+
+```html
+<!-- Sign-in button (hidden when authenticated) -->
+<button id="signin-btn" onclick="handleSignIn()" style="display: none;">
+    Sign in with Lemma
+</button>
+
+<!-- App content (hidden until authenticated) -->
+<div id="app" style="display: none;">
+    <p>Welcome, <span id="user-email"></span>!</p>
+    <!-- Your app content -->
+</div>
+
+<script>
+async function initAuth() {
+    const wallet = new LemmaWallet({ debug: true });
+    await wallet.init();
+    
+    if (wallet.isAuthenticated()) {
+        const cred = await wallet.getCredential('permission', window.location.hostname);
+        if (cred) {
+            const claims = cred.claims || cred.credentialSubject;
+            document.getElementById('user-email').textContent = claims.email || 'User';
+            document.getElementById('app').style.display = 'block';
+        } else {
+            document.getElementById('signin-btn').style.display = 'block';
+        }
+    } else {
+        document.getElementById('signin-btn').style.display = 'block';
+    }
+}
+
+initAuth();
+</script>
 ```
 
 ---
 
 ## ✅ **That's It! Your Site Now Has:**
 
-- ✅ Email-based authentication
-- ✅ **Built-in bot resistance** (cryptographic nonces)
-- ✅ **Sign in once per device** (credentials persist)
-- ✅ No password management
-- ✅ No session tracking
-- ✅ Sub-100ms verification
-- ✅ Works offline (7-day cache)
-- ✅ Instant revocation (<100ms when admin revokes)
+- ✅ Passkey authentication (Touch ID, Face ID, Windows Hello)
+- ✅ No passwords to manage
+- ✅ No server sessions to maintain
+- ✅ Built-in bot resistance
+- ✅ Works offline after first auth
+- ✅ 90-day credential persistence
+- ✅ Instant revocation when needed (<100ms)
 
 ---
 
-## 🎯 **Key Concept: User-Controlled Credentials**
+## 🔄 **Authentication Flow**
 
-### **Traditional Session-Based Auth:**
-```
-User logs in
-  ↓
-Server creates session (stored in Redis/database)
-  ↓
-Server tracks user (knows you're logged in)
-  ↓
-Session expires (must re-login)
-  ↓
-User must logout (to clear server session)
-```
+### First-Time User
 
-### **Lemma Credential-Based Auth:**
 ```
-User confirms email (one time)
-  ↓
-Credential issued to user's browser wallet (encrypted)
-  ↓
-Server has ZERO state (doesn't track you)
-  ↓
-Credential verified locally on each request
-  ↓
-Credential stays valid until admin revokes or it expires
-  ↓
-No logout needed! (credential is in YOUR browser, not server session)
+1. User clicks "Sign in with Lemma"
+   ↓
+2. Browser prompts for passkey creation (biometric)
+   ↓
+3. Wallet created, passkey registered
+   ↓
+4. Site requests permission from Lemma API
+   ↓
+5. Credential stored in user's wallet
+   ↓
+6. User is authenticated ✅
 ```
 
-**Think of it like a physical ID card:**
-- You don't "logout" of having a driver's license
-- You carry it in your wallet
-- You show it when needed
-- It stays valid until it expires or gets revoked
-- **You control when you have it**
+### Returning User (Same Device)
 
----
-
-## 🔐 **Built-In Bot Resistance**
-
-### **Traditional Login Systems:**
-```javascript
-// No bot defense built-in
-// Must add reCAPTCHA separately:
-if (user.login(email, password)) {
-    // Anyone with credentials can replay this!
-    grantAccess();
-}
+```
+1. Page loads
+   ↓
+2. wallet.isAuthenticated() checks if unlocked today
+   ↓
+3. If YES → Instant access (no prompt!) ✅
+4. If NO → Browser prompts passkey (biometric)
+   ↓
+5. Wallet unlocked → User authenticated ✅
 ```
 
-### **Lemma:**
-```javascript
-// Bot resistance BUILT-IN
-// Every verification requires fresh nonce:
-const nonce = crypto.getRandomValues(new Uint8Array(32));
-const verified = await auth.isAuthenticated(); // Uses nonce internally
+### Returning User (Different Device)
 
-// Server checks:
-// 1. Nonce never used before (Redis cache)
-// 2. Timestamp within 5 minutes
-// 3. Site domain matches credential
-// 4. Ed25519 signature valid
-// 5. Not revoked (Bloom filter)
-
-// Result: Bots CANNOT reuse stolen credentials!
 ```
-
-**No CAPTCHAs. No friction. Just cryptographic proof.**
-
----
-
-## 📚 **Complete API Reference**
-
-### **LemmaAuth Class**
-
-#### **Constructor**
-```javascript
-const auth = new LemmaAuth({
-    apiKey: 'your_api_key',      // Required: Get from lemma.id/dashboard
-    siteId: 'your_site_id',      // Required: Your site identifier
-    siteDomain: 'yoursite.com',  // Optional: defaults to window.location.hostname
-    debug: false                 // Optional: enable debug logging
-});
-```
-
-#### **Methods**
-
-##### `sendLoginEmail(email, options)`
-Request access via email confirmation.
-
-```javascript
-const result = await auth.sendLoginEmail('user@example.com', {
-    role: 'user',                           // Optional: 'user', 'admin', 'editor'
-    redirectUrl: 'https://yoursite.com/app' // Optional: where to redirect after
-});
-
-// Returns: { success: boolean, message: string }
-```
-
-##### `isAuthenticated(skipNonce)`
-Check if user has valid credential. Includes bot resistance.
-
-```javascript
-// With nonce verification (bot resistance)
-const isAuth = await auth.isAuthenticated(false);
-
-// Quick check (skip nonce for performance)
-const isAuth = await auth.isAuthenticated(true);
-
-// Returns: boolean
-```
-
-##### `getUser()`
-Get current authenticated user information.
-
-```javascript
-const user = await auth.getUser();
-
-// Returns:
-// {
-//     email: 'user@example.com',
-//     role: 'user',
-//     authenticated: true,
-//     credential: { /* full credential object */ }
-// }
-// or null if not authenticated
-```
-
-##### `hasPermission(permission)`
-Check if user has specific permission.
-
-```javascript
-const isAdmin = await auth.hasPermission('admin');
-const isEditor = await auth.hasPermission('editor');
-
-// Returns: boolean
+1. User sets up new device
+   ↓
+2. Registers NEW passkey on new device
+   ↓
+3. OR uses QR code sync from existing device
+   ↓
+4. Wallet synced → All credentials available ✅
 ```
 
 ---
 
-## 🎯 **Common Use Cases**
+## 🔐 **Privacy: Different Sites Can't Track You**
 
-### **Use Case 1: Simple App Authentication**
+```
+Same user, different sites:
+
+yoursite.com sees: did:lemma:ppid_abc123...
+othersite.com sees: did:lemma:ppid_def456...
+
+These identifiers CANNOT be correlated!
+User privacy preserved across the network.
+```
+
+---
+
+## 🛡️ **Security Features**
+
+### No Sessions = No Session Hijacking
+
+```
+Traditional:
+  Attacker steals session cookie → Full access
+
+Lemma:
+  No session cookies exist
+  Credential is in user's wallet, protected by passkey
+  Attacker needs physical device + biometrics
+```
+
+### Passkey = Phishing Resistant
+
+```
+Phishing site: evil-site.com pretending to be yoursite.com
+
+Traditional:
+  User enters password → Attacker has credentials
+
+Lemma:
+  Passkey is bound to yoursite.com domain
+  Browser REFUSES to use it on evil-site.com
+  Attack fails automatically
+```
+
+---
+
+## 🎯 **Common Patterns**
+
+### Check Specific Permission
 
 ```javascript
-// Initialize
-const auth = new LemmaAuth({
-    apiKey: 'your_api_key',
-    siteId: 'my_app'
-});
-
-// Check on page load
-window.addEventListener('DOMContentLoaded', async () => {
-    const isAuth = await auth.isAuthenticated(true); // Quick check
+async function requireAdmin() {
+    const wallet = new LemmaWallet();
+    await wallet.init();
     
-    if (isAuth) {
-        const user = await auth.getUser();
-        showApp(user);
-    } else {
-        showLoginForm();
+    const cred = await wallet.getCredential('permission', 'yoursite.com');
+    const claims = cred?.claims || cred?.credentialSubject || {};
+    
+    if (claims.permissionId === 'admin' || claims.permissions?.includes('admin')) {
+        return true;
     }
-});
-
-// Login form handler
-async function handleLogin(email) {
-    const result = await auth.sendLoginEmail(email);
-    alert('Check your email!');
+    
+    window.location.href = '/unauthorized';
+    return false;
 }
 ```
 
-**User Experience:**
-- First visit: Enter email, confirm link
-- Every future visit: Automatically authenticated
-- **No repeated logins for 90 days**
-
----
-
-### **Use Case 2: Admin Panel Protection**
+### Handle Sign-Out
 
 ```javascript
-const auth = new LemmaAuth({
-    apiKey: 'your_api_key',
-    siteId: 'my_app'
-});
-
-// Protect admin routes
-async function checkAdminAccess() {
-    const isAdmin = await auth.hasPermission('admin');
+async function handleSignOut() {
+    const wallet = new LemmaWallet();
+    await wallet.init();
     
-    if (!isAdmin) {
-        window.location.href = '/unauthorized';
+    // Remove credential for this site
+    const credentials = await wallet.getCredentials('permission');
+    for (const cred of credentials) {
+        const claims = cred.claims || cred.credentialSubject || {};
+        if (claims.siteId === window.location.hostname) {
+            await wallet.removeCredential(cred.id);
+        }
     }
+    
+    window.location.reload();
 }
+```
 
-// Call on admin page load
-checkAdminAccess();
+**Note:** "Sign out" removes the credential, but the wallet still exists. The user can get a new credential anytime by unlocking their wallet again.
+
+### Check Credential Expiration
+
+```javascript
+async function checkCredentialStatus() {
+    const wallet = new LemmaWallet();
+    await wallet.init();
+    
+    const cred = await wallet.getCredential('permission', 'yoursite.com');
+    
+    if (!cred) {
+        return { valid: false, reason: 'no_credential' };
+    }
+    
+    const expiresAt = cred.expirationDate || cred.claims?.expiresAt;
+    if (expiresAt && Date.now() > expiresAt) {
+        return { valid: false, reason: 'expired' };
+    }
+    
+    return { valid: true, credential: cred };
+}
 ```
 
 ---
 
-## 🔄 **Credential Lifecycle**
+## 📱 **Mobile Support**
 
-```
-Day 0: User confirms email
-  ↓
-  Credential issued (Ed25519 signed)
-  ↓
-  Stored in encrypted browser wallet
-  ↓
-Days 1-89: User stays authenticated
-  ↓
-  - No re-logins needed
-  - Works offline
-  - Verification happens locally
-  - Admin can revoke anytime (<100ms)
-  ↓
-Day 90: Credential expires
-  ↓
-  User re-confirms email (seamless)
-  ↓
-  New credential issued
-```
+Lemma works great on mobile:
+
+- **iOS**: Face ID, Touch ID
+- **Android**: Fingerprint, Face Unlock
+
+Same code works on all platforms - the browser handles passkey UI.
 
 ---
 
-## 🎯 **What You Get vs Competitors**
+## ⚡ **Performance**
 
-| Feature | Auth0/Clerk | Lemma |
-|---------|-------------|-------|
-| **Re-login Frequency** | Often (session timeouts) | **Once per 90 days** |
-| **Session Timeouts** | Yes (30-60 min) | **No (credentials persist)** |
-| **Bot Resistance** | Extra (reCAPTCHA) | **Built-in (nonces)** |
-| **Server Tracking** | Full tracking | **Zero tracking** |
-| **Offline Capability** | No | **Yes (7 days)** |
-| **Revocation Speed** | 30-60s | **<100ms** |
-| **Verification Speed** | 200-500ms | **~63µs client-side (3,000-8,000x faster)** |
-| **Cost per Verification** | $0.05 | **$0.00** |
+| Operation | Time |
+|-----------|------|
+| Passkey prompt | ~300ms (biometric) |
+| Credential check | <1ms (local) |
+| Permission request | ~100ms (network) |
+| Signature verification | 32µs (local) |
+
+**After first auth, everything is local and instant.**
+
+---
+
+## 🐛 **Troubleshooting**
+
+### "Passkey not supported"
+
+```javascript
+// Check WebAuthn support
+if (!window.PublicKeyCredential) {
+    // Show email fallback
+    showEmailLogin();
+}
+```
+
+### "Wallet not persisting"
+
+This usually means private/incognito mode. IndexedDB is blocked in some browsers' private mode.
+
+### "Permission request failed"
+
+```javascript
+// Check the response
+const response = await fetch('https://lemma.id/api/wallet-auth/issue', ...);
+const result = await response.json();
+
+if (!result.success) {
+    console.error('Error:', result.error);
+    // Common: site_id format invalid, wallet_secret missing
+}
+```
 
 ---
 
 ## 📖 **Next Steps**
 
-- [Live Demo](https://lemma.id/examples/simple-auth-demo.html) - Test it yourself
-- [API Reference](./IAM_API_REFERENCE.md) - Complete API documentation
-- [Integration Examples](../examples/) - More complex examples
+- [SDK Documentation](../sdk/README.md) - Full API reference
+- [IAM API Reference](./IAM_API_REFERENCE.md) - Server-side endpoints
+- [Architecture](./ARCHITECTURE_WALLET_FIRST.md) - How it works
 
 ---
 
 ## 🆘 **Support**
 
-- **Documentation:** https://lemma.id/docs
-- **Live Demo:** https://lemma.id/examples/simple-auth-demo.html
-- **Email:** support@lemma.id
+- **Documentation**: https://lemma.id/docs
+- **Live Demo**: https://lemma.id
+- **Email**: support@lemma.id
 
 ---
 
-## 🎉 **Welcome to Persistent Authentication**
+## 🎉 **Welcome to Passwordless Authentication**
 
-**Traditional thinking:** Users must logout for security  
-**Lemma thinking:** Credentials persist until admin revokes or they expire
+**Traditional thinking:** Users must remember passwords and re-login constantly
+**Lemma thinking:** Passkey unlocks wallet, credentials persist until revoked
 
-**Your users will thank you for not forcing them to re-login every 30 minutes.**
-
-
-
-
+**Your users will thank you for not asking for passwords.**
