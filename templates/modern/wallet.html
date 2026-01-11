@@ -24,54 +24,22 @@
     
     <!-- Critical CSS for wallet page - inline for faster LCP -->
     <style>
-        /* Critical wallet styles - prevent CLS */
+        /* Critical wallet styles - prevent CLS with fixed dimensions */
         .wallet-container{max-width:1100px;margin:0 auto;padding:40px 24px;min-height:600px}
-        .wallet-header{margin-bottom:32px;text-align:center;min-height:120px}
+        .wallet-header{margin-bottom:32px;text-align:center;min-height:80px}
         .wallet-header h1{font-size:2.25rem;font-weight:600;color:var(--gray-900);margin-bottom:8px;line-height:1.2}
+        .wallet-header p{font-size:1rem;color:var(--gray-600);max-width:500px;margin:0 auto;line-height:1.5}
         .wallet-main{display:grid;grid-template-columns:1fr;gap:32px;margin-bottom:32px}
         .section-title{font-size:1.4rem;font-weight:600;color:var(--gray-900);margin-bottom:16px}
-        .wallet-card{background:var(--white);border:1px solid var(--gray-200);border-radius:16px;padding:24px;min-height:200px}
-        .credential-list{min-height:100px}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        .loading-spinner{display:inline-block;width:32px;height:32px;border:3px solid var(--gray-200);border-top-color:var(--primary);border-radius:50%;animation:spin 1s linear infinite}
+        .wallet-card{background:var(--white);border:1px solid var(--gray-200);border-radius:16px;padding:24px;min-height:150px}
+        .credential-list{min-height:80px}
+        /* Remove spinner - show content instantly */
+        .wallet-ready-state{padding:24px;text-align:center;color:var(--gray-500)}
+        .wallet-ready-state .icon{font-size:32px;margin-bottom:8px}
     </style>
     
-    <!-- Session-Free Auth already loaded in layout.html -->
+    <!-- Non-critical wallet styles -->
     <style>
-        .wallet-container {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 40px 24px;
-        }
-
-        .wallet-header {
-            margin-bottom: 32px;
-            text-align: center;
-        }
-
-        .wallet-header h1 {
-            font-size: 2.25rem;
-            font-weight: 600;
-            color: var(--gray-900);
-            margin-bottom: 8px;
-            line-height: 1.2;
-        }
-
-        .wallet-header p {
-            font-size: 1rem;
-            color: var(--gray-600);
-            max-width: 500px;
-            margin: 0 auto;
-            line-height: 1.5;
-        }
-
-        .wallet-main {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 32px;
-            margin-bottom: 32px;
-        }
-
         .wallet-status {
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: var(--white);
@@ -423,19 +391,6 @@
             transform: translateY(-1px);
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 24px;
-            height: 24px;
-            border: 3px solid var(--gray-200);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
     </style>
 {% endblock %}
 
@@ -448,10 +403,10 @@
     </header>
     
     <!-- Main Credential List - For unlock flow and initial display -->
-    <div id="credential-list" style="min-height: 300px;">
-        <div style="padding: 48px; text-align: center; color: var(--gray-500);">
-            <div class="loading-spinner" style="margin: 0 auto 16px;"></div>
-            <div style="font-weight: 500;">Loading wallet...</div>
+    <div id="credential-list" style="min-height: 200px;">
+        <div class="wallet-ready-state">
+            <div class="icon">🔐</div>
+            <div style="font-weight: 500;">Initializing wallet...</div>
         </div>
     </div>
 
@@ -495,9 +450,9 @@
                 </div>
             </div>
             
-            <div id="poh-credentials-list" class="credential-list" style="border-radius: 10px; background: var(--white); min-height: 100px;">
-                <div id="poh-loading" style="padding: 32px; text-align: center; color: var(--gray-500);">
-                    <div style="font-weight: 500; margin-bottom: 6px; font-size: 0.9rem;">Checking for PoH lemmas...</div>
+            <div id="poh-credentials-list" class="credential-list" style="border-radius: 10px; background: var(--white); min-height: 80px;">
+                <div id="poh-loading" style="padding: 20px; text-align: center; color: var(--gray-500); font-size: 0.9rem;">
+                    Checking PoH lemmas...
                 </div>
             </div>
         </div>
@@ -519,9 +474,9 @@
                 </div>
             </div>
             
-            <div id="permission-credentials-list" class="credential-list" style="border-radius: 10px; background: var(--white); min-height: 100px;">
-                <div id="permission-loading" style="padding: 32px; text-align: center; color: var(--gray-500);">
-                    <div style="font-weight: 500; margin-bottom: 6px; font-size: 0.9rem;">Checking for permission lemmas...</div>
+            <div id="permission-credentials-list" class="credential-list" style="border-radius: 10px; background: var(--white); min-height: 80px;">
+                <div id="permission-loading" style="padding: 20px; text-align: center; color: var(--gray-500); font-size: 0.9rem;">
+                    Checking permissions...
                 </div>
             </div>
         </div>
@@ -1936,9 +1891,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div style="background: white; padding: 32px; border-radius: 12px; max-width: 450px; text-align: center;">
                             <h3 style="margin: 0 0 16px 0;">📱 Device Sync QR Code</h3>
                             <div id="qr-code-container" style="margin: 16px 0; min-height: 220px; display: flex; align-items: center; justify-content: center; border: 2px solid #e5e7eb; border-radius: 8px; background: #f9fafb;">
-                                <div id="qr-loading" style="padding: 20px;">
+                                <div id="qr-loading" style="padding: 20px; text-align: center;">
                                     <div style="font-size: 48px; color: #9ca3af;">📱</div>
-                                    <div style="margin-top: 8px; color: #6b7280;">Loading QR code...</div>
+                                    <div style="margin-top: 8px; color: #6b7280;">Generating QR code...</div>
                                 </div>
                             </div>
                             <p style="font-size: 0.9rem; color: #666; margin: 16px 0;">
