@@ -5,313 +5,65 @@
 
 {% block head %}
     {{ super() }}
+    <!-- Critical CSS for above-the-fold docs content - inlined for fast LCP -->
     <style>
-        /* Modern Developer Documentation Styles */
-        .docs-layout {
-            display: grid;
-            grid-template-columns: 280px 1fr;
-            gap: 0;
-            min-height: 100vh;
-            background: var(--white);
-        }
-        
-        .docs-sidebar {
-            background: var(--gray-50);
-            border-right: 1px solid var(--gray-200);
-            padding: var(--space-6) 0;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-            overflow-y: auto;
-        }
-        
-        .docs-content {
-            padding: var(--space-8);
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        
-        .docs-hero {
-            background: linear-gradient(135deg, var(--gray-900) 0%, var(--black) 100%);
-            color: var(--white);
-            padding: var(--space-12) 0;
-            margin: calc(-1 * var(--space-8)) calc(-1 * var(--space-8)) var(--space-12);
-            text-align: center;
-        }
-        
-        .sidebar-nav {
-            padding: 0 var(--space-6);
-        }
-        
-        .nav-section {
-            margin-bottom: var(--space-6);
-        }
-        
-        .nav-title {
-            font-size: var(--font-size-sm);
-            font-weight: 600;
-            color: var(--gray-900);
-            margin-bottom: var(--space-3);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .nav-link {
-            display: block;
-            padding: var(--space-2) var(--space-3);
-            color: var(--gray-600);
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: var(--font-size-sm);
-            transition: all 0.2s ease;
-            margin-bottom: 2px;
-        }
-        
-        .nav-link:hover {
-            background: var(--primary-50);
-            color: var(--primary-600);
-        }
-        
-        .nav-link.active {
-            background: var(--primary-500);
-            color: var(--white);
-            font-weight: 500;
-        }
-        
-        .code-block {
-            background: var(--gray-900);
-            color: var(--white);
-            border-radius: 8px;
-            padding: var(--space-4);
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 14px;
-            line-height: 1.6;
-            overflow-x: auto;
-            margin: var(--space-4) 0;
-            position: relative;
-            border: 1px solid var(--gray-700);
-        }
-        
-        .code-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: var(--gray-800);
-            padding: var(--space-2) var(--space-4);
-            border-radius: 8px 8px 0 0;
-            border-bottom: 1px solid var(--gray-700);
-            margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) var(--space-3);
-        }
-        
-        .code-language {
-            font-size: var(--font-size-xs);
-            color: var(--gray-400);
-            font-weight: 500;
-        }
-        
-        .copy-button {
-            background: var(--gray-700);
-            color: var(--gray-300);
-            border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: var(--font-size-xs);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .copy-button:hover {
-            background: var(--gray-600);
-            color: var(--white);
-        }
-        
-        .copy-button.copied {
-            background: var(--success);
-            color: var(--white);
-        }
-        
-        .api-endpoint {
-            background: var(--gray-50);
-            border: 1px solid var(--gray-200);
-            border-radius: 8px;
-            padding: var(--space-4);
-            margin: var(--space-4) 0;
-        }
-        
-        .endpoint-method {
-            display: inline-block;
-            background: var(--primary-500);
-            color: var(--white);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            margin-right: var(--space-2);
-        }
-        
-        .endpoint-method.post { background: var(--success); }
-        .endpoint-method.get { background: var(--primary-500); }
-        .endpoint-method.put { background: var(--warning); }
-        .endpoint-method.delete { background: var(--danger); }
-        
-        .response-time {
-            background: var(--success);
-            color: var(--white);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            margin-left: var(--space-2);
-        }
-        
-        .quick-start-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: var(--space-6);
-            margin: var(--space-8) 0;
-        }
-        
-        .docs-card {
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: 12px;
-            padding: var(--space-6);
-            transition: all 0.2s ease;
-            height: fit-content;
-        }
-        
-        .docs-card:hover {
-            border-color: var(--primary-300);
-            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.1);
-        }
-        
-        .card-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--primary-500);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            margin-bottom: var(--space-4);
-        }
-        
-        .integration-badge {
-            background: var(--success);
-            color: var(--white);
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            margin-left: var(--space-2);
-        }
-        
-        .table-responsive {
-            overflow-x: auto;
-            margin: var(--space-4) 0;
-        }
-        
-        .docs-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: var(--font-size-sm);
-        }
-        
-        .docs-table th {
-            background: var(--gray-50);
-            padding: var(--space-3);
-            text-align: left;
-            border-bottom: 1px solid var(--gray-200);
-            font-weight: 600;
-            color: var(--gray-900);
-        }
-        
-        .docs-table td {
-            padding: var(--space-3);
-            border-bottom: 1px solid var(--gray-100);
-            color: var(--gray-700);
-        }
-        
-        .docs-table tr:hover {
-            background: var(--gray-25);
-        }
-        
-        .status-badge {
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-        }
-        
-        .status-stable { background: var(--success); color: var(--white); }
-        .status-beta { background: var(--warning); color: var(--white); }
-        .status-experimental { background: var(--gray-500); color: var(--white); }
-        
-        /* Mobile responsiveness */
-        @media (max-width: 1024px) {
-            .docs-layout {
-                grid-template-columns: 1fr;
-            }
-            
-            .docs-sidebar {
-                display: none;
-            }
-            
-            .mobile-nav-toggle {
-                display: block;
-            }
-        }
-        
-        .mobile-nav-toggle {
-            display: none;
-            background: var(--primary-500);
-            color: var(--white);
-            border: none;
-            padding: var(--space-2) var(--space-4);
-            border-radius: 6px;
-            margin-bottom: var(--space-4);
-            cursor: pointer;
-        }
-        
-        .section-anchor {
-            position: relative;
-            scroll-margin-top: 80px;
-        }
-        
-        .anchor-link {
-            position: absolute;
-            left: -24px;
-            top: 0;
-            color: var(--gray-400);
-            text-decoration: none;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-        
-        .section-anchor:hover .anchor-link {
-            opacity: 1;
-        }
-        
-        /* Swagger UI Customization */
-        #swagger-ui .swagger-ui {
-            font-family: var(--font-sans);
-        }
-        
-        #swagger-ui .topbar {
-            display: none; /* Hide Swagger UI top bar */
-        }
-        
-        #swagger-ui .scheme-container {
-            background: var(--gray-50);
-            border-radius: 8px;
-            padding: var(--space-4);
-            margin-bottom: var(--space-4);
-        }
+        /* Critical docs styles - layout and hero */
+        .docs-layout{display:grid;grid-template-columns:280px 1fr;gap:0;min-height:100vh;background:var(--white)}
+        .docs-sidebar{background:var(--gray-50);border-right:1px solid var(--gray-200);padding:24px 0;position:sticky;top:0;height:100vh;overflow-y:auto}
+        .docs-content{padding:32px;max-width:800px;margin:0 auto}
+        .docs-hero{background:linear-gradient(135deg,var(--gray-900) 0%,#000 100%);color:var(--white);padding:48px 0;margin:-32px -32px 48px;text-align:center;min-height:200px}
+        .sidebar-nav{padding:0 24px}
+        .nav-section{margin-bottom:24px}
+        .nav-title{font-size:13px;font-weight:600;color:var(--gray-900);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}
+        .nav-link{display:block;padding:8px 12px;color:var(--gray-600);text-decoration:none;border-radius:6px;font-size:14px;margin-bottom:2px}
+        .nav-link:hover{background:rgba(99,102,241,.1);color:var(--primary)}
+        .nav-link.active{background:var(--primary);color:var(--white);font-weight:500}
+        .mobile-nav-toggle{display:none;background:var(--primary);color:var(--white);border:none;padding:8px 16px;border-radius:6px;margin-bottom:16px;cursor:pointer}
+        @media(max-width:1024px){.docs-layout{grid-template-columns:1fr}.docs-sidebar{display:none}.mobile-nav-toggle{display:block}}
     </style>
     
-    <!-- Swagger UI CSS -->
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+    <!-- Non-critical docs CSS - loads after LCP -->
+    <style>
+        /* Code blocks and cards - below the fold */
+        .code-block{background:var(--gray-900);color:var(--white);border-radius:8px;padding:16px;font-family:'Monaco','Menlo','Ubuntu Mono',monospace;font-size:14px;line-height:1.6;overflow-x:auto;margin:16px 0;position:relative;border:1px solid var(--gray-700)}
+        .code-header{display:flex;align-items:center;justify-content:space-between;background:var(--gray-800);padding:8px 16px;border-radius:8px 8px 0 0;border-bottom:1px solid var(--gray-700);margin:-16px -16px 12px}
+        .code-language{font-size:12px;color:var(--gray-400);font-weight:500}
+        .copy-button{background:var(--gray-700);color:var(--gray-300);border:none;padding:4px 8px;border-radius:4px;font-size:12px;cursor:pointer}
+        .copy-button:hover{background:var(--gray-600);color:var(--white)}
+        .copy-button.copied{background:var(--success);color:var(--white)}
+        .api-endpoint{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:16px;margin:16px 0}
+        .endpoint-method{display:inline-block;background:var(--primary);color:var(--white);padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;margin-right:8px}
+        .endpoint-method.post{background:var(--success)}
+        .endpoint-method.get{background:var(--primary)}
+        .endpoint-method.put{background:#f59e0b}
+        .endpoint-method.delete{background:#ef4444}
+        .response-time{background:var(--success);color:var(--white);padding:2px 6px;border-radius:4px;font-size:12px;font-weight:600;margin-left:8px}
+        .quick-start-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:24px;margin:32px 0}
+        .docs-card{background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:24px;transition:all .2s ease;height:fit-content}
+        .docs-card:hover{border-color:rgba(99,102,241,.3);box-shadow:0 8px 25px rgba(99,102,241,.1)}
+        .card-icon{width:40px;height:40px;background:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px}
+        .integration-badge{background:var(--success);color:var(--white);padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;margin-left:8px}
+        .table-responsive{overflow-x:auto;margin:16px 0}
+        .docs-table{width:100%;border-collapse:collapse;font-size:14px}
+        .docs-table th{background:var(--gray-50);padding:12px;text-align:left;border-bottom:1px solid var(--gray-200);font-weight:600;color:var(--gray-900)}
+        .docs-table td{padding:12px;border-bottom:1px solid var(--gray-100);color:var(--gray-700)}
+        .docs-table tr:hover{background:rgba(248,250,252,.5)}
+        .status-badge{padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600}
+        .status-stable{background:var(--success);color:var(--white)}
+        .status-beta{background:#f59e0b;color:var(--white)}
+        .status-experimental{background:var(--gray-500);color:var(--white)}
+        .section-anchor{position:relative;scroll-margin-top:80px}
+        .anchor-link{position:absolute;left:-24px;top:0;color:var(--gray-400);text-decoration:none;opacity:0;transition:opacity .2s ease}
+        .section-anchor:hover .anchor-link{opacity:1}
+        /* Swagger UI Customization */
+        #swagger-ui .swagger-ui{font-family:var(--font-family)}
+        #swagger-ui .topbar{display:none}
+        #swagger-ui .scheme-container{background:var(--gray-50);border-radius:8px;padding:16px;margin-bottom:16px}
+    </style>
+    
+    <!-- Swagger UI CSS - load async to not block LCP -->
+    <link rel="preload" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css"></noscript>
 {% endblock %}
 
 {% block content %}
@@ -1264,108 +1016,165 @@ const shield = new LemmaBotShield({
     </main>
 </div>
 
-<!-- Copy Code Functionality -->
+<!-- Copy Code & Navigation - Non-blocking -->
 <script>
+// Copy code to clipboard
 function copyCode(button) {
     const codeBlock = button.closest('.code-block');
     const code = codeBlock.textContent.replace(/Copy\s*/, '').replace(/^\s*\w+\s*/, '').trim();
     
-    navigator.clipboard.writeText(code).then(() => {
+    navigator.clipboard.writeText(code).then(function() {
         button.textContent = 'Copied!';
         button.classList.add('copied');
-        
-        setTimeout(() => {
+        setTimeout(function() {
             button.textContent = 'Copy';
             button.classList.remove('copied');
         }, 2000);
-    }).catch(err => {
-        console.error('Failed to copy code:', err);
+    }).catch(function() {
         button.textContent = 'Failed';
-        setTimeout(() => {
-            button.textContent = 'Copy';
-        }, 2000);
+        setTimeout(function() { button.textContent = 'Copy'; }, 2000);
     });
 }
 
-// Sidebar navigation highlighting
-document.addEventListener('DOMContentLoaded', function() {
-    const navLinks = document.querySelectorAll('.nav-link');
-    const sections = document.querySelectorAll('.section-anchor');
-    
-    function updateActiveNav() {
-        let current = '';
-        sections.forEach(section => {
-            const rect = section.getBoundingClientRect();
-            if (rect.top <= 100) {
-                current = section.id;
-            }
-        });
+// Sidebar navigation - use requestIdleCallback for non-blocking init
+(function() {
+    function initNav() {
+        var navLinks = document.querySelectorAll('.nav-link');
+        var sections = document.querySelectorAll('.section-anchor');
+        var scrollTimeout;
         
-        navLinks.forEach(link => {
-            link.classList.remove('active');
-            if (link.getAttribute('href') === '#' + current) {
-                link.classList.add('active');
+        function updateActiveNav() {
+            var current = '';
+            sections.forEach(function(section) {
+                if (section.getBoundingClientRect().top <= 100) {
+                    current = section.id;
+                }
+            });
+            
+            navLinks.forEach(function(link) {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        }
+        
+        // Throttled scroll handler
+        window.addEventListener('scroll', function() {
+            if (scrollTimeout) return;
+            scrollTimeout = setTimeout(function() {
+                scrollTimeout = null;
+                updateActiveNav();
+            }, 100);
+        }, { passive: true });
+        
+        updateActiveNav();
+        
+        // Mobile navigation toggle
+        var mobileToggle = document.querySelector('.mobile-nav-toggle');
+        var sidebar = document.querySelector('.docs-sidebar');
+        
+        if (mobileToggle && sidebar) {
+            mobileToggle.addEventListener('click', function() {
+                sidebar.style.display = sidebar.style.display === 'block' ? 'none' : 'block';
+            });
+        }
+    }
+    
+    // Non-blocking initialization
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(initNav);
+            } else {
+                setTimeout(initNav, 0);
             }
         });
+    } else {
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(initNav);
+        } else {
+            setTimeout(initNav, 0);
+        }
     }
-    
-    window.addEventListener('scroll', updateActiveNav);
-    updateActiveNav();
-    
-    // Mobile navigation toggle
-    const mobileToggle = document.querySelector('.mobile-nav-toggle');
-    const sidebar = document.querySelector('.docs-sidebar');
-    
-    if (mobileToggle && sidebar) {
-        mobileToggle.addEventListener('click', () => {
-            sidebar.style.display = sidebar.style.display === 'block' ? 'none' : 'block';
-        });
-    }
-});
+})();
 </script>
 
-<!-- Swagger UI JavaScript -->
-<script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+<!-- Swagger UI JavaScript - Lazy loaded when scrolled into view -->
 <script>
-// Initialize Swagger UI
-document.addEventListener('DOMContentLoaded', function() {
-    // Only initialize Swagger UI if the container exists
-    const swaggerContainer = document.getElementById('swagger-ui');
-    if (swaggerContainer) {
-        SwaggerUIBundle({
-            url: '/static/openapi.yaml',
-            dom_id: '#swagger-ui',
-            deepLinking: true,
-            presets: [
-                SwaggerUIBundle.presets.apis,
-                SwaggerUIBundle.presets.standalone
-            ],
-            plugins: [
-                SwaggerUIBundle.plugins.DownloadUrl
-            ],
-            layout: "BaseLayout",
-            defaultModelsExpandDepth: 1,
-            defaultModelExpandDepth: 1,
-            docExpansion: "list",
-            tryItOutEnabled: true,
-            filter: true,
-            supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
-            onComplete: function() {
-                console.log('✅ Swagger UI loaded successfully');
-            },
-            onFailure: function(error) {
-                console.error('❌ Swagger UI failed to load:', error);
-                swaggerContainer.innerHTML = `
-                    <div style="background: var(--danger-50); border: 1px solid var(--danger-200); border-radius: 8px; padding: var(--space-4); text-align: center;">
-                        <p style="color: var(--danger-700); margin: 0;">
-                            <strong>⚠️ API Explorer temporarily unavailable</strong><br>
-                            Please refer to the code examples above or contact support.
-                        </p>
-                    </div>
-                `;
+// Lazy load Swagger UI only when the API section is visible (improves LCP)
+(function() {
+    let swaggerLoaded = false;
+    
+    function loadSwaggerUI() {
+        if (swaggerLoaded) return;
+        swaggerLoaded = true;
+        
+        const swaggerContainer = document.getElementById('swagger-ui');
+        if (!swaggerContainer) return;
+        
+        // Show loading state
+        swaggerContainer.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-500);">Loading API Explorer...</div>';
+        
+        // Load Swagger UI script dynamically
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js';
+        script.onload = function() {
+            SwaggerUIBundle({
+                url: '/static/openapi.yaml',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIBundle.presets.standalone
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "BaseLayout",
+                defaultModelsExpandDepth: 1,
+                defaultModelExpandDepth: 1,
+                docExpansion: "list",
+                tryItOutEnabled: true,
+                filter: true,
+                supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+                onComplete: function() {
+                    console.log('Swagger UI loaded');
+                },
+                onFailure: function() {
+                    swaggerContainer.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;text-align:center;"><p style="color:#b91c1c;margin:0;"><strong>API Explorer temporarily unavailable</strong><br>Please refer to the code examples above.</p></div>';
+                }
+            });
+        };
+        script.onerror = function() {
+            swaggerContainer.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;text-align:center;"><p style="color:#b91c1c;margin:0;"><strong>Failed to load API Explorer</strong><br>Please refer to the code examples above.</p></div>';
+        };
+        document.body.appendChild(script);
+    }
+    
+    // Use Intersection Observer to lazy load when API section is visible
+    if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    loadSwaggerUI();
+                    observer.disconnect();
+                }
+            });
+        }, { rootMargin: '200px' }); // Load 200px before visible
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const swaggerSection = document.getElementById('swagger-ui');
+            if (swaggerSection) {
+                observer.observe(swaggerSection);
             }
         });
+    } else {
+        // Fallback: load after page load
+        window.addEventListener('load', function() {
+            setTimeout(loadSwaggerUI, 1000);
+        });
     }
-});
+})();
 </script>
 {% endblock %} 
