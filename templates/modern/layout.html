@@ -11,7 +11,9 @@
     
     <!-- Preload critical resources for faster LCP -->
     <link rel="preload" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121" as="style">
+    {% block preload_scripts %}
     <link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=1121" as="script">
+    {% endblock %}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     

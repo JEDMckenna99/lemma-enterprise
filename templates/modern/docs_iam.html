@@ -3,6 +3,10 @@
 {% block title %}Developer Documentation - Lemma IAM{% endblock %}
 {% block description %}Integrate Lemma IAM into your platform in 5 minutes. REST API, SDKs, and comprehensive guides for adding authentication and access control.{% endblock %}
 
+{% block preload_scripts %}
+<!-- Docs page doesn't need wallet preload - skip for faster LCP -->
+{% endblock %}
+
 {% block wallet_scripts %}
 <!-- Docs page doesn't need wallet scripts - skip for faster LCP -->
 {% endblock %}
