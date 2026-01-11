@@ -527,7 +527,40 @@ def create_app():
 
     @app.route('/docs')
     def docs():
+        # Check if user is authenticated (has customer in session)
+        from flask import session
+        customer_id = session.get('customer_id')
+        
+        if customer_id:
+            # Try to get customer info for personalized docs
+            try:
+                from api.customer_accounts import customer_manager
+                customer = customer_manager.get_customer(customer_id)
+                if customer:
+                    return render_template('modern/docs_setup.html', customer=customer)
+            except Exception:
+                pass
+        
+        # Default docs page for non-authenticated users
         return render_template('modern/docs_iam.html')
+    
+    @app.route('/docs/setup')
+    def docs_setup():
+        """Personalized setup guide after registration"""
+        from flask import session
+        customer_id = session.get('customer_id')
+        
+        if customer_id:
+            try:
+                from api.customer_accounts import customer_manager
+                customer = customer_manager.get_customer(customer_id)
+                if customer:
+                    return render_template('modern/docs_setup.html', customer=customer)
+            except Exception:
+                pass
+        
+        # Redirect to registration if not authenticated
+        return render_template('modern/docs_setup.html', customer=None)
 
     @app.route('/qr-demo')
     def qr_demo():

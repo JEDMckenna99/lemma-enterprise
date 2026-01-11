@@ -56,7 +56,10 @@
 {% block content %}
 <div class="docs-hero">
     <h1>Lemma IAM Developer Docs</h1>
-    <p>Integrate enterprise-grade authentication and access control into your platform in minutes</p>
+    <p>Integrate passkey authentication into your platform in minutes</p>
+    <div style="margin-top: 20px;">
+        <a href="/login" style="display: inline-block; background: #fff; color: var(--primary); padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-right: 12px;">Get Personalized Code →</a>
+    </div>
 </div>
 
 <div class="docs-container">
@@ -201,28 +204,46 @@
                 <h3 style="margin-top: 32px;">Step 3: Add to Your Site</h3>
                 <div class="code-block">
                     <div class="code-header">
-                        <span>HTML</span>
+                        <span>HTML + JavaScript</span>
                         <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                     </div>
-<pre>&lt;script src="https://lemma.id/static/js/lemma-iam-sdk.js"&gt;&lt;/script&gt;
+<pre>&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
 
 &lt;script&gt;
-const lemmaIAM = new LemmaIAM({
-    apiKey: 'YOUR_API_KEY',
-    siteId: 'YOUR_SITE_ID'
-});
+const SITE_ID = 'yourcompany.com';
+const wallet = new LemmaWallet({ debug: true });
 
-// Check if user has access
-const hasAccess = await lemmaIAM.verifyAccess(
-    '/admin/users', 
-    'read'
-);
-
-if (hasAccess) {
-    // Show protected content
-} else {
-    // Redirect to access request
+async function init() {
+    await wallet.init();
+    
+    if (wallet.isAuthenticated()) {
+        const cred = await wallet.getCredential('permission', SITE_ID);
+        if (cred) {
+            showApp(); // User is authenticated!
+            return;
+        }
+    }
+    showSignInButton();
 }
+
+async function signIn() {
+    const info = await wallet.getWalletInfo();
+    info.hasPasskey ? await wallet.unlock() : await wallet.registerPasskey();
+    
+    const secret = await wallet.getWalletSecret();
+    const res = await fetch('https://lemma.id/api/wallet-auth/issue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ site_id: SITE_ID, wallet_secret: secret })
+    });
+    const data = await res.json();
+    if (data.success) {
+        await wallet.storeCredential(data.permission_lemma);
+        location.reload();
+    }
+}
+
+init();
 &lt;/script&gt;</pre>
                 </div>
                 
@@ -272,16 +293,16 @@ if (hasAccess) {
             <section id="how-it-works" class="docs-section">
                 <h2>How It Works</h2>
                 
-                <h3>Architecture Overview</h3>
+                <h3>Wallet-First Architecture</h3>
                 <div style="background: var(--gray-50); padding: 24px; border-radius: 12px; margin: 24px 0;">
                     <ol style="line-height: 2;">
-                        <li><strong>User requests access</strong> → Enters email on your site</li>
-                        <li><strong>Email confirmation</strong> → Lemma sends confirmation email</li>
+                        <li><strong>User clicks "Sign In"</strong> → Passkey prompt (Touch ID, Face ID, etc.)</li>
+                        <li><strong>Wallet created/unlocked</strong> → Local passkey verification (no server call)</li>
+                        <li><strong>Permission requested</strong> → Your site requests credential from Lemma</li>
                         <li><strong>Permission lemma issued</strong> → Ed25519-signed credential</li>
-                        <li><strong>Stored in browser wallet</strong> → AES-256-GCM encrypted</li>
-                        <li><strong>Verification (client-side)</strong> → Sub-millisecond via WebCrypto API (no server calls)</li>
-                        <li><strong>Background checks</strong> → Continuous nonce verification</li>
-                        <li><strong>Revocation (if needed)</strong> → OPRF + Bloom filter</li>
+                        <li><strong>Stored in browser wallet</strong> → Encrypted in IndexedDB</li>
+                        <li><strong>Verification (client-side)</strong> → Sub-millisecond via WebCrypto API</li>
+                        <li><strong>User stays signed in</strong> → Credential persists until expiry/revocation</li>
                     </ol>
                 </div>
                 
@@ -290,19 +311,24 @@ if (hasAccess) {
                     <div class="code-header">
                         <span>Sequence Diagram</span>
                     </div>
-<pre>User → Your Site: "Login with email"
-Your Site → Lemma API: POST /api/v1/iam/request-access
-Lemma → User Email: Confirmation link
-User → Lemma: Click confirmation
-Lemma → User Browser: Permission lemma (Ed25519 signed)
-User Browser → Local Storage: Store encrypted credential
-User → Your Site: Return with credential
-Your Site → Client (local, no server call): Verify Ed25519 signature via WebCrypto API
-Client → Your Site: ✅ Access granted
+<pre>User → Your Site: Click "Sign In"
+Browser → User: Passkey prompt (biometric)
+User → Browser: Authenticate with passkey
+Browser → Wallet: Unlock wallet locally
+Your Site → Lemma API: POST /api/wallet-auth/issue
+Lemma → Your Site: Permission lemma (Ed25519 signed)
+Your Site → Wallet: Store credential
+User → Your Site: Access granted ✅
 
-Every 5 minutes (background):
-Your Site → Lemma API: Verify with fresh nonce
-Lemma → Your Site: ✅ Still valid (or ❌ revoked)</pre>
+Return visits:
+Browser → User: Passkey prompt (if needed)
+Wallet → Your Site: Present stored credential
+Your Site → Client: Verify signature locally (~30µs)
+User → Your Site: Access granted ✅</pre>
+                </div>
+                
+                <div style="background: #ecfdf5; border: 1px solid #a7f3d0; padding: 16px; border-radius: 8px; margin-top: 16px;">
+                    <p style="margin: 0; color: #065f46;"><strong>🔐 No passwords, no email verification</strong> - Passkey (biometric) is the only authentication factor needed.</p>
                 </div>
             </section>
 
@@ -375,36 +401,48 @@ Lemma → Your Site: ✅ Still valid (or ❌ revoked)</pre>
             </section>
 
             <section id="api-users" class="docs-section">
-                <h2>API Reference - User Access</h2>
+                <h2>API Reference - Wallet Authentication</h2>
                 
                 <div class="api-endpoint">
                     <div>
                         <span class="http-method http-post">POST</span>
-                        <code>/api/v1/iam/request-access</code>
+                        <code>/api/wallet-auth/issue</code>
                     </div>
-                    <p style="margin: 12px 0 0 0; color: var(--gray-600);">User requests access (sends email confirmation)</p>
+                    <p style="margin: 12px 0 0 0; color: var(--gray-600);">Issue permission credential to user's wallet (primary method)</p>
                 </div>
                 
                 <h4>Request Body:</h4>
                 <div class="code-block">
 <pre>{
-  "site_id": "site_abc123",
-  "user_email": "user@example.com",
-  "permission_level": "admin",
-  "redirect_url": "https://yourcompany.com/dashboard"
+  "site_id": "yourcompany.com",
+  "wallet_secret": "64-char-hex-string"
+}</pre>
+                </div>
+                
+                <h4>Response:</h4>
+                <div class="code-block">
+<pre>{
+  "success": true,
+  "ppid": "did:lemma:ppid_abc123...",
+  "site_id": "yourcompany.com",
+  "permission_lemma": { /* Ed25519-signed credential */ }
 }</pre>
                 </div>
                 
                 <h4>Flow:</h4>
                 <ol style="margin-left: 20px; line-height: 1.8; color: var(--gray-700);">
-                    <li>User enters email on your site</li>
-                    <li>Your site calls this API</li>
-                    <li>Lemma sends confirmation email to user</li>
-                    <li>User clicks link</li>
-                    <li>Permission lemma issued to user's browser</li>
-                    <li>User redirected back to your site</li>
-                    <li>Verification happens automatically</li>
+                    <li>User clicks "Sign In" on your site</li>
+                    <li>Browser prompts for passkey (biometric)</li>
+                    <li>Wallet unlocked locally</li>
+                    <li>Your site calls this API with wallet_secret</li>
+                    <li>Lemma returns signed permission credential</li>
+                    <li>Credential stored in user's wallet</li>
+                    <li>User is authenticated!</li>
                 </ol>
+                
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 16px; border-radius: 8px; margin-top: 16px;">
+                    <p style="margin: 0; color: #1e40af;"><strong>💡 Note:</strong> The <code>wallet_secret</code> is generated client-side when the user registers their passkey. It's used to derive a unique PPID (identifier) for your site.</p>
+                </div>
             </section>
 
             <section id="api-verification" class="docs-section">
