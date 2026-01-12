@@ -2,11 +2,10 @@
 Migration 011: Data migration from JSON columns to normalized tables
 
 This script:
-1. Reads customers.sites JSON and inserts into sites table
-2. Reads customers.api_keys JSON and inserts into api_keys table
-3. Links sites to customers via customer_id foreign key
-
-Run this AFTER running the SQL migration (011_consolidate_storage.sql)
+1. Adds customer_id column to sites table
+2. Creates api_keys table
+3. Reads customers.sites JSON and inserts into sites table
+4. Reads customers.api_keys JSON and inserts into api_keys table
 """
 
 import os
@@ -37,12 +36,116 @@ def get_db_connection():
     return psycopg2.connect(database_url, sslmode='require')
 
 
+def run_schema_migration(conn):
+    """Run the schema changes"""
+    cursor = conn.cursor()
+    
+    # Step 1: Add customer_id column to sites table
+    try:
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'sites' AND column_name = 'customer_id'")
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE sites ADD COLUMN customer_id VARCHAR(50)")
+            logger.info("✅ Added customer_id column to sites table")
+        else:
+            logger.info("✅ customer_id column already exists")
+    except Exception as e:
+        logger.warning(f"Could not add customer_id: {e}")
+        conn.rollback()
+    
+    conn.commit()
+    
+    # Step 2: Add environment column
+    try:
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'sites' AND column_name = 'environment'")
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE sites ADD COLUMN environment VARCHAR(20) DEFAULT 'production'")
+            logger.info("✅ Added environment column to sites table")
+        else:
+            logger.info("✅ environment column already exists")
+    except Exception as e:
+        logger.warning(f"Could not add environment: {e}")
+        conn.rollback()
+    
+    conn.commit()
+    
+    # Step 3: Add site_label column
+    try:
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'sites' AND column_name = 'site_label'")
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE sites ADD COLUMN site_label VARCHAR(255)")
+            logger.info("✅ Added site_label column to sites table")
+        else:
+            logger.info("✅ site_label column already exists")
+    except Exception as e:
+        logger.warning(f"Could not add site_label: {e}")
+        conn.rollback()
+    
+    conn.commit()
+    
+    # Step 4: Make columns nullable
+    for col in ['api_key', 'oauth_client_id', 'company_name']:
+        try:
+            cursor.execute(f"ALTER TABLE sites ALTER COLUMN {col} DROP NOT NULL")
+            logger.info(f"✅ Made {col} nullable")
+        except Exception as e:
+            logger.debug(f"Could not alter {col}: {e}")
+            conn.rollback()
+    
+    conn.commit()
+    
+    # Step 5: Create api_keys table
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS api_keys (
+                id SERIAL PRIMARY KEY,
+                customer_id VARCHAR(50) NOT NULL,
+                site_id VARCHAR(50) NOT NULL,
+                key_hash VARCHAR(64) NOT NULL UNIQUE,
+                key_hint VARCHAR(8) NOT NULL,
+                name VARCHAR(255) DEFAULT 'API Key',
+                status VARCHAR(20) DEFAULT 'active',
+                environment VARCHAR(20) DEFAULT 'production',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_used TIMESTAMP,
+                usage_count INTEGER DEFAULT 0,
+                revoked_at TIMESTAMP
+            )
+        """)
+        logger.info("✅ Created api_keys table")
+    except Exception as e:
+        logger.warning(f"Could not create api_keys table: {e}")
+        conn.rollback()
+    
+    conn.commit()
+    
+    # Step 6: Add indexes
+    indexes = [
+        ("idx_sites_customer_id", "sites", "customer_id"),
+        ("idx_sites_environment", "sites", "environment"),
+        ("idx_api_keys_customer", "api_keys", "customer_id"),
+        ("idx_api_keys_site", "api_keys", "site_id"),
+        ("idx_api_keys_status", "api_keys", "status"),
+    ]
+    
+    for idx_name, table, column in indexes:
+        try:
+            cursor.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table}({column})")
+            logger.info(f"✅ Created index {idx_name}")
+        except Exception as e:
+            logger.debug(f"Could not create index {idx_name}: {e}")
+            conn.rollback()
+    
+    conn.commit()
+    cursor.close()
+    logger.info("✅ Schema migration complete")
+
+
 def migrate_sites(conn):
     """Migrate sites from customers.sites JSON to sites table"""
     cursor = conn.cursor()
     
     # Get all customers with sites
-    cursor.execute("SELECT customer_id, sites FROM customers WHERE sites IS NOT NULL AND sites != '[]'")
+    cursor.execute("SELECT customer_id, sites FROM customers WHERE sites IS NOT NULL AND sites::text != '[]'")
     customers = cursor.fetchall()
     
     migrated = 0
@@ -75,7 +178,7 @@ def migrate_sites(conn):
                         INSERT INTO sites (
                             site_id, site_domain, company_name, admin_email, customer_id,
                             environment, site_label, status, created_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'active', NOW())
                         ON CONFLICT (site_id) DO UPDATE SET customer_id = EXCLUDED.customer_id
                     """, (
                         site_id,
@@ -84,17 +187,17 @@ def migrate_sites(conn):
                         site_entry.get('admin_email') or site_entry.get('contact_email') or '',
                         customer_id,
                         site_entry.get('environment') or 'production',
-                        site_entry.get('label') or site_entry.get('site_label') or '',
-                        'active',
-                        site_entry.get('created_at') or datetime.utcnow()
+                        site_entry.get('label') or site_entry.get('site_label') or ''
                     ))
                     migrated += 1
                     logger.info(f"Migrated site {site_id} ({site_domain}) for customer {customer_id}")
                 except Exception as e:
                     logger.error(f"Failed to migrate site {site_id}: {e}")
+                    conn.rollback()
                     skipped += 1
     
     conn.commit()
+    cursor.close()
     logger.info(f"Sites migration complete: {migrated} migrated, {skipped} skipped")
     return migrated, skipped
 
@@ -104,7 +207,7 @@ def migrate_api_keys(conn):
     cursor = conn.cursor()
     
     # Get all customers with api_keys
-    cursor.execute("SELECT customer_id, api_keys FROM customers WHERE api_keys IS NOT NULL AND api_keys != '[]'")
+    cursor.execute("SELECT customer_id, api_keys FROM customers WHERE api_keys IS NOT NULL AND api_keys::text != '[]'")
     customers = cursor.fetchall()
     
     migrated = 0
@@ -165,9 +268,11 @@ def migrate_api_keys(conn):
                 logger.info(f"Migrated API key for site {site_id} (customer {customer_id})")
             except Exception as e:
                 logger.error(f"Failed to migrate API key for site {site_id}: {e}")
+                conn.rollback()
                 skipped += 1
     
     conn.commit()
+    cursor.close()
     logger.info(f"API keys migration complete: {migrated} migrated, {skipped} skipped")
     return migrated, skipped
 
@@ -185,11 +290,13 @@ def verify_migration(conn):
     total_api_keys = cursor.fetchone()[0]
     
     # Count customers with JSON data
-    cursor.execute("SELECT COUNT(*) FROM customers WHERE sites IS NOT NULL AND sites != '[]'")
+    cursor.execute("SELECT COUNT(*) FROM customers WHERE sites IS NOT NULL AND sites::text != '[]'")
     customers_with_sites = cursor.fetchone()[0]
     
-    cursor.execute("SELECT COUNT(*) FROM customers WHERE api_keys IS NOT NULL AND api_keys != '[]'")
+    cursor.execute("SELECT COUNT(*) FROM customers WHERE api_keys IS NOT NULL AND api_keys::text != '[]'")
     customers_with_keys = cursor.fetchone()[0]
+    
+    cursor.close()
     
     logger.info("=" * 50)
     logger.info("Migration Verification:")
@@ -213,28 +320,10 @@ def run_migration():
     
     try:
         conn = get_db_connection()
-        conn.autocommit = True  # Allow DDL statements to work independently
         
-        # First run the SQL migration
-        logger.info("Running SQL schema migration...")
-        with open('migrations/011_consolidate_storage.sql', 'r') as f:
-            sql = f.read()
-        
-        cursor = conn.cursor()
-        # Execute each statement separately (PostgreSQL doesn't like multiple in one execute)
-        for statement in sql.split(';'):
-            statement = statement.strip()
-            if statement and not statement.startswith('--'):
-                try:
-                    cursor.execute(statement)
-                    logger.info(f"✅ SQL executed: {statement[:60]}...")
-                except Exception as e:
-                    logger.warning(f"SQL statement failed (may already be applied): {e}")
-        cursor.close()
-        logger.info("SQL schema migration complete")
-        
-        # Turn off autocommit for data migration
-        conn.autocommit = False
+        # Run schema migration first
+        logger.info("Running schema migration...")
+        run_schema_migration(conn)
         
         # Migrate sites data
         logger.info("Migrating sites...")
