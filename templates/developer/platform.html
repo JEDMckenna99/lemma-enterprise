@@ -1559,8 +1559,12 @@
             });
         });
         
+        // Store available sites globally
+        window.availableSites = [];
+        window.selectedUsersSiteId = null;
+        
         // Load users data (shows users for the caller's site)
-        async function loadUsersData() {
+        async function loadUsersData(specificSiteId = null) {
             try {
                 console.log('👥 Fetching users for your site...');
                 
@@ -1574,12 +1578,13 @@
                     console.warn('Could not parse credential');
                 }
                 
-                // POST request with user credential to determine site
+                // POST request with user credential and optional specific site
                 const response = await fetch('/api/platform/users', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        user_credential: userCredential
+                        user_credential: userCredential,
+                        site_id: specificSiteId || window.selectedUsersSiteId
                     })
                 });
                 const data = await response.json();
@@ -1587,10 +1592,30 @@
                 // Store current site context
                 window.currentSiteId = data.site_id;
                 window.currentSiteDomain = data.site_domain;
+                window.availableSites = data.available_sites || [];
+                window.selectedUsersSiteId = data.site_id;
+                
+                // Build site selector if multiple sites
+                let siteSelectorHtml = '';
+                if (window.availableSites.length > 1) {
+                    siteSelectorHtml = `
+                        <div style="margin-bottom: 16px;">
+                            <label style="font-size: 13px; color: #374151; margin-right: 8px;">Select Site:</label>
+                            <select id="users-site-selector" onchange="switchUsersSite(this.value)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                                ${window.availableSites.map(site => `
+                                    <option value="${site.site_id}" ${site.site_id === data.site_id ? 'selected' : ''}>
+                                        ${site.site_domain} ${site.company_name ? `(${site.company_name})` : ''}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                    `;
+                }
                 
                 // Show site context header
                 const siteContext = data.site_domain ? 
-                    `<div style="margin-bottom: 16px; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+                    `${siteSelectorHtml}
+                    <div style="margin-bottom: 16px; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
                         <span style="font-size: 13px; color: #166534;">
                             Showing users for: <strong>${data.site_domain}</strong>
                             ${data.is_lemma_admin ? ' (Admin view)' : ''}
@@ -1674,6 +1699,13 @@
                     </div>
                 `;
             }
+        }
+        
+        // Switch to a different site for users view
+        async function switchUsersSite(siteId) {
+            window.selectedUsersSiteId = siteId;
+            console.log('📊 Switching to site:', siteId);
+            await loadUsersData(siteId);
         }
         
         // Load API keys data

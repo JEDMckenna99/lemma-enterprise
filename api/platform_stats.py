@@ -225,11 +225,11 @@ def get_platform_users():
     Get all users with permissions for the caller's site
     
     - Lemma.id admins see lemma_platform users
-    - Site owners see their own site's users
-    - Looks up site ownership via admin_email
+    - Site owners see their own site's users (looked up via customer_id from API keys)
     
     POST body (optional):
     {
+        "site_id": "specific_site_id",  // Optional: specific site to query
         "user_credential": {...}  // Caller's credential to determine their site
     }
     
@@ -237,21 +237,26 @@ def get_platform_users():
         {
             "users": [...],
             "site_id": "the_site_id",
-            "site_domain": "the domain"
+            "site_domain": "the domain",
+            "available_sites": [...]  // List of sites the caller can view
         }
     """
     conn = None
     cursor = None
     try:
         # Determine which site's users to show
-        site_id = 'lemma_platform'  # Default for admins
-        site_domain = 'lemma.id'
+        site_id = None
+        site_domain = None
         user_email = None
+        customer_id = None
         is_lemma_admin = False
+        available_sites = []
         
-        # Get caller's credential to determine their site
+        # Get caller's credential and requested site
+        requested_site_id = None
         if request.method == 'POST':
             data = request.get_json() or {}
+            requested_site_id = data.get('site_id')  # Specific site requested
             user_credential = data.get('user_credential')
             if user_credential:
                 claims = user_credential.get('claims') or user_credential.get('credentialSubject') or {}
@@ -262,59 +267,100 @@ def get_platform_users():
                 admin_permissions = ['admin_access', 'super_admin', 'site_admin', 'admin']
                 is_lemma_admin = permission_id in admin_permissions
         else:
-            # GET request - try to get email from query param
+            # GET request - try to get from query params
             user_email = request.args.get('email')
+            requested_site_id = request.args.get('site_id')
         
-        # If not a lemma.id admin, look up their site(s)
-        if user_email and not is_lemma_admin:
+        # Try to get customer_id from session (set during login)
+        from flask import session as flask_session
+        customer_id = flask_session.get('customer_id')
+        
+        # If lemma.id admin and no specific site requested, show lemma.id users
+        if is_lemma_admin and not requested_site_id:
+            site_id = 'lemma_platform'
+            site_domain = 'lemma.id'
+            logger.info(f"📊 Admin view - showing lemma.id users")
+        else:
+            # Look up sites the caller owns (via API keys / customer_id)
             try:
-                # Look up sites where this user is the admin
                 site_conn = get_db_connection()
                 site_cursor = site_conn.cursor()
                 
-                # Check sites table for admin_email match
-                site_cursor.execute("""
-                    SELECT site_id, site_domain, company_name 
-                    FROM sites 
-                    WHERE admin_email = %s
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                """, (user_email,))
-                
-                site_result = site_cursor.fetchone()
-                
-                if site_result:
-                    site_id = site_result[0]
-                    site_domain = site_result[1]
-                    logger.info(f"📊 Showing users for site {site_id} (owner: {user_email})")
-                else:
-                    # Also check site_admins table
+                # First, try to find sites via customer_id (from API keys table)
+                if customer_id:
                     site_cursor.execute("""
-                        SELECT site_id 
-                        FROM site_admins 
-                        WHERE admin_email = %s AND is_active = TRUE
-                        ORDER BY added_at DESC
-                        LIMIT 1
+                        SELECT DISTINCT s.site_id, s.site_domain, s.company_name
+                        FROM sites s
+                        JOIN api_keys ak ON s.site_id = ak.site_id
+                        WHERE ak.customer_id = %s AND ak.status = 'active'
+                        ORDER BY s.created_at DESC
+                    """, (customer_id,))
+                    
+                    site_results = site_cursor.fetchall()
+                    for row in site_results:
+                        available_sites.append({
+                            'site_id': row[0],
+                            'site_domain': row[1],
+                            'company_name': row[2]
+                        })
+                    
+                    logger.info(f"📊 Found {len(available_sites)} sites for customer {customer_id}")
+                
+                # Fallback: look up by admin_email
+                if not available_sites and user_email:
+                    site_cursor.execute("""
+                        SELECT site_id, site_domain, company_name 
+                        FROM sites 
+                        WHERE admin_email = %s
+                        ORDER BY created_at DESC
                     """, (user_email,))
                     
-                    admin_result = site_cursor.fetchone()
-                    if admin_result:
-                        site_id = admin_result[0]
-                        # Get site domain
-                        site_cursor.execute("SELECT site_domain FROM sites WHERE site_id = %s", (site_id,))
-                        domain_result = site_cursor.fetchone()
-                        if domain_result:
-                            site_domain = domain_result[0]
-                        logger.info(f"📊 Showing users for site {site_id} (admin: {user_email})")
-                    else:
-                        logger.info(f"📊 No site found for {user_email}, showing empty list")
-                        site_id = None  # No site, will return empty list
+                    for row in site_cursor.fetchall():
+                        available_sites.append({
+                            'site_id': row[0],
+                            'site_domain': row[1],
+                            'company_name': row[2]
+                        })
+                    
+                    # Also check site_admins table
+                    site_cursor.execute("""
+                        SELECT s.site_id, s.site_domain, s.company_name
+                        FROM site_admins sa
+                        JOIN sites s ON sa.site_id = s.site_id
+                        WHERE sa.admin_email = %s AND sa.is_active = TRUE
+                    """, (user_email,))
+                    
+                    for row in site_cursor.fetchall():
+                        if not any(s['site_id'] == row[0] for s in available_sites):
+                            available_sites.append({
+                                'site_id': row[0],
+                                'site_domain': row[1],
+                                'company_name': row[2]
+                            })
                 
                 site_cursor.close()
                 site_conn.close()
                 
+                # If specific site requested, validate and use it
+                if requested_site_id:
+                    matching_site = next((s for s in available_sites if s['site_id'] == requested_site_id), None)
+                    if matching_site or is_lemma_admin:
+                        site_id = requested_site_id
+                        site_domain = matching_site['site_domain'] if matching_site else requested_site_id
+                    else:
+                        logger.warning(f"⚠️ Requested site {requested_site_id} not in available sites")
+                
+                # Use first available site if no specific request
+                if not site_id and available_sites:
+                    site_id = available_sites[0]['site_id']
+                    site_domain = available_sites[0]['site_domain']
+                    logger.info(f"📊 Using first available site: {site_domain}")
+                
+                if not site_id:
+                    logger.info(f"📊 No sites found for caller, showing empty list")
+                
             except Exception as e:
-                logger.warning(f"⚠️ Could not look up site for {user_email}: {e}")
+                logger.warning(f"⚠️ Could not look up sites: {e}")
         
         # Get users for the determined site
         if not site_id:
@@ -324,6 +370,7 @@ def get_platform_users():
                 'total': 0,
                 'site_id': None,
                 'site_domain': None,
+                'available_sites': [],
                 'message': 'No site registered. Register a site to see your users.'
             })
         
@@ -385,7 +432,8 @@ def get_platform_users():
             'total': len(users),
             'site_id': site_id,
             'site_domain': site_domain,
-            'is_lemma_admin': is_lemma_admin
+            'is_lemma_admin': is_lemma_admin,
+            'available_sites': available_sites
         })
         
     except Exception as e:
