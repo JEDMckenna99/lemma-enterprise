@@ -132,6 +132,84 @@
             </button>
         </div>
     </div>
+    
+    <!-- Issue Permission to Developer Site -->
+    <div class="card" style="margin-top: var(--space-8);">
+        <h2 class="card-title">🎫 Issue Permission to Developer Site</h2>
+        <p style="color: var(--gray-600); margin-bottom: var(--space-4);">
+            Issue a permission credential directly to a user's wallet for any registered site.
+            The credential will be stored in their central Lemma wallet.
+        </p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+            <!-- Left: Form -->
+            <div>
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--gray-700);">
+                        Target Site
+                    </label>
+                    <select id="issue-site-id" style="width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 14px;">
+                        <option value="">Select a registered site...</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--gray-700);">
+                        User Email
+                    </label>
+                    <input type="email" id="issue-user-email" placeholder="user@example.com" 
+                           style="width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 14px;">
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--gray-700);">
+                        Permission Level
+                    </label>
+                    <select id="issue-permission-level" style="width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 14px;">
+                        <option value="user">User (Basic Access)</option>
+                        <option value="editor">Editor (Read/Write)</option>
+                        <option value="admin">Admin (Full Access)</option>
+                        <option value="custom">Custom...</option>
+                    </select>
+                </div>
+                
+                <div id="custom-permission-field" style="margin-bottom: var(--space-4); display: none;">
+                    <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--gray-700);">
+                        Custom Permission ID
+                    </label>
+                    <input type="text" id="issue-custom-permission" placeholder="e.g., beta_tester, premium_user" 
+                           style="width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 14px;">
+                </div>
+                
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--gray-700);">
+                        Expiry (Days)
+                    </label>
+                    <input type="number" id="issue-expiry-days" value="90" min="1" max="365"
+                           style="width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 14px;">
+                </div>
+                
+                <div style="display: flex; gap: var(--space-2);">
+                    <button class="btn btn-primary" onclick="issuePermissionToSite()" style="flex: 1;">
+                        🎫 Issue Permission
+                    </button>
+                    <button class="btn btn-secondary" onclick="previewPermission()" style="flex: 1;">
+                        👁️ Preview
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Right: Preview/Result -->
+            <div>
+                <div id="issue-permission-result" style="background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; padding: 16px; min-height: 300px;">
+                    <div style="text-align: center; color: var(--gray-500); padding: 40px;">
+                        <div style="font-size: 48px; margin-bottom: 12px;">🎫</div>
+                        <div>Fill out the form and click "Issue Permission" to create a credential</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -572,6 +650,181 @@ async function refreshCustomers() {
 async function refreshSites() {
     await loadSites();
 }
+
+// ============================================
+// ISSUE PERMISSION TO DEVELOPER SITE
+// ============================================
+
+// Show/hide custom permission field
+document.getElementById('issue-permission-level')?.addEventListener('change', function() {
+    const customField = document.getElementById('custom-permission-field');
+    if (this.value === 'custom') {
+        customField.style.display = 'block';
+    } else {
+        customField.style.display = 'none';
+    }
+});
+
+// Populate sites dropdown
+async function populateSitesDropdown() {
+    try {
+        const response = await fetch('/api/admin/sites');
+        const data = await response.json();
+        
+        if (data.success && data.sites) {
+            const select = document.getElementById('issue-site-id');
+            data.sites.forEach(site => {
+                const option = document.createElement('option');
+                option.value = site.site_id || site.site_domain;
+                option.textContent = `${site.site_domain} (${site.company_name || 'Unknown'})`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load sites:', error);
+    }
+}
+
+// Preview permission before issuing
+function previewPermission() {
+    const siteId = document.getElementById('issue-site-id').value;
+    const email = document.getElementById('issue-user-email').value;
+    const permissionLevel = document.getElementById('issue-permission-level').value;
+    const customPermission = document.getElementById('issue-custom-permission').value;
+    const expiryDays = document.getElementById('issue-expiry-days').value;
+    
+    const permission = permissionLevel === 'custom' ? customPermission : permissionLevel;
+    
+    const resultDiv = document.getElementById('issue-permission-result');
+    
+    if (!siteId || !email) {
+        resultDiv.innerHTML = `
+            <div style="padding: 20px; text-align: center; color: var(--error);">
+                <div style="font-size: 24px; margin-bottom: 8px;">⚠️</div>
+                Please select a site and enter a user email
+            </div>
+        `;
+        return;
+    }
+    
+    resultDiv.innerHTML = `
+        <div style="padding: 16px;">
+            <h4 style="margin: 0 0 16px 0; color: var(--gray-900);">📋 Permission Preview</h4>
+            <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px;">
+                <div style="margin-bottom: 8px;"><strong>Site:</strong> ${siteId}</div>
+                <div style="margin-bottom: 8px;"><strong>User Email:</strong> ${email}</div>
+                <div style="margin-bottom: 8px;"><strong>Permission:</strong> ${permission}</div>
+                <div style="margin-bottom: 8px;"><strong>Expiry:</strong> ${expiryDays} days</div>
+                <div style="margin-bottom: 8px;"><strong>Issued By:</strong> Platform Admin</div>
+            </div>
+            <div style="margin-top: 16px; padding: 12px; background: #fef3c7; border-radius: 6px; font-size: 13px; color: #92400e;">
+                <strong>⚠️ Note:</strong> This will create a signed credential and store it in the user's central wallet.
+                The user will see this permission at lemma.id/wallet.
+            </div>
+        </div>
+    `;
+}
+
+// Issue permission to a developer site
+async function issuePermissionToSite() {
+    const siteId = document.getElementById('issue-site-id').value;
+    const email = document.getElementById('issue-user-email').value;
+    const permissionLevel = document.getElementById('issue-permission-level').value;
+    const customPermission = document.getElementById('issue-custom-permission').value;
+    const expiryDays = parseInt(document.getElementById('issue-expiry-days').value);
+    
+    const permission = permissionLevel === 'custom' ? customPermission : permissionLevel;
+    
+    const resultDiv = document.getElementById('issue-permission-result');
+    
+    if (!siteId || !email || !permission) {
+        resultDiv.innerHTML = `
+            <div style="padding: 20px; text-align: center; color: var(--error);">
+                <div style="font-size: 24px; margin-bottom: 8px;">❌</div>
+                Please fill in all required fields
+            </div>
+        `;
+        return;
+    }
+    
+    // Show loading
+    resultDiv.innerHTML = `
+        <div style="padding: 40px; text-align: center;">
+            <div style="font-size: 32px; margin-bottom: 12px; animation: pulse 1s infinite;">🔄</div>
+            <div style="color: var(--gray-600);">Issuing permission credential...</div>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch('/api/platform/issue-site-permission', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                site_id: siteId,
+                user_email: email,
+                permission_level: permission,
+                expiry_days: expiryDays
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            resultDiv.innerHTML = `
+                <div style="padding: 16px;">
+                    <div style="text-align: center; margin-bottom: 16px;">
+                        <div style="font-size: 48px; margin-bottom: 8px;">✅</div>
+                        <div style="font-size: 18px; font-weight: 600; color: var(--success);">Permission Issued!</div>
+                    </div>
+                    <div style="background: var(--white); border: 1px solid var(--success); border-radius: 6px; padding: 12px; font-size: 13px;">
+                        <div style="margin-bottom: 8px;"><strong>Credential ID:</strong> ${result.credential_id || 'Generated'}</div>
+                        <div style="margin-bottom: 8px;"><strong>Site:</strong> ${siteId}</div>
+                        <div style="margin-bottom: 8px;"><strong>User:</strong> ${email}</div>
+                        <div style="margin-bottom: 8px;"><strong>Permission:</strong> ${permission}</div>
+                        <div style="margin-bottom: 8px;"><strong>Issue Time:</strong> ${result.issue_time_us ? result.issue_time_us.toFixed(2) + 'µs' : 'Fast'}</div>
+                    </div>
+                    ${result.stored_in_wallet ? `
+                        <div style="margin-top: 12px; padding: 12px; background: #ecfdf5; border-radius: 6px; font-size: 13px; color: #065f46;">
+                            ✅ <strong>Stored in central wallet</strong> - User can view at lemma.id/wallet
+                        </div>
+                    ` : `
+                        <div style="margin-top: 12px; padding: 12px; background: #fef3c7; border-radius: 6px; font-size: 13px; color: #92400e;">
+                            📧 <strong>Email sent</strong> - User will receive credential via email confirmation
+                        </div>
+                    `}
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div style="padding: 20px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 8px;">❌</div>
+                    <div style="color: var(--error); font-weight: 500; margin-bottom: 8px;">Failed to Issue Permission</div>
+                    <div style="color: var(--gray-600); font-size: 13px;">${result.error || 'Unknown error'}</div>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('Failed to issue permission:', error);
+        resultDiv.innerHTML = `
+            <div style="padding: 20px; text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 8px;">❌</div>
+                <div style="color: var(--error); font-weight: 500; margin-bottom: 8px;">Request Failed</div>
+                <div style="color: var(--gray-600); font-size: 13px;">${error.message}</div>
+            </div>
+        `;
+    }
+}
+
+// Initialize on page load - add to existing init
+document.addEventListener('DOMContentLoaded', function() {
+    // Populate sites dropdown if element exists
+    if (document.getElementById('issue-site-id')) {
+        populateSitesDropdown();
+    }
+});
 </script>
 {% endblock %}
 

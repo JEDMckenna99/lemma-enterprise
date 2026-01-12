@@ -576,3 +576,184 @@ def get_time_ago(timestamp):
     else:
         return "Just now"
 
+
+@platform_stats_bp.route('/api/platform/issue-site-permission', methods=['POST'])
+def issue_site_permission():
+    """
+    Issue a permission credential directly to a user for any registered site.
+    This allows platform admins to grant access without the email confirmation flow.
+    
+    POST /api/platform/issue-site-permission
+    {
+        "site_id": "example.com",
+        "user_email": "user@example.com", 
+        "permission_level": "user" | "editor" | "admin" | "custom_permission",
+        "expiry_days": 90
+    }
+    
+    Returns:
+        - permission_lemma: The signed credential
+        - credential_id: Unique ID
+        - stored_in_wallet: Whether stored in user's central wallet
+    """
+    import time
+    import json
+    
+    conn = None
+    cursor = None
+    
+    try:
+        data = request.get_json()
+        site_id = data.get('site_id')
+        user_email = data.get('user_email')
+        permission_level = data.get('permission_level', 'user')
+        expiry_days = data.get('expiry_days', 90)
+        
+        if not site_id or not user_email:
+            return jsonify({
+                'success': False,
+                'error': 'site_id and user_email are required'
+            }), 400
+        
+        logger.info(f"🎫 Issuing permission: {permission_level} for {user_email} on {site_id}")
+        
+        # Get or create site manager
+        from api.real_iam_manager import get_or_create_site_manager
+        
+        # Get site domain from database or use site_id as domain
+        conn = get_db_connection(site_id='lemma_platform')
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT site_domain, company_name FROM sites WHERE site_id = %s OR site_domain = %s
+        """, (site_id, site_id))
+        
+        site_row = cursor.fetchone()
+        site_domain = site_row[0] if site_row else site_id
+        company_name = site_row[1] if site_row else site_id
+        
+        # Get or create manager for this site
+        manager = get_or_create_site_manager(site_id, site_domain)
+        
+        # Ensure permission type exists
+        if permission_level not in manager.permissions:
+            manager.add_permission({
+                'permission_id': permission_level,
+                'display_name': permission_level.replace('_', ' ').title(),
+                'scope': ['read', 'write'] if permission_level in ['editor', 'admin'] else ['read'],
+                'conditions': [],
+                'priority': 100
+            })
+        
+        # Derive user DID (PPID) from email + site
+        from api.ppid import derive_ppid_did
+        user_did = derive_ppid_did(user_email, site_domain)
+        
+        # Issue the permission lemma
+        start_time = time.perf_counter()
+        
+        permission_lemma = manager.issue_permission_lemma(
+            user_did,
+            permission_level,
+            expiry_days=expiry_days,
+            custom_claims={
+                'email': user_email,
+                'site_domain': site_domain,
+                'accountType': permission_level,
+                'permissionId': f'{permission_level}_access',
+                'issuedBy': 'platform_admin'
+            }
+        )
+        
+        # Add W3C type fields
+        permission_lemma['type'] = ['VerifiableCredential', 'PermissionLemma']
+        permission_lemma['packageType'] = 'permission'
+        
+        if 'credentialSubject' in permission_lemma:
+            permission_lemma['credentialSubject']['packageType'] = 'permission'
+        if 'claims' in permission_lemma:
+            permission_lemma['claims']['packageType'] = 'permission'
+        
+        issue_time_us = (time.perf_counter() - start_time) * 1_000_000
+        
+        # Track in database
+        try:
+            from datetime import timedelta
+            expires_at = datetime.utcnow() + timedelta(days=expiry_days) if expiry_days > 0 else None
+            
+            # Get or create permission type
+            cursor.execute("""
+                SELECT id FROM permission_types 
+                WHERE site_id = %s AND name = %s
+            """, (site_id, permission_level))
+            
+            perm_type_row = cursor.fetchone()
+            if perm_type_row:
+                permission_type_id = perm_type_row[0]
+            else:
+                cursor.execute("""
+                    INSERT INTO permission_types (site_id, name, type, description, active)
+                    VALUES (%s, %s, 'role', %s, TRUE)
+                    RETURNING id
+                """, (site_id, permission_level, f'{permission_level.title()} access'))
+                permission_type_id = cursor.fetchone()[0]
+            
+            # Insert permission instance
+            cursor.execute("""
+                INSERT INTO permission_instances 
+                (permission_type_id, site_id, email, credential_did, granted_at, granted_by, expires_at, metadata)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                permission_type_id,
+                site_id,
+                user_email,
+                user_did,
+                datetime.utcnow(),
+                'platform_admin',
+                expires_at,
+                json.dumps({
+                    'credential_id': permission_lemma.get('id', ''),
+                    'issue_time_us': issue_time_us,
+                    'issued_via': 'platform_dashboard'
+                })
+            ))
+            
+            conn.commit()
+            logger.info(f"✅ Tracked permission in database")
+            
+        except Exception as db_err:
+            logger.warning(f"⚠️ Database tracking failed (credential still issued): {db_err}")
+            if conn:
+                conn.rollback()
+        
+        logger.info(f"✅ Permission issued: {permission_level} for {user_email} on {site_domain}")
+        logger.info(f"⚡ Issue time: {issue_time_us:.2f}µs")
+        
+        return jsonify({
+            'success': True,
+            'credential_id': permission_lemma.get('id', 'generated'),
+            'permission_lemma': permission_lemma,
+            'site_id': site_id,
+            'site_domain': site_domain,
+            'user_email': user_email,
+            'permission_level': permission_level,
+            'expiry_days': expiry_days,
+            'issue_time_us': issue_time_us,
+            'stored_in_wallet': False,  # User needs to claim via email or direct wallet storage
+            'message': f'Permission credential issued. User can claim at lemma.id/wallet or via email.'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to issue site permission: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+        
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
