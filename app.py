@@ -424,6 +424,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register SDK Config API: {e}")
 
+    # Developer Self-Issue (developers can issue permissions to their own wallet)
+    try:
+        from api.developer_self_issue import developer_self_issue_bp
+        app.register_blueprint(developer_self_issue_bp)
+        logger.info("✅ Developer Self-Issue API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Developer Self-Issue API: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status

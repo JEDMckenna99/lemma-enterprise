@@ -866,38 +866,96 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title">Issue Permission</h3>
-                <p class="modal-subtitle">Grant access to a user via email confirmation</p>
+                <p class="modal-subtitle">Grant access to a user for your site</p>
             </div>
             
-            <form id="issue-permission-form" onsubmit="issuePermission(event)">
-                <div class="form-group">
-                    <label class="form-label">Email Address</label>
-                    <input type="email" class="form-input" id="permission-email" required placeholder="user@example.com">
+            <!-- Tabs for Email vs Direct Issue -->
+            <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px;">
+                <button type="button" class="tab-btn active" onclick="switchIssueTab('email')" id="issue-tab-email" style="padding: 8px 16px; border: none; background: #667eea; color: white; border-radius: 6px; cursor: pointer;">
+                    📧 Via Email
+                </button>
+                <button type="button" class="tab-btn" onclick="switchIssueTab('direct')" id="issue-tab-direct" style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; cursor: pointer;">
+                    ⚡ Direct to My Wallet
+                </button>
+            </div>
+            
+            <!-- Email Flow Tab -->
+            <div id="issue-tab-email-content">
+                <form id="issue-permission-form" onsubmit="issuePermission(event)">
+                    <div class="form-group">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" class="form-input" id="permission-email" required placeholder="user@example.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Site</label>
+                        <select class="form-select" id="permission-site" required>
+                            <option value="lemma.id">lemma.id</option>
+                            <option value="custom">Custom site (enter below)</option>
+                        </select>
+                        <input type="text" class="form-input" id="permission-custom-site" placeholder="yoursite.com" style="margin-top: 8px; display: none;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Permission Level</label>
+                        <select class="form-select" id="permission-level" required>
+                            <option value="beta-user">Beta User</option>
+                            <option value="admin">Admin</option>
+                            <option value="super_admin">Super Admin</option>
+                        </select>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('issue-permission-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Send Email Confirmation</button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Direct Issue Tab (to current wallet) -->
+            <div id="issue-tab-direct-content" style="display: none;">
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <p style="margin: 0; font-size: 14px; color: #1e40af;">
+                        <strong>⚡ Direct Issue</strong> - Issue a permission credential directly to your current browser's wallet. 
+                        Perfect for giving yourself admin access to your own site.
+                    </p>
                 </div>
                 
-                <div class="form-group">
-                    <label class="form-label">Site</label>
-                    <select class="form-select" id="permission-site" required>
-                        <option value="lemma.id">lemma.id</option>
-                        <option value="custom">Custom site (enter below)</option>
-                    </select>
-                    <input type="text" class="form-input" id="permission-custom-site" placeholder="yoursite.com" style="margin-top: 8px; display: none;">
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Permission Level</label>
-                    <select class="form-select" id="permission-level" required>
-                        <option value="beta-user">Beta User</option>
-                        <option value="admin">Admin</option>
-                        <option value="super_admin">Super Admin</option>
-                    </select>
-                </div>
-                
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('issue-permission-modal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Send Email Confirmation</button>
-                </div>
-            </form>
+                <form id="direct-issue-form" onsubmit="issueDirectPermission(event)">
+                    <div class="form-group">
+                        <label class="form-label">Your Site</label>
+                        <select class="form-select" id="direct-permission-site" required>
+                            <option value="">Select your registered site...</option>
+                            <!-- Populated dynamically from user's registered sites -->
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Permission Level</label>
+                        <select class="form-select" id="direct-permission-level" required>
+                            <option value="user">User (Basic Access)</option>
+                            <option value="editor">Editor (Read/Write)</option>
+                            <option value="admin" selected>Admin (Full Access)</option>
+                            <option value="super_admin">Super Admin</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Expiry (Days)</label>
+                        <input type="number" class="form-input" id="direct-permission-expiry" value="365" min="1" max="730">
+                        <small style="color: #6b7280; font-size: 12px;">How long this permission should be valid</small>
+                    </div>
+                    
+                    <div id="direct-issue-result" style="margin-bottom: 16px;"></div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('issue-permission-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="direct-issue-btn">
+                            ⚡ Issue to My Wallet
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
     
@@ -1978,6 +2036,171 @@
         // Modal helpers
         function showIssuePermissionModal() {
             document.getElementById('issue-permission-modal').classList.add('show');
+            // Load user's registered sites for direct issue
+            loadUserSitesForDirectIssue();
+        }
+        
+        // Switch between Email and Direct issue tabs
+        function switchIssueTab(tab) {
+            const emailTab = document.getElementById('issue-tab-email');
+            const directTab = document.getElementById('issue-tab-direct');
+            const emailContent = document.getElementById('issue-tab-email-content');
+            const directContent = document.getElementById('issue-tab-direct-content');
+            
+            if (tab === 'email') {
+                emailTab.style.background = '#667eea';
+                emailTab.style.color = 'white';
+                emailTab.style.border = 'none';
+                directTab.style.background = 'white';
+                directTab.style.color = '#374151';
+                directTab.style.border = '1px solid #d1d5db';
+                emailContent.style.display = 'block';
+                directContent.style.display = 'none';
+            } else {
+                directTab.style.background = '#667eea';
+                directTab.style.color = 'white';
+                directTab.style.border = 'none';
+                emailTab.style.background = 'white';
+                emailTab.style.color = '#374151';
+                emailTab.style.border = '1px solid #d1d5db';
+                emailContent.style.display = 'none';
+                directContent.style.display = 'block';
+            }
+        }
+        
+        // Load user's registered sites for direct issue dropdown
+        async function loadUserSitesForDirectIssue() {
+            const select = document.getElementById('direct-permission-site');
+            if (!select) return;
+            
+            try {
+                // Try to get sites from already loaded data or fetch
+                const response = await fetch('/api/sdk/auth/api-keys');
+                const data = await response.json();
+                
+                select.innerHTML = '<option value="">Select your registered site...</option>';
+                
+                if (data.success && data.api_keys) {
+                    data.api_keys.forEach(key => {
+                        const option = document.createElement('option');
+                        option.value = key.site_id || key.site_domain;
+                        option.textContent = `${key.site_domain} (${key.site_label || key.environment || 'production'})`;
+                        option.dataset.domain = key.site_domain;
+                        select.appendChild(option);
+                    });
+                }
+                
+                // Always add lemma.id as an option
+                if (!Array.from(select.options).find(o => o.value === 'lemma.id')) {
+                    const lemmaOption = document.createElement('option');
+                    lemmaOption.value = 'lemma.id';
+                    lemmaOption.textContent = 'lemma.id (Lemma Platform)';
+                    select.appendChild(lemmaOption);
+                }
+                
+            } catch (e) {
+                console.log('Could not load sites, using defaults');
+                select.innerHTML = `
+                    <option value="">Select your registered site...</option>
+                    <option value="lemma.id">lemma.id (Lemma Platform)</option>
+                `;
+            }
+        }
+        
+        // Issue permission directly to current wallet
+        async function issueDirectPermission(event) {
+            event.preventDefault();
+            
+            const siteId = document.getElementById('direct-permission-site').value;
+            const permissionLevel = document.getElementById('direct-permission-level').value;
+            const expiryDays = parseInt(document.getElementById('direct-permission-expiry').value) || 365;
+            const resultDiv = document.getElementById('direct-issue-result');
+            const submitBtn = document.getElementById('direct-issue-btn');
+            
+            if (!siteId) {
+                resultDiv.innerHTML = `
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; color: #991b1b;">
+                        Please select a site
+                    </div>
+                `;
+                return;
+            }
+            
+            // Get site domain from selected option
+            const selectedOption = document.getElementById('direct-permission-site').selectedOptions[0];
+            const siteDomain = selectedOption?.dataset?.domain || siteId;
+            
+            // Show loading
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '⏳ Issuing...';
+            resultDiv.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: #6b7280;">
+                    <div style="font-size: 24px; margin-bottom: 8px;">⏳</div>
+                    Issuing permission credential...
+                </div>
+            `;
+            
+            try {
+                // Call API to issue the permission
+                const response = await fetch('/api/developer/issue-self-permission', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: siteId,
+                        site_domain: siteDomain,
+                        permission_level: permissionLevel,
+                        expiry_days: expiryDays
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.permission_lemma) {
+                    // Store in wallet
+                    const wallet = window.globalLemmaWallet;
+                    if (wallet) {
+                        await wallet.storeCredential(result.permission_lemma);
+                        
+                        resultDiv.innerHTML = `
+                            <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 16px;">
+                                <div style="text-align: center; margin-bottom: 12px;">
+                                    <div style="font-size: 32px;">✅</div>
+                                    <div style="font-weight: 600; color: #065f46;">Permission Stored in Wallet!</div>
+                                </div>
+                                <div style="font-size: 13px; color: #065f46;">
+                                    <div><strong>Site:</strong> ${siteDomain}</div>
+                                    <div><strong>Permission:</strong> ${permissionLevel}</div>
+                                    <div><strong>Expires:</strong> ${expiryDays} days</div>
+                                    <div><strong>Issue Time:</strong> ${result.issue_time_us?.toFixed(2) || '~'}µs</div>
+                                </div>
+                                <div style="margin-top: 12px; padding: 8px; background: #d1fae5; border-radius: 4px; font-size: 12px;">
+                                    🎉 You now have <strong>${permissionLevel}</strong> access to <strong>${siteDomain}</strong>!
+                                    <br>View at <a href="/wallet" style="color: #065f46;">lemma.id/wallet</a>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        throw new Error('Wallet not available');
+                    }
+                } else {
+                    throw new Error(result.error || 'Failed to issue permission');
+                }
+                
+            } catch (error) {
+                console.error('Direct issue failed:', error);
+                resultDiv.innerHTML = `
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 16px;">
+                        <div style="text-align: center; margin-bottom: 8px;">
+                            <div style="font-size: 24px;">❌</div>
+                            <div style="font-weight: 600; color: #991b1b;">Failed to Issue</div>
+                        </div>
+                        <div style="font-size: 13px; color: #991b1b;">${error.message}</div>
+                    </div>
+                `;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '⚡ Issue to My Wallet';
+            }
         }
         
         function showRevokeModal(email, credentialId) {
