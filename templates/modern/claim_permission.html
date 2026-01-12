@@ -324,11 +324,42 @@ async function claimPermission() {
     loadingDiv.classList.add('show');
     
     try {
-        // Step 1: Authenticate with passkey
+        // Step 1: Get passkey credential ID
+        // Use wallet if already unlocked (no re-passkey needed)
+        // Only prompt for passkey if wallet is locked or not available
         let passkeyCredentialId;
         
-        // Try to use existing passkey or create new one
-        if (window.PublicKeyCredential) {
+        // Check if wallet is already unlocked (user authenticated today)
+        if (window.globalLemmaWallet) {
+            const info = await window.globalLemmaWallet.getWalletInfo();
+            
+            if (info.isUnlocked && info.passkeyCredentialId) {
+                // Wallet already unlocked - use existing passkey ID
+                passkeyCredentialId = info.passkeyCredentialId;
+                console.log('✅ Using existing wallet session (no passkey prompt needed)');
+            } else if (info.hasPasskey) {
+                // Wallet exists but locked - unlock it (one passkey prompt)
+                console.log('🔓 Wallet locked, requesting unlock...');
+                const unlockResult = await window.globalLemmaWallet.unlock();
+                if (unlockResult.success) {
+                    // Get passkey ID from unlocked wallet
+                    const walletInfo = await window.globalLemmaWallet.getWalletInfo();
+                    passkeyCredentialId = walletInfo.passkeyCredentialId;
+                    console.log('✅ Wallet unlocked');
+                } else {
+                    throw new Error('Wallet unlock failed');
+                }
+            }
+        }
+        
+        // Fallback: No wallet or wallet doesn't have passkey - do fresh WebAuthn
+        if (!passkeyCredentialId) {
+            console.log('ℹ️ No wallet session, using WebAuthn...');
+            
+            if (!window.PublicKeyCredential) {
+                throw new Error('Your browser does not support passkeys. Please use a modern browser.');
+            }
+            
             try {
                 // First, try to get existing credential
                 const getOptions = {
@@ -388,8 +419,6 @@ async function claimPermission() {
                 console.error('WebAuthn error:', webauthnError);
                 throw new Error('Passkey authentication failed. Please try again.');
             }
-        } else {
-            throw new Error('Your browser does not support passkeys. Please use a modern browser.');
         }
         
         // Step 2: Claim the permission with passkey credential
@@ -475,6 +504,39 @@ function resetClaim() {
     document.getElementById('claim-loading').classList.remove('show');
     document.getElementById('claim-success').classList.remove('show');
     document.getElementById('claim-error').classList.remove('show');
+}
+
+// Check if wallet is already unlocked on page load
+async function checkWalletState() {
+    if (window.globalLemmaWallet) {
+        try {
+            const info = await window.globalLemmaWallet.getWalletInfo();
+            const btn = document.querySelector('.claim-btn');
+            
+            if (info.isUnlocked && info.passkeyCredentialId) {
+                // Already unlocked - update button to reflect no passkey needed
+                if (btn) {
+                    btn.innerHTML = '<span>✅</span><span>Claim Permission (Wallet Unlocked)</span>';
+                }
+                console.log('✅ Wallet already unlocked - no passkey prompt will be needed');
+            } else if (info.hasPasskey) {
+                // Has passkey but locked
+                if (btn) {
+                    btn.innerHTML = '<span>🔑</span><span>Unlock Wallet & Claim</span>';
+                }
+                console.log('🔒 Wallet locked - one passkey prompt will be needed');
+            }
+        } catch (e) {
+            console.log('Could not check wallet state:', e);
+        }
+    }
+}
+
+// Run on page load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkWalletState);
+} else {
+    checkWalletState();
 }
 </script>
 {% endif %}
