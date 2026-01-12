@@ -24,27 +24,27 @@
  * - Credentials must be properly signed
  */
 
-// Allowed origins (registered sites can communicate with the bridge)
-// In production, this would be dynamically loaded from the database
-const ALLOWED_ORIGINS = [
-    'https://lemma.id',
-    'https://lemma-enterprise-0f6ba17076c1.herokuapp.com',
-    'http://localhost:5000',
-    'http://localhost:3000',
-    'http://127.0.0.1:5000',
-    // Allow any origin for development - in production, validate against registered sites
-];
+// ============================================
+// ORIGIN VALIDATION - PURELY CLIENT-SIDE
+// ============================================
+// 
+// SECURITY MODEL: Per-site credential filtering is the PRIMARY protection.
+// Each site can ONLY see credentials issued for their domain.
+// No server calls needed - the bridge is just a window into IndexedDB.
+//
+// Origin validation is SECONDARY - we allow any HTTPS origin to connect,
+// but they can only access their own credentials (enforced in each handler).
 
-// For production: validate origin against registered sites in database
-async function isOriginAllowed(origin) {
-    // Allow known origins
-    if (ALLOWED_ORIGINS.includes(origin)) {
-        return true;
-    }
-    
-    // In production, check if origin is a registered site
-    // For now, allow all HTTPS origins (sites must have valid API key)
-    if (origin.startsWith('https://')) {
+/**
+ * Check if origin is allowed - PURELY CLIENT-SIDE, NO SERVER CALLS
+ * 
+ * The real security is per-site credential filtering in each message handler.
+ * This just does basic sanity checks (HTTPS required for production).
+ */
+function isOriginAllowed(origin) {
+    // Allow Lemma infrastructure
+    if (origin === 'https://lemma.id' || 
+        origin === 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com') {
         return true;
     }
     
@@ -53,6 +53,13 @@ async function isOriginAllowed(origin) {
         return true;
     }
     
+    // Production: require HTTPS
+    // The per-site credential filtering in each handler is the real protection
+    if (origin.startsWith('https://')) {
+        return true;
+    }
+    
+    console.warn(`🔒 Rejected non-HTTPS origin: ${origin}`);
     return false;
 }
 
@@ -87,9 +94,9 @@ async function initWallet() {
 window.addEventListener('message', async (event) => {
     const origin = event.origin;
     
-    // Validate origin
-    const allowed = await isOriginAllowed(origin);
-    if (!allowed) {
+    // Basic origin validation (client-side only, no server call)
+    // Real security is per-site credential filtering in each handler
+    if (!isOriginAllowed(origin)) {
         console.warn('⚠️ Message from unauthorized origin:', origin);
         return;
     }
@@ -161,12 +168,34 @@ window.addEventListener('message', async (event) => {
                     return;
                 }
                 
+                // SECURITY: Extract requesting site for validation
+                let storingSite;
+                try {
+                    storingSite = new URL(origin).hostname.toLowerCase().replace(/^www\./, '');
+                } catch (e) {
+                    respond({ success: false, error: 'Invalid origin' });
+                    return;
+                }
+                
+                // SECURITY: Validate credential's siteId matches the requesting origin
+                // This prevents malicious sites from storing fake credentials for other sites
+                const credClaims = credential.claims || credential.credentialSubject || {};
+                const credSiteId = (credClaims.siteId || credClaims.site_id || '').toLowerCase().replace(/^www\./, '');
+                
+                if (credSiteId && credSiteId !== storingSite && 
+                    !storingSite.endsWith('.' + credSiteId) && 
+                    !credSiteId.endsWith('.' + storingSite)) {
+                    console.warn(`🔒 Blocked: ${storingSite} tried to store credential for ${credSiteId}`);
+                    respond({ success: false, error: 'Cannot store credentials for other sites' });
+                    return;
+                }
+                
                 // Ensure packageType is set for proper filtering
                 credential.packageType = credential.packageType || 'permission';
                 
                 // Store the credential
                 const storeResult = await wallet.storeCredential(credential);
-                console.log('✅ Credential stored via bridge:', credential.id);
+                console.log(`✅ Credential stored via bridge for ${storingSite}:`, credential.id);
                 
                 respond({
                     success: true,
@@ -176,26 +205,46 @@ window.addEventListener('message', async (event) => {
                 break;
                 
             case 'GET_CREDENTIALS':
-                // Get credentials (optionally filtered by type or siteId)
+                // Get credentials - SECURITY: Only return credentials for the requesting origin
                 if (!wallet) await initWallet();
                 
                 const filterType = payload?.type || null;
-                const filterSiteId = payload?.siteId || null;
+                
+                // Extract requesting site's hostname for security filtering
+                let requestingSite;
+                try {
+                    requestingSite = new URL(origin).hostname;
+                } catch (e) {
+                    respond({ success: false, error: 'Invalid origin' });
+                    return;
+                }
                 
                 let credentials = await wallet.getCredentials(filterType);
                 
-                // Filter by siteId if specified
-                if (filterSiteId) {
-                    credentials = credentials.filter(c => {
-                        const claims = c.claims || c.credentialSubject || {};
-                        return claims.siteId === filterSiteId;
-                    });
-                }
+                // SECURITY FIX: Only return credentials issued for the requesting site
+                // This prevents cross-site credential leakage while preserving the
+                // "traveling wallet" experience - each site sees only their own credentials
+                credentials = credentials.filter(c => {
+                    const claims = c.claims || c.credentialSubject || {};
+                    const credSiteId = claims.siteId || claims.site_id || '';
+                    
+                    // Normalize both for comparison
+                    const normalizedCredSite = credSiteId.toLowerCase().replace(/^www\./, '');
+                    const normalizedRequestingSite = requestingSite.toLowerCase().replace(/^www\./, '');
+                    
+                    // Match: exact domain, subdomain of credential site, or credential is subdomain
+                    return normalizedCredSite === normalizedRequestingSite ||
+                           normalizedRequestingSite.endsWith('.' + normalizedCredSite) ||
+                           normalizedCredSite.endsWith('.' + normalizedRequestingSite);
+                });
+                
+                console.log(`🔒 Returning ${credentials.length} credentials for ${requestingSite}`);
                 
                 respond({
                     success: true,
                     credentials: credentials,
-                    count: credentials.length
+                    count: credentials.length,
+                    filteredFor: requestingSite
                 });
                 break;
                 
@@ -218,7 +267,7 @@ window.addEventListener('message', async (event) => {
                 break;
                 
             case 'REMOVE_CREDENTIAL':
-                // Remove a credential
+                // Remove a credential - SECURITY: Only allow removing own credentials
                 if (!wallet) await initWallet();
                 
                 const credId = payload?.credentialId;
@@ -227,7 +276,34 @@ window.addEventListener('message', async (event) => {
                     return;
                 }
                 
+                // SECURITY: Extract requesting site
+                let removingSite;
+                try {
+                    removingSite = new URL(origin).hostname.toLowerCase().replace(/^www\./, '');
+                } catch (e) {
+                    respond({ success: false, error: 'Invalid origin' });
+                    return;
+                }
+                
+                // SECURITY: Fetch the credential and verify it belongs to the requesting site
+                const allCreds = await wallet.getCredentials();
+                const credToRemove = allCreds.find(c => c.id === credId);
+                
+                if (credToRemove) {
+                    const removeClaims = credToRemove.claims || credToRemove.credentialSubject || {};
+                    const removeSiteId = (removeClaims.siteId || removeClaims.site_id || '').toLowerCase().replace(/^www\./, '');
+                    
+                    if (removeSiteId && removeSiteId !== removingSite &&
+                        !removingSite.endsWith('.' + removeSiteId) &&
+                        !removeSiteId.endsWith('.' + removingSite)) {
+                        console.warn(`🔒 Blocked: ${removingSite} tried to remove credential for ${removeSiteId}`);
+                        respond({ success: false, error: 'Cannot remove credentials for other sites' });
+                        return;
+                    }
+                }
+                
                 await wallet.removeCredential(credId);
+                console.log(`✅ Credential removed via bridge for ${removingSite}:`, credId);
                 respond({ success: true, removed: true });
                 break;
                 
@@ -241,8 +317,11 @@ window.addEventListener('message', async (event) => {
     }
 });
 
-// Initialize on load
-initWallet().then(ready => {
+// Initialize on load - NO SERVER CALLS
+// The bridge is purely client-side, accessing lemma.id's IndexedDB
+(async function() {
+    // Initialize wallet (opens IndexedDB - no server call)
+    const ready = await initWallet();
     console.log('🌉 Wallet bridge ready:', ready);
     
     // Notify parent that bridge is ready
@@ -252,7 +331,7 @@ initWallet().then(ready => {
             ready: ready
         }, '*');
     }
-});
+})();
 </script>
 </body>
 </html>

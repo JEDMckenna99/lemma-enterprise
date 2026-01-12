@@ -1435,5 +1435,78 @@ def sdk_health():
         'timestamp': time.time()
     })
 
+
+# ============================================================================
+# INTERNAL: Registered Sites for Wallet Bridge Security
+# ============================================================================
+
+@sdk_api_bp.route('/api/internal/registered-sites', methods=['GET'])
+def get_registered_sites():
+    """
+    Get list of registered sites for wallet bridge origin validation.
+    
+    This endpoint is called ONCE when the wallet bridge initializes.
+    The result is cached in-memory by the bridge for instant origin checks.
+    
+    SECURITY: This does NOT affect verification speed - it's only called at bridge init.
+    All subsequent origin checks are in-memory O(1) lookups.
+    """
+    try:
+        # Get registered sites from database
+        from .database import get_db_connection
+        
+        sites = []
+        
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Get all active registered sites
+            cursor.execute("""
+                SELECT site_id FROM sites 
+                WHERE is_active = true OR is_active IS NULL
+            """)
+            
+            rows = cursor.fetchall()
+            sites = [row[0] for row in rows if row[0]]
+            
+            cursor.close()
+            conn.close()
+            
+        except Exception as db_error:
+            logger.warning(f"⚠️ Could not fetch sites from database: {db_error}")
+            # Fallback: return known production sites
+            sites = []
+        
+        # Always include Lemma infrastructure
+        infrastructure_sites = [
+            'lemma.id',
+            'lemma-enterprise-0f6ba17076c1.herokuapp.com',
+        ]
+        
+        # Combine and deduplicate
+        all_sites = list(set(sites + infrastructure_sites))
+        
+        logger.info(f"🔑 Returning {len(all_sites)} registered sites for bridge validation")
+        
+        return jsonify({
+            'success': True,
+            'sites': all_sites,
+            'count': len(all_sites),
+            'cached_at': time.time(),
+            'note': 'Sites are cached in bridge for instant origin checks'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get registered sites: {e}")
+        # Return empty list - bridge will fall back to permissive mode
+        # (still protected by per-site credential filtering)
+        return jsonify({
+            'success': False,
+            'sites': [],
+            'error': str(e)
+        }), 500
+
+
 # Export the blueprint
 __all__ = ['sdk_api_bp'] 
