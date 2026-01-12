@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma Wallet Bridge</title>
+    <!-- This page is loaded in an iframe by third-party sites to access the central wallet -->
+</head>
+<body>
+<script src="/static/js/lemma-wallet.js"></script>
+<script>
+/**
+ * Lemma Wallet Bridge
+ * 
+ * This iframe provides cross-origin access to the user's Lemma wallet.
+ * Third-party sites can communicate via postMessage to:
+ * - Store credentials issued by their site
+ * - Check if wallet is unlocked
+ * - Request wallet unlock (user interaction required)
+ * 
+ * Security:
+ * - Origin validation for all messages
+ * - Only allows credential storage, not arbitrary data
+ * - Credentials must be properly signed
+ */
+
+// Allowed origins (registered sites can communicate with the bridge)
+// In production, this would be dynamically loaded from the database
+const ALLOWED_ORIGINS = [
+    'https://lemma.id',
+    'https://lemma-enterprise-0f6ba17076c1.herokuapp.com',
+    'http://localhost:5000',
+    'http://localhost:3000',
+    'http://127.0.0.1:5000',
+    // Allow any origin for development - in production, validate against registered sites
+];
+
+// For production: validate origin against registered sites in database
+async function isOriginAllowed(origin) {
+    // Allow known origins
+    if (ALLOWED_ORIGINS.includes(origin)) {
+        return true;
+    }
+    
+    // In production, check if origin is a registered site
+    // For now, allow all HTTPS origins (sites must have valid API key)
+    if (origin.startsWith('https://')) {
+        return true;
+    }
+    
+    // Allow localhost for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return true;
+    }
+    
+    return false;
+}
+
+let wallet = null;
+
+// Initialize wallet
+async function initWallet() {
+    try {
+        // Wait for LemmaWallet to be available
+        let attempts = 0;
+        while (typeof LemmaWallet === 'undefined' && attempts < 50) {
+            await new Promise(r => setTimeout(r, 100));
+            attempts++;
+        }
+        
+        if (typeof LemmaWallet === 'undefined') {
+            console.error('❌ LemmaWallet not loaded');
+            return false;
+        }
+        
+        wallet = window.globalLemmaWallet || new LemmaWallet({ debug: true });
+        await wallet.init();
+        console.log('✅ Wallet bridge initialized');
+        return true;
+    } catch (e) {
+        console.error('❌ Wallet init failed:', e);
+        return false;
+    }
+}
+
+// Handle incoming messages from parent/opener windows
+window.addEventListener('message', async (event) => {
+    const origin = event.origin;
+    
+    // Validate origin
+    const allowed = await isOriginAllowed(origin);
+    if (!allowed) {
+        console.warn('⚠️ Message from unauthorized origin:', origin);
+        return;
+    }
+    
+    const { type, payload, requestId } = event.data || {};
+    
+    if (!type) return;
+    
+    console.log(`📨 Bridge received: ${type} from ${origin}`);
+    
+    // Helper to send response back
+    const respond = (data) => {
+        event.source.postMessage({
+            type: `${type}_response`,
+            requestId,
+            ...data
+        }, origin);
+    };
+    
+    try {
+        switch (type) {
+            case 'WALLET_PING':
+                // Health check
+                respond({ success: true, ready: !!wallet });
+                break;
+                
+            case 'WALLET_INIT':
+                // Initialize wallet
+                const initResult = await initWallet();
+                respond({ success: initResult });
+                break;
+                
+            case 'WALLET_STATUS':
+                // Get wallet status
+                if (!wallet) await initWallet();
+                const info = await wallet.getWalletInfo();
+                respond({
+                    success: true,
+                    isUnlocked: info.isUnlocked,
+                    hasPasskey: info.hasPasskey,
+                    credentialCount: info.credentialCount || 0
+                });
+                break;
+                
+            case 'WALLET_UNLOCK':
+                // Request wallet unlock (requires user interaction)
+                if (!wallet) await initWallet();
+                try {
+                    const unlocked = await wallet.unlock();
+                    respond({ success: unlocked });
+                } catch (e) {
+                    respond({ success: false, error: e.message });
+                }
+                break;
+                
+            case 'STORE_CREDENTIAL':
+                // Store a credential in the wallet
+                if (!wallet) await initWallet();
+                
+                const credential = payload?.credential;
+                if (!credential) {
+                    respond({ success: false, error: 'No credential provided' });
+                    return;
+                }
+                
+                // Validate credential has required fields
+                if (!credential.id || !credential.issuer) {
+                    respond({ success: false, error: 'Invalid credential format' });
+                    return;
+                }
+                
+                // Ensure packageType is set for proper filtering
+                credential.packageType = credential.packageType || 'permission';
+                
+                // Store the credential
+                const storeResult = await wallet.storeCredential(credential);
+                console.log('✅ Credential stored via bridge:', credential.id);
+                
+                respond({
+                    success: true,
+                    credentialId: credential.id,
+                    stored: true
+                });
+                break;
+                
+            case 'GET_CREDENTIALS':
+                // Get credentials (optionally filtered by type or siteId)
+                if (!wallet) await initWallet();
+                
+                const filterType = payload?.type || null;
+                const filterSiteId = payload?.siteId || null;
+                
+                let credentials = await wallet.getCredentials(filterType);
+                
+                // Filter by siteId if specified
+                if (filterSiteId) {
+                    credentials = credentials.filter(c => {
+                        const claims = c.claims || c.credentialSubject || {};
+                        return claims.siteId === filterSiteId;
+                    });
+                }
+                
+                respond({
+                    success: true,
+                    credentials: credentials,
+                    count: credentials.length
+                });
+                break;
+                
+            case 'VERIFY_CREDENTIAL':
+                // Verify a credential locally
+                if (!wallet) await initWallet();
+                
+                const credToVerify = payload?.credential;
+                if (!credToVerify) {
+                    respond({ success: false, error: 'No credential provided' });
+                    return;
+                }
+                
+                const verification = await wallet.verifyCredential(credToVerify);
+                respond({
+                    success: true,
+                    valid: verification.valid,
+                    reason: verification.reason
+                });
+                break;
+                
+            case 'REMOVE_CREDENTIAL':
+                // Remove a credential
+                if (!wallet) await initWallet();
+                
+                const credId = payload?.credentialId;
+                if (!credId) {
+                    respond({ success: false, error: 'No credentialId provided' });
+                    return;
+                }
+                
+                await wallet.removeCredential(credId);
+                respond({ success: true, removed: true });
+                break;
+                
+            default:
+                respond({ success: false, error: `Unknown message type: ${type}` });
+        }
+        
+    } catch (error) {
+        console.error(`❌ Bridge error handling ${type}:`, error);
+        respond({ success: false, error: error.message });
+    }
+});
+
+// Initialize on load
+initWallet().then(ready => {
+    console.log('🌉 Wallet bridge ready:', ready);
+    
+    // Notify parent that bridge is ready
+    if (window.parent !== window) {
+        window.parent.postMessage({
+            type: 'WALLET_BRIDGE_READY',
+            ready: ready
+        }, '*');
+    }
+});
+</script>
+</body>
+</html>

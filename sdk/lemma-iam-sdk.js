@@ -24,6 +24,10 @@ class LemmaIAM {
         this.redirectUri = config.redirectUri;
         this.debug = config.debug || false;
         
+        // Central wallet option - stores credentials in lemma.id wallet instead of locally
+        // This ensures all user permissions are visible in the lemma.id/wallet page
+        this.useCentralWallet = config.useCentralWallet || false;
+        
         // Wallet reference
         this.wallet = null;
         this.walletReady = false;
@@ -38,7 +42,14 @@ class LemmaIAM {
 
     async _initWallet() {
         try {
-            // Wait for global wallet if it exists
+            // If useCentralWallet is enabled, use the cross-origin wallet bridge
+            if (this.useCentralWallet) {
+                this.log('🌉 Using central wallet bridge...');
+                await this._initWalletBridge();
+                return;
+            }
+            
+            // Wait for global wallet if it exists (local wallet mode)
             let attempts = 0;
             while (!window.globalLemmaWallet && attempts < 20) {
                 await new Promise(r => setTimeout(r, 100));
@@ -49,19 +60,188 @@ class LemmaIAM {
             if (this.wallet) {
                 await this.wallet.init();
                 this.walletReady = true;
-                this.log('✅ Wallet initialized');
+                this.log('✅ Local wallet initialized');
             } else {
-                this.log('⚠️ No wallet found - OAuth-only mode');
+                this.log('⚠️ No local wallet found - trying bridge...');
+                // Fallback to bridge if no local wallet
+                await this._initWalletBridge();
             }
         } catch (error) {
-            this.log('Wallet init failed, OAuth-only mode:', error);
+            this.log('Wallet init failed:', error);
+            // Try bridge as fallback
+            await this._initWalletBridge();
         }
+    }
+    
+    // ============================================
+    // CROSS-ORIGIN WALLET BRIDGE
+    // ============================================
+    
+    /**
+     * Initialize the wallet bridge iframe for cross-origin storage
+     * This allows storing credentials in the central lemma.id wallet
+     * from any third-party site.
+     */
+    async _initWalletBridge() {
+        return new Promise((resolve) => {
+            // Check if bridge already exists
+            if (this._bridgeIframe && this._bridgeReady) {
+                this.walletReady = true;
+                resolve(true);
+                return;
+            }
+            
+            // Create hidden iframe for wallet bridge
+            this._bridgeIframe = document.createElement('iframe');
+            this._bridgeIframe.src = `${this.baseUrl}/wallet/bridge`;
+            this._bridgeIframe.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden;';
+            this._bridgeIframe.id = 'lemma-wallet-bridge';
+            
+            // Set up message listener
+            this._bridgeCallbacks = {};
+            this._bridgeReady = false;
+            
+            const messageHandler = (event) => {
+                // Validate origin
+                if (!event.origin.includes('lemma')) {
+                    // Allow localhost for development
+                    if (!event.origin.includes('localhost') && !event.origin.includes('127.0.0.1')) {
+                        return;
+                    }
+                }
+                
+                const { type, requestId, ...data } = event.data || {};
+                
+                // Handle bridge ready notification
+                if (type === 'WALLET_BRIDGE_READY') {
+                    this._bridgeReady = true;
+                    this.walletReady = true;
+                    this.log('✅ Wallet bridge ready');
+                    resolve(true);
+                    return;
+                }
+                
+                // Handle response to our requests
+                if (type && type.endsWith('_response') && requestId && this._bridgeCallbacks[requestId]) {
+                    this._bridgeCallbacks[requestId](data);
+                    delete this._bridgeCallbacks[requestId];
+                }
+            };
+            
+            window.addEventListener('message', messageHandler);
+            this._bridgeMessageHandler = messageHandler;
+            
+            // Add iframe to document
+            document.body.appendChild(this._bridgeIframe);
+            
+            // Timeout after 5 seconds
+            setTimeout(() => {
+                if (!this._bridgeReady) {
+                    this.log('⚠️ Wallet bridge timeout - falling back to local');
+                    resolve(false);
+                }
+            }, 5000);
+        });
+    }
+    
+    /**
+     * Send a message to the wallet bridge and wait for response
+     */
+    async _bridgeSend(type, payload = {}) {
+        if (!this._bridgeIframe || !this._bridgeReady) {
+            throw new Error('Wallet bridge not initialized');
+        }
+        
+        return new Promise((resolve, reject) => {
+            const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Set up callback
+            this._bridgeCallbacks[requestId] = (response) => {
+                if (response.success) {
+                    resolve(response);
+                } else {
+                    reject(new Error(response.error || 'Bridge request failed'));
+                }
+            };
+            
+            // Send message to bridge
+            this._bridgeIframe.contentWindow.postMessage({
+                type,
+                payload,
+                requestId
+            }, this.baseUrl);
+            
+            // Timeout after 10 seconds
+            setTimeout(() => {
+                if (this._bridgeCallbacks[requestId]) {
+                    delete this._bridgeCallbacks[requestId];
+                    reject(new Error('Bridge request timeout'));
+                }
+            }, 10000);
+        });
+    }
+    
+    /**
+     * Store credential via bridge (for central wallet storage)
+     */
+    async _storeCredentialViaBridge(credential) {
+        this.log('🌉 Storing credential via bridge...');
+        const result = await this._bridgeSend('STORE_CREDENTIAL', { credential });
+        this.log('✅ Credential stored in central wallet:', result.credentialId);
+        return result;
+    }
+    
+    /**
+     * Get credentials via bridge (from central wallet)
+     */
+    async _getCredentialsViaBridge(type = null, siteId = null) {
+        const result = await this._bridgeSend('GET_CREDENTIALS', { type, siteId });
+        return result.credentials || [];
+    }
+    
+    /**
+     * Create a wallet proxy that uses the bridge
+     * This allows the rest of the SDK to work transparently
+     */
+    _createBridgeWalletProxy() {
+        const sdk = this;
+        return {
+            async storeCredential(credential) {
+                return sdk._storeCredentialViaBridge(credential);
+            },
+            async getCredentials(type) {
+                return sdk._getCredentialsViaBridge(type);
+            },
+            async removeCredential(credentialId) {
+                return sdk._bridgeSend('REMOVE_CREDENTIAL', { credentialId });
+            },
+            async verifyCredential(credential) {
+                return sdk._bridgeSend('VERIFY_CREDENTIAL', { credential });
+            },
+            async getWalletInfo() {
+                return sdk._bridgeSend('WALLET_STATUS');
+            },
+            async unlock() {
+                const result = await sdk._bridgeSend('WALLET_UNLOCK');
+                return result.success;
+            },
+            async getSession() {
+                return null; // Session managed separately
+            },
+            session: null
+        };
     }
 
     async ensureWallet() {
         if (!this.walletReady) {
             await this._initWallet();
         }
+        
+        // If using bridge, return a proxy wallet
+        if (this.useCentralWallet && this._bridgeReady) {
+            return this._createBridgeWalletProxy();
+        }
+        
         return this.wallet;
     }
 
@@ -79,20 +259,22 @@ class LemmaIAM {
      */
     async signIn() {
         this.log('🔐 Starting wallet-first sign in...');
+        this.log(`   Mode: ${this.useCentralWallet ? 'Central Wallet (bridge)' : 'Local Wallet'}`);
         
-        const wallet = await this.ensureWallet();
-        if (!wallet) {
-            this.log('No wallet - falling back to OAuth');
+        // Get the wallet (either local or bridge proxy)
+        this.wallet = await this.ensureWallet();
+        if (!this.wallet) {
+            this.log('No wallet available - falling back to OAuth');
             return this.signInWithOAuth();
         }
         
         try {
             // Check if wallet is unlocked
-            const info = await wallet.getWalletInfo();
+            const info = await this.wallet.getWalletInfo();
             
             if (!info.isUnlocked) {
                 this.log('Wallet locked, requesting unlock...');
-                const unlocked = await wallet.unlock();
+                const unlocked = await this.wallet.unlock();
                 if (!unlocked) {
                     return { success: false, error: 'Wallet unlock cancelled' };
                 }
@@ -194,9 +376,9 @@ class LemmaIAM {
 
     async _requestPermission() {
         try {
-            const walletId = this.wallet.session?.walletId || 'wallet_' + Date.now();
+            const walletId = this.wallet?.session?.walletId || 'wallet_' + Date.now();
             
-            // Request permission from Lemma
+            // Request permission from Lemma API
             const response = await fetch(`${this.baseUrl}/api/wallet-auth/issue`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -212,19 +394,23 @@ class LemmaIAM {
                 throw new Error(result.error || 'Failed to get permission');
             }
             
-            // Store permission in wallet
+            // Store permission in wallet (this.wallet is either local or bridge proxy)
+            // The bridge proxy will store it in the central lemma.id wallet
             await this.wallet.storeCredential(result.permission_lemma);
-            this.log('✅ Permission stored in wallet');
+            
+            const storageType = this.useCentralWallet ? 'central wallet (via bridge)' : 'local wallet';
+            this.log(`✅ Permission stored in ${storageType}`);
             
             return {
                 success: true,
                 user: {
-                    did: result.user.id,
-                    email: result.user.email,
-                    isNew: result.user.isNew
+                    did: result.user?.id || result.ppid,
+                    email: result.user?.email,
+                    isNew: result.user?.isNew || !result.user?.existing
                 },
                 permission: result.permission_lemma,
                 method: 'wallet',
+                centralWallet: this.useCentralWallet,
                 offline: false  // Server was contacted for issuance
             };
             
@@ -232,6 +418,45 @@ class LemmaIAM {
             this.log('Permission request failed:', error);
             throw error;
         }
+    }
+    
+    /**
+     * Check if we're using central wallet mode
+     */
+    isCentralWalletMode() {
+        return this.useCentralWallet && this._bridgeReady;
+    }
+    
+    /**
+     * Get info about where credentials are stored
+     */
+    getStorageInfo() {
+        if (this.useCentralWallet && this._bridgeReady) {
+            return {
+                mode: 'central',
+                location: 'lemma.id wallet (via bridge)',
+                viewAt: `${this.baseUrl}/wallet`
+            };
+        }
+        return {
+            mode: 'local', 
+            location: 'This site\'s browser storage',
+            viewAt: null
+        };
+    }
+    
+    /**
+     * Handle callback after permission flow (kept for backwards compatibility)
+     * With the bridge approach, this is no longer needed but kept for legacy support
+     */
+    async handleCentralWalletCallback() {
+        // With the bridge approach, no callback handling is needed
+        // The permission is stored directly via postMessage
+        return {
+            success: true,
+            method: 'bridge',
+            message: 'Using bridge mode - no callback needed'
+        };
     }
 
     _extractPermissions(permission) {

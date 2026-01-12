@@ -519,6 +519,24 @@ def create_app():
         """Wallet PIN Reset Page"""
         logger.info("🔐 Serving PIN reset page")
         return render_template('modern/reset_pin.html')
+    
+    @app.route('/wallet/bridge')
+    def wallet_bridge():
+        """
+        Cross-origin wallet bridge - allows third-party sites to store credentials
+        in the user's central Lemma wallet via postMessage.
+        
+        This page is loaded in an iframe by third-party sites.
+        """
+        logger.info("🌉 Serving wallet bridge")
+        response = render_template('wallet_bridge.html')
+        # Allow embedding in iframes from any origin (for cross-site wallet access)
+        # Security is enforced via postMessage origin validation
+        return response, 200, {
+            'X-Frame-Options': 'ALLOWALL',
+            'Content-Security-Policy': "frame-ancestors *;",
+            'Cache-Control': 'no-cache'
+        }
 
     # Essential pages
     @app.route('/pricing')

@@ -87,6 +87,59 @@ await wallet.init();
 
 ---
 
+## 🌉 **Central Wallet Mode (Recommended for Third-Party Sites)**
+
+By default, each site stores credentials in its own browser storage (IndexedDB is same-origin). To have all credentials visible in the user's **central wallet at lemma.id/wallet**, use the central wallet bridge:
+
+### Using the IAM SDK with Central Wallet
+
+```javascript
+// Load the IAM SDK
+<script src="https://lemma.id/sdk/lemma-iam-sdk.js"></script>
+
+<script>
+const lemma = new LemmaIAM({
+    apiKey: 'your-api-key',
+    siteId: 'yoursite.com',
+    useCentralWallet: true,  // ← Store credentials in lemma.id wallet
+    debug: true
+});
+
+// Sign in - credential stored in central wallet via bridge
+const result = await lemma.signIn();
+if (result.success) {
+    console.log('Signed in!', result.user);
+    console.log('View all permissions at: lemma.id/wallet');
+}
+</script>
+```
+
+### How Central Wallet Works
+
+```
+Without useCentralWallet (default):
+├── yoursite.com issues credential
+├── Stored in yoursite.com's IndexedDB
+└── NOT visible at lemma.id/wallet ❌
+
+With useCentralWallet: true:
+├── yoursite.com issues credential  
+├── SDK loads hidden iframe from lemma.id/wallet/bridge
+├── Credential sent via postMessage to iframe
+├── Stored in lemma.id's IndexedDB
+└── Visible at lemma.id/wallet ✅
+```
+
+### Storage Mode Info
+
+```javascript
+const storageInfo = lemma.getStorageInfo();
+console.log(storageInfo);
+// { mode: 'central', location: 'lemma.id wallet (via bridge)', viewAt: 'https://lemma.id/wallet' }
+```
+
+---
+
 ## 📦 **LemmaWallet Class**
 
 The wallet is the core of Lemma authentication.
