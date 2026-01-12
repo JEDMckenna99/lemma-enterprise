@@ -1442,7 +1442,26 @@
                     
                     // Store site context for overview
                     window.overviewSiteDomain = data.site_domain;
+                    window.overviewAvailableSites = data.available_sites || [];
                     console.log('✅ Stats loaded for', data.site_domain || 'platform');
+                    
+                    // Show which site's stats are displayed
+                    const overviewHeader = document.querySelector('#section-overview .section-header');
+                    if (overviewHeader && data.site_domain && data.site_domain !== 'lemma.id') {
+                        // Add site indicator if not already present
+                        let siteIndicator = document.getElementById('overview-site-indicator');
+                        if (!siteIndicator) {
+                            siteIndicator = document.createElement('div');
+                            siteIndicator.id = 'overview-site-indicator';
+                            siteIndicator.style.cssText = 'margin-bottom: 16px; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;';
+                            overviewHeader.insertAdjacentElement('afterend', siteIndicator);
+                        }
+                        siteIndicator.innerHTML = `
+                            <span style="font-size: 13px; color: #166534;">
+                                📊 Showing stats for: <strong>${data.site_domain}</strong>
+                            </span>
+                        `;
+                    }
                     
                     // Load recent activity
                     if (data.recent_activity && data.recent_activity.length > 0) {
