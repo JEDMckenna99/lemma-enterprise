@@ -1285,7 +1285,7 @@ class LemmaWallet {
 
     /**
      * Store credential (backwards compatible alias for storeLemma)
-     * Does NOT require unlock for backwards compatibility with existing flows
+     * Automatically syncs to central lemma.id wallet via bridge if on third-party site
      */
     async storeCredential(credential) {
         await this.init();
@@ -1302,18 +1302,108 @@ class LemmaWallet {
             storedAt: Date.now()
         };
         
+        // Store locally
         await this._put('lemmas', lemma);
-        console.log('✅ Credential stored (backwards compat):', lemma.id);
+        console.log('✅ Credential stored locally:', lemma.id);
+        
+        // If on third-party site, also sync to central lemma.id wallet via bridge
+        if (!window.location.hostname.includes('lemma.id') && 
+            !window.location.hostname.includes('localhost')) {
+            await this._syncToCentralWallet(lemma);
+        }
+        
         return { success: true, id: lemma.id };
+    }
+    
+    /**
+     * Sync credential to central lemma.id wallet via iframe bridge
+     * This ensures credentials are visible at lemma.id/wallet
+     */
+    async _syncToCentralWallet(credential) {
+        try {
+            // Find or create bridge iframe
+            let bridge = document.getElementById('lemma-wallet-bridge');
+            
+            if (!bridge) {
+                // Create bridge iframe
+                bridge = document.createElement('iframe');
+                bridge.id = 'lemma-wallet-bridge';
+                bridge.src = 'https://lemma.id/wallet/bridge';
+                bridge.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden;';
+                document.body.appendChild(bridge);
+                
+                // Wait for bridge to be ready
+                await new Promise((resolve) => {
+                    const handler = (event) => {
+                        if (event.data?.type === 'WALLET_BRIDGE_READY') {
+                            window.removeEventListener('message', handler);
+                            resolve();
+                        }
+                    };
+                    window.addEventListener('message', handler);
+                    setTimeout(resolve, 3000); // Timeout after 3s
+                });
+            }
+            
+            // Send credential to bridge
+            return new Promise((resolve) => {
+                const requestId = `sync_${Date.now()}`;
+                
+                const handler = (event) => {
+                    if (event.data?.requestId === requestId) {
+                        window.removeEventListener('message', handler);
+                        if (event.data.success) {
+                            console.log('✅ Credential synced to central wallet:', credential.id);
+                        }
+                        resolve(event.data);
+                    }
+                };
+                
+                window.addEventListener('message', handler);
+                
+                bridge.contentWindow.postMessage({
+                    type: 'STORE_CREDENTIAL',
+                    payload: { credential },
+                    requestId
+                }, 'https://lemma.id');
+                
+                setTimeout(() => {
+                    window.removeEventListener('message', handler);
+                    resolve({ success: false, error: 'timeout' });
+                }, 5000);
+            });
+            
+        } catch (e) {
+            console.warn('⚠️ Could not sync to central wallet:', e.message);
+        }
     }
 
     /**
      * Get credentials (backwards compatible alias for getLemmas)
+     * On third-party sites, also checks central wallet via bridge
      * @param {string} type - Optional filter by packageType ('permission', 'identity', etc)
      */
     async getCredentials(type = null) {
         await this.init();
-        const lemmas = await this._getAll('lemmas');
+        let lemmas = await this._getAll('lemmas');
+        
+        // On third-party sites, also fetch from central wallet
+        if (!window.location.hostname.includes('lemma.id') && 
+            !window.location.hostname.includes('localhost')) {
+            try {
+                const centralCreds = await this._getFromCentralWallet(type);
+                
+                // Merge: add central creds not in local
+                const localIds = new Set(lemmas.map(l => l.id));
+                for (const cred of centralCreds) {
+                    if (!localIds.has(cred.id)) {
+                        lemmas.push(cred);
+                    }
+                }
+            } catch (e) {
+                console.warn('⚠️ Could not fetch from central wallet:', e.message);
+            }
+        }
         
         if (type) {
             return lemmas.filter(l => {
@@ -1325,6 +1415,64 @@ class LemmaWallet {
         }
         
         return lemmas;
+    }
+    
+    /**
+     * Get credentials from central lemma.id wallet via bridge
+     */
+    async _getFromCentralWallet(type = null) {
+        try {
+            let bridge = document.getElementById('lemma-wallet-bridge');
+            
+            if (!bridge) {
+                // Create bridge iframe
+                bridge = document.createElement('iframe');
+                bridge.id = 'lemma-wallet-bridge';
+                bridge.src = 'https://lemma.id/wallet/bridge';
+                bridge.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden;';
+                document.body.appendChild(bridge);
+                
+                // Wait for bridge to be ready
+                await new Promise((resolve) => {
+                    const handler = (event) => {
+                        if (event.data?.type === 'WALLET_BRIDGE_READY') {
+                            window.removeEventListener('message', handler);
+                            resolve();
+                        }
+                    };
+                    window.addEventListener('message', handler);
+                    setTimeout(resolve, 3000);
+                });
+            }
+            
+            return new Promise((resolve) => {
+                const requestId = `get_${Date.now()}`;
+                
+                const handler = (event) => {
+                    if (event.data?.requestId === requestId) {
+                        window.removeEventListener('message', handler);
+                        resolve(event.data.credentials || []);
+                    }
+                };
+                
+                window.addEventListener('message', handler);
+                
+                bridge.contentWindow.postMessage({
+                    type: 'GET_CREDENTIALS',
+                    payload: { type },
+                    requestId
+                }, 'https://lemma.id');
+                
+                setTimeout(() => {
+                    window.removeEventListener('message', handler);
+                    resolve([]);
+                }, 3000);
+            });
+            
+        } catch (e) {
+            console.warn('⚠️ Could not get from central wallet:', e.message);
+            return [];
+        }
     }
 
     /**
