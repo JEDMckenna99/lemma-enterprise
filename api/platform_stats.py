@@ -46,14 +46,17 @@ def get_platform_stats():
         current_month = datetime.now().strftime('%Y-%m')
         
         # Determine which site's stats to show
-        site_id = 'lemma_platform'  # Default for admins
-        site_domain = 'lemma.id'
+        site_id = None
+        site_domain = None
         user_email = None
         is_lemma_admin = False
+        available_sites = []
         
         # Get caller's credential to determine their site
+        requested_site_id = None
         if request.method == 'POST':
             data = request.get_json() or {}
+            requested_site_id = data.get('site_id')  # Allow requesting specific site
             user_credential = data.get('user_credential')
             if user_credential:
                 claims = user_credential.get('claims') or user_credential.get('credentialSubject') or {}
@@ -64,69 +67,118 @@ def get_platform_stats():
                 admin_permissions = ['admin_access', 'super_admin', 'site_admin', 'admin']
                 is_lemma_admin = permission_id in admin_permissions
         
-        # If not a lemma.id admin, look up their site(s)
-        if user_email and not is_lemma_admin:
+        # Try to get customer_id from session (set during login)
+        from flask import session as flask_session
+        customer_id = flask_session.get('customer_id')
+        
+        # If lemma.id admin and no specific site requested, show lemma.id stats
+        if is_lemma_admin and not requested_site_id:
+            site_id = 'lemma_platform'
+            site_domain = 'lemma.id'
+            logger.info(f"📊 Admin view - showing lemma.id stats")
+        else:
+            # Look up sites the caller owns
             try:
                 site_conn = get_db_connection()
                 site_cursor = site_conn.cursor()
                 
-                # Check sites table for admin_email match
-                site_cursor.execute("""
-                    SELECT site_id, site_domain 
-                    FROM sites 
-                    WHERE admin_email = %s
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                """, (user_email,))
+                # Method 1: Look up sites via customer_id in customers table (API keys stored as JSON)
+                if customer_id:
+                    try:
+                        site_cursor.execute("""
+                            SELECT api_keys FROM customers WHERE customer_id = %s
+                        """, (customer_id,))
+                        
+                        customer_row = site_cursor.fetchone()
+                        if customer_row and customer_row[0]:
+                            import json
+                            api_keys_data = customer_row[0]
+                            if isinstance(api_keys_data, str):
+                                api_keys_data = json.loads(api_keys_data)
+                            
+                            # Extract unique site_ids from API keys
+                            site_ids_from_keys = set()
+                            for key_data in api_keys_data or []:
+                                key_site_id = key_data.get('site_id')
+                                if key_site_id and key_data.get('status') != 'revoked':
+                                    site_ids_from_keys.add(key_site_id)
+                            
+                            # Fetch site details for those site_ids
+                            if site_ids_from_keys:
+                                placeholders = ','.join(['%s'] * len(site_ids_from_keys))
+                                site_cursor.execute(f"""
+                                    SELECT site_id, site_domain, company_name 
+                                    FROM sites 
+                                    WHERE site_id IN ({placeholders})
+                                    ORDER BY created_at DESC
+                                """, tuple(site_ids_from_keys))
+                                
+                                for row in site_cursor.fetchall():
+                                    available_sites.append({
+                                        'site_id': row[0],
+                                        'site_domain': row[1],
+                                        'company_name': row[2]
+                                    })
+                            
+                            logger.info(f"📊 Found {len(available_sites)} sites via customer {customer_id} API keys")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not look up sites via customer API keys: {e}")
                 
-                site_result = site_cursor.fetchone()
-                
-                if site_result:
-                    site_id = site_result[0]
-                    site_domain = site_result[1]
-                    logger.info(f"📊 Showing stats for site {site_id} (owner: {user_email})")
-                else:
-                    # Also check site_admins table
+                # Method 2: Fallback - look up by admin_email in sites table
+                if not available_sites and user_email:
                     site_cursor.execute("""
-                        SELECT site_id 
-                        FROM site_admins 
-                        WHERE admin_email = %s AND is_active = TRUE
-                        ORDER BY added_at DESC
-                        LIMIT 1
+                        SELECT site_id, site_domain, company_name 
+                        FROM sites 
+                        WHERE admin_email = %s
+                        ORDER BY created_at DESC
                     """, (user_email,))
                     
-                    admin_result = site_cursor.fetchone()
-                    if admin_result:
-                        site_id = admin_result[0]
-                        site_cursor.execute("SELECT site_domain FROM sites WHERE site_id = %s", (site_id,))
-                        domain_result = site_cursor.fetchone()
-                        if domain_result:
-                            site_domain = domain_result[0]
-                        logger.info(f"📊 Showing stats for site {site_id} (admin: {user_email})")
-                    else:
-                        # No site registered - return empty stats
-                        site_cursor.close()
-                        site_conn.close()
-                        return jsonify({
-                            'success': True,
-                            'stats': {
-                                'mau': 0,
-                                'total_verifications': 0,
-                                'active_users': 0,
-                                'registered_sites': 0
-                            },
-                            'recent_activity': [],
-                            'site_id': None,
-                            'site_domain': None,
-                            'month': current_month,
-                            'message': 'No site registered yet. Register a site to see your stats.'
+                    for row in site_cursor.fetchall():
+                        available_sites.append({
+                            'site_id': row[0],
+                            'site_domain': row[1],
+                            'company_name': row[2]
                         })
+                    
+                    logger.info(f"📊 Found {len(available_sites)} sites via admin_email {user_email}")
                 
                 site_cursor.close()
                 site_conn.close()
                 
+                # If specific site requested, validate and use it
+                if requested_site_id:
+                    matching_site = next((s for s in available_sites if s['site_id'] == requested_site_id), None)
+                    if matching_site or is_lemma_admin:
+                        site_id = requested_site_id
+                        site_domain = matching_site['site_domain'] if matching_site else requested_site_id
+                
+                # Use first available site if no specific request
+                if not site_id and available_sites:
+                    site_id = available_sites[0]['site_id']
+                    site_domain = available_sites[0]['site_domain']
+                    logger.info(f"📊 Using first available site: {site_domain}")
+                
+                # No site found - return empty stats
+                if not site_id:
+                    logger.info(f"📊 No sites found for caller (customer_id={customer_id}, email={user_email})")
+                    return jsonify({
+                        'success': True,
+                        'stats': {
+                            'mau': 0,
+                            'total_verifications': 0,
+                            'active_users': 0,
+                            'registered_sites': 0
+                        },
+                        'recent_activity': [],
+                        'site_id': None,
+                        'site_domain': None,
+                        'available_sites': [],
+                        'month': current_month,
+                        'message': 'No site registered yet. Register a site to see your stats.'
+                    })
+                
             except Exception as e:
-                logger.warning(f"⚠️ Could not look up site for {user_email}: {e}")
+                logger.warning(f"⚠️ Could not look up sites: {e}")
         
         # 1. Get MAU (from Redis via usage_tracking)
         mau_count = get_monthly_active_users(site_id)
@@ -196,6 +248,7 @@ def get_platform_stats():
             'site_id': site_id,
             'site_domain': site_domain,
             'is_lemma_admin': is_lemma_admin,
+            'available_sites': available_sites,
             'month': current_month
         })
         
