@@ -1418,9 +1418,13 @@
                 }
                 
                 // POST request with user credential to determine site
+                // Include Authorization header for customer_id extraction
                 const response = await fetch('/api/platform/stats', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
                     body: JSON.stringify({
                         user_credential: userCredential
                     })
@@ -1598,9 +1602,13 @@
                 }
                 
                 // POST request with user credential and optional specific site
+                // Include Authorization header for customer_id extraction
                 const response = await fetch('/api/platform/users', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
                     body: JSON.stringify({
                         user_credential: userCredential,
                         site_id: specificSiteId || window.selectedUsersSiteId
@@ -2610,10 +2618,14 @@
                     console.warn('Could not parse credential');
                 }
                 
-                // Fetch sites from the platform users endpoint (same as users section)
+                // Fetch sites from the platform stats endpoint
+                // Include Authorization header for customer_id extraction
                 const response = await fetch('/api/platform/stats', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
                     body: JSON.stringify({ user_credential: userCredential })
                 });
                 

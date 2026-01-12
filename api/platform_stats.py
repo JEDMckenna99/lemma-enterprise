@@ -67,9 +67,14 @@ def get_platform_stats():
                 admin_permissions = ['admin_access', 'super_admin', 'site_admin', 'admin']
                 is_lemma_admin = permission_id in admin_permissions
         
-        # Try to get customer_id from session (set during login)
+        # Try to get customer_id from Authorization header (like /api/customer/api-keys does)
+        # Fall back to session if not available
+        from api.customer_accounts import _extract_customer_id_from_request
         from flask import session as flask_session
-        customer_id = flask_session.get('customer_id')
+        
+        customer_id = _extract_customer_id_from_request()
+        if not customer_id:
+            customer_id = flask_session.get('customer_id')
         
         logger.info(f"📊 Stats request: customer_id={customer_id}, is_lemma_admin={is_lemma_admin}, user_email={user_email}")
         
@@ -347,9 +352,14 @@ def get_platform_users():
             user_email = request.args.get('email')
             requested_site_id = request.args.get('site_id')
         
-        # Try to get customer_id from session (set during login)
+        # Try to get customer_id from Authorization header (like /api/customer/api-keys does)
+        # Fall back to session if not available
+        from api.customer_accounts import _extract_customer_id_from_request
         from flask import session as flask_session
-        customer_id = flask_session.get('customer_id')
+        
+        customer_id = _extract_customer_id_from_request()
+        if not customer_id:
+            customer_id = flask_session.get('customer_id')
         
         logger.info(f"📊 Users request: customer_id={customer_id}, is_lemma_admin={is_lemma_admin}, user_email={user_email}")
         
