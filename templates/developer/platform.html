@@ -1344,33 +1344,93 @@
             }
         }
         
+        // Global storage for customer's registered sites (loaded from API keys)
+        window.customerSites = [];
+        window.primarySite = null;
+        
         // Grant platform access
-        function grantPlatformAccess(credential) {
+        async function grantPlatformAccess(credential) {
             const claims = credential.claims || credential.credentialSubject || {};
             userPermission = claims.permissionId || claims.permission_level || 'developer';
             lemmaPlatformCredentialString = JSON.stringify(credential);
-            
+
             console.log('✅ Platform access granted -', userPermission);
-            
+
             // Check admin status
             const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'];
-            const isAdmin = adminPermissions.includes(userPermission) || 
-                           (userPermission.toLowerCase().includes('admin') && 
+            const isAdmin = adminPermissions.includes(userPermission) ||
+                           (userPermission.toLowerCase().includes('admin') &&
                             !userPermission.toLowerCase().includes('beta'));
-            
+
             window.isLemmaAdmin = isAdmin;
-            
+
             if (isAdmin) {
                 const adminSection = document.getElementById('admin-section');
                 if (adminSection) adminSection.style.display = 'block';
             }
+
+            // IMPORTANT: Load API keys FIRST to get customer's registered sites
+            // This data is used by stats/users endpoints
+            await loadCustomerSitesFromAPIKeys();
             
-            // Load data and show platform
-            loadAPIKeysData(false);
+            // Now load overview with the site context
             loadOverviewData();
-            
+
             document.getElementById('loading-state').style.display = 'none';
             document.getElementById('section-overview').style.display = 'block';
+        }
+        
+        // Load customer's sites from API keys endpoint (this works reliably)
+        async function loadCustomerSitesFromAPIKeys() {
+            try {
+                console.log('🔑 Loading customer sites from API keys...');
+                
+                const response = await fetch('/api/customer/api-keys', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Extract unique sites from API keys
+                    const sitesFromKeys = [];
+                    const seenSiteIds = new Set();
+                    
+                    for (const key of (data.api_keys || [])) {
+                        if (key.site_id && !seenSiteIds.has(key.site_id)) {
+                            seenSiteIds.add(key.site_id);
+                            sitesFromKeys.push({
+                                site_id: key.site_id,
+                                site_domain: key.site_domain || key.site_id,
+                                from_api_key: true
+                            });
+                        }
+                    }
+                    
+                    // Also include sites from the sites array
+                    for (const site of (data.sites || [])) {
+                        if (site.site_id && !seenSiteIds.has(site.site_id)) {
+                            seenSiteIds.add(site.site_id);
+                            sitesFromKeys.push(site);
+                        }
+                    }
+                    
+                    window.customerSites = sitesFromKeys;
+                    window.primarySite = sitesFromKeys[0] || null;
+                    
+                    console.log('✅ Loaded customer sites:', window.customerSites);
+                    console.log('📍 Primary site:', window.primarySite);
+                    
+                    // Also render the API keys (existing functionality)
+                    renderAPIKeys(data.api_keys || [], {});
+                }
+            } catch (error) {
+                console.error('❌ Failed to load customer sites:', error);
+            }
         }
         
         // Show "setup wallet" message
@@ -1405,9 +1465,16 @@
         // Load overview data (shows stats for the caller's site)
         async function loadOverviewData() {
             try {
-                console.log('📊 Fetching stats for your site...');
+                // Use the primary site loaded from API keys (reliable source)
+                const targetSite = window.primarySite;
                 
-                // Get user's credential to determine their site
+                if (targetSite) {
+                    console.log('📊 Fetching stats for:', targetSite.site_domain || targetSite.site_id);
+                } else {
+                    console.log('📊 No registered site found, fetching default stats...');
+                }
+                
+                // Get user's credential
                 let userCredential = null;
                 try {
                     if (lemmaPlatformCredentialString) {
@@ -1417,8 +1484,7 @@
                     console.warn('Could not parse credential for stats');
                 }
                 
-                // POST request with user credential to determine site
-                // Include Authorization header for customer_id extraction
+                // POST request with explicit site_id from API keys
                 const response = await fetch('/api/platform/stats', {
                     method: 'POST',
                     headers: { 
@@ -1426,7 +1492,8 @@
                         ...getLemmaAuthHeaders()
                     },
                     body: JSON.stringify({
-                        user_credential: userCredential
+                        user_credential: userCredential,
+                        site_id: targetSite?.site_id  // Explicitly pass the site_id
                     })
                 });
                 const data = await response.json();
@@ -1589,9 +1656,16 @@
         // Load users data (shows users for the caller's site)
         async function loadUsersData(specificSiteId = null) {
             try {
-                console.log('👥 Fetching users for your site...');
+                // Use explicit site_id or fall back to primary site from API keys
+                const targetSiteId = specificSiteId || window.selectedUsersSiteId || window.primarySite?.site_id;
                 
-                // Get user's credential to determine their site
+                if (targetSiteId) {
+                    console.log('👥 Fetching users for site:', targetSiteId);
+                } else {
+                    console.log('👥 No site specified, fetching default...');
+                }
+                
+                // Get user's credential
                 let userCredential = null;
                 try {
                     if (lemmaPlatformCredentialString) {
@@ -1601,8 +1675,7 @@
                     console.warn('Could not parse credential');
                 }
                 
-                // POST request with user credential and optional specific site
-                // Include Authorization header for customer_id extraction
+                // POST request with explicit site_id from API keys
                 const response = await fetch('/api/platform/users', {
                     method: 'POST',
                     headers: { 
@@ -1611,7 +1684,7 @@
                     },
                     body: JSON.stringify({
                         user_credential: userCredential,
-                        site_id: specificSiteId || window.selectedUsersSiteId
+                        site_id: targetSiteId  // Explicitly pass the site_id
                     })
                 });
                 const data = await response.json();
