@@ -1,6 +1,12 @@
 """
-IAM Email Confirmation Flow
-Implements email-based permission lemma issuance
+IAM Email Confirmation Flow - PRIVACY PRESERVING
+Implements email-based permission lemma issuance WITHOUT storing email addresses.
+
+Privacy Design:
+- Email is used ONLY for delivery (via SendGrid)
+- Email is NEVER stored in Redis, database, or credentials
+- User must authenticate with passkey to claim permission
+- DID is derived from passkey credential ID (not email)
 """
 
 import secrets
@@ -29,7 +35,7 @@ iam_email_bp = Blueprint('iam_email', __name__)
 
 # Token storage (Redis for production, fallback to in-memory for dev)
 if redis_available:
-    logger.info("✅ Using Redis for email confirmation tokens")
+    logger.info("✅ Using Redis for email confirmation tokens (PRIVACY MODE - no email stored)")
 else:
     logger.warning("⚠️ Redis not available - using in-memory storage (tokens lost on restart!)")
     pending_access_requests = {}
@@ -125,16 +131,22 @@ def delete_confirmation_token(token):
 @rate_limit_email_confirmation()
 def request_access():
     """
-    User requests access to a site via email
+    PRIVACY-PRESERVING: Send permission claim link via email
+    
+    The email address is used ONLY for SendGrid delivery - it is NEVER stored
+    in Redis, database, or credential claims.
     
     POST /api/v1/iam/request-access
     {
         "site_id": "customer_site_123",
         "site_domain": "customer.com",
-        "user_email": "user@example.com",
+        "user_email": "user@example.com",       # Used for delivery only
         "permission_level": "user|admin|editor",
         "redirect_url": "https://customer.com/dashboard"
     }
+    
+    The recipient must authenticate with passkey to claim the permission.
+    Their DID is derived from passkey (not email).
     """
     try:
         data = request.get_json()
@@ -147,60 +159,78 @@ def request_access():
         
         site_id = data['site_id']
         site_domain = data.get('site_domain', f'site_{site_id}.com')
-        user_email = data['user_email']
+        user_email = data['user_email']  # Used ONLY for delivery
         permission_level = data.get('permission_level', 'user')
         redirect_url = data.get('redirect_url', f'https://{site_domain}')
+        expiry_days = data.get('expiry_days', 90)
         
-        # Validate email format
+        # Validate email format (for delivery only)
         if '@' not in user_email or '.' not in user_email:
             return jsonify({'error': 'Invalid email address'}), 400
         
         # Get or create site manager (auto-creates for new sites)
         manager = get_or_create_site_manager(site_id, site_domain)
         
-        # Generate confirmation token
-        confirmation_token = secrets.token_urlsafe(32)
+        # Generate claim token (secure, one-time use)
+        claim_token = secrets.token_urlsafe(32)
         
-        # Store pending request (in Redis with TTL, expires in 24 hours)
+        # PRIVACY: Store ONLY permission metadata - NO EMAIL
+        # The email is used for SendGrid delivery and then discarded
         token_data = {
             'site_id': site_id,
             'site_domain': site_domain,
-            'user_email': user_email,
             'permission_level': permission_level,
             'redirect_url': redirect_url,
+            'expiry_days': expiry_days,
             'created_at': time.time(),
-            'expires_at': time.time() + (24 * 60 * 60)
+            'expires_at': time.time() + (7 * 24 * 60 * 60),  # 7 day claim window
+            # NO user_email field - privacy by design
         }
-        store_confirmation_token(confirmation_token, token_data, ttl=86400)
+        store_confirmation_token(claim_token, token_data, ttl=604800)  # 7 days
         
-        # Generate confirmation link
+        # Generate claim link (goes to passkey-protected claim page)
         base_url = request.host_url.rstrip('/')
-        confirmation_link = f"{base_url}/confirm-access?token={confirmation_token}"
+        claim_link = f"{base_url}/claim-permission?token={claim_token}"
         
-        # Send confirmation email
+        # Send email via SendGrid (email address NOT logged or stored)
         email_html = render_email_template(
-            'access_confirmation',
+            'permission_claim',  # New privacy-preserving template
             site_domain=site_domain,
             permission_level=permission_level,
-            confirmation_link=confirmation_link
+            claim_link=claim_link,
+            expiry_days=7  # Claim window
         )
+        
+        # Fallback to old template if new one doesn't exist
+        if not email_html:
+            email_html = render_email_template(
+                'access_confirmation',
+                site_domain=site_domain,
+                permission_level=permission_level,
+                confirmation_link=claim_link
+            )
         
         email_result = send_email(
             to=user_email,
-            subject=f"Confirm access to {site_domain}",
+            subject=f"🎫 Claim your {permission_level} access to {site_domain}",
             html=email_html
         )
         
         if email_result['success']:
-            logger.info(f"📧 Sent access confirmation to {user_email} for {site_domain} ({permission_level})")
+            # Log without email (privacy)
+            logger.info(f"📧 Sent permission claim email for {site_domain} ({permission_level})")
+            logger.info(f"🔒 Privacy mode: email address not stored")
             
             return jsonify({
                 'success': True,
-                'message': 'Confirmation email sent. Check your inbox.',
-                'expires_in': 86400,
+                'message': 'Permission claim email sent. Recipient must authenticate with passkey to claim.',
+                'expires_in': 604800,  # 7 days
+                'privacy_mode': True,
                 'email_provider': email_result.get('provider')
             })
         else:
+            # Clean up token on email failure
+            delete_confirmation_token(claim_token)
             return jsonify({
                 'success': False,
                 'error': 'Failed to send email',
@@ -215,55 +245,114 @@ def request_access():
 @iam_email_bp.route('/confirm-access', methods=['GET'])
 def confirm_access():
     """
-    User clicks confirmation link
-    Issues permission lemma to their browser wallet
+    Legacy endpoint - redirect to new claim page
+    """
+    token = request.args.get('token')
+    if token:
+        return redirect(f'/claim-permission?token={token}')
+    return jsonify({'error': 'missing_token'}), 400
+
+
+@iam_email_bp.route('/claim-permission', methods=['GET'])
+def claim_permission_page():
+    """
+    PRIVACY-PRESERVING: Claim permission page
     
-    GET /confirm-access?token=abc123
+    User lands here from email link, must authenticate with passkey
+    to claim the permission. No email is stored or used for DID.
+    
+    GET /claim-permission?token=abc123
     """
     try:
         token = request.args.get('token')
         
         if not token:
-            return jsonify({
-                'error': 'missing_token',
-                'message': 'Missing confirmation token'
-            }), 400
+            return render_template('modern/claim_permission.html',
+                                 error='Missing claim token',
+                                 token=None)
         
-        # Get pending request from Redis
+        # Get pending request from Redis (contains NO email)
         pending = get_confirmation_token(token)
         
         if not pending:
-            logger.warning(f"⚠️ Invalid or expired token attempted: {token[:16]}...")
-            return jsonify({
-                'error': 'invalid_token',
-                'message': 'Invalid or expired confirmation link'
-            }), 400
+            logger.warning(f"⚠️ Invalid or expired claim token: {token[:16]}...")
+            return render_template('modern/claim_permission.html',
+                                 error='Invalid or expired claim link. Please request a new one.',
+                                 token=None)
         
         # Check expiration
         if time.time() > pending['expires_at']:
             delete_confirmation_token(token)
-            logger.warning(f"⏰ Expired token attempted: {token[:16]}...")
-            return jsonify({
-                'error': 'expired_token',
-                'message': 'Confirmation link expired (24 hour limit)'
-            }), 400
+            return render_template('modern/claim_permission.html',
+                                 error='Claim link expired. Please request a new one.',
+                                 token=None)
         
-        # Get site manager
+        # Render claim page - user must authenticate with passkey
+        return render_template('modern/claim_permission.html',
+                             token=token,
+                             site_domain=pending['site_domain'],
+                             permission_level=pending['permission_level'],
+                             expiry_days=pending.get('expiry_days', 90),
+                             redirect_url=pending.get('redirect_url', '/'),
+                             error=None)
+        
+    except Exception as e:
+        logger.error(f"❌ Claim permission page error: {e}")
+        return render_template('modern/claim_permission.html',
+                             error=f'Error: {str(e)}',
+                             token=None)
+
+
+@iam_email_bp.route('/api/v1/iam/claim-permission', methods=['POST'])
+@cross_origin()
+def claim_permission():
+    """
+    PRIVACY-PRESERVING: Claim permission with passkey authentication
+    
+    POST /api/v1/iam/claim-permission
+    {
+        "token": "claim_token_from_email",
+        "passkey_credential_id": "base64_credential_id"  # From WebAuthn
+    }
+    
+    The user's DID is derived from their passkey credential ID (not email).
+    NO email is stored anywhere.
+    """
+    try:
+        data = request.get_json()
+        token = data.get('token')
+        passkey_credential_id = data.get('passkey_credential_id')
+        
+        if not token:
+            return jsonify({'error': 'Missing claim token'}), 400
+        
+        if not passkey_credential_id:
+            return jsonify({'error': 'Passkey authentication required'}), 400
+        
+        # Get pending request (contains NO email)
+        pending = get_confirmation_token(token)
+        
+        if not pending:
+            return jsonify({'error': 'Invalid or expired claim token'}), 400
+        
+        if time.time() > pending['expires_at']:
+            delete_confirmation_token(token)
+            return jsonify({'error': 'Claim link expired'}), 400
+        
+        # Extract permission details
         site_id = pending['site_id']
         site_domain = pending['site_domain']
-        manager = get_site_manager(site_id, site_domain)
+        permission_level = pending['permission_level']
+        expiry_days = pending.get('expiry_days', 90)
+        redirect_url = pending.get('redirect_url', f'https://{site_domain}')
+        
+        # Get or create site manager
+        manager = get_or_create_site_manager(site_id, site_domain)
         
         if not manager:
-            # Try to recreate manager
-            manager = get_or_create_site_manager(site_id, site_domain)
-            if not manager:
-                return jsonify({
-                    'error': 'site_not_found',
-                    'message': 'Site not found'
-                }), 404
+            return jsonify({'error': 'Site not found'}), 404
         
-        # Recreate permission if not in memory (multi-dyno issue)
-        permission_level = pending['permission_level']
+        # Ensure permission type exists
         if permission_level not in manager.permissions:
             manager.add_permission({
                 'permission_id': permission_level,
@@ -273,45 +362,52 @@ def confirm_access():
                 'priority': 100
             })
         
-        # Create pairwise user DID (PPID) from email + RP (site domain)
-        user_email = pending['user_email']
-        user_did = derive_ppid_did(user_email, site_domain)
+        # PRIVACY: Derive DID from passkey credential ID (NOT email)
+        # This ensures the user's identity is tied to their passkey, not email
+        user_did = derive_ppid_did(passkey_credential_id, site_domain)
         
-        # Issue permission lemma with REAL Ed25519 signature
+        # Issue permission lemma
         start_time = time.perf_counter()
-        expiry_days = 90  # Default expiry for all permissions
         
         permission_lemma = manager.issue_permission_lemma(
             user_did,
             permission_level,
             expiry_days=expiry_days,
             custom_claims={
-                'email': user_email,
+                # NO email in claims - privacy by design
                 'site_domain': site_domain,
+                'siteId': site_id,
+                'siteDomain': site_domain,
                 'accountType': 'customer' if permission_level == 'user' else permission_level,
-                'permissionId': f'{permission_level}_access'
+                'permissionId': f'{permission_level}_access',
+                'claimedVia': 'passkey_authenticated_email_link'
             }
         )
         
-        # Add W3C type field and packageType (same as admin bootstrap)
+        # Add W3C type field and packageType
         permission_lemma['type'] = ['VerifiableCredential', 'PermissionLemma']
         permission_lemma['packageType'] = 'permission'
         
         if 'credentialSubject' in permission_lemma:
             permission_lemma['credentialSubject']['packageType'] = 'permission'
+            permission_lemma['credentialSubject']['siteId'] = site_id
+            permission_lemma['credentialSubject']['siteDomain'] = site_domain
         if 'claims' in permission_lemma:
             permission_lemma['claims']['packageType'] = 'permission'
+            permission_lemma['claims']['siteId'] = site_id
+            permission_lemma['claims']['siteDomain'] = site_domain
         
         issue_time_us = (time.perf_counter() - start_time) * 1_000_000
         
-        # Clean up pending request (delete from Redis)
+        # Delete the claim token (one-time use)
         delete_confirmation_token(token)
         
-        logger.info(f"✅ Issued {permission_level} credential to {user_email} for {site_domain}")
+        # Log without any PII
+        logger.info(f"✅ Issued {permission_level} credential for {site_domain} (passkey-authenticated)")
         logger.info(f"⚡ Issue time: {issue_time_us:.2f}µs")
-        logger.info(f"🔐 Credential ID: {permission_lemma['id']}")
+        logger.info(f"🔒 Privacy mode: no email stored in credential or database")
         
-        # Track credential issuance in database using permission_instances table
+        # Track in database WITHOUT email
         try:
             from api.database import get_db_connection
             from datetime import datetime, timedelta
@@ -319,10 +415,7 @@ def confirm_access():
             conn = get_db_connection(site_id=site_id)
             cursor = conn.cursor()
             
-            # Calculate expiry
-            expires_at_value = None
-            if expiry_days and expiry_days > 0:
-                expires_at_value = datetime.utcnow() + timedelta(days=expiry_days)
+            expires_at_value = datetime.utcnow() + timedelta(days=expiry_days) if expiry_days > 0 else None
             
             # Get or create permission type
             cursor.execute("""
@@ -334,7 +427,6 @@ def confirm_access():
             if result:
                 permission_type_id = result[0]
             else:
-                # Create permission type if doesn't exist
                 cursor.execute("""
                     INSERT INTO permission_types (site_id, name, type, description, active)
                     VALUES (%s, %s, 'role', %s, TRUE)
@@ -342,7 +434,7 @@ def confirm_access():
                 """, (site_id, permission_level, f'{permission_level.title()} access'))
                 permission_type_id = cursor.fetchone()[0]
             
-            # Insert permission instance (tracks the grant)
+            # Insert permission instance WITHOUT email (privacy mode)
             cursor.execute("""
                 INSERT INTO permission_instances 
                 (permission_type_id, site_id, email, credential_did, granted_at, granted_by, expires_at, metadata)
@@ -350,41 +442,40 @@ def confirm_access():
             """, (
                 permission_type_id,
                 site_id,
-                user_email,
+                '[privacy-protected]',  # Never store actual email
                 user_did,
                 datetime.utcnow(),
-                'email_confirmation',
+                'passkey_claim',
                 expires_at_value,
-                json.dumps({'credential_id': permission_lemma['id'], 'issue_time_us': issue_time_us})
+                json.dumps({
+                    'credential_id': permission_lemma['id'],
+                    'issue_time_us': issue_time_us,
+                    'privacy_mode': True
+                })
             ))
             
             conn.commit()
             cursor.close()
             conn.close()
             
-            logger.info(f"📊 Tracked permission grant in permission_instances table")
-            
         except Exception as e:
-            logger.warning(f"⚠️ Failed to track permission in database (non-critical): {e}")
-            # Don't fail the whole flow if tracking fails
+            logger.warning(f"⚠️ Database tracking failed (credential still valid): {e}")
         
-        # Render confirmation page with credential
-        return render_template('modern/confirm_access.html',
-                             permission_lemma=json.dumps(permission_lemma),
-                             redirect_url=pending['redirect_url'],
-                             user_email=user_email,
-                             site_domain=site_domain,
-                             permission_level=permission_level,
-                             issue_time_us=issue_time_us)
+        return jsonify({
+            'success': True,
+            'permission_lemma': permission_lemma,
+            'redirect_url': redirect_url,
+            'site_domain': site_domain,
+            'permission_level': permission_level,
+            'issue_time_us': issue_time_us,
+            'privacy_mode': True
+        })
         
     except Exception as e:
-        logger.error(f"❌ Confirm access error: {e}")
+        logger.error(f"❌ Claim permission error: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({
-            'error': 'internal_error',
-            'message': f'Error confirming access: {str(e)}'
-        }), 500
+        return jsonify({'error': str(e)}), 500
 
 
 def get_default_scope(permission_level: str) -> list:

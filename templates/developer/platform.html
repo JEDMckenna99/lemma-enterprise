@@ -881,15 +881,25 @@
             
             <!-- Email Flow Tab -->
             <div id="issue-tab-email-content">
+                <!-- Privacy Notice -->
+                <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <p style="margin: 0; font-size: 13px; color: #065f46;">
+                        <strong>🔒 Privacy Mode:</strong> Email addresses are used <strong>only for delivery</strong> - they are never stored by Lemma. 
+                        Recipients must authenticate with passkey to claim their permission.
+                    </p>
+                </div>
+                
                 <form id="issue-permission-form" onsubmit="issuePermission(event)">
                     <div class="form-group">
-                        <label class="form-label">Email Address</label>
+                        <label class="form-label">Recipient Email</label>
                         <input type="email" class="form-input" id="permission-email" required placeholder="user@example.com">
+                        <small style="color: #6b7280; font-size: 12px;">Used only for delivery - not stored</small>
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label">Site</label>
-                        <select class="form-select" id="permission-site" required>
+                        <select class="form-select" id="permission-site" required onchange="toggleCustomSite()">
+                            <option value="">Select a registered site...</option>
                             <option value="lemma.id">lemma.id</option>
                             <option value="custom">Custom site (enter below)</option>
                         </select>
@@ -899,15 +909,21 @@
                     <div class="form-group">
                         <label class="form-label">Permission Level</label>
                         <select class="form-select" id="permission-level" required>
-                            <option value="beta-user">Beta User</option>
-                            <option value="admin">Admin</option>
+                            <option value="user">User (Basic Access)</option>
+                            <option value="editor">Editor (Read/Write)</option>
+                            <option value="admin">Admin (Full Access)</option>
                             <option value="super_admin">Super Admin</option>
                         </select>
                     </div>
                     
+                    <div class="form-group">
+                        <label class="form-label">Expiry (Days)</label>
+                        <input type="number" class="form-input" id="permission-expiry" value="90" min="1" max="730">
+                    </div>
+                    
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" onclick="closeModal('issue-permission-modal')">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Send Email Confirmation</button>
+                        <button type="submit" class="btn btn-primary">📧 Send Claim Link</button>
                     </div>
                 </form>
             </div>
@@ -1867,7 +1883,7 @@
             }
         }
         
-        // Issue permission
+        // Issue permission via email (privacy-preserving)
         async function issuePermission(event) {
             event.preventDefault();
             
@@ -1875,13 +1891,14 @@
             const siteSelect = document.getElementById('permission-site').value;
             const siteId = siteSelect === 'custom' 
                 ? document.getElementById('permission-custom-site').value 
-                : 'lemma_platform';
+                : (siteSelect || 'lemma_platform');
             const siteDomain = siteSelect === 'custom'
                 ? document.getElementById('permission-custom-site').value
-                : 'lemma.id';
+                : (siteSelect || 'lemma.id');
             const permissionLevel = document.getElementById('permission-level').value;
+            const expiryDays = parseInt(document.getElementById('permission-expiry').value) || 90;
             
-            console.log('📧 Issuing permission:', { email, siteId, siteDomain, permissionLevel });
+            console.log('📧 Sending claim link (privacy mode):', { siteDomain, permissionLevel, expiryDays });
             
             try {
                 const response = await fetch('/api/v1/iam/request-access', {
@@ -1892,24 +1909,35 @@
                         site_domain: siteDomain,
                         user_email: email,
                         permission_level: permissionLevel,
-                        redirect_url: window.location.origin + '/'
+                        expiry_days: expiryDays,
+                        redirect_url: `https://${siteDomain}/`
                     })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert(`✅ Confirmation email sent to ${email}!\n\nThey will receive a link to confirm and get their credential.`);
+                    alert(`✅ Claim link sent!\n\n` +
+                          `🔒 Privacy Mode: Email address not stored\n\n` +
+                          `The recipient will receive a link to claim their ${permissionLevel} permission.\n` +
+                          `They must authenticate with passkey to claim.`);
                     closeModal('issue-permission-modal');
                     document.getElementById('issue-permission-form').reset();
                 } else {
-                    alert(`❌ Failed: ${data.message || 'Unknown error'}`);
+                    alert(`❌ Failed: ${data.error || data.message || 'Unknown error'}`);
                 }
                 
             } catch (error) {
                 console.error('❌ Issue permission failed:', error);
                 alert('Failed to send email. Please try again.');
             }
+        }
+        
+        // Toggle custom site input
+        function toggleCustomSite() {
+            const siteSelect = document.getElementById('permission-site');
+            const customInput = document.getElementById('permission-custom-site');
+            customInput.style.display = siteSelect.value === 'custom' ? 'block' : 'none';
         }
         
         // API key helpers
@@ -2036,8 +2064,48 @@
         // Modal helpers
         function showIssuePermissionModal() {
             document.getElementById('issue-permission-modal').classList.add('show');
-            // Load user's registered sites for direct issue
+            // Load user's registered sites for both email and direct issue
             loadUserSitesForDirectIssue();
+            loadUserSitesForEmailIssue();
+        }
+        
+        // Load sites for email permission issuance
+        async function loadUserSitesForEmailIssue() {
+            const select = document.getElementById('permission-site');
+            if (!select) return;
+            
+            try {
+                const response = await fetch('/api/sdk/auth/api-keys');
+                const data = await response.json();
+                
+                // Preserve custom option
+                select.innerHTML = '<option value="">Select your registered site...</option>';
+                
+                if (data.success && data.api_keys) {
+                    data.api_keys.forEach(key => {
+                        const option = document.createElement('option');
+                        option.value = key.site_id || key.site_domain;
+                        option.textContent = `${key.site_domain} (${key.site_label || key.environment || 'production'})`;
+                        option.dataset.domain = key.site_domain;
+                        select.appendChild(option);
+                    });
+                }
+                
+                // Add lemma.id option
+                const lemmaOption = document.createElement('option');
+                lemmaOption.value = 'lemma.id';
+                lemmaOption.textContent = 'lemma.id (Lemma Platform)';
+                select.appendChild(lemmaOption);
+                
+                // Add custom option at end
+                const customOption = document.createElement('option');
+                customOption.value = 'custom';
+                customOption.textContent = 'Custom site (enter below)';
+                select.appendChild(customOption);
+                
+            } catch (e) {
+                console.log('Could not load sites for email issue');
+            }
         }
         
         // Switch between Email and Direct issue tabs

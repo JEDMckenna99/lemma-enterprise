@@ -325,6 +325,72 @@ def render_email_template(template_name: str, **kwargs) -> str:
                 </div>
             </body>
             </html>
+        ''',
+        
+        'permission_claim': '''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9fafb; }
+                    .card { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+                    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }
+                    .header h1 { margin: 0 0 8px; font-size: 26px; font-weight: 600; }
+                    .header p { margin: 0; opacity: 0.9; font-size: 15px; }
+                    .content { padding: 30px; }
+                    .permission-box { background: #f3f4f6; border-radius: 10px; padding: 20px; margin: 20px 0; }
+                    .permission-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+                    .permission-row:last-child { border-bottom: none; }
+                    .permission-label { color: #6b7280; }
+                    .permission-value { font-weight: 600; color: #111827; }
+                    .permission-badge { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 12px; border-radius: 20px; font-size: 13px; }
+                    .button { display: block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; text-align: center; margin: 24px 0; font-size: 16px; }
+                    .privacy-box { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 16px; margin: 20px 0; }
+                    .privacy-box p { margin: 0; font-size: 13px; color: #065f46; }
+                    .footer { text-align: center; padding: 20px 30px 30px; color: #6b7280; font-size: 13px; }
+                    .footer a { color: #667eea; text-decoration: none; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="header">
+                        <h1>🎫 Claim Your Permission</h1>
+                        <p>You've been invited to access {site_domain}</p>
+                    </div>
+                    <div class="content">
+                        <p>Hi there,</p>
+                        <p>Someone has granted you access to <strong>{site_domain}</strong>. Click below to claim your permission credential.</p>
+                        
+                        <div class="permission-box">
+                            <div class="permission-row">
+                                <span class="permission-label">Site</span>
+                                <span class="permission-value">{site_domain}</span>
+                            </div>
+                            <div class="permission-row">
+                                <span class="permission-label">Permission Level</span>
+                                <span class="permission-badge">{permission_level}</span>
+                            </div>
+                            <div class="permission-row">
+                                <span class="permission-label">Claim Window</span>
+                                <span class="permission-value">{expiry_days} days</span>
+                            </div>
+                        </div>
+                        
+                        <a href="{claim_link}" class="button">🔑 Claim with Passkey</a>
+                        
+                        <div class="privacy-box">
+                            <p><strong>🔒 Privacy-First:</strong> Your email address is used only to deliver this link. It is not stored or shared. Your permission will be tied to your passkey, not your email.</p>
+                        </div>
+                        
+                        <p style="color: #6b7280; font-size: 14px;">This link expires in {expiry_days} days. If you didn't expect this, you can safely ignore this email.</p>
+                    </div>
+                    <div class="footer">
+                        <p>Powered by <a href="https://lemma.id">Lemma</a> • Privacy-first authentication</p>
+                    </div>
+                </div>
+            </body>
+            </html>
         '''
     }
     
