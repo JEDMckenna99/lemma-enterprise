@@ -415,14 +415,23 @@ def get_platform_users():
             if not credential_id:
                 credential_id = credential_did or f'perm_{instance_id}'
             
+            # For wallet-first auth, email may be empty - show PPID instead
+            display_identifier = email if email else (
+                credential_did[:30] + '...' if credential_did and len(credential_did) > 30 else credential_did
+            )
+            
             users.append({
                 'email': email,
+                'credential_did': credential_did,  # Full PPID for revocation
+                'display_identifier': display_identifier,  # For UI display
+                'auth_method': 'wallet' if not email else 'email',
                 'permission': permission_name,
                 'granted_at': granted_at.isoformat() if granted_at else None,
                 'expires_at': expires_at.isoformat() if expires_at else 'Never',
                 'status': status,
                 'time_ago': get_time_ago(granted_at) if granted_at else 'Unknown',
-                'credential_id': credential_id  # For revocation
+                'credential_id': credential_id,  # For revocation
+                'instance_id': instance_id  # Database ID for revocation
             })
         
         logger.info(f"📊 Retrieved {len(users)} users for {site_id} ({site_domain})")
@@ -454,82 +463,115 @@ def get_platform_users():
 @platform_stats_bp.route('/api/platform/revoke-permission', methods=['POST'])
 def revoke_platform_permission():
     """
-    Revoke a user's permission from the platform
+    Revoke a user's permission from a site
     
-    REQUIRES: Admin permission (admin_access, super_admin, site_admin)
-    Beta users CANNOT revoke permissions.
+    Site owners can revoke permissions for their own sites.
+    Lemma admins can revoke any permission.
     
     POST /api/platform/revoke-permission
     {
-        "email": "user@example.com",
-        "credential_id": "cred_xxx",
-        "reason": "User requested / Admin action",
-        "admin_credential": {...}  // Admin's credential for authorization
+        "email": "user@example.com",       // Optional - for email-based users
+        "credential_did": "did:lemma:...", // Optional - for wallet-based users
+        "instance_id": 123,                // Optional - direct DB ID
+        "site_id": "site_xxx",             // Required - which site
+        "reason": "admin_action",
+        "admin_credential": {...}          // Caller's credential for authorization
     }
     
     This will:
-    1. Verify admin has revocation authority
+    1. Verify caller owns the site or is lemma admin
     2. Mark permission as revoked in database
     3. Trigger Bloom filter update
     4. Publish revocation event to all dynos via Redis pub/sub
-    5. Clients will sync on next page load or after 7 days
     """
     conn = None
     cursor = None
     try:
         data = request.get_json()
         email = data.get('email')
+        credential_did = data.get('credential_did')
+        instance_id = data.get('instance_id')
         credential_id = data.get('credential_id')
         reason = data.get('reason', 'admin_action')
         admin_credential = data.get('admin_credential')
-        
-        # CRITICAL: Verify caller has admin permission
-        admin_permissions = ['admin_access', 'super_admin', 'site_admin', 'admin', 'superadmin']
+        requested_site_id = data.get('site_id')
         
         if not admin_credential:
-            logger.warning(f"🚫 Revocation attempt without admin credential")
+            logger.warning(f"🚫 Revocation attempt without credential")
             return jsonify({
                 'success': False,
-                'error': 'Admin credential required for revocation'
+                'error': 'Credential required for revocation'
             }), 403
         
-        # Extract permission from admin credential
+        # Extract permission info from caller's credential
         admin_claims = admin_credential.get('claims') or admin_credential.get('credentialSubject') or {}
         admin_permission_id = admin_claims.get('permissionId') or admin_claims.get('permission_level') or ''
+        admin_site_id = admin_claims.get('siteId') or admin_claims.get('site_id') or ''
         
-        # Check if this is an actual admin (NOT beta-user)
-        is_admin = admin_permission_id in admin_permissions or \
-                   admin_permission_id.lower() in ['admin', 'superadmin', 'super_admin']
+        # Check if caller is lemma.id admin
+        is_lemma_admin = admin_site_id == 'lemma.id' or admin_site_id == 'lemma_platform'
+        is_admin_role = admin_permission_id.lower() in ['admin', 'superadmin', 'super_admin', 'admin_access', 'site_admin']
         
-        if not is_admin:
-            logger.warning(f"🚫 Non-admin ({admin_permission_id}) attempted to revoke credential for {email}")
+        # Determine the site_id for the revocation
+        site_id = requested_site_id or admin_site_id
+        
+        if not site_id or site_id == 'lemma.id':
+            site_id = 'lemma_platform'
+        
+        # Authorization check:
+        # - Lemma admins can revoke anything
+        # - Site owners (admin role for that site) can revoke their own site's users
+        can_revoke = (is_lemma_admin and is_admin_role) or \
+                     (admin_site_id == site_id and is_admin_role)
+        
+        if not can_revoke:
+            logger.warning(f"🚫 Unauthorized revocation: caller site={admin_site_id}, target site={site_id}, role={admin_permission_id}")
             return jsonify({
                 'success': False,
-                'error': 'Only administrators can revoke permissions. Beta users cannot revoke.'
+                'error': 'You can only revoke permissions for your own site'
             }), 403
         
-        logger.info(f"✅ Admin {admin_permission_id} authorized to revoke credential for {email}")
-        
-        if not email:
+        # Need at least one identifier
+        if not email and not credential_did and not instance_id:
             return jsonify({
                 'success': False,
-                'error': 'Email is required'
+                'error': 'Email, credential_did, or instance_id required'
             }), 400
         
-        site_id = 'lemma_platform'
+        logger.info(f"✅ Authorized revocation: site={site_id}, email={email}, did={credential_did[:30] if credential_did else None}...")
         
         # Mark permission as revoked in database
         conn = get_db_connection(site_id=site_id)
         cursor = conn.cursor()
         
-        cursor.execute("""
-            UPDATE permission_instances
-            SET revoked_at = NOW(),
-                revoked_by = %s,
-                revocation_reason = %s
-            WHERE site_id = %s AND email = %s AND revoked_at IS NULL
-            RETURNING id, credential_did
-        """, ('platform_admin', reason, site_id, email))
+        # Build query based on available identifiers
+        if instance_id:
+            cursor.execute("""
+                UPDATE permission_instances
+                SET revoked_at = NOW(),
+                    revoked_by = %s,
+                    revocation_reason = %s
+                WHERE id = %s AND site_id = %s AND revoked_at IS NULL
+                RETURNING id, credential_did, email
+            """, (admin_permission_id, reason, instance_id, site_id))
+        elif credential_did:
+            cursor.execute("""
+                UPDATE permission_instances
+                SET revoked_at = NOW(),
+                    revoked_by = %s,
+                    revocation_reason = %s
+                WHERE site_id = %s AND credential_did = %s AND revoked_at IS NULL
+                RETURNING id, credential_did, email
+            """, (admin_permission_id, reason, site_id, credential_did))
+        else:
+            cursor.execute("""
+                UPDATE permission_instances
+                SET revoked_at = NOW(),
+                    revoked_by = %s,
+                    revocation_reason = %s
+                WHERE site_id = %s AND email = %s AND revoked_at IS NULL
+                RETURNING id, credential_did, email
+            """, (admin_permission_id, reason, site_id, email))
         
         result = cursor.fetchone()
         
@@ -542,20 +584,20 @@ def revoke_platform_permission():
                 'error': 'No active permission found for this user'
             }), 404
         
-        instance_id, user_did = result
+        revoked_instance_id, user_did, revoked_email = result
         conn.commit()
         
-        logger.info(f"✅ Marked permission as revoked in database: {email}")
+        identifier = revoked_email or user_did or f'instance_{revoked_instance_id}'
+        logger.info(f"✅ Marked permission as revoked in database: {identifier}")
         
         # Add to revocation list table
-        # Note: Table has both lemma_id (unique, required) and credential_id (optional, for compatibility)
-        cred_id_value = credential_id or f'perm_{instance_id}'
+        cred_id_value = credential_id or f'perm_{revoked_instance_id}'
         cursor.execute("""
             INSERT INTO revocation_list 
             (lemma_id, credential_id, user_did, lemma_type, site_id, revoked_at, reason, bloom_filter_updated)
             VALUES (%s, %s, %s, 'permission', %s, NOW(), %s, FALSE)
             ON CONFLICT (lemma_id) DO UPDATE SET revoked_at = NOW()
-        """, (cred_id_value, cred_id_value, user_did or f'user_{email}', site_id, reason))
+        """, (cred_id_value, cred_id_value, user_did or f'user_{revoked_instance_id}', site_id, reason))
         
         conn.commit()
         cursor.close()
@@ -564,10 +606,11 @@ def revoke_platform_permission():
         logger.info(f"✅ Added to revocation_list table")
         
         # Trigger immediate Bloom filter sync via event bus (site-targeted)
+        event_published = False
         try:
             from api.revocation_sync import trigger_revocation_sync
             
-            cred_id_for_sync = credential_id or f'perm_{instance_id}'
+            cred_id_for_sync = credential_id or f'perm_{revoked_instance_id}'
             
             # Site-targeted sync: Only this site's users will sync
             event_published = trigger_revocation_sync(cred_id_for_sync, 'permission', site_id=site_id)
@@ -582,11 +625,13 @@ def revoke_platform_permission():
         
         return jsonify({
             'success': True,
-            'message': f'Permission revoked for {email}',
-            'email': email,
+            'message': f'Permission revoked for {identifier}',
+            'email': revoked_email,
+            'credential_did': user_did,
+            'instance_id': revoked_instance_id,
             'revoked_at': datetime.utcnow().isoformat(),
             'bloom_filter_updated': True,
-            'sync_propagated': event_published if 'event_published' in locals() else False
+            'sync_propagated': event_published
         })
         
     except Exception as e:

@@ -275,6 +275,11 @@
             background: #fef3c7;
             color: #92400e;
         }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
         
         .badge-info {
             background: #dbeafe;
@@ -836,10 +841,13 @@
             
             <form id="revoke-permission-form" onsubmit="revokePermission(event)">
                 <div class="form-group">
-                    <label class="form-label">User Email</label>
-                    <input type="text" class="form-input" id="revoke-email" readonly style="background: #f9fafb;">
+                    <label class="form-label">User Identifier</label>
+                    <input type="text" class="form-input" id="revoke-email" readonly style="background: #f9fafb; font-family: monospace; font-size: 13px;">
+                    <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                        Email, Wallet ID (PPID), or Instance ID
+                    </div>
                 </div>
-                
+
                 <input type="hidden" id="revoke-credential-id">
                 
                 <div class="form-group">
@@ -1344,93 +1352,33 @@
             }
         }
         
-        // Global storage for customer's registered sites (loaded from API keys)
-        window.customerSites = [];
-        window.primarySite = null;
-        
         // Grant platform access
-        async function grantPlatformAccess(credential) {
+        function grantPlatformAccess(credential) {
             const claims = credential.claims || credential.credentialSubject || {};
             userPermission = claims.permissionId || claims.permission_level || 'developer';
             lemmaPlatformCredentialString = JSON.stringify(credential);
-
+            
             console.log('✅ Platform access granted -', userPermission);
-
+            
             // Check admin status
             const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'];
-            const isAdmin = adminPermissions.includes(userPermission) ||
-                           (userPermission.toLowerCase().includes('admin') &&
+            const isAdmin = adminPermissions.includes(userPermission) || 
+                           (userPermission.toLowerCase().includes('admin') && 
                             !userPermission.toLowerCase().includes('beta'));
-
+            
             window.isLemmaAdmin = isAdmin;
-
+            
             if (isAdmin) {
                 const adminSection = document.getElementById('admin-section');
                 if (adminSection) adminSection.style.display = 'block';
             }
-
-            // IMPORTANT: Load API keys FIRST to get customer's registered sites
-            // This data is used by stats/users endpoints
-            await loadCustomerSitesFromAPIKeys();
             
-            // Now load overview with the site context
+            // Load data and show platform
+            loadAPIKeysData(false);
             loadOverviewData();
-
+            
             document.getElementById('loading-state').style.display = 'none';
             document.getElementById('section-overview').style.display = 'block';
-        }
-        
-        // Load customer's sites from API keys endpoint (this works reliably)
-        async function loadCustomerSitesFromAPIKeys() {
-            try {
-                console.log('🔑 Loading customer sites from API keys...');
-                
-                const response = await fetch('/api/customer/api-keys', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...getLemmaAuthHeaders()
-                    }
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Extract unique sites from API keys
-                    const sitesFromKeys = [];
-                    const seenSiteIds = new Set();
-                    
-                    for (const key of (data.api_keys || [])) {
-                        if (key.site_id && !seenSiteIds.has(key.site_id)) {
-                            seenSiteIds.add(key.site_id);
-                            sitesFromKeys.push({
-                                site_id: key.site_id,
-                                site_domain: key.site_domain || key.site_id,
-                                from_api_key: true
-                            });
-                        }
-                    }
-                    
-                    // Also include sites from the sites array
-                    for (const site of (data.sites || [])) {
-                        if (site.site_id && !seenSiteIds.has(site.site_id)) {
-                            seenSiteIds.add(site.site_id);
-                            sitesFromKeys.push(site);
-                        }
-                    }
-                    
-                    window.customerSites = sitesFromKeys;
-                    window.primarySite = sitesFromKeys[0] || null;
-                    
-                    console.log('✅ Loaded customer sites:', window.customerSites);
-                    console.log('📍 Primary site:', window.primarySite);
-                    
-                    // Also render the API keys (existing functionality)
-                    renderAPIKeys(data.api_keys || [], {});
-                }
-            } catch (error) {
-                console.error('❌ Failed to load customer sites:', error);
-            }
         }
         
         // Show "setup wallet" message
@@ -1465,16 +1413,9 @@
         // Load overview data (shows stats for the caller's site)
         async function loadOverviewData() {
             try {
-                // Use the primary site loaded from API keys (reliable source)
-                const targetSite = window.primarySite;
+                console.log('📊 Fetching stats for your site...');
                 
-                if (targetSite) {
-                    console.log('📊 Fetching stats for:', targetSite.site_domain || targetSite.site_id);
-                } else {
-                    console.log('📊 No registered site found, fetching default stats...');
-                }
-                
-                // Get user's credential
+                // Get user's credential to determine their site
                 let userCredential = null;
                 try {
                     if (lemmaPlatformCredentialString) {
@@ -1484,7 +1425,8 @@
                     console.warn('Could not parse credential for stats');
                 }
                 
-                // POST request with explicit site_id from API keys
+                // POST request with user credential to determine site
+                // Include Authorization header for customer_id extraction
                 const response = await fetch('/api/platform/stats', {
                     method: 'POST',
                     headers: { 
@@ -1492,8 +1434,7 @@
                         ...getLemmaAuthHeaders()
                     },
                     body: JSON.stringify({
-                        user_credential: userCredential,
-                        site_id: targetSite?.site_id  // Explicitly pass the site_id
+                        user_credential: userCredential
                     })
                 });
                 const data = await response.json();
@@ -1656,16 +1597,9 @@
         // Load users data (shows users for the caller's site)
         async function loadUsersData(specificSiteId = null) {
             try {
-                // Use explicit site_id or fall back to primary site from API keys
-                const targetSiteId = specificSiteId || window.selectedUsersSiteId || window.primarySite?.site_id;
+                console.log('👥 Fetching users for your site...');
                 
-                if (targetSiteId) {
-                    console.log('👥 Fetching users for site:', targetSiteId);
-                } else {
-                    console.log('👥 No site specified, fetching default...');
-                }
-                
-                // Get user's credential
+                // Get user's credential to determine their site
                 let userCredential = null;
                 try {
                     if (lemmaPlatformCredentialString) {
@@ -1675,7 +1609,8 @@
                     console.warn('Could not parse credential');
                 }
                 
-                // POST request with explicit site_id from API keys
+                // POST request with user credential and optional specific site
+                // Include Authorization header for customer_id extraction
                 const response = await fetch('/api/platform/users', {
                     method: 'POST',
                     headers: { 
@@ -1684,7 +1619,7 @@
                     },
                     body: JSON.stringify({
                         user_credential: userCredential,
-                        site_id: targetSiteId  // Explicitly pass the site_id
+                        site_id: specificSiteId || window.selectedUsersSiteId
                     })
                 });
                 const data = await response.json();
@@ -1723,13 +1658,17 @@
                     </div>` : '';
                 
                 if (data.success && data.users && data.users.length > 0) {
-                    // Create users table
+                    // Store site_id for revocation
+                    window.currentUsersSiteId = data.site_id;
+                    
+                    // Create users table - support both email and wallet-based auth
                     const tableHTML = `
                         ${siteContext}
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>Email</th>
+                                    <th>User</th>
+                                    <th>Auth Method</th>
                                     <th>Permission</th>
                                     <th>Status</th>
                                     <th>Granted</th>
@@ -1738,24 +1677,38 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                ${data.users.map(user => `
+                                ${data.users.map(user => {
+                                    // Determine display identifier
+                                    const displayId = user.display_identifier || user.email || 
+                                        (user.credential_did ? user.credential_did.substring(0, 25) + '...' : 'Unknown');
+                                    
+                                    // Auth method badge
+                                    const authMethod = user.auth_method || (user.email ? 'email' : 'wallet');
+                                    const authBadge = authMethod === 'wallet' 
+                                        ? '<span class="badge" style="background: #dbeafe; color: #1d4ed8;">🔐 Wallet</span>'
+                                        : '<span class="badge" style="background: #dcfce7; color: #166534;">📧 Email</span>';
+                                    
+                                    return `
                                     <tr>
-                                        <td>${user.email}</td>
-                                        <td><span class="badge badge-info">${user.permission}</span></td>
-                                        <td><span class="badge ${user.status === 'active' ? 'badge-success' : 'badge-warning'}">${user.status}</span></td>
+                                        <td>
+                                            <div style="font-size: 13px; font-weight: 500;">${escapeHTML(displayId)}</div>
+                                            ${user.credential_did && user.email ? `<div style="font-size: 11px; color: #9ca3af;">${escapeHTML(user.credential_did.substring(0, 30))}...</div>` : ''}
+                                        </td>
+                                        <td>${authBadge}</td>
+                                        <td><span class="badge badge-info">${escapeHTML(user.permission)}</span></td>
+                                        <td><span class="badge ${user.status === 'active' ? 'badge-success' : user.status === 'revoked' ? 'badge-danger' : 'badge-warning'}">${user.status}</span></td>
                                         <td style="font-size: 13px; color: #6b7280;">${user.time_ago}</td>
                                         <td style="font-size: 13px; color: #6b7280;">${user.expires_at}</td>
                                         <td>
-                                            ${user.status === 'active' ? (
-                                                window.isLemmaAdmin ? `
-                                                <button class="btn btn-secondary btn-sm" onclick="showRevokeModal('${user.email}', '${user.credential_id || ''}')">
+                                            ${user.status === 'active' ? `
+                                                <button class="btn btn-secondary btn-sm" style="color: #dc2626; border-color: #fecaca;" 
+                                                    onclick="showRevokeModal('${escapeHTML(user.email || '')}', '${escapeHTML(user.credential_id || '')}', '${escapeHTML(user.credential_did || '')}', ${user.instance_id || 0})">
                                                     Revoke
                                                 </button>
-                                                ` : '<span style="color: #9ca3af; font-size: 11px;">-</span>'
-                                            ) : '<span style="color: #9ca3af; font-size: 13px;">Revoked</span>'}
+                                            ` : '<span class="badge badge-danger" style="font-size: 11px;">Revoked</span>'}
                                         </td>
                                     </tr>
-                                `).join('')}
+                                `;}).join('')}
                             </tbody>
                         </table>
                     `;
@@ -2403,13 +2356,19 @@
             }
         }
         
-        function showRevokeModal(email, credentialId) {
-            // Double-check admin permission
-            if (!window.isLemmaAdmin) {
-                alert('Permission Denied\n\nOnly administrators can revoke user permissions.');
-                return;
-            }
-            document.getElementById('revoke-email').value = email;
+        function showRevokeModal(email, credentialId, credentialDid, instanceId) {
+            // Store all identifiers for revocation
+            window.revokeData = {
+                email: email,
+                credentialId: credentialId,
+                credentialDid: credentialDid,
+                instanceId: instanceId,
+                siteId: window.currentUsersSiteId
+            };
+            
+            // Update modal display
+            const displayLabel = email || (credentialDid ? credentialDid.substring(0, 40) + '...' : `User #${instanceId}`);
+            document.getElementById('revoke-email').value = displayLabel;
             document.getElementById('revoke-credential-id').value = credentialId;
             document.getElementById('revoke-permission-modal').classList.add('show');
         }
@@ -2418,33 +2377,26 @@
             document.getElementById(modalId).classList.remove('show');
         }
         
-        // Revoke permission
-        // Revoke permission (ADMIN ONLY - beta users cannot revoke)
+        // Revoke permission - site owners can revoke their own site's users
         async function revokePermission(event) {
             event.preventDefault();
-            
-            // Check admin permission
-            if (!window.isLemmaAdmin) {
-                alert('Permission Denied\n\nOnly administrators can revoke user permissions.\nBeta users do not have revocation authority.');
-                return;
-            }
-            
-            const email = document.getElementById('revoke-email').value;
-            const credentialId = document.getElementById('revoke-credential-id').value;
+
+            const revokeData = window.revokeData || {};
             const reason = document.getElementById('revoke-reason').value;
-            
-            const confirmed = confirm(`Are you sure you want to revoke access for ${email}?\n\nThis will:\n- Update the Bloom filter\n- Sync to all clients\n- Cannot be undone`);
-            
+            const displayLabel = document.getElementById('revoke-email').value;
+
+            const confirmed = confirm(`Are you sure you want to revoke access for ${displayLabel}?\n\nThis will:\n- Revoke their permission immediately\n- Update the revocation list\n- Cannot be undone`);
+
             if (!confirmed) return;
+
+            console.log('🚨 Revoking permission:', revokeData);
             
-            console.log('🚨 Admin revoking permission:', { email, credentialId, reason });
-            
-            // Get admin credential for authorization
+            // Get caller's credential for authorization
             let adminCredential = null;
             try {
                 adminCredential = JSON.parse(lemmaPlatformCredentialString);
             } catch (e) {
-                alert('Could not retrieve admin credential');
+                alert('Could not retrieve your credential for authorization');
                 return;
             }
             
@@ -2453,8 +2405,11 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        email: email,
-                        credential_id: credentialId,
+                        email: revokeData.email || null,
+                        credential_did: revokeData.credentialDid || null,
+                        credential_id: revokeData.credentialId || null,
+                        instance_id: revokeData.instanceId || null,
+                        site_id: revokeData.siteId || null,
                         reason: reason,
                         admin_credential: adminCredential
                     })
@@ -2463,14 +2418,14 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert(`✅ Permission revoked for ${email}!\n\n` +
+                    alert(`✅ Permission revoked!\n\n` +
+                          `• User: ${data.email || data.credential_did || 'User #' + data.instance_id}\n` +
                           `• Database updated\n` +
-                          `• Bloom filter ${data.bloom_filter_updated ? 'updated' : 'pending'}\n` +
-                          `• Sync ${data.sync_propagated ? 'propagated to all dynos' : 'local only'}\n\n` +
-                          `Clients will sync the revocation within 7 days.`);
+                          `• Revocation will sync to clients\n`);
                     
                     closeModal('revoke-permission-modal');
                     document.getElementById('revoke-permission-form').reset();
+                    window.revokeData = null;
                     
                     // Reload users list to show updated status
                     loadUsersData();
