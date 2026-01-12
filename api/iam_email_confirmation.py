@@ -136,31 +136,85 @@ def request_access():
     The email address is used ONLY for SendGrid delivery - it is NEVER stored
     in Redis, database, or credential claims.
     
+    DEVELOPER API - Call from your backend with API key:
+    
     POST /api/v1/iam/request-access
+    Headers:
+        X-API-Key: your_api_key
+        Content-Type: application/json
+    
+    Body:
     {
-        "site_id": "customer_site_123",
-        "site_domain": "customer.com",
-        "user_email": "user@example.com",       # Used for delivery only
+        "user_email": "user@example.com",       # Used for delivery only - NEVER stored
         "permission_level": "user|admin|editor",
-        "redirect_url": "https://customer.com/dashboard"
+        "redirect_url": "https://yoursite.com/dashboard",  # Optional
+        "expiry_days": 90  # Optional, default 90
     }
     
     The recipient must authenticate with passkey to claim the permission.
     Their DID is derived from passkey (not email).
+    
+    Returns:
+    {
+        "success": true,
+        "message": "Permission claim email sent...",
+        "privacy_mode": true,
+        "expires_in": 604800
+    }
     """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+        
+        # Check for API key authentication (for developer backend calls)
+        api_key = request.headers.get('X-API-Key') or data.get('api_key')
+        site_id = None
+        site_domain = None
+        
+        if api_key:
+            # Validate API key and get associated site
+            try:
+                from api.database import get_db_connection
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    SELECT site_id, site_domain FROM api_keys 
+                    WHERE api_key = %s AND active = TRUE
+                """, (api_key,))
+                
+                result = cursor.fetchone()
+                cursor.close()
+                conn.close()
+                
+                if result:
+                    site_id = result[0]
+                    site_domain = result[1]
+                    logger.info(f"📧 API key authenticated for site: {site_domain}")
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Invalid API key'
+                    }), 401
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ API key validation failed: {e}")
+                # Fall back to provided site_id/site_domain
+        
+        # If no API key, require site_id in body (for platform UI calls)
+        if not site_id:
+            site_id = data.get('site_id')
+            site_domain = data.get('site_domain', f'site_{site_id}.com' if site_id else None)
         
         # Validate required fields
-        required = ['site_id', 'user_email', 'permission_level']
-        for field in required:
-            if not data.get(field):
-                return jsonify({'error': f'Missing required field: {field}'}), 400
-        
-        site_id = data['site_id']
-        site_domain = data.get('site_domain', f'site_{site_id}.com')
-        user_email = data['user_email']  # Used ONLY for delivery
+        user_email = data.get('user_email')
         permission_level = data.get('permission_level', 'user')
+        
+        if not user_email:
+            return jsonify({'error': 'Missing required field: user_email'}), 400
+        
+        if not site_id:
+            return jsonify({'error': 'Missing site_id or API key'}), 400
+        
         redirect_url = data.get('redirect_url', f'https://{site_domain}')
         expiry_days = data.get('expiry_days', 90)
         
@@ -494,69 +548,200 @@ def get_default_scope(permission_level: str) -> list:
 @cross_origin()
 def send_credential_directly():
     """
-    Direct API for sending permission lemma via email
-    Used by site admins to grant access to users
+    Legacy endpoint - redirects to privacy-preserving flow
+    Use /api/v1/iam/invite instead
+    """
+    # Forward to privacy-preserving endpoint
+    return invite_user()
+
+
+@iam_email_bp.route('/api/v1/iam/invite', methods=['POST'])
+@cross_origin()
+def invite_user():
+    """
+    DEVELOPER API: Invite a user to your site via email
     
-    POST /api/v1/iam/send-credential-email
+    Privacy-preserving: Email is used ONLY for delivery, never stored.
+    User must authenticate with passkey to claim the permission.
+    
+    Headers:
+        X-API-Key: your_api_key (required)
+        Content-Type: application/json
+    
+    POST /api/v1/iam/invite
     {
-        "site_id": "lemma_platform",
-        "site_domain": "lemma.id",
-        "user_email": "jedmckenna@lemma.id",
-        "permission_level": "super_admin",
-        "api_key": "your_api_key"
+        "email": "user@example.com",           # For delivery only - NEVER stored
+        "permission": "user|editor|admin",     # Permission level
+        "redirect_url": "https://yoursite.com/welcome",  # Optional
+        "expiry_days": 90,                     # Optional, credential validity
+        "claim_window_days": 7                 # Optional, link validity
     }
+    
+    Returns:
+    {
+        "success": true,
+        "message": "Invitation sent",
+        "claim_expires_in": 604800,
+        "privacy_mode": true
+    }
+    
+    Example (curl):
+    ```
+    curl -X POST https://lemma.id/api/v1/iam/invite \\
+      -H "X-API-Key: your_api_key" \\
+      -H "Content-Type: application/json" \\
+      -d '{"email": "user@example.com", "permission": "admin"}'
+    ```
+    
+    Example (Node.js):
+    ```javascript
+    await fetch('https://lemma.id/api/v1/iam/invite', {
+        method: 'POST',
+        headers: {
+            'X-API-Key': process.env.LEMMA_API_KEY,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            email: 'user@example.com',
+            permission: 'admin'
+        })
+    });
+    ```
     """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         
-        # For now, allow direct send (in production, validate API key)
-        site_id = data.get('site_id', 'lemma_platform')
-        site_domain = data.get('site_domain', 'lemma.id')
-        user_email = data['user_email']
-        permission_level = data.get('permission_level', 'admin')
+        # Require API key for this endpoint
+        api_key = request.headers.get('X-API-Key') or data.get('api_key')
         
-        # Create confirmation request
-        confirmation_token = secrets.token_urlsafe(32)
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'API key required. Pass via X-API-Key header.'
+            }), 401
         
-        pending_access_requests[confirmation_token] = {
+        # Validate API key
+        try:
+            from api.database import get_db_connection
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT site_id, site_domain FROM api_keys 
+                WHERE api_key = %s AND active = TRUE
+            """, (api_key,))
+            
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            if not result:
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid API key'
+                }), 401
+            
+            site_id, site_domain = result
+            
+        except Exception as e:
+            logger.error(f"❌ API key validation error: {e}")
+            return jsonify({
+                'success': False,
+                'error': 'API key validation failed'
+            }), 500
+        
+        # Get parameters
+        user_email = data.get('email') or data.get('user_email')
+        permission_level = data.get('permission') or data.get('permission_level', 'user')
+        redirect_url = data.get('redirect_url', f'https://{site_domain}')
+        expiry_days = data.get('expiry_days', 90)
+        claim_window_days = data.get('claim_window_days', 7)
+        
+        if not user_email:
+            return jsonify({
+                'success': False,
+                'error': 'email is required'
+            }), 400
+        
+        # Validate email format
+        if '@' not in user_email or '.' not in user_email:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid email format'
+            }), 400
+        
+        # Get or create site manager
+        manager = get_or_create_site_manager(site_id, site_domain)
+        
+        # Generate claim token
+        claim_token = secrets.token_urlsafe(32)
+        
+        # PRIVACY: Store ONLY permission metadata - NO EMAIL
+        token_data = {
             'site_id': site_id,
             'site_domain': site_domain,
-            'user_email': user_email,
             'permission_level': permission_level,
-            'redirect_url': f'https://{site_domain}/dashboard',
+            'redirect_url': redirect_url,
+            'expiry_days': expiry_days,
             'created_at': time.time(),
-            'expires_at': time.time() + (24 * 60 * 60)
+            'expires_at': time.time() + (claim_window_days * 24 * 60 * 60)
         }
+        store_confirmation_token(claim_token, token_data, ttl=claim_window_days * 86400)
         
-        # Generate confirmation link
-        base_url = request.host_url.rstrip('/')
-        confirmation_link = f"{base_url}/confirm-access?token={confirmation_token}"
+        # Generate claim link
+        base_url = 'https://lemma.id'  # Always use lemma.id for claim page
+        claim_link = f"{base_url}/claim-permission?token={claim_token}"
         
-        # Send email
+        # Send email via SendGrid (email NOT stored)
         email_html = render_email_template(
-            'access_confirmation',
+            'permission_claim',
             site_domain=site_domain,
             permission_level=permission_level,
-            confirmation_link=confirmation_link
+            claim_link=claim_link,
+            expiry_days=claim_window_days
         )
+        
+        if not email_html:
+            email_html = render_email_template(
+                'access_confirmation',
+                site_domain=site_domain,
+                permission_level=permission_level,
+                confirmation_link=claim_link
+            )
         
         email_result = send_email(
             to=user_email,
-            subject=f"Your {permission_level} access to {site_domain}",
+            subject=f"🎫 You're invited to {site_domain}",
             html=email_html
         )
         
-        logger.info(f"📧 Sent credential email to {user_email} for {site_domain}")
-        
-        return jsonify({
-            'success': True,
-            'message': f'Credential email sent to {user_email}',
-            'confirmation_link': confirmation_link,  # For testing
-            'email_provider': email_result.get('provider')
-        })
-        
+        if email_result['success']:
+            logger.info(f"📧 Invitation sent for {site_domain} ({permission_level}) - privacy mode")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Invitation sent. User must authenticate with passkey to claim.',
+                'claim_expires_in': claim_window_days * 86400,
+                'credential_expires_in_days': expiry_days,
+                'privacy_mode': True,
+                'email_provider': email_result.get('provider')
+            })
+        else:
+            # Clean up token on email failure
+            delete_confirmation_token(claim_token)
+            return jsonify({
+                'success': False,
+                'error': 'Failed to send email',
+                'details': email_result.get('message')
+            }), 500
+            
     except Exception as e:
-        logger.error(f"❌ Send credential email error: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"❌ Invite user error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 

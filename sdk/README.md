@@ -564,6 +564,78 @@ Verify wallet session and permissions.
 }
 ```
 
+### Server-Side API (Backend Integration)
+
+#### `POST /api/v1/iam/invite`
+
+**Privacy-Preserving Email Invitation** - Invite users to your site via email. Email is used ONLY for delivery and is **never stored**.
+
+```bash
+# cURL example
+curl -X POST https://lemma.id/api/v1/iam/invite \
+  -H "X-API-Key: your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "permission": "admin",
+    "redirect_url": "https://yoursite.com/welcome"
+  }'
+```
+
+```javascript
+// Node.js example
+const response = await fetch('https://lemma.id/api/v1/iam/invite', {
+    method: 'POST',
+    headers: {
+        'X-API-Key': process.env.LEMMA_API_KEY,
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        email: 'user@example.com',
+        permission: 'admin',           // user, editor, admin, super_admin
+        redirect_url: 'https://yoursite.com/welcome',  // Optional
+        expiry_days: 90,               // Optional - credential validity
+        claim_window_days: 7           // Optional - link validity
+    })
+});
+
+const result = await response.json();
+// { success: true, message: "Invitation sent...", privacy_mode: true }
+```
+
+```python
+# Python example
+import requests
+
+response = requests.post(
+    'https://lemma.id/api/v1/iam/invite',
+    headers={
+        'X-API-Key': os.environ['LEMMA_API_KEY'],
+        'Content-Type': 'application/json'
+    },
+    json={
+        'email': 'user@example.com',
+        'permission': 'admin'
+    }
+)
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `email` | string | Yes | Recipient email (delivery only - never stored) |
+| `permission` | string | No | Permission level: `user`, `editor`, `admin`, `super_admin` (default: `user`) |
+| `redirect_url` | string | No | URL to redirect after claiming |
+| `expiry_days` | number | No | Credential validity in days (default: 90) |
+| `claim_window_days` | number | No | Link validity in days (default: 7) |
+
+**Privacy Guarantees:**
+- ✅ Email address is NEVER stored in database, Redis, or credential claims
+- ✅ User must authenticate with passkey to claim permission
+- ✅ User DID is derived from passkey (not email)
+- ✅ Database stores `[privacy-protected]` instead of email
+
 ---
 
 ## 🐛 **Troubleshooting**
