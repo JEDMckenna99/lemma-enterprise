@@ -85,90 +85,20 @@ def get_platform_stats():
             site_domain = 'lemma.id'
             logger.info(f"📊 Admin view - showing lemma.id stats")
         else:
-            # Look up sites the caller owns
-            try:
-                site_conn = get_db_connection()
-                site_cursor = site_conn.cursor()
-                
-                # Method 1: Look up sites via customer_id in customers table
-                # Sites are stored in TWO places:
-                # - customer.sites JSON (platform-registered sites)
-                # - customer.api_keys JSON (site_id field)
-                # We need to check BOTH
-                if customer_id:
-                    try:
-                        import json
-                        
-                        # Fetch both api_keys and sites from customer record
-                        site_cursor.execute("""
-                            SELECT api_keys, sites FROM customers WHERE customer_id = %s
-                        """, (customer_id,))
-                        
-                        customer_row = site_cursor.fetchone()
-                        if customer_row:
-                            api_keys_data = customer_row[0]
-                            sites_data = customer_row[1]
-                            
-                            # Parse JSON if needed
-                            if isinstance(api_keys_data, str):
-                                api_keys_data = json.loads(api_keys_data) if api_keys_data else []
-                            if isinstance(sites_data, str):
-                                sites_data = json.loads(sites_data) if sites_data else []
-                            
-                            # Method 1a: Get sites from customer.sites JSON (primary source)
-                            for site_entry in (sites_data or []):
-                                site_id_val = site_entry.get('site_id')
-                                site_domain_val = site_entry.get('site_domain') or site_entry.get('domain')
-                                if site_id_val:
-                                    available_sites.append({
-                                        'site_id': site_id_val,
-                                        'site_domain': site_domain_val or site_id_val,
-                                        'company_name': site_entry.get('company_name') or site_entry.get('label') or ''
-                                    })
-                            
-                            logger.info(f"📊 Found {len(available_sites)} sites from customer.sites")
-                            
-                            # Method 1b: Also check API keys for any site_ids not in sites list
-                            existing_site_ids = {s['site_id'] for s in available_sites}
-                            for key_data in (api_keys_data or []):
-                                key_site_id = key_data.get('site_id')
-                                if key_site_id and key_data.get('status') != 'revoked' and key_site_id not in existing_site_ids:
-                                    # Site from API key not in sites list - use site_id as domain
-                                    available_sites.append({
-                                        'site_id': key_site_id,
-                                        'site_domain': key_site_id,  # Use site_id as fallback domain
-                                        'company_name': key_data.get('name', '')
-                                    })
-                            
-                            logger.info(f"📊 Total {len(available_sites)} sites for customer {customer_id}")
-                            
-                            # Method 1c: Try to enrich with PostgreSQL sites table if available
-                            if available_sites:
-                                site_ids_to_lookup = [s['site_id'] for s in available_sites if s['site_domain'] == s['site_id']]
-                                if site_ids_to_lookup:
-                                    try:
-                                        placeholders = ','.join(['%s'] * len(site_ids_to_lookup))
-                                        site_cursor.execute(f"""
-                                            SELECT site_id, site_domain, company_name 
-                                            FROM sites 
-                                            WHERE site_id IN ({placeholders})
-                                        """, tuple(site_ids_to_lookup))
-                                        
-                                        pg_sites = {row[0]: (row[1], row[2]) for row in site_cursor.fetchall()}
-                                        
-                                        # Update available_sites with PostgreSQL data
-                                        for site in available_sites:
-                                            if site['site_id'] in pg_sites:
-                                                site['site_domain'] = pg_sites[site['site_id']][0]
-                                                site['company_name'] = pg_sites[site['site_id']][1] or site['company_name']
-                                    except Exception as e:
-                                        logger.debug(f"PostgreSQL sites lookup failed: {e}")
-                            
-                    except Exception as e:
-                        logger.warning(f"⚠️ Could not look up sites via customer record: {e}")
-                
-                # Method 2: Fallback - look up by admin_email in sites table
-                if not available_sites and user_email:
+            # Look up sites the caller owns using unified helper
+            if customer_id:
+                try:
+                    from api.storage_helpers import get_sites_for_customer_from_postgres
+                    available_sites = get_sites_for_customer_from_postgres(customer_id)
+                    logger.info(f"📊 Found {len(available_sites)} sites for customer {customer_id}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not look up sites via helper: {e}")
+            
+            # Method 2: Fallback - look up by admin_email in sites table
+            if not available_sites and user_email:
+                try:
+                    site_conn = get_db_connection()
+                    site_cursor = site_conn.cursor()
                     site_cursor.execute("""
                         SELECT site_id, site_domain, company_name 
                         FROM sites 
@@ -184,44 +114,23 @@ def get_platform_stats():
                         })
                     
                     logger.info(f"📊 Found {len(available_sites)} sites via admin_email {user_email}")
-                
-                site_cursor.close()
-                site_conn.close()
-                
-                # If specific site requested, validate and use it
-                if requested_site_id:
-                    matching_site = next((s for s in available_sites if s['site_id'] == requested_site_id), None)
-                    if matching_site or is_lemma_admin:
-                        site_id = requested_site_id
-                        site_domain = matching_site['site_domain'] if matching_site else requested_site_id
-                
-                # Use first available site if no specific request
-                if not site_id and available_sites:
-                    site_id = available_sites[0]['site_id']
-                    site_domain = available_sites[0]['site_domain']
-                    logger.info(f"📊 Using first available site: {site_domain}")
-                
-                # No site found - return empty stats
-                if not site_id:
-                    logger.info(f"📊 No sites found for caller (customer_id={customer_id}, email={user_email})")
-                    return jsonify({
-                        'success': True,
-                        'stats': {
-                            'mau': 0,
-                            'total_verifications': 0,
-                            'active_users': 0,
-                            'registered_sites': 0
-                        },
-                        'recent_activity': [],
-                        'site_id': None,
-                        'site_domain': None,
-                        'available_sites': [],
-                        'month': current_month,
-                        'message': 'No site registered yet. Register a site to see your stats.'
-                    })
-                
-            except Exception as e:
-                logger.warning(f"⚠️ Could not look up sites: {e}")
+                    site_cursor.close()
+                    site_conn.close()
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not look up sites by admin_email: {e}")
+            
+            # Select site from available sites
+            if requested_site_id:
+                matching_site = next((s for s in available_sites if s['site_id'] == requested_site_id), None)
+                if matching_site or is_lemma_admin:
+                    site_id = requested_site_id
+                    site_domain = matching_site['site_domain'] if matching_site else requested_site_id
+            
+            # Use first available site if no specific request
+            if not site_id and available_sites:
+                site_id = available_sites[0]['site_id']
+                site_domain = available_sites[0]['site_domain']
+                logger.info(f"📊 Using first available site: {site_domain}")
         
         # SAFETY CHECK: If we still don't have a site_id and user is NOT admin, return empty
         # This prevents accidentally showing lemma.id stats to non-admins
@@ -405,84 +314,20 @@ def get_platform_users():
             site_domain = 'lemma.id'
             logger.info(f"📊 Admin view - showing lemma.id users")
         else:
-            # Look up sites the caller owns
-            try:
-                site_conn = get_db_connection()
-                site_cursor = site_conn.cursor()
-
-                # Method 1: Look up sites via customer_id in customers table
-                # Sites are stored in TWO places:
-                # - customer.sites JSON (platform-registered sites)
-                # - customer.api_keys JSON (site_id field)
-                if customer_id:
-                    try:
-                        import json
-                        
-                        # Fetch both api_keys and sites from customer record
-                        site_cursor.execute("""
-                            SELECT api_keys, sites FROM customers WHERE customer_id = %s
-                        """, (customer_id,))
-                        
-                        customer_row = site_cursor.fetchone()
-                        if customer_row:
-                            api_keys_data = customer_row[0]
-                            sites_data = customer_row[1]
-                            
-                            # Parse JSON if needed
-                            if isinstance(api_keys_data, str):
-                                api_keys_data = json.loads(api_keys_data) if api_keys_data else []
-                            if isinstance(sites_data, str):
-                                sites_data = json.loads(sites_data) if sites_data else []
-                            
-                            # Method 1a: Get sites from customer.sites JSON (primary source)
-                            for site_entry in (sites_data or []):
-                                site_id_val = site_entry.get('site_id')
-                                site_domain_val = site_entry.get('site_domain') or site_entry.get('domain')
-                                if site_id_val:
-                                    available_sites.append({
-                                        'site_id': site_id_val,
-                                        'site_domain': site_domain_val or site_id_val,
-                                        'company_name': site_entry.get('company_name') or site_entry.get('label') or ''
-                                    })
-                            
-                            # Method 1b: Also check API keys for any site_ids not in sites list
-                            existing_site_ids = {s['site_id'] for s in available_sites}
-                            for key_data in (api_keys_data or []):
-                                key_site_id = key_data.get('site_id')
-                                if key_site_id and key_data.get('status') != 'revoked' and key_site_id not in existing_site_ids:
-                                    available_sites.append({
-                                        'site_id': key_site_id,
-                                        'site_domain': key_site_id,
-                                        'company_name': key_data.get('name', '')
-                                    })
-                            
-                            logger.info(f"📊 Found {len(available_sites)} sites for customer {customer_id}")
-                            
-                            # Try to enrich with PostgreSQL sites table
-                            if available_sites:
-                                site_ids_to_lookup = [s['site_id'] for s in available_sites if s['site_domain'] == s['site_id']]
-                                if site_ids_to_lookup:
-                                    try:
-                                        placeholders = ','.join(['%s'] * len(site_ids_to_lookup))
-                                        site_cursor.execute(f"""
-                                            SELECT site_id, site_domain, company_name 
-                                            FROM sites 
-                                            WHERE site_id IN ({placeholders})
-                                        """, tuple(site_ids_to_lookup))
-                                        
-                                        pg_sites = {row[0]: (row[1], row[2]) for row in site_cursor.fetchall()}
-                                        for site in available_sites:
-                                            if site['site_id'] in pg_sites:
-                                                site['site_domain'] = pg_sites[site['site_id']][0]
-                                                site['company_name'] = pg_sites[site['site_id']][1] or site['company_name']
-                                    except Exception as e:
-                                        logger.debug(f"PostgreSQL sites lookup failed: {e}")
-                            
-                    except Exception as e:
-                        logger.warning(f"⚠️ Could not look up sites via customer record: {e}")
-
-                # Method 2: Fallback - look up by admin_email in sites table
-                if not available_sites and user_email:
+            # Look up sites the caller owns using unified helper
+            if customer_id:
+                try:
+                    from api.storage_helpers import get_sites_for_customer_from_postgres
+                    available_sites = get_sites_for_customer_from_postgres(customer_id)
+                    logger.info(f"📊 Found {len(available_sites)} sites for customer {customer_id}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not look up sites via helper: {e}")
+            
+            # Fallback - look up by admin_email in sites table
+            if not available_sites and user_email:
+                try:
+                    site_conn = get_db_connection()
+                    site_cursor = site_conn.cursor()
                     site_cursor.execute("""
                         SELECT site_id, site_domain, company_name
                         FROM sites
@@ -498,53 +343,25 @@ def get_platform_users():
                         })
                     
                     logger.info(f"📊 Found {len(available_sites)} sites via admin_email {user_email}")
-                
-                # Method 3: Check site_admins table if still no sites
-                if not available_sites and user_email:
-                    try:
-                        site_cursor.execute("""
-                            SELECT s.site_id, s.site_domain, s.company_name
-                            FROM site_admins sa
-                            JOIN sites s ON sa.site_id = s.site_id
-                            WHERE sa.admin_email = %s AND sa.is_active = TRUE
-                        """, (user_email,))
-                        
-                        for row in site_cursor.fetchall():
-                            if not any(s['site_id'] == row[0] for s in available_sites):
-                                available_sites.append({
-                                    'site_id': row[0],
-                                    'site_domain': row[1],
-                                    'company_name': row[2]
-                                })
-                        
-                        if available_sites:
-                            logger.info(f"📊 Found {len(available_sites)} sites via site_admins table")
-                    except Exception as e:
-                        logger.debug(f"site_admins lookup failed (table may not exist): {e}")
-                
-                site_cursor.close()
-                site_conn.close()
-                
-                # If specific site requested, validate and use it
-                if requested_site_id:
-                    matching_site = next((s for s in available_sites if s['site_id'] == requested_site_id), None)
-                    if matching_site or is_lemma_admin:
-                        site_id = requested_site_id
-                        site_domain = matching_site['site_domain'] if matching_site else requested_site_id
-                    else:
-                        logger.warning(f"⚠️ Requested site {requested_site_id} not in available sites")
-                
-                # Use first available site if no specific request
-                if not site_id and available_sites:
-                    site_id = available_sites[0]['site_id']
-                    site_domain = available_sites[0]['site_domain']
-                    logger.info(f"📊 Using first available site: {site_domain}")
-                
-                if not site_id:
-                    logger.info(f"📊 No sites found for caller (customer_id={customer_id}, email={user_email})")
-                
-            except Exception as e:
-                logger.warning(f"⚠️ Could not look up sites: {e}")
+                    site_cursor.close()
+                    site_conn.close()
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not look up sites by admin_email: {e}")
+            
+            # Select site from available sites
+            if requested_site_id:
+                matching_site = next((s for s in available_sites if s['site_id'] == requested_site_id), None)
+                if matching_site or is_lemma_admin:
+                    site_id = requested_site_id
+                    site_domain = matching_site['site_domain'] if matching_site else requested_site_id
+                else:
+                    logger.warning(f"⚠️ Requested site {requested_site_id} not in available sites")
+            
+            # Use first available site if no specific request
+            if not site_id and available_sites:
+                site_id = available_sites[0]['site_id']
+                site_domain = available_sites[0]['site_domain']
+                logger.info(f"📊 Using first available site: {site_domain}")
         
         # Get users for the determined site
         if not site_id:

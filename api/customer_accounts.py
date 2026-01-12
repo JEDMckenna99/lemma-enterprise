@@ -802,6 +802,22 @@ class CustomerAccountManager:
         self.api_key_to_customer[key_hash] = customer_id
         self.api_key_to_customer[raw_api_key] = customer_id
         
+        # Also write to PostgreSQL api_keys table (dual-write for migration)
+        if site_id:
+            try:
+                from api.storage_helpers import upsert_api_key_to_postgres
+                upsert_api_key_to_postgres(
+                    customer_id=customer_id,
+                    site_id=site_id,
+                    key_hash=key_hash,
+                    key_hint=key_hint,
+                    name=key_name
+                )
+                logger.info(f"✅ API key written to PostgreSQL api_keys table")
+            except Exception as pg_err:
+                logger.warning(f"⚠️ Could not write to PostgreSQL api_keys table: {pg_err}")
+                # Don't fail - JSON write succeeded
+        
         logger.info(f"Generated additional API key for customer: {customer_id}")
         
         return {
@@ -1754,15 +1770,34 @@ def register_customer_site():
         
         customer.sites = sites
         
-        # Update database record
+        # Update database record - DUAL WRITE to both JSON column and normalized table
         if customer_manager.db_available:
             db = None
             try:
                 db = get_db()
                 db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == customer_id).first()
                 if db_customer:
+                    # Write to JSON column (legacy)
                     db_customer.sites = sites
                     db.commit()
+                
+                # Also write to normalized sites table (new)
+                try:
+                    from api.storage_helpers import upsert_site_to_postgres
+                    upsert_site_to_postgres(
+                        site_id=site_id,
+                        site_domain=site_domain,
+                        customer_id=customer_id,
+                        company_name=company_name,
+                        admin_email=contact_email,
+                        environment=environment,
+                        site_label=site_label
+                    )
+                    logger.info(f"✅ Site {site_id} written to PostgreSQL sites table")
+                except Exception as pg_err:
+                    logger.warning(f"⚠️ Could not write to PostgreSQL sites table: {pg_err}")
+                    # Don't fail - JSON write succeeded
+                
             except Exception as e:
                 logger.error(f"Failed to persist site metadata for {customer_id}: {e}")
                 if db is not None:
