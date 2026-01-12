@@ -21,7 +21,7 @@ if (typeof window !== 'undefined' && window.LemmaWallet) {
 
 const WALLET_DB_NAME = 'LemmaWallet';
 const WALLET_DB_VERSION = 3;  // v3: Added wallet_secret for PPID derivation
-const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
+const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Auth states
 const AUTH_STATE = {
