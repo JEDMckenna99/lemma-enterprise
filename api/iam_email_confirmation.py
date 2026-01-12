@@ -228,8 +228,11 @@ def request_access():
         # Generate claim token (secure, one-time use)
         claim_token = secrets.token_urlsafe(32)
         
-        # PRIVACY: Store ONLY permission metadata - NO EMAIL
-        # The email is used for SendGrid delivery and then discarded
+        # PRIVACY NOTE: Email stored in Redis token ONLY for EmailLemma issuance
+        # - Token auto-expires in 7 days (Redis TTL)
+        # - Token deleted immediately after claim
+        # - Email NEVER stored in our database
+        # - Email goes into user's wallet (EmailLemma) - user controls it
         token_data = {
             'site_id': site_id,
             'site_domain': site_domain,
@@ -238,7 +241,8 @@ def request_access():
             'expiry_days': expiry_days,
             'created_at': time.time(),
             'expires_at': time.time() + (7 * 24 * 60 * 60),  # 7 day claim window
-            # NO user_email field - privacy by design
+            # Email stored temporarily for EmailLemma issuance (user's wallet)
+            '_email_for_lemma': user_email,  # Prefixed with _ to indicate temporary
         }
         store_confirmation_token(claim_token, token_data, ttl=604800)  # 7 days
         
@@ -363,14 +367,18 @@ def claim_permission():
     """
     PRIVACY-PRESERVING: Claim permission with passkey authentication
     
+    Issues TWO credentials to user's wallet:
+    1. EmailLemma - proves email ownership (email stored in USER's wallet only)
+    2. PermissionLemma - site access (no email, uses passkey-derived DID)
+    
     POST /api/v1/iam/claim-permission
     {
         "token": "claim_token_from_email",
         "passkey_credential_id": "base64_credential_id"  # From WebAuthn
     }
     
-    The user's DID is derived from their passkey credential ID (not email).
-    NO email is stored anywhere.
+    Returns both credentials for wallet storage.
+    Email is NEVER stored in Lemma's database - only in user's wallet.
     """
     try:
         data = request.get_json()
@@ -383,7 +391,7 @@ def claim_permission():
         if not passkey_credential_id:
             return jsonify({'error': 'Passkey authentication required'}), 400
         
-        # Get pending request (contains NO email)
+        # Get pending request
         pending = get_confirmation_token(token)
         
         if not pending:
@@ -393,12 +401,15 @@ def claim_permission():
             delete_confirmation_token(token)
             return jsonify({'error': 'Claim link expired'}), 400
         
-        # Extract permission details
+        # Extract details
         site_id = pending['site_id']
         site_domain = pending['site_domain']
         permission_level = pending['permission_level']
         expiry_days = pending.get('expiry_days', 90)
         redirect_url = pending.get('redirect_url', f'https://{site_domain}')
+        
+        # Get email for EmailLemma (temporary, from Redis only)
+        user_email = pending.get('_email_for_lemma')
         
         # Get or create site manager
         manager = get_or_create_site_manager(site_id, site_domain)
@@ -417,24 +428,72 @@ def claim_permission():
             })
         
         # PRIVACY: Derive DID from passkey credential ID (NOT email)
-        # This ensures the user's identity is tied to their passkey, not email
         user_did = derive_ppid_did(passkey_credential_id, site_domain)
         
-        # Issue permission lemma
         start_time = time.perf_counter()
         
+        # ============================================================
+        # 1. ISSUE EMAIL LEMMA (if email available)
+        # ============================================================
+        email_lemma = None
+        if user_email:
+            # Get Lemma platform manager for EmailLemma issuance
+            lemma_manager = get_or_create_site_manager('lemma.id', 'lemma.id')
+            
+            # Derive a consistent DID for email verification (passkey + lemma.id)
+            email_did = derive_ppid_did(passkey_credential_id, 'lemma.id')
+            
+            from datetime import datetime
+            
+            # Issue EmailLemma - proves user verified this email
+            email_lemma = {
+                'id': f'urn:uuid:email:{secrets.token_hex(16)}',
+                'type': ['VerifiableCredential', 'EmailLemma'],
+                'packageType': 'email',
+                'issuer': 'did:lemma:issuer',
+                'issuanceDate': datetime.utcnow().isoformat() + 'Z',
+                'expirationDate': None,  # Email verification doesn't expire
+                'credentialSubject': {
+                    'id': email_did,
+                    'email': user_email,
+                    'packageType': 'email',
+                    'verifiedAt': datetime.utcnow().isoformat() + 'Z',
+                    'verificationMethod': 'email_link_passkey_auth'
+                },
+                'claims': {
+                    'email': user_email,
+                    'packageType': 'email',
+                    'verifiedAt': datetime.utcnow().isoformat() + 'Z',
+                    'verificationMethod': 'email_link_passkey_auth'
+                }
+            }
+            
+            # Sign the EmailLemma
+            try:
+                from api.ed25519_issuer import sign_credential
+                email_lemma = sign_credential(email_lemma)
+            except Exception as sign_err:
+                logger.warning(f"⚠️ EmailLemma signing failed: {sign_err}")
+                # Continue without signature (still useful)
+            
+            logger.info(f"📧 Issued EmailLemma for verified email (stored in user wallet only)")
+        
+        # ============================================================
+        # 2. ISSUE PERMISSION LEMMA (site access)
+        # ============================================================
         permission_lemma = manager.issue_permission_lemma(
             user_did,
             permission_level,
             expiry_days=expiry_days,
             custom_claims={
-                # NO email in claims - privacy by design
+                # NO email in permission claims - privacy by design
                 'site_domain': site_domain,
                 'siteId': site_id,
                 'siteDomain': site_domain,
                 'accountType': 'customer' if permission_level == 'user' else permission_level,
                 'permissionId': f'{permission_level}_access',
-                'claimedVia': 'passkey_authenticated_email_link'
+                'claimedVia': 'passkey_authenticated_email_link',
+                'hasEmailLemma': bool(email_lemma)  # Indicates user has verified email
             }
         )
         
@@ -453,13 +512,14 @@ def claim_permission():
         
         issue_time_us = (time.perf_counter() - start_time) * 1_000_000
         
-        # Delete the claim token (one-time use)
+        # Delete the claim token (one-time use) - email is now gone from Redis
         delete_confirmation_token(token)
         
         # Log without any PII
         logger.info(f"✅ Issued {permission_level} credential for {site_domain} (passkey-authenticated)")
-        logger.info(f"⚡ Issue time: {issue_time_us:.2f}µs")
-        logger.info(f"🔒 Privacy mode: no email stored in credential or database")
+        logger.info(f"📧 EmailLemma: {'issued' if email_lemma else 'not issued'}")
+        logger.info(f"⚡ Total issue time: {issue_time_us:.2f}µs")
+        logger.info(f"🔒 Privacy: email in user wallet only, not in Lemma database")
         
         # Track in database WITHOUT email
         try:
@@ -504,7 +564,8 @@ def claim_permission():
                 json.dumps({
                     'credential_id': permission_lemma['id'],
                     'issue_time_us': issue_time_us,
-                    'privacy_mode': True
+                    'privacy_mode': True,
+                    'email_lemma_issued': bool(email_lemma)
                 })
             ))
             
@@ -513,9 +574,10 @@ def claim_permission():
             conn.close()
             
         except Exception as e:
-            logger.warning(f"⚠️ Database tracking failed (credential still valid): {e}")
+            logger.warning(f"⚠️ Database tracking failed (credentials still valid): {e}")
         
-        return jsonify({
+        # Return BOTH credentials
+        response_data = {
             'success': True,
             'permission_lemma': permission_lemma,
             'redirect_url': redirect_url,
@@ -523,7 +585,16 @@ def claim_permission():
             'permission_level': permission_level,
             'issue_time_us': issue_time_us,
             'privacy_mode': True
-        })
+        }
+        
+        # Include EmailLemma if issued
+        if email_lemma:
+            response_data['email_lemma'] = email_lemma
+            response_data['credentials_issued'] = ['permission', 'email']
+        else:
+            response_data['credentials_issued'] = ['permission']
+        
+        return jsonify(response_data)
         
     except Exception as e:
         logger.error(f"❌ Claim permission error: {e}")
@@ -676,7 +747,11 @@ def invite_user():
         # Generate claim token
         claim_token = secrets.token_urlsafe(32)
         
-        # PRIVACY: Store ONLY permission metadata - NO EMAIL
+        # PRIVACY NOTE: Email stored in Redis token ONLY for EmailLemma issuance
+        # - Token auto-expires (Redis TTL)
+        # - Token deleted immediately after claim
+        # - Email NEVER stored in our database
+        # - Email goes into user's wallet (EmailLemma) - user controls it
         token_data = {
             'site_id': site_id,
             'site_domain': site_domain,
@@ -684,7 +759,9 @@ def invite_user():
             'redirect_url': redirect_url,
             'expiry_days': expiry_days,
             'created_at': time.time(),
-            'expires_at': time.time() + (claim_window_days * 24 * 60 * 60)
+            'expires_at': time.time() + (claim_window_days * 24 * 60 * 60),
+            # Email stored temporarily for EmailLemma issuance (user's wallet)
+            '_email_for_lemma': user_email,
         }
         store_confirmation_token(claim_token, token_data, ttl=claim_window_days * 86400)
         

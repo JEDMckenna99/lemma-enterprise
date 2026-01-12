@@ -281,8 +281,13 @@
             <!-- Success State -->
             <div id="claim-success" class="claim-status success">
                 <div class="icon">✅</div>
-                <h3>Permission Claimed!</h3>
-                <p>Your <strong>{{ permission_level }}</strong> access to <strong>{{ site_domain }}</strong> has been stored in your wallet.</p>
+                <h3>Credentials Claimed!</h3>
+                <div id="success-details">
+                    <p>Your <strong>{{ permission_level }}</strong> access to <strong>{{ site_domain }}</strong> has been stored in your wallet.</p>
+                </div>
+                <div id="credentials-list" style="background: #d1fae5; border-radius: 8px; padding: 12px; margin: 16px 0; text-align: left; font-size: 13px;">
+                    <!-- Populated by JS -->
+                </div>
                 <a href="{{ redirect_url }}" class="claim-btn" style="margin-top: 20px; text-decoration: none;">
                     Continue to {{ site_domain }} →
                 </a>
@@ -403,24 +408,59 @@ async function claimPermission() {
             throw new Error(result.error || 'Failed to claim permission');
         }
         
-        // Step 3: Store in wallet
+        // Step 3: Store credentials in wallet
+        const credentialsStored = [];
+        
         if (window.globalLemmaWallet) {
-            await window.globalLemmaWallet.storeCredential(result.permission_lemma);
-            console.log('✅ Permission stored in wallet');
+            // Store Permission Lemma
+            if (result.permission_lemma) {
+                await window.globalLemmaWallet.storeCredential(result.permission_lemma);
+                credentialsStored.push('🎫 Site Permission');
+                console.log('✅ Permission stored in wallet');
+            }
+            
+            // Store Email Lemma (if issued)
+            if (result.email_lemma) {
+                await window.globalLemmaWallet.storeCredential(result.email_lemma);
+                credentialsStored.push('📧 Email Verification');
+                console.log('✅ EmailLemma stored in wallet');
+            }
         } else {
-            // Try to initialize wallet and store
-            console.log('⚠️ Wallet not ready, storing via bridge...');
-            // The permission_lemma is still valid, user can view at lemma.id/wallet
+            console.log('⚠️ Wallet not ready, credentials returned but not stored locally');
+            credentialsStored.push('🎫 Site Permission (returned)');
+            if (result.email_lemma) {
+                credentialsStored.push('📧 Email Verification (returned)');
+            }
+        }
+        
+        // Update success UI with credentials list
+        const credentialsList = document.getElementById('credentials-list');
+        if (credentialsList) {
+            let html = '<strong>Stored in your wallet:</strong><ul style="margin: 8px 0 0; padding-left: 20px;">';
+            credentialsStored.forEach(cred => {
+                html += `<li>${cred}</li>`;
+            });
+            html += '</ul>';
+            if (result.email_lemma) {
+                const email = result.email_lemma.credentialSubject?.email || result.email_lemma.claims?.email;
+                if (email) {
+                    html += `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #a7f3d0;">`;
+                    html += `<strong>Verified email:</strong> ${email}`;
+                    html += `<br><span style="font-size: 11px; color: #065f46;">This proof is stored only in YOUR wallet, not on Lemma servers.</span>`;
+                    html += `</div>`;
+                }
+            }
+            credentialsList.innerHTML = html;
         }
         
         // Show success
         loadingDiv.classList.remove('show');
         successDiv.classList.add('show');
         
-        // Auto-redirect after 3 seconds
+        // Auto-redirect after 4 seconds (longer to show credentials)
         setTimeout(() => {
             window.location.href = REDIRECT_URL;
-        }, 3000);
+        }, 4000);
         
     } catch (error) {
         console.error('❌ Claim failed:', error);
