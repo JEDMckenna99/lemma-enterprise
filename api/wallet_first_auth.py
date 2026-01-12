@@ -299,7 +299,69 @@ def issue_to_wallet():
         # Check if this is an existing user for this site
         user_info = get_or_create_user_for_site(site_id, wallet_secret, passkey_credential_id)
         
-        # Issue permission lemma with PPID as subject
+        # Check if user already has an active permission for this site
+        existing_permission = None
+        try:
+            from .database import get_db_connection
+            conn = get_db_connection(site_id=site_id)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT pi.id, pi.granted_at, pi.expires_at, pt.name as permission_name
+                FROM permission_instances pi
+                JOIN permission_types pt ON pi.permission_type_id = pt.id
+                WHERE pi.site_id = %s 
+                  AND pi.credential_did = %s
+                  AND pi.revoked_at IS NULL
+                  AND (pi.expires_at IS NULL OR pi.expires_at > NOW())
+                ORDER BY pi.granted_at DESC
+                LIMIT 1
+            """, (site_id, ppid))
+            row = cursor.fetchone()
+            if row:
+                existing_permission = {
+                    'id': row[0],
+                    'granted_at': row[1],
+                    'expires_at': row[2],
+                    'permission_name': row[3]
+                }
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            logger.warning(f"Could not check existing permission: {e}")
+        
+        if existing_permission and not data.get('force_reissue'):
+            # Return existing without issuing new - prevent duplicates
+            logger.info(f"✅ User already has active permission for {site_id}, reusing existing")
+            
+            # Build a minimal credential response for the client to store
+            # This ensures idempotent sign-ins
+            from api.issuer_management import get_issuer_manager
+            issuer_manager = get_issuer_manager()
+            site_issuer = issuer_manager.get_iam_issuer(site_id)
+            
+            issued_at = existing_permission['granted_at'] or datetime.utcnow()
+            expires_at = existing_permission['expires_at'] or (datetime.utcnow() + timedelta(days=30))
+            
+            # Re-issue the same credential with same data
+            permission_lemma = issue_permission_lemma(
+                subject_ppid=ppid,
+                site_id=site_id,
+                permissions=['read', 'write', 'access'],
+                granted_by='wallet_auth',
+                track_in_db=False  # Don't create duplicate DB entry
+            )
+            
+            return jsonify({
+                'success': True,
+                'ppid': ppid,
+                'site_id': site_id,
+                'is_new_user': False,
+                'permission_lemma': permission_lemma,
+                'message': 'Permission already active. Returning credential for wallet sync.',
+                'existing': True
+            })
+        
+        # Issue NEW permission lemma with PPID as subject
         permission_lemma = issue_permission_lemma(
             subject_ppid=ppid,
             site_id=site_id,
