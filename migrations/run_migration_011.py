@@ -177,8 +177,8 @@ def migrate_sites(conn):
                     cursor.execute("""
                         INSERT INTO sites (
                             site_id, site_domain, company_name, admin_email, customer_id,
-                            environment, site_label, status, created_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'active', NOW())
+                            environment, site_label, oauth_client_secret, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, '', NOW())
                         ON CONFLICT (site_id) DO UPDATE SET customer_id = EXCLUDED.customer_id
                     """, (
                         site_id,
