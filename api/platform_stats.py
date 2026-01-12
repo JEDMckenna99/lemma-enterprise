@@ -505,12 +505,11 @@ def revoke_platform_permission():
         
         # Extract permission info from caller's credential
         admin_claims = admin_credential.get('claims') or admin_credential.get('credentialSubject') or {}
-        admin_permission_id = admin_claims.get('permissionId') or admin_claims.get('permission_level') or ''
+        admin_permission_id = admin_claims.get('permissionId') or admin_claims.get('permission_level') or admin_claims.get('permissions') or ''
         admin_site_id = admin_claims.get('siteId') or admin_claims.get('site_id') or ''
         
-        # Check if caller is lemma.id admin
-        is_lemma_admin = admin_site_id == 'lemma.id' or admin_site_id == 'lemma_platform'
-        is_admin_role = admin_permission_id.lower() in ['admin', 'superadmin', 'super_admin', 'admin_access', 'site_admin']
+        # Check if caller is lemma.id platform user
+        is_lemma_platform_user = admin_site_id == 'lemma.id' or admin_site_id == 'lemma_platform'
         
         # Determine the site_id for the revocation
         site_id = requested_site_id or admin_site_id
@@ -519,10 +518,49 @@ def revoke_platform_permission():
             site_id = 'lemma_platform'
         
         # Authorization check:
-        # - Lemma admins can revoke anything
-        # - Site owners (admin role for that site) can revoke their own site's users
-        can_revoke = (is_lemma_admin and is_admin_role) or \
-                     (admin_site_id == site_id and is_admin_role)
+        # Option 1: Platform user revoking from their own customer site
+        # Option 2: Site admin revoking from their own site  
+        # Option 3: Lemma superadmin can revoke anything
+        can_revoke = False
+        
+        # If caller is a lemma.id platform user, check if they own the target site
+        if is_lemma_platform_user and site_id != 'lemma_platform':
+            # Look up the customer's sites from database
+            try:
+                from api.storage_helpers import get_sites_for_customer_from_postgres
+                # Get customer_id from the credential or lookup by email
+                admin_email = admin_claims.get('email') or admin_claims.get('userEmail') or ''
+                
+                # Get customer by email
+                conn_check = get_db_connection(site_id='lemma_platform')
+                cursor_check = conn_check.cursor()
+                cursor_check.execute("SELECT customer_id FROM customers WHERE email = %s", (admin_email,))
+                customer_row = cursor_check.fetchone()
+                
+                if customer_row:
+                    customer_id = customer_row[0]
+                    # Check if this customer owns the target site
+                    owned_sites = get_sites_for_customer_from_postgres(customer_id)
+                    owned_site_ids = [s.get('site_id') for s in owned_sites]
+                    
+                    if site_id in owned_site_ids:
+                        can_revoke = True
+                        logger.info(f"✅ Platform user {admin_email} owns site {site_id} - revocation authorized")
+                    else:
+                        logger.warning(f"🚫 Platform user {admin_email} does not own site {site_id}")
+                
+                cursor_check.close()
+                conn_check.close()
+            except Exception as e:
+                logger.error(f"Error checking site ownership: {e}")
+        
+        # Direct site admin
+        if admin_site_id == site_id:
+            can_revoke = True
+            
+        # Lemma superadmin can revoke anything
+        if is_lemma_platform_user and 'admin' in admin_permission_id.lower():
+            can_revoke = True
         
         if not can_revoke:
             logger.warning(f"🚫 Unauthorized revocation: caller site={admin_site_id}, target site={site_id}, role={admin_permission_id}")

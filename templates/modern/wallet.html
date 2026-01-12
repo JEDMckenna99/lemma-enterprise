@@ -1200,6 +1200,41 @@ async function debugWalletStorage() {
     });
 }
 
+// Fetch server-side permissions (credentials issued on third-party sites)
+async function fetchServerPermissions() {
+    try {
+        // Get wallet secret or passkey credential ID
+        const walletSecret = await lemmaWallet.getWalletSecret();
+        const passkeyCredentialId = await lemmaWallet.getPasskeyCredentialId();
+        
+        if (!walletSecret && !passkeyCredentialId) {
+            console.log('⚠️ No wallet identity - cannot fetch server permissions');
+            return [];
+        }
+        
+        const response = await fetch('/api/wallet-auth/my-permissions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                wallet_secret: walletSecret,
+                passkey_credential_id: passkeyCredentialId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.permissions) {
+            console.log(`📡 Fetched ${data.permissions.length} permissions from server (${data.sites_checked} sites)`);
+            return data.permissions;
+        }
+        
+        return [];
+    } catch (error) {
+        console.error('❌ Failed to fetch server permissions:', error);
+        return [];
+    }
+}
+
 // Enhanced Wallet Data Loading - Shows both PoH and Permission Lemmas
 async function loadWalletData() {
     try {
@@ -1221,9 +1256,9 @@ async function loadWalletData() {
         
         console.log('📦 Loading wallet data...');
 
-        // Get all credentials from wallet
+        // Get all credentials from local wallet
         const allCredentials = await lemmaWallet.getCredentials();
-        console.log('🔍 DEBUG: All credentials from wallet:', allCredentials);
+        console.log('🔍 DEBUG: All credentials from local wallet:', allCredentials);
         
         // Filter by type
         const pohCredentials = allCredentials.filter(c => {
@@ -1232,23 +1267,49 @@ async function loadWalletData() {
                    pkgType === 'poh' || pkgType === 'ProofOfHuman';
         });
         
-        const permissionCredentials = allCredentials.filter(c => {
+        let permissionCredentials = allCredentials.filter(c => {
             const pkgType = c.packageType || c.type?.[1] || '';
             return pkgType === 'permission' || pkgType === 'PermissionLemma';
         });
         
-        console.log('📊 Wallet contents:', {
+        // Also fetch server-side permissions (from third-party sites)
+        const serverPermissions = await fetchServerPermissions();
+        
+        // Merge: convert server permissions to credential-like format
+        const localCredIds = new Set(permissionCredentials.map(c => c.id));
+        
+        for (const sp of serverPermissions) {
+            // Skip if we already have this one locally
+            if (localCredIds.has(sp.id)) continue;
+            
+            // Add as a "remote" credential
+            permissionCredentials.push({
+                id: sp.id,
+                packageType: 'permission',
+                claims: {
+                    siteId: sp.site_id,
+                    permissions: sp.permission,
+                    permissionId: sp.permission
+                },
+                issuanceDate: sp.granted_at ? new Date(sp.granted_at).getTime() / 1000 : Date.now() / 1000,
+                expirationDate: sp.expires_at ? new Date(sp.expires_at).getTime() / 1000 : null,
+                source: 'server',  // Mark as server-side
+                issuer: 'did:web:' + sp.site_id
+            });
+        }
+        
+        console.log('📊 Wallet contents (merged):', {
             poh: pohCredentials.length,
             permissions: permissionCredentials.length,
+            local: allCredentials.length,
+            serverSynced: serverPermissions.length,
             total: pohCredentials.length + permissionCredentials.length
         });
-        
-        console.log('🔍 DEBUG: Permission credentials returned:', permissionCredentials);
 
         // Display PoH credentials
         displayPohLemmas(pohCredentials);
         
-        // Display permission credentials
+        // Display permission credentials (now includes server-side ones)
         await displayPermissionLemmas(permissionCredentials);
         
         // Show/hide join network section based on PoH credentials
@@ -1390,8 +1451,20 @@ async function displayPermissionLemmas(permissionLemmas) {
                     const permissionId = (lemma.claims || lemma.credentialSubject)?.permissionId || 'permission';
                     const accountType = (lemma.claims || lemma.credentialSubject)?.accountType || (lemma.claims || lemma.credentialSubject)?.permissions || 'User';
                     
+                    // Server-synced badge (for credentials from third-party sites)
+                    const isServerSynced = lemma.source === 'server';
+                    const syncBadge = isServerSynced 
+                        ? `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #dbeafe; color: #1d4ed8; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 4px;">
+                             ☁️ Synced
+                           </span>`
+                        : '';
+                    
                     // Verification status badge
-                    const statusBadge = verification.verified 
+                    const statusBadge = isServerSynced 
+                        ? `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #ecfdf5; color: #059669; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
+                             ✓ Active
+                           </span>`
+                        : verification.verified 
                         ? `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #ecfdf5; color: #059669; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
                              ✓ Verified (${verifyTime}μs)
                            </span>`
@@ -1409,9 +1482,10 @@ async function displayPermissionLemmas(permissionLemmas) {
                                         </svg>
                                     </div>
                                     <div>
-                                        <h5 style="margin: 0; color: var(--gray-900); font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+                                        <h5 style="margin: 0; color: var(--gray-900); font-size: 0.9rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                                             ${permissionId}
                                             ${statusBadge}
+                                            ${syncBadge}
                                         </h5>
                                         <p style="margin: 0; color: var(--gray-600); font-size: 0.75rem;">Role: ${accountType}</p>
                                     </div>

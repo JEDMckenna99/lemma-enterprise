@@ -449,6 +449,110 @@ def verify_wallet_session():
         }), 500
 
 
+@wallet_first_bp.route('/api/wallet-auth/my-permissions', methods=['POST'])
+@cross_origin()
+def get_user_permissions():
+    """
+    Get all permissions issued to a user across all sites.
+    
+    This lets the lemma.id/wallet page show permissions that were issued
+    on third-party sites (where the credential is stored in that site's origin).
+    
+    POST /api/wallet-auth/my-permissions
+    {
+        "wallet_secret": "hex...",          // For PPID derivation
+        "passkey_credential_id": "..."      // Passkey credential ID
+    }
+    
+    Returns all permission_instances where the user's PPID matches.
+    """
+    from .database import get_db_connection
+    
+    try:
+        data = request.get_json() or {}
+        wallet_secret = data.get('wallet_secret')
+        passkey_credential_id = data.get('passkey_credential_id')
+        
+        if not wallet_secret and not passkey_credential_id:
+            return jsonify({
+                'success': False,
+                'error': 'Either wallet_secret or passkey_credential_id required'
+            }), 400
+        
+        # Query all sites that have permission_instances
+        conn = get_db_connection(site_id='lemma_platform')
+        cursor = conn.cursor()
+        
+        # Get distinct site_ids from permission_instances
+        cursor.execute("SELECT DISTINCT site_id FROM permission_instances")
+        site_ids = [row[0] for row in cursor.fetchall()]
+        
+        all_permissions = []
+        ppids_by_site = {}
+        
+        for site_id in site_ids:
+            # Derive the PPID for this site
+            ppid = derive_user_ppid(site_id, wallet_secret, passkey_credential_id)
+            ppids_by_site[site_id] = ppid
+            
+            # Look up permissions for this PPID
+            cursor.execute("""
+                SELECT 
+                    pi.id,
+                    pi.site_id,
+                    pi.credential_did,
+                    pt.name as permission_name,
+                    pi.granted_at,
+                    pi.expires_at,
+                    pi.revoked_at,
+                    pi.metadata
+                FROM permission_instances pi
+                JOIN permission_types pt ON pi.permission_type_id = pt.id
+                WHERE pi.credential_did = %s
+                  AND pi.revoked_at IS NULL
+                ORDER BY pi.granted_at DESC
+            """, (ppid,))
+            
+            for row in cursor.fetchall():
+                inst_id, inst_site_id, cred_did, perm_name, granted_at, expires_at, revoked_at, metadata = row
+                
+                # Check if expired
+                if expires_at and expires_at < datetime.utcnow():
+                    continue
+                
+                all_permissions.append({
+                    'id': f'perm_{inst_id}',
+                    'site_id': inst_site_id,
+                    'permission': perm_name,
+                    'ppid': ppid,
+                    'granted_at': granted_at.isoformat() if granted_at else None,
+                    'expires_at': expires_at.isoformat() if expires_at else None,
+                    'status': 'active',
+                    'source': 'server'  # Indicates this came from DB, not local wallet
+                })
+        
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"📋 Found {len(all_permissions)} permissions for user across {len(site_ids)} sites")
+        
+        return jsonify({
+            'success': True,
+            'permissions': all_permissions,
+            'sites_checked': len(site_ids),
+            'ppids': ppids_by_site  # Debug: show what PPIDs were checked
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Get user permissions failed: {e}")
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 @wallet_first_bp.route('/api/wallet-auth/debug-hash', methods=['POST'])
 @cross_origin()
 def debug_credential_hash():
