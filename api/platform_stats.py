@@ -71,7 +71,10 @@ def get_platform_stats():
         from flask import session as flask_session
         customer_id = flask_session.get('customer_id')
         
-        # If lemma.id admin and no specific site requested, show lemma.id stats
+        logger.info(f"📊 Stats request: customer_id={customer_id}, is_lemma_admin={is_lemma_admin}, user_email={user_email}")
+        
+        # ONLY show lemma.id stats if user is EXPLICITLY a lemma.id admin
+        # Regular developers should NEVER see lemma.id stats
         if is_lemma_admin and not requested_site_id:
             site_id = 'lemma_platform'
             site_domain = 'lemma.id'
@@ -179,6 +182,26 @@ def get_platform_stats():
                 
             except Exception as e:
                 logger.warning(f"⚠️ Could not look up sites: {e}")
+        
+        # SAFETY CHECK: If we still don't have a site_id and user is NOT admin, return empty
+        # This prevents accidentally showing lemma.id stats to non-admins
+        if not site_id and not is_lemma_admin:
+            logger.info(f"📊 Safety check: No site found for non-admin user, returning empty stats")
+            return jsonify({
+                'success': True,
+                'stats': {
+                    'mau': 0,
+                    'total_verifications': 0,
+                    'active_users': 0,
+                    'registered_sites': 0
+                },
+                'recent_activity': [],
+                'site_id': None,
+                'site_domain': None,
+                'available_sites': [],
+                'month': current_month,
+                'message': 'No site registered yet. Register a site to see your stats.'
+            })
         
         # 1. Get MAU (from Redis via usage_tracking)
         mau_count = get_monthly_active_users(site_id)
@@ -328,7 +351,10 @@ def get_platform_users():
         from flask import session as flask_session
         customer_id = flask_session.get('customer_id')
         
-        # If lemma.id admin and no specific site requested, show lemma.id users
+        logger.info(f"📊 Users request: customer_id={customer_id}, is_lemma_admin={is_lemma_admin}, user_email={user_email}")
+        
+        # ONLY show lemma.id users if user is EXPLICITLY a lemma.id admin
+        # Regular developers should NEVER see lemma.id users
         if is_lemma_admin and not requested_site_id:
             site_id = 'lemma_platform'
             site_domain = 'lemma.id'
