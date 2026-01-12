@@ -416,6 +416,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Permission Type API: {e}")
 
+    # SDK Remote Configuration (auto-update settings for all SDK instances)
+    try:
+        from api.sdk_config import sdk_config_bp
+        app.register_blueprint(sdk_config_bp)
+        logger.info("✅ SDK Remote Config API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register SDK Config API: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status

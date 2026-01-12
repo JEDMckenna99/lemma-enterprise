@@ -16,6 +16,8 @@
  */
 
 class LemmaIAM {
+    static VERSION = '2.0.0';
+    
     constructor(config) {
         this.apiKey = config.apiKey;
         this.siteId = config.siteId;
@@ -28,12 +30,124 @@ class LemmaIAM {
         // This ensures all user permissions are visible in the lemma.id/wallet page
         this.useCentralWallet = config.useCentralWallet || false;
         
+        // Remote config (fetched from server - allows auto-updates)
+        this.remoteConfig = null;
+        this.configLoaded = false;
+        
         // Wallet reference
         this.wallet = null;
         this.walletReady = false;
         
-        // Initialize wallet
-        this._initWallet();
+        // Initialize: fetch remote config, then wallet
+        this._init();
+    }
+    
+    // ============================================
+    // REMOTE CONFIGURATION (Auto-Update Support)
+    // ============================================
+    
+    async _init() {
+        // Fetch remote config first (enables server-side feature flags)
+        await this._loadRemoteConfig();
+        
+        // Then initialize wallet
+        await this._initWallet();
+    }
+    
+    /**
+     * Load remote configuration from server
+     * Allows pushing updates to all SDK instances without code changes
+     */
+    async _loadRemoteConfig() {
+        try {
+            const response = await fetch(
+                `${this.baseUrl}/api/sdk/config?site_id=${encodeURIComponent(this.siteId)}&sdk_version=${LemmaIAM.VERSION}`,
+                { method: 'GET', headers: { 'Accept': 'application/json' } }
+            );
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.remoteConfig = data.config;
+                this.configLoaded = true;
+                
+                // Apply remote config settings
+                this._applyRemoteConfig();
+                
+                this.log('📡 Remote config loaded:', this.remoteConfig?.version);
+            }
+        } catch (e) {
+            // Config fetch failed - continue with defaults (offline-friendly)
+            this.log('⚠️ Remote config unavailable, using defaults');
+        }
+    }
+    
+    /**
+     * Apply remote configuration to SDK behavior
+     */
+    _applyRemoteConfig() {
+        if (!this.remoteConfig) return;
+        
+        const { features, settings, announcements } = this.remoteConfig;
+        
+        // Apply feature flags
+        if (features) {
+            // Server can override useCentralWallet for all sites
+            if (features.centralWallet !== undefined && !this.useCentralWallet) {
+                // Only enable, don't disable if user explicitly set it
+                // this.useCentralWallet = features.centralWallet;
+            }
+        }
+        
+        // Apply settings
+        if (settings) {
+            if (settings.debugMode !== undefined) {
+                // Server can enable debug for troubleshooting
+                this.debug = this.debug || settings.debugMode;
+            }
+        }
+        
+        // Show announcements (optional)
+        if (announcements && announcements.length > 0 && this.debug) {
+            announcements.forEach(a => {
+                if (!this._hasSeenAnnouncement(a.id)) {
+                    console.log(`📢 Lemma: ${a.message}`);
+                    this._markAnnouncementSeen(a.id);
+                }
+            });
+        }
+    }
+    
+    _hasSeenAnnouncement(id) {
+        try {
+            const seen = JSON.parse(localStorage.getItem('lemma_announcements_seen') || '[]');
+            return seen.includes(id);
+        } catch { return false; }
+    }
+    
+    _markAnnouncementSeen(id) {
+        try {
+            const seen = JSON.parse(localStorage.getItem('lemma_announcements_seen') || '[]');
+            seen.push(id);
+            localStorage.setItem('lemma_announcements_seen', JSON.stringify(seen));
+        } catch {}
+    }
+    
+    /**
+     * Get current feature flags (from remote config)
+     */
+    getFeatures() {
+        return this.remoteConfig?.features || {
+            centralWallet: true,
+            bridgeEnabled: true,
+            offlineVerification: true
+        };
+    }
+    
+    /**
+     * Check if a specific feature is enabled
+     */
+    isFeatureEnabled(featureName) {
+        return this.getFeatures()[featureName] ?? false;
     }
 
     // ============================================
