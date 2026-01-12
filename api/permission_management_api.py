@@ -31,6 +31,75 @@ logger = logging.getLogger(__name__)
 
 permission_api = Blueprint('permission_api', __name__)
 
+
+def _track_permission_in_db(site_id: str, permission_id: str, user_did: str,
+                            credential_id: str, email: str = None,
+                            granted_by: str = 'api', expiry_days: int = 90):
+    """
+    Track permission grant in permission_instances table for admin management.
+    This enables:
+    - Viewing users on the platform dashboard
+    - Revoking permissions
+    - Analytics and billing
+    """
+    from api.database import get_db_connection
+    
+    conn = None
+    try:
+        conn = get_db_connection(site_id=site_id)
+        cursor = conn.cursor()
+        
+        # Get or create permission type
+        cursor.execute("""
+            SELECT id FROM permission_types WHERE site_id = %s AND name = %s
+        """, (site_id, permission_id))
+        result = cursor.fetchone()
+        
+        if result:
+            permission_type_id = result[0]
+        else:
+            # Create permission type if it doesn't exist
+            cursor.execute("""
+                INSERT INTO permission_types (site_id, name, type, description, active)
+                VALUES (%s, %s, 'role', %s, TRUE)
+                RETURNING id
+            """, (site_id, permission_id, f'{permission_id.title()} access'))
+            permission_type_id = cursor.fetchone()[0]
+        
+        # Calculate expiry
+        from datetime import datetime, timedelta
+        expires_at = datetime.utcnow() + timedelta(days=expiry_days)
+        
+        # Insert permission instance
+        cursor.execute("""
+            INSERT INTO permission_instances
+            (permission_type_id, site_id, email, credential_did, granted_at, granted_by, expires_at, metadata)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT DO NOTHING
+        """, (
+            permission_type_id,
+            site_id,
+            email or '',
+            user_did,
+            datetime.utcnow(),
+            granted_by,
+            expires_at,
+            {'credential_id': credential_id} if credential_id else {}
+        ))
+        
+        conn.commit()
+        cursor.close()
+        logger.info(f"📝 Tracked permission grant: {user_did[:30]}... → {permission_id} on {site_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to track permission in DB: {e}")
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if conn:
+            conn.close()
+
 # Note: Site managers are now managed by real_iam_manager module
 # Each site gets:
 # - Unique Ed25519 keypair (site-specific DID)
@@ -228,6 +297,20 @@ def grant_user_permission(site_id, user_did):
         
         # Log billing event (MAU tracking)
         log_permission_operation(site_id, 'permission_granted', 1, user_did)
+        
+        # Track permission grant in database for admin management
+        try:
+            _track_permission_in_db(
+                site_id=site_id,
+                permission_id=permission_id,
+                user_did=user_did,
+                credential_id=credential.get('id'),
+                email=data.get('email') or data.get('custom_claims', {}).get('email'),
+                granted_by=request.headers.get('X-Admin-Did', 'api'),
+                expiry_days=expiry_days
+            )
+        except Exception as track_err:
+            logger.warning(f"⚠️ Could not track permission in DB (non-fatal): {track_err}")
         
         logger.info(f"✅ Granted permission '{permission_id}' to {user_did[:30]}...")
         logger.info(f"🔐 Signed with site-specific key: {manager.issuer_did[:50]}...")

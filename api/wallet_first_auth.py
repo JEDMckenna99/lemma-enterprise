@@ -189,47 +189,63 @@ def _track_permission_grant(site_id: str, user_did: str, permission_id: str,
     """
     Track permission grant in database for admin management, revocation, and billing.
     This is separate from the credential itself (which is in the user's wallet).
-    """
-    from .database import get_db
-    from sqlalchemy import text
-    import hashlib
     
-    db = get_db()
+    Uses permission_instances table (the correct table for tracking).
+    """
+    from .database import get_db_connection
+    
+    conn = None
     try:
-        # Create fingerprint from credential ID
-        fingerprint = hashlib.sha256(credential_id.encode()).hexdigest()[:64]
+        conn = get_db_connection(site_id=site_id)
+        cursor = conn.cursor()
         
-        # Insert or update permission grant using PostgreSQL upsert
-        db.execute(text("""
-            INSERT INTO user_permissions 
-            (site_id, user_did, permission_id, credential_fingerprint, granted_by, expires_at, granted_at)
-            VALUES (:site_id, :user_did, :permission_id, :fingerprint, :granted_by, :expires_at, CURRENT_TIMESTAMP)
-            ON CONFLICT ON CONSTRAINT unique_user_site_permission 
-            DO UPDATE SET 
-                credential_fingerprint = EXCLUDED.credential_fingerprint,
-                granted_by = EXCLUDED.granted_by,
-                expires_at = EXCLUDED.expires_at,
-                granted_at = CURRENT_TIMESTAMP,
-                revoked_at = NULL,
-                revoked_by = NULL
-        """), {
-            'site_id': site_id,
-            'user_did': user_did,
-            'permission_id': permission_id,
-            'fingerprint': fingerprint,
-            'granted_by': granted_by,
-            'expires_at': expires_at
-        })
-        db.commit()
+        # Get or create permission type
+        cursor.execute("""
+            SELECT id FROM permission_types WHERE site_id = %s AND name = %s
+        """, (site_id, permission_id))
+        result = cursor.fetchone()
         
-        logger.debug(f"📝 Tracked permission grant: {user_did[:30]}... → {permission_id} on {site_id}")
+        if result:
+            permission_type_id = result[0]
+        else:
+            # Create permission type if it doesn't exist
+            cursor.execute("""
+                INSERT INTO permission_types (site_id, name, type, description, active)
+                VALUES (%s, %s, 'role', %s, TRUE)
+                RETURNING id
+            """, (site_id, permission_id, f'{permission_id.title()} access'))
+            permission_type_id = cursor.fetchone()[0]
+        
+        # Insert permission instance
+        cursor.execute("""
+            INSERT INTO permission_instances
+            (permission_type_id, site_id, email, credential_did, granted_at, granted_by, expires_at, metadata)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT DO NOTHING
+        """, (
+            permission_type_id,
+            site_id,
+            '',  # Email empty for wallet-first (privacy mode)
+            user_did,
+            datetime.utcnow(),
+            granted_by,
+            expires_at,
+            json.dumps({'credential_id': credential_id}) if credential_id else '{}'
+        ))
+        
+        conn.commit()
+        cursor.close()
+        
+        logger.info(f"📝 Tracked permission grant: {user_did[:30]}... → {permission_id} on {site_id}")
         
     except Exception as e:
         logger.error(f"❌ Database tracking failed: {e}")
-        db.rollback()
+        if conn:
+            conn.rollback()
         raise
     finally:
-        db.close()
+        if conn:
+            conn.close()
 
 
 @wallet_first_bp.route('/api/wallet-auth/issue', methods=['POST'])
