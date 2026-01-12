@@ -213,6 +213,7 @@ def run_migration():
     
     try:
         conn = get_db_connection()
+        conn.autocommit = True  # Allow DDL statements to work independently
         
         # First run the SQL migration
         logger.info("Running SQL schema migration...")
@@ -226,11 +227,14 @@ def run_migration():
             if statement and not statement.startswith('--'):
                 try:
                     cursor.execute(statement)
+                    logger.info(f"✅ SQL executed: {statement[:60]}...")
                 except Exception as e:
                     logger.warning(f"SQL statement failed (may already be applied): {e}")
-        conn.commit()
         cursor.close()
         logger.info("SQL schema migration complete")
+        
+        # Turn off autocommit for data migration
+        conn.autocommit = False
         
         # Migrate sites data
         logger.info("Migrating sites...")
