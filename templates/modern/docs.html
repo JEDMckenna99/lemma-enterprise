@@ -83,6 +83,7 @@
                 <div class="nav-title">Integration Guides</div>
                 <a href="#guide-simple-login" class="nav-link">Simple Login (5 min)</a>
                 <a href="#guide-iam-api" class="nav-link">IAM API Reference</a>
+                <a href="#guide-email-lemma" class="nav-link">📧 EmailLemma</a>
                 <a href="#guide-error-codes" class="nav-link">Error Codes</a>
                 <a href="#guide-checklist" class="nav-link">Integration Checklist</a>
                 <a href="#guide-webhooks" class="nav-link">Webhooks</a>
@@ -210,6 +211,20 @@
                     </a>
                 </div>
                 
+                <!-- EmailLemma -->
+                <div style="background: var(--white); border: 2px solid #10b981; border-radius: 12px; padding: var(--space-6); transition: all 0.3s ease;">
+                    <div style="display: flex; align-items: center; margin-bottom: var(--space-3);">
+                        <h3 style="margin: 0; color: #059669;">📧 EmailLemma</h3>
+                        <span class="integration-badge" style="margin-left: auto; background: #10b981;">New</span>
+                    </div>
+                    <p style="color: var(--gray-600); margin-bottom: var(--space-4);">
+                        Privacy-preserving email verification. Users get proof in their wallet - you never store emails.
+                    </p>
+                    <a href="#guide-email-lemma" style="color: #059669; text-decoration: none; font-weight: 600;">
+                        Read Guide →
+                    </a>
+                </div>
+                
                 <!-- Complete Example -->
                 <div style="background: var(--white); border: 2px solid var(--success-200); border-radius: 12px; padding: var(--space-6); transition: all 0.3s ease;">
                     <div style="display: flex; align-items: center; margin-bottom: var(--space-3);">
@@ -296,6 +311,13 @@ if (isAuth) {
             <h3>Core Endpoints:</h3>
             <div class="api-endpoint">
                 <span class="endpoint-method" style="background: var(--success);">POST</span>
+                <code>/api/v1/iam/invite</code>
+                <span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 8px;">NEW</span>
+                <p style="margin: var(--space-2) 0 0; color: var(--gray-600); font-size: var(--font-size-sm);">Privacy-preserving email invitation - email never stored</p>
+            </div>
+            
+            <div class="api-endpoint">
+                <span class="endpoint-method" style="background: var(--success);">POST</span>
                 <code>/api/v1/iam/request-access</code>
                 <p style="margin: var(--space-2) 0 0; color: var(--gray-600); font-size: var(--font-size-sm);">Send authentication email and issue credential</p>
             </div>
@@ -322,6 +344,204 @@ if (isAuth) {
                 <span class="endpoint-method" style="background: var(--success);">POST</span>
                 <code>/api/platform/revoke-permission</code>
                 <p style="margin: var(--space-2) 0 0; color: var(--gray-600); font-size: var(--font-size-sm);">Revoke user access (propagates in &lt;100ms)</p>
+            </div>
+            
+            <!-- Email Invitation API Details -->
+            <h3 style="margin-top: var(--space-8);">📧 Email Invitation API (Privacy-Preserving)</h3>
+            <p style="color: var(--gray-600); margin-bottom: var(--space-4);">
+                Invite users to your site via email. <strong>Email is used only for delivery and is NEVER stored</strong> on Lemma servers. 
+                Users must authenticate with passkey to claim their permission.
+            </p>
+            
+            <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: var(--space-4); margin-bottom: var(--space-4);">
+                <p style="margin: 0; color: #065f46; font-size: var(--font-size-sm);">
+                    <strong>🔒 Privacy Guarantees:</strong><br>
+                    • Email address is NEVER stored in database, Redis, or credentials<br>
+                    • User must authenticate with passkey to claim<br>
+                    • User DID derived from passkey (not email)<br>
+                    • User receives EmailLemma proof in their wallet
+                </p>
+            </div>
+            
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">cURL</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+curl -X POST https://lemma.id/api/v1/iam/invite \
+  -H "X-API-Key: your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "permission": "admin",
+    "redirect_url": "https://yoursite.com/welcome",
+    "expiry_days": 90
+  }'
+            </div>
+            
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">Node.js</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+const response = await fetch('https://lemma.id/api/v1/iam/invite', {
+    method: 'POST',
+    headers: {
+        'X-API-Key': process.env.LEMMA_API_KEY,
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        email: 'user@example.com',
+        permission: 'admin',  // user, editor, admin, super_admin
+        redirect_url: 'https://yoursite.com/welcome',
+        expiry_days: 90,
+        claim_window_days: 7
+    })
+});
+
+// Response: { success: true, privacy_mode: true }
+            </div>
+            
+            <h4 style="margin-top: var(--space-6);">Parameters</h4>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--space-4) 0;">
+                <thead>
+                    <tr style="background: var(--gray-50);">
+                        <th style="padding: var(--space-3); text-align: left; border-bottom: 2px solid var(--gray-200);">Parameter</th>
+                        <th style="padding: var(--space-3); text-align: left; border-bottom: 2px solid var(--gray-200);">Required</th>
+                        <th style="padding: var(--space-3); text-align: left; border-bottom: 2px solid var(--gray-200);">Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);"><code>email</code></td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">Yes</td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">Recipient email (delivery only - never stored)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);"><code>permission</code></td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">No</td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">Permission level: user, editor, admin, super_admin (default: user)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);"><code>redirect_url</code></td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">No</td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">URL to redirect after claiming</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);"><code>expiry_days</code></td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">No</td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">Credential validity in days (default: 90)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);"><code>claim_window_days</code></td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">No</td>
+                        <td style="padding: var(--space-3); border-bottom: 1px solid var(--gray-100);">Link validity in days (default: 7)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        
+        <!-- EmailLemma Section -->
+        <section id="guide-email-lemma" class="section-anchor" style="margin-top: var(--space-16);">
+            <a href="#guide-email-lemma" class="anchor-link">#</a>
+            <h2 style="margin-bottom: var(--space-4);">📧 EmailLemma - Verified Email Credential</h2>
+            <p style="color: var(--gray-600); margin-bottom: var(--space-6);">
+                When users claim permissions via email, they also receive an <strong>EmailLemma</strong> - 
+                a verifiable credential proving they own that email address. This credential is stored 
+                only in the user's wallet, never on Lemma servers.
+            </p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-bottom: var(--space-6);">
+                <div style="background: var(--success-50); border: 1px solid var(--success-200); border-radius: 8px; padding: var(--space-4);">
+                    <h4 style="color: var(--success-700); margin-bottom: var(--space-3);">✅ What Users Get</h4>
+                    <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-700); font-size: var(--font-size-sm);">
+                        <li>Proof of verified email in their wallet</li>
+                        <li>Can share with sites that need it</li>
+                        <li>Verify once, use everywhere</li>
+                        <li>User controls who sees their email</li>
+                    </ul>
+                </div>
+                
+                <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: 8px; padding: var(--space-4);">
+                    <h4 style="color: var(--primary-700); margin-bottom: var(--space-3);">🔐 Privacy Benefits</h4>
+                    <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-700); font-size: var(--font-size-sm);">
+                        <li>Email stored only in user's wallet</li>
+                        <li>Lemma database has no email</li>
+                        <li>No central email registry</li>
+                        <li>User decides who to share with</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <h3 style="margin-top: var(--space-6);">EmailLemma Structure</h3>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">JSON</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+{
+    "type": ["VerifiableCredential", "EmailLemma"],
+    "packageType": "email",
+    "issuer": "did:lemma:issuer",
+    "issuanceDate": "2026-01-11T...",
+    "credentialSubject": {
+        "email": "user@example.com",
+        "verifiedAt": "2026-01-11T...",
+        "verificationMethod": "email_link_passkey_auth"
+    },
+    "proof": { /* Ed25519 signature */ }
+}
+            </div>
+            
+            <h3 style="margin-top: var(--space-6);">Check if User Has Verified Email</h3>
+            <p style="color: var(--gray-600); margin-bottom: var(--space-4);">
+                Developers can check if a user has a verified email without needing to store it themselves:
+            </p>
+            
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">JavaScript</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+// Check if user has verified their email
+const emailLemma = await wallet.getCredential('email');
+
+if (emailLemma) {
+    // User has verified email - stored in THEIR wallet
+    console.log('Verified email:', emailLemma.claims.email);
+    console.log('Verified at:', emailLemma.claims.verifiedAt);
+    
+    // Enable email-dependent features
+    enableNotifications(emailLemma.claims.email);
+} else {
+    // User hasn't verified email (or hasn't shared it)
+    // Can still use passkey-only authentication
+    console.log('No email verification found');
+}
+            </div>
+            
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">JavaScript</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                </div>
+// Quick check without retrieving the credential
+const hasVerifiedEmail = await wallet.hasValidCredential('email');
+
+if (hasVerifiedEmail) {
+    showVerifiedBadge();
+}
+            </div>
+            
+            <div style="background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; padding: var(--space-4); margin-top: var(--space-6);">
+                <h4 style="margin-bottom: var(--space-2);">💡 Use Cases for EmailLemma</h4>
+                <ul style="margin: 0; padding-left: var(--space-4); color: var(--gray-700); font-size: var(--font-size-sm);">
+                    <li><strong>Notifications:</strong> Send important updates to verified emails</li>
+                    <li><strong>Account recovery:</strong> Alternative recovery path with verified email</li>
+                    <li><strong>Team features:</strong> Check @company.com domain for workspace access</li>
+                    <li><strong>Trust indicators:</strong> Show "verified email" badge to other users</li>
+                    <li><strong>Compliance:</strong> Audit trail for email verification without storing emails</li>
+                </ul>
             </div>
         </section>
         
