@@ -28,7 +28,8 @@ class LemmaIAM {
         
         // Central wallet option - stores credentials in lemma.id wallet instead of locally
         // This ensures all user permissions are visible in the lemma.id/wallet page
-        this.useCentralWallet = config.useCentralWallet || false;
+        // DEFAULT: true - credentials stored via bridge so they appear at lemma.id/wallet
+        this.useCentralWallet = config.useCentralWallet !== false;
         
         // Remote config (fetched from server - allows auto-updates)
         this.remoteConfig = null;
