@@ -720,6 +720,112 @@ class LemmaWallet {
     }
 
     /**
+     * Ensure user is authenticated via Lemma (ONE PASSKEY PER DAY flow)
+     * 
+     * This is the RECOMMENDED method for third-party sites to authenticate users.
+     * It checks the central bridge session and redirects to unlock if needed.
+     * 
+     * @param {Object} options Configuration
+     * @param {boolean} options.autoRedirect If true, automatically redirect to unlock page (default: true)
+     * @param {string} options.returnUrl URL to return to after unlock (default: current page)
+     * @returns {Promise<Object>} Authentication result
+     * 
+     * @example
+     * // In your app's login/protected route:
+     * const auth = await lemmaWallet.ensureAuthenticated();
+     * if (auth.authenticated) {
+     *     // User is authenticated! Show protected content
+     *     console.log('Welcome back!', auth.walletId);
+     * }
+     * // If not authenticated, user will be redirected to lemma.id/wallet/unlock
+     */
+    async ensureAuthenticated(options = {}) {
+        const { 
+            autoRedirect = true, 
+            returnUrl = window.location.href 
+        } = options;
+        
+        await this.init();
+        
+        // Check if we're on lemma.id (first-party)
+        if (window.location.hostname.includes('lemma.id')) {
+            const localAuth = this.getAuthState();
+            if (localAuth.authenticated) {
+                return {
+                    authenticated: true,
+                    source: 'local',
+                    walletId: this.session?.walletId,
+                    expiresAt: this.session?.expiresAt
+                };
+            }
+            
+            // Need to unlock locally
+            if (autoRedirect) {
+                window.location.href = `/wallet/unlock?return=${encodeURIComponent(returnUrl)}`;
+                return { authenticated: false, redirecting: true };
+            }
+            return { authenticated: false, needsUnlock: true };
+        }
+        
+        // Third-party site: Check bridge session
+        try {
+            const bridgeSession = await this.checkBridgeSession();
+            
+            if (bridgeSession.valid) {
+                console.log('[Lemma] ✅ Authenticated via bridge session');
+                return {
+                    authenticated: true,
+                    source: 'bridge',
+                    walletId: bridgeSession.walletId,
+                    expiresAt: bridgeSession.expiresAt,
+                    timeRemaining: bridgeSession.timeRemaining,
+                    syncedFromServer: bridgeSession.syncedFromServer
+                };
+            }
+            
+            // No valid session - redirect to unlock
+            if (autoRedirect) {
+                console.log('[Lemma] 🔓 Redirecting to unlock...');
+                const unlockUrl = `https://lemma.id/wallet/unlock?return=${encodeURIComponent(returnUrl)}`;
+                window.location.href = unlockUrl;
+                return { authenticated: false, redirecting: true };
+            }
+            
+            return { 
+                authenticated: false, 
+                needsUnlock: true,
+                unlockUrl: `https://lemma.id/wallet/unlock?return=${encodeURIComponent(returnUrl)}`
+            };
+            
+        } catch (e) {
+            console.error('[Lemma] Bridge check failed:', e);
+            
+            if (autoRedirect) {
+                const unlockUrl = `https://lemma.id/wallet/unlock?return=${encodeURIComponent(returnUrl)}`;
+                window.location.href = unlockUrl;
+                return { authenticated: false, redirecting: true };
+            }
+            
+            return { 
+                authenticated: false, 
+                error: e.message,
+                needsUnlock: true 
+            };
+        }
+    }
+
+    /**
+     * Check if user has unlocked today (URL param check)
+     * Use this after redirect back from lemma.id/wallet/unlock
+     * 
+     * @returns {boolean} True if lemma_unlocked=true is in URL
+     */
+    checkUnlockReturn() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('lemma_unlocked') === 'true';
+    }
+
+    /**
      * Send message to bridge iframe and get response
      * @private
      */
