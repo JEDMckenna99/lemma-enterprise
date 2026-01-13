@@ -937,8 +937,37 @@ async function loadWalletData() {
             return;
         }
 
-        // Get credentials from the federated wallet
-        const credentials = await lemmaWallet.getCredentials();
+        // Get credentials from local wallet
+        let credentials = await lemmaWallet.getCredentials();
+        
+        // ALSO fetch from server (for credentials synced from other sites)
+        try {
+            const serverResponse = await fetch('/api/wallet/get-credentials', {
+                credentials: 'include'
+            });
+            if (serverResponse.ok) {
+                const serverData = await serverResponse.json();
+                if (serverData.credentials && serverData.credentials.length > 0) {
+                    console.log(`📥 Fetched ${serverData.credentials.length} credentials from server`);
+                    // Merge: add server creds not in local
+                    const localIds = new Set(credentials.map(c => c.id));
+                    for (const cred of serverData.credentials) {
+                        if (!localIds.has(cred.id)) {
+                            credentials.push(cred);
+                            // Also store locally for future offline access
+                            try {
+                                await lemmaWallet.storeCredential(cred);
+                            } catch (e) {
+                                console.warn('Could not cache server credential locally:', e);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ Could not fetch credentials from server:', e.message);
+        }
+        
         const activeCredentials = credentials.filter(cred => !cred.revoked);
         
         // Show/hide sections based on credential status

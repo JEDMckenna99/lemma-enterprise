@@ -239,3 +239,115 @@ def clear_session():
     response = jsonify({'success': True, 'session_cleared': True})
     response.delete_cookie(SESSION_COOKIE_NAME, path='/')
     return response
+
+
+# In-memory credential store (in production, use database)
+# Key: wallet_id, Value: list of credentials
+_credential_store = {}
+
+
+@wallet_session_sync_bp.route('/api/wallet/sync-credential', methods=['POST', 'OPTIONS'])
+def sync_credential():
+    """
+    Sync a credential to the server for cross-site availability.
+    
+    Called by the bridge when storing credentials from third-party sites.
+    This ensures credentials are available when viewing lemma.id/wallet.
+    """
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+    
+    # Get session cookie
+    session_token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not session_token:
+        response = jsonify({'success': False, 'error': 'not_authenticated'})
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response, 401
+    
+    session_data = validate_session_token(session_token)
+    if not session_data:
+        response = jsonify({'success': False, 'error': 'session_expired'})
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response, 401
+    
+    wallet_id = session_data['wallet_id']
+    data = request.get_json() or {}
+    credential = data.get('credential')
+    
+    if not credential:
+        response = jsonify({'success': False, 'error': 'no_credential_provided'})
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response, 400
+    
+    # Store credential (in-memory for now, use DB in production)
+    if wallet_id not in _credential_store:
+        _credential_store[wallet_id] = []
+    
+    # Check if credential already exists (by ID)
+    existing_ids = {c.get('id') for c in _credential_store[wallet_id]}
+    if credential.get('id') not in existing_ids:
+        _credential_store[wallet_id].append(credential)
+        print(f"✅ Credential synced to server: {credential.get('id')} for wallet {wallet_id}")
+    
+    response = jsonify({
+        'success': True,
+        'synced': True,
+        'credential_id': credential.get('id'),
+        'total_credentials': len(_credential_store[wallet_id])
+    })
+    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
+
+
+@wallet_session_sync_bp.route('/api/wallet/get-credentials', methods=['GET', 'OPTIONS'])
+def get_credentials():
+    """
+    Get all credentials for the authenticated wallet.
+    
+    Used by lemma.id/wallet to display unified credential list.
+    """
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+    
+    # Get session cookie
+    session_token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not session_token:
+        response = jsonify({'success': False, 'error': 'not_authenticated', 'credentials': []})
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response, 401
+    
+    session_data = validate_session_token(session_token)
+    if not session_data:
+        response = jsonify({'success': False, 'error': 'session_expired', 'credentials': []})
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response, 401
+    
+    wallet_id = session_data['wallet_id']
+    credentials = _credential_store.get(wallet_id, [])
+    
+    response = jsonify({
+        'success': True,
+        'credentials': credentials,
+        'count': len(credentials)
+    })
+    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
