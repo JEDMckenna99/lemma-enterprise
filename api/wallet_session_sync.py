@@ -396,6 +396,94 @@ def sync_credential():
     return response
 
 
+@wallet_session_sync_bp.route('/api/wallet/revoke-credential', methods=['POST', 'OPTIONS'])
+def revoke_credential():
+    """
+    Mark a credential as revoked in the server database.
+    
+    Called when user revokes a credential from the wallet page.
+    Keeps the credential for audit trail but marks it as revoked.
+    """
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+    
+    # Get session cookie
+    session_token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not session_token:
+        response = jsonify({'success': False, 'error': 'not_authenticated'})
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response, 401
+    
+    session_data = validate_session_token(session_token)
+    if not session_data:
+        response = jsonify({'success': False, 'error': 'session_expired'})
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response, 401
+    
+    wallet_id = session_data['wallet_id']
+    data = request.get_json() or {}
+    credential_id = data.get('credential_id')
+    
+    if not credential_id:
+        response = jsonify({'success': False, 'error': 'credential_id required'})
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response, 400
+    
+    # Mark as revoked in database
+    revoked = _revoke_credential_db(wallet_id, credential_id)
+    
+    if revoked:
+        print(f"🗑️ Credential revoked in database: {credential_id} for wallet {wallet_id}")
+    
+    response = jsonify({
+        'success': True,
+        'revoked': revoked,
+        'credential_id': credential_id
+    })
+    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
+
+
+def _revoke_credential_db(wallet_id: str, credential_id: str) -> bool:
+    """Mark credential as revoked in database (soft delete)."""
+    conn = _get_db_connection()
+    if not conn:
+        print("⚠️ No database connection, credential not revoked on server")
+        return False
+    
+    try:
+        cur = conn.cursor()
+        
+        # Soft delete - mark as revoked with timestamp
+        cur.execute("""
+            UPDATE wallet_credentials 
+            SET revoked = TRUE, revoked_at = NOW(), updated_at = NOW()
+            WHERE wallet_id = %s AND credential_id = %s
+        """, (wallet_id, credential_id))
+        
+        affected = cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+        return affected > 0
+        
+    except Exception as e:
+        print(f"Error revoking credential: {e}")
+        if conn:
+            conn.close()
+        return False
+
+
 @wallet_session_sync_bp.route('/api/wallet/get-credentials', methods=['GET', 'OPTIONS'])
 def get_credentials():
     """
@@ -441,90 +529,3 @@ def get_credentials():
     response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
-
-
-@wallet_session_sync_bp.route('/api/wallet/revoke-credential', methods=['POST', 'OPTIONS'])
-def revoke_credential():
-    """
-    Revoke a credential from the server sync storage.
-    
-    Called when user revokes a credential from the wallet page.
-    This removes it from the unified wallet view.
-    """
-    # Handle CORS preflight
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        return response
-    
-    # Get session cookie
-    session_token = request.cookies.get(SESSION_COOKIE_NAME)
-    if not session_token:
-        response = jsonify({'success': False, 'error': 'not_authenticated'})
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        return response, 401
-    
-    session_data = validate_session_token(session_token)
-    if not session_data:
-        response = jsonify({'success': False, 'error': 'session_expired'})
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        return response, 401
-    
-    wallet_id = session_data['wallet_id']
-    data = request.get_json() or {}
-    credential_id = data.get('credential_id')
-    
-    if not credential_id:
-        response = jsonify({'success': False, 'error': 'credential_id required'})
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        return response, 400
-    
-    # Revoke from database
-    revoked = _revoke_credential_db(wallet_id, credential_id)
-    
-    if revoked:
-        print(f"🗑️ Credential revoked from database: {credential_id} for wallet {wallet_id}")
-    
-    response = jsonify({
-        'success': True,
-        'revoked': revoked,
-        'credential_id': credential_id
-    })
-    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
-    return response
-
-
-def _revoke_credential_db(wallet_id: str, credential_id: str) -> bool:
-    """Mark credential as revoked in database (or delete it)."""
-    conn = _get_db_connection()
-    if not conn:
-        print("⚠️ No database connection, credential not revoked from server")
-        return False
-    
-    try:
-        cur = conn.cursor()
-        
-        # Option 1: Delete the credential entirely
-        cur.execute("""
-            DELETE FROM wallet_credentials 
-            WHERE wallet_id = %s AND credential_id = %s
-        """, (wallet_id, credential_id))
-        
-        deleted = cur.rowcount > 0
-        conn.commit()
-        cur.close()
-        conn.close()
-        return deleted
-        
-    except Exception as e:
-        print(f"Error revoking credential: {e}")
-        if conn:
-            conn.close()
-        return False
