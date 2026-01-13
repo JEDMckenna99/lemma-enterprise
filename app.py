@@ -706,7 +706,7 @@ def create_app():
     def lemma_service_worker():
         """
         Serve the Lemma service worker from root path for proper scope.
-        
+
         Service workers can only control URLs within their scope. By serving
         from root, the SW can cache all lemma.id resources.
         """
@@ -714,6 +714,20 @@ def create_app():
         response = send_from_directory('static/js', 'lemma-sw.js', mimetype='application/javascript')
         response.headers['Service-Worker-Allowed'] = '/'
         response.headers['Cache-Control'] = 'no-cache'  # SW should always be fresh
+        return response
+
+    @app.route('/sdk/lemma-wallet.js')
+    def lemma_wallet_sdk_fresh():
+        """
+        Serve the Lemma wallet SDK with no-cache headers for development.
+        Use this endpoint when you need the absolute latest version.
+        """
+        from flask import send_from_directory
+        response = send_from_directory('static/js', 'lemma-wallet.js', mimetype='application/javascript')
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        response.headers['X-SDK-Version'] = '2.3.0-bridge-check'
         return response
 
     # Essential pages

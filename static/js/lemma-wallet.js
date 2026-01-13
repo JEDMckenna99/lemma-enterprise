@@ -1,5 +1,11 @@
 /**
  * Lemma Wallet SDK - Wallet-Centric Architecture
+ * Version: 2.3.0 (2026-01-13)
+ * 
+ * FEATURES:
+ * - ONE PASSKEY PER DAY: unlock() and registerPasskey() auto-check bridge session
+ * - Session sync via secure cookies across all Lemma-enabled sites
+ * - Local Ed25519 verification (zero network calls)
  * 
  * The wallet is unlocked locally via passkey (no server call).
  * Sites can issue their own lemmas to be stored in the wallet.
