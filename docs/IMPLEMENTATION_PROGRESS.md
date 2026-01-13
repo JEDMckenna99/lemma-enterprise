@@ -78,14 +78,32 @@ content-security-policy: frame-ancestors https: http://localhost:* http://127.0.
 
 ---
 
-### Phase 3: Session Management ⬜ PENDING
+### Phase 3: Session Management ⏳ IN PROGRESS
+**Status:** 🟡 In Progress  
+**Started:** 2026-01-13
 
 | Task | Status | Notes |
 |------|--------|-------|
-| 3.1 Configurable session duration | ⬜ Pending | |
-| 3.2 Session extension (tap only, no biometric) | ⬜ Pending | |
-| 3.3 Max extension limit (7 days) | ⬜ Pending | |
-| 3.4 Session state persistence | ⬜ Pending | |
+| 3.1 Configurable session duration | ✅ Complete | SESSION_CONFIG in bridge |
+| 3.2 Session extension (tap only, no biometric) | ✅ Complete | userVerification: 'discouraged' |
+| 3.3 Max extension limit (7 days) | ✅ Complete | MAX_EXTENSIONS: 7 |
+| 3.4 Session state persistence | ✅ Complete | IndexedDB session store |
+| 3.5 SDK bridge session methods | ✅ Complete | checkBridgeSession(), extendBridgeSession() |
+| 3.6 getSessionState() for cross-site | ✅ Complete | Combines local + bridge state |
+| 3.7 manageSession() auto-manager | ✅ Complete | Smart extension with callbacks |
+| 3.8 startSessionManager() helper | ✅ Complete | Periodic auto-check with events |
+| 3.9 Deploy & verify | ⏳ Pending | Deploy to Heroku |
+
+**Files Modified:**
+- `templates/wallet_bridge.html` - Session config already in place
+- `static/js/lemma-wallet.js` - Added SDK session management methods
+
+**Session Features:**
+- **checkBridgeSession()** - Get session state from central bridge
+- **extendBridgeSession()** - Tap-only session extension via bridge
+- **getSessionState()** - Unified session state (local + bridge)
+- **manageSession()** - Smart auto-extend with callbacks
+- **startLemmaSessionManager()** - Background session management
 
 ---
 

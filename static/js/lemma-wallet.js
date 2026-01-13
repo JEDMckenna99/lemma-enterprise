@@ -458,6 +458,168 @@ class LemmaWallet {
     }
 
     // ========================================
+    // BRIDGE SESSION MANAGEMENT
+    // ========================================
+
+    /**
+     * Check session via the central bridge (for cross-site session sharing)
+     * This is the recommended method for third-party sites.
+     * 
+     * @returns {Promise<Object>} Session state from bridge
+     */
+    async checkBridgeSession() {
+        return this._sendBridgeMessage('CHECK_SESSION', {});
+    }
+
+    /**
+     * Extend session via bridge (tap-only, no full biometric)
+     * Use when session is about to expire but user is still active.
+     * 
+     * @returns {Promise<Object>} Extension result
+     */
+    async extendBridgeSession() {
+        return this._sendBridgeMessage('EXTEND_SESSION', {});
+    }
+
+    /**
+     * Get full session state for cross-site authentication
+     * Combines local and bridge session information.
+     * 
+     * @returns {Promise<Object>} Comprehensive session state
+     */
+    async getSessionState() {
+        const localState = this.getAuthState();
+        
+        // If we're on lemma.id, use local state
+        if (window.location.hostname.includes('lemma.id')) {
+            return {
+                source: 'local',
+                ...localState,
+                canExtend: true,
+                extensionsRemaining: 7
+            };
+        }
+        
+        // For third-party sites, check bridge
+        try {
+            const bridgeState = await this.checkBridgeSession();
+            return {
+                source: 'bridge',
+                valid: bridgeState.valid,
+                authenticated: bridgeState.valid,
+                expiresAt: bridgeState.expiresAt,
+                timeRemaining: bridgeState.timeRemaining,
+                canExtend: bridgeState.canExtend,
+                extensionCount: bridgeState.extensionCount,
+                shouldPromptExtend: bridgeState.shouldPromptExtend,
+                walletExists: bridgeState.walletExists
+            };
+        } catch (e) {
+            console.warn('[Lemma] Bridge session check failed:', e.message);
+            return {
+                source: 'local',
+                ...localState,
+                bridgeError: e.message
+            };
+        }
+    }
+
+    /**
+     * Smart session management - auto-extend or prompt as needed
+     * Call this periodically (e.g., every 30 minutes) for seamless UX.
+     * 
+     * @param {Object} options Configuration options
+     * @param {Function} options.onExtendNeeded Called when extension needed (return true to extend)
+     * @param {Function} options.onExpired Called when session expired
+     * @returns {Promise<Object>} Session management result
+     */
+    async manageSession(options = {}) {
+        const { onExtendNeeded, onExpired } = options;
+        
+        const state = await this.getSessionState();
+        
+        if (!state.valid && state.walletExists) {
+            // Session expired
+            if (onExpired) onExpired(state);
+            return { action: 'expired', state };
+        }
+        
+        if (state.shouldPromptExtend && state.canExtend) {
+            // Session about to expire, can extend
+            let shouldExtend = true;
+            
+            if (onExtendNeeded) {
+                shouldExtend = await onExtendNeeded(state);
+            }
+            
+            if (shouldExtend) {
+                try {
+                    const result = await this.extendBridgeSession();
+                    if (result.success) {
+                        console.log('[Lemma] Session extended successfully');
+                        return { action: 'extended', result };
+                    }
+                } catch (e) {
+                    console.warn('[Lemma] Session extension failed:', e.message);
+                }
+            }
+            
+            return { action: 'extension_needed', state };
+        }
+        
+        return { action: 'valid', state };
+    }
+
+    /**
+     * Send message to bridge iframe and get response
+     * @private
+     */
+    async _sendBridgeMessage(type, payload, timeout = 10000) {
+        // Check if bridge iframe exists
+        let bridge = document.querySelector('iframe[src*="/wallet/bridge"]');
+        
+        if (!bridge) {
+            // Create bridge iframe if needed
+            bridge = document.createElement('iframe');
+            bridge.src = 'https://lemma.id/wallet/bridge';
+            bridge.style.cssText = 'display:none;width:0;height:0;border:none;';
+            bridge.id = 'lemma-bridge';
+            document.body.appendChild(bridge);
+            
+            // Wait for bridge to load
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Bridge load timeout')), 5000);
+                bridge.onload = () => {
+                    clearTimeout(timeout);
+                    // Give bridge time to initialize
+                    setTimeout(resolve, 100);
+                };
+            });
+        }
+        
+        return new Promise((resolve, reject) => {
+            const requestId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+            const timeoutId = setTimeout(() => {
+                window.removeEventListener('message', handler);
+                reject(new Error(`Bridge response timeout for ${type}`));
+            }, timeout);
+            
+            const handler = (event) => {
+                if (!event.origin.includes('lemma.id')) return;
+                const response = event.data;
+                if (response.requestId !== requestId) return;
+                
+                clearTimeout(timeoutId);
+                window.removeEventListener('message', handler);
+                resolve(response);
+            };
+            
+            window.addEventListener('message', handler);
+            bridge.contentWindow.postMessage({ type, payload, requestId }, 'https://lemma.id');
+        });
+    }
+
+    // ========================================
     // LEMMA STORAGE
     // ========================================
 
@@ -1611,6 +1773,102 @@ if (typeof window !== 'undefined') {
     if (window.location.hostname.includes('lemma.id')) {
         registerLemmaServiceWorker();
     }
+    
+    // ========================================
+    // AUTO SESSION MANAGER
+    // ========================================
+    // Provides automatic session management for third-party sites
+    
+    /**
+     * Start automatic session management
+     * Periodically checks session and prompts for extension when needed.
+     * 
+     * @param {Object} options Configuration
+     * @param {number} options.checkInterval How often to check (default: 30 min)
+     * @param {Function} options.onSessionExpired Called when session expires
+     * @param {Function} options.onExtensionNeeded Called when extension is needed (return true to auto-extend)
+     * @param {Function} options.onSessionExtended Called after successful extension
+     * @param {boolean} options.autoExtend Auto-extend without prompt (default: false)
+     * @returns {Object} Session manager with stop() method
+     */
+    function startSessionManager(options = {}) {
+        const {
+            checkInterval = 30 * 60 * 1000,  // 30 minutes
+            onSessionExpired = null,
+            onExtensionNeeded = null,
+            onSessionExtended = null,
+            autoExtend = false
+        } = options;
+        
+        let intervalId = null;
+        let isRunning = true;
+        
+        const check = async () => {
+            if (!isRunning) return;
+            
+            try {
+                const result = await lemmaWalletInstance.manageSession({
+                    onExtendNeeded: async (state) => {
+                        if (autoExtend) return true;
+                        if (onExtensionNeeded) {
+                            return await onExtensionNeeded(state);
+                        }
+                        return false;
+                    },
+                    onExpired: (state) => {
+                        if (onSessionExpired) onSessionExpired(state);
+                    }
+                });
+                
+                if (result.action === 'extended' && onSessionExtended) {
+                    onSessionExtended(result.result);
+                }
+                
+                return result;
+            } catch (e) {
+                console.warn('[Lemma] Session check error:', e.message);
+            }
+        };
+        
+        // Initial check
+        check();
+        
+        // Start periodic checks
+        intervalId = setInterval(check, checkInterval);
+        
+        console.log(`[Lemma] Session manager started (interval: ${checkInterval / 60000} min)`);
+        
+        return {
+            stop: () => {
+                isRunning = false;
+                if (intervalId) {
+                    clearInterval(intervalId);
+                    intervalId = null;
+                }
+                console.log('[Lemma] Session manager stopped');
+            },
+            check,  // Manual check
+            isRunning: () => isRunning
+        };
+    }
+    
+    // Export session manager
+    window.startLemmaSessionManager = startSessionManager;
+    
+    // ========================================
+    // SESSION EVENTS
+    // ========================================
+    // Custom events for session state changes
+    
+    /**
+     * Dispatch a custom Lemma session event
+     */
+    function dispatchSessionEvent(eventName, detail) {
+        window.dispatchEvent(new CustomEvent(`lemma:${eventName}`, { detail }));
+    }
+    
+    // Export event dispatcher for internal use
+    window._lemmaDispatchEvent = dispatchSessionEvent;
 }
 
 // Export for modules
