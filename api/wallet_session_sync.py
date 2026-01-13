@@ -241,9 +241,33 @@ def clear_session():
     return response
 
 
-# In-memory credential store (in production, use database)
-# Key: wallet_id, Value: list of credentials
-_credential_store = {}
+# Credential storage
+# In production, this uses the database table `wallet_credentials`
+# For now, we use a file-based cache to persist across restarts
+import json
+import os
+
+CREDENTIAL_CACHE_FILE = '/tmp/lemma_credentials.json'
+
+def _load_credential_store():
+    """Load credentials from persistent file."""
+    try:
+        if os.path.exists(CREDENTIAL_CACHE_FILE):
+            with open(CREDENTIAL_CACHE_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Could not load credential cache: {e}")
+    return {}
+
+def _save_credential_store(store):
+    """Save credentials to persistent file."""
+    try:
+        with open(CREDENTIAL_CACHE_FILE, 'w') as f:
+            json.dump(store, f)
+    except Exception as e:
+        print(f"Could not save credential cache: {e}")
+
+_credential_store = _load_credential_store()
 
 
 @wallet_session_sync_bp.route('/api/wallet/sync-credential', methods=['POST', 'OPTIONS'])
@@ -296,6 +320,7 @@ def sync_credential():
     existing_ids = {c.get('id') for c in _credential_store[wallet_id]}
     if credential.get('id') not in existing_ids:
         _credential_store[wallet_id].append(credential)
+        _save_credential_store(_credential_store)  # Persist to file
         print(f"✅ Credential synced to server: {credential.get('id')} for wallet {wallet_id}")
     
     response = jsonify({
@@ -341,6 +366,9 @@ def get_credentials():
         return response, 401
     
     wallet_id = session_data['wallet_id']
+    # Reload from file to get latest
+    global _credential_store
+    _credential_store = _load_credential_store()
     credentials = _credential_store.get(wallet_id, [])
     
     response = jsonify({
