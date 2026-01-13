@@ -518,32 +518,14 @@ window.addEventListener('message', async (event) => {
                 // Ensure packageType is set for proper filtering
                 credential.packageType = credential.packageType || 'permission';
 
-                // Store the credential locally
+                // Store the credential locally (no server sync - privacy preserved)
                 const storeResult = await wallet.storeCredential(credential);
                 console.log(`✅ Credential stored locally via bridge for ${requestingSite} (siteId: ${credSiteId}):`, credential.id);
-
-                // ALSO sync to server for unified wallet view on lemma.id
-                // This solves the storage partitioning issue
-                try {
-                    const syncResponse = await fetch('https://lemma.id/api/wallet/sync-credential', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ credential })
-                    });
-                    if (syncResponse.ok) {
-                        const syncResult = await syncResponse.json();
-                        console.log(`✅ Credential synced to server:`, syncResult);
-                    }
-                } catch (syncError) {
-                    console.warn('⚠️ Server sync failed (credential still stored locally):', syncError.message);
-                }
 
                 respond({
                     success: true,
                     credentialId: credential.id,
                     stored: true,
-                    syncedToServer: true,
                     sessionRemaining: storeSession.timeRemaining
                 });
                 break;

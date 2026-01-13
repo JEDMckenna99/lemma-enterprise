@@ -1168,23 +1168,9 @@ async function revokeCredential(credentialId) {
     }
 
     try {
-        // Remove from local wallet
+        // Remove from local wallet (no server sync - privacy preserved)
         await lemmaWallet.removeCredential(credentialId);
-        
-        // ALSO mark as revoked on server (for unified wallet sync)
-        try {
-            const response = await fetch('/api/wallet/revoke-credential', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ credential_id: credentialId })
-            });
-            if (response.ok) {
-                console.log('✅ Credential revoked on server:', credentialId);
-            }
-        } catch (e) {
-            console.warn('⚠️ Could not sync revocation to server:', e.message);
-        }
+        console.log('✅ Credential revoked locally:', credentialId);
         
         await loadWalletData(); // Refresh display
         alert('Credential revoked successfully. Changes are propagating across the network.');
@@ -1341,40 +1327,12 @@ async function loadWalletData() {
 
         console.log('📦 Loading wallet data...');
 
-        // Get all credentials from local wallet
-        let allCredentials = await lemmaWallet.getCredentials();
+        // Get all credentials from local wallet (privacy-first: no server sync)
+        const allCredentials = await lemmaWallet.getCredentials();
         console.log('🔍 Local credentials:', allCredentials.length);
-
-        // ALSO fetch from server (for credentials synced from other sites)
-        try {
-            const serverResponse = await fetch('/api/wallet/get-credentials', {
-                credentials: 'include'
-            });
-            if (serverResponse.ok) {
-                const serverData = await serverResponse.json();
-                if (serverData.credentials && serverData.credentials.length > 0) {
-                    console.log(`📥 Fetched ${serverData.credentials.length} credentials from server`);
-                    // Merge: add server creds not in local
-                    const localIds = new Set(allCredentials.map(c => c.id));
-                    for (const cred of serverData.credentials) {
-                        if (!localIds.has(cred.id)) {
-                            allCredentials.push(cred);
-                            console.log(`✅ Added from server: ${cred.id}`);
-                            // Also store locally for future offline access
-                            try {
-                                await lemmaWallet.storeCredential(cred);
-                            } catch (e) {
-                                console.warn('Could not cache server credential locally:', e);
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('⚠️ Could not fetch credentials from server:', e.message);
-        }
-
-        console.log('📊 Total credentials after merge:', allCredentials.length);
+        
+        // Note: Credentials from third-party sites are stored in their partitioned IndexedDB
+        // and must be managed on those sites. This preserves user privacy.
 
         // Show the Lock Wallet button now that wallet is loaded
         const walletActions = document.getElementById('wallet-actions');
@@ -1739,22 +1697,7 @@ async function revokeLemma(lemmaId, lemmaType) {
             console.log(`  Encrypted storage now has ${Object.keys(parsedCheck).length} credentials`);
         }
         
-        // ALSO mark as revoked on server (for unified wallet sync)
-        try {
-            const response = await fetch('/api/wallet/revoke-credential', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ credential_id: lemmaId })
-            });
-            if (response.ok) {
-                console.log(`  ✅ Revocation synced to server`);
-            }
-        } catch (e) {
-            console.warn(`  ⚠️ Could not sync revocation to server:`, e.message);
-        }
-        
-        // Refresh display
+        // Refresh display (no server sync - privacy preserved)
         console.log(`  Refreshing wallet display...`);
         await loadWalletData();
         
