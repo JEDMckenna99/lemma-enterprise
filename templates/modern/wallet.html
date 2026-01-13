@@ -1243,17 +1243,48 @@ async function loadWalletData() {
         const walletHeader = document.querySelector('.wallet-header');
         const walletMain = document.querySelector('.wallet-main');
         const speedTracker = document.getElementById('wallet-speed-tracker');
-        
+
         if (credentialList) credentialList.style.display = 'none';
         // Header stays visible (already shown for LCP)
         if (walletMain) walletMain.style.display = 'grid';
         if (speedTracker) speedTracker.style.display = 'block';
-        
+
         console.log('📦 Loading wallet data...');
 
-        // Get all credentials from wallet (includes credentials stored via bridge from third-party sites)
-        const allCredentials = await lemmaWallet.getCredentials();
-        console.log('🔍 DEBUG: All credentials from wallet:', allCredentials);
+        // Get all credentials from local wallet
+        let allCredentials = await lemmaWallet.getCredentials();
+        console.log('🔍 Local credentials:', allCredentials.length);
+
+        // ALSO fetch from server (for credentials synced from other sites)
+        try {
+            const serverResponse = await fetch('/api/wallet/get-credentials', {
+                credentials: 'include'
+            });
+            if (serverResponse.ok) {
+                const serverData = await serverResponse.json();
+                if (serverData.credentials && serverData.credentials.length > 0) {
+                    console.log(`📥 Fetched ${serverData.credentials.length} credentials from server`);
+                    // Merge: add server creds not in local
+                    const localIds = new Set(allCredentials.map(c => c.id));
+                    for (const cred of serverData.credentials) {
+                        if (!localIds.has(cred.id)) {
+                            allCredentials.push(cred);
+                            console.log(`✅ Added from server: ${cred.id}`);
+                            // Also store locally for future offline access
+                            try {
+                                await lemmaWallet.storeCredential(cred);
+                            } catch (e) {
+                                console.warn('Could not cache server credential locally:', e);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ Could not fetch credentials from server:', e.message);
+        }
+
+        console.log('📊 Total credentials after merge:', allCredentials.length);
         
         // Filter by type
         const pohCredentials = allCredentials.filter(c => {
