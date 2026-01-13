@@ -241,33 +241,97 @@ def clear_session():
     return response
 
 
-# Credential storage
-# In production, this uses the database table `wallet_credentials`
-# For now, we use a file-based cache to persist across restarts
-import json
-import os
+# Database-backed credential storage
+# Uses wallet_credentials table for persistent, scalable storage
 
-CREDENTIAL_CACHE_FILE = '/tmp/lemma_credentials.json'
-
-def _load_credential_store():
-    """Load credentials from persistent file."""
+def _get_db_connection():
+    """Get database connection."""
     try:
-        if os.path.exists(CREDENTIAL_CACHE_FILE):
-            with open(CREDENTIAL_CACHE_FILE, 'r') as f:
-                return json.load(f)
+        import psycopg2
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url:
+            # Heroku uses postgres:// but psycopg2 needs postgresql://
+            if database_url.startswith('postgres://'):
+                database_url = database_url.replace('postgres://', 'postgresql://', 1)
+            return psycopg2.connect(database_url, sslmode='require')
     except Exception as e:
-        print(f"Could not load credential cache: {e}")
-    return {}
+        print(f"Database connection error: {e}")
+    return None
 
-def _save_credential_store(store):
-    """Save credentials to persistent file."""
+
+def _store_credential_db(wallet_id: str, credential: dict) -> bool:
+    """Store credential in database."""
+    conn = _get_db_connection()
+    if not conn:
+        print("⚠️ No database connection, credential not persisted")
+        return False
+    
     try:
-        with open(CREDENTIAL_CACHE_FILE, 'w') as f:
-            json.dump(store, f)
+        cur = conn.cursor()
+        
+        # Extract metadata from credential
+        cred_id = credential.get('id', '')
+        site_id = credential.get('claims', {}).get('siteId', credential.get('claims', {}).get('site_id', ''))
+        site_domain = credential.get('claims', {}).get('siteDomain', site_id)
+        package_type = credential.get('packageType', 'permission')
+        
+        # Upsert credential
+        cur.execute("""
+            INSERT INTO wallet_credentials (wallet_id, credential_id, site_id, site_domain, credential_data, package_type, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (wallet_id, credential_id) 
+            DO UPDATE SET 
+                credential_data = EXCLUDED.credential_data,
+                site_domain = EXCLUDED.site_domain,
+                updated_at = NOW()
+        """, (wallet_id, cred_id, site_id, site_domain, json.dumps(credential), package_type))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+        
     except Exception as e:
-        print(f"Could not save credential cache: {e}")
+        print(f"Error storing credential: {e}")
+        if conn:
+            conn.close()
+        return False
 
-_credential_store = _load_credential_store()
+
+def _get_credentials_db(wallet_id: str) -> list:
+    """Get all credentials for a wallet from database."""
+    conn = _get_db_connection()
+    if not conn:
+        print("⚠️ No database connection, returning empty credentials")
+        return []
+    
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT credential_data FROM wallet_credentials 
+            WHERE wallet_id = %s AND revoked = FALSE
+            ORDER BY created_at DESC
+        """, (wallet_id,))
+        
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        credentials = []
+        for row in rows:
+            try:
+                cred = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                credentials.append(cred)
+            except:
+                pass
+        
+        return credentials
+        
+    except Exception as e:
+        print(f"Error fetching credentials: {e}")
+        if conn:
+            conn.close()
+        return []
 
 
 @wallet_session_sync_bp.route('/api/wallet/sync-credential', methods=['POST', 'OPTIONS'])
@@ -312,22 +376,20 @@ def sync_credential():
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         return response, 400
     
-    # Store credential (in-memory for now, use DB in production)
-    if wallet_id not in _credential_store:
-        _credential_store[wallet_id] = []
+    # Store credential in database
+    stored = _store_credential_db(wallet_id, credential)
     
-    # Check if credential already exists (by ID)
-    existing_ids = {c.get('id') for c in _credential_store[wallet_id]}
-    if credential.get('id') not in existing_ids:
-        _credential_store[wallet_id].append(credential)
-        _save_credential_store(_credential_store)  # Persist to file
-        print(f"✅ Credential synced to server: {credential.get('id')} for wallet {wallet_id}")
+    if stored:
+        print(f"✅ Credential synced to database: {credential.get('id')} for wallet {wallet_id}")
+    
+    # Get updated count
+    all_creds = _get_credentials_db(wallet_id)
     
     response = jsonify({
         'success': True,
-        'synced': True,
+        'synced': stored,
         'credential_id': credential.get('id'),
-        'total_credentials': len(_credential_store[wallet_id])
+        'total_credentials': len(all_creds)
     })
     response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
     response.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -366,10 +428,10 @@ def get_credentials():
         return response, 401
     
     wallet_id = session_data['wallet_id']
-    # Reload from file to get latest
-    global _credential_store
-    _credential_store = _load_credential_store()
-    credentials = _credential_store.get(wallet_id, [])
+    
+    # Fetch from database
+    credentials = _get_credentials_db(wallet_id)
+    print(f"📥 Fetched {len(credentials)} credentials from database for wallet {wallet_id}")
     
     response = jsonify({
         'success': True,
