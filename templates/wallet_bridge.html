@@ -496,18 +496,24 @@ window.addEventListener('message', async (event) => {
                 }
                 
                 // SECURITY: Validate credential's siteId matches the requesting origin
-                // EXCEPTION: lemma.id can store credentials for ANY site (unified wallet)
+                // EXCEPTIONS:
+                // - lemma.id can store credentials for ANY site (unified wallet)
+                // - Internal site IDs (site_xxx format) are allowed (they're opaque identifiers)
                 const credClaims = credential.claims || credential.credentialSubject || {};
                 const credSiteId = (credClaims.siteId || credClaims.site_id || '').toLowerCase().replace(/^www\./, '');
                 const isLemmaOrigin = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
-                
-                if (!isLemmaOrigin && credSiteId && credSiteId !== requestingSite && 
-                    !requestingSite.endsWith('.' + credSiteId) && 
+                const isInternalSiteId = credSiteId.startsWith('site_') || credSiteId.match(/^[a-f0-9-]{20,}$/);
+
+                if (!isLemmaOrigin && !isInternalSiteId && credSiteId && credSiteId !== requestingSite &&
+                    !requestingSite.endsWith('.' + credSiteId) &&
                     !credSiteId.endsWith('.' + requestingSite)) {
                     console.warn(`🔒 Blocked: ${requestingSite} tried to store credential for ${credSiteId}`);
                     respond({ success: false, error: 'Cannot store credentials for other sites' });
                     return;
                 }
+                
+                // Store the requesting site's domain for future filtering
+                credential.storedFromDomain = requestingSite;
                 
                 // Ensure packageType is set for proper filtering
                 credential.packageType = credential.packageType || 'permission';
