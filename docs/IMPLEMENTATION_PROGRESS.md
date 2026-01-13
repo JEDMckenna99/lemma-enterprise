@@ -62,15 +62,18 @@ content-security-policy: frame-ancestors https: http://localhost:* http://127.0.
 | 2.2 Add HTTP cache headers for bridge | ✅ Complete | Done in Phase 1 |
 | 2.3 Add SW registration to SDK | ✅ Complete | Auto-registers on lemma.id |
 | 2.4 Pre-warm cache on install | ✅ Complete | Bridge + SDK precached |
-| 2.5 Deploy & verify caching works | ⬜ Pending | |
+| 2.5 Deploy & verify caching works | ⚠️ Pending CDN purge | CDN caching old file |
 
 **Files Created:**
 - `static/js/lemma-sw.js` - Service worker with cache-first strategy
+- `static/js/lemma-wallet.js` - Updated with SW registration
 
 **Caching Strategy:**
 - Cache-first for bridge HTML and SDK JS
 - Stale-while-revalidate for revocation lists
 - Background updates without blocking
+
+**Note:** Static JS files are cached by Cloudflare CDN. New code is deployed but requires CDN cache purge to take effect. Bridge HTML caching is working correctly.
 
 ---
 
@@ -131,6 +134,9 @@ content-security-policy: frame-ancestors https: http://localhost:* http://127.0.
 | 2026-01-13 | Bridge initialization | ✅ Pass | Initialized in 70ms, 0 network calls |
 | 2026-01-13 | checkSession() function | ✅ Pass | Returns correct session state |
 | 2026-01-13 | SESSION_CONFIG values | ✅ Pass | 24h duration, 7 max extensions |
+| 2026-01-13 | Service worker file created | ✅ Pass | lemma-sw.js deployed |
+| 2026-01-13 | SW registration code added | ✅ Pass | In lemma-wallet.js |
+| 2026-01-13 | CDN cache update | ⚠️ Pending | Old file cached (45KB vs 55KB) |
 
 ---
 
@@ -172,6 +178,11 @@ Total per page load        0
 - Aggressive HTTP caching (1 year, immutable)
 - Fixed X-Frame-Options to allow iframe embedding for bridge only
 - Verified all tests passing on Heroku
+
+- **Phase 2 IN PROGRESS** 🟡
+- Created service worker (lemma-sw.js) with cache-first strategy
+- Added SW registration to lemma-wallet.js
+- Deployed to Heroku (awaiting CDN cache purge for JS files)
 
 ### 2026-01-12
 - Created implementation plan
