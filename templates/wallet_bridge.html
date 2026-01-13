@@ -139,13 +139,43 @@ async function requestStorageAccess() {
         // Safari: requires user interaction
         // Firefox: requires user interaction
         await document.requestStorageAccess();
-        console.log('✅ Storage access granted');
+        console.log('✅ Storage access granted via API');
         storageAccessGranted = true;
         return true;
     } catch (e) {
         console.warn('⚠️ Storage access denied:', e.message);
-        console.warn('   User may need to visit lemma.id directly first');
+        console.warn('   User may need to click to grant access');
         return false;
+    }
+}
+
+/**
+ * Request storage access with user gesture (for browsers that require it)
+ * This is called when parent sends REQUEST_STORAGE_ACCESS message
+ */
+async function requestStorageAccessWithGesture() {
+    if (!document.requestStorageAccess) {
+        return { success: false, error: 'Storage Access API not available' };
+    }
+    
+    try {
+        await document.requestStorageAccess();
+        storageAccessGranted = true;
+        
+        // Re-initialize wallet with new storage access
+        wallet = null;
+        await initWallet();
+        
+        // Check session with new access
+        const session = await checkSession();
+        
+        return {
+            success: true,
+            storageAccess: 'unpartitioned',
+            session: session
+        };
+    } catch (e) {
+        return { success: false, error: e.message };
     }
 }
 
@@ -810,6 +840,13 @@ window.addEventListener('message', async (event) => {
                     freshUnder5min: freshAuthAgeMs < 300000,
                     freshUnder1hr: freshAuthAgeMs < 3600000
                 });
+                break;
+                
+            case 'REQUEST_STORAGE_ACCESS':
+                // Request storage access with user gesture context
+                // Parent should call this after user interaction (click)
+                const storageResult = await requestStorageAccessWithGesture();
+                respond(storageResult);
                 break;
                 
             case 'DEBUG_DB':
