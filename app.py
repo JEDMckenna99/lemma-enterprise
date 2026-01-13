@@ -728,6 +728,7 @@ def create_app():
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
         response.headers['X-SDK-Version'] = '2.3.0-bridge-check'
+        response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
     # Essential pages
