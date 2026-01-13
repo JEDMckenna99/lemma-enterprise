@@ -573,7 +573,7 @@ def create_app():
             # - No eval, no dynamic code
             'Content-Security-Policy': (
                 "default-src 'none'; "
-                "script-src 'self'; "
+                "script-src 'self' 'unsafe-inline'; "  # Inline needed for bridge logic
                 "connect-src 'self' https://lemma.id; "
                 "style-src 'self' 'unsafe-inline'; "
                 "frame-ancestors https: http://localhost:* http://127.0.0.1:*; "
@@ -587,7 +587,7 @@ def create_app():
             # Bridge HTML is static; all dynamic state is in IndexedDB
             # ETag allows revalidation on version updates
             'Cache-Control': 'public, max-age=31536000, immutable',
-            'ETag': '"bridge-v2.1.0-hardened"',
+            'ETag': '"bridge-v2.2.0-inline-fix"',
 
             # Additional cache hints
             'Vary': 'Accept-Encoding'
