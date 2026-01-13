@@ -102,12 +102,61 @@ function getHostnameFromOrigin(origin) {
 // ============================================
 
 let wallet = null;
+let storageAccessGranted = false;
+
+/**
+ * Request unpartitioned storage access (needed for cross-site wallet)
+ * Modern browsers partition third-party storage by default.
+ * We need to request access to the REAL lemma.id storage.
+ */
+async function requestStorageAccess() {
+    // Check if we're in an iframe (third-party context)
+    const isThirdParty = window.self !== window.top;
+    
+    if (!isThirdParty) {
+        // First-party context - no need to request
+        storageAccessGranted = true;
+        return true;
+    }
+    
+    // Check if Storage Access API is available
+    if (!document.hasStorageAccess) {
+        console.warn('⚠️ Storage Access API not available - storage may be partitioned');
+        return false;
+    }
+    
+    try {
+        // Check if we already have access
+        const hasAccess = await document.hasStorageAccess();
+        if (hasAccess) {
+            console.log('✅ Storage access already granted');
+            storageAccessGranted = true;
+            return true;
+        }
+        
+        // Request access - this may require user gesture in some browsers
+        // Chrome: automatic if user has visited lemma.id recently
+        // Safari: requires user interaction
+        // Firefox: requires user interaction
+        await document.requestStorageAccess();
+        console.log('✅ Storage access granted');
+        storageAccessGranted = true;
+        return true;
+    } catch (e) {
+        console.warn('⚠️ Storage access denied:', e.message);
+        console.warn('   User may need to visit lemma.id directly first');
+        return false;
+    }
+}
 
 /**
  * Initialize wallet - opens IndexedDB, NO server calls
  */
 async function initWallet() {
     try {
+        // Request storage access first (for cross-site usage)
+        await requestStorageAccess();
+        
         let attempts = 0;
         while (typeof LemmaWallet === 'undefined' && attempts < 50) {
             await new Promise(r => setTimeout(r, 100));
@@ -122,6 +171,7 @@ async function initWallet() {
         wallet = window.globalLemmaWallet || new LemmaWallet({ debug: true });
         await wallet.init();
         console.log('✅ Wallet bridge initialized (v2.0 - local-first)');
+        console.log('   Storage access:', storageAccessGranted ? 'unpartitioned' : 'partitioned');
         return true;
     } catch (e) {
         console.error('❌ Wallet init failed:', e);
@@ -820,18 +870,20 @@ window.addEventListener('message', async (event) => {
     
     const initTime = performance.now() - initStart;
     
-    console.log('🌉 Wallet bridge ready (v2.0 local-first)');
+    console.log('🌉 Wallet bridge ready (v2.1 local-first)');
     console.log(`   ├─ Initialized in ${initTime.toFixed(0)}ms`);
+    console.log(`   ├─ Storage access: ${storageAccessGranted ? 'unpartitioned ✓' : 'partitioned ⚠️'}`);
     console.log(`   ├─ Session: ${session.valid ? 'active' : 'none/expired'}`);
     console.log(`   └─ Network calls: 0`);
-    
+
     // Notify parent that bridge is ready with session info
     if (window.parent !== window) {
         window.parent.postMessage({
             type: 'WALLET_BRIDGE_READY',
             ready: ready,
-            version: '2.0',
+            version: '2.1',
             session: session,
+            storageAccess: storageAccessGranted ? 'unpartitioned' : 'partitioned',
             initTimeMs: initTime.toFixed(2),
             networkCalls: 0,
             // Include capabilities for SDK feature detection
@@ -842,7 +894,8 @@ window.addEventListener('message', async (event) => {
                 localVerification: true,
                 revocationCache: true,
                 freshAuth: true,          // High-security fresh authentication
-                authFreshnessCheck: true  // Check auth age without re-auth
+                authFreshnessCheck: true, // Check auth age without re-auth
+                storageAccessAPI: !!document.hasStorageAccess
             }
         }, '*');
     }
