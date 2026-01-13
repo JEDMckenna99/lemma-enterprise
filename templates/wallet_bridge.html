@@ -416,10 +416,12 @@ window.addEventListener('message', async (event) => {
                 }
                 
                 // SECURITY: Validate credential's siteId matches the requesting origin
+                // EXCEPTION: lemma.id can store credentials for ANY site (unified wallet)
                 const credClaims = credential.claims || credential.credentialSubject || {};
                 const credSiteId = (credClaims.siteId || credClaims.site_id || '').toLowerCase().replace(/^www\./, '');
+                const isLemmaOrigin = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
                 
-                if (credSiteId && credSiteId !== requestingSite && 
+                if (!isLemmaOrigin && credSiteId && credSiteId !== requestingSite && 
                     !requestingSite.endsWith('.' + credSiteId) && 
                     !credSiteId.endsWith('.' + requestingSite)) {
                     console.warn(`🔒 Blocked: ${requestingSite} tried to store credential for ${credSiteId}`);
@@ -432,7 +434,7 @@ window.addEventListener('message', async (event) => {
                 
                 // Store the credential
                 const storeResult = await wallet.storeCredential(credential);
-                console.log(`✅ Credential stored via bridge for ${requestingSite}:`, credential.id);
+                console.log(`✅ Credential stored via bridge for ${requestingSite} (siteId: ${credSiteId}):`, credential.id);
                 
                 respond({
                     success: true,
@@ -448,34 +450,40 @@ window.addEventListener('message', async (event) => {
                 if (!wallet) await initWallet();
                 
                 const filterType = payload?.type || null;
+                const showAll = payload?.showAll || false;  // Flag to show all credentials
                 
                 let credentials = await wallet.getCredentials(filterType);
                 
-                // SECURITY: Only return credentials issued for the requesting site
-                // This prevents cross-site credential leakage while preserving
-                // the "traveling wallet" - each site sees only their own credentials
-                credentials = credentials.filter(c => {
-                    const claims = c.claims || c.credentialSubject || {};
-                    const credSiteId = claims.siteId || claims.site_id || '';
-                    
-                    const normalizedCredSite = credSiteId.toLowerCase().replace(/^www\./, '');
-                    
-                    // Match: exact domain, subdomain of credential site, or credential is subdomain
-                    return normalizedCredSite === requestingSite ||
-                           requestingSite.endsWith('.' + normalizedCredSite) ||
-                           normalizedCredSite.endsWith('.' + requestingSite);
-                });
+                // Check if this is lemma.id requesting (unified wallet view)
+                const isLemmaRequesting = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+                
+                // SECURITY: Filter credentials based on requesting site
+                // EXCEPTION: lemma.id can see ALL credentials (unified wallet view)
+                if (!isLemmaRequesting && !showAll) {
+                    credentials = credentials.filter(c => {
+                        const claims = c.claims || c.credentialSubject || {};
+                        const credSiteId = claims.siteId || claims.site_id || '';
+                        
+                        const normalizedCredSite = credSiteId.toLowerCase().replace(/^www\./, '');
+                        
+                        // Match: exact domain, subdomain of credential site, or credential is subdomain
+                        return normalizedCredSite === requestingSite ||
+                               requestingSite.endsWith('.' + normalizedCredSite) ||
+                               normalizedCredSite.endsWith('.' + requestingSite);
+                    });
+                }
                 
                 // Get session status for client convenience
                 const getCredsSession = await checkSession();
                 
-                console.log(`🔒 Returning ${credentials.length} credentials for ${requestingSite}`);
+                console.log(`🔒 Returning ${credentials.length} credentials for ${requestingSite}${isLemmaRequesting ? ' (unified wallet)' : ''}`);
                 
                 respond({
                     success: true,
                     credentials: credentials,
                     count: credentials.length,
-                    filteredFor: requestingSite,
+                    filteredFor: isLemmaRequesting ? 'all' : requestingSite,
+                    unifiedWallet: isLemmaRequesting,
                     session: getCredsSession,
                     // Help client know if they need to prompt unlock
                     needsUnlock: !getCredsSession.valid && credentials.length === 0
@@ -590,6 +598,35 @@ window.addEventListener('message', async (event) => {
                     cached: syncResult.cached,
                     // Note: This is the ONE network call in the system
                     networkCalls: syncResult.success ? 1 : 0
+                });
+                break;
+                
+            case 'GET_ALL_CREDENTIALS':
+                // Get ALL credentials from unified wallet (for lemma.id wallet UI)
+                // SECURITY: Only allowed from lemma.id origin
+                if (!wallet) await initWallet();
+                
+                const isWalletOrigin = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+                if (!isWalletOrigin) {
+                    respond({ 
+                        success: false, 
+                        error: 'GET_ALL_CREDENTIALS only allowed from lemma.id',
+                        hint: 'Use GET_CREDENTIALS for per-site filtered access'
+                    });
+                    return;
+                }
+                
+                const allCredentials = await wallet.getCredentials();
+                const allSession = await checkSession();
+                
+                console.log(`📦 Returning ALL ${allCredentials.length} credentials for unified wallet`);
+                
+                respond({
+                    success: true,
+                    credentials: allCredentials,
+                    count: allCredentials.length,
+                    unifiedWallet: true,
+                    session: allSession
                 });
                 break;
                 
