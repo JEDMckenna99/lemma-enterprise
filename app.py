@@ -577,6 +577,20 @@ def create_app():
             'Vary': 'Accept-Encoding'
         }
 
+    @app.route('/lemma-sw.js')
+    def lemma_service_worker():
+        """
+        Serve the Lemma service worker from root path for proper scope.
+        
+        Service workers can only control URLs within their scope. By serving
+        from root, the SW can cache all lemma.id resources.
+        """
+        from flask import send_from_directory
+        response = send_from_directory('static/js', 'lemma-sw.js', mimetype='application/javascript')
+        response.headers['Service-Worker-Allowed'] = '/'
+        response.headers['Cache-Control'] = 'no-cache'  # SW should always be fresh
+        return response
+
     # Essential pages
     @app.route('/pricing')
     def pricing():

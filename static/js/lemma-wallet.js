@@ -1574,9 +1574,10 @@ if (typeof window !== 'undefined') {
                 return null;
             }
             
+            // Service worker must be served from root for proper scope
             const swUrl = isLemmaOrigin 
-                ? '/static/js/lemma-sw.js' 
-                : 'https://lemma.id/static/js/lemma-sw.js';
+                ? '/lemma-sw.js' 
+                : 'https://lemma.id/lemma-sw.js';
             
             const registration = await navigator.serviceWorker.register(swUrl, {
                 scope: '/'
