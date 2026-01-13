@@ -154,9 +154,33 @@ class LemmaWallet {
     /**
      * Register a passkey for local wallet unlock
      * This stores the public key locally for future verification
+     * 
+     * NOTE: On third-party sites, this will first check if the user has a valid
+     * session via the central bridge. If they do, it returns success without
+     * prompting for a new passkey (ONE PASSKEY PER DAY flow).
      */
     async registerPasskey() {
         await this.init();
+
+        // SMART CHECK: On third-party sites, check bridge session first
+        // If user already unlocked on lemma.id today, don't prompt for passkey
+        if (!window.location.hostname.includes('lemma.id') && 
+            !window.location.hostname.includes('localhost')) {
+            try {
+                const bridgeSession = await this.checkBridgeSession();
+                if (bridgeSession.valid) {
+                    console.log('[Lemma] ✅ Already authenticated via bridge - skipping passkey registration');
+                    return {
+                        success: true,
+                        method: 'bridge_session',
+                        walletId: bridgeSession.walletId,
+                        message: 'Authenticated via central wallet session'
+                    };
+                }
+            } catch (e) {
+                console.log('[Lemma] Bridge check failed, falling back to local passkey');
+            }
+        }
 
         if (!this._isPasskeySupported()) {
             throw new Error('Passkeys not supported in this browser');
@@ -256,9 +280,44 @@ class LemmaWallet {
     /**
      * Unlock the wallet using passkey (100% local)
      * No server call required!
+     * 
+     * NOTE: On third-party sites, this will first check if the user has a valid
+     * session via the central bridge. If they do, it returns success without
+     * prompting for a new passkey (ONE PASSKEY PER DAY flow).
      */
     async unlock() {
         await this.init();
+
+        // SMART CHECK: On third-party sites, check bridge session first
+        // If user already unlocked on lemma.id today, don't prompt for passkey
+        if (!window.location.hostname.includes('lemma.id') && 
+            !window.location.hostname.includes('localhost')) {
+            try {
+                const bridgeSession = await this.checkBridgeSession();
+                if (bridgeSession.valid) {
+                    console.log('[Lemma] ✅ Already authenticated via bridge - skipping local unlock');
+                    
+                    // Update local session to match bridge
+                    this.session = {
+                        isUnlocked: true,
+                        unlockedAt: bridgeSession.unlockedAt || Date.now(),
+                        expiresAt: bridgeSession.expiresAt,
+                        walletId: bridgeSession.walletId,
+                        source: 'bridge'
+                    };
+                    
+                    return {
+                        success: true,
+                        method: 'bridge_session',
+                        walletId: bridgeSession.walletId,
+                        expiresAt: bridgeSession.expiresAt,
+                        message: 'Authenticated via central wallet session'
+                    };
+                }
+            } catch (e) {
+                console.log('[Lemma] Bridge check failed, falling back to local passkey');
+            }
+        }
 
         // Get stored passkey
         const passkey = await this._get('passkey', 'primary');
