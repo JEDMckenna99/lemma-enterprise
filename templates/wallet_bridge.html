@@ -762,6 +762,39 @@ window.addEventListener('message', async (event) => {
                 });
                 break;
                 
+            case 'DEBUG_DB':
+                // Debug: dump database info
+                if (!wallet) await initWallet();
+                
+                try {
+                    const sessionData = await wallet._get('session', 'current');
+                    const passkeyData = await wallet._get('passkey', 'primary');
+                    const walletIdData = await wallet._get('passkey', 'walletId');
+                    
+                    respond({
+                        success: true,
+                        debug: {
+                            origin: window.location.origin,
+                            hostname: window.location.hostname,
+                            dbName: wallet.db?.name,
+                            dbVersion: wallet.db?.version,
+                            session: sessionData ? {
+                                exists: true,
+                                isUnlocked: sessionData.isUnlocked,
+                                unlockedAt: sessionData.unlockedAt,
+                                expiresAt: sessionData.expiresAt,
+                                isExpired: sessionData.expiresAt < Date.now(),
+                                timeRemaining: sessionData.expiresAt - Date.now()
+                            } : { exists: false },
+                            passkey: passkeyData ? { exists: true } : { exists: false },
+                            walletId: walletIdData?.value || null
+                        }
+                    });
+                } catch (e) {
+                    respond({ success: false, error: e.message, stack: e.stack });
+                }
+                break;
+                
             default:
                 respond({ success: false, error: `Unknown message type: ${type}` });
         }
