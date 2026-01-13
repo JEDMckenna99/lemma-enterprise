@@ -13,7 +13,8 @@
 | **Offline Capability** | None | Full | **Lemma** |
 | **Vendor Lock-in** | High | None | **Lemma** |
 | **Maturity** | Production-grade | Emerging | **Traditional** |
-| **Ecosystem** | Rich integrations | Growing | **Traditional** |
+| **Enterprise Integrations** | SAML/LDAP/AD | Growing | **Traditional** |
+| **User Directory** | Managed only | Managed OR self-hosted | **Lemma (flexible)** |
 
 ---
 
@@ -369,13 +370,86 @@ If Lemma.id is down:
 
 ---
 
-## 6. When to Choose What
+## 6. User Directory & Management
+
+### 6.1 Lemma's User Management Options
+
+Lemma.id provides **two deployment models**, giving developers flexibility:
+
+#### Option A: Managed Service (Lemma hosts user directory)
+
+```
+POST /api/v1/sites/register/managed
+
+Features:
+├── ✅ User storage in Lemma database
+├── ✅ Full user management APIs
+├── ✅ Dashboard UI for user management
+├── ✅ Credential issuance via Lemma API
+└── ✅ Per-user billing
+```
+
+**API Endpoints:**
+```
+GET  /api/v1/sites/{site_id}/users              # List all users
+POST /api/v1/sites/{site_id}/users/{did}/permissions  # Grant permission
+GET  /api/v1/sites/{site_id}/verify             # Verify credential
+POST /platform/users                            # Get platform users
+```
+
+#### Option B: Self-Service (Developer controls directory)
+
+```
+POST /api/v1/sites/register/self-service
+
+Features:
+├── ✅ Site generates own keypair (browser SDK)
+├── ✅ Site manages own user database
+├── ✅ Site issues credentials client-side
+├── ✅ Lemma syncs for revocation/verification
+└── ✅ Pay only for PoH verifications
+```
+
+**Developer fetches & syncs:**
+```javascript
+// Fetch user directory from Lemma
+const response = await fetch('/api/platform/users', {
+    method: 'POST',
+    body: JSON.stringify({ user_credential: myAdminCredential })
+});
+const { users, site_id } = await response.json();
+
+// Sync to your own database
+await syncUsersToMyDB(users);
+```
+
+### 6.2 Comparison with Traditional Providers
+
+| Capability | Auth0 | Okta | Lemma |
+|------------|-------|------|-------|
+| **Managed user directory** | ✅ | ✅ | ✅ |
+| **Self-hosted option** | ❌ | ❌ | ✅ |
+| **User list API** | ✅ | ✅ | ✅ |
+| **Bulk user operations** | ✅ | ✅ | ✅ |
+| **Admin dashboard** | ✅ | ✅ | ✅ |
+| **Export users** | ✅ | ✅ | ✅ |
+| **SCIM provisioning** | ✅ | ✅ | 🔜 (planned) |
+| **LDAP sync** | ✅ | ✅ | ❌ |
+| **AD integration** | ✅ | ✅ | ❌ |
+
+**Key Difference:** Lemma offers a **hybrid model** where developers can:
+1. Use Lemma's managed directory (like Auth0)
+2. OR run their own directory and sync credentials
+3. OR fully self-service with their own keys
+
+---
+
+## 7. When to Choose What
 
 ### Choose Traditional Auth (Auth0/Okta) When:
 
 - ✅ Need rich enterprise integrations (SAML, LDAP, AD)
 - ✅ Require compliance certifications (SOC 2 Type II, HIPAA)
-- ✅ Need managed user directory
 - ✅ Want proven, battle-tested solution
 - ✅ Team unfamiliar with WebAuthn/passkeys
 
@@ -391,7 +465,7 @@ If Lemma.id is down:
 
 ---
 
-## 7. Conclusion
+## 8. Conclusion
 
 ### Summary Scores (1-10)
 
