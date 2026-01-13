@@ -45,8 +45,10 @@ def create_app():
         # Prevent MIME type sniffing
         response.headers['X-Content-Type-Options'] = 'nosniff'
         
-        # Prevent clickjacking
-        response.headers['X-Frame-Options'] = 'DENY'
+        # Prevent clickjacking - but allow for wallet bridge (needs to be embedded in iframes)
+        # The bridge route sets its own X-Frame-Options to ALLOWALL
+        if 'X-Frame-Options' not in response.headers:
+            response.headers['X-Frame-Options'] = 'DENY'
         
         # XSS Protection (legacy but still useful)
         response.headers['X-XSS-Protection'] = '1; mode=block'
@@ -58,19 +60,21 @@ def create_app():
         response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
         
         # Content Security Policy - Restrict resource loading
-        csp = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://static.cloudflareinsights.com https://challenges.cloudflare.com https://js.stripe.com; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "font-src 'self' https://fonts.gstatic.com; "
-            "img-src 'self' data: https:; "
-            "connect-src 'self' https://lemma.id https://*.stripe.com https://api.stripe.com; "
-            "frame-src 'self' https://*.stripe.com https://challenges.cloudflare.com; "
-            "object-src 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self' https://*.stripe.com"
-        )
-        response.headers['Content-Security-Policy'] = csp
+        # Skip if route already set its own CSP (e.g., wallet bridge)
+        if 'Content-Security-Policy' not in response.headers:
+            csp = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://static.cloudflareinsights.com https://challenges.cloudflare.com https://js.stripe.com; "
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                "font-src 'self' https://fonts.gstatic.com; "
+                "img-src 'self' data: https:; "
+                "connect-src 'self' https://lemma.id https://*.stripe.com https://api.stripe.com; "
+                "frame-src 'self' https://*.stripe.com https://challenges.cloudflare.com; "
+                "object-src 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self' https://*.stripe.com"
+            )
+            response.headers['Content-Security-Policy'] = csp
         
         return response
 
