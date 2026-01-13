@@ -22,9 +22,10 @@
 
 ## Implementation Phases
 
-### Phase 1: Bridge Security Hardening ⏳ IN PROGRESS
-**Status:** 🟡 In Progress  
-**Started:** 2026-01-12
+### Phase 1: Bridge Security Hardening ✅ COMPLETE
+**Status:** ✅ Complete  
+**Started:** 2026-01-12  
+**Completed:** 2026-01-13
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -35,11 +36,19 @@
 | 1.5 Add EXTEND_SESSION message type | ✅ Complete | Tap-only re-auth, max 7 extensions |
 | 1.6 Add QUICK_VERIFY message type | ✅ Complete | Fast verification with cache |
 | 1.7 Add HTTP cache headers | ✅ Complete | 1 year, immutable |
-| 1.8 Deploy to Heroku & test | ⬜ Pending | |
+| 1.8 Fix X-Frame-Options for iframes | ✅ Complete | Skip global DENY for bridge |
+| 1.9 Deploy to Heroku & test | ✅ Complete | Verified headers working |
 
 **Files Modified:**
 - `templates/wallet_bridge.html` - v2.0 with session management
-- `app.py` - Aggressive cache headers for bridge
+- `app.py` - Aggressive cache headers + iframe allowance for bridge
+
+**Verified Headers:**
+```
+Cache-Control: public, max-age=31536000, immutable
+x-frame-options: ALLOWALL
+content-security-policy: frame-ancestors https: http://localhost:* http://127.0.0.1:*;
+```
 
 ---
 
@@ -106,7 +115,12 @@
 
 | Date | Test | Result | Notes |
 |------|------|--------|-------|
-| | | | |
+| 2026-01-13 | Bridge v2.0 deployment | ✅ Pass | Deployed successfully |
+| 2026-01-13 | Cache headers verification | ✅ Pass | `max-age=31536000, immutable` |
+| 2026-01-13 | X-Frame-Options | ✅ Pass | `ALLOWALL` for bridge only |
+| 2026-01-13 | Bridge initialization | ✅ Pass | Initialized in 70ms, 0 network calls |
+| 2026-01-13 | checkSession() function | ✅ Pass | Returns correct session state |
+| 2026-01-13 | SESSION_CONFIG values | ✅ Pass | 24h duration, 7 max extensions |
 
 ---
 
@@ -139,6 +153,15 @@ Total per page load        0
 ---
 
 ## Changelog
+
+### 2026-01-13
+- **Phase 1 COMPLETE** ✅
+- Deployed bridge v2.0 with session management
+- Added CHECK_SESSION, EXTEND_SESSION, QUICK_VERIFY message types
+- Session-gated write operations (STORE/REMOVE require valid session)
+- Aggressive HTTP caching (1 year, immutable)
+- Fixed X-Frame-Options to allow iframe embedding for bridge only
+- Verified all tests passing on Heroku
 
 ### 2026-01-12
 - Created implementation plan
