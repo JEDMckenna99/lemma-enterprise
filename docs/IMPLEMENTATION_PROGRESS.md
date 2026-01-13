@@ -52,9 +52,10 @@ content-security-policy: frame-ancestors https: http://localhost:* http://127.0.
 
 ---
 
-### Phase 2: Smart Caching Layer ⏳ IN PROGRESS
-**Status:** 🟡 In Progress  
-**Started:** 2026-01-13
+### Phase 2: Smart Caching Layer ✅ COMPLETE
+**Status:** ✅ Complete  
+**Started:** 2026-01-13  
+**Completed:** 2026-01-13
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -62,7 +63,7 @@ content-security-policy: frame-ancestors https: http://localhost:* http://127.0.
 | 2.2 Add HTTP cache headers for bridge | ✅ Complete | Done in Phase 1 |
 | 2.3 Add SW registration to SDK | ✅ Complete | Auto-registers on lemma.id |
 | 2.4 Pre-warm cache on install | ✅ Complete | Bridge + SDK precached |
-| 2.5 Deploy & verify caching works | ⚠️ Pending CDN purge | CDN caching old file |
+| 2.5 Deploy & verify caching works | ✅ Complete | SW registered successfully |
 
 **Files Created:**
 - `static/js/lemma-sw.js` - Service worker with cache-first strategy
@@ -136,7 +137,9 @@ content-security-policy: frame-ancestors https: http://localhost:* http://127.0.
 | 2026-01-13 | SESSION_CONFIG values | ✅ Pass | 24h duration, 7 max extensions |
 | 2026-01-13 | Service worker file created | ✅ Pass | lemma-sw.js deployed |
 | 2026-01-13 | SW registration code added | ✅ Pass | In lemma-wallet.js |
-| 2026-01-13 | CDN cache update | ⚠️ Pending | Old file cached (45KB vs 55KB) |
+| 2026-01-13 | Cloudflare cache purged | ✅ Pass | Dev mode enabled, then disabled |
+| 2026-01-13 | SW root path routing | ✅ Pass | /lemma-sw.js with Service-Worker-Allowed header |
+| 2026-01-13 | SW registration verified | ✅ Pass | "Service worker registered: https://lemma.id/" |
 
 ---
 
@@ -179,10 +182,12 @@ Total per page load        0
 - Fixed X-Frame-Options to allow iframe embedding for bridge only
 - Verified all tests passing on Heroku
 
-- **Phase 2 IN PROGRESS** 🟡
+- **Phase 2 COMPLETE** ✅
 - Created service worker (lemma-sw.js) with cache-first strategy
 - Added SW registration to lemma-wallet.js
-- Deployed to Heroku (awaiting CDN cache purge for JS files)
+- Enabled Cloudflare development mode to bypass CDN cache
+- Added /lemma-sw.js route with Service-Worker-Allowed header
+- Service worker now registers successfully on lemma.id
 
 ### 2026-01-12
 - Created implementation plan
