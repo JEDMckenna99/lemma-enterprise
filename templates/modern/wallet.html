@@ -384,6 +384,24 @@
     <header class="wallet-header">
         <h1>Your Lemma Wallet</h1>
         <p>Manage your federated identity credentials and access the decentralized network</p>
+        <div id="wallet-actions" style="margin-top: 16px; display: none;">
+            <button onclick="lockWallet()" style="
+                background: transparent;
+                border: 1px solid var(--gray-300);
+                color: var(--gray-600);
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-size: 0.875rem;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                transition: all 0.2s;
+            " onmouseover="this.style.borderColor='var(--error)'; this.style.color='var(--error)';"
+               onmouseout="this.style.borderColor='var(--gray-300)'; this.style.color='var(--gray-600)';">
+                🔒 Lock Wallet
+            </button>
+        </div>
     </header>
     
     <!-- Main Credential List - Static initial state for fast LCP -->
@@ -665,6 +683,61 @@ document.addEventListener('DOMContentLoaded', async function() {
 // ========================================
 // PASSKEY UNLOCK FLOW
 // ========================================
+
+/**
+ * Lock the wallet (clears session but keeps credentials)
+ * Useful for testing the unlock flow or security when stepping away
+ */
+async function lockWallet() {
+    if (!confirm('Lock your wallet? You will need to use your passkey to unlock it again.\n\nYour credentials will be preserved.')) {
+        return;
+    }
+    
+    console.log('🔒 Locking wallet...');
+    
+    try {
+        // Clear local session in IndexedDB
+        if (lemmaWallet && lemmaWallet.db) {
+            const tx = lemmaWallet.db.transaction('session', 'readwrite');
+            const store = tx.objectStore('session');
+            store.delete('current');
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = reject;
+            });
+            console.log('✅ Local session cleared');
+        }
+        
+        // Clear server session cookie
+        try {
+            await fetch('/api/wallet/clear-session', { 
+                method: 'POST', 
+                credentials: 'include' 
+            });
+            console.log('✅ Server session cleared');
+        } catch (e) {
+            console.warn('⚠️ Could not clear server session:', e.message);
+        }
+        
+        // Hide the lock button and wallet content
+        const walletActions = document.getElementById('wallet-actions');
+        if (walletActions) walletActions.style.display = 'none';
+        
+        // Reset wallet state
+        if (lemmaWallet) {
+            lemmaWallet.isReady = false;
+        }
+        
+        console.log('🔒 Wallet locked successfully');
+        
+        // Reload the page to show locked state
+        window.location.reload();
+        
+    } catch (error) {
+        console.error('Failed to lock wallet:', error);
+        alert('Failed to lock wallet. Please try again.');
+    }
+}
 
 async function checkAndUnlockWallet() {
     const listContainer = document.getElementById('credential-list');
@@ -1302,7 +1375,11 @@ async function loadWalletData() {
         }
 
         console.log('📊 Total credentials after merge:', allCredentials.length);
-        
+
+        // Show the Lock Wallet button now that wallet is loaded
+        const walletActions = document.getElementById('wallet-actions');
+        if (walletActions) walletActions.style.display = 'block';
+
         // Filter by type
         const pohCredentials = allCredentials.filter(c => {
             const pkgType = c.packageType || c.type?.[1] || '';
