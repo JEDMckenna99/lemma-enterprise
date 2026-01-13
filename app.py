@@ -539,19 +539,38 @@ def create_app():
     @app.route('/wallet/bridge')
     def wallet_bridge():
         """
-        Cross-origin wallet bridge - allows third-party sites to store credentials
-        in the user's central Lemma wallet via postMessage.
+        Cross-origin wallet bridge v2.0 - LOCAL-FIRST authentication
         
-        This page is loaded in an iframe by third-party sites.
+        This page is loaded in an iframe by third-party sites to access the
+        user's central Lemma wallet via postMessage. NO server calls for verification.
+        
+        CACHING STRATEGY:
+        - Aggressive caching (1 year, immutable) for bridge HTML
+        - Bridge code is static - all state is in IndexedDB
+        - First load: 1 network call (this HTML)
+        - All subsequent loads: 0 network calls (from cache)
+        
+        SECURITY:
+        - Per-site credential isolation (sites only see their own credentials)
+        - Session-gated write operations
+        - Ed25519 signature verification (local WebCrypto)
         """
-        logger.info("🌉 Serving wallet bridge")
+        logger.info("🌉 Serving wallet bridge v2.0 (local-first)")
         response = render_template('wallet_bridge.html')
-        # Allow embedding in iframes from any origin (for cross-site wallet access)
-        # Security is enforced via postMessage origin validation
+        
         return response, 200, {
+            # Allow embedding from any HTTPS origin
             'X-Frame-Options': 'ALLOWALL',
-            'Content-Security-Policy': "frame-ancestors *;",
-            'Cache-Control': 'no-cache'
+            'Content-Security-Policy': "frame-ancestors https: http://localhost:* http://127.0.0.1:*;",
+            
+            # AGGRESSIVE CACHING - This is key to local-first!
+            # Bridge HTML is static; all dynamic state is in IndexedDB
+            # ETag allows revalidation on version updates
+            'Cache-Control': 'public, max-age=31536000, immutable',
+            'ETag': '"bridge-v2.0.0"',
+            
+            # Additional cache hints
+            'Vary': 'Accept-Encoding'
         }
 
     # Essential pages
