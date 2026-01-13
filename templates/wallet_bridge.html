@@ -603,6 +603,127 @@ window.addEventListener('message', async (event) => {
                     networkCalls: 0
                 });
                 break;
+            
+            // ========================================
+            // HIGH-SECURITY: FRESH AUTHENTICATION
+            // For banks, financial apps that need proof of recent auth
+            // ========================================
+            
+            case 'REQUIRE_FRESH_AUTH':
+                // Force fresh passkey authentication (full biometric, not tap-only)
+                // Returns timestamp of authentication for high-security verification
+                if (!wallet) await initWallet();
+                
+                const maxAgeMs = payload?.maxAgeMs || 30000;  // Default 30 seconds
+                const currentSession = await checkSession();
+                
+                // Check if current auth is fresh enough
+                if (currentSession.valid && currentSession.unlockedAt) {
+                    const authAge = Date.now() - currentSession.unlockedAt;
+                    if (authAge < maxAgeMs) {
+                        // Auth is fresh enough, return attestation
+                        respond({
+                            success: true,
+                            fresh: true,
+                            authTimestamp: currentSession.unlockedAt,
+                            authAgeMs: authAge,
+                            maxAgeMs: maxAgeMs,
+                            walletId: await wallet._get('passkey', 'walletId')?.value,
+                            // Sites can verify this timestamp with Lemma server if needed
+                            verificationEndpoint: 'https://lemma.id/api/verify-session-freshness'
+                        });
+                        return;
+                    }
+                }
+                
+                // Need fresh authentication
+                const passkey = await wallet._get('passkey', 'primary');
+                if (!passkey) {
+                    respond({ success: false, error: 'No passkey registered' });
+                    return;
+                }
+                
+                try {
+                    // Full biometric verification (not tap-only)
+                    const freshAuthCredential = await navigator.credentials.get({
+                        publicKey: {
+                            challenge: crypto.getRandomValues(new Uint8Array(32)),
+                            rpId: window.location.hostname,
+                            allowCredentials: [{
+                                id: wallet._base64urlToBuffer(passkey.credentialId),
+                                type: 'public-key'
+                            }],
+                            userVerification: 'required',  // FULL biometric required
+                            timeout: 60000
+                        }
+                    });
+                    
+                    if (!freshAuthCredential) {
+                        respond({ success: false, error: 'Authentication cancelled' });
+                        return;
+                    }
+                    
+                    // Update session with fresh unlock time
+                    const freshAuthTime = Date.now();
+                    const updatedSession = {
+                        id: 'current',
+                        unlockedAt: freshAuthTime,
+                        expiresAt: freshAuthTime + SESSION_CONFIG.DEFAULT_DURATION,
+                        extensionCount: 0,  // Reset extensions on fresh auth
+                        freshAuthAt: freshAuthTime  // Track fresh auth specifically
+                    };
+                    await wallet._put('session', updatedSession);
+                    
+                    const walletIdRecord = await wallet._get('passkey', 'walletId');
+                    
+                    respond({
+                        success: true,
+                        fresh: true,
+                        authTimestamp: freshAuthTime,
+                        authAgeMs: 0,
+                        maxAgeMs: maxAgeMs,
+                        walletId: walletIdRecord?.value,
+                        // High-security sites can call this endpoint to verify
+                        verificationEndpoint: 'https://lemma.id/api/verify-session-freshness'
+                    });
+                    
+                } catch (e) {
+                    respond({ success: false, error: 'Authentication failed: ' + e.message });
+                }
+                break;
+            
+            case 'GET_AUTH_FRESHNESS':
+                // Check how fresh the current auth is (without requiring new auth)
+                if (!wallet) await initWallet();
+                
+                const freshnessSession = await checkSession();
+                if (!freshnessSession.valid || !freshnessSession.unlockedAt) {
+                    respond({
+                        success: true,
+                        authenticated: false,
+                        fresh: false,
+                        reason: 'no_session'
+                    });
+                    return;
+                }
+                
+                const authAgeMs = Date.now() - freshnessSession.unlockedAt;
+                const freshAuthAt = freshnessSession.freshAuthAt || freshnessSession.unlockedAt;
+                const freshAuthAgeMs = Date.now() - freshAuthAt;
+                
+                respond({
+                    success: true,
+                    authenticated: true,
+                    authTimestamp: freshnessSession.unlockedAt,
+                    authAgeMs: authAgeMs,
+                    freshAuthTimestamp: freshAuthAt,
+                    freshAuthAgeMs: freshAuthAgeMs,
+                    // Convenience flags for different security levels
+                    freshUnder30s: freshAuthAgeMs < 30000,
+                    freshUnder5min: freshAuthAgeMs < 300000,
+                    freshUnder1hr: freshAuthAgeMs < 3600000
+                });
+                break;
                 
             default:
                 respond({ success: false, error: `Unknown message type: ${type}` });
@@ -649,7 +770,9 @@ window.addEventListener('message', async (event) => {
                 extendSession: true,
                 quickVerify: true,
                 localVerification: true,
-                revocationCache: true
+                revocationCache: true,
+                freshAuth: true,          // High-security fresh authentication
+                authFreshnessCheck: true  // Check auth age without re-auth
             }
         }, '*');
     }

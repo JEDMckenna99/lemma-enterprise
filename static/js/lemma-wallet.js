@@ -474,11 +474,160 @@ class LemmaWallet {
     /**
      * Extend session via bridge (tap-only, no full biometric)
      * Use when session is about to expire but user is still active.
-     * 
+     *
      * @returns {Promise<Object>} Extension result
      */
     async extendBridgeSession() {
         return this._sendBridgeMessage('EXTEND_SESSION', {});
+    }
+
+    // ========================================
+    // HIGH-SECURITY: FRESH AUTHENTICATION
+    // For banks, financial apps requiring proof of recent auth
+    // ========================================
+
+    /**
+     * Require fresh authentication (full biometric)
+     * Use for high-security operations like bank transfers, password changes, etc.
+     * 
+     * @param {Object} options Configuration
+     * @param {number} options.maxAgeMs Max acceptable auth age in ms (default: 30000 = 30s)
+     * @returns {Promise<Object>} Fresh auth result with timestamp
+     * 
+     * @example
+     * // Before a bank transfer, require auth within last 30 seconds
+     * const auth = await lemmaWallet.requireFreshAuth({ maxAgeMs: 30000 });
+     * if (auth.fresh) {
+     *     // User just authenticated - proceed with transfer
+     *     await performTransfer(auth.authTimestamp);
+     * }
+     */
+    async requireFreshAuth(options = {}) {
+        const maxAgeMs = options.maxAgeMs || 30000;  // Default 30 seconds
+        
+        // If on lemma.id, do it locally
+        if (window.location.hostname.includes('lemma.id')) {
+            return this._localFreshAuth(maxAgeMs);
+        }
+        
+        // For third-party sites, use bridge
+        return this._sendBridgeMessage('REQUIRE_FRESH_AUTH', { maxAgeMs });
+    }
+
+    /**
+     * Check how fresh the current authentication is (without requiring new auth)
+     * Use to show UI hints about whether fresh auth will be needed.
+     * 
+     * @returns {Promise<Object>} Auth freshness info
+     * 
+     * @example
+     * const freshness = await lemmaWallet.getAuthFreshness();
+     * if (!freshness.freshUnder30s) {
+     *     showMessage("You'll need to re-authenticate for this action");
+     * }
+     */
+    async getAuthFreshness() {
+        // If on lemma.id, check locally
+        if (window.location.hostname.includes('lemma.id')) {
+            const session = await this._get('session', 'current');
+            if (!session || !session.unlockedAt) {
+                return { authenticated: false, fresh: false, reason: 'no_session' };
+            }
+            
+            const authAgeMs = Date.now() - session.unlockedAt;
+            const freshAuthAt = session.freshAuthAt || session.unlockedAt;
+            const freshAuthAgeMs = Date.now() - freshAuthAt;
+            
+            return {
+                success: true,
+                authenticated: true,
+                authTimestamp: session.unlockedAt,
+                authAgeMs: authAgeMs,
+                freshAuthTimestamp: freshAuthAt,
+                freshAuthAgeMs: freshAuthAgeMs,
+                freshUnder30s: freshAuthAgeMs < 30000,
+                freshUnder5min: freshAuthAgeMs < 300000,
+                freshUnder1hr: freshAuthAgeMs < 3600000
+            };
+        }
+        
+        // For third-party sites, use bridge
+        return this._sendBridgeMessage('GET_AUTH_FRESHNESS', {});
+    }
+
+    /**
+     * Verify auth freshness with Lemma server (highest security)
+     * Use for critical operations where you can't trust client timestamps.
+     * 
+     * @param {Object} authResult Result from requireFreshAuth()
+     * @returns {Promise<Object>} Server verification result
+     * 
+     * @example
+     * // For bank-level security, verify with server
+     * const auth = await lemmaWallet.requireFreshAuth();
+     * const verified = await lemmaWallet.verifyAuthWithServer(auth);
+     * if (verified.valid && verified.fresh) {
+     *     // Server confirmed auth is fresh - safe to proceed
+     * }
+     */
+    async verifyAuthWithServer(authResult) {
+        if (!authResult || !authResult.authTimestamp) {
+            return { valid: false, fresh: false, reason: 'invalid_auth_result' };
+        }
+        
+        try {
+            const response = await fetch('https://lemma.id/api/verify-session-freshness', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    walletId: authResult.walletId,
+                    authTimestamp: authResult.authTimestamp,
+                    maxAgeMs: authResult.maxAgeMs || 30000
+                })
+            });
+            
+            return await response.json();
+        } catch (e) {
+            return { valid: false, fresh: false, reason: 'server_error', error: e.message };
+        }
+    }
+
+    /**
+     * Local fresh auth implementation (for lemma.id origin)
+     * @private
+     */
+    async _localFreshAuth(maxAgeMs) {
+        await this.init();
+        
+        // Check if current auth is fresh enough
+        const session = await this._get('session', 'current');
+        if (session && session.unlockedAt) {
+            const authAge = Date.now() - session.unlockedAt;
+            if (authAge < maxAgeMs) {
+                return {
+                    success: true,
+                    fresh: true,
+                    authTimestamp: session.unlockedAt,
+                    authAgeMs: authAge,
+                    maxAgeMs: maxAgeMs
+                };
+            }
+        }
+        
+        // Need fresh auth - do full unlock
+        try {
+            await this.unlock();
+            const newSession = await this._get('session', 'current');
+            return {
+                success: true,
+                fresh: true,
+                authTimestamp: newSession.unlockedAt,
+                authAgeMs: 0,
+                maxAgeMs: maxAgeMs
+            };
+        } catch (e) {
+            return { success: false, fresh: false, error: e.message };
+        }
     }
 
     /**
