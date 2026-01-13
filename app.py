@@ -180,6 +180,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Wallet-First Auth: {e}")
 
+    # Wallet Session Sync (one passkey per day across all sites)
+    try:
+        from api.wallet_session_sync import wallet_session_sync_bp
+        app.register_blueprint(wallet_session_sync_bp)
+        logger.info("✅ Wallet Session Sync registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Wallet Session Sync: {e}")
+
     # Issuer Registry (for wallet-centric architecture)
     try:
         from api.issuer_registry import issuer_registry_bp, init_issuer_registry_table
@@ -539,7 +547,23 @@ def create_app():
         """Wallet PIN Reset Page"""
         logger.info("🔐 Serving PIN reset page")
         return render_template('modern/reset_pin.html')
-    
+
+    @app.route('/wallet/unlock')
+    def wallet_unlock():
+        """
+        Wallet unlock page for cross-site authentication.
+        
+        FLOW:
+        1. Third-party site redirects here with return_url
+        2. User unlocks wallet via passkey
+        3. Session cookie is set (24 hours)
+        4. User is redirected back to return_url
+        5. Third-party site calls /api/wallet/session-sync to get session
+        
+        This enables "One Passkey Per Day" across all Lemma-enabled sites.
+        """
+        return render_template('wallet_unlock.html')
+
     @app.route('/wallet/bridge')
     def wallet_bridge():
         """
@@ -587,7 +611,7 @@ def create_app():
             # Bridge HTML is static; all dynamic state is in IndexedDB
             # ETag allows revalidation on version updates
             'Cache-Control': 'public, max-age=31536000, immutable',
-            'ETag': '"bridge-v2.5.0-gesture"',
+            'ETag': '"bridge-v2.6.0-session-sync"',
 
             # Additional cache hints
             'Vary': 'Accept-Encoding'

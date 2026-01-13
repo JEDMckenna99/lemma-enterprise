@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unlock Wallet - Lemma.id</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 48px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 24px;
+        }
+        h1 {
+            color: #1a1a2e;
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 32px;
+        }
+        .site-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            color: #555;
+        }
+        .site-info strong {
+            color: #333;
+        }
+        .unlock-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .unlock-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        .unlock-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            margin-top: 16px;
+            font-size: 14px;
+            color: #666;
+        }
+        .status.error {
+            color: #e74c3c;
+        }
+        .status.success {
+            color: #27ae60;
+        }
+        .fingerprint-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .privacy-note {
+            margin-top: 24px;
+            font-size: 11px;
+            color: #999;
+        }
+        .auto-unlock {
+            display: none;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="fingerprint-icon">🔐</div>
+        <h1>Unlock Your Wallet</h1>
+        <p class="subtitle">One passkey unlock, access everywhere</p>
+        
+        <div class="site-info" id="siteInfo">
+            Returning to: <strong id="returnSite">...</strong>
+        </div>
+        
+        <button class="unlock-btn" id="unlockBtn" onclick="unlockWallet()">
+            <span id="btnText">Unlock with Passkey</span>
+        </button>
+        
+        <div class="status" id="status"></div>
+        
+        <p class="privacy-note">
+            Your passkey never leaves your device.<br>
+            Lemma.id doesn't store your biometrics.
+        </p>
+    </div>
+
+    <script src="/static/js/lemma-wallet.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const returnUrl = urlParams.get('return') || urlParams.get('return_url');
+        const autoUnlock = urlParams.get('auto') === 'true';
+        
+        // Show return site
+        if (returnUrl) {
+            try {
+                const url = new URL(returnUrl);
+                document.getElementById('returnSite').textContent = url.hostname;
+            } catch (e) {
+                document.getElementById('returnSite').textContent = returnUrl;
+            }
+        } else {
+            document.getElementById('siteInfo').style.display = 'none';
+        }
+        
+        const wallet = new LemmaWallet();
+        
+        async function unlockWallet() {
+            const btn = document.getElementById('unlockBtn');
+            const btnText = document.getElementById('btnText');
+            const status = document.getElementById('status');
+            
+            btn.disabled = true;
+            btnText.innerHTML = '<span class="spinner"></span>Unlocking...';
+            status.className = 'status';
+            status.textContent = '';
+            
+            try {
+                await wallet.init();
+                
+                // Check if passkey exists
+                const hasPasskey = await wallet._get('passkey', 'primary');
+                
+                if (!hasPasskey) {
+                    // Need to register first
+                    status.textContent = 'Setting up your wallet...';
+                    const regResult = await wallet.registerPasskey();
+                    
+                    if (!regResult.success) {
+                        throw new Error('Failed to set up wallet');
+                    }
+                }
+                
+                // Unlock wallet
+                const result = await wallet.unlock();
+                
+                if (result.success) {
+                    status.className = 'status success';
+                    status.textContent = '✓ Wallet unlocked!';
+                    btnText.textContent = 'Redirecting...';
+                    
+                    // Set session cookie via API
+                    await fetch('/api/wallet/set-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wallet_id: result.walletId,
+                            unlocked_at: Date.now()
+                        }),
+                        credentials: 'include'
+                    });
+                    
+                    // Redirect back
+                    if (returnUrl) {
+                        // Add success indicator to URL
+                        const redirectUrl = new URL(returnUrl);
+                        redirectUrl.searchParams.set('lemma_unlocked', 'true');
+                        
+                        setTimeout(() => {
+                            window.location.href = redirectUrl.toString();
+                        }, 500);
+                    } else {
+                        // No return URL, go to wallet
+                        setTimeout(() => {
+                            window.location.href = '/wallet';
+                        }, 500);
+                    }
+                } else {
+                    throw new Error(result.error || 'Unlock failed');
+                }
+                
+            } catch (e) {
+                console.error('Unlock error:', e);
+                status.className = 'status error';
+                status.textContent = e.message || 'Failed to unlock. Please try again.';
+                btn.disabled = false;
+                btnText.textContent = 'Try Again';
+            }
+        }
+        
+        // Auto-unlock if requested and wallet exists
+        if (autoUnlock) {
+            wallet.init().then(async () => {
+                const hasPasskey = await wallet._get('passkey', 'primary');
+                if (hasPasskey) {
+                    unlockWallet();
+                }
+            });
+        }
+    </script>
+</body>
+</html>

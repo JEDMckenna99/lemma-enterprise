@@ -893,36 +893,122 @@ window.addEventListener('message', async (event) => {
 });
 
 // ============================================
-// INITIALIZATION - NO SERVER CALLS
+// SESSION SYNC (for partitioned storage)
+// ============================================
+
+/**
+ * Sync session from lemma.id server when local storage is empty.
+ * This enables "One Passkey Per Day" by using httpOnly cookies.
+ * 
+ * @returns {Object} Sync result with session data
+ */
+async function syncSessionFromServer() {
+    try {
+        console.log('🔄 Attempting session sync from server...');
+        
+        const response = await fetch('https://lemma.id/api/wallet/session-sync', {
+            method: 'POST',
+            credentials: 'include',  // Include cookies
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            console.log('⚠️ Session sync: No valid session on server');
+            return { success: false, error: error.error || 'sync_failed' };
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.session) {
+            console.log('✅ Session synced from server!');
+            
+            // Store synced session in local (partitioned) IndexedDB
+            if (wallet) {
+                await wallet._put('session', {
+                    id: 'current',
+                    isUnlocked: true,
+                    unlockedAt: data.session.unlocked_at,
+                    expiresAt: data.session.expires_at * 1000, // Convert to ms
+                    walletId: data.session.wallet_id,
+                    syncedFromServer: true,
+                    syncedAt: Date.now()
+                });
+                
+                // Store any synced credentials
+                if (data.credentials && data.credentials.length > 0) {
+                    for (const cred of data.credentials) {
+                        await wallet._put('lemmas', cred);
+                    }
+                    console.log(`   └─ Synced ${data.credentials.length} credentials`);
+                }
+            }
+            
+            return { 
+                success: true, 
+                session: data.session,
+                credentials: data.credentials || []
+            };
+        }
+        
+        return { success: false, error: 'invalid_response' };
+        
+    } catch (e) {
+        console.warn('⚠️ Session sync error:', e.message);
+        return { success: false, error: e.message };
+    }
+}
+
+// ============================================
+// INITIALIZATION
 // ============================================
 
 (async function() {
     const initStart = performance.now();
+    let networkCalls = 0;
     
     // Initialize wallet (opens IndexedDB - no server call)
     const ready = await initWallet();
     
     // Check session status
-    const session = ready ? await checkSession() : { valid: false };
+    let session = ready ? await checkSession() : { valid: false };
+    
+    // If session invalid and we're in an iframe, try syncing from server
+    // This enables the "One Passkey Per Day" flow
+    if (!session.valid && window.parent !== window) {
+        const syncResult = await syncSessionFromServer();
+        networkCalls = 1;  // We made one sync call
+        
+        if (syncResult.success) {
+            // Re-check session after sync
+            session = await checkSession();
+            session.syncedFromServer = true;
+        } else {
+            // No session on server either - user needs to unlock
+            session.needsUnlock = true;
+            session.unlockUrl = 'https://lemma.id/wallet/unlock';
+        }
+    }
     
     const initTime = performance.now() - initStart;
     
-    console.log('🌉 Wallet bridge ready (v2.1 local-first)');
+    console.log('🌉 Wallet bridge ready (v2.2 session-sync)');
     console.log(`   ├─ Initialized in ${initTime.toFixed(0)}ms`);
-    console.log(`   ├─ Storage access: ${storageAccessGranted ? 'unpartitioned ✓' : 'partitioned ⚠️'}`);
-    console.log(`   ├─ Session: ${session.valid ? 'active' : 'none/expired'}`);
-    console.log(`   └─ Network calls: 0`);
+    console.log(`   ├─ Storage: ${storageAccessGranted ? 'unpartitioned' : 'partitioned'}`);
+    console.log(`   ├─ Session: ${session.valid ? 'active ✓' : 'none/expired'}`);
+    console.log(`   ├─ Synced from server: ${session.syncedFromServer ? 'yes' : 'no'}`);
+    console.log(`   └─ Network calls: ${networkCalls}`);
 
     // Notify parent that bridge is ready with session info
     if (window.parent !== window) {
         window.parent.postMessage({
             type: 'WALLET_BRIDGE_READY',
             ready: ready,
-            version: '2.1',
+            version: '2.2',
             session: session,
             storageAccess: storageAccessGranted ? 'unpartitioned' : 'partitioned',
             initTimeMs: initTime.toFixed(2),
-            networkCalls: 0,
+            networkCalls: networkCalls,
             // Include capabilities for SDK feature detection
             capabilities: {
                 checkSession: true,
@@ -930,10 +1016,13 @@ window.addEventListener('message', async (event) => {
                 quickVerify: true,
                 localVerification: true,
                 revocationCache: true,
-                freshAuth: true,          // High-security fresh authentication
-                authFreshnessCheck: true, // Check auth age without re-auth
-                storageAccessAPI: !!document.hasStorageAccess
-            }
+                freshAuth: true,
+                authFreshnessCheck: true,
+                storageAccessAPI: !!document.hasStorageAccess,
+                sessionSync: true  // NEW: Server session sync capability
+            },
+            // If no session, include unlock URL for SDK to redirect
+            unlockUrl: session.needsUnlock ? 'https://lemma.id/wallet/unlock' : null
         }, '*');
     }
 })();
