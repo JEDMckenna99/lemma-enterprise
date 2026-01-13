@@ -1601,12 +1601,30 @@ async function revokeLemma(lemmaId, lemmaType) {
     
     try {
         console.log(`🗑️ Starting revocation of ${lemmaId}...`);
-        
-        // Remove from wallet (this should delete from encrypted storage)
+
+        // 1. Remove from local wallet (IndexedDB)
         const removeResult = await lemmaWallet.removeCredential(lemmaId);
-        console.log(`  Removal result: ${removeResult ? 'SUCCESS' : 'FAILED'}`);
-        
-        // CRITICAL FIX: Directly remove from encrypted localStorage to ensure it's gone
+        console.log(`  Local removal: ${removeResult ? 'SUCCESS' : 'FAILED'}`);
+
+        // 2. Remove from server sync storage
+        try {
+            const serverResponse = await fetch('/api/wallet/revoke-credential', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ credential_id: lemmaId })
+            });
+            if (serverResponse.ok) {
+                const serverResult = await serverResponse.json();
+                console.log(`  Server removal: ${serverResult.revoked ? 'SUCCESS' : 'NOT FOUND'}`);
+            } else {
+                console.warn(`  Server removal failed: ${serverResponse.status}`);
+            }
+        } catch (serverError) {
+            console.warn(`  Could not remove from server:`, serverError.message);
+        }
+
+        // 3. CRITICAL FIX: Directly remove from encrypted localStorage to ensure it's gone
         try {
             const encryptedData = localStorage.getItem('lemma_credentials_encrypted');
             if (encryptedData) {
@@ -1618,7 +1636,7 @@ async function revokeLemma(lemmaId, lemmaType) {
                     console.log(`  ✅ Directly removed from encrypted localStorage`);
                 }
             }
-            
+
             // Also remove from plaintext if it exists
             const plaintextData = localStorage.getItem('lemma_credentials');
             if (plaintextData) {
@@ -1632,10 +1650,10 @@ async function revokeLemma(lemmaId, lemmaType) {
         } catch (storageError) {
             console.error(`  ❌ Failed to clean localStorage:`, storageError);
         }
-        
+
         // Wait a moment to ensure all writes complete
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         // Verify it's actually gone
         const encryptedCheck = localStorage.getItem('lemma_credentials_encrypted');
         if (encryptedCheck) {
@@ -1644,7 +1662,7 @@ async function revokeLemma(lemmaId, lemmaType) {
             console.log(`  Verification: Still in encrypted localStorage: ${stillInStorage}`);
             console.log(`  Encrypted storage now has ${Object.keys(parsedCheck).length} credentials`);
         }
-        
+
         // Refresh display
         console.log(`  Refreshing wallet display...`);
         await loadWalletData();
