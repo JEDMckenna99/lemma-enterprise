@@ -1,6 +1,10 @@
 /**
  * Lemma Wallet SDK - Wallet-Centric Architecture
- * Version: 2.3.0 (2026-01-13)
+ * Version: 2.4.0 (2026-01-13)
+ * 
+ * New in 2.4.0:
+ * - Session heartbeat: Detects when wallet is locked remotely
+ * - Auto-logout on third-party sites when central wallet is locked
  * 
  * FEATURES:
  * - ONE PASSKEY PER DAY: unlock() and registerPasskey() auto-check bridge session
@@ -49,6 +53,89 @@ class LemmaWallet {
             expiresAt: null
         };
         this._initialized = false;
+        this._heartbeatInterval = null;
+        this._onSessionExpired = null; // Callback for when session is invalidated
+    }
+
+    /**
+     * Set callback for when session expires (e.g., wallet locked remotely)
+     * @param {Function} callback - Called when session is invalidated
+     */
+    onSessionExpired(callback) {
+        this._onSessionExpired = callback;
+    }
+
+    /**
+     * Start session heartbeat (checks if central wallet session is still valid)
+     * Call this on third-party sites to detect when wallet is locked remotely
+     * @param {number} intervalMs - Check interval in ms (default: 60000 = 1 minute)
+     */
+    startSessionHeartbeat(intervalMs = 60000) {
+        // Only run on third-party sites
+        if (window.location.hostname.includes('lemma.id') ||
+            window.location.hostname.includes('localhost')) {
+            return;
+        }
+
+        // Clear any existing heartbeat
+        if (this._heartbeatInterval) {
+            clearInterval(this._heartbeatInterval);
+        }
+
+        console.log('[Lemma] Starting session heartbeat (checking every', intervalMs/1000, 'seconds)');
+
+        this._heartbeatInterval = setInterval(async () => {
+            try {
+                const bridgeSession = await this.checkBridgeSession();
+                
+                if (!bridgeSession.valid && this.session.isUnlocked) {
+                    console.log('[Lemma] ⚠️ Central wallet session expired - clearing local session');
+                    
+                    // Clear local session
+                    this.session = {
+                        isUnlocked: false,
+                        unlockedAt: null,
+                        expiresAt: null
+                    };
+                    
+                    // Clear session from IndexedDB
+                    if (this.db) {
+                        try {
+                            const tx = this.db.transaction('session', 'readwrite');
+                            tx.objectStore('session').delete('current');
+                        } catch (e) {
+                            console.warn('[Lemma] Could not clear session from DB:', e);
+                        }
+                    }
+                    
+                    // Trigger callback if set
+                    if (this._onSessionExpired) {
+                        this._onSessionExpired({
+                            reason: 'wallet_locked',
+                            message: 'Central wallet was locked. Please sign in again.'
+                        });
+                    }
+                    
+                    // Dispatch custom event for apps to listen to
+                    window.dispatchEvent(new CustomEvent('lemma:session-expired', {
+                        detail: { reason: 'wallet_locked' }
+                    }));
+                }
+            } catch (e) {
+                console.warn('[Lemma] Heartbeat check failed:', e.message);
+            }
+        }, intervalMs);
+    }
+
+    /**
+     * Stop session heartbeat
+     */
+    stopSessionHeartbeat() {
+        if (this._heartbeatInterval) {
+            clearInterval(this._heartbeatInterval);
+            this._heartbeatInterval = null;
+            console.log('[Lemma] Session heartbeat stopped');
+        }
     }
 
     // ========================================
@@ -311,7 +398,7 @@ class LemmaWallet {
                 
                 if (bridgeSession.valid) {
                     console.log('[Lemma] ✅ Already authenticated via bridge - skipping local unlock');
-                    
+
                     // Update local session to match bridge
                     this.session = {
                         isUnlocked: true,
@@ -320,7 +407,10 @@ class LemmaWallet {
                         walletId: bridgeSession.walletId,
                         source: 'bridge'
                     };
-                    
+
+                    // Start session heartbeat to detect if wallet is locked remotely
+                    this.startSessionHeartbeat(30000); // Check every 30 seconds
+
                     return {
                         success: true,
                         method: 'bridge_session',
