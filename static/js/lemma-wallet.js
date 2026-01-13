@@ -172,8 +172,11 @@ class LemmaWallet {
         // If user already unlocked on lemma.id today, don't prompt for passkey
         if (!window.location.hostname.includes('lemma.id') && 
             !window.location.hostname.includes('localhost')) {
+            console.log('[Lemma] Third-party site detected, checking bridge session for registerPasskey...');
             try {
                 const bridgeSession = await this.checkBridgeSession();
+                console.log('[Lemma] Bridge session result:', bridgeSession);
+                
                 if (bridgeSession.valid) {
                     console.log('[Lemma] ✅ Already authenticated via bridge - skipping passkey registration');
                     return {
@@ -182,9 +185,12 @@ class LemmaWallet {
                         walletId: bridgeSession.walletId,
                         message: 'Authenticated via central wallet session'
                     };
+                } else {
+                    console.log('[Lemma] Bridge session not valid for registerPasskey:', bridgeSession.reason || 'no valid session');
                 }
             } catch (e) {
-                console.log('[Lemma] Bridge check failed, falling back to local passkey');
+                console.warn('[Lemma] Bridge check failed in registerPasskey:', e.message);
+                console.log('[Lemma] Falling back to local passkey registration');
             }
         }
 
@@ -298,8 +304,11 @@ class LemmaWallet {
         // If user already unlocked on lemma.id today, don't prompt for passkey
         if (!window.location.hostname.includes('lemma.id') && 
             !window.location.hostname.includes('localhost')) {
+            console.log('[Lemma] Third-party site detected, checking bridge session...');
             try {
                 const bridgeSession = await this.checkBridgeSession();
+                console.log('[Lemma] Bridge session result:', bridgeSession);
+                
                 if (bridgeSession.valid) {
                     console.log('[Lemma] ✅ Already authenticated via bridge - skipping local unlock');
                     
@@ -319,9 +328,12 @@ class LemmaWallet {
                         expiresAt: bridgeSession.expiresAt,
                         message: 'Authenticated via central wallet session'
                     };
+                } else {
+                    console.log('[Lemma] Bridge session not valid:', bridgeSession.reason || 'no valid session');
                 }
             } catch (e) {
-                console.log('[Lemma] Bridge check failed, falling back to local passkey');
+                console.warn('[Lemma] Bridge check failed:', e.message);
+                console.log('[Lemma] Falling back to local passkey');
             }
         }
 
@@ -900,20 +912,32 @@ class LemmaWallet {
         
         if (!bridge) {
             // Create bridge iframe if needed
+            console.log('[Lemma] Creating bridge iframe...');
             bridge = document.createElement('iframe');
             bridge.src = 'https://lemma.id/wallet/bridge';
             bridge.style.cssText = 'display:none;width:0;height:0;border:none;';
             bridge.id = 'lemma-bridge';
             document.body.appendChild(bridge);
             
-            // Wait for bridge to load
+            // Wait for WALLET_BRIDGE_READY message (not just onload)
             await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('Bridge load timeout')), 5000);
-                bridge.onload = () => {
-                    clearTimeout(timeout);
-                    // Give bridge time to initialize
-                    setTimeout(resolve, 100);
+                const timeoutId = setTimeout(() => {
+                    window.removeEventListener('message', handler);
+                    console.warn('[Lemma] Bridge ready timeout - continuing anyway');
+                    resolve(); // Don't reject, try to continue
+                }, 8000);
+                
+                const handler = (event) => {
+                    if (event.origin === 'https://lemma.id' && 
+                        event.data?.type === 'WALLET_BRIDGE_READY') {
+                        clearTimeout(timeoutId);
+                        window.removeEventListener('message', handler);
+                        console.log('[Lemma] Bridge ready, session:', event.data.session?.valid ? 'active' : 'none');
+                        resolve();
+                    }
                 };
+                
+                window.addEventListener('message', handler);
             });
         }
         
