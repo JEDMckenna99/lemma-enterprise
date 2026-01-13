@@ -162,15 +162,47 @@ await lemmaWallet.syncRevocations();
 
 ---
 
-### Phase 5: SDK Integration Layer ⬜ PENDING
+### Phase 5: SDK Integration Layer ✅ COMPLETE
+**Status:** ✅ Complete  
+**Started:** 2026-01-13  
+**Completed:** 2026-01-13
 
 | Task | Status | Notes |
 |------|--------|-------|
-| 5.1 Main LemmaSDK class | ⬜ Pending | |
-| 5.2 BridgeClient wrapper | ⬜ Pending | |
-| 5.3 React hook (useLemma) | ⬜ Pending | |
-| 5.4 TypeScript definitions | ⬜ Pending | |
-| 5.5 NPM package setup | ⬜ Pending | |
+| 5.1 Main LemmaSDK class | ✅ Complete | `sdk/src/index.ts` with WASM verification |
+| 5.2 BridgeClient wrapper | ✅ Complete | `_sendBridgeMessage()` in lemma-wallet.js |
+| 5.3 React hooks | ✅ Complete | `useLemma`, `useLemmaSession`, `useLemmaVerification` |
+| 5.4 TypeScript definitions | ✅ Complete | Session types added to `sdk/src/types.ts` |
+| 5.5 NPM package setup | ✅ Complete | `packages/wallet/package.json` ready |
+
+**Files Created/Modified:**
+- `sdk/src/react.ts` - React hooks for wallet, session, verification
+- `sdk/src/types.ts` - Added SessionState, SessionManager types
+- `packages/wallet/` - NPM package with build scripts
+
+**React Hooks:**
+```tsx
+import { useLemma, useLemmaSession, useLemmaVerification } from '@lemma/sdk/react';
+
+function App() {
+  // Wallet state & methods
+  const { isUnlocked, unlock, getCredentials } = useLemma();
+  
+  // Session management (cross-site)
+  const { session, extendSession } = useLemmaSession({ 
+    autoManage: true,
+    onSessionExpired: () => redirect('/login')
+  });
+  
+  // Credential verification
+  const { verify, quickVerify, isVerifying } = useLemmaVerification();
+}
+```
+
+**TypeScript Types:**
+- `SessionState` - Cross-site session info
+- `SessionManager` - Auto-management interface
+- `SessionManagerOptions` - Configuration options
 
 ---
 

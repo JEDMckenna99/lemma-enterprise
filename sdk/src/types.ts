@@ -185,6 +185,46 @@ export interface LemmaResultDisplayProps {
   theme?: 'light' | 'dark';
 }
 
+// Session state types (for cross-site authentication)
+export interface SessionState {
+  valid: boolean;
+  authenticated: boolean;
+  expiresAt: number | null;
+  timeRemaining: number | null;
+  unlockedAt?: number;
+  extensionCount: number;
+  canExtend: boolean;
+  shouldPromptExtend: boolean;
+  walletExists?: boolean;
+  source: 'local' | 'bridge';
+  reason?: string;
+}
+
+export interface SessionManageResult {
+  action: 'valid' | 'extended' | 'extension_needed' | 'expired';
+  state?: SessionState;
+  result?: {
+    success: boolean;
+    expiresAt?: number;
+    extensionCount?: number;
+    extensionsRemaining?: number;
+  };
+}
+
+export interface SessionManagerOptions {
+  checkInterval?: number;
+  autoExtend?: boolean;
+  onSessionExpired?: (state: SessionState) => void;
+  onExtensionNeeded?: (state: SessionState) => boolean | Promise<boolean>;
+  onSessionExtended?: (result: any) => void;
+}
+
+export interface SessionManager {
+  stop: () => void;
+  check: () => Promise<SessionManageResult>;
+  isRunning: () => boolean;
+}
+
 // Core SDK interface
 export interface LemmaSDK {
   // Configuration
@@ -197,6 +237,12 @@ export interface LemmaSDK {
   verify(credentialData: string): Promise<VerificationResult>;
   scanQR(options?: QRScanOptions): Promise<QRScanResult>;
   stopQRScan(): void;
+  
+  // Session management (cross-site)
+  checkBridgeSession(): Promise<SessionState>;
+  extendBridgeSession(): Promise<{ success: boolean; expiresAt?: number; extensionCount?: number }>;
+  getSessionState(): Promise<SessionState>;
+  manageSession(options?: SessionManagerOptions): Promise<SessionManageResult>;
   
   // Event system
   on<T = any>(event: LemmaEventType, callback: LemmaEventCallback<T>): void;
@@ -218,6 +264,9 @@ export interface LemmaSDK {
   getCacheSize(): number;
   setCacheEnabled(enabled: boolean): void;
 }
+
+// Global function for starting session manager
+export declare function startLemmaSessionManager(options?: SessionManagerOptions): SessionManager;
 
 // Error types
 export class LemmaError extends Error {
