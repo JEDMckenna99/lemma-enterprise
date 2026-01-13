@@ -52,15 +52,25 @@ content-security-policy: frame-ancestors https: http://localhost:* http://127.0.
 
 ---
 
-### Phase 2: Smart Caching Layer ⬜ PENDING
+### Phase 2: Smart Caching Layer ⏳ IN PROGRESS
+**Status:** 🟡 In Progress  
+**Started:** 2026-01-13
 
 | Task | Status | Notes |
 |------|--------|-------|
-| 2.1 Create service worker (lemma-sw.js) | ⬜ Pending | |
-| 2.2 Add HTTP cache headers for bridge | ⬜ Pending | |
-| 2.3 Implement CacheManager class | ⬜ Pending | |
-| 2.4 Pre-warm cache on SDK init | ⬜ Pending | |
+| 2.1 Create service worker (lemma-sw.js) | ✅ Complete | Cache-first for bridge/SDK |
+| 2.2 Add HTTP cache headers for bridge | ✅ Complete | Done in Phase 1 |
+| 2.3 Add SW registration to SDK | ✅ Complete | Auto-registers on lemma.id |
+| 2.4 Pre-warm cache on install | ✅ Complete | Bridge + SDK precached |
 | 2.5 Deploy & verify caching works | ⬜ Pending | |
+
+**Files Created:**
+- `static/js/lemma-sw.js` - Service worker with cache-first strategy
+
+**Caching Strategy:**
+- Cache-first for bridge HTML and SDK JS
+- Stale-while-revalidate for revocation lists
+- Background updates without blocking
 
 ---
 

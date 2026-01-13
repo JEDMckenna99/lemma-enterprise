@@ -1551,6 +1551,65 @@ if (typeof window !== 'undefined') {
     } else {
         lemmaWalletInstance.init();
     }
+    
+    // ========================================
+    // SERVICE WORKER REGISTRATION
+    // ========================================
+    // Registers the Lemma service worker for offline-first caching
+    // This enables 0 network calls after first visit
+    
+    async function registerLemmaServiceWorker() {
+        if (!('serviceWorker' in navigator)) {
+            console.log('[Lemma] Service workers not supported');
+            return null;
+        }
+        
+        try {
+            // Only register SW on lemma.id or sites that explicitly opt-in
+            const isLemmaOrigin = window.location.hostname.includes('lemma.id');
+            const hasOptIn = document.querySelector('meta[name="lemma-sw"]');
+            
+            if (!isLemmaOrigin && !hasOptIn) {
+                // Don't auto-register on third-party sites
+                return null;
+            }
+            
+            const swUrl = isLemmaOrigin 
+                ? '/static/js/lemma-sw.js' 
+                : 'https://lemma.id/static/js/lemma-sw.js';
+            
+            const registration = await navigator.serviceWorker.register(swUrl, {
+                scope: '/'
+            });
+            
+            console.log('[Lemma] Service worker registered:', registration.scope);
+            
+            // Listen for updates
+            registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                console.log('[Lemma] Service worker update found');
+                
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        console.log('[Lemma] New service worker ready - refresh for updates');
+                    }
+                });
+            });
+            
+            return registration;
+        } catch (error) {
+            console.warn('[Lemma] Service worker registration failed:', error);
+            return null;
+        }
+    }
+    
+    // Export SW registration function
+    window.registerLemmaServiceWorker = registerLemmaServiceWorker;
+    
+    // Auto-register on lemma.id
+    if (window.location.hostname.includes('lemma.id')) {
+        registerLemmaServiceWorker();
+    }
 }
 
 // Export for modules
