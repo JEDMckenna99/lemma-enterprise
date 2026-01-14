@@ -744,18 +744,59 @@ async function checkAndUnlockWallet() {
     const walletHeader = document.querySelector('.wallet-header');
     const walletMain = document.querySelector('.wallet-main');
     const speedTracker = document.getElementById('wallet-speed-tracker');
-    
+
     // Keep header visible for stable LCP, hide wallet main until loaded
     // Header stays visible to prevent CLS
     if (walletMain) walletMain.style.display = 'none';
     if (listContainer) listContainer.style.display = 'block';
     if (speedTracker) speedTracker.style.display = 'none';
-    
+
     try {
+        // FIRST: Check if there's a valid session cookie (from cross-site unlock)
+        // This enables "one passkey per day" when user unlocked on another site
+        try {
+            const syncResponse = await fetch('/api/wallet/session-sync', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (syncResponse.ok) {
+                const syncData = await syncResponse.json();
+                if (syncData.success && syncData.session?.valid) {
+                    console.log('✅ Valid session cookie found - wallet unlocked via another site');
+                    
+                    // Sync session to local IndexedDB so getWalletInfo shows unlocked
+                    if (lemmaWallet.db) {
+                        const session = {
+                            id: 'current',
+                            isUnlocked: true,
+                            unlockedAt: syncData.session.unlocked_at,
+                            expiresAt: syncData.session.expires_at * 1000,
+                            walletId: syncData.session.wallet_id,
+                            source: 'cookie_sync'
+                        };
+                        await lemmaWallet._put('session', session);
+                        lemmaWallet.session = session;
+                        console.log('✅ Session synced to local IndexedDB');
+                    }
+                    
+                    // Show wallet actions and load data
+                    const walletActions = document.getElementById('wallet-actions');
+                    if (walletActions) walletActions.style.display = 'block';
+                    
+                    await loadWalletData();
+                    return;
+                }
+            }
+        } catch (syncError) {
+            console.log('ℹ️ No cross-site session found:', syncError.message);
+        }
+
         // Check if wallet has a passkey registered
         const walletStatus = await lemmaWallet.getWalletInfo();
         console.log('🔐 Wallet status:', walletStatus);
-        
+
         if (walletStatus.hasPasskey) {
             // Wallet has passkey - check if already unlocked
             if (walletStatus.isUnlocked) {
