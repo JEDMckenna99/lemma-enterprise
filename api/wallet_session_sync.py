@@ -22,6 +22,8 @@ import hashlib
 import hmac
 import os
 import json
+import secrets
+from urllib.parse import urlparse
 
 wallet_session_sync_bp = Blueprint('wallet_session_sync', __name__)
 
@@ -29,11 +31,75 @@ wallet_session_sync_bp = Blueprint('wallet_session_sync', __name__)
 SESSION_COOKIE_NAME = 'lemma_wallet_session'
 SESSION_DURATION = 24 * 60 * 60  # 24 hours in seconds
 SESSION_SECRET = os.environ.get('SESSION_SECRET', 'dev-secret-change-in-production')
+CSRF_COOKIE_NAME = 'lemma_wallet_csrf'
+
+_ALLOWED_ORIGINS = {
+    origin.strip().lower()
+    for origin in os.environ.get('LEMMA_ALLOWED_ORIGINS', '').split(',')
+    if origin.strip()
+}
+_ALLOWED_ORIGIN_SUFFIXES = [
+    suffix.strip().lower()
+    for suffix in os.environ.get('LEMMA_ALLOWED_ORIGIN_SUFFIXES', '').split(',')
+    if suffix.strip()
+]
+_ALLOW_DEV_ORIGINS = os.environ.get('LEMMA_ALLOW_DEV_ORIGINS', '1') != '0'
+
+
+def _parse_origin(origin: str) -> str | None:
+    if not origin:
+        return None
+    try:
+        parsed = urlparse(origin)
+        if not parsed.scheme or not parsed.netloc:
+            return None
+        return origin.lower()
+    except Exception:
+        return None
+
+
+def _origin_allowed(origin: str | None) -> bool:
+    if not origin:
+        return False
+    normalized = _parse_origin(origin)
+    if not normalized:
+        return False
+    if normalized in _ALLOWED_ORIGINS:
+        return True
+    hostname = urlparse(normalized).hostname or ''
+    if hostname:
+        for suffix in _ALLOWED_ORIGIN_SUFFIXES:
+            if hostname.endswith(suffix.lstrip('.')):
+                return True
+    if _ALLOW_DEV_ORIGINS and hostname in {'localhost', '127.0.0.1'}:
+        return True
+    return False
+
+
+def _cors_headers(origin: str | None) -> dict:
+    if not _origin_allowed(origin):
+        return {}
+    return {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Lemma-CSRF',
+        'Access-Control-Allow-Credentials': 'true',
+        'Vary': 'Origin',
+    }
+
+
+def _validate_csrf() -> bool:
+    csrf_cookie = request.cookies.get(CSRF_COOKIE_NAME)
+    csrf_header = request.headers.get('X-Lemma-CSRF')
+    if not csrf_cookie or not csrf_header:
+        return False
+    return secrets.compare_digest(csrf_cookie, csrf_header)
 
 
 def generate_session_token(wallet_id: str, unlocked_at: int) -> str:
     """Generate a secure session token for the cookie."""
-    payload = f"{wallet_id}:{unlocked_at}:{int(time.time())}"
+    session_nonce = secrets.token_hex(16)
+    payload = f"{wallet_id}:{unlocked_at}:{int(time.time())}:{session_nonce}"
     signature = hmac.new(
         SESSION_SECRET.encode(),
         payload.encode(),
@@ -46,15 +112,15 @@ def validate_session_token(token: str) -> dict:
     """Validate and decode a session token."""
     try:
         parts = token.split(':')
-        if len(parts) != 4:
+        if len(parts) != 5:
             return None
         
-        wallet_id, unlocked_at, created_at, signature = parts
+        wallet_id, unlocked_at, created_at, session_nonce, signature = parts
         unlocked_at = int(unlocked_at)
         created_at = int(created_at)
         
         # Verify signature
-        payload = f"{wallet_id}:{unlocked_at}:{created_at}"
+        payload = f"{wallet_id}:{unlocked_at}:{created_at}:{session_nonce}"
         expected_sig = hmac.new(
             SESSION_SECRET.encode(),
             payload.encode(),
@@ -94,12 +160,16 @@ def session_sync():
     # Handle CORS preflight
     if request.method == 'OPTIONS':
         response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        if not _origin_allowed(origin):
+            return response, 403
         response.headers['Access-Control-Max-Age'] = '86400'
         return response
+    
+    origin = request.headers.get('Origin')
+    if not _origin_allowed(origin):
+        return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
     
     # Get session cookie
     session_token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -111,8 +181,7 @@ def session_sync():
             'message': 'No wallet session. User needs to unlock wallet on lemma.id',
             'unlock_url': 'https://lemma.id/wallet/unlock'
         })
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers.update(_cors_headers(origin))
         return response, 401
     
     # Validate session
@@ -125,9 +194,11 @@ def session_sync():
             'message': 'Wallet session expired. User needs to unlock again.',
             'unlock_url': 'https://lemma.id/wallet/unlock'
         })
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers.update(_cors_headers(origin))
         return response, 401
+
+    # NOTE: No CSRF check for session-sync (read-only operation)
+    # CSRF is required for write operations like sync-credential, revoke-credential
     
     # Get requesting site for credential filtering
     requesting_origin = request.headers.get('Origin', '')
@@ -187,8 +258,7 @@ def session_sync():
         }
     
     response = jsonify(response_data)
-    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers.update(_cors_headers(origin))
     return response
 
 
@@ -208,9 +278,13 @@ def set_session():
     
     if not wallet_id:
         return jsonify({'success': False, 'error': 'wallet_id required'}), 400
+
+    if SESSION_SECRET == 'dev-secret-change-in-production' and os.environ.get('FLASK_ENV') != 'development':
+        return jsonify({'success': False, 'error': 'session_secret_not_configured'}), 500
     
-    # Generate session token
+    # Generate session token + CSRF token
     token = generate_session_token(wallet_id, unlocked_at)
+    csrf_token = secrets.token_urlsafe(32)
     
     # Create response with cookie
     response = jsonify({
@@ -229,6 +303,15 @@ def set_session():
         samesite='None',  # Allow cross-site requests
         path='/'
     )
+    response.set_cookie(
+        CSRF_COOKIE_NAME,
+        csrf_token,
+        max_age=SESSION_DURATION,
+        httponly=False,
+        secure=True,
+        samesite='None',
+        path='/'
+    )
     
     return response
 
@@ -238,6 +321,7 @@ def clear_session():
     """Clear wallet session cookie (logout)."""
     response = jsonify({'success': True, 'session_cleared': True})
     response.delete_cookie(SESSION_COOKIE_NAME, path='/')
+    response.delete_cookie(CSRF_COOKIE_NAME, path='/')
     return response
 
 
@@ -345,26 +429,33 @@ def sync_credential():
     # Handle CORS preflight
     if request.method == 'OPTIONS':
         response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        if not _origin_allowed(origin):
+            return response, 403
         return response
+    
+    origin = request.headers.get('Origin')
+    if not _origin_allowed(origin):
+        return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
     
     # Get session cookie
     session_token = request.cookies.get(SESSION_COOKIE_NAME)
     if not session_token:
         response = jsonify({'success': False, 'error': 'not_authenticated'})
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers.update(_cors_headers(origin))
         return response, 401
     
     session_data = validate_session_token(session_token)
     if not session_data:
         response = jsonify({'success': False, 'error': 'session_expired'})
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers.update(_cors_headers(origin))
         return response, 401
+
+    if not _validate_csrf():
+        response = jsonify({'success': False, 'error': 'csrf_missing_or_invalid'})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
     
     wallet_id = session_data['wallet_id']
     data = request.get_json() or {}
@@ -372,8 +463,7 @@ def sync_credential():
     
     if not credential:
         response = jsonify({'success': False, 'error': 'no_credential_provided'})
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers.update(_cors_headers(origin))
         return response, 400
     
     # Store credential in database
@@ -391,8 +481,7 @@ def sync_credential():
         'credential_id': credential.get('id'),
         'total_credentials': len(all_creds)
     })
-    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers.update(_cors_headers(origin))
     return response
 
 
@@ -407,26 +496,33 @@ def revoke_credential():
     # Handle CORS preflight
     if request.method == 'OPTIONS':
         response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        if not _origin_allowed(origin):
+            return response, 403
         return response
+    
+    origin = request.headers.get('Origin')
+    if not _origin_allowed(origin):
+        return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
     
     # Get session cookie
     session_token = request.cookies.get(SESSION_COOKIE_NAME)
     if not session_token:
         response = jsonify({'success': False, 'error': 'not_authenticated'})
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers.update(_cors_headers(origin))
         return response, 401
     
     session_data = validate_session_token(session_token)
     if not session_data:
         response = jsonify({'success': False, 'error': 'session_expired'})
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers.update(_cors_headers(origin))
         return response, 401
+
+    if not _validate_csrf():
+        response = jsonify({'success': False, 'error': 'csrf_missing_or_invalid'})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
     
     wallet_id = session_data['wallet_id']
     data = request.get_json() or {}
@@ -434,8 +530,7 @@ def revoke_credential():
     
     if not credential_id:
         response = jsonify({'success': False, 'error': 'credential_id required'})
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers.update(_cors_headers(origin))
         return response, 400
     
     # Mark as revoked in database
@@ -449,8 +544,7 @@ def revoke_credential():
         'revoked': revoked,
         'credential_id': credential_id
     })
-    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers.update(_cors_headers(origin))
     return response
 
 
@@ -494,29 +588,33 @@ def get_credentials():
     # Handle CORS preflight
     if request.method == 'OPTIONS':
         response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        if not _origin_allowed(origin):
+            return response, 403
         return response
+    
+    origin = request.headers.get('Origin')
+    if not _origin_allowed(origin):
+        return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
     
     # Get session cookie
     session_token = request.cookies.get(SESSION_COOKIE_NAME)
     if not session_token:
         response = jsonify({'success': False, 'error': 'not_authenticated', 'credentials': []})
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers.update(_cors_headers(origin))
         return response, 401
     
     session_data = validate_session_token(session_token)
     if not session_data:
         response = jsonify({'success': False, 'error': 'session_expired', 'credentials': []})
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers.update(_cors_headers(origin))
         return response, 401
-    
+
+    # NOTE: No CSRF check for get-credentials (read-only operation)
+
     wallet_id = session_data['wallet_id']
-    
+
     # Fetch from database
     credentials = _get_credentials_db(wallet_id)
     print(f"📥 Fetched {len(credentials)} credentials from database for wallet {wallet_id}")
@@ -526,6 +624,5 @@ def get_credentials():
         'credentials': credentials,
         'count': len(credentials)
     })
-    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers.update(_cors_headers(origin))
     return response
