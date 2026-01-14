@@ -262,30 +262,40 @@ def session_sync():
     return response
 
 
-@wallet_session_sync_bp.route('/api/wallet/set-session', methods=['POST'])
+@wallet_session_sync_bp.route('/api/wallet/set-session', methods=['POST', 'OPTIONS'])
 def set_session():
     """
     Set wallet session cookie after successful passkey unlock.
-    Called from lemma.id pages after wallet unlock.
-    
+    Called from any site after wallet unlock (cross-origin supported).
+
     Request body:
         - wallet_id: The user's wallet ID
         - unlocked_at: Timestamp of unlock
     """
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        if not _origin_allowed(origin):
+            return response, 403
+        return response
+
+    origin = request.headers.get('Origin')
+    
     data = request.get_json() or {}
     wallet_id = data.get('wallet_id')
     unlocked_at = data.get('unlocked_at', int(time.time() * 1000))
-    
-    if not wallet_id:
-        return jsonify({'success': False, 'error': 'wallet_id required'}), 400
 
-    if SESSION_SECRET == 'dev-secret-change-in-production' and os.environ.get('FLASK_ENV') != 'development':
-        return jsonify({'success': False, 'error': 'session_secret_not_configured'}), 500
-    
+    if not wallet_id:
+        response = jsonify({'success': False, 'error': 'wallet_id required'})
+        response.headers.update(_cors_headers(origin))
+        return response, 400
+
     # Generate session token + CSRF token
     token = generate_session_token(wallet_id, unlocked_at)
     csrf_token = secrets.token_urlsafe(32)
-    
+
     # Create response with cookie
     response = jsonify({
         'success': True,
@@ -293,6 +303,9 @@ def set_session():
         'expires_at': int(time.time()) + SESSION_DURATION
     })
     
+    # Add CORS headers
+    response.headers.update(_cors_headers(origin))
+
     # Set secure cookie
     response.set_cookie(
         SESSION_COOKIE_NAME,
@@ -312,7 +325,7 @@ def set_session():
         samesite='None',
         path='/'
     )
-    
+
     return response
 
 
