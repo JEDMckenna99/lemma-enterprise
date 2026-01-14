@@ -1,0 +1,465 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Lemma Wallet (SDK Test){% endblock %}
+{% block description %}Clean SDK-only wallet page for testing.{% endblock %}
+
+{% block preload_scripts %}{% endblock %}
+
+{% block head %}
+<style>
+.wallet-container { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
+.wallet-header { margin-bottom: 32px; text-align: center; }
+.wallet-header h1 { font-size: 2rem; font-weight: 600; color: #111827; margin: 0 0 8px; }
+.wallet-header p { font-size: 1rem; color: #6b7280; }
+.wallet-header .badge { 
+    display: inline-block; 
+    background: #fef3cd; 
+    color: #856404; 
+    padding: 4px 12px; 
+    border-radius: 12px; 
+    font-size: 0.75rem; 
+    margin-top: 8px;
+}
+.card { 
+    background: #fff; 
+    border: 1px solid #e5e7eb; 
+    border-radius: 16px; 
+    padding: 24px; 
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.card h2 { font-size: 1.1rem; font-weight: 600; margin: 0 0 16px; color: #111827; }
+.status-box { 
+    padding: 16px; 
+    border-radius: 12px; 
+    margin-bottom: 16px; 
+    font-family: monospace;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+.status-box.locked { background: #fef3cd; border: 1px solid #f59e0b; color: #92400e; }
+.status-box.unlocked { background: #d1fae5; border: 1px solid #10b981; color: #065f46; }
+.status-box.error { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+.status-box.info { background: #e0f2fe; border: 1px solid #0ea5e9; color: #0c4a6e; }
+.btn { 
+    padding: 12px 24px; 
+    border-radius: 8px; 
+    font-weight: 500; 
+    cursor: pointer; 
+    border: none;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    margin: 4px;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+.btn-secondary { background: #6b7280; color: white; }
+.btn-danger { background: #ef4444; color: white; }
+.btn-success { background: #10b981; color: white; }
+.credentials-list { 
+    background: #f9fafb; 
+    border: 1px solid #e5e7eb; 
+    border-radius: 8px; 
+    min-height: 100px;
+}
+.credential-item {
+    padding: 16px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.credential-item:last-child { border-bottom: none; }
+.credential-info h4 { margin: 0 0 4px; font-size: 0.95rem; color: #111827; }
+.credential-info p { margin: 0; font-size: 0.8rem; color: #6b7280; }
+.log-container {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 16px;
+    border-radius: 8px;
+    font-family: 'Consolas', monospace;
+    font-size: 0.75rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.log-entry { margin: 2px 0; }
+.log-entry.info { color: #9cdcfe; }
+.log-entry.success { color: #4ec9b0; }
+.log-entry.error { color: #f14c4c; }
+.log-entry.warn { color: #cca700; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wallet-container">
+    <header class="wallet-header">
+        <h1>Lemma Wallet</h1>
+        <p>SDK-Only Test Page</p>
+        <span class="badge">Uses only LemmaWallet SDK methods</span>
+    </header>
+
+    <!-- Session Status -->
+    <div class="card">
+        <h2>Session Status</h2>
+        <div id="session-status" class="status-box info">Loading...</div>
+        <div class="actions">
+            <button class="btn btn-primary" onclick="refreshStatus()">Refresh Status</button>
+            <button class="btn btn-secondary" onclick="checkBridge()">Check Bridge</button>
+            <button class="btn btn-secondary" onclick="checkCookie()">Check Cookie</button>
+        </div>
+    </div>
+
+    <!-- Wallet Actions -->
+    <div class="card">
+        <h2>Wallet Actions</h2>
+        <div class="actions">
+            <button class="btn btn-primary" onclick="unlockWallet()">🔓 Unlock Wallet</button>
+            <button class="btn btn-secondary" onclick="lockWallet()">🔒 Lock Wallet</button>
+            <button class="btn btn-success" onclick="registerPasskey()">🔑 Register Passkey</button>
+        </div>
+        <div class="actions">
+            <button class="btn btn-danger" onclick="clearAll()">🗑️ Clear All State</button>
+        </div>
+    </div>
+
+    <!-- Credentials -->
+    <div class="card">
+        <h2>Credentials</h2>
+        <div class="actions">
+            <button class="btn btn-secondary" onclick="loadCredentials()">Refresh Credentials</button>
+        </div>
+        <div id="credentials-list" class="credentials-list">
+            <div style="padding: 24px; text-align: center; color: #9ca3af;">
+                Click "Refresh Credentials" to load
+            </div>
+        </div>
+    </div>
+
+    <!-- Console Log -->
+    <div class="card">
+        <h2>Console Log</h2>
+        <div id="log" class="log-container"></div>
+        <div class="actions" style="margin-top: 12px;">
+            <button class="btn btn-secondary" onclick="clearLog()">Clear Log</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/lemma-wallet.js"></script>
+<script>
+// =============================================
+// SDK-ONLY WALLET PAGE
+// All operations use only LemmaWallet public API
+// =============================================
+
+let wallet = null;
+const logEl = document.getElementById('log');
+
+// Capture console for display
+const origLog = console.log;
+const origWarn = console.warn;
+const origError = console.error;
+
+function addLog(msg, type = 'info') {
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    const time = new Date().toLocaleTimeString();
+    const text = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
+    entry.textContent = `[${time}] ${text}`;
+    logEl.appendChild(entry);
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+console.log = (...args) => {
+    origLog.apply(console, args);
+    addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'info');
+};
+console.warn = (...args) => {
+    origWarn.apply(console, args);
+    addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'warn');
+};
+console.error = (...args) => {
+    origError.apply(console, args);
+    addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'error');
+};
+
+function clearLog() {
+    logEl.innerHTML = '';
+}
+
+// Initialize SDK
+async function initSDK() {
+    if (wallet) return wallet;
+    try {
+        addLog('Creating LemmaWallet instance...', 'info');
+        wallet = new LemmaWallet();
+        await wallet.init();
+        addLog('✅ SDK initialized', 'success');
+        return wallet;
+    } catch (e) {
+        addLog(`❌ SDK init failed: ${e.message}`, 'error');
+        throw e;
+    }
+}
+
+// Update status display
+function updateStatus(text, type = 'info') {
+    const el = document.getElementById('session-status');
+    el.textContent = text;
+    el.className = `status-box ${type}`;
+}
+
+// Refresh session status using SDK only
+async function refreshStatus() {
+    try {
+        await initSDK();
+        
+        // Use SDK's getWalletInfo() - the ONLY way to check status
+        const info = await wallet.getWalletInfo();
+        addLog('SDK getWalletInfo(): ' + JSON.stringify(info), 'info');
+        
+        if (info.isUnlocked) {
+            updateStatus(`✅ WALLET UNLOCKED
+            
+Wallet ID: ${info.walletId || 'unknown'}
+Has Passkey: ${info.hasPasskey}
+Credentials: ${info.lemmaCount || 0}
+Session Expires: ${info.session?.expiresAt ? new Date(info.session.expiresAt).toLocaleString() : 'unknown'}`, 'unlocked');
+        } else {
+            updateStatus(`🔒 WALLET LOCKED
+
+Has Passkey: ${info.hasPasskey}
+Credentials: ${info.lemmaCount || 0}
+
+Use "Unlock Wallet" to authenticate.`, 'locked');
+        }
+    } catch (e) {
+        updateStatus(`❌ Error: ${e.message}`, 'error');
+        addLog(`❌ refreshStatus failed: ${e.message}`, 'error');
+    }
+}
+
+// Check bridge session (for cross-site testing)
+async function checkBridge() {
+    try {
+        await initSDK();
+        addLog('Calling SDK checkBridgeSession()...', 'info');
+        const session = await wallet.checkBridgeSession();
+        addLog('Bridge result: ' + JSON.stringify(session), session.valid ? 'success' : 'warn');
+        
+        if (session.valid) {
+            updateStatus(`✅ BRIDGE SESSION ACTIVE
+
+Wallet ID: ${session.walletId}
+Expires: ${session.expiresAt ? new Date(session.expiresAt).toLocaleString() : 'unknown'}
+Time Remaining: ${session.timeRemaining ? Math.round(session.timeRemaining / 60000) + ' min' : 'unknown'}`, 'unlocked');
+        } else {
+            updateStatus(`🔒 BRIDGE SESSION INVALID
+
+Reason: ${session.reason || 'no session'}
+Wallet Exists: ${session.walletExists}`, 'locked');
+        }
+    } catch (e) {
+        updateStatus(`❌ Bridge error: ${e.message}`, 'error');
+        addLog(`❌ checkBridge failed: ${e.message}`, 'error');
+    }
+}
+
+// Check cookie session (lemma.id only)
+async function checkCookie() {
+    try {
+        addLog('Checking cookie session via API...', 'info');
+        const response = await fetch('/api/wallet/session-sync', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        addLog('Cookie result: ' + JSON.stringify(data), data.success ? 'success' : 'warn');
+        
+        if (data.success && data.session?.valid) {
+            updateStatus(`✅ COOKIE SESSION ACTIVE
+
+Wallet ID: ${data.session.wallet_id}
+Expires: ${new Date(data.session.expires_at * 1000).toLocaleString()}
+Unlocked At: ${new Date(data.session.unlocked_at).toLocaleString()}`, 'unlocked');
+        } else {
+            updateStatus(`🔒 NO COOKIE SESSION
+
+Error: ${data.error || 'none'}
+
+The session cookie enables cross-site unlock detection.`, 'locked');
+        }
+    } catch (e) {
+        updateStatus(`❌ Cookie check error: ${e.message}`, 'error');
+        addLog(`❌ checkCookie failed: ${e.message}`, 'error');
+    }
+}
+
+// Unlock wallet using SDK only
+async function unlockWallet() {
+    try {
+        await initSDK();
+        addLog('=== Calling SDK unlock() ===', 'info');
+        
+        const result = await wallet.unlock();
+        addLog('unlock() result: ' + JSON.stringify(result), 'success');
+        
+        await refreshStatus();
+    } catch (e) {
+        addLog(`❌ unlock() failed: ${e.message}`, 'error');
+        updateStatus(`❌ Unlock failed: ${e.message}`, 'error');
+    }
+}
+
+// Lock wallet using SDK only
+async function lockWallet() {
+    try {
+        await initSDK();
+        addLog('=== Calling SDK lock() ===', 'info');
+        
+        // SDK should have a lock() method, or we clear session
+        if (typeof wallet.lock === 'function') {
+            await wallet.lock();
+        } else {
+            // Fallback: Clear session via API
+            await fetch('/api/wallet/clear-session', {
+                method: 'POST',
+                credentials: 'include'
+            });
+            // Clear local session
+            wallet.session = null;
+        }
+        
+        addLog('✅ Wallet locked', 'success');
+        await refreshStatus();
+    } catch (e) {
+        addLog(`❌ lock() failed: ${e.message}`, 'error');
+    }
+}
+
+// Register passkey using SDK only
+async function registerPasskey() {
+    try {
+        await initSDK();
+        addLog('=== Calling SDK registerPasskey() ===', 'info');
+        
+        const result = await wallet.registerPasskey();
+        addLog('registerPasskey() result: ' + JSON.stringify(result), 'success');
+        
+        await refreshStatus();
+    } catch (e) {
+        addLog(`❌ registerPasskey() failed: ${e.message}`, 'error');
+    }
+}
+
+// Load credentials using SDK only
+async function loadCredentials() {
+    const container = document.getElementById('credentials-list');
+    try {
+        await initSDK();
+        addLog('Calling SDK getCredentials()...', 'info');
+        
+        const credentials = await wallet.getCredentials();
+        addLog(`Found ${credentials.length} credentials`, 'info');
+        
+        if (credentials.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 32px; text-align: center; color: #9ca3af;">
+                    <div style="font-size: 2rem; margin-bottom: 8px;">📭</div>
+                    <div>No credentials found</div>
+                </div>`;
+            return;
+        }
+        
+        container.innerHTML = credentials.map(cred => {
+            const claims = cred.claims || cred.credentialSubject || {};
+            const type = cred.packageType || cred.type || 'unknown';
+            const site = claims.siteId || claims.site_id || claims.siteName || 'Unknown site';
+            const issuedAt = cred.issuedAt || cred.issuanceDate;
+            
+            return `
+                <div class="credential-item">
+                    <div class="credential-info">
+                        <h4>${type === 'permission' ? '🔑' : '👤'} ${type.charAt(0).toUpperCase() + type.slice(1)}</h4>
+                        <p>Site: ${site}</p>
+                        <p>ID: ${cred.id?.substring(0, 30)}...</p>
+                        ${issuedAt ? `<p>Issued: ${new Date(issuedAt).toLocaleDateString()}</p>` : ''}
+                    </div>
+                    <button class="btn btn-danger" onclick="revokeCredential('${cred.id}')">Revoke</button>
+                </div>`;
+        }).join('');
+        
+    } catch (e) {
+        container.innerHTML = `
+            <div style="padding: 24px; text-align: center; color: #ef4444;">
+                Error: ${e.message}
+            </div>`;
+        addLog(`❌ loadCredentials failed: ${e.message}`, 'error');
+    }
+}
+
+// Revoke credential using SDK only
+async function revokeCredential(credId) {
+    if (!confirm('Revoke this credential? This cannot be undone.')) return;
+    
+    try {
+        await initSDK();
+        addLog(`Calling SDK removeCredential(${credId})...`, 'info');
+        
+        const result = await wallet.removeCredential(credId);
+        addLog('removeCredential result: ' + JSON.stringify(result), 'success');
+        
+        await loadCredentials();
+    } catch (e) {
+        addLog(`❌ revokeCredential failed: ${e.message}`, 'error');
+    }
+}
+
+// Clear all state
+async function clearAll() {
+    if (!confirm('Clear ALL wallet data? This includes credentials and session.')) return;
+    
+    try {
+        addLog('Clearing all state...', 'warn');
+        
+        // Delete IndexedDB
+        indexedDB.deleteDatabase('LemmaWallet');
+        addLog('  - Deleted IndexedDB', 'info');
+        
+        // Delete cookies
+        document.cookie = 'lemma_wallet_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'lemma_wallet_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        addLog('  - Deleted cookies', 'info');
+        
+        // Unregister service workers
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) await reg.unregister();
+        addLog(`  - Unregistered ${regs.length} service workers`, 'info');
+        
+        wallet = null;
+        addLog('✅ All state cleared - refreshing page...', 'success');
+        
+        setTimeout(() => location.reload(), 1000);
+    } catch (e) {
+        addLog(`❌ clearAll failed: ${e.message}`, 'error');
+    }
+}
+
+// Initialize on load
+window.addEventListener('DOMContentLoaded', async () => {
+    addLog('SDK-Only Wallet Page loaded', 'info');
+    addLog(`Hostname: ${window.location.hostname}`, 'info');
+    
+    try {
+        await initSDK();
+        await refreshStatus();
+        await loadCredentials();
+    } catch (e) {
+        addLog(`Init error: ${e.message}`, 'error');
+    }
+});
+</script>
+{% endblock %}

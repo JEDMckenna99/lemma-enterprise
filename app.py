@@ -542,6 +542,25 @@ def create_app():
             'Expires': '0'
         }
     
+    @app.route('/wallet/simple')
+    def wallet_simple():
+        """SDK-Only Wallet Page for Testing"""
+        logger.info("🧪 Serving SDK-only wallet test page")
+        app.jinja_env.cache = {}
+        return render_template('wallet_simple.html'), 200, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+    
+    @app.route('/sdk-test')
+    def sdk_test():
+        """SDK Test Page"""
+        logger.info("🧪 Serving SDK test page")
+        return render_template('sdk_test.html'), 200, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+        }
+    
     @app.route('/wallet/reset-pin')
     def wallet_reset_pin():
         """Wallet PIN Reset Page"""
@@ -611,7 +630,7 @@ def create_app():
             # Bridge HTML is static; all dynamic state is in IndexedDB
             # ETag allows revalidation on version updates
             'Cache-Control': 'public, max-age=31536000, immutable',
-            'ETag': '"bridge-v3.1.0-csrf-protected"',
+            'ETag': '"bridge-v3.2.0-cache-optimized"',
 
             # Additional cache hints
             'Vary': 'Accept-Encoding'

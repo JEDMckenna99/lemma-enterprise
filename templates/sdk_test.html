@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma SDK Test Page</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px; 
+            margin: 40px auto; 
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 12px 0;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #cce5ff; color: #004085; }
+        .status.warning { background: #fff3cd; color: #856404; }
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 8px 8px 8px 0;
+            transition: transform 0.1s;
+        }
+        button:hover { transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        #log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log-entry { margin: 4px 0; }
+        .log-entry.info { color: #9cdcfe; }
+        .log-entry.success { color: #4ec9b0; }
+        .log-entry.error { color: #f14c4c; }
+        .log-entry.warn { color: #cca700; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Lemma SDK Test Page</h1>
+    <p>Clean environment for testing SDK behavior without wallet page customizations.</p>
+
+    <div class="card">
+        <h2>Environment</h2>
+        <table>
+            <tr><th>Property</th><th>Value</th></tr>
+            <tr><td>Hostname</td><td id="env-hostname">-</td></tr>
+            <tr><td>Is Lemma.id</td><td id="env-islemma">-</td></tr>
+            <tr><td>SDK Loaded</td><td id="env-sdk">-</td></tr>
+            <tr><td>SDK Version</td><td id="env-version">-</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Session Status</h2>
+        <div id="session-status" class="status info">Click "Check Session" to view</div>
+        <button onclick="checkLocalSession()">Check Local Session</button>
+        <button onclick="checkBridgeSession()">Check Bridge Session</button>
+        <button onclick="checkCookieSession()">Check Cookie Session</button>
+    </div>
+
+    <div class="card">
+        <h2>SDK Actions</h2>
+        <button onclick="testUnlock()">🔓 Test unlock()</button>
+        <button onclick="testRegisterPasskey()">🔑 Test registerPasskey()</button>
+        <button onclick="testGetCredentials()">📋 Get Credentials</button>
+        <button onclick="testGetWalletInfo()">ℹ️ Get Wallet Info</button>
+        <br><br>
+        <button class="secondary" onclick="testInit()">Initialize SDK</button>
+        <button class="danger" onclick="clearAllState()">🗑️ Clear All State</button>
+    </div>
+
+    <div class="card">
+        <h2>Console Log</h2>
+        <div id="log"></div>
+        <button class="secondary" onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script src="/static/js/lemma-wallet.js"></script>
+    <script>
+        let wallet = null;
+        const logEl = document.getElementById('log');
+
+        // Override console.log to capture SDK logs
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+
+        function addLog(msg, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        console.log = (...args) => {
+            originalLog.apply(console, args);
+            addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'info');
+        };
+        console.warn = (...args) => {
+            originalWarn.apply(console, args);
+            addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'warn');
+        };
+        console.error = (...args) => {
+            originalError.apply(console, args);
+            addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'error');
+        };
+
+        function clearLog() {
+            logEl.innerHTML = '';
+        }
+
+        function updateStatus(msg, type = 'info') {
+            const el = document.getElementById('session-status');
+            el.textContent = msg;
+            el.className = `status ${type}`;
+        }
+
+        // Environment check
+        function checkEnvironment() {
+            document.getElementById('env-hostname').textContent = window.location.hostname;
+            document.getElementById('env-islemma').textContent = 
+                window.location.hostname.includes('lemma.id') ? '✅ Yes' : '❌ No (third-party)';
+            document.getElementById('env-sdk').textContent = 
+                typeof LemmaWallet !== 'undefined' ? '✅ Loaded' : '❌ Not loaded';
+            document.getElementById('env-version').textContent = 
+                typeof LemmaWallet !== 'undefined' ? (LemmaWallet.VERSION || 'unknown') : '-';
+        }
+
+        // Initialize SDK
+        async function testInit() {
+            try {
+                addLog('Creating new LemmaWallet instance...', 'info');
+                wallet = new LemmaWallet();
+                addLog('Calling wallet.init()...', 'info');
+                await wallet.init();
+                addLog('✅ SDK initialized successfully', 'success');
+                checkEnvironment();
+            } catch (e) {
+                addLog(`❌ Init failed: ${e.message}`, 'error');
+            }
+        }
+
+        // Check local session
+        async function checkLocalSession() {
+            if (!wallet) await testInit();
+            try {
+                const info = await wallet.getWalletInfo();
+                addLog('Local wallet info: ' + JSON.stringify(info, null, 2), 'info');
+                if (info.isUnlocked) {
+                    updateStatus(`✅ Local session ACTIVE\nWallet ID: ${info.walletId}\nExpires: ${info.session?.expiresAt ? new Date(info.session.expiresAt).toLocaleString() : 'unknown'}`, 'success');
+                } else {
+                    updateStatus(`🔒 Local session LOCKED\nHas passkey: ${info.hasPasskey}`, 'warning');
+                }
+            } catch (e) {
+                updateStatus(`❌ Error: ${e.message}`, 'error');
+                addLog(`❌ Error: ${e.message}`, 'error');
+            }
+        }
+
+        // Check bridge session
+        async function checkBridgeSession() {
+            if (!wallet) await testInit();
+            try {
+                addLog('Checking bridge session...', 'info');
+                const session = await wallet.checkBridgeSession();
+                addLog('Bridge session result: ' + JSON.stringify(session, null, 2), 'info');
+                if (session.valid) {
+                    updateStatus(`✅ Bridge session ACTIVE\nWallet ID: ${session.walletId}\nExpires: ${session.expiresAt ? new Date(session.expiresAt).toLocaleString() : 'unknown'}`, 'success');
+                } else {
+                    updateStatus(`🔒 Bridge session INVALID\nReason: ${session.reason || 'unknown'}`, 'warning');
+                }
+            } catch (e) {
+                updateStatus(`❌ Bridge error: ${e.message}`, 'error');
+                addLog(`❌ Bridge error: ${e.message}`, 'error');
+            }
+        }
+
+        // Check cookie session (lemma.id only)
+        async function checkCookieSession() {
+            try {
+                addLog('Checking cookie session via API...', 'info');
+                const response = await fetch('/api/wallet/session-sync', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                addLog('Cookie session result: ' + JSON.stringify(data, null, 2), 'info');
+                if (data.success && data.session?.valid) {
+                    updateStatus(`✅ Cookie session ACTIVE\nWallet ID: ${data.session.wallet_id}\nExpires: ${new Date(data.session.expires_at * 1000).toLocaleString()}`, 'success');
+                } else {
+                    updateStatus(`🔒 No cookie session\nError: ${data.error || 'none'}`, 'warning');
+                }
+            } catch (e) {
+                updateStatus(`❌ Cookie check error: ${e.message}`, 'error');
+                addLog(`❌ Cookie check error: ${e.message}`, 'error');
+            }
+        }
+
+        // Test unlock
+        async function testUnlock() {
+            if (!wallet) await testInit();
+            try {
+                addLog('=== CALLING wallet.unlock() ===', 'info');
+                addLog('This should trigger third-party detection on non-lemma.id sites', 'info');
+                const result = await wallet.unlock();
+                addLog('unlock() result: ' + JSON.stringify(result, null, 2), 'success');
+                await checkLocalSession();
+            } catch (e) {
+                addLog(`❌ unlock() failed: ${e.message}`, 'error');
+            }
+        }
+
+        // Test registerPasskey
+        async function testRegisterPasskey() {
+            if (!wallet) await testInit();
+            try {
+                addLog('=== CALLING wallet.registerPasskey() ===', 'info');
+                addLog('This should trigger third-party detection on non-lemma.id sites', 'info');
+                const result = await wallet.registerPasskey();
+                addLog('registerPasskey() result: ' + JSON.stringify(result, null, 2), 'success');
+                await checkLocalSession();
+            } catch (e) {
+                addLog(`❌ registerPasskey() failed: ${e.message}`, 'error');
+            }
+        }
+
+        // Get credentials
+        async function testGetCredentials() {
+            if (!wallet) await testInit();
+            try {
+                addLog('Getting credentials...', 'info');
+                const creds = await wallet.getCredentials();
+                addLog(`Found ${creds.length} credentials:`, 'info');
+                creds.forEach((c, i) => {
+                    addLog(`  [${i}] ${c.id} - ${c.packageType || c.type}`, 'info');
+                });
+            } catch (e) {
+                addLog(`❌ getCredentials() failed: ${e.message}`, 'error');
+            }
+        }
+
+        // Get wallet info
+        async function testGetWalletInfo() {
+            if (!wallet) await testInit();
+            try {
+                const info = await wallet.getWalletInfo();
+                addLog('Wallet info: ' + JSON.stringify(info, null, 2), 'info');
+            } catch (e) {
+                addLog(`❌ getWalletInfo() failed: ${e.message}`, 'error');
+            }
+        }
+
+        // Clear all state
+        async function clearAllState() {
+            try {
+                addLog('Clearing all Lemma state...', 'warn');
+                
+                // Delete IndexedDB
+                indexedDB.deleteDatabase('LemmaWallet');
+                addLog('  - Deleted IndexedDB', 'info');
+                
+                // Delete cookies
+                document.cookie = 'lemma_wallet_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                document.cookie = 'lemma_wallet_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                addLog('  - Deleted cookies', 'info');
+                
+                // Unregister service worker
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const reg of regs) await reg.unregister();
+                addLog(`  - Unregistered ${regs.length} service workers`, 'info');
+                
+                wallet = null;
+                addLog('✅ All state cleared - refresh page to start fresh', 'success');
+                updateStatus('State cleared - refresh page', 'warning');
+            } catch (e) {
+                addLog(`❌ Clear failed: ${e.message}`, 'error');
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            checkEnvironment();
+            addLog('SDK Test Page loaded', 'info');
+            addLog(`Hostname: ${window.location.hostname}`, 'info');
+            addLog(`Is third-party: ${!window.location.hostname.includes('lemma.id')}`, 'info');
+        });
+    </script>
+</body>
+</html>
