@@ -69,6 +69,28 @@ class LemmaWallet {
     }
 
     /**
+     * Get CSRF token from cookie (for double-submit CSRF protection)
+     * @returns {string|null} CSRF token or null if not set
+     */
+    _getCsrfToken() {
+        const match = document.cookie.match(/lemma_wallet_csrf=([^;]+)/);
+        return match ? match[1] : null;
+    }
+
+    /**
+     * Get headers with CSRF token for credentialed requests
+     * @returns {Object} Headers object with Content-Type and X-Lemma-CSRF
+     */
+    _getSecureHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        const csrf = this._getCsrfToken();
+        if (csrf) {
+            headers['X-Lemma-CSRF'] = csrf;
+        }
+        return headers;
+    }
+
+    /**
      * Start session heartbeat (checks if central wallet session is still valid)
      * Call this on third-party sites to detect when wallet is locked remotely
      * @param {number} intervalMs - Check interval in ms (default: 60000 = 1 minute)

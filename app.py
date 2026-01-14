@@ -611,7 +611,7 @@ def create_app():
             # Bridge HTML is static; all dynamic state is in IndexedDB
             # ETag allows revalidation on version updates
             'Cache-Control': 'public, max-age=31536000, immutable',
-            'ETag': '"bridge-v3.0.0-privacy-first"',
+            'ETag': '"bridge-v3.1.0-csrf-protected"',
 
             # Additional cache hints
             'Vary': 'Accept-Encoding'
@@ -970,12 +970,45 @@ def create_app():
         if request.method == "OPTIONS":
             if request.path.startswith('/api/'):
                 from flask import make_response
+                from urllib.parse import urlparse
                 response = make_response()
-                origin = request.headers.get('Origin', '*')
-                response.headers['Access-Control-Allow-Origin'] = origin
+                origin = request.headers.get('Origin')
+
+                allowed_origins = {
+                    o.strip().lower()
+                    for o in os.environ.get('LEMMA_ALLOWED_ORIGINS', '').split(',')
+                    if o.strip()
+                }
+                allowed_suffixes = [
+                    s.strip().lower()
+                    for s in os.environ.get('LEMMA_ALLOWED_ORIGIN_SUFFIXES', '').split(',')
+                    if s.strip()
+                ]
+                allow_dev = os.environ.get('LEMMA_ALLOW_DEV_ORIGINS', '1') != '0'
+
+                is_allowed = False
+                if origin:
+                    parsed = urlparse(origin)
+                    hostname = parsed.hostname or ''
+                    if origin.lower() in allowed_origins:
+                        is_allowed = True
+                    elif hostname:
+                        for suffix in allowed_suffixes:
+                            if hostname.endswith(suffix.lstrip('.')):
+                                is_allowed = True
+                                break
+                    if allow_dev and hostname in {'localhost', '127.0.0.1'}:
+                        is_allowed = True
+
                 response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key'
-                response.headers['Access-Control-Allow-Credentials'] = 'true'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key, X-Lemma-CSRF'
+                response.headers['Vary'] = 'Origin'
+
+                if origin and is_allowed:
+                    response.headers['Access-Control-Allow-Origin'] = origin
+                    response.headers['Access-Control-Allow-Credentials'] = 'true'
+                else:
+                    response.headers['Access-Control-Allow-Origin'] = '*'
                 return response
 
     # Error handlers
