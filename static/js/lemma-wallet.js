@@ -1,6 +1,9 @@
 /**
  * Lemma Wallet SDK - Wallet-Centric Architecture
- * Version: 2.4.0 (2026-01-13)
+ * Version: 2.5.0 (2026-01-14)
+ * 
+ * New in 2.5.0:
+ * - Fix: Set lemma.id session cookie after ANY unlock (enables cross-site auth)
  * 
  * New in 2.4.0:
  * - Session heartbeat: Detects when wallet is locked remotely
@@ -493,16 +496,43 @@ class LemmaWallet {
             walletSecret: walletSecretRecord.secret
         };
 
-        // Persist session
+        // Persist session locally
         await this._put('session', {
             id: 'current',
             ...this.session
         });
-        
+
         console.log('✅ Wallet unlocked successfully');
-            
-        return { 
-            success: true, 
+
+        // CRITICAL: Set session cookie on lemma.id for cross-site "one passkey per day"
+        // This enables the session to be shared across all sites via the bridge
+        try {
+            const setSessionResponse = await fetch('https://lemma.id/api/wallet/set-session', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wallet_id: walletId,
+                    unlocked_at: this.session.unlockedAt
+                })
+            });
+            if (setSessionResponse.ok) {
+                console.log('[Lemma] ✅ Session cookie set on lemma.id - cross-site auth enabled');
+            } else {
+                console.warn('[Lemma] ⚠️ Could not set session cookie:', setSessionResponse.status);
+            }
+        } catch (e) {
+            console.warn('[Lemma] ⚠️ Could not set session cookie on lemma.id:', e.message);
+        }
+
+        // Start heartbeat on third-party sites
+        if (!window.location.hostname.includes('lemma.id') &&
+            !window.location.hostname.includes('localhost')) {
+            this.startSessionHeartbeat(30000);
+        }
+
+        return {
+            success: true,
             expiresAt: this.session.expiresAt,
             expiresIn: SESSION_DURATION_MS,
             walletId: walletId,
