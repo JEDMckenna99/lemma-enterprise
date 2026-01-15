@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.12.0';
+    static VERSION = '2.13.0';
     
     constructor() {
         this.db = null;
@@ -132,20 +132,24 @@ class LemmaWallet {
             }
         }
         
-        // Determine suggested action based on state
+        // Determine suggested action based on state and domain
         if (state.isUnlocked && state.walletSecret) {
             // User has unlocked wallet - they can sign in or create account
-            // Customer site should check if PPID exists in their DB
             state.suggestedAction = 'auto_sign_in';
             state.suggestedButtonText = 'Sign In';
+        } else if (!this._isLemmaDomain()) {
+            // Third-party site with no valid session - redirect to lemma.id
+            state.suggestedAction = 'redirect_to_lemma';
+            state.suggestedButtonText = 'Sign In with Lemma';
+            state.unlockUrl = 'https://lemma.id/wallet/simple';
         } else if (state.hasWallet) {
-            // Has wallet but not unlocked - needs to unlock
+            // lemma.id with wallet but not unlocked
             state.suggestedAction = 'unlock';
-            state.suggestedButtonText = 'Unlock Wallet & Sign In';
+            state.suggestedButtonText = 'Unlock Wallet';
         } else {
-            // No wallet - needs to create passkey
+            // lemma.id with no wallet - create passkey here
             state.suggestedAction = 'create_passkey';
-            state.suggestedButtonText = 'Create Passkey & Sign In';
+            state.suggestedButtonText = 'Create Passkey';
         }
         
         return state;
@@ -579,10 +583,28 @@ class LemmaWallet {
                     };
                 } else {
                     console.log('[Lemma] Bridge session not valid for registerPasskey:', bridgeSession.reason || 'no valid session');
+                    
+                    // DON'T create local passkey on third-party sites!
+                    // User needs to unlock on lemma.id first
+                    console.log('[Lemma] ⚠️ User needs to unlock wallet on lemma.id first');
+                    return {
+                        success: false,
+                        needsUnlock: true,
+                        unlockUrl: 'https://lemma.id/wallet/simple',
+                        message: 'Please unlock your wallet on lemma.id first, then return here.',
+                        reason: bridgeSession.reason || 'no_session'
+                    };
                 }
             } catch (e) {
                 console.warn('[Lemma] Bridge check failed in registerPasskey:', e.message);
-                console.log('[Lemma] Falling back to local passkey registration');
+                // DON'T fall back to local passkey - redirect to lemma.id instead
+                return {
+                    success: false,
+                    needsUnlock: true,
+                    unlockUrl: 'https://lemma.id/wallet/simple',
+                    message: 'Could not connect to wallet bridge. Please unlock on lemma.id first.',
+                    error: e.message
+                };
             }
         }
 
