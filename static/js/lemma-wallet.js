@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.10.0';
+    static VERSION = '2.11.0';
     
     constructor() {
         this.db = null;
@@ -261,6 +261,45 @@ class LemmaWallet {
     }
 
     /**
+     * Check if session is still valid (useful after page refresh)
+     * On third-party sites, this verifies with the bridge.
+     * 
+     * @returns {Promise<boolean>} True if session is valid
+     */
+    async isSessionValid() {
+        await this.init();
+        
+        // Check local session first
+        if (!this.session.isUnlocked) {
+            return false;
+        }
+        
+        // On third-party sites, verify with bridge
+        if (!this._isLemmaDomain()) {
+            try {
+                const bridgeSession = await this.checkBridgeSession();
+                if (!bridgeSession.valid) {
+                    console.log('[Lemma] Session invalidated by bridge');
+                    // Clear local session
+                    this.session = { isUnlocked: false };
+                    await this._delete('session', 'current');
+                    
+                    // Trigger callback
+                    if (this._onSessionExpired) {
+                        this._onSessionExpired({ reason: 'bridge_invalid' });
+                    }
+                    return false;
+                }
+            } catch (e) {
+                console.warn('[Lemma] Could not verify session with bridge:', e.message);
+                // If bridge fails, trust local session
+            }
+        }
+        
+        return true;
+    }
+
+    /**
      * Get CSRF token from cookie (for double-submit CSRF protection)
      * @returns {string|null} CSRF token or null if not set
      */
@@ -441,6 +480,7 @@ class LemmaWallet {
 
     /**
      * Check and restore session state from storage
+     * On third-party sites, also starts heartbeat if session exists
      */
     async _checkSessionState() {
         try {
@@ -449,8 +489,17 @@ class LemmaWallet {
                 this.session = {
                     isUnlocked: true,
                     unlockedAt: storedSession.unlockedAt,
-                    expiresAt: storedSession.expiresAt
+                    expiresAt: storedSession.expiresAt,
+                    walletId: storedSession.walletId,
+                    source: storedSession.source || 'local'
                 };
+                
+                // AUTO-START HEARTBEAT on third-party sites with existing session
+                // This ensures lock detection works even after page refresh
+                if (!this._isLemmaDomain()) {
+                    console.log('[Lemma] Existing session found on third-party site - starting heartbeat');
+                    this._autoStartHeartbeat();
+                }
             }
         } catch (e) {
             // No stored session, that's fine
