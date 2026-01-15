@@ -104,6 +104,35 @@ function getHostnameFromOrigin(origin) {
 let wallet = null;
 let storageAccessGranted = false;
 
+// ============================================
+// MICRO-CACHE (speed: avoid repeated IndexedDB)
+// ============================================
+
+const CACHE_CONFIG = {
+    sessionTtlMs: 2000,
+    credentialsTtlMs: 5000
+};
+
+const cache = {
+    session: { value: null, ts: 0, promise: null },
+    credentials: new Map(),
+    credentialsPromises: new Map()
+};
+
+function isFresh(ts, ttl) {
+    return Date.now() - ts < ttl;
+}
+
+function clearCredentialsCache() {
+    cache.credentials.clear();
+    cache.credentialsPromises.clear();
+}
+
+function updateSessionCache(value) {
+    cache.session.value = value;
+    cache.session.ts = Date.now();
+}
+
 /**
  * Request unpartitioned storage access (needed for cross-site wallet)
  * Modern browsers partition third-party storage by default.
@@ -213,36 +242,48 @@ async function initWallet() {
  * Check session validity - NO server calls
  * Returns detailed session state for cross-site session sharing
  */
-async function checkSession() {
+async function checkSession(options = {}) {
     if (!wallet) await initWallet();
     
     try {
+        if (!options.force && cache.session.value && isFresh(cache.session.ts, CACHE_CONFIG.sessionTtlMs)) {
+            return cache.session.value;
+        }
+        if (!options.force && cache.session.promise) {
+            return await cache.session.promise;
+        }
+
+        cache.session.promise = (async () => {
         const session = await wallet._get('session', 'current');
         
         if (!session) {
-            return { 
+            const result = { 
                 valid: false, 
                 reason: 'no_session',
                 walletExists: !!(await wallet._get('passkey', 'primary'))
             };
+            updateSessionCache(result);
+            return result;
         }
         
         const now = Date.now();
         
         if (session.expiresAt < now) {
-            return { 
+            const result = { 
                 valid: false, 
                 reason: 'expired',
                 expiredAt: session.expiresAt,
                 expiredAgo: now - session.expiresAt,
                 walletExists: true
             };
+            updateSessionCache(result);
+            return result;
         }
         
         const timeRemaining = session.expiresAt - now;
         const extensionCount = session.extensionCount || 0;
         
-        return {
+        const result = {
             valid: true,
             expiresAt: session.expiresAt,
             timeRemaining,
@@ -252,9 +293,17 @@ async function checkSession() {
             shouldPromptExtend: timeRemaining < SESSION_CONFIG.EXTEND_THRESHOLD,
             walletExists: true
         };
+        updateSessionCache(result);
+        return result;
+        })();
+
+        const result = await cache.session.promise;
+        return result;
     } catch (e) {
         console.error('Session check error:', e);
         return { valid: false, reason: 'error', error: e.message };
+    } finally {
+        cache.session.promise = null;
     }
 }
 
@@ -325,16 +374,59 @@ async function extendSession() {
         
         console.log(`✅ Session extended (${extensionCount + 1}/${SESSION_CONFIG.MAX_EXTENSIONS})`);
         
-        return {
+        const result = {
             success: true,
             expiresAt: newExpiry,
             extensionCount: extensionCount + 1,
             extensionsRemaining: SESSION_CONFIG.MAX_EXTENSIONS - extensionCount - 1
         };
+        updateSessionCache({
+            valid: true,
+            expiresAt: newExpiry,
+            timeRemaining: newExpiry - now,
+            unlockedAt: session.unlockedAt,
+            extensionCount: extensionCount + 1,
+            canExtend: extensionCount + 1 < SESSION_CONFIG.MAX_EXTENSIONS,
+            shouldPromptExtend: (newExpiry - now) < SESSION_CONFIG.EXTEND_THRESHOLD,
+            walletExists: true
+        });
+        return result;
     } catch (e) {
         console.error('Session extend error:', e);
         return { success: false, reason: 'error', error: e.message };
     }
+}
+
+async function getCredentialsCached(filterType, requestingSite, showAll) {
+    const key = `${filterType || 'all'}|${requestingSite || 'unknown'}|${showAll ? 'all' : 'site'}`;
+    const cached = cache.credentials.get(key);
+    if (cached && isFresh(cached.ts, CACHE_CONFIG.credentialsTtlMs)) {
+        return cached.value;
+    }
+    if (cache.credentialsPromises.has(key)) {
+        return await cache.credentialsPromises.get(key);
+    }
+    const promise = (async () => {
+        let credentials = await wallet.getCredentials(filterType);
+        const isLemmaRequesting = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+        if (!isLemmaRequesting && !showAll) {
+            credentials = credentials.filter(c => {
+                const claims = c.claims || c.credentialSubject || {};
+                const credSiteId = claims.siteId || claims.site_id || '';
+                const normalizedCredSite = credSiteId.toLowerCase().replace(/^www\./, '');
+                return normalizedCredSite === requestingSite ||
+                       requestingSite.endsWith('.' + normalizedCredSite) ||
+                       normalizedCredSite.endsWith('.' + requestingSite);
+            });
+        }
+        const value = { credentials, isLemmaRequesting };
+        cache.credentials.set(key, { value, ts: Date.now() });
+        return value;
+    })().finally(() => {
+        cache.credentialsPromises.delete(key);
+    });
+    cache.credentialsPromises.set(key, promise);
+    return await promise;
 }
 
 // ============================================
@@ -428,7 +520,7 @@ window.addEventListener('message', async (event) => {
                 if (!wallet) await initWallet();
                 try {
                     const unlockResult = await wallet.unlock();
-                    const newSession = await checkSession();
+                    const newSession = await checkSession({ force: true });
                     respond({ 
                         success: true,
                         ...unlockResult,
@@ -441,9 +533,12 @@ window.addEventListener('message', async (event) => {
                 
             case 'GET_WALLET_SECRET':
                 // Get wallet secret for PPID derivation (requires valid session)
+                console.log('🔑 GET_WALLET_SECRET request received');
                 if (!wallet) await initWallet();
                 const secretSession = await checkSession();
+                console.log('🔑 Session check for secret:', secretSession.valid ? 'valid' : 'invalid');
                 if (!secretSession.valid) {
+                    console.warn('🔑 ❌ Session invalid for GET_WALLET_SECRET');
                     respond({ 
                         success: false, 
                         error: 'Session expired or invalid',
@@ -452,12 +547,15 @@ window.addEventListener('message', async (event) => {
                     return;
                 }
                 try {
+                    console.log('🔑 Attempting to get wallet secret...');
                     const walletSecret = await wallet.getWalletSecret();
+                    console.log('🔑 ✅ Got wallet secret:', walletSecret ? 'exists (' + walletSecret.length + ' chars)' : 'null');
                     respond({
                         success: true,
                         walletSecret: walletSecret
                     });
                 } catch (e) {
+                    console.error('🔑 ❌ Failed to get wallet secret:', e.message);
                     respond({ success: false, error: e.message });
                 }
                 break;
@@ -520,6 +618,7 @@ window.addEventListener('message', async (event) => {
 
                 // Store the credential locally (no server sync - privacy preserved)
                 const storeResult = await wallet.storeCredential(credential);
+                clearCredentialsCache();
                 console.log(`✅ Credential stored locally via bridge for ${requestingSite} (siteId: ${credSiteId}):`, credential.id);
 
                 respond({
@@ -538,26 +637,9 @@ window.addEventListener('message', async (event) => {
                 const filterType = payload?.type || null;
                 const showAll = payload?.showAll || false;  // Flag to show all credentials
                 
-                let credentials = await wallet.getCredentials(filterType);
-                
-                // Check if this is lemma.id requesting (unified wallet view)
-                const isLemmaRequesting = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
-                
-                // SECURITY: Filter credentials based on requesting site
-                // EXCEPTION: lemma.id can see ALL credentials (unified wallet view)
-                if (!isLemmaRequesting && !showAll) {
-                    credentials = credentials.filter(c => {
-                        const claims = c.claims || c.credentialSubject || {};
-                        const credSiteId = claims.siteId || claims.site_id || '';
-                        
-                        const normalizedCredSite = credSiteId.toLowerCase().replace(/^www\./, '');
-                        
-                        // Match: exact domain, subdomain of credential site, or credential is subdomain
-                        return normalizedCredSite === requestingSite ||
-                               requestingSite.endsWith('.' + normalizedCredSite) ||
-                               normalizedCredSite.endsWith('.' + requestingSite);
-                    });
-                }
+                const cached = await getCredentialsCached(filterType, requestingSite, showAll);
+                const credentials = cached.credentials;
+                const isLemmaRequesting = cached.isLemmaRequesting;
                 
                 // Get session status for client convenience
                 const getCredsSession = await checkSession();
@@ -665,6 +747,7 @@ window.addEventListener('message', async (event) => {
                 }
                 
                 await wallet.removeCredential(credId);
+                clearCredentialsCache();
                 console.log(`✅ Credential removed via bridge for ${requestingSite}:`, credId);
                 respond({ success: true, removed: true });
                 break;
@@ -956,12 +1039,23 @@ async function syncSessionFromServer() {
                     syncedFromServer: true,
                     syncedAt: Date.now()
                 });
+                updateSessionCache({
+                    valid: true,
+                    expiresAt: data.session.expires_at * 1000,
+                    timeRemaining: (data.session.expires_at * 1000) - Date.now(),
+                    unlockedAt: data.session.unlocked_at,
+                    extensionCount: 0,
+                    canExtend: true,
+                    shouldPromptExtend: false,
+                    walletExists: true
+                });
                 
                 // Store any synced credentials
                 if (data.credentials && data.credentials.length > 0) {
                     for (const cred of data.credentials) {
                         await wallet._put('lemmas', cred);
                     }
+                    clearCredentialsCache();
                     console.log(`   └─ Synced ${data.credentials.length} credentials`);
                 }
             }
@@ -991,6 +1085,11 @@ async function syncSessionFromServer() {
     
     // Initialize wallet (opens IndexedDB - no server call)
     const ready = await initWallet();
+    // Pre-warm session cache when idle
+    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 0));
+    idle(() => {
+        checkSession().catch(() => {});
+    });
     
     // Check session status
     let session = ready ? await checkSession() : { valid: false };
@@ -1003,7 +1102,7 @@ async function syncSessionFromServer() {
         
         if (syncResult.success) {
             // Re-check session after sync
-            session = await checkSession();
+            session = await checkSession({ force: true });
             session.syncedFromServer = true;
         } else {
             // No session on server either - user needs to unlock
