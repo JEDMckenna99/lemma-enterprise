@@ -630,7 +630,7 @@ def create_app():
             # Bridge HTML is static; all dynamic state is in IndexedDB
             # ETag allows revalidation on version updates
             'Cache-Control': 'public, max-age=31536000, immutable',
-            'ETag': '"bridge-v3.4.0-server-sync"',
+            'ETag': '"bridge-v3.5.0-fix-sync-check"',
 
             # Additional cache hints
             'Vary': 'Accept-Encoding'

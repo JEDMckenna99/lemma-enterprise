@@ -276,8 +276,11 @@ async function checkSession(options = {}) {
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const data = await response.json();
+                console.log('🔄 Server response:', response.status, data.success ? 'valid' : data.error);
                 
-                if (data.success && data.session?.valid) {
+                // API returns {success: true, session: {...}} when valid
+                // API returns {success: false, error: 'no_session'|'session_expired'} when invalid
+                if (response.ok && data.success && data.session) {
                     // Server says session is valid
                     console.log('✅ Server session confirmed valid');
                     
@@ -295,11 +298,14 @@ async function checkSession(options = {}) {
                         console.log('📥 Local session restored from server');
                     }
                 } else if (session) {
-                    // Server says no session but we have local - LOCK DETECTED
-                    console.log('⚠️ Server session invalid - wallet locked remotely');
+                    // Server says no session (401) but we have local - LOCK DETECTED
+                    console.log('⚠️ Server session invalid - wallet locked remotely!');
+                    console.log('⚠️ Clearing local session to match server state');
                     // Clear local session to match server
                     await wallet._delete('session', 'current');
                     session = null;
+                } else {
+                    console.log('ℹ️ No server session and no local session');
                 }
             } catch (e) {
                 console.warn('Server sync failed (offline?):', e.message);
