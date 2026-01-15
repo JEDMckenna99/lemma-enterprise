@@ -42,7 +42,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.6.0';
+    static VERSION = '2.7.0';
     
     constructor() {
         this.db = null;
@@ -287,10 +287,37 @@ class LemmaWallet {
                 
                 if (bridgeSession.valid) {
                     console.log('[Lemma] ✅ Already authenticated via bridge - skipping passkey registration');
+                    
+                    // CRITICAL: Set local session to match bridge session
+                    // This ensures getWalletSecret() and other methods work
+                    this.session = {
+                        isUnlocked: true,
+                        unlockedAt: bridgeSession.unlockedAt || Date.now(),
+                        expiresAt: bridgeSession.expiresAt,
+                        walletId: bridgeSession.walletId,
+                        source: 'bridge'
+                    };
+                    await this._put('session', { id: 'current', ...this.session });
+                    
+                    // Get wallet secret from bridge for PPID derivation
+                    let walletSecret = null;
+                    try {
+                        const secretResult = await this._bridgeRequest('GET_WALLET_SECRET', {});
+                        if (secretResult.success && secretResult.walletSecret) {
+                            walletSecret = secretResult.walletSecret;
+                            // Cache locally for this session
+                            await this._put('secrets', { id: 'master', secret: walletSecret, source: 'bridge' });
+                            console.log('[Lemma] ✅ Wallet secret synced from bridge');
+                        }
+                    } catch (e) {
+                        console.warn('[Lemma] Could not get wallet secret from bridge:', e.message);
+                    }
+                    
                     return {
                         success: true,
                         method: 'bridge_session',
                         walletId: bridgeSession.walletId,
+                        walletSecret: walletSecret,
                         message: 'Authenticated via central wallet session'
                     };
                 } else {
@@ -449,6 +476,23 @@ class LemmaWallet {
                         walletId: bridgeSession.walletId,
                         source: 'bridge'
                     };
+                    // CRITICAL: Save session to IndexedDB so getWalletInfo() works
+                    await this._put('session', { id: 'current', ...this.session });
+
+                    // Get wallet secret from bridge for PPID derivation
+                    let walletSecret = null;
+                    try {
+                        const secretResult = await this._bridgeRequest('GET_WALLET_SECRET', {});
+                        if (secretResult.success && secretResult.walletSecret) {
+                            walletSecret = secretResult.walletSecret;
+                            // Cache locally for this session
+                            await this._put('secrets', { id: 'master', secret: walletSecret, source: 'bridge' });
+                            this.session.walletSecret = walletSecret;
+                            console.log('[Lemma] ✅ Wallet secret synced from bridge');
+                        }
+                    } catch (e) {
+                        console.warn('[Lemma] Could not get wallet secret from bridge:', e.message);
+                    }
 
                     // Start session heartbeat to detect if wallet is locked remotely
                     this.startSessionHeartbeat(30000); // Check every 30 seconds
@@ -457,6 +501,7 @@ class LemmaWallet {
                         success: true,
                         method: 'bridge_session',
                         walletId: bridgeSession.walletId,
+                        walletSecret: walletSecret,
                         expiresAt: bridgeSession.expiresAt,
                         message: 'Authenticated via central wallet session'
                     };
