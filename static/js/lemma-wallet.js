@@ -1,6 +1,9 @@
 /**
  * Lemma Wallet SDK - Wallet-Centric Architecture
- * Version: 2.5.0 (2026-01-14)
+ * Version: 2.6.0 (2026-01-12)
+ * 
+ * New in 2.6.0:
+ * - registerPasskey() now calls set-session to create cookie (enables cross-site auth)
  * 
  * New in 2.5.0:
  * - Fix: Set lemma.id session cookie after ANY unlock (enables cross-site auth)
@@ -388,6 +391,27 @@ class LemmaWallet {
         };
         await this._put('session', { id: 'current', ...this.session });
         console.log('✅ Wallet auto-unlocked after passkey registration');
+
+        // CRITICAL: Set session cookie on lemma.id for cross-site "one passkey per day"
+        // This enables the session to be shared across all sites via the bridge
+        try {
+            const setSessionResponse = await fetch('https://lemma.id/api/wallet/set-session', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wallet_id: walletId.value,
+                    unlocked_at: this.session.unlockedAt
+                })
+            });
+            if (setSessionResponse.ok) {
+                console.log('[Lemma] ✅ Session cookie set on lemma.id - cross-site auth enabled');
+            } else {
+                console.warn('[Lemma] ⚠️ Could not set session cookie:', setSessionResponse.status);
+            }
+        } catch (e) {
+            console.warn('[Lemma] ⚠️ Could not set session cookie on lemma.id:', e.message);
+        }
 
         return {
             success: true,
