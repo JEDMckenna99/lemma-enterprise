@@ -162,7 +162,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=290"></script>
+<script src="/static/js/lemma-wallet.js?v=291"></script>
 <script>
 // =============================================
 // SDK-ONLY WALLET PAGE
@@ -335,21 +335,13 @@ async function lockWallet() {
         await initSDK();
         addLog('=== Calling SDK lock() ===', 'info');
         
-        // SDK should have a lock() method, or we clear session
-        if (typeof wallet.lock === 'function') {
-            await wallet.lock();
-        } else {
-            // Fallback: Clear session via API
-            await fetch('/api/wallet/clear-session', {
-                method: 'POST',
-                credentials: 'include'
-            });
-            // Clear local session
-            wallet.session = null;
-        }
+        await wallet.lock();
         
-        addLog('✅ Wallet locked', 'success');
+        addLog('✅ Wallet locked (local + server session cleared)', 'success');
+        
+        // Refresh all UI
         await refreshStatus();
+        await initSmartAuth();  // Update smart auth button
     } catch (e) {
         addLog(`❌ lock() failed: ${e.message}`, 'error');
     }

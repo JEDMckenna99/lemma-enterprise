@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.9.0';
+    static VERSION = '2.9.1';
     
     constructor() {
         this.db = null;
@@ -804,15 +804,41 @@ class LemmaWallet {
     }
 
     /**
-     * Lock the wallet (clear session)
+     * Lock the wallet (clear session locally and on server)
      */
     async lock() {
+        console.log('[Lemma] Locking wallet...');
+        
+        // Clear local session
         this.session = {
             isUnlocked: false,
             unlockedAt: null,
-            expiresAt: null
+            expiresAt: null,
+            walletSecret: null
         };
         await this._delete('session', 'current');
+        
+        // Clear server session cookie (for cross-site sync)
+        // This ensures customer sites see the wallet as locked
+        if (this._isLemmaDomain()) {
+            try {
+                console.log('[Lemma] Clearing server session cookie...');
+                const response = await fetch('/api/wallet/clear-session', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: this._getSecureHeaders()
+                });
+                if (response.ok) {
+                    console.log('[Lemma] ✅ Server session cleared');
+                } else {
+                    console.warn('[Lemma] Server session clear returned:', response.status);
+                }
+            } catch (e) {
+                console.warn('[Lemma] Could not clear server session:', e.message);
+            }
+        }
+        
+        console.log('[Lemma] ✅ Wallet locked');
     }
 
     /**
