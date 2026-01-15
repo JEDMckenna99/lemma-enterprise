@@ -42,7 +42,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.7.0';
+    static VERSION = '2.7.1';
     
     constructor() {
         this.db = null;
@@ -302,11 +302,12 @@ class LemmaWallet {
                     // Get wallet secret from bridge for PPID derivation
                     let walletSecret = null;
                     try {
-                        const secretResult = await this._bridgeRequest('GET_WALLET_SECRET', {});
+                        const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET', {});
                         if (secretResult.success && secretResult.walletSecret) {
                             walletSecret = secretResult.walletSecret;
                             // Cache locally for this session
                             await this._put('secrets', { id: 'master', secret: walletSecret, source: 'bridge' });
+                            this.session.walletSecret = walletSecret;
                             console.log('[Lemma] ✅ Wallet secret synced from bridge');
                         }
                     } catch (e) {
@@ -482,7 +483,7 @@ class LemmaWallet {
                     // Get wallet secret from bridge for PPID derivation
                     let walletSecret = null;
                     try {
-                        const secretResult = await this._bridgeRequest('GET_WALLET_SECRET', {});
+                        const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET', {});
                         if (secretResult.success && secretResult.walletSecret) {
                             walletSecret = secretResult.walletSecret;
                             // Cache locally for this session
