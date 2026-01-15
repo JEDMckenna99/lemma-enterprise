@@ -1,21 +1,11 @@
 /**
  * Lemma Wallet SDK - Wallet-Centric Architecture
- * Version: 2.6.0 (2026-01-12)
- * 
- * New in 2.6.0:
- * - registerPasskey() now calls set-session to create cookie (enables cross-site auth)
- * 
- * New in 2.5.0:
- * - Fix: Set lemma.id session cookie after ANY unlock (enables cross-site auth)
- * 
- * New in 2.4.0:
- * - Session heartbeat: Detects when wallet is locked remotely
- * - Auto-logout on third-party sites when central wallet is locked
  * 
  * FEATURES:
  * - ONE PASSKEY PER DAY: unlock() and registerPasskey() auto-check bridge session
  * - Session sync via secure cookies across all Lemma-enabled sites
  * - Local Ed25519 verification (zero network calls)
+ * - Session heartbeat: Detects when wallet is locked remotely
  * 
  * The wallet is unlocked locally via passkey (no server call).
  * Sites can issue their own lemmas to be stored in the wallet.
@@ -51,6 +41,9 @@ const AUTH_STATE = {
 // ============================================
 
 class LemmaWallet {
+    // SDK version - check with LemmaWallet.VERSION
+    static VERSION = '2.6.0';
+    
     constructor() {
         this.db = null;
         this.session = {

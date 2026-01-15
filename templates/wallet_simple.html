@@ -97,7 +97,7 @@
     <header class="wallet-header">
         <h1>Lemma Wallet</h1>
         <p>SDK-Only Test Page</p>
-        <span class="badge">Uses only LemmaWallet SDK methods</span>
+        <span class="badge">SDK Version: <span id="sdk-version">loading...</span></span>
     </header>
 
     <!-- Session Status -->
@@ -147,7 +147,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js"></script>
+<script src="/static/js/lemma-wallet.js?v=260"></script>
 <script>
 // =============================================
 // SDK-ONLY WALLET PAGE
@@ -450,9 +450,18 @@ async function clearAll() {
 
 // Initialize on load
 window.addEventListener('DOMContentLoaded', async () => {
-    addLog('SDK-Only Wallet Page loaded', 'info');
-    addLog(`Hostname: ${window.location.hostname}`, 'info');
+    // Show SDK version
+    const versionEl = document.getElementById('sdk-version');
+    if (typeof LemmaWallet !== 'undefined' && LemmaWallet.VERSION) {
+        versionEl.textContent = LemmaWallet.VERSION;
+    } else {
+        versionEl.textContent = 'unknown';
+    }
     
+    addLog('SDK-Only Wallet Page loaded', 'info');
+    addLog(`SDK Version: ${LemmaWallet.VERSION || 'unknown'}`, 'info');
+    addLog(`Hostname: ${window.location.hostname}`, 'info');
+
     try {
         await initSDK();
         await refreshStatus();
