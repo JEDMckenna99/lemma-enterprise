@@ -6,6 +6,18 @@
  * - Session sync via secure cookies across all Lemma-enabled sites
  * - Local Ed25519 verification (zero network calls)
  * - Session heartbeat: Detects when wallet is locked remotely
+ * - Smart Auth State: getAuthState() and autoAuthenticate() for smart UI
+ * 
+ * SMART AUTH FLOW (for customer sites):
+ *   const wallet = new LemmaWallet();
+ *   const result = await wallet.autoAuthenticate();
+ *   
+ *   if (result.authenticated) {
+ *     // User has unlocked wallet - check if they have account, auto sign-in
+ *     // Send result.walletSecret to backend to derive PPID and lookup user
+ *   } else {
+ *     // Show "Create Passkey & Sign In" button
+ *   }
  * 
  * The wallet is unlocked locally via passkey (no server call).
  * Sites can issue their own lemmas to be stored in the wallet.
@@ -42,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.8.0';
+    static VERSION = '2.9.0';
     
     constructor() {
         this.db = null;
@@ -62,6 +74,172 @@ class LemmaWallet {
      */
     onSessionExpired(callback) {
         this._onSessionExpired = callback;
+    }
+
+    // ========================================
+    // SMART AUTH STATE (for customer site UIs)
+    // ========================================
+
+    /**
+     * Get comprehensive auth state for UI decisions.
+     * Call this to determine what button to show or whether to auto-sign-in.
+     * 
+     * @returns {Promise<Object>} Auth state with:
+     *   - hasWallet: boolean - User has a wallet (passkey registered somewhere)
+     *   - isUnlocked: boolean - Wallet is currently unlocked
+     *   - walletSecret: string|null - Secret for PPID derivation (if unlocked)
+     *   - suggestedAction: 'auto_sign_in' | 'create_account' | 'create_passkey'
+     *   - suggestedButtonText: string - Text to show on sign-in button
+     */
+    async getAuthState() {
+        await this.init();
+        
+        const state = {
+            hasWallet: false,
+            isUnlocked: false,
+            walletSecret: null,
+            suggestedAction: 'create_passkey',
+            suggestedButtonText: 'Create Passkey & Sign In'
+        };
+        
+        // Check local session first
+        if (this.session.isUnlocked) {
+            state.hasWallet = true;
+            state.isUnlocked = true;
+            try {
+                state.walletSecret = await this.getWalletSecret();
+            } catch (e) {
+                console.warn('[Lemma] Could not get wallet secret:', e.message);
+            }
+        }
+        
+        // On third-party sites, check bridge session
+        if (!state.isUnlocked && !this._isLemmaDomain()) {
+            try {
+                const bridgeSession = await this.checkBridgeSession();
+                if (bridgeSession.valid) {
+                    state.hasWallet = true;
+                    state.isUnlocked = true;
+                    
+                    // Get wallet secret from bridge
+                    const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET', {});
+                    if (secretResult.success && secretResult.walletSecret) {
+                        state.walletSecret = secretResult.walletSecret;
+                    }
+                }
+            } catch (e) {
+                console.warn('[Lemma] Bridge check failed:', e.message);
+            }
+        }
+        
+        // Determine suggested action based on state
+        if (state.isUnlocked && state.walletSecret) {
+            // User has unlocked wallet - they can sign in or create account
+            // Customer site should check if PPID exists in their DB
+            state.suggestedAction = 'auto_sign_in';
+            state.suggestedButtonText = 'Sign In';
+        } else if (state.hasWallet) {
+            // Has wallet but not unlocked - needs to unlock
+            state.suggestedAction = 'unlock';
+            state.suggestedButtonText = 'Unlock Wallet & Sign In';
+        } else {
+            // No wallet - needs to create passkey
+            state.suggestedAction = 'create_passkey';
+            state.suggestedButtonText = 'Create Passkey & Sign In';
+        }
+        
+        return state;
+    }
+
+    /**
+     * Auto-authenticate if user has an unlocked wallet.
+     * Returns wallet credentials needed to sign in or create account.
+     * 
+     * Usage:
+     *   const result = await wallet.autoAuthenticate();
+     *   if (result.authenticated) {
+     *     // Send result.walletSecret to your backend to derive PPID
+     *     // Backend checks if PPID exists -> sign in, else -> create account
+     *   } else if (result.needsPasskey) {
+     *     // Show "Create Passkey & Sign In" button
+     *   }
+     * 
+     * @returns {Promise<Object>} Result with authenticated status and credentials
+     */
+    async autoAuthenticate() {
+        await this.init();
+        
+        const result = {
+            authenticated: false,
+            needsPasskey: true,
+            walletSecret: null,
+            walletId: null,
+            message: ''
+        };
+        
+        // Try local session first
+        if (this.session.isUnlocked) {
+            try {
+                result.walletSecret = await this.getWalletSecret();
+                result.walletId = this.session.walletId;
+                result.authenticated = true;
+                result.needsPasskey = false;
+                result.message = 'Authenticated from local session';
+                console.log('[Lemma] ✅ Auto-authenticated from local session');
+                return result;
+            } catch (e) {
+                console.warn('[Lemma] Local session exists but could not get secret:', e.message);
+            }
+        }
+        
+        // On third-party sites, try bridge session
+        if (!this._isLemmaDomain()) {
+            try {
+                const bridgeSession = await this.checkBridgeSession();
+                
+                if (bridgeSession.valid) {
+                    // Set local session
+                    this.session = {
+                        isUnlocked: true,
+                        unlockedAt: bridgeSession.unlockedAt || Date.now(),
+                        expiresAt: bridgeSession.expiresAt,
+                        walletId: bridgeSession.walletId,
+                        source: 'bridge'
+                    };
+                    await this._put('session', { id: 'current', ...this.session });
+                    
+                    // Get wallet secret from bridge
+                    const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET', {});
+                    if (secretResult.success && secretResult.walletSecret) {
+                        await this._put('secrets', { id: 'master', secret: secretResult.walletSecret, source: 'bridge' });
+                        this.session.walletSecret = secretResult.walletSecret;
+                        
+                        result.walletSecret = secretResult.walletSecret;
+                        result.walletId = bridgeSession.walletId;
+                        result.authenticated = true;
+                        result.needsPasskey = false;
+                        result.message = 'Authenticated via bridge session';
+                        console.log('[Lemma] ✅ Auto-authenticated via bridge session');
+                        return result;
+                    }
+                }
+            } catch (e) {
+                console.warn('[Lemma] Bridge auto-auth failed:', e.message);
+            }
+        }
+        
+        result.message = 'No valid session - passkey required';
+        console.log('[Lemma] No valid session found - user needs to create/unlock passkey');
+        return result;
+    }
+
+    /**
+     * Check if current domain is lemma.id or localhost
+     * @private
+     */
+    _isLemmaDomain() {
+        const hostname = window.location.hostname;
+        return hostname.includes('lemma.id') || hostname.includes('localhost');
     }
 
     /**
