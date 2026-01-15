@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.11.0';
+    static VERSION = '2.12.0';
     
     constructor() {
         this.db = null;
@@ -177,22 +177,8 @@ class LemmaWallet {
             message: ''
         };
         
-        // Try local session first
-        if (this.session.isUnlocked) {
-            try {
-                result.walletSecret = await this.getWalletSecret();
-                result.walletId = this.session.walletId;
-                result.authenticated = true;
-                result.needsPasskey = false;
-                result.message = 'Authenticated from local session';
-                console.log('[Lemma] ✅ Auto-authenticated from local session');
-                return result;
-            } catch (e) {
-                console.warn('[Lemma] Local session exists but could not get secret:', e.message);
-            }
-        }
-        
-        // On third-party sites, try bridge session
+        // On third-party sites, ALWAYS verify with bridge first
+        // This prevents stale local sessions from causing auth failures
         if (!this._isLemmaDomain()) {
             try {
                 const bridgeSession = await this.checkBridgeSession();
@@ -231,6 +217,28 @@ class LemmaWallet {
             } catch (e) {
                 console.warn('[Lemma] Bridge auto-auth failed:', e.message);
             }
+        }
+        
+        // On lemma.id, check local session
+        if (this._isLemmaDomain() && this.session.isUnlocked) {
+            try {
+                result.walletSecret = await this.getWalletSecret();
+                result.walletId = this.session.walletId;
+                result.authenticated = true;
+                result.needsPasskey = false;
+                result.message = 'Authenticated from local session';
+                console.log('[Lemma] ✅ Auto-authenticated from local session');
+                return result;
+            } catch (e) {
+                console.warn('[Lemma] Local session exists but could not get secret:', e.message);
+            }
+        }
+        
+        // Clear any stale local session on third-party sites
+        if (!this._isLemmaDomain() && this.session.isUnlocked) {
+            console.log('[Lemma] Clearing stale local session (bridge says invalid)');
+            this.session = { isUnlocked: false };
+            await this._delete('session', 'current');
         }
         
         result.message = 'No valid session - passkey required';
