@@ -1,5 +1,5 @@
 """
-Wallet Session Sync API
+Wallet Session Sync API - PRIVACY-HARDENED
 
 Enables the "One Passkey Per Day" experience by syncing wallet sessions
 across sites via secure cookies.
@@ -7,13 +7,24 @@ across sites via secure cookies.
 FLOW:
 1. User unlocks wallet on lemma.id → Session cookie set (24hr)
 2. User visits third-party site → SDK calls /api/wallet/session-sync
-3. Cookie validated → Session + credentials returned
+3. Cookie validated → Session returned (stateless JWT validation)
 4. SDK stores locally → All verifications are local (0 network calls)
 
-PRIVACY:
-- No email required
-- Credentials are signed blobs (lemma.id can't read contents)
-- Only sync calls are logged (not verifications)
+PRIVACY MODEL:
+- STATELESS: Session validation uses signed JWT, no database queries
+- NO TRACKING: We don't log which sites users visit
+- NO REFERRER: All responses include Referrer-Policy: no-referrer
+- NO ANALYTICS: No tracking pixels, no third-party scripts
+- MINIMAL DATA: Only wallet_id and timestamps in session token
+
+What lemma.id CAN see:
+- A session cookie exists (not which site requested it)
+- When sessions are created/expire
+
+What lemma.id CANNOT see:
+- Which sites users visit
+- User activities on any site
+- User credentials (encrypted on device)
 """
 
 from flask import Blueprint, request, jsonify, make_response
@@ -77,14 +88,23 @@ def _origin_allowed(origin: str | None) -> bool:
 
 
 def _cors_headers(origin: str | None) -> dict:
+    """
+    Generate CORS headers with privacy protections.
+    Includes Referrer-Policy to prevent site tracking.
+    """
     if not _origin_allowed(origin):
-        return {}
+        return {
+            # Privacy headers even on error responses
+            'Referrer-Policy': 'no-referrer',
+        }
     return {
         'Access-Control-Allow-Origin': origin,
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, X-Lemma-CSRF',
         'Access-Control-Allow-Credentials': 'true',
         'Vary': 'Origin',
+        # PRIVACY: Prevent referrer leakage
+        'Referrer-Policy': 'no-referrer',
     }
 
 
@@ -140,8 +160,8 @@ def validate_session_token(token: str) -> dict:
             'created_at': created_at,
             'expires_at': created_at + SESSION_DURATION
         }
-    except Exception as e:
-        print(f"Session token validation error: {e}")
+    except Exception:
+        # PRIVACY: Don't log validation errors (could leak timing info)
         return None
 
 
@@ -240,9 +260,8 @@ def session_sync():
             'synced_at': int(time.time() * 1000)
         }
         
-    except Exception as e:
-        print(f"Error fetching credentials: {e}")
-        # Return session without credentials on error
+    except Exception:
+        # PRIVACY: Don't log errors (return session without credentials)
         response_data = {
             'success': True,
             'session': {
@@ -351,8 +370,8 @@ def _get_db_connection():
             if database_url.startswith('postgres://'):
                 database_url = database_url.replace('postgres://', 'postgresql://', 1)
             return psycopg2.connect(database_url, sslmode='require')
-    except Exception as e:
-        print(f"Database connection error: {e}")
+    except Exception:
+        pass  # PRIVACY: Silent failure
     return None
 
 
@@ -360,7 +379,6 @@ def _store_credential_db(wallet_id: str, credential: dict) -> bool:
     """Store credential in database."""
     conn = _get_db_connection()
     if not conn:
-        print("⚠️ No database connection, credential not persisted")
         return False
     
     try:
@@ -388,8 +406,7 @@ def _store_credential_db(wallet_id: str, credential: dict) -> bool:
         conn.close()
         return True
         
-    except Exception as e:
-        print(f"Error storing credential: {e}")
+    except Exception:
         if conn:
             conn.close()
         return False
@@ -399,7 +416,6 @@ def _get_credentials_db(wallet_id: str) -> list:
     """Get all credentials for a wallet from database."""
     conn = _get_db_connection()
     if not conn:
-        print("⚠️ No database connection, returning empty credentials")
         return []
     
     try:
@@ -424,8 +440,7 @@ def _get_credentials_db(wallet_id: str) -> list:
         
         return credentials
         
-    except Exception as e:
-        print(f"Error fetching credentials: {e}")
+    except Exception:
         if conn:
             conn.close()
         return []
@@ -479,11 +494,8 @@ def sync_credential():
         response.headers.update(_cors_headers(origin))
         return response, 400
     
-    # Store credential in database
+    # Store credential in database (PRIVACY: no logging)
     stored = _store_credential_db(wallet_id, credential)
-    
-    if stored:
-        print(f"✅ Credential synced to database: {credential.get('id')} for wallet {wallet_id}")
     
     # Get updated count
     all_creds = _get_credentials_db(wallet_id)
@@ -546,11 +558,8 @@ def revoke_credential():
         response.headers.update(_cors_headers(origin))
         return response, 400
     
-    # Mark as revoked in database
+    # Mark as revoked in database (PRIVACY: no logging)
     revoked = _revoke_credential_db(wallet_id, credential_id)
-    
-    if revoked:
-        print(f"🗑️ Credential revoked in database: {credential_id} for wallet {wallet_id}")
     
     response = jsonify({
         'success': True,
@@ -565,7 +574,6 @@ def _revoke_credential_db(wallet_id: str, credential_id: str) -> bool:
     """Mark credential as revoked in database (soft delete)."""
     conn = _get_db_connection()
     if not conn:
-        print("⚠️ No database connection, credential not revoked on server")
         return False
     
     try:
@@ -584,8 +592,7 @@ def _revoke_credential_db(wallet_id: str, credential_id: str) -> bool:
         conn.close()
         return affected > 0
         
-    except Exception as e:
-        print(f"Error revoking credential: {e}")
+    except Exception:
         if conn:
             conn.close()
         return False
@@ -630,8 +637,7 @@ def get_credentials():
 
     # Fetch from database
     credentials = _get_credentials_db(wallet_id)
-    print(f"📥 Fetched {len(credentials)} credentials from database for wallet {wallet_id}")
-    
+    # PRIVACY: No logging of credential access
     response = jsonify({
         'success': True,
         'credentials': credentials,

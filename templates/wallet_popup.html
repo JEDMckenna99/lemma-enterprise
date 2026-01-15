@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
     <title>Unlock Lemma Wallet</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -129,15 +130,11 @@
     <script>
         let wallet = null;
         
-        // Get opener origin for display
-        const openerOrigin = document.referrer ? new URL(document.referrer).hostname : 'Unknown site';
+        // PRIVACY: Don't display or log referrer
+        // The popup just unlocks the wallet, doesn't track which site requested it
         
         async function init() {
-            // Show which site is requesting
-            if (openerOrigin && openerOrigin !== window.location.hostname) {
-                document.getElementById('site-name').textContent = openerOrigin;
-                document.getElementById('site-info').classList.remove('hidden');
-            }
+            // PRIVACY: Site info hidden - we don't track which site requested unlock
             
             try {
                 wallet = new LemmaWallet();
