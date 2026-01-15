@@ -100,6 +100,20 @@
         <span class="badge">SDK Version: <span id="sdk-version">loading...</span></span>
     </header>
 
+    <!-- Smart Auth - Primary Action -->
+    <div class="card" style="border: 2px solid #667eea; background: linear-gradient(135deg, #f5f3ff, #ede9fe);">
+        <h2 style="color: #5b21b6;">✨ Smart Sign In</h2>
+        <div id="smart-auth-status" class="status-box info">Checking auth state...</div>
+        <div class="actions" style="justify-content: center; margin-top: 16px;">
+            <button id="smart-auth-btn" class="btn btn-primary" style="font-size: 1.1rem; padding: 16px 32px;" onclick="smartAuth()">
+                Loading...
+            </button>
+        </div>
+        <p style="text-align: center; color: #6b7280; font-size: 0.85rem; margin-top: 12px;">
+            Uses <code>autoAuthenticate()</code> and <code>getAuthState()</code>
+        </p>
+    </div>
+
     <!-- Session Status -->
     <div class="card">
         <h2>Session Status</h2>
@@ -108,12 +122,13 @@
             <button class="btn btn-primary" onclick="refreshStatus()">Refresh Status</button>
             <button class="btn btn-secondary" onclick="checkBridge()">Check Bridge</button>
             <button class="btn btn-secondary" onclick="checkCookie()">Check Cookie</button>
+            <button class="btn btn-secondary" onclick="checkAuthState()">Get Auth State</button>
         </div>
     </div>
 
     <!-- Wallet Actions -->
     <div class="card">
-        <h2>Wallet Actions</h2>
+        <h2>Manual Wallet Actions</h2>
         <div class="actions">
             <button class="btn btn-primary" onclick="unlockWallet()">🔓 Unlock Wallet</button>
             <button class="btn btn-secondary" onclick="lockWallet()">🔒 Lock Wallet</button>
@@ -147,7 +162,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=271"></script>
+<script src="/static/js/lemma-wallet.js?v=290"></script>
 <script>
 // =============================================
 // SDK-ONLY WALLET PAGE
@@ -448,6 +463,136 @@ async function clearAll() {
     }
 }
 
+// =============================================
+// SMART AUTH (new SDK v2.9.0 features)
+// =============================================
+
+let currentAuthState = null;
+
+// Check and display auth state
+async function checkAuthState() {
+    try {
+        await initSDK();
+        addLog('=== Calling SDK getAuthState() ===', 'info');
+        
+        const state = await wallet.getAuthState();
+        currentAuthState = state;
+        addLog('getAuthState() result: ' + JSON.stringify(state), 'success');
+        
+        return state;
+    } catch (e) {
+        addLog(`❌ getAuthState() failed: ${e.message}`, 'error');
+        return null;
+    }
+}
+
+// Update smart auth UI based on state
+function updateSmartAuthUI(state) {
+    const statusEl = document.getElementById('smart-auth-status');
+    const btnEl = document.getElementById('smart-auth-btn');
+    
+    if (!state) {
+        statusEl.textContent = 'Error checking auth state';
+        statusEl.className = 'status-box error';
+        btnEl.textContent = 'Try Again';
+        return;
+    }
+    
+    if (state.isUnlocked && state.walletSecret) {
+        statusEl.textContent = `✅ WALLET UNLOCKED
+
+You're signed in! Your wallet is ready.
+Wallet Secret: ${state.walletSecret.substring(0, 16)}...
+
+Suggested Action: ${state.suggestedAction}`;
+        statusEl.className = 'status-box unlocked';
+        btnEl.textContent = '✓ Already Signed In';
+        btnEl.disabled = true;
+        btnEl.style.opacity = '0.6';
+    } else if (state.hasWallet) {
+        statusEl.textContent = `🔒 WALLET LOCKED
+
+You have a wallet but it's locked.
+Unlock with your passkey to continue.
+
+Suggested Action: ${state.suggestedAction}`;
+        statusEl.className = 'status-box locked';
+        btnEl.textContent = state.suggestedButtonText || 'Unlock Wallet';
+        btnEl.disabled = false;
+        btnEl.style.opacity = '1';
+    } else {
+        statusEl.textContent = `📱 NO WALLET
+
+Create a passkey to get started.
+Your wallet will be securely stored on this device.
+
+Suggested Action: ${state.suggestedAction}`;
+        statusEl.className = 'status-box info';
+        btnEl.textContent = state.suggestedButtonText || 'Create Passkey & Sign In';
+        btnEl.disabled = false;
+        btnEl.style.opacity = '1';
+    }
+}
+
+// Smart auth action - uses autoAuthenticate() then falls back to registerPasskey()
+async function smartAuth() {
+    const btnEl = document.getElementById('smart-auth-btn');
+    const origText = btnEl.textContent;
+    
+    try {
+        await initSDK();
+        btnEl.textContent = 'Checking...';
+        btnEl.disabled = true;
+        
+        addLog('=== Calling SDK autoAuthenticate() ===', 'info');
+        const result = await wallet.autoAuthenticate();
+        addLog('autoAuthenticate() result: ' + JSON.stringify(result), result.authenticated ? 'success' : 'warn');
+        
+        if (result.authenticated) {
+            // Already authenticated!
+            addLog('✅ Auto-authenticated! Wallet secret available.', 'success');
+            
+            // Refresh state and update UI
+            const state = await checkAuthState();
+            updateSmartAuthUI(state);
+            await refreshStatus();
+            return;
+        }
+        
+        // Need to create/unlock passkey
+        addLog('No existing session - calling registerPasskey()...', 'info');
+        btnEl.textContent = 'Creating Passkey...';
+        
+        const regResult = await wallet.registerPasskey();
+        addLog('registerPasskey() result: ' + JSON.stringify(regResult), 'success');
+        
+        // Now get wallet secret
+        const secret = regResult.walletSecret || await wallet.getWalletSecret();
+        addLog(`Wallet secret: ${secret ? secret.substring(0, 16) + '...' : 'none'}`, secret ? 'success' : 'warn');
+        
+        // Refresh state and update UI
+        const state = await checkAuthState();
+        updateSmartAuthUI(state);
+        await refreshStatus();
+        
+    } catch (e) {
+        addLog(`❌ smartAuth failed: ${e.message}`, 'error');
+        btnEl.textContent = origText;
+        btnEl.disabled = false;
+    }
+}
+
+// Initialize smart auth on load
+async function initSmartAuth() {
+    try {
+        await initSDK();
+        const state = await checkAuthState();
+        updateSmartAuthUI(state);
+    } catch (e) {
+        addLog(`Smart auth init error: ${e.message}`, 'error');
+    }
+}
+
 // Initialize on load
 window.addEventListener('DOMContentLoaded', async () => {
     // Show SDK version
@@ -464,6 +609,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     try {
         await initSDK();
+        
+        // Initialize smart auth UI first (shows correct button)
+        await initSmartAuth();
+        
         await refreshStatus();
         await loadCredentials();
     } catch (e) {
