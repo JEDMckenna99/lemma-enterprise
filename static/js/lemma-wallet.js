@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.13.0';
+    static VERSION = '2.14.0';
     
     constructor() {
         this.db = null;
@@ -270,6 +270,129 @@ class LemmaWallet {
     _isLemmaDomain() {
         const hostname = window.location.hostname;
         return hostname.includes('lemma.id') || hostname.includes('localhost');
+    }
+
+    /**
+     * Open a popup to lemma.id for wallet unlock.
+     * User unlocks in popup, popup closes, and this returns success.
+     * 
+     * @returns {Promise<Object>} Result with success status
+     */
+    async unlockWithPopup() {
+        return new Promise((resolve) => {
+            const width = 450;
+            const height = 600;
+            const left = window.screenX + (window.outerWidth - width) / 2;
+            const top = window.screenY + (window.outerHeight - height) / 2;
+            
+            const popupUrl = 'https://lemma.id/wallet/popup';
+            const popup = window.open(
+                popupUrl,
+                'lemma_unlock',
+                `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
+            );
+            
+            if (!popup) {
+                console.warn('[Lemma] Popup blocked - user needs to allow popups');
+                resolve({
+                    success: false,
+                    reason: 'popup_blocked',
+                    message: 'Popup was blocked. Please allow popups for this site.'
+                });
+                return;
+            }
+            
+            console.log('[Lemma] Popup opened, waiting for unlock...');
+            
+            // Listen for message from popup
+            const messageHandler = async (event) => {
+                if (event.origin !== 'https://lemma.id') return;
+                
+                if (event.data?.type === 'LEMMA_UNLOCK_SUCCESS') {
+                    console.log('[Lemma] ✅ Popup unlock successful!');
+                    window.removeEventListener('message', messageHandler);
+                    clearInterval(checkClosed);
+                    
+                    // Update local session from bridge
+                    try {
+                        const bridgeSession = await this.checkBridgeSession();
+                        if (bridgeSession.valid) {
+                            this.session = {
+                                isUnlocked: true,
+                                unlockedAt: bridgeSession.unlockedAt || Date.now(),
+                                expiresAt: bridgeSession.expiresAt,
+                                walletId: bridgeSession.walletId,
+                                source: 'popup'
+                            };
+                            await this._put('session', { id: 'current', ...this.session });
+                        }
+                    } catch (e) {
+                        console.warn('[Lemma] Could not sync session after popup:', e.message);
+                    }
+                    
+                    resolve({
+                        success: true,
+                        walletId: event.data.walletId,
+                        message: 'Wallet unlocked via popup'
+                    });
+                } else if (event.data?.type === 'LEMMA_UNLOCK_CANCELLED') {
+                    console.log('[Lemma] Popup unlock cancelled');
+                    window.removeEventListener('message', messageHandler);
+                    clearInterval(checkClosed);
+                    resolve({
+                        success: false,
+                        reason: 'cancelled',
+                        message: 'Unlock was cancelled'
+                    });
+                }
+            };
+            
+            window.addEventListener('message', messageHandler);
+            
+            // Check if popup was closed manually
+            const checkClosed = setInterval(() => {
+                if (popup.closed) {
+                    console.log('[Lemma] Popup was closed');
+                    window.removeEventListener('message', messageHandler);
+                    clearInterval(checkClosed);
+                    
+                    // Check if unlock succeeded (bridge session might be valid now)
+                    this.checkBridgeSession().then(session => {
+                        if (session.valid) {
+                            resolve({
+                                success: true,
+                                walletId: session.walletId,
+                                message: 'Wallet unlocked'
+                            });
+                        } else {
+                            resolve({
+                                success: false,
+                                reason: 'popup_closed',
+                                message: 'Popup was closed before unlock completed'
+                            });
+                        }
+                    }).catch(() => {
+                        resolve({
+                            success: false,
+                            reason: 'popup_closed',
+                            message: 'Popup was closed'
+                        });
+                    });
+                }
+            }, 500);
+            
+            // Timeout after 5 minutes
+            setTimeout(() => {
+                window.removeEventListener('message', messageHandler);
+                clearInterval(checkClosed);
+                if (!popup.closed) popup.close();
+                resolve({
+                    success: false,
+                    reason: 'timeout',
+                    message: 'Unlock timed out'
+                });
+            }, 5 * 60 * 1000);
+        });
     }
 
     /**
@@ -584,16 +707,44 @@ class LemmaWallet {
                 } else {
                     console.log('[Lemma] Bridge session not valid for registerPasskey:', bridgeSession.reason || 'no valid session');
                     
-                    // DON'T create local passkey on third-party sites!
-                    // User needs to unlock on lemma.id first
-                    console.log('[Lemma] ⚠️ User needs to unlock wallet on lemma.id first');
-                    return {
-                        success: false,
-                        needsUnlock: true,
-                        unlockUrl: 'https://lemma.id/wallet/simple',
-                        message: 'Please unlock your wallet on lemma.id first, then return here.',
-                        reason: bridgeSession.reason || 'no_session'
-                    };
+                    // Try popup unlock flow
+                    console.log('[Lemma] 🔓 Opening popup for wallet unlock...');
+                    const popupResult = await this.unlockWithPopup();
+                    
+                    if (popupResult.success) {
+                        // Popup unlock succeeded - now get wallet secret
+                        console.log('[Lemma] ✅ Popup unlock successful, getting wallet secret...');
+                        let walletSecret = null;
+                        try {
+                            const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET', {});
+                            if (secretResult.success && secretResult.walletSecret) {
+                                walletSecret = secretResult.walletSecret;
+                                await this._put('secrets', { id: 'master', secret: walletSecret, source: 'bridge' });
+                                this.session.walletSecret = walletSecret;
+                            }
+                        } catch (e) {
+                            console.warn('[Lemma] Could not get wallet secret after popup:', e.message);
+                        }
+                        
+                        this._autoStartHeartbeat();
+                        
+                        return {
+                            success: true,
+                            method: 'popup_unlock',
+                            walletId: popupResult.walletId,
+                            walletSecret: walletSecret,
+                            message: 'Authenticated via popup unlock'
+                        };
+                    } else {
+                        // Popup was closed or failed
+                        return {
+                            success: false,
+                            needsUnlock: true,
+                            unlockUrl: 'https://lemma.id/wallet/simple',
+                            message: popupResult.message || 'Unlock cancelled',
+                            reason: popupResult.reason || 'popup_closed'
+                        };
+                    }
                 }
             } catch (e) {
                 console.warn('[Lemma] Bridge check failed in registerPasskey:', e.message);

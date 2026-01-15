@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unlock Lemma Wallet</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px 30px;
+            max-width: 380px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 20px;
+            margin: 0 auto 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+        h1 {
+            font-size: 1.5rem;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+        p {
+            color: #6b7280;
+            font-size: 0.95rem;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 12px;
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #4b5563;
+        }
+        .status {
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        .status.loading { background: #fef3c7; color: #92400e; }
+        .status.success { background: #d1fae5; color: #065f46; }
+        .status.error { background: #fee2e2; color: #991b1b; }
+        .status.info { background: #e0f2fe; color: #0c4a6e; }
+        .hidden { display: none; }
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .site-info {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+        .site-info strong { color: #1f2937; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="logo">🔐</div>
+        <h1>Unlock Your Wallet</h1>
+        
+        <div id="site-info" class="site-info hidden">
+            Signing in to: <strong id="site-name"></strong>
+        </div>
+        
+        <div id="status" class="status info">
+            Checking wallet status...
+        </div>
+        
+        <div id="actions">
+            <button id="unlock-btn" class="btn btn-primary hidden" onclick="unlockWallet()">
+                🔓 Unlock with Passkey
+            </button>
+            <button id="register-btn" class="btn btn-primary hidden" onclick="registerPasskey()">
+                🔑 Create Passkey
+            </button>
+            <button class="btn btn-secondary" onclick="cancelUnlock()">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    <script src="/static/js/lemma-wallet.js?v=2130"></script>
+    <script>
+        let wallet = null;
+        
+        // Get opener origin for display
+        const openerOrigin = document.referrer ? new URL(document.referrer).hostname : 'Unknown site';
+        
+        async function init() {
+            // Show which site is requesting
+            if (openerOrigin && openerOrigin !== window.location.hostname) {
+                document.getElementById('site-name').textContent = openerOrigin;
+                document.getElementById('site-info').classList.remove('hidden');
+            }
+            
+            try {
+                wallet = new LemmaWallet();
+                await wallet.init();
+                
+                const info = await wallet.getWalletInfo();
+                
+                if (info.isUnlocked) {
+                    // Already unlocked!
+                    showStatus('✅ Wallet is already unlocked!', 'success');
+                    setTimeout(() => sendSuccessAndClose(), 1000);
+                } else if (info.hasPasskey) {
+                    // Has passkey, just needs to unlock
+                    showStatus('Enter your passkey to unlock', 'info');
+                    document.getElementById('unlock-btn').classList.remove('hidden');
+                } else {
+                    // No passkey yet
+                    showStatus('Create a passkey to secure your wallet', 'info');
+                    document.getElementById('register-btn').classList.remove('hidden');
+                }
+            } catch (e) {
+                showStatus('Error: ' + e.message, 'error');
+            }
+        }
+        
+        function showStatus(message, type) {
+            const el = document.getElementById('status');
+            el.textContent = message;
+            el.className = 'status ' + type;
+        }
+        
+        async function unlockWallet() {
+            showStatus('🔓 Unlocking...', 'loading');
+            document.getElementById('unlock-btn').disabled = true;
+            
+            try {
+                const result = await wallet.unlock();
+                
+                if (result.success) {
+                    showStatus('✅ Wallet unlocked!', 'success');
+                    setTimeout(() => sendSuccessAndClose(), 500);
+                } else {
+                    showStatus('❌ ' + (result.message || 'Unlock failed'), 'error');
+                    document.getElementById('unlock-btn').disabled = false;
+                }
+            } catch (e) {
+                showStatus('❌ ' + e.message, 'error');
+                document.getElementById('unlock-btn').disabled = false;
+            }
+        }
+        
+        async function registerPasskey() {
+            showStatus('🔑 Creating passkey...', 'loading');
+            document.getElementById('register-btn').disabled = true;
+            
+            try {
+                const result = await wallet.registerPasskey();
+                
+                if (result.success) {
+                    showStatus('✅ Passkey created and wallet unlocked!', 'success');
+                    setTimeout(() => sendSuccessAndClose(), 500);
+                } else {
+                    showStatus('❌ ' + (result.message || 'Registration failed'), 'error');
+                    document.getElementById('register-btn').disabled = false;
+                }
+            } catch (e) {
+                showStatus('❌ ' + e.message, 'error');
+                document.getElementById('register-btn').disabled = false;
+            }
+        }
+        
+        function sendSuccessAndClose() {
+            // Send success message to opener
+            if (window.opener) {
+                window.opener.postMessage({
+                    type: 'LEMMA_UNLOCK_SUCCESS',
+                    walletId: wallet?.session?.walletId
+                }, '*');
+            }
+            window.close();
+        }
+        
+        function cancelUnlock() {
+            if (window.opener) {
+                window.opener.postMessage({
+                    type: 'LEMMA_UNLOCK_CANCELLED'
+                }, '*');
+            }
+            window.close();
+        }
+        
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>

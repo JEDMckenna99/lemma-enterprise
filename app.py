@@ -553,6 +553,16 @@ def create_app():
             'Expires': '0'
         }
     
+    @app.route('/wallet/popup')
+    def wallet_popup():
+        """Popup Wallet Unlock for Third-Party Sites"""
+        logger.info("🔓 Serving popup unlock page")
+        return render_template('wallet_popup.html'), 200, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+    
     @app.route('/sdk-test')
     def sdk_test():
         """SDK Test Page"""
