@@ -238,8 +238,12 @@ async function initWallet() {
     }
 }
 
+// Track last server sync to avoid excessive calls
+let lastServerSync = 0;
+const SERVER_SYNC_INTERVAL = 30000; // Check server every 30 seconds
+
 /**
- * Check session validity - NO server calls
+ * Check session validity - syncs with server cookie to detect remote locks
  * Returns detailed session state for cross-site session sharing
  */
 async function checkSession(options = {}) {
@@ -254,7 +258,54 @@ async function checkSession(options = {}) {
         }
 
         cache.session.promise = (async () => {
-        const session = await wallet._get('session', 'current');
+        // First check local IndexedDB
+        let session = await wallet._get('session', 'current');
+        
+        // IMPORTANT: Periodically sync with server to catch remote locks
+        // This handles the case where user locks on lemma.id but bridge has stale data
+        const now = Date.now();
+        const shouldSyncServer = (now - lastServerSync) > SERVER_SYNC_INTERVAL;
+        
+        if (shouldSyncServer) {
+            lastServerSync = now;
+            try {
+                console.log('🔄 Checking server session cookie...');
+                const response = await fetch('/api/wallet/session-sync', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                
+                if (data.success && data.session?.valid) {
+                    // Server says session is valid
+                    console.log('✅ Server session confirmed valid');
+                    
+                    // If local is missing/stale, restore from server
+                    if (!session || session.expiresAt < data.session.expires_at * 1000) {
+                        session = {
+                            id: 'current',
+                            isUnlocked: true,
+                            unlockedAt: data.session.unlocked_at,
+                            expiresAt: data.session.expires_at * 1000,
+                            walletId: data.session.wallet_id,
+                            source: 'server_sync'
+                        };
+                        await wallet._put('session', session);
+                        console.log('📥 Local session restored from server');
+                    }
+                } else if (session) {
+                    // Server says no session but we have local - LOCK DETECTED
+                    console.log('⚠️ Server session invalid - wallet locked remotely');
+                    // Clear local session to match server
+                    await wallet._delete('session', 'current');
+                    session = null;
+                }
+            } catch (e) {
+                console.warn('Server sync failed (offline?):', e.message);
+                // Continue with local session if server unreachable
+            }
+        }
         
         if (!session) {
             const result = { 
@@ -265,8 +316,6 @@ async function checkSession(options = {}) {
             updateSessionCache(result);
             return result;
         }
-        
-        const now = Date.now();
         
         if (session.expiresAt < now) {
             const result = { 
