@@ -42,7 +42,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.7.1';
+    static VERSION = '2.8.0';
     
     constructor() {
         this.db = null;
@@ -1937,7 +1937,10 @@ class LemmaWallet {
      * Get the wallet secret for PPID derivation.
      * PPID = HMAC(wallet_secret, site_id) - different for each site.
      * 
-     * @returns {string|null} 64-char hex string, or null if not available
+     * If no secret exists but wallet is unlocked, auto-generates one.
+     * This handles users who registered before wallet secret was implemented.
+     * 
+     * @returns {string} 64-char hex string
      */
     async getWalletSecret() {
         await this.init();
@@ -1959,7 +1962,27 @@ class LemmaWallet {
             return secretRecord.secret;
         }
         
-        return null;
+        // AUTO-GENERATE: User has passkey but no secret (legacy registration)
+        // Generate and store a new wallet secret
+        console.log('🔐 No wallet secret found - generating for legacy passkey...');
+        const secretBytes = crypto.getRandomValues(new Uint8Array(32));
+        const secretHex = Array.from(secretBytes)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+        
+        const newSecret = {
+            id: 'master',
+            secret: secretHex,
+            createdAt: Date.now(),
+            migrated: true  // Flag indicating this was auto-generated
+        };
+        await this._put('secrets', newSecret);
+        
+        // Cache in session
+        this.session.walletSecret = secretHex;
+        console.log('🔐 ✅ Generated wallet secret for PPID derivation');
+        
+        return secretHex;
     }
 
     /**
