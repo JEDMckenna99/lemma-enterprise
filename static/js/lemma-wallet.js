@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.9.1';
+    static VERSION = '2.10.0';
     
     constructor() {
         this.db = null;
@@ -220,6 +220,11 @@ class LemmaWallet {
                         result.needsPasskey = false;
                         result.message = 'Authenticated via bridge session';
                         console.log('[Lemma] ✅ Auto-authenticated via bridge session');
+                        
+                        // AUTO-START HEARTBEAT on third-party sites
+                        // This detects when wallet is locked on lemma.id
+                        this._autoStartHeartbeat();
+                        
                         return result;
                     }
                 }
@@ -231,6 +236,19 @@ class LemmaWallet {
         result.message = 'No valid session - passkey required';
         console.log('[Lemma] No valid session found - user needs to create/unlock passkey');
         return result;
+    }
+    
+    /**
+     * Auto-start heartbeat on third-party sites after successful authentication.
+     * Customers can optionally set onSessionExpired callback to handle sign-out.
+     * @private
+     */
+    _autoStartHeartbeat() {
+        if (this._isLemmaDomain()) return;
+        if (this._heartbeatInterval) return; // Already running
+        
+        console.log('[Lemma] 🔄 Auto-starting session heartbeat (checks every 30s)');
+        this.startSessionHeartbeat(30000); // Check every 30 seconds
     }
 
     /**
@@ -491,6 +509,9 @@ class LemmaWallet {
                     } catch (e) {
                         console.warn('[Lemma] Could not get wallet secret from bridge:', e.message);
                     }
+                    
+                    // AUTO-START HEARTBEAT on third-party sites
+                    this._autoStartHeartbeat();
                     
                     return {
                         success: true,
