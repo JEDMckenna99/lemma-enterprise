@@ -162,7 +162,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=291"></script>
+<script src="/static/js/lemma-wallet.js?v=2110"></script>
 <script>
 // =============================================
 // SDK-ONLY WALLET PAGE
@@ -585,6 +585,46 @@ async function initSmartAuth() {
     }
 }
 
+// Sync session from server cookie (handles unlock on third-party sites)
+async function syncFromServerCookie() {
+    try {
+        addLog('🔄 Checking server cookie for session sync...', 'info');
+        const response = await fetch('/api/wallet/session-sync', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        
+        if (data.success && data.session) {
+            // Server has valid session - sync to local IndexedDB
+            const localInfo = await wallet.getWalletInfo();
+            
+            if (!localInfo.isUnlocked) {
+                addLog('📥 Server has session but local is locked - syncing...', 'info');
+                
+                // Manually set the session in SDK
+                wallet.session = {
+                    isUnlocked: true,
+                    unlockedAt: data.session.unlocked_at,
+                    expiresAt: data.session.expires_at * 1000,
+                    walletId: data.session.wallet_id,
+                    source: 'server_sync'
+                };
+                
+                // Save to IndexedDB
+                await wallet._put('session', { id: 'current', ...wallet.session });
+                addLog('✅ Session synced from server cookie!', 'success');
+                return true;
+            }
+        }
+        return false;
+    } catch (e) {
+        addLog(`Server sync failed: ${e.message}`, 'warn');
+        return false;
+    }
+}
+
 // Initialize on load
 window.addEventListener('DOMContentLoaded', async () => {
     // Show SDK version
@@ -602,7 +642,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
         await initSDK();
         
-        // Initialize smart auth UI first (shows correct button)
+        // IMPORTANT: Sync from server cookie FIRST
+        // This handles the case where user unlocked on a third-party site
+        const synced = await syncFromServerCookie();
+        if (synced) {
+            addLog('🔄 Re-initializing after server sync...', 'info');
+        }
+        
+        // Initialize smart auth UI (shows correct button)
         await initSmartAuth();
         
         await refreshStatus();
