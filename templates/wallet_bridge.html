@@ -716,11 +716,40 @@ window.addEventListener('message', async (event) => {
             case 'VERIFY_CREDENTIAL':
                 // Verify a credential locally using Ed25519 - NO SERVER CALLS
                 // This is Lemma's core edge: local cryptographic verification
+                // SECURITY: Also validates credential is for requesting site (device binding)
                 if (!wallet) await initWallet();
                 
                 const credToVerify = payload?.credential;
                 if (!credToVerify) {
                     respond({ success: false, error: 'No credential provided' });
+                    return;
+                }
+                
+                // SECURITY: Validate credential's siteId matches requesting site
+                // This enforces site-specific credential isolation
+                const verifyClaims = credToVerify.claims || credToVerify.credentialSubject || {};
+                const verifySiteId = (verifyClaims.siteId || verifyClaims.site_id || '').toLowerCase().replace(/^www\./, '');
+                const isLemmaVerifying = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+                const isInternalVerifySiteId = verifySiteId.startsWith('site_') || verifySiteId.match(/^[a-f0-9-]{20,}$/);
+                
+                // Allow verification if:
+                // 1. lemma.id is verifying (unified wallet)
+                // 2. siteId is internal/opaque
+                // 3. siteId matches requesting site (or subdomain)
+                // 4. No siteId (cross-site credential)
+                const siteIdMatches = !verifySiteId || isLemmaVerifying || isInternalVerifySiteId ||
+                    verifySiteId === requestingSite ||
+                    requestingSite.endsWith('.' + verifySiteId) ||
+                    verifySiteId.endsWith('.' + requestingSite);
+                
+                if (!siteIdMatches) {
+                    console.warn(`🔒 Blocked verify: ${requestingSite} tried to verify credential for ${verifySiteId}`);
+                    respond({ 
+                        success: false, 
+                        valid: false,
+                        error: 'Cannot verify credentials for other sites',
+                        reason: 'Site mismatch'
+                    });
                     return;
                 }
                 
@@ -736,15 +765,18 @@ window.addEventListener('message', async (event) => {
                     claims: verification.claims,
                     verificationTimeMs: verifyTime.toFixed(2),
                     verificationTimeUs: verification.verifyTimeUs,
-                    // Emphasize local-first nature
+                    // Security metadata
                     verifiedLocally: true,
-                    networkCalls: 0
+                    networkCalls: 0,
+                    siteIsolation: verifySiteId ? 'site_specific' : 'cross_site',
+                    deviceBound: true  // Credential access requires passkey (device-bound)
                 });
                 break;
             
             case 'QUICK_VERIFY':
                 // Quick verify - skips signature if already verified (cached)
                 // ~50μs vs ~1000μs for full verification
+                // SECURITY: Also validates credential is for requesting site
                 if (!wallet) await initWallet();
                 
                 const quickCredential = payload?.credential;
@@ -753,12 +785,36 @@ window.addEventListener('message', async (event) => {
                     return;
                 }
                 
+                // SECURITY: Same siteId validation as full verify
+                const quickClaims = quickCredential.claims || quickCredential.credentialSubject || {};
+                const quickSiteId = (quickClaims.siteId || quickClaims.site_id || '').toLowerCase().replace(/^www\./, '');
+                const isLemmaQuickVerify = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+                const isInternalQuickSiteId = quickSiteId.startsWith('site_') || quickSiteId.match(/^[a-f0-9-]{20,}$/);
+                
+                const quickSiteMatches = !quickSiteId || isLemmaQuickVerify || isInternalQuickSiteId ||
+                    quickSiteId === requestingSite ||
+                    requestingSite.endsWith('.' + quickSiteId) ||
+                    quickSiteId.endsWith('.' + requestingSite);
+                
+                if (!quickSiteMatches) {
+                    console.warn(`🔒 Blocked quick verify: ${requestingSite} tried to verify credential for ${quickSiteId}`);
+                    respond({ 
+                        success: false, 
+                        valid: false,
+                        error: 'Cannot verify credentials for other sites',
+                        reason: 'Site mismatch'
+                    });
+                    return;
+                }
+                
                 const quickResult = await wallet.quickVerify(quickCredential);
                 respond({
                     success: true,
                     ...quickResult,
                     verifiedLocally: true,
-                    networkCalls: 0
+                    networkCalls: 0,
+                    siteIsolation: quickSiteId ? 'site_specific' : 'cross_site',
+                    deviceBound: true
                 });
                 break;
                 

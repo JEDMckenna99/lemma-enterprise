@@ -143,7 +143,13 @@ def issue_permission_lemma(subject_ppid: str, site_id: str = 'lemma.id', permiss
             'siteId': site_id,
             'permissions': ','.join(perm_list),
             'issuedAt': issued_at.isoformat() + 'Z',
-            'expiresAt': expires_at.isoformat() + 'Z'
+            'expiresAt': expires_at.isoformat() + 'Z',
+            # SECURITY: Explicit credential scope for revocation handling
+            # site_specific = Only valid for this site, targeted bloom filter sync
+            # cross_site = Valid across sites, global bloom filter sync required
+            'credentialScope': 'site_specific',
+            # Device binding indicator - credential requires passkey to access
+            'deviceBound': 'true'
         }
         
         # Issue the credential with PPID as subject
@@ -154,6 +160,8 @@ def issue_permission_lemma(subject_ppid: str, site_id: str = 'lemma.id', permiss
         
         # Add metadata for wallet storage
         credential['packageType'] = 'permission'
+        credential['credentialScope'] = 'site_specific'  # For SDK filtering
+        credential['deviceBound'] = True  # Requires passkey (device-bound)
         credential['issuerInfo'] = {
             'did': site_issuer.get_did(),
             'publicKey': site_issuer.get_public_key_hex(),

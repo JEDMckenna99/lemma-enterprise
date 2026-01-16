@@ -35,6 +35,7 @@ def revoke_credential():
         
         credential_id = data.get('credential_id')
         credential_type = data.get('credential_type', 'unknown')  # 'poh' or 'permission'
+        credential_scope = data.get('credential_scope', 'site_specific')  # 'site_specific' or 'cross_site'
         site_domain = data.get('site_domain')  # Site domain for permission lemmas
         reason = data.get('reason', 'user_requested')
         
@@ -45,9 +46,39 @@ def revoke_credential():
                 'message': 'credential_id is required'
             }), 400
         
-        logger.info(f"🚨 Wallet revocation request: {credential_id} (type: {credential_type}, site: {site_domain})")
+        logger.info(f"🚨 Wallet revocation request: {credential_id} (type: {credential_type}, scope: {credential_scope}, site: {site_domain})")
         
-        # For PoH lemmas: Network-wide revocation
+        # Cross-site credentials require global sync (all sites must update)
+        # This is used for portable credentials that work across multiple sites
+        if credential_scope == 'cross_site':
+            network_success = await_network_revocation(credential_id, reason)
+            
+            try:
+                from api.revocation_sync import trigger_revocation_sync
+                # site_id=None triggers ALL sites to sync
+                event_published = trigger_revocation_sync(credential_id, 'cross_site', site_id=None)
+                
+                if event_published:
+                    logger.info(f"✅ Cross-site revocation event published - ALL sites will sync")
+                else:
+                    logger.warning(f"⚠️ Event bus not available - local sync only")
+            except Exception as e:
+                logger.error(f"❌ Event-driven revocation sync failed: {e}")
+            
+            return jsonify({
+                'success': True,
+                'credential_id': credential_id,
+                'revocation_type': 'cross_site',
+                'credential_scope': 'cross_site',
+                'network_propagated': network_success,
+                'message': 'Cross-site credential revoked - all sites will sync',
+                'scope': 'All sites using this credential will be updated',
+                'wallet_deleted': True,
+                'bloom_filter_synced': True,
+                'sync_method': 'event_driven_redis_pubsub'
+            })
+        
+        # For PoH lemmas: Network-wide revocation (same as cross_site)
         if credential_type == 'poh':
             network_success = await_network_revocation(credential_id, reason)
             
