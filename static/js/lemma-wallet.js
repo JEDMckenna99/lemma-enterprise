@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.14.0';
+    static VERSION = '2.15.0';
     
     constructor() {
         this.db = null;
@@ -1920,6 +1920,126 @@ class LemmaWallet {
             lastSynced: revocations.lastSynced,
             age: Date.now() - revocations.lastSynced
         };
+    }
+    
+    /**
+     * Revoke a credential - adds to bloom filter AND deletes locally
+     * This ensures the credential is invalidated across ALL sites.
+     * 
+     * Flow:
+     * 1. Calls server API to add credential ID to revocation list (bloom filter)
+     * 2. Server publishes event to trigger sync on all sites
+     * 3. Deletes credential from local IndexedDB
+     * 4. Syncs local revocation list
+     * 
+     * @param {string} credentialId - ID of credential to revoke
+     * @param {string} reason - Reason for revocation (optional)
+     * @returns {Object} Result with revoked, serverRevoked, addedToBloomFilter flags
+     */
+    async revokeCredential(credentialId, reason = 'user_requested') {
+        await this.init();
+        
+        if (!credentialId) {
+            return { success: false, error: 'credentialId required' };
+        }
+        
+        // On third-party sites, use bridge
+        if (this._isThirdPartySite()) {
+            try {
+                const result = await this._sendBridgeMessage('REVOKE_CREDENTIAL', {
+                    credentialId,
+                    reason
+                });
+                
+                if (result.success) {
+                    console.log(`🚨 Credential revoked: ${credentialId}`);
+                    console.log(`   Server revoked: ${result.serverRevoked}`);
+                    console.log(`   Bloom filter: ${result.addedToBloomFilter}`);
+                }
+                
+                return result;
+            } catch (e) {
+                console.error('Bridge revoke failed:', e);
+                return { success: false, error: e.message };
+            }
+        }
+        
+        // On lemma.id, revoke directly
+        let serverRevoked = false;
+        
+        // 1. Get credential info for site targeting
+        const credentials = await this.getCredentials();
+        const credential = credentials.find(c => c.id === credentialId);
+        let siteId = null;
+        let credType = 'permission';
+        
+        if (credential) {
+            const claims = credential.claims || credential.credentialSubject || {};
+            siteId = claims.siteId || claims.site_id || null;
+            credType = credential.packageType || 'permission';
+        }
+        
+        // 2. Call server API to add to revocation list
+        try {
+            const response = await fetch('/api/wallet/revoke', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    credential_id: credentialId,
+                    credential_type: credType,
+                    site_domain: siteId,
+                    reason: reason
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                serverRevoked = data.success;
+                console.log(`✅ Server revocation: ${credentialId}`, data);
+            } else {
+                console.warn(`⚠️ Server revocation failed: ${response.status}`);
+            }
+        } catch (e) {
+            console.warn(`⚠️ Server revocation error: ${e.message}`);
+        }
+        
+        // 3. Delete from local IndexedDB
+        await this.removeCredential(credentialId);
+        
+        // 4. Sync revocation list locally
+        await this.syncRevocations();
+        
+        console.log(`🚨 Credential revoked: ${credentialId}`);
+        return {
+            success: true,
+            revoked: true,
+            serverRevoked: serverRevoked,
+            credentialId: credentialId,
+            addedToBloomFilter: serverRevoked,
+            locallyDeleted: true,
+            sitesShouldSync: true
+        };
+    }
+    
+    /**
+     * Force all sites to sync their revocation lists
+     * Call this after revoking to ensure propagation
+     */
+    async triggerRevocationSync() {
+        // Sync our own list
+        const result = await this.syncRevocations();
+        
+        // On third-party sites, also tell the bridge to sync
+        if (this._isThirdPartySite()) {
+            try {
+                await this._sendBridgeMessage('SYNC_REVOCATIONS', {});
+            } catch (e) {
+                console.warn('Bridge sync failed:', e);
+            }
+        }
+        
+        return result;
     }
 
     // ========================================

@@ -824,6 +824,98 @@ window.addEventListener('message', async (event) => {
                     networkCalls: syncResult.success ? 1 : 0
                 });
                 break;
+            
+            case 'REVOKE_CREDENTIAL':
+                // REVOKE a credential - adds to bloom filter AND deletes locally
+                // SECURITY: Requires session + site ownership
+                if (!wallet) await initWallet();
+                
+                // Check session for write operations
+                const revokeSession = await checkSession();
+                if (!revokeSession.valid) {
+                    console.warn(`🔒 Blocked revoke: No valid session from ${requestingSite}`);
+                    respond({ 
+                        success: false, 
+                        error: 'Session required to revoke credentials',
+                        sessionStatus: revokeSession
+                    });
+                    return;
+                }
+                
+                const revokeCredId = payload?.credentialId;
+                const revokeReason = payload?.reason || 'user_requested';
+                if (!revokeCredId) {
+                    respond({ success: false, error: 'No credentialId provided' });
+                    return;
+                }
+                
+                // SECURITY: Verify credential belongs to requesting site
+                const allCredsForRevoke = await wallet.getCredentials();
+                const credToRevoke = allCredsForRevoke.find(c => c.id === revokeCredId);
+                
+                let revokeSiteId = requestingSite;
+                let credType = 'permission';
+                
+                if (credToRevoke) {
+                    const revokeClaims = credToRevoke.claims || credToRevoke.credentialSubject || {};
+                    revokeSiteId = (revokeClaims.siteId || revokeClaims.site_id || requestingSite).toLowerCase().replace(/^www\./, '');
+                    credType = credToRevoke.packageType || 'permission';
+                    
+                    // Check site ownership (lemma.id can revoke any)
+                    const isLemmaRevoking = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+                    if (!isLemmaRevoking && revokeSiteId !== requestingSite &&
+                        !requestingSite.endsWith('.' + revokeSiteId) &&
+                        !revokeSiteId.endsWith('.' + requestingSite)) {
+                        console.warn(`🔒 Blocked: ${requestingSite} tried to revoke credential for ${revokeSiteId}`);
+                        respond({ success: false, error: 'Cannot revoke credentials for other sites' });
+                        return;
+                    }
+                }
+                
+                // 1. Add to server revocation list (bloom filter)
+                let serverRevoked = false;
+                try {
+                    const revokeResponse = await fetch('https://lemma.id/api/wallet/revoke', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            credential_id: revokeCredId,
+                            credential_type: credType,
+                            site_domain: revokeSiteId,
+                            reason: revokeReason
+                        })
+                    });
+                    
+                    if (revokeResponse.ok) {
+                        const revokeData = await revokeResponse.json();
+                        serverRevoked = revokeData.success;
+                        console.log(`✅ Credential revoked on server: ${revokeCredId}`, revokeData);
+                    } else {
+                        console.warn(`⚠️ Server revocation failed: ${revokeResponse.status}`);
+                    }
+                } catch (e) {
+                    console.warn(`⚠️ Server revocation error: ${e.message}`);
+                }
+                
+                // 2. Delete from local IndexedDB
+                await wallet.removeCredential(revokeCredId);
+                clearCredentialsCache();
+                
+                // 3. Force sync revocation list locally
+                await wallet.syncRevocations();
+                
+                console.log(`🚨 Credential revoked via bridge for ${requestingSite}:`, revokeCredId);
+                respond({ 
+                    success: true, 
+                    revoked: true,
+                    serverRevoked: serverRevoked,
+                    credentialId: revokeCredId,
+                    addedToBloomFilter: serverRevoked,
+                    locallyDeleted: true,
+                    sitesShouldSync: true  // Signal that other sites should sync revocation list
+                });
+                break;
                 
             case 'GET_ALL_CREDENTIALS':
                 // Get ALL credentials from unified wallet (for lemma.id wallet UI)
