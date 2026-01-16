@@ -218,63 +218,21 @@ def session_sync():
         return response, 401
 
     # NOTE: No CSRF check for session-sync (read-only operation)
-    # CSRF is required for write operations like sync-credential, revoke-credential
     
-    # Get requesting site for credential filtering
-    requesting_origin = request.headers.get('Origin', '')
-    requesting_site = requesting_origin.replace('https://', '').replace('http://', '').split(':')[0]
-    
-    # Fetch user's credentials from database
-    # For now, return session without credentials (credentials will come from server-side storage)
-    # In production, query the credentials table for this wallet_id
-    
-    try:
-        from database import db
-        
-        # Get user by wallet_id
-        user = db.get_user_by_wallet_id(session_data['wallet_id'])
-        
-        credentials = []
-        if user:
-            # Get permissions/credentials for this user
-            # Filter by requesting site if needed
-            all_credentials = db.get_user_credentials(user.id) or []
-            
-            for cred in all_credentials:
-                # Include credential if it matches the requesting site
-                # or if it's a global credential (no site restriction)
-                cred_site = cred.get('claims', {}).get('siteId', '')
-                if not cred_site or cred_site == requesting_site or requesting_site.endswith(cred_site):
-                    credentials.append(cred)
-        
-        response_data = {
-            'success': True,
-            'session': {
-                'valid': True,
-                'wallet_id': session_data['wallet_id'],
-                'unlocked_at': session_data['unlocked_at'],
-                'expires_at': session_data['expires_at'],
-                'time_remaining': session_data['expires_at'] - int(time.time())
-            },
-            'credentials': credentials,
-            'synced_at': int(time.time() * 1000)
-        }
-        
-    except Exception:
-        # PRIVACY: Don't log errors (return session without credentials)
-        response_data = {
-            'success': True,
-            'session': {
-                'valid': True,
-                'wallet_id': session_data['wallet_id'],
-                'unlocked_at': session_data['unlocked_at'],
-                'expires_at': session_data['expires_at'],
-                'time_remaining': session_data['expires_at'] - int(time.time())
-            },
-            'credentials': [],
-            'synced_at': int(time.time() * 1000),
-            'note': 'Credentials not available from server, use local wallet'
-        }
+    # PRIVACY: Return session only, no credentials
+    # Credentials are stored locally in each site's IndexedDB
+    response_data = {
+        'success': True,
+        'session': {
+            'valid': True,
+            'wallet_id': session_data['wallet_id'],
+            'unlocked_at': session_data['unlocked_at'],
+            'expires_at': session_data['expires_at'],
+            'time_remaining': session_data['expires_at'] - int(time.time())
+        },
+        'credentials': [],  # Credentials stored locally only
+        'synced_at': int(time.time() * 1000)
+    }
     
     response = jsonify(response_data)
     response.headers.update(_cors_headers(origin))
@@ -449,10 +407,10 @@ def _get_credentials_db(wallet_id: str) -> list:
 @wallet_session_sync_bp.route('/api/wallet/sync-credential', methods=['POST', 'OPTIONS'])
 def sync_credential():
     """
-    Sync a credential to the server for cross-site availability.
+    DEPRECATED: Credential sync to server is disabled for privacy.
     
-    Called by the bridge when storing credentials from third-party sites.
-    This ensures credentials are available when viewing lemma.id/wallet.
+    Credentials are stored locally in each site's IndexedDB.
+    This endpoint returns success but does NOT store credentials on the server.
     """
     # Handle CORS preflight
     if request.method == 'OPTIONS':
@@ -464,47 +422,17 @@ def sync_credential():
         return response
     
     origin = request.headers.get('Origin')
-    if not _origin_allowed(origin):
-        return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
     
-    # Get session cookie
-    session_token = request.cookies.get(SESSION_COOKIE_NAME)
-    if not session_token:
-        response = jsonify({'success': False, 'error': 'not_authenticated'})
-        response.headers.update(_cors_headers(origin))
-        return response, 401
-    
-    session_data = validate_session_token(session_token)
-    if not session_data:
-        response = jsonify({'success': False, 'error': 'session_expired'})
-        response.headers.update(_cors_headers(origin))
-        return response, 401
-
-    if not _validate_csrf():
-        response = jsonify({'success': False, 'error': 'csrf_missing_or_invalid'})
-        response.headers.update(_cors_headers(origin))
-        return response, 403
-    
-    wallet_id = session_data['wallet_id']
+    # PRIVACY: Return success but don't store anything
+    # Credentials stay in local IndexedDB only
     data = request.get_json() or {}
-    credential = data.get('credential')
-    
-    if not credential:
-        response = jsonify({'success': False, 'error': 'no_credential_provided'})
-        response.headers.update(_cors_headers(origin))
-        return response, 400
-    
-    # Store credential in database (PRIVACY: no logging)
-    stored = _store_credential_db(wallet_id, credential)
-    
-    # Get updated count
-    all_creds = _get_credentials_db(wallet_id)
+    credential = data.get('credential', {})
     
     response = jsonify({
         'success': True,
-        'synced': stored,
+        'synced': False,  # Not actually synced to server
         'credential_id': credential.get('id'),
-        'total_credentials': len(all_creds)
+        'note': 'Credentials stored locally only (privacy mode)'
     })
     response.headers.update(_cors_headers(origin))
     return response
@@ -513,10 +441,10 @@ def sync_credential():
 @wallet_session_sync_bp.route('/api/wallet/revoke-credential', methods=['POST', 'OPTIONS'])
 def revoke_credential():
     """
-    Mark a credential as revoked in the server database.
+    DEPRECATED: Server-side revocation is disabled for privacy.
     
-    Called when user revokes a credential from the wallet page.
-    Keeps the credential for audit trail but marks it as revoked.
+    Credentials are managed locally in each site's IndexedDB.
+    This endpoint returns success but does NOT modify any server data.
     """
     # Handle CORS preflight
     if request.method == 'OPTIONS':
@@ -528,43 +456,16 @@ def revoke_credential():
         return response
     
     origin = request.headers.get('Origin')
-    if not _origin_allowed(origin):
-        return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
-    
-    # Get session cookie
-    session_token = request.cookies.get(SESSION_COOKIE_NAME)
-    if not session_token:
-        response = jsonify({'success': False, 'error': 'not_authenticated'})
-        response.headers.update(_cors_headers(origin))
-        return response, 401
-    
-    session_data = validate_session_token(session_token)
-    if not session_data:
-        response = jsonify({'success': False, 'error': 'session_expired'})
-        response.headers.update(_cors_headers(origin))
-        return response, 401
-
-    if not _validate_csrf():
-        response = jsonify({'success': False, 'error': 'csrf_missing_or_invalid'})
-        response.headers.update(_cors_headers(origin))
-        return response, 403
-    
-    wallet_id = session_data['wallet_id']
     data = request.get_json() or {}
     credential_id = data.get('credential_id')
     
-    if not credential_id:
-        response = jsonify({'success': False, 'error': 'credential_id required'})
-        response.headers.update(_cors_headers(origin))
-        return response, 400
-    
-    # Mark as revoked in database (PRIVACY: no logging)
-    revoked = _revoke_credential_db(wallet_id, credential_id)
-    
+    # PRIVACY: Return success but don't modify anything on server
+    # Revocation is handled locally in IndexedDB
     response = jsonify({
         'success': True,
-        'revoked': revoked,
-        'credential_id': credential_id
+        'revoked': True,  # Assumed revoked locally
+        'credential_id': credential_id,
+        'note': 'Credentials managed locally only (privacy mode)'
     })
     response.headers.update(_cors_headers(origin))
     return response
@@ -601,9 +502,10 @@ def _revoke_credential_db(wallet_id: str, credential_id: str) -> bool:
 @wallet_session_sync_bp.route('/api/wallet/get-credentials', methods=['GET', 'OPTIONS'])
 def get_credentials():
     """
-    Get all credentials for the authenticated wallet.
+    DEPRECATED: Server-side credential storage is disabled for privacy.
     
-    Used by lemma.id/wallet to display unified credential list.
+    Credentials are stored locally in each site's IndexedDB.
+    This endpoint returns empty list - use local IndexedDB instead.
     """
     # Handle CORS preflight
     if request.method == 'OPTIONS':
@@ -615,33 +517,13 @@ def get_credentials():
         return response
     
     origin = request.headers.get('Origin')
-    if not _origin_allowed(origin):
-        return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
     
-    # Get session cookie
-    session_token = request.cookies.get(SESSION_COOKIE_NAME)
-    if not session_token:
-        response = jsonify({'success': False, 'error': 'not_authenticated', 'credentials': []})
-        response.headers.update(_cors_headers(origin))
-        return response, 401
-    
-    session_data = validate_session_token(session_token)
-    if not session_data:
-        response = jsonify({'success': False, 'error': 'session_expired', 'credentials': []})
-        response.headers.update(_cors_headers(origin))
-        return response, 401
-
-    # NOTE: No CSRF check for get-credentials (read-only operation)
-
-    wallet_id = session_data['wallet_id']
-
-    # Fetch from database
-    credentials = _get_credentials_db(wallet_id)
-    # PRIVACY: No logging of credential access
+    # PRIVACY: Return empty - credentials are stored locally only
     response = jsonify({
         'success': True,
-        'credentials': credentials,
-        'count': len(credentials)
+        'credentials': [],
+        'count': 0,
+        'note': 'Credentials stored locally only (privacy mode). Use wallet.getCredentials() for local credentials.'
     })
     response.headers.update(_cors_headers(origin))
     return response
