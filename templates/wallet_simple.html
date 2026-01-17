@@ -126,11 +126,30 @@
         </div>
     </div>
 
+    <!-- Popup Flow Testing -->
+    <div class="card" id="popup-test-card" style="border: 2px solid #f59e0b; background: linear-gradient(135deg, #fffbeb, #fef3c7);">
+        <h2 style="color: #92400e;">🪟 Popup Flow Testing</h2>
+        <div id="popup-status" class="status-box info">
+            <strong>Context:</strong> <span id="context-type">Checking...</span><br>
+            <strong>Is First-Party:</strong> <span id="is-first-party">...</span><br>
+            <strong>Popup Needed:</strong> <span id="popup-needed">...</span>
+        </div>
+        <div class="actions">
+            <button class="btn btn-primary" onclick="testUnlockWithPopup()">🪟 Test unlockWithPopup()</button>
+            <button class="btn btn-secondary" onclick="testPopupDirect()">🔗 Open Popup Direct</button>
+            <button class="btn btn-secondary" onclick="simulateThirdParty()">🌐 Simulate 3rd Party</button>
+        </div>
+        <p style="color: #78716c; font-size: 0.8rem; margin-top: 12px;">
+            <strong>Note:</strong> On lemma.id, popup is not needed (direct passkey access).<br>
+            On third-party sites, <code>unlockWithPopup()</code> opens lemma.id/wallet/popup to authenticate.
+        </p>
+    </div>
+
     <!-- Wallet Actions -->
     <div class="card">
         <h2>Manual Wallet Actions</h2>
         <div class="actions">
-            <button class="btn btn-primary" onclick="unlockWallet()">🔓 Unlock Wallet</button>
+            <button class="btn btn-primary" onclick="unlockWallet()">🔓 Unlock (Direct)</button>
             <button class="btn btn-secondary" onclick="lockWallet()">🔒 Lock Wallet</button>
             <button class="btn btn-success" onclick="registerPasskey()">🔑 Register Passkey</button>
         </div>
@@ -162,7 +181,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=2110"></script>
+<script src="/static/js/lemma-wallet.js?v=2170"></script>
 <script>
 // =============================================
 // SDK-ONLY WALLET PAGE
@@ -625,8 +644,124 @@ async function syncFromServerCookie() {
     }
 }
 
+// =============================================
+// POPUP FLOW TESTING
+// =============================================
+
+function updateContextInfo() {
+    const hostname = window.location.hostname;
+    const isFirstParty = hostname === 'lemma.id' || hostname.endsWith('.lemma.id') || hostname === 'localhost';
+    
+    document.getElementById('context-type').textContent = hostname;
+    document.getElementById('is-first-party').textContent = isFirstParty ? '✅ Yes (lemma.id)' : '❌ No (third-party)';
+    document.getElementById('popup-needed').textContent = isFirstParty ? 
+        '❌ No (direct passkey access)' : 
+        '✅ Yes (must unlock via popup)';
+    
+    // Style the card based on context
+    const card = document.getElementById('popup-test-card');
+    if (!isFirstParty) {
+        card.style.border = '2px solid #10b981';
+        card.style.background = 'linear-gradient(135deg, #ecfdf5, #d1fae5)';
+    }
+}
+
+// Test unlockWithPopup() - the SDK method for third-party sites
+async function testUnlockWithPopup() {
+    try {
+        await initSDK();
+        addLog('=== Calling SDK unlockWithPopup() ===', 'info');
+        addLog('This opens a popup to lemma.id/wallet/popup', 'info');
+        
+        const result = await wallet.unlockWithPopup();
+        
+        addLog('unlockWithPopup() result:', 'info');
+        addLog(JSON.stringify(result, null, 2), result.success ? 'success' : 'warn');
+        
+        if (result.success) {
+            // Show what data came from popup
+            const statusEl = document.getElementById('popup-status');
+            statusEl.innerHTML = `<strong>✅ Popup Success!</strong><br>
+<strong>Wallet ID:</strong> ${result.walletId || 'N/A'}<br>
+<strong>Wallet Secret:</strong> ${result.walletSecret ? result.walletSecret.substring(0, 16) + '...' : 'N/A'}<br>
+<strong>Message:</strong> ${result.message || 'N/A'}`;
+            statusEl.className = 'status-box unlocked';
+            
+            // Refresh other UI
+            await refreshStatus();
+            await initSmartAuth();
+        } else {
+            const statusEl = document.getElementById('popup-status');
+            statusEl.innerHTML = `<strong>❌ Popup Failed/Cancelled</strong><br>
+<strong>Reason:</strong> ${result.reason || 'unknown'}<br>
+<strong>Message:</strong> ${result.message || 'N/A'}`;
+            statusEl.className = 'status-box error';
+        }
+    } catch (e) {
+        addLog(`❌ unlockWithPopup() failed: ${e.message}`, 'error');
+    }
+}
+
+// Open popup directly (for debugging)
+function testPopupDirect() {
+    addLog('Opening popup directly to lemma.id/wallet/popup', 'info');
+    
+    const width = 450;
+    const height = 600;
+    const left = (window.screen.width - width) / 2;
+    const top = (window.screen.height - height) / 2;
+    
+    const popup = window.open(
+        'https://lemma.id/wallet/popup',
+        'lemma-wallet-popup',
+        `width=${width},height=${height},left=${left},top=${top},popup=yes`
+    );
+    
+    if (!popup) {
+        addLog('❌ Popup blocked! Enable popups for this site.', 'error');
+        return;
+    }
+    
+    addLog('Popup opened - waiting for messages...', 'info');
+    
+    // Listen for messages from popup
+    const handler = (event) => {
+        if (event.origin !== 'https://lemma.id') return;
+        addLog(`📨 Message from popup: ${JSON.stringify(event.data)}`, 'success');
+        
+        if (event.data?.type === 'LEMMA_UNLOCK_SUCCESS' || event.data?.type === 'LEMMA_UNLOCK_CANCELLED') {
+            window.removeEventListener('message', handler);
+        }
+    };
+    window.addEventListener('message', handler);
+}
+
+// Simulate third-party behavior (force popup even on lemma.id)
+async function simulateThirdParty() {
+    try {
+        await initSDK();
+        addLog('=== SIMULATING THIRD-PARTY SITE BEHAVIOR ===', 'warn');
+        addLog('Even on lemma.id, this will use the popup flow', 'info');
+        
+        // Directly call unlockWithPopup (which is what third-party sites do)
+        addLog('Calling unlockWithPopup() regardless of context...', 'info');
+        
+        const result = await wallet.unlockWithPopup();
+        addLog('Result: ' + JSON.stringify(result), result.success ? 'success' : 'warn');
+        
+        if (result.success) {
+            await refreshStatus();
+            await initSmartAuth();
+        }
+    } catch (e) {
+        addLog(`❌ Simulation failed: ${e.message}`, 'error');
+    }
+}
+
 // Initialize on load
 window.addEventListener('DOMContentLoaded', async () => {
+    // Update context info first
+    updateContextInfo();
     // Show SDK version
     const versionEl = document.getElementById('sdk-version');
     if (typeof LemmaWallet !== 'undefined' && LemmaWallet.VERSION) {
