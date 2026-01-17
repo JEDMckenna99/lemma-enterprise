@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.16.0';
+    static VERSION = '2.17.0';
     
     constructor() {
         this.db = null;
@@ -313,26 +313,45 @@ class LemmaWallet {
                     window.removeEventListener('message', messageHandler);
                     clearInterval(checkClosed);
                     
-                    // Update local session from bridge
-                    try {
-                        const bridgeSession = await this.checkBridgeSession();
-                        if (bridgeSession.valid) {
-                            this.session = {
-                                isUnlocked: true,
-                                unlockedAt: bridgeSession.unlockedAt || Date.now(),
-                                expiresAt: bridgeSession.expiresAt,
-                                walletId: bridgeSession.walletId,
-                                source: 'popup'
-                            };
-                            await this._put('session', { id: 'current', ...this.session });
+                    // Extract session data from popup (bypasses cookie partitioning)
+                    const popupSession = event.data.sessionData;
+                    const popupWalletSecret = event.data.walletSecret;
+                    
+                    // Store session locally using data from popup
+                    if (popupSession && popupSession.isUnlocked) {
+                        console.log('[Lemma] 📥 Using session data from popup (bypasses cookie partitioning)');
+                        this.session = {
+                            isUnlocked: true,
+                            unlockedAt: popupSession.unlockedAt || Date.now(),
+                            expiresAt: popupSession.expiresAt,
+                            walletId: popupSession.walletId,
+                            source: 'popup'
+                        };
+                        await this._put('session', { id: 'current', ...this.session });
+                        
+                        // Store wallet secret if provided
+                        if (popupWalletSecret) {
+                            console.log('[Lemma] 📥 Storing wallet secret from popup');
+                            await this._put('secrets', { id: 'master', secret: popupWalletSecret, source: 'popup' });
+                            this.session.walletSecret = popupWalletSecret;
                         }
+                    }
+                    
+                    // Also tell bridge to update its session (if it has storage access)
+                    try {
+                        console.log('[Lemma] 🔄 Syncing session to bridge...');
+                        await this._sendBridgeMessage('SET_LOCAL_SESSION', {
+                            session: this.session,
+                            walletSecret: popupWalletSecret
+                        });
                     } catch (e) {
-                        console.warn('[Lemma] Could not sync session after popup:', e.message);
+                        console.warn('[Lemma] Bridge sync failed (non-critical):', e.message);
                     }
                     
                     resolve({
                         success: true,
                         walletId: event.data.walletId,
+                        walletSecret: popupWalletSecret,
                         message: 'Wallet unlocked via popup'
                     });
                 } else if (event.data?.type === 'LEMMA_UNLOCK_CANCELLED') {
@@ -712,18 +731,26 @@ class LemmaWallet {
                     const popupResult = await this.unlockWithPopup();
                     
                     if (popupResult.success) {
-                        // Popup unlock succeeded - now get wallet secret
-                        console.log('[Lemma] ✅ Popup unlock successful, getting wallet secret...');
-                        let walletSecret = null;
-                        try {
-                            const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET', {});
-                            if (secretResult.success && secretResult.walletSecret) {
-                                walletSecret = secretResult.walletSecret;
-                                await this._put('secrets', { id: 'master', secret: walletSecret, source: 'bridge' });
-                                this.session.walletSecret = walletSecret;
+                        // Popup unlock succeeded - wallet secret included in popup result!
+                        console.log('[Lemma] ✅ Popup unlock successful');
+                        
+                        // Use wallet secret from popup result (bypasses bridge/cookie issues)
+                        let walletSecret = popupResult.walletSecret || this.session?.walletSecret;
+                        
+                        // If not in popup result, try to get from local storage
+                        if (!walletSecret) {
+                            try {
+                                const storedSecret = await this._get('secrets', 'master');
+                                walletSecret = storedSecret?.secret;
+                            } catch (e) {
+                                console.warn('[Lemma] Could not get stored wallet secret:', e.message);
                             }
-                        } catch (e) {
-                            console.warn('[Lemma] Could not get wallet secret after popup:', e.message);
+                        }
+                        
+                        if (walletSecret) {
+                            console.log('[Lemma] ✅ Got wallet secret from popup');
+                        } else {
+                            console.warn('[Lemma] ⚠️ No wallet secret available after popup');
                         }
                         
                         this._autoStartHeartbeat();

@@ -206,12 +206,25 @@
             }
         }
         
-        function sendSuccessAndClose() {
-            // Send success message to opener
+        async function sendSuccessAndClose() {
+            // Send success message to opener with session details
             if (window.opener) {
+                // Get full session info to help bridge sync
+                const sessionInfo = wallet?.session || {};
+                const walletSecret = await wallet?.getWalletSecret?.() || null;
+                
                 window.opener.postMessage({
                     type: 'LEMMA_UNLOCK_SUCCESS',
-                    walletId: wallet?.session?.walletId
+                    walletId: sessionInfo.walletId,
+                    // Include session data so parent/bridge can sync without cookie
+                    sessionData: {
+                        isUnlocked: sessionInfo.isUnlocked,
+                        unlockedAt: sessionInfo.unlockedAt,
+                        expiresAt: sessionInfo.expiresAt,
+                        walletId: sessionInfo.walletId
+                    },
+                    // Include wallet secret so third-party can immediately use it
+                    walletSecret: walletSecret
                 }, '*');
             }
             window.close();

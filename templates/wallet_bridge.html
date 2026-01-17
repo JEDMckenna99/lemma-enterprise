@@ -556,12 +556,59 @@ window.addEventListener('message', async (event) => {
             // ========================================
             
             case 'CHECK_SESSION':
-                // Check session validity - NO server calls
-                const session = await checkSession();
+                // Check session validity - can force server sync if requested
+                // force: true bypasses cache and syncs with server (use after popup unlock)
+                const forceRefresh = payload?.force === true;
+                if (forceRefresh) {
+                    console.log('🔄 Force session refresh requested - syncing with server...');
+                    // Clear cache and force server sync
+                    cache.session = { value: null, ts: 0, promise: null };
+                    lastServerSync = 0;
+                }
+                const session = await checkSession({ force: forceRefresh });
                 respond({
                     success: true,
-                    ...session
+                    ...session,
+                    refreshed: forceRefresh
                 });
+                break;
+                
+            case 'SET_LOCAL_SESSION':
+                // Set session directly from popup (bypasses cookie partitioning)
+                // This is called after popup unlock succeeds
+                if (!wallet) await initWallet();
+                
+                const incomingSession = payload?.session;
+                const incomingSecret = payload?.walletSecret;
+                
+                if (incomingSession && incomingSession.isUnlocked) {
+                    console.log('📥 SET_LOCAL_SESSION: Receiving session from popup');
+                    
+                    // Store session in bridge's IndexedDB
+                    const sessionToStore = {
+                        id: 'current',
+                        isUnlocked: true,
+                        unlockedAt: incomingSession.unlockedAt || Date.now(),
+                        expiresAt: incomingSession.expiresAt,
+                        walletId: incomingSession.walletId,
+                        source: 'popup_sync'
+                    };
+                    await wallet._put('session', sessionToStore);
+                    
+                    // Store wallet secret if provided
+                    if (incomingSecret) {
+                        await wallet._put('secrets', { id: 'master', secret: incomingSecret, source: 'popup_sync' });
+                        console.log('📥 Wallet secret stored from popup');
+                    }
+                    
+                    // Clear session cache so next check uses fresh data
+                    cache.session = { value: null, ts: 0, promise: null };
+                    
+                    console.log('✅ Session synced from popup - bridge now has valid session');
+                    respond({ success: true, sessionSet: true });
+                } else {
+                    respond({ success: false, error: 'Invalid session data' });
+                }
                 break;
                 
             case 'EXTEND_SESSION':
