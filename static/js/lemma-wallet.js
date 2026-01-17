@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.15.0';
+    static VERSION = '2.16.0';
     
     constructor() {
         this.db = null;
@@ -1109,12 +1109,12 @@ class LemmaWallet {
     // ========================================
 
     /**
-     * Get current authentication state
-     * This can be used as the primary auth method instead of email
+     * Get basic authentication state (internal use)
+     * For public API, use the async getAuthState() method
      */
-    getAuthState() {
+    _getBasicAuthState() {
         if (!this.session.isUnlocked) {
-                return {
+            return {
                 state: AUTH_STATE.LOCKED,
                 authenticated: false,
                 reason: 'Wallet is locked'
@@ -1122,7 +1122,7 @@ class LemmaWallet {
         }
 
         if (this.session.expiresAt && this.session.expiresAt < Date.now()) {
-                    return {
+            return {
                 state: AUTH_STATE.LOCKED,
                 authenticated: false,
                 reason: 'Session expired'
@@ -1134,7 +1134,7 @@ class LemmaWallet {
         const today = new Date();
         const isToday = unlockedDate.toDateString() === today.toDateString();
             
-            return {
+        return {
             state: isToday ? AUTH_STATE.UNLOCKED_TODAY : AUTH_STATE.UNLOCKED,
             authenticated: true,
             unlockedAt: this.session.unlockedAt,
@@ -1178,7 +1178,7 @@ class LemmaWallet {
      * Use this as the primary auth check instead of email sessions
      */
     isAuthenticated() {
-        const authState = this.getAuthState();
+        const authState = this._getBasicAuthState();
         return authState.authenticated && authState.unlockedToday;
     }
 
@@ -1374,7 +1374,7 @@ class LemmaWallet {
      * @returns {Promise<Object>} Comprehensive session state
      */
     async getSessionState() {
-        const localState = this.getAuthState();
+        const localState = this._getBasicAuthState();
         
         // If we're on lemma.id, use local state
         if (window.location.hostname.includes('lemma.id')) {
@@ -1486,7 +1486,7 @@ class LemmaWallet {
         
         // Check if we're on lemma.id (first-party)
         if (window.location.hostname.includes('lemma.id')) {
-            const localAuth = this.getAuthState();
+            const localAuth = this._getBasicAuthState();
             if (localAuth.authenticated) {
                 return {
                     authenticated: true,
