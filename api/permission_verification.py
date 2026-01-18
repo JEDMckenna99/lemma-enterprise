@@ -24,6 +24,7 @@ import logging
 import time
 import os
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -256,12 +257,24 @@ def verify_permission_lemma():
                 'security_alert': True
             }), 403
         
-        # 3. Extract credential claims
+        # 3. Validate request origin matches site_domain when provided
+        origin = request.headers.get('Origin')
+        if origin:
+            parsed = urlparse(origin)
+            origin_host = parsed.hostname or ''
+            if origin_host and origin_host != site_domain and not origin_host.endswith(f".{site_domain}"):
+                return jsonify({
+                    'success': False,
+                    'verified': False,
+                    'error': f'Origin mismatch: {origin_host} != {site_domain}'
+                }), 403
+
+        # 4. Extract credential claims
         claims = credential.get('claims') or credential.get('credentialSubject') or {}
         cred_site_domain = claims.get('siteDomain') or claims.get('site_domain')
         cred_id = credential.get('id')
         
-        # 4. Verify site domain matches
+        # 5. Verify site domain matches
         if cred_site_domain != site_domain:
             return jsonify({
                 'success': False,
@@ -269,7 +282,7 @@ def verify_permission_lemma():
                 'error': f'Site domain mismatch: {cred_site_domain} != {site_domain}'
             }), 403
         
-        # 5. Cryptographic verification with OPRF + Bloom filter revocation check
+        # 6. Cryptographic verification with OPRF + Bloom filter revocation check
         start_time = time.perf_counter()
         
         try:
@@ -294,11 +307,12 @@ def verify_permission_lemma():
             verification_time_us = (time.perf_counter() - start_time) * 1_000_000
             
             if is_valid:
-                logger.info(f"✅ Permission lemma verified for {site_domain} in {verification_time_us:.0f}µs")
-                logger.info(f"   Credential: {cred_id}")
-                logger.info(f"   Permission: {claims.get('permissionId')}")
-                logger.info(f"   Nonce: {nonce[:16]}...")
-                logger.info(f"   Method: Ed25519 + OPRF + Bloom filter + nonce")
+                # PRIVACY: Minimal logging - no credential contents, no user identifiers
+                # Only log aggregate metrics for performance monitoring
+                logger.info(f"✅ Verification OK: {verification_time_us:.0f}µs (site: {site_domain})")
+                # REMOVED: credential ID logging - could enable correlation
+                # REMOVED: permission ID logging - reveals user permissions
+                # REMOVED: nonce logging - not needed after validation
                 
                 return jsonify({
                     'success': True,
@@ -323,20 +337,21 @@ def verify_permission_lemma():
                 is_revoked = verifier.is_revoked(cred_id)
                 
                 if is_revoked:
-                    logger.warning(f"⚠️ Revoked credential presented: {cred_id}")
+                    # PRIVACY: Don't log credential ID - could enable tracking
+                    logger.warning(f"⚠️ Revoked credential presented (site: {site_domain})")
                     return jsonify({
                         'success': False,
                         'verified': False,
-                        'error': 'Credential has been revoked (OPRF + Bloom filter)',
-                        'security_alert': True,
-                        'revocation_method': 'oprf_bloom_filter'
+                        'error': 'Credential has been revoked',
+                        'security_alert': True
                     }), 403
                 else:
-                    logger.warning(f"❌ Invalid signature for credential {cred_id}")
+                    # PRIVACY: Don't log credential ID
+                    logger.warning(f"❌ Invalid signature (site: {site_domain})")
                     return jsonify({
                         'success': False,
                         'verified': False,
-                        'error': 'Invalid Ed25519 signature',
+                        'error': 'Invalid signature',
                         'security_alert': True
                     }), 403
                 

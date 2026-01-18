@@ -21,13 +21,18 @@ def track_user():
     """
     Track user activity for MAU calculation
     
+    PRIVACY: user_id should be a PPID (Pairwise Pseudonymous Identifier),
+    NOT an email address or other PII. PPIDs are site-specific and unlinkable.
+    
     Expected payload:
     {
-        "customer_id": "cus_stripe_customer_id",
-        "user_id": "user@example.com",
+        "customer_id": "site_abc123",                    -- Site identifier
+        "user_id": "did:lemma:ppid_abc123def...",       -- PPID (NOT email!)
         "timestamp": "2024-01-15T10:30:00Z" (optional),
         "stripe_identity_verified": false (optional, default false)
     }
+    
+    The user_id is hashed (HMAC-SHA256) before storage for additional privacy.
     """
     try:
         data = request.get_json()
@@ -65,10 +70,13 @@ def track_stripe_identity():
     """
     Track Stripe Identity verification for $2.00 billing
     
+    PRIVACY: user_id should be a PPID (Pairwise Pseudonymous Identifier),
+    NOT an email address. The PPID is hashed before storage.
+    
     Expected payload:
     {
-        "customer_id": "cus_stripe_customer_id",
-        "user_id": "user@example.com",
+        "customer_id": "site_abc123",                    -- Site identifier  
+        "user_id": "did:lemma:ppid_abc123def...",       -- PPID (NOT email!)
         "timestamp": "2024-01-15T10:30:00Z" (optional)
     }
     """
@@ -235,12 +243,15 @@ def track_users_batch():
     """
     Track multiple user activities in batch for MAU calculation
     
+    PRIVACY: All user_id values should be PPIDs (Pairwise Pseudonymous Identifiers),
+    NOT email addresses or other PII. PPIDs are site-specific and unlinkable.
+    
     Expected payload:
     {
-        "customer_id": "cus_stripe_customer_id",
+        "customer_id": "site_abc123",
         "users": [
-            {"user_id": "user1@example.com", "timestamp": "2024-01-15T10:30:00Z", "stripe_identity_verified": false},
-            {"user_id": "user2@example.com", "timestamp": "2024-01-15T10:31:00Z", "stripe_identity_verified": true},
+            {"user_id": "did:lemma:ppid_abc123...", "timestamp": "2024-01-15T10:30:00Z", "stripe_identity_verified": false},
+            {"user_id": "did:lemma:ppid_def456...", "timestamp": "2024-01-15T10:31:00Z", "stripe_identity_verified": true},
             ...
         ]
     }

@@ -260,20 +260,28 @@ class SitePermissionGrant(Base):
     conditions = Column(JSON, default=dict)  # Additional conditions/metadata
 
 class NetworkActivity(Base):
-    """Activity log for both federated identity and IAM services"""
+    """
+    Activity log for administrative operations only (grants, revokes).
+    
+    PRIVACY COMMITMENT: This table does NOT log verification events.
+    - No IP addresses are collected
+    - No user agents are collected  
+    - Verification happens client-side (local Ed25519) - Lemma cannot observe it
+    - Only administrative actions (permission grants/revokes) are logged for audit
+    """
     __tablename__ = 'network_activity'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     site_id = Column(String, nullable=False)
-    user_did = Column(String)  # May be hashed for privacy
-    activity_type = Column(String, nullable=False)  # 'poh_verification', 'permission_check', 'login', 'grant', 'revoke'
-    service_type = Column(String, nullable=False)  # 'poh_network', 'iam'
+    user_did = Column(String)  # PPID only (site-specific, unlinkable)
+    activity_type = Column(String, nullable=False)  # 'grant', 'revoke' ONLY - no verification logging
+    service_type = Column(String, nullable=False)  # 'iam' - administrative operations
     success = Column(Boolean, nullable=False)
-    verification_time_us = Column(Integer)  # Microsecond timing
-    activity_metadata = Column(JSON, default=dict)  # Additional context
+    verification_time_us = Column(Integer)  # Performance metrics only
+    # REMOVED: activity_metadata - could leak sensitive context
     timestamp = Column(DateTime, default=datetime.utcnow)
-    ip_address = Column(String)  # For security/analytics
-    user_agent = Column(String)
+    # REMOVED: ip_address - privacy violation, not needed
+    # REMOVED: user_agent - privacy violation, not needed
 
 class BillingRecord(Base):
     """Billing records for MAU tracking and invoicing"""
