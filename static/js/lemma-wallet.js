@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.22.0';
+    static VERSION = '2.23.0';
     
     constructor() {
         this.db = null;
@@ -2681,62 +2681,80 @@ class LemmaWallet {
      * @returns {Object} { code: string, qrData: string, expiresAt: number, expiresIn: number }
      */
     async generateLinkCode() {
-        await this.init();
-        
-        if (!this.isUnlocked()) {
-            throw new Error('Wallet must be unlocked to generate link code');
+        try {
+            console.log('[Lemma] generateLinkCode: starting...');
+            await this.init();
+            console.log('[Lemma] generateLinkCode: init complete, db:', !!this.db);
+            
+            if (!this.isUnlocked()) {
+                throw new Error('Wallet must be unlocked to generate link code');
+            }
+            console.log('[Lemma] generateLinkCode: wallet is unlocked');
+            
+            const walletSecret = await this.getWalletSecret();
+            console.log('[Lemma] generateLinkCode: walletSecret obtained:', !!walletSecret, 'length:', walletSecret?.length);
+            if (!walletSecret) {
+                throw new Error('No wallet secret found');
+            }
+            
+            const walletId = await this._get('passkey', 'walletId');
+            console.log('[Lemma] generateLinkCode: walletId:', walletId);
+            
+            // Generate a random encryption key (16 bytes = 128 bits)
+            const encryptionKey = crypto.getRandomValues(new Uint8Array(16));
+            const encryptionKeyHex = Array.from(encryptionKey)
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+            console.log('[Lemma] generateLinkCode: encryption key generated');
+            
+            // Create payload to encrypt
+            const payload = JSON.stringify({
+                walletSecret: walletSecret,
+                walletId: walletId?.value || null,
+                createdAt: Date.now(),
+                expiresAt: Date.now() + 60000 // 60 seconds
+            });
+            console.log('[Lemma] generateLinkCode: payload created, length:', payload.length);
+            
+            // Encrypt payload using AES-GCM
+            const encryptedPayload = await this._encryptForLink(payload, encryptionKey);
+            console.log('[Lemma] generateLinkCode: payload encrypted, length:', encryptedPayload?.length);
+            
+            // Generate a short numeric code (6 digits) for manual entry
+            // This is derived from the encryption key for consistency
+            const shortCode = this._deriveShortCode(encryptionKey);
+            console.log('[Lemma] generateLinkCode: shortCode:', shortCode);
+            
+            // QR data contains everything needed to link (self-contained, no local storage needed)
+            const qrData = JSON.stringify({
+                v: 1, // version
+                k: encryptionKeyHex, // encryption key
+                p: encryptedPayload, // encrypted payload
+                e: Date.now() + 60000 // expiry
+            });
+            console.log('[Lemma] generateLinkCode: qrData created, length:', qrData.length);
+            
+            // Create a URL that opens the link page with the code pre-filled
+            // This makes scanning work properly on mobile devices
+            const qrDataBase64 = btoa(qrData);
+            console.log('[Lemma] generateLinkCode: base64 encoded, length:', qrDataBase64.length);
+            const qrUrl = `https://lemma.id/wallet/link#${qrDataBase64}`;
+            console.log('[Lemma] generateLinkCode: qrUrl created, length:', qrUrl.length);
+            
+            console.log('[Lemma] 📱 Link code generated - expires in 60 seconds');
+            
+            return {
+                shortCode: shortCode,
+                qrData: qrData,        // Raw JSON for manual paste
+                qrUrl: qrUrl,          // URL for QR code scanning
+                expiresAt: Date.now() + 60000,
+                expiresIn: 60
+            };
+        } catch (e) {
+            console.error('[Lemma] generateLinkCode ERROR:', e);
+            console.error('[Lemma] generateLinkCode ERROR stack:', e.stack);
+            throw e;
         }
-        
-        const walletSecret = await this.getWalletSecret();
-        if (!walletSecret) {
-            throw new Error('No wallet secret found');
-        }
-        
-        const walletId = await this._get('passkey', 'walletId');
-        
-        // Generate a random encryption key (16 bytes = 128 bits)
-        const encryptionKey = crypto.getRandomValues(new Uint8Array(16));
-        const encryptionKeyHex = Array.from(encryptionKey)
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-        
-        // Create payload to encrypt
-        const payload = JSON.stringify({
-            walletSecret: walletSecret,
-            walletId: walletId?.value || null,
-            createdAt: Date.now(),
-            expiresAt: Date.now() + 60000 // 60 seconds
-        });
-        
-        // Encrypt payload using AES-GCM
-        const encryptedPayload = await this._encryptForLink(payload, encryptionKey);
-        
-        // Generate a short numeric code (6 digits) for manual entry
-        // This is derived from the encryption key for consistency
-        const shortCode = this._deriveShortCode(encryptionKey);
-        
-        // QR data contains everything needed to link (self-contained, no local storage needed)
-        const qrData = JSON.stringify({
-            v: 1, // version
-            k: encryptionKeyHex, // encryption key
-            p: encryptedPayload, // encrypted payload
-            e: Date.now() + 60000 // expiry
-        });
-        
-        // Create a URL that opens the link page with the code pre-filled
-        // This makes scanning work properly on mobile devices
-        const qrDataBase64 = btoa(qrData);
-        const qrUrl = `https://lemma.id/wallet/link#${qrDataBase64}`;
-        
-        console.log('[Lemma] 📱 Link code generated - expires in 60 seconds');
-        
-        return {
-            shortCode: shortCode,
-            qrData: qrData,        // Raw JSON for manual paste
-            qrUrl: qrUrl,          // URL for QR code scanning
-            expiresAt: Date.now() + 60000,
-            expiresIn: 60
-        };
     }
     
     /**
