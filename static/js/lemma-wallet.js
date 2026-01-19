@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.19.0';
+    static VERSION = '2.20.0';
     
     constructor() {
         this.db = null;
@@ -165,6 +165,43 @@ class LemmaWallet {
         }
         
         return state;
+    }
+
+    /**
+     * Get HTML snippet for "Link existing wallet" option.
+     * Customer sites can inject this below their sign-in button.
+     * 
+     * Usage:
+     *   const linkHtml = await wallet.getLinkDeviceHtml();
+     *   if (linkHtml) {
+     *     document.getElementById('lemma-link-container').innerHTML = linkHtml;
+     *   }
+     * 
+     * @param {Object} options - Customization options
+     * @param {string} options.text - Custom text (default: "Already have a wallet on another device?")
+     * @param {string} options.linkText - Custom link text (default: "Link this device")
+     * @param {string} options.className - Custom CSS class for styling
+     * @returns {string|null} HTML string or null if link option shouldn't be shown
+     */
+    async getLinkDeviceHtml(options = {}) {
+        const state = await this.getAuthState();
+        
+        // Don't show if user is already signed in or can't link
+        if (state.isUnlocked || !state.canLinkDevice) {
+            return null;
+        }
+        
+        const text = options.text || 'Already have a wallet on another device?';
+        const linkText = options.linkText || 'Link this device';
+        const className = options.className || 'lemma-link-device';
+        const url = state.linkDeviceUrl || 'https://lemma.id/wallet/link';
+        
+        return `<div class="${className}" style="margin-top: 12px; text-align: center; font-size: 0.85rem;">
+    <span style="color: #6b7280;">${text}</span>
+    <a href="${url}" target="_blank" rel="noopener" style="color: #667eea; margin-left: 4px; text-decoration: none; font-weight: 500;">
+        🔗 ${linkText}
+    </a>
+</div>`;
     }
 
     /**
