@@ -521,9 +521,34 @@ async function clearAll() {
     try {
         addLog('Clearing all state...', 'warn');
         
-        // Delete IndexedDB
-        indexedDB.deleteDatabase('LemmaWallet');
-        addLog('  - Deleted IndexedDB', 'info');
+        // Delete IndexedDB - wait for it to complete
+        await new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase('LemmaWallet');
+            req.onsuccess = () => {
+                addLog('  - Deleted IndexedDB LemmaWallet', 'info');
+                resolve();
+            };
+            req.onerror = () => {
+                addLog('  - Error deleting IndexedDB: ' + req.error, 'error');
+                resolve(); // Continue anyway
+            };
+            req.onblocked = () => {
+                addLog('  - IndexedDB deletion blocked - closing connections...', 'warn');
+                // Force close any open connections
+                if (wallet && wallet.db) {
+                    wallet.db.close();
+                }
+                resolve();
+            };
+        });
+        
+        // Also try clearing localStorage
+        try {
+            localStorage.clear();
+            addLog('  - Cleared localStorage', 'info');
+        } catch (e) {
+            addLog('  - localStorage clear failed: ' + e.message, 'warn');
+        }
         
         // Delete cookies
         document.cookie = 'lemma_wallet_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
@@ -531,16 +556,30 @@ async function clearAll() {
         addLog('  - Deleted cookies', 'info');
         
         // Unregister service workers
-        const regs = await navigator.serviceWorker.getRegistrations();
-        for (const reg of regs) await reg.unregister();
-        addLog(`  - Unregistered ${regs.length} service workers`, 'info');
+        if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const reg of regs) {
+                await reg.unregister();
+            }
+            addLog(`  - Unregistered ${regs.length} service workers`, 'info');
+        }
+        
+        // Clear caches
+        if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            for (const name of cacheNames) {
+                await caches.delete(name);
+            }
+            addLog(`  - Cleared ${cacheNames.length} caches`, 'info');
+        }
         
         wallet = null;
-        addLog('✅ All state cleared - refreshing page...', 'success');
+        addLog('✅ All state cleared - refreshing page in 2 seconds...', 'success');
         
-        setTimeout(() => location.reload(), 1000);
+        setTimeout(() => location.reload(), 2000);
     } catch (e) {
         addLog(`❌ clearAll failed: ${e.message}`, 'error');
+        console.error('clearAll error:', e);
     }
 }
 
