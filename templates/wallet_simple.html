@@ -986,16 +986,29 @@ async function showAddDevice() {
         // Clear any previous QR code
         qrContainer.innerHTML = '';
         
+        // Log the URL for debugging
+        console.log('QR URL length:', result.qrUrl.length);
+        console.log('QR URL:', result.qrUrl);
+        
         // Create QR code with URL (so mobile scanners open browser directly)
-        // Use qrUrl which contains: https://lemma.id/wallet/link#BASE64_DATA
-        new QRCode(qrContainer, {
-            text: result.qrUrl,
-            width: 200,
-            height: 200,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.L
-        });
+        try {
+            new QRCode(qrContainer, {
+                text: result.qrUrl,
+                width: 200,
+                height: 200,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.L : 1
+            });
+        } catch (qrError) {
+            console.error('QR generation failed:', qrError);
+            // Fallback to showing the code as text
+            qrContainer.innerHTML = '<p style="color: red; font-size: 0.8rem;">QR too large. Copy the code below instead.</p>';
+            window._linkCode = result.qrData;
+            document.getElementById('qr-display').innerHTML += 
+                '<textarea id="link-code-text" readonly style="width: 100%; height: 80px; font-family: monospace; font-size: 0.7rem; margin-top: 8px;">' + result.qrData + '</textarea>' +
+                '<button onclick="copyLinkCode()" style="margin-top: 8px; padding: 8px 16px; cursor: pointer;">📋 Copy Code</button>';
+        }
         
         qrDisplay.style.display = 'block';
         
