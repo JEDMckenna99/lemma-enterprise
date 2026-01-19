@@ -160,34 +160,71 @@
 
     <!-- Device Management -->
     <div class="card" style="border: 2px solid #10b981; background: linear-gradient(135deg, #ecfdf5, #d1fae5);">
-        <h2 style="color: #065f46;">📱 Device Management</h2>
-        <div id="device-status" class="status-box info">
-            Checking device status...
-        </div>
-        <div class="actions">
-            <button class="btn btn-success" id="add-device-btn" onclick="showAddDevice()">📱 Add Another Device</button>
-            <button class="btn btn-secondary" onclick="window.location.href='/wallet/link'">🔗 Link to Existing Wallet</button>
-        </div>
+        <h2 style="color: #065f46;">📱 Transfer Wallet</h2>
         
-        <!-- QR Code Display (hidden by default) -->
-        <div id="qr-display" style="display: none; margin-top: 16px; text-align: center;">
-            <div style="background: white; padding: 20px; border-radius: 12px; display: inline-block;">
-                <canvas id="qr-canvas" style="width: 200px; height: 200px;"></canvas>
-            </div>
-            <p style="margin-top: 12px; font-size: 0.9rem; color: #065f46;">
-                Scan this QR code on your new device at<br>
-                <strong>lemma.id/wallet/link</strong>
-            </p>
-            <div id="qr-timer" style="font-size: 1.2rem; font-weight: 600; color: #92400e; margin-top: 8px;">
-                ⏱️ Expires in 60s
-            </div>
-            <button class="btn btn-secondary" style="margin-top: 12px;" onclick="hideQR()">Close</button>
+        <!-- Toggle Tabs -->
+        <div style="display: flex; gap: 0; margin-bottom: 16px; border-radius: 8px; overflow: hidden; border: 2px solid #10b981;">
+            <button id="tab-send" onclick="showTransferTab('send')" 
+                style="flex: 1; padding: 12px; border: none; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; background: #10b981; color: white;">
+                📤 Send to Device
+            </button>
+            <button id="tab-receive" onclick="showTransferTab('receive')"
+                style="flex: 1; padding: 12px; border: none; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; background: white; color: #065f46;">
+                📥 Receive from Device
+            </button>
         </div>
 
-        <p style="color: #065f46; font-size: 0.8rem; margin-top: 12px;">
-            <strong>Add Device:</strong> Generate a QR code to link another device to this wallet.<br>
-            <strong>Link to Existing:</strong> This device will join an existing wallet.
-        </p>
+        <!-- SEND TAB: Send wallet to another device -->
+        <div id="transfer-send" style="display: block;">
+            <div id="device-status" class="status-box info">
+                Checking device status...
+            </div>
+            
+            <div id="send-actions">
+                <button class="btn btn-success" id="add-device-btn" onclick="showAddDevice()" style="width: 100%;">
+                    📱 Generate QR Code
+                </button>
+                <p style="color: #065f46; font-size: 0.8rem; margin-top: 8px; text-align: center;">
+                    Show this QR code to your other device to transfer your wallet there.
+                </p>
+            </div>
+            
+            <!-- QR Code Display -->
+            <div id="qr-display" style="display: none; margin-top: 16px; text-align: center;">
+                <div style="background: white; padding: 20px; border-radius: 12px; display: inline-block; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <canvas id="qr-canvas" style="width: 200px; height: 200px;"></canvas>
+                </div>
+                <p style="margin-top: 12px; font-size: 0.9rem; color: #065f46;">
+                    Scan this on your other device
+                </p>
+                <div id="qr-timer" style="font-size: 1.2rem; font-weight: 600; color: #92400e; margin-top: 8px;">
+                    ⏱️ Expires in 60s
+                </div>
+                <button class="btn btn-secondary" style="margin-top: 12px;" onclick="hideQR()">Close</button>
+            </div>
+        </div>
+
+        <!-- RECEIVE TAB: Receive wallet from another device -->
+        <div id="transfer-receive" style="display: none;">
+            <div class="status-box info" style="margin-bottom: 16px;">
+                📷 Scan a QR code from your other device, or paste the transfer code below.
+            </div>
+            
+            <div style="margin-bottom: 12px;">
+                <textarea id="receive-code" placeholder="Paste the QR code data here..." 
+                    style="width: 100%; padding: 12px; border: 1px solid #10b981; border-radius: 8px; font-family: monospace; font-size: 0.8rem; min-height: 80px; resize: vertical;"></textarea>
+            </div>
+            
+            <button class="btn btn-success" onclick="receiveWallet()" style="width: 100%;">
+                🔗 Link This Device
+            </button>
+            
+            <div id="receive-status" style="margin-top: 12px; display: none;"></div>
+            
+            <p style="color: #065f46; font-size: 0.8rem; margin-top: 12px; text-align: center;">
+                On your other device, go to this page and click "Generate QR Code" to get a transfer code.
+            </p>
+        </div>
     </div>
 
     <!-- Credentials -->
@@ -213,7 +250,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=2180"></script>
+<script src="/static/js/lemma-wallet.js?v=2200"></script>
 <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script>
 // =============================================
@@ -792,10 +829,89 @@ async function simulateThirdParty() {
 }
 
 // =============================================
-// DEVICE MANAGEMENT
+// DEVICE MANAGEMENT / WALLET TRANSFER
 // =============================================
 
 let qrTimerInterval = null;
+let currentTransferTab = 'send';
+
+function showTransferTab(tab) {
+    currentTransferTab = tab;
+    
+    // Update tab styles
+    const sendTab = document.getElementById('tab-send');
+    const receiveTab = document.getElementById('tab-receive');
+    const sendContent = document.getElementById('transfer-send');
+    const receiveContent = document.getElementById('transfer-receive');
+    
+    if (tab === 'send') {
+        sendTab.style.background = '#10b981';
+        sendTab.style.color = 'white';
+        receiveTab.style.background = 'white';
+        receiveTab.style.color = '#065f46';
+        sendContent.style.display = 'block';
+        receiveContent.style.display = 'none';
+    } else {
+        receiveTab.style.background = '#10b981';
+        receiveTab.style.color = 'white';
+        sendTab.style.background = 'white';
+        sendTab.style.color = '#065f46';
+        receiveContent.style.display = 'block';
+        sendContent.style.display = 'none';
+    }
+    
+    // Hide QR if switching tabs
+    hideQR();
+}
+
+async function receiveWallet() {
+    const codeInput = document.getElementById('receive-code');
+    const statusEl = document.getElementById('receive-status');
+    const code = codeInput.value.trim();
+    
+    if (!code) {
+        statusEl.innerHTML = '<div class="status-box error">Please paste the transfer code from your other device.</div>';
+        statusEl.style.display = 'block';
+        return;
+    }
+    
+    statusEl.innerHTML = '<div class="status-box info">🔄 Linking wallet...</div>';
+    statusEl.style.display = 'block';
+    
+    try {
+        await initSDK();
+        
+        // Check if already has wallet
+        const info = await wallet.getWalletInfo();
+        if (info.hasWalletSecret) {
+            statusEl.innerHTML = '<div class="status-box error">❌ This device already has a wallet. Clear it first in Manual Actions → Clear All State.</div>';
+            return;
+        }
+        
+        const result = await wallet.linkDevice({ qrData: code });
+        
+        if (result.success) {
+            statusEl.innerHTML = '<div class="status-box unlocked">✅ Wallet linked! Now create a passkey to secure it.</div>';
+            addLog('✅ Wallet linked successfully!', 'success');
+            
+            // Prompt to create passkey
+            setTimeout(async () => {
+                if (confirm('Wallet linked! Create a passkey to secure it on this device?')) {
+                    await registerPasskey();
+                }
+                // Refresh UI
+                await refreshStatus();
+                await updateDeviceStatus();
+                await initSmartAuth();
+            }, 500);
+        } else {
+            throw new Error(result.message || 'Link failed');
+        }
+    } catch (e) {
+        addLog('❌ Link failed: ' + e.message, 'error');
+        statusEl.innerHTML = `<div class="status-box error">❌ ${e.message}</div>`;
+    }
+}
 
 async function updateDeviceStatus() {
     const statusEl = document.getElementById('device-status');
