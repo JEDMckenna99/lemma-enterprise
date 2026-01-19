@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.18.0';
+    static VERSION = '2.19.0';
     
     constructor() {
         this.db = null;
@@ -99,7 +99,10 @@ class LemmaWallet {
             isUnlocked: false,
             walletSecret: null,
             suggestedAction: 'create_passkey',
-            suggestedButtonText: 'Create Passkey & Sign In'
+            suggestedButtonText: 'Create Passkey & Sign In',
+            // Device linking info
+            canLinkDevice: false,
+            linkDeviceUrl: 'https://lemma.id/wallet/link'
         };
         
         // Check local session first
@@ -137,19 +140,28 @@ class LemmaWallet {
             // User has unlocked wallet - they can sign in or create account
             state.suggestedAction = 'auto_sign_in';
             state.suggestedButtonText = 'Sign In';
+            // User with wallet can add devices
+            state.canLinkDevice = true;
+            state.canAddDevice = true;
         } else if (!this._isLemmaDomain()) {
-            // Third-party site with no valid session - redirect to lemma.id
-            state.suggestedAction = 'redirect_to_lemma';
+            // Third-party site with no valid session - offer popup or link
+            state.suggestedAction = 'popup_unlock';
             state.suggestedButtonText = 'Sign In with Lemma';
             state.unlockUrl = 'https://lemma.id/wallet/simple';
+            // User might have wallet on another device
+            state.canLinkDevice = true;
+            state.linkDeviceText = 'Already have a wallet? Link this device';
         } else if (state.hasWallet) {
             // lemma.id with wallet but not unlocked
             state.suggestedAction = 'unlock';
             state.suggestedButtonText = 'Unlock Wallet';
+            state.canAddDevice = true;
         } else {
-            // lemma.id with no wallet - create passkey here
+            // lemma.id with no wallet - offer create or link
             state.suggestedAction = 'create_passkey';
             state.suggestedButtonText = 'Create Passkey';
+            state.canLinkDevice = true;
+            state.linkDeviceText = 'Already have a wallet on another device?';
         }
         
         return state;

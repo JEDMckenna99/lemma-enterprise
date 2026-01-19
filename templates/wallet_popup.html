@@ -124,9 +124,19 @@
                 Cancel
             </button>
         </div>
+        
+        <!-- Link device option (shown when no wallet) -->
+        <div id="link-option" class="hidden" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center;">
+            <p style="color: #6b7280; font-size: 0.85rem; margin: 0 0 8px;">
+                Already have a wallet on another device?
+            </p>
+            <a href="/wallet/link" style="color: #667eea; font-weight: 500; text-decoration: none;">
+                🔗 Link this device instead
+            </a>
+        </div>
     </div>
 
-    <script src="/static/js/lemma-wallet.js?v=2130"></script>
+    <script src="/static/js/lemma-wallet.js?v=2180"></script>
     <script>
         let wallet = null;
         
@@ -151,9 +161,11 @@
                     showStatus('Enter your passkey to unlock', 'info');
                     document.getElementById('unlock-btn').classList.remove('hidden');
                 } else {
-                    // No passkey yet
+                    // No passkey yet - show create option AND link option
                     showStatus('Create a passkey to secure your wallet', 'info');
                     document.getElementById('register-btn').classList.remove('hidden');
+                    // Show link device option for users who have wallet elsewhere
+                    document.getElementById('link-option').classList.remove('hidden');
                 }
             } catch (e) {
                 showStatus('Error: ' + e.message, 'error');
