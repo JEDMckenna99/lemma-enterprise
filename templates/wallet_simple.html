@@ -251,7 +251,7 @@
 </div>
 
 <script src="/static/js/lemma-wallet.js?v=2210"></script>
-<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script>
 // =============================================
 // SDK-ONLY WALLET PAGE
@@ -951,6 +951,25 @@ async function showAddDevice() {
         if (!wallet.isUnlocked()) {
             addLog('❌ Wallet must be unlocked to add a device', 'error');
             alert('Please unlock your wallet first');
+            return;
+        }
+        
+        // Check if QRCode library is loaded
+        if (typeof QRCode === 'undefined') {
+            addLog('❌ QR code library not loaded - showing code as text', 'warn');
+            const result = await wallet.generateLinkCode();
+            // Fallback: show the code as text
+            const qrDisplay = document.getElementById('qr-display');
+            qrDisplay.innerHTML = `
+                <div style="background: white; padding: 20px; border-radius: 12px; text-align: left;">
+                    <p style="margin-bottom: 8px; font-weight: 600;">Copy this code to your other device:</p>
+                    <textarea readonly style="width: 100%; height: 100px; font-family: monospace; font-size: 0.7rem; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">${result.qrData}</textarea>
+                    <button onclick="navigator.clipboard.writeText(\`${result.qrData}\`).then(() => alert('Copied!'))" style="margin-top: 8px; padding: 8px 16px; cursor: pointer;">📋 Copy</button>
+                </div>
+                <div id="qr-timer" style="font-size: 1.2rem; font-weight: 600; color: #92400e; margin-top: 8px;">⏱️ Expires in ${result.expiresIn}s</div>
+                <button class="btn btn-secondary" style="margin-top: 12px;" onclick="hideQR()">Close</button>
+            `;
+            qrDisplay.style.display = 'block';
             return;
         }
         
