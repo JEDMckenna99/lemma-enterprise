@@ -200,6 +200,17 @@
                 <div id="qr-timer" style="font-size: 1.2rem; font-weight: 600; color: #92400e; margin-top: 8px;">
                     ⏱️ Expires in 60s
                 </div>
+                
+                <!-- Link URL for sharing -->
+                <div style="margin-top: 16px; padding: 12px; background: #f0fdf4; border: 1px solid #10b981; border-radius: 8px;">
+                    <p style="font-size: 0.8rem; color: #065f46; margin-bottom: 8px;">Or share this link:</p>
+                    <input type="text" id="link-url" readonly 
+                        style="width: 100%; padding: 8px; font-family: monospace; font-size: 0.7rem; border: 1px solid #ccc; border-radius: 4px; background: white; text-overflow: ellipsis;">
+                    <button onclick="copyLinkUrl()" style="margin-top: 8px; padding: 8px 16px; cursor: pointer; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600;">
+                        📋 Copy Link
+                    </button>
+                </div>
+                
                 <button class="btn btn-secondary" style="margin-top: 12px;" onclick="hideQR()">Close</button>
             </div>
         </div>
@@ -1049,6 +1060,16 @@ async function showAddDevice() {
                 '<button onclick="copyLinkCode()" style="margin-top: 8px; padding: 8px 16px; cursor: pointer;">📋 Copy Code</button>';
         }
         
+        // Set the link URL for copying
+        const linkUrlInput = document.getElementById('link-url');
+        if (linkUrlInput) {
+            linkUrlInput.value = result.qrUrl;
+            window._linkUrl = result.qrUrl;
+        }
+        
+        // Store qrData for the other copy function
+        window._linkCode = result.qrData;
+        
         qrDisplay.style.display = 'block';
         
         // Start countdown timer
@@ -1098,6 +1119,23 @@ function copyLinkCode() {
                 textarea.select();
                 document.execCommand('copy');
                 alert('Copied!');
+            }
+        });
+    }
+}
+
+function copyLinkUrl() {
+    if (window._linkUrl) {
+        navigator.clipboard.writeText(window._linkUrl).then(() => {
+            alert('Link copied! Send it to your other device.');
+            addLog('📋 Link URL copied to clipboard', 'success');
+        }).catch(() => {
+            // Fallback
+            const input = document.getElementById('link-url');
+            if (input) {
+                input.select();
+                document.execCommand('copy');
+                alert('Link copied!');
             }
         });
     }
