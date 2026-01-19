@@ -418,6 +418,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('status').innerHTML = '⚠️ This device already has a wallet.<br><br>' +
                 '<a href="/wallet/simple" style="color: #0ea5e9;">Go to your wallet →</a>';
             document.getElementById('status').className = 'status-box warning';
+            return;
+        }
+        
+        // Check for link code in URL hash (from QR scan)
+        // URL format: https://lemma.id/wallet/link#BASE64_ENCODED_JSON
+        if (window.location.hash && window.location.hash.length > 1) {
+            const hashData = window.location.hash.substring(1); // Remove the #
+            try {
+                // Decode base64 to get the JSON
+                const qrData = atob(hashData);
+                // Validate it's valid JSON
+                JSON.parse(qrData);
+                
+                console.log('Found link code in URL hash - auto-processing...');
+                document.getElementById('status').innerHTML = '✅ Link code detected from QR scan!<br>Processing...';
+                document.getElementById('status').className = 'status-box success';
+                
+                // Auto-process the link code
+                setTimeout(() => processLinkCode(qrData), 500);
+            } catch (e) {
+                console.log('Invalid hash data, ignoring:', e.message);
+            }
         }
     } catch (e) {
         console.error('Init error:', e);

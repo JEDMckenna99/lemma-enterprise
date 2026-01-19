@@ -986,9 +986,10 @@ async function showAddDevice() {
         // Clear any previous QR code
         qrContainer.innerHTML = '';
         
-        // Create QR code (qrcodejs API)
+        // Create QR code with URL (so mobile scanners open browser directly)
+        // Use qrUrl which contains: https://lemma.id/wallet/link#BASE64_DATA
         new QRCode(qrContainer, {
-            text: result.qrData,
+            text: result.qrUrl,
             width: 200,
             height: 200,
             colorDark: '#000000',

@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.21.0';
+    static VERSION = '2.22.0';
     
     constructor() {
         this.db = null;
@@ -2723,11 +2723,17 @@ class LemmaWallet {
             e: Date.now() + 60000 // expiry
         });
         
+        // Create a URL that opens the link page with the code pre-filled
+        // This makes scanning work properly on mobile devices
+        const qrDataBase64 = btoa(qrData);
+        const qrUrl = `https://lemma.id/wallet/link#${qrDataBase64}`;
+        
         console.log('[Lemma] 📱 Link code generated - expires in 60 seconds');
         
         return {
             shortCode: shortCode,
-            qrData: qrData,
+            qrData: qrData,        // Raw JSON for manual paste
+            qrUrl: qrUrl,          // URL for QR code scanning
             expiresAt: Date.now() + 60000,
             expiresIn: 60
         };
