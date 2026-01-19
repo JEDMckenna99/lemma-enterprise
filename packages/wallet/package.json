@@ -1,0 +1,66 @@
+{
+  "name": "lemma-wallet-sdk",
+  "version": "1.0.0",
+  "description": "Lemma Wallet SDK - Passkey-protected credential wallet for decentralized authentication",
+  "main": "dist/lemma-wallet.js",
+  "module": "dist/lemma-wallet.esm.js",
+  "browser": "dist/lemma-wallet.umd.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/lemma-wallet.esm.js",
+      "require": "./dist/lemma-wallet.js",
+      "browser": "./dist/lemma-wallet.umd.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./utils": {
+      "import": "./dist/credential-utils.esm.js",
+      "require": "./dist/credential-utils.js",
+      "types": "./dist/credential-utils.d.ts"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "src/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.js",
+    "build:dev": "node scripts/build.js --dev",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Tests pending\" && exit 0"
+  },
+  "keywords": [
+    "lemma",
+    "wallet",
+    "passkey",
+    "webauthn",
+    "authentication",
+    "credential",
+    "identity",
+    "decentralized",
+    "offline",
+    "indexeddb",
+    "pwa"
+  ],
+  "author": "Lemma <support@lemma.id>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aspect-build/lemma-wallet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aspect-build/lemma-wallet/issues"
+  },
+  "homepage": "https://lemma.id/docs",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "terser": "^5.26.0"
+  }
+}

@@ -914,10 +914,13 @@ function showTransferTab(tab) {
     hideQR();
 }
 
-async function receiveWallet() {
+// Store pending link data for conflict resolution
+let pendingReceiveCode = null;
+
+async function receiveWallet(replaceExisting = false) {
     const codeInput = document.getElementById('receive-code');
     const statusEl = document.getElementById('receive-status');
-    const code = codeInput.value.trim();
+    const code = replaceExisting ? pendingReceiveCode : codeInput.value.trim();
     
     if (!code) {
         statusEl.innerHTML = '<div class="status-box error">Please paste the transfer code from your other device.</div>';
@@ -925,24 +928,55 @@ async function receiveWallet() {
         return;
     }
     
-    statusEl.innerHTML = '<div class="status-box info">🔄 Linking wallet...</div>';
+    // Store for potential conflict resolution
+    pendingReceiveCode = code;
+    
+    statusEl.innerHTML = '<div class="status-box info">Linking wallet...</div>';
     statusEl.style.display = 'block';
     
     try {
         await initSDK();
         
-        // Check if already has wallet
-        const info = await wallet.getWalletInfo();
-        if (info.hasWalletSecret) {
-            statusEl.innerHTML = '<div class="status-box error">❌ This device already has a wallet. Clear it first in Manual Actions → Clear All State.</div>';
+        const result = await wallet.linkDevice({ 
+            qrData: code,
+            replaceExisting: replaceExisting 
+        });
+        
+        // Handle conflict - different wallet already exists
+        if (result.conflict) {
+            statusEl.innerHTML = `
+                <div class="status-box" style="background: #fef3cd; border: 1px solid #f59e0b; color: #92400e;">
+                    <strong>Wallet Already Exists</strong><br><br>
+                    This device has a different wallet. Choose what to do:
+                    <div style="display: flex; gap: 12px; margin-top: 16px;">
+                        <button class="btn btn-primary" onclick="receiveWallet(true)" style="flex: 1; padding: 10px;">
+                            Replace Wallet
+                        </button>
+                        <button class="btn btn-secondary" onclick="cancelReceiveWallet()" style="flex: 1; padding: 10px;">
+                            Keep Current
+                        </button>
+                    </div>
+                    <p style="font-size: 0.8rem; margin-top: 12px; opacity: 0.8;">
+                        Your current wallet will be backed up before replacement.
+                    </p>
+                </div>
+            `;
+            addLog('Wallet conflict - awaiting user choice', 'warn');
             return;
         }
         
-        const result = await wallet.linkDevice({ qrData: code });
+        // Handle already linked (same wallet)
+        if (result.alreadyLinked) {
+            statusEl.innerHTML = '<div class="status-box unlocked">This wallet is already linked to this device.</div>';
+            addLog('Wallet already linked', 'info');
+            pendingReceiveCode = null;
+            return;
+        }
         
         if (result.success) {
-            statusEl.innerHTML = '<div class="status-box unlocked">✅ Wallet linked! Now create a passkey to secure it.</div>';
-            addLog('✅ Wallet linked successfully!', 'success');
+            statusEl.innerHTML = '<div class="status-box unlocked">Wallet linked! Now create a passkey to secure it.</div>';
+            addLog('Wallet linked successfully!', 'success');
+            pendingReceiveCode = null;
             
             // Prompt to create passkey
             setTimeout(async () => {
@@ -958,9 +992,17 @@ async function receiveWallet() {
             throw new Error(result.message || 'Link failed');
         }
     } catch (e) {
-        addLog('❌ Link failed: ' + e.message, 'error');
-        statusEl.innerHTML = `<div class="status-box error">❌ ${e.message}</div>`;
+        addLog('Link failed: ' + e.message, 'error');
+        statusEl.innerHTML = `<div class="status-box error">${e.message}</div>`;
+        pendingReceiveCode = null;
     }
+}
+
+function cancelReceiveWallet() {
+    const statusEl = document.getElementById('receive-status');
+    statusEl.innerHTML = '<div class="status-box info">Keeping current wallet.</div>';
+    pendingReceiveCode = null;
+    addLog('Wallet link cancelled - kept existing wallet', 'info');
 }
 
 async function updateDeviceStatus() {

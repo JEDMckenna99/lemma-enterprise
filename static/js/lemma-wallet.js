@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.23.0';
+    static VERSION = '2.24.0';
     
     constructor() {
         this.db = null;
@@ -2761,18 +2761,18 @@ class LemmaWallet {
      * Link this device to an existing wallet using a link code.
      * This transfers the wallet_secret from another device.
      * 
-     * @param {Object} options - Either { qrData } or { shortCode }
-     * @returns {Object} { success: boolean, walletId?: string }
+     * Smart conflict resolution:
+     * - Same wallet: Returns success (already linked)
+     * - Orphaned wallet (no passkey): Auto-replaces
+     * - Different active wallet: Returns conflict for user decision
+     * 
+     * @param {Object} options - { qrData } or { shortCode }, plus optional { replaceExisting: true }
+     * @returns {Object} { success, conflict?, walletId?, needsPasskey?, message }
      */
     async linkDevice(options) {
         await this.init();
         
-        // Check if wallet already exists
-        const existingSecret = await this._get('secrets', 'master');
-        if (existingSecret?.secret) {
-            throw new Error('This device already has a wallet. Clear it first to link a new one.');
-        }
-        
+        // First, decrypt the payload to see what wallet we're linking
         let payload;
         
         if (options.qrData) {
@@ -2794,6 +2794,51 @@ class LemmaWallet {
             throw new Error('Link code expired. Please generate a new one on your other device.');
         }
         
+        // Check for existing wallet
+        const existingSecret = await this._get('secrets', 'master');
+        const existingPasskey = await this._get('passkey', 'primary');
+        const existingWalletId = await this._get('passkey', 'walletId');
+        
+        if (existingSecret?.secret) {
+            // Case 1: Same wallet - already linked
+            if (existingSecret.secret === payload.walletSecret) {
+                console.log('[Lemma] Wallet already linked to this device');
+                return {
+                    success: true,
+                    alreadyLinked: true,
+                    walletId: payload.walletId,
+                    message: 'This wallet is already on this device.'
+                };
+            }
+            
+            // Case 2: Orphaned wallet (has secret but no passkey) - safe to auto-replace
+            if (!existingPasskey?.credentialId) {
+                console.log('[Lemma] Replacing orphaned wallet (no passkey registered)');
+                await this._clearWalletData();
+                // Continue to link below
+            }
+            // Case 3: Different active wallet with passkey - need user confirmation
+            else if (!options.replaceExisting) {
+                console.log('[Lemma] Wallet conflict detected - different active wallet exists');
+                return {
+                    success: false,
+                    conflict: true,
+                    existingWalletId: existingWalletId?.value || 'unknown',
+                    existingHasPasskey: true,
+                    incomingWalletId: payload.walletId,
+                    message: 'This device has a different wallet. Choose to replace it or keep the existing one.',
+                    options: ['replace', 'cancel']
+                };
+            }
+            // Case 4: User explicitly chose to replace
+            else {
+                console.log('[Lemma] User chose to replace existing wallet');
+                // Backup before clearing (stored in localStorage for recovery)
+                await this._backupWalletData();
+                await this._clearWalletData();
+            }
+        }
+        
         // Store the wallet secret
         await this._put('secrets', {
             id: 'master',
@@ -2811,14 +2856,150 @@ class LemmaWallet {
             });
         }
         
-        console.log('[Lemma] ✅ Device linked successfully!');
-        console.log('[Lemma] 📱 Now create a passkey to secure this wallet');
+        console.log('[Lemma] Device linked successfully');
         
         return {
             success: true,
             walletId: payload.walletId,
             needsPasskey: true,
             message: 'Wallet linked! Now create a passkey to secure it on this device.'
+        };
+    }
+    
+    /**
+     * Backup current wallet data to localStorage before replacement.
+     * Allows recovery if user made a mistake.
+     * @private
+     */
+    async _backupWalletData() {
+        try {
+            const backup = {
+                timestamp: Date.now(),
+                secret: await this._get('secrets', 'master'),
+                walletId: await this._get('passkey', 'walletId'),
+                lemmas: await this._getAll('lemmas'),
+                issuers: await this._getAll('issuers')
+            };
+            
+            // Store backup in localStorage (survives IndexedDB clear)
+            const existingBackups = JSON.parse(localStorage.getItem('lemma_wallet_backups') || '[]');
+            existingBackups.unshift(backup);
+            // Keep only last 3 backups
+            if (existingBackups.length > 3) {
+                existingBackups.pop();
+            }
+            localStorage.setItem('lemma_wallet_backups', JSON.stringify(existingBackups));
+            
+            console.log('[Lemma] Wallet data backed up to localStorage');
+            return backup;
+        } catch (e) {
+            console.warn('[Lemma] Backup failed:', e.message);
+            return null;
+        }
+    }
+    
+    /**
+     * Clear all wallet data from IndexedDB stores.
+     * Used when replacing an existing wallet during device linking.
+     * @private
+     */
+    async _clearWalletData() {
+        try {
+            // Clear all stores
+            const stores = ['secrets', 'passkey', 'lemmas', 'issuers', 'session', 'revocations'];
+            
+            for (const storeName of stores) {
+                try {
+                    const tx = this.db.transaction(storeName, 'readwrite');
+                    const store = tx.objectStore(storeName);
+                    await new Promise((resolve, reject) => {
+                        const request = store.clear();
+                        request.onsuccess = () => resolve();
+                        request.onerror = () => reject(request.error);
+                    });
+                } catch (e) {
+                    console.warn(`[Lemma] Could not clear store ${storeName}:`, e.message);
+                }
+            }
+            
+            // Clear session state
+            this.session = {
+                isUnlocked: false,
+                unlockedAt: null,
+                expiresAt: null,
+                walletSecret: null
+            };
+            
+            console.log('[Lemma] Wallet data cleared');
+            return true;
+        } catch (e) {
+            console.error('[Lemma] Clear wallet data failed:', e);
+            throw new Error('Failed to clear existing wallet data');
+        }
+    }
+    
+    /**
+     * Get list of wallet backups (for recovery UI)
+     * @returns {Array} List of backup objects with timestamps
+     */
+    getWalletBackups() {
+        try {
+            return JSON.parse(localStorage.getItem('lemma_wallet_backups') || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+    
+    /**
+     * Restore wallet from a backup
+     * @param {number} backupIndex - Index of backup to restore (0 = most recent)
+     * @returns {Object} { success, message }
+     */
+    async restoreWalletFromBackup(backupIndex = 0) {
+        await this.init();
+        
+        const backups = this.getWalletBackups();
+        if (!backups[backupIndex]) {
+            throw new Error('Backup not found');
+        }
+        
+        const backup = backups[backupIndex];
+        
+        // Clear current data first
+        await this._clearWalletData();
+        
+        // Restore secret
+        if (backup.secret) {
+            await this._put('secrets', backup.secret);
+        }
+        
+        // Restore wallet ID
+        if (backup.walletId) {
+            await this._put('passkey', backup.walletId);
+        }
+        
+        // Restore lemmas
+        if (backup.lemmas) {
+            for (const lemma of backup.lemmas) {
+                await this._put('lemmas', lemma);
+            }
+        }
+        
+        // Restore issuers
+        if (backup.issuers) {
+            for (const issuer of backup.issuers) {
+                await this._put('issuers', issuer);
+            }
+        }
+        
+        console.log('[Lemma] Wallet restored from backup');
+        
+        return {
+            success: true,
+            needsPasskey: true,
+            message: 'Wallet restored. Create a passkey to secure it.',
+            restoredAt: Date.now(),
+            backupTimestamp: backup.timestamp
         };
     }
     

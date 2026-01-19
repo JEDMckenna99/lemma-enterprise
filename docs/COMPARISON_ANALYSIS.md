@@ -9,7 +9,7 @@
 | **Security** | Server-trusting model | Client-verifiable proofs | **Lemma** |
 | **Privacy** | Centralized tracking | PPID unlinkability | **Lemma** |
 | **Operational Cost** | ~$0.01-0.05/MAU | ~$0.001/MAU | **Lemma (10-50x)** |
-| **Network Calls** | 5-7 per login | 0 per login | **Lemma** |
+| **Network Calls** | 5-7 per login | 1 (issuance only) | **Lemma (5-7× fewer)** |
 | **Offline Capability** | None | Full | **Lemma** |
 | **Vendor Lock-in** | High | None | **Lemma** |
 | **Maturity** | Production-grade | Emerging | **Traditional** |
@@ -110,6 +110,11 @@ SESSION_CONFIG = {
     // Total: 8 days without full re-authentication
 }
 ```
+
+**Session Sync Hardening (Server-Side):**
+- CORS allowlist for credentialed requests (no wildcard origins)
+- CSRF double-submit token required for session sync and credential operations
+- Session tokens include random nonce + HMAC signature
 
 ---
 
@@ -226,7 +231,7 @@ Sites CANNOT correlate: Different identifiers
 └────────────────────────────────────────────────────────────┘
 ```
 
-#### Lemma (Per Login Session)
+#### Lemma (Per Login Session) - Current Implementation
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -244,6 +249,91 @@ Sites CANNOT correlate: Different identifiers
 
 * Revocation sync is background, once per hour, non-blocking
 ```
+
+### 3.1.1 Detailed Scenario: User Logs Into 3 Sites
+
+**Traditional Auth (Auth0/Okta):**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  EVENT                          │ CALLS │ WHAT HAPPENS      │
+├─────────────────────────────────────────────────────────────┤
+│  Site A - First login           │   3   │ OAuth flow→token  │
+│  Site A - Session checks (×5/hr)│  10   │ Validate token    │
+│  Site A - Token refresh (×2)    │   2   │ Refresh endpoint  │
+│  Site B - First login           │   3   │ OAuth flow→token  │
+│  Site B - Session checks (×3/hr)│   6   │ Validate token    │
+│  Site B - Token refresh (×1)    │   1   │ Refresh endpoint  │
+│  Site C - First login           │   3   │ OAuth flow→token  │
+│  Site C - Session checks (×2/hr)│   4   │ Validate token    │
+├─────────────────────────────────────────────────────────────┤
+│  TOTAL NETWORK CALLS            │  32+  │ All require server│
+│  SERVER LOAD                    │  32+  │ Auth server hit   │
+│  LATENCY ADDED                  │~1.5-3s│ Total auth latency│
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Lemma (With Server Sync for Unified Wallet):**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  EVENT                          │ CALLS │ WHAT HAPPENS      │
+├─────────────────────────────────────────────────────────────┤
+│  Unlock wallet (once per day)   │   1   │ Passkey + cookie  │
+│  Site A - Credential issuance   │   1   │ Issue + DB sync   │
+│  Site A - All verifications     │   0   │ Local Ed25519     │
+│  Site B - Bridge session check  │   0   │ Cookie validates  │
+│  Site B - Credential issuance   │   1   │ Issue + DB sync   │
+│  Site B - All verifications     │   0   │ Local Ed25519     │
+│  Site C - Bridge session check  │   0   │ Cookie validates  │
+│  Site C - Credential issuance   │   1   │ Issue + DB sync   │
+│  Site C - All verifications     │   0   │ Local Ed25519     │
+│  View wallet (optional)         │   1   │ Fetch from DB     │
+├─────────────────────────────────────────────────────────────┤
+│  TOTAL NETWORK CALLS            │  4-5  │ Only issuance     │
+│  SERVER LOAD                    │  4-5  │ Minimal hits      │
+│  LATENCY ADDED                  │ ~50ms │ Issuance only     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 3.1.2 Network Call Categories
+
+| Category | Traditional | Lemma | Reduction |
+|----------|-------------|-------|-----------|
+| **Authentication** | 3-5 per login | 1 (first time) | **80-90%** |
+| **Session validation** | Every request | 0 (local) | **100%** |
+| **Token refresh** | Hourly | Never | **100%** |
+| **Permission check** | Per request | 0 (local) | **100%** |
+| **Credential issuance** | N/A | 1 per cred | N/A |
+| **Wallet sync** | N/A | 1 per issuance | N/A |
+
+### 3.1.3 When Lemma Server Is Called (Complete List)
+
+| Action | Calls | When | Purpose |
+|--------|-------|------|---------|
+| Wallet unlock | 1 | Once per 24hr | Passkey auth |
+| Set session cookie | 1 | After unlock | Cross-site session |
+| Credential issuance | 1 | First site access | Sign credential |
+| Credential DB sync | 1 | After issuance | Unified wallet |
+| Fetch wallet (UI) | 1 | View lemma.id/wallet | Display all creds |
+| Revocation sync | 1 | Hourly, background | Security update |
+
+**NEVER calls server for:**
+- ✗ Session validation (local cookie + IndexedDB)
+- ✗ Token refresh (no tokens!)
+- ✗ Permission verification (local Ed25519)
+- ✗ Credential verification (local crypto)
+- ✗ User info lookup (in credential)
+
+### 3.1.4 Server Load at Scale (Daily)
+
+| MAU | Traditional | Lemma | Savings |
+|-----|-------------|-------|---------|
+| 1K | 32,000 req | 4,000 req | **8× fewer** |
+| 10K | 320,000 req | 40,000 req | **8× fewer** |
+| 100K | 3.2M req | 400K req | **8× fewer** |
+| 1M | 32M req | 4M req | **8× fewer** |
+
+**Key Insight:** After credential issuance, all verification is **100% local**.
+The server sync is purely for the **unified wallet view** convenience feature.
 
 ### 3.2 Infrastructure Cost Comparison
 
@@ -280,6 +370,183 @@ Traditional (Auth0):  100,000 × $0.02 = $2,000/month
 Lemma:                Fixed ~$150/month + negligible per-user
 
 Savings: ~$1,850/month = $22,000/year
+```
+
+### 3.2.1 Cost Scaling: Users × Sites
+
+#### Traditional Auth: Linear Cost Growth
+
+Traditional auth costs scale **linearly** with both users AND authentication events:
+
+```
+Cost = (MAU × per_user_cost) + (auth_events × compute_cost)
+
+Where:
+- MAU grows with your user base
+- Auth events = users × logins × session_checks × sites
+```
+
+**Auth0 Pricing at Scale:**
+
+| MAU | Sites | Daily Auth Events | Monthly Cost | Cost/User |
+|-----|-------|-------------------|--------------|-----------|
+| 1,000 | 1 | 32,000 | $70 | $0.07 |
+| 1,000 | 3 | 96,000 | $70 | $0.07 |
+| 10,000 | 1 | 320,000 | $700 | $0.07 |
+| 10,000 | 3 | 960,000 | $700+ | $0.07+ |
+| 100,000 | 1 | 3.2M | $7,000 | $0.07 |
+| 100,000 | 3 | 9.6M | $7,000+ | $0.07+ |
+| 1,000,000 | 1 | 32M | $35,000+ | $0.035 |
+| 1,000,000 | 3 | 96M | $35,000+ | $0.035+ |
+
+*Note: Enterprise tiers may have volume discounts but require contracts*
+
+#### Lemma: Fixed + Marginal Cost Growth
+
+Lemma costs are **mostly fixed** because verification is local:
+
+```
+Cost = Fixed_Infrastructure + (Issuance_Events × marginal_cost)
+
+Where:
+- Fixed infrastructure: ~$100-300/month (server, DB, CDN)
+- Issuance events: Only when NEW credentials are created
+- Verification: $0 (100% local)
+```
+
+**Lemma Pricing at Scale:**
+
+| MAU | Sites | Issuance Events* | Monthly Cost | Cost/User |
+|-----|-------|------------------|--------------|-----------|
+| 1,000 | 1 | 1,000 | ~$150 | $0.15 |
+| 1,000 | 3 | 3,000 | ~$150 | $0.15 |
+| 10,000 | 1 | 10,000 | ~$200 | $0.02 |
+| 10,000 | 3 | 30,000 | ~$250 | $0.025 |
+| 100,000 | 1 | 100,000 | ~$300 | $0.003 |
+| 100,000 | 3 | 300,000 | ~$400 | $0.004 |
+| 1,000,000 | 1 | 1,000,000 | ~$500 | $0.0005 |
+| 1,000,000 | 3 | 3,000,000 | ~$800 | $0.0008 |
+
+*Issuance = new credential per user per site (one-time, not per login)*
+
+### 3.2.2 Cost Comparison Chart
+
+```
+Monthly Cost ($) vs MAU
+                                                    
+$40,000 ┤                                    ╭── Traditional (Auth0)
+        │                               ╭────╯
+$30,000 ┤                          ╭────╯
+        │                     ╭────╯
+$20,000 ┤                ╭────╯
+        │           ╭────╯
+$10,000 ┤      ╭────╯
+        │ ╭────╯
+        │╭╯    ════════════════════════════ Lemma (nearly flat)
+   $500 ┼═══════════════════════════════════════════════════
+        │
+      0 ┼───────┬───────┬───────┬───────┬───────┬───────┬──▶
+        0    100K    200K    400K    600K    800K    1M   MAU
+```
+
+### 3.2.3 Cost Scaling Formula
+
+**Traditional Auth:**
+```
+Monthly_Cost = Base_Fee + (MAU × Per_User_Rate)
+
+Example (Auth0 Professional):
+- Base: $240/month
+- Per MAU: $0.07 (after 500 free)
+- 100K users: $240 + (99,500 × $0.07) = $7,205/month
+```
+
+**Lemma:**
+```
+Monthly_Cost = Infrastructure + (New_Credentials × DB_Cost)
+
+Example:
+- Infrastructure: $200/month (Heroku + Postgres)
+- DB write cost: ~$0.0001 per credential
+- 100K users × 3 sites: $200 + (300K × $0.0001) = $230/month
+```
+
+### 3.2.4 Multi-Site Cost Impact
+
+The cost advantage grows dramatically with multiple sites:
+
+| Scenario | Traditional | Lemma | Savings |
+|----------|-------------|-------|---------|
+| 10K users, 1 site | $700/mo | $200/mo | 3.5× |
+| 10K users, 3 sites | $700/mo | $250/mo | 2.8× |
+| 10K users, 10 sites | $700/mo | $350/mo | 2× |
+| 100K users, 1 site | $7,000/mo | $300/mo | **23×** |
+| 100K users, 3 sites | $7,000/mo | $400/mo | **17×** |
+| 100K users, 10 sites | $7,000/mo | $600/mo | **12×** |
+| 1M users, 1 site | $35,000/mo | $500/mo | **70×** |
+| 1M users, 3 sites | $35,000/mo | $800/mo | **44×** |
+| 1M users, 10 sites | $35,000/mo | $1,500/mo | **23×** |
+
+**Why Lemma scales better:**
+- Traditional: Charges per user regardless of auth events
+- Lemma: Only charges for storage (credentials) and one-time issuance
+- All verification is FREE (local crypto)
+
+### 3.2.5 What You're Paying For
+
+**Traditional Auth (recurring costs per user):**
+```
+┌────────────────────────────────────────────────────────┐
+│  ✓ Token generation (every login)                      │
+│  ✓ Token validation (every request)                    │
+│  ✓ Token refresh (hourly)                              │
+│  ✓ Session storage (Redis/DB)                          │
+│  ✓ User profile storage                                │
+│  ✓ MFA infrastructure                                  │
+│  ✓ Auth server compute                                 │
+│  ✓ Network egress                                      │
+└────────────────────────────────────────────────────────┘
+```
+
+**Lemma (one-time costs per credential):**
+```
+┌────────────────────────────────────────────────────────┐
+│  ✓ Credential signing (one-time per site)              │
+│  ✓ Credential storage in DB (~1KB per cred)            │
+│  ✓ Session cookie (negligible)                         │
+│                                                        │
+│  FREE (client-side):                                   │
+│  ✗ All verification                                    │
+│  ✗ All session checks                                  │
+│  ✗ All permission checks                               │
+│  ✗ Token refresh (no tokens!)                          │
+└────────────────────────────────────────────────────────┘
+```
+
+### 3.2.6 Break-Even Analysis
+
+At what scale does Lemma become cheaper?
+
+```
+Break-even point: ~500 MAU
+
+Below 500 MAU:
+- Auth0 free tier (7,000 MAU) may be cheaper
+- Lemma fixed costs (~$150/mo) higher than $0
+
+Above 500 MAU:
+- Lemma: ~$150-200 fixed
+- Auth0: 500 × $0.07 = $35 (but grows linearly)
+
+At 5,000 MAU:
+- Auth0: ~$350/month
+- Lemma: ~$175/month
+- Lemma wins by 2×
+
+At 50,000 MAU:
+- Auth0: ~$3,500/month
+- Lemma: ~$250/month
+- Lemma wins by 14×
 ```
 
 ### 3.3 Scalability Characteristics

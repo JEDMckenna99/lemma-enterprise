@@ -5,8 +5,7 @@ Handles real-time wallet transfers between devices
 Multi-dyno compatible with Redis fallback
 """
 
-from flask import Blueprint, request, jsonify, Response
-from flask_cors import cross_origin
+from flask import Blueprint, request, jsonify, make_response
 import json
 import time
 import uuid
@@ -14,6 +13,14 @@ import hashlib
 import threading
 import os
 from datetime import datetime, timedelta
+
+from api.wallet_session_sync import (
+    SESSION_COOKIE_NAME,
+    validate_session_token,
+    _cors_headers,
+    _origin_allowed,
+    _validate_csrf,
+)
 
 # Try Redis first, fallback to in-memory
 try:
@@ -156,8 +163,7 @@ class TransferSession:
     def is_expired(self):
         return datetime.now() > self.expires_at
 
-@wallet_transfer_bp.route('/api/wallet/transfer/create-session', methods=['POST'])
-@cross_origin()
+@wallet_transfer_bp.route('/api/wallet/transfer/create-session', methods=['POST', 'OPTIONS'])
 def create_transfer_session():
     """
     Create a new wallet transfer session
@@ -166,34 +172,39 @@ def create_transfer_session():
     SECURITY: Only the PIN-protected /wallet page can initiate transfers
     """
     try:
-        # SECURITY CHECK: Only allow transfers from /wallet page
-        referer = request.headers.get('Referer', '')
-        origin = request.headers.get('Origin', '')
-        
-        # Check if request came from /wallet page
-        valid_origins = [
-            'https://lemma.id/wallet',
-            'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/wallet',
-            'http://localhost:5000/wallet',  # Dev only
-            'http://127.0.0.1:5000/wallet'   # Dev only
-        ]
-        
-        is_valid = any(referer.startswith(valid_origin) for valid_origin in valid_origins)
-        
-        if not is_valid:
-            print(f"🚫 SECURITY: Blocked transfer attempt from {referer or origin or 'unknown'}")
-            return jsonify({
-                'success': False,
-                'error': 'Wallet transfers can only be initiated from the Lemma wallet page'
-            }), 403
+        if request.method == 'OPTIONS':
+            response = make_response()
+            origin = request.headers.get('Origin')
+            response.headers.update(_cors_headers(origin))
+            if not _origin_allowed(origin):
+                return response, 403
+            return response
+
+        origin = request.headers.get('Origin')
+        if not _origin_allowed(origin):
+            return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
+
+        session_token = request.cookies.get(SESSION_COOKIE_NAME)
+        if not session_token or not validate_session_token(session_token):
+            response = jsonify({'success': False, 'error': 'not_authenticated'})
+            response.headers.update(_cors_headers(origin))
+            return response, 401
+
+        if not _validate_csrf():
+            response = jsonify({'success': False, 'error': 'csrf_missing_or_invalid'})
+            response.headers.update(_cors_headers(origin))
+            return response, 403
         
         data = request.get_json()
         
         if not data or 'device_id' not in data:
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Missing device_id'
-            }), 400
+            })
+            response.status_code = 400
+            response.headers.update(_cors_headers(origin))
+            return response
         
         device_id = data['device_id']
         wallet_data = data.get('wallet_data')  # Optional - can be set later
@@ -214,31 +225,39 @@ def create_transfer_session():
         }
         
         if not _storage.set_session(session.session_id, session_data):
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Failed to store session'
-            }), 500
+            })
+            response.status_code = 500
+            response.headers.update(_cors_headers(origin))
+            return response
             
         debug_session_state("SESSION CREATED", session.session_id)
         
         print(f"✅ Created transfer session {session.session_id} for device {device_id[:8]}...")
         
-        return jsonify({
+        response = jsonify({
             'success': True,
             'session_id': session.session_id,
             'qr_data': session.to_qr_data(),
             'expires_at': int(session.expires_at.timestamp() * 1000)
         })
+        response.headers.update(_cors_headers(origin))
+        return response
         
     except Exception as e:
         print(f"❌ Failed to create transfer session: {e}")
-        return jsonify({
+        response = jsonify({
             'success': False,
             'error': str(e)
-        }), 500
+        })
+        response.status_code = 500
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        return response
 
-@wallet_transfer_bp.route('/api/wallet/transfer/set-wallet', methods=['POST'])
-@cross_origin()
+@wallet_transfer_bp.route('/api/wallet/transfer/set-wallet', methods=['POST', 'OPTIONS'])
 def set_wallet_data():
     """
     Set wallet data for an existing transfer session
@@ -246,29 +265,39 @@ def set_wallet_data():
     SECURITY: Only the PIN-protected /wallet page can set wallet data
     """
     try:
-        # SECURITY CHECK: Only allow from /wallet page
-        referer = request.headers.get('Referer', '')
-        valid_origins = [
-            'https://lemma.id/wallet',
-            'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/wallet',
-            'http://localhost:5000/wallet',
-            'http://127.0.0.1:5000/wallet'
-        ]
-        
-        if not any(referer.startswith(origin) for origin in valid_origins):
-            print(f"🚫 SECURITY: Blocked set-wallet attempt from {referer or 'unknown'}")
-            return jsonify({
-                'success': False,
-                'error': 'Wallet data can only be set from the Lemma wallet page'
-            }), 403
+        if request.method == 'OPTIONS':
+            response = make_response()
+            origin = request.headers.get('Origin')
+            response.headers.update(_cors_headers(origin))
+            if not _origin_allowed(origin):
+                return response, 403
+            return response
+
+        origin = request.headers.get('Origin')
+        if not _origin_allowed(origin):
+            return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
+
+        session_token = request.cookies.get(SESSION_COOKIE_NAME)
+        if not session_token or not validate_session_token(session_token):
+            response = jsonify({'success': False, 'error': 'not_authenticated'})
+            response.headers.update(_cors_headers(origin))
+            return response, 401
+
+        if not _validate_csrf():
+            response = jsonify({'success': False, 'error': 'csrf_missing_or_invalid'})
+            response.headers.update(_cors_headers(origin))
+            return response, 403
         
         data = request.get_json()
         
         if not data or 'session_id' not in data or 'wallet_data' not in data:
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Missing session_id or wallet_data'
-            }), 400
+            })
+            response.status_code = 400
+            response.headers.update(_cors_headers(origin))
+            return response
         
         session_id = data['session_id']
         wallet_data = data['wallet_data']
@@ -279,59 +308,88 @@ def set_wallet_data():
         session_data = _storage.get_session(session_id)
         if not session_data:
             debug_session_state("SESSION NOT FOUND", session_id)
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Transfer session not found'
-            }), 404
+            })
+            response.status_code = 404
+            response.headers.update(_cors_headers(origin))
+            return response
         
         # Check if expired
         expires_at = datetime.fromisoformat(session_data['expires_at'])
         if datetime.now() > expires_at:
             _storage.delete_session(session_id)
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Transfer session expired'
-            }), 410
+            })
+            response.status_code = 410
+            response.headers.update(_cors_headers(origin))
+            return response
         
         # Update session data
         session_data['wallet_data'] = wallet_data
         session_data['status'] = 'ready'
         
         if not _storage.set_session(session_id, session_data):
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Failed to update session'
-            }), 500
+            })
+            response.status_code = 500
+            response.headers.update(_cors_headers(origin))
+            return response
             
         debug_session_state("WALLET DATA SET", session_id)
         print(f"✅ Wallet data set for session {session_id}")
         
-        return jsonify({
+        response = jsonify({
             'success': True,
             'status': 'ready'
         })
+        response.headers.update(_cors_headers(origin))
+        return response
         
     except Exception as e:
         print(f"❌ Failed to set wallet data: {e}")
-        return jsonify({
+        response = jsonify({
             'success': False,
             'error': str(e)
-        }), 500
+        })
+        response.status_code = 500
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        return response
 
-@wallet_transfer_bp.route('/api/wallet/transfer/get-wallet', methods=['POST'])
-@cross_origin()
+@wallet_transfer_bp.route('/api/wallet/transfer/get-wallet', methods=['POST', 'OPTIONS'])
 def get_wallet_data():
     """
     Get wallet data from transfer session
     """
     try:
+        if request.method == 'OPTIONS':
+            response = make_response()
+            origin = request.headers.get('Origin')
+            response.headers.update(_cors_headers(origin))
+            if not _origin_allowed(origin):
+                return response, 403
+            return response
+
+        origin = request.headers.get('Origin')
+        if not _origin_allowed(origin):
+            return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
+
         data = request.get_json()
         
         if not data or 'session_id' not in data or 'transfer_key' not in data:
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Missing session_id or transfer_key'
-            }), 400
+            })
+            response.status_code = 400
+            response.headers.update(_cors_headers(origin))
+            return response
         
         session_id = data['session_id']
         transfer_key = data['transfer_key']
@@ -342,31 +400,43 @@ def get_wallet_data():
         # Get session from storage
         session_data = _storage.get_session(session_id)
         if not session_data:
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Transfer session not found'
-            }), 404
+            })
+            response.status_code = 404
+            response.headers.update(_cors_headers(origin))
+            return response
         
         # Check if expired
         expires_at = datetime.fromisoformat(session_data['expires_at'])
         if datetime.now() > expires_at:
             _storage.delete_session(session_id)
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Transfer session expired'
-            }), 410
+            })
+            response.status_code = 410
+            response.headers.update(_cors_headers(origin))
+            return response
         
         if session_data['transfer_key'] != transfer_key:
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Invalid transfer key'
-            }), 403
+            })
+            response.status_code = 403
+            response.headers.update(_cors_headers(origin))
+            return response
         
         if not session_data['wallet_data']:
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Wallet data not ready yet'
-            }), 202  # Accepted, but not ready
+            })
+            response.status_code = 202  # Accepted, but not ready
+            response.headers.update(_cors_headers(origin))
+            return response
         
         # Mark as completed but keep session for multiple retrievals
         wallet_data = session_data['wallet_data']
@@ -378,53 +448,82 @@ def get_wallet_data():
         
         print(f"✅ Wallet transferred from session {session_id} to device {target_device_id[:8]}...")
         
-        return jsonify({
+        response = jsonify({
             'success': True,
             'wallet_data': wallet_data,
             'transfer_completed': True
         })
+        response.headers.update(_cors_headers(origin))
+        return response
         
     except Exception as e:
         print(f"❌ Failed to get wallet data: {e}")
-        return jsonify({
+        response = jsonify({
             'success': False,
             'error': str(e)
-        }), 500
+        })
+        response.status_code = 500
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        return response
 
-@wallet_transfer_bp.route('/api/wallet/transfer/status/<session_id>', methods=['GET'])
-@cross_origin()
+@wallet_transfer_bp.route('/api/wallet/transfer/status/<session_id>', methods=['GET', 'OPTIONS'])
 def get_transfer_status(session_id):
     """
     Get transfer session status
     """
     try:
+        if request.method == 'OPTIONS':
+            response = make_response()
+            origin = request.headers.get('Origin')
+            response.headers.update(_cors_headers(origin))
+            if not _origin_allowed(origin):
+                return response, 403
+            return response
+
+        origin = request.headers.get('Origin')
+        if not _origin_allowed(origin):
+            return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
+
         transfer_sessions, transfer_lock = get_transfer_sessions()
         with transfer_lock:
             if session_id not in transfer_sessions:
-                return jsonify({
+            response = jsonify({
                     'success': False,
                     'error': 'Transfer session not found'
-                }), 404
+            })
+            response.status_code = 404
+                response.headers.update(_cors_headers(origin))
+                return response
             
             session = transfer_sessions[session_id]
             
             if session.is_expired():
                 del transfer_sessions[session_id]
-                return jsonify({
+            response = jsonify({
                     'success': False,
                     'error': 'Transfer session expired'
-                }), 410
+            })
+            response.status_code = 410
+                response.headers.update(_cors_headers(origin))
+                return response
         
-        return jsonify({
+        response = jsonify({
             'success': True,
             'status': session.status,
             'expires_at': int(session.expires_at.timestamp() * 1000),
             'has_wallet_data': bool(session.wallet_data)
         })
+        response.headers.update(_cors_headers(origin))
+        return response
         
     except Exception as e:
         print(f"❌ Failed to get transfer status: {e}")
-        return jsonify({
+        response = jsonify({
             'success': False,
             'error': str(e)
-        }), 500
+        })
+        response.status_code = 500
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        return response

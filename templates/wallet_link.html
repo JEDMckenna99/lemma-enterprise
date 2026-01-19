@@ -152,7 +152,7 @@
 {% block content %}
 <div class="link-container">
     <header class="link-header">
-        <h1>🔗 Link Device</h1>
+        <h1>Link Device</h1>
         <p>Connect this device to your existing wallet</p>
     </header>
 
@@ -181,7 +181,7 @@
         </div>
         
         <button class="btn btn-primary" id="scan-btn" onclick="startScanner()">
-            📷 Scan QR Code
+            Scan QR Code
         </button>
 
         <div class="divider">or paste code manually</div>
@@ -196,7 +196,7 @@
         </button>
 
         <div class="security-note">
-            <strong>🔒 Security Note</strong>
+            <strong>Security Note</strong>
             Only link devices you physically control. The link code expires in 60 seconds 
             and can only be used once.
         </div>
@@ -207,7 +207,7 @@
         <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Step 2: Linking Wallet</h2>
         
         <div id="link-status" class="status-box info">
-            🔄 Linking wallet...
+            Linking wallet...
         </div>
     </div>
 
@@ -216,12 +216,12 @@
         <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Step 3: Secure This Device</h2>
         
         <div id="passkey-status" class="status-box success">
-            ✅ Wallet linked successfully!<br>
+            Wallet linked successfully!<br>
             Now create a passkey to secure it on this device.
         </div>
 
         <button class="btn btn-success" onclick="createPasskey()">
-            🔑 Create Passkey
+            Create Passkey
         </button>
 
         <p style="text-align: center; color: #6b7280; font-size: 0.85rem; margin-top: 12px;">
@@ -232,7 +232,6 @@
     <!-- Step 4: Complete -->
     <div id="complete-content" class="card hidden">
         <div class="status-box success">
-            <div style="font-size: 3rem; margin-bottom: 12px;">🎉</div>
             <strong style="font-size: 1.2rem;">Device Linked!</strong><br><br>
             Your wallet is now available on this device.<br>
             You can use it on any site that supports Lemma.
@@ -244,7 +243,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=2180"></script>
+<script src="/static/js/lemma-wallet.js?v=2240"></script>
 <script src="https://unpkg.com/@nicolo-ribaudo/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 let wallet = null;
@@ -292,13 +291,13 @@ async function startScanner() {
             html5QrCode = null;
         }
         scannerActive = false;
-        scanBtn.textContent = '📷 Scan QR Code';
+        scanBtn.textContent = 'Scan QR Code';
         video.srcObject = null;
         return;
     }
     
     try {
-        scanBtn.textContent = '⏹️ Stop Scanner';
+        scanBtn.textContent = 'Stop Scanner';
         scannerActive = true;
         
         html5QrCode = new Html5Qrcode("scanner-container");
@@ -310,9 +309,9 @@ async function startScanner() {
         );
     } catch (e) {
         console.error('Scanner error:', e);
-        document.getElementById('status').textContent = '❌ Camera access denied or not available';
+        document.getElementById('status').textContent = 'Camera access denied or not available';
         document.getElementById('status').className = 'status-box error';
-        scanBtn.textContent = '📷 Scan QR Code';
+        scanBtn.textContent = 'Scan QR Code';
         scannerActive = false;
     }
 }
@@ -334,7 +333,7 @@ async function onQrCodeScanned(decodedText) {
 async function submitManualCode() {
     const qrData = document.getElementById('qr-data').value.trim();
     if (!qrData) {
-        document.getElementById('status').textContent = '❌ Please paste the QR code data';
+        document.getElementById('status').textContent = 'Please paste the QR code data';
         document.getElementById('status').className = 'status-box error';
         return;
     }
@@ -342,28 +341,41 @@ async function submitManualCode() {
     await processLinkCode(qrData);
 }
 
-async function processLinkCode(qrData) {
+// Store pending link data for conflict resolution
+let pendingLinkData = null;
+
+async function processLinkCode(qrData, replaceExisting = false) {
     setStep(2);
     
     const linkStatus = document.getElementById('link-status');
-    linkStatus.textContent = '🔄 Decrypting and verifying link code...';
+    linkStatus.textContent = 'Decrypting and verifying link code...';
     linkStatus.className = 'status-box info';
     
     try {
         await initWallet();
         
-        // Check if wallet already exists
-        const info = await wallet.getWalletInfo();
-        if (info.hasWalletSecret) {
-            linkStatus.textContent = '❌ This device already has a wallet.\n\nGo to Settings → Clear All to reset, then try again.';
-            linkStatus.className = 'status-box error';
+        const result = await wallet.linkDevice({ 
+            qrData: qrData,
+            replaceExisting: replaceExisting
+        });
+        
+        // Handle conflict - show user choice
+        if (result.conflict) {
+            pendingLinkData = qrData;
+            showConflictResolution(result);
             return;
         }
         
-        const result = await wallet.linkDevice({ qrData: qrData });
+        // Handle already linked (same wallet)
+        if (result.alreadyLinked) {
+            linkStatus.innerHTML = 'This wallet is already linked to this device.<br><br>' +
+                '<a href="/wallet/simple" style="color: #10b981; font-weight: 600;">Go to Wallet</a>';
+            linkStatus.className = 'status-box success';
+            return;
+        }
         
         if (result.success) {
-            linkStatus.textContent = '✅ Wallet linked!';
+            linkStatus.textContent = 'Wallet linked!';
             linkStatus.className = 'status-box success';
             
             setTimeout(() => setStep(3), 1000);
@@ -372,7 +384,7 @@ async function processLinkCode(qrData) {
         }
     } catch (e) {
         console.error('Link error:', e);
-        linkStatus.textContent = '❌ ' + e.message;
+        linkStatus.textContent = e.message;
         linkStatus.className = 'status-box error';
         
         // Add retry button
@@ -382,9 +394,51 @@ async function processLinkCode(qrData) {
     }
 }
 
+function showConflictResolution(conflictResult) {
+    const linkStatus = document.getElementById('link-status');
+    linkStatus.className = 'status-box warning';
+    linkStatus.innerHTML = `
+        <strong style="display: block; margin-bottom: 12px;">Wallet Already Exists</strong>
+        <p style="margin-bottom: 16px;">This device has a different wallet. What would you like to do?</p>
+        
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <button class="btn btn-primary" onclick="replaceExistingWallet()" style="margin: 0;">
+                Replace with New Wallet
+            </button>
+            <button class="btn btn-secondary" onclick="keepExistingWallet()" style="margin: 0;">
+                Keep Current Wallet
+            </button>
+        </div>
+        
+        <p style="font-size: 0.8rem; color: #92400e; margin-top: 16px;">
+            Note: Your current wallet data will be backed up locally before replacement.
+        </p>
+    `;
+}
+
+async function replaceExistingWallet() {
+    if (!pendingLinkData) {
+        setStep(1);
+        return;
+    }
+    
+    const linkStatus = document.getElementById('link-status');
+    linkStatus.textContent = 'Replacing wallet...';
+    linkStatus.className = 'status-box info';
+    
+    // Re-process with replaceExisting flag
+    await processLinkCode(pendingLinkData, true);
+    pendingLinkData = null;
+}
+
+function keepExistingWallet() {
+    pendingLinkData = null;
+    window.location.href = '/wallet/simple';
+}
+
 async function createPasskey() {
     const passkeyStatus = document.getElementById('passkey-status');
-    passkeyStatus.textContent = '🔑 Creating passkey...';
+    passkeyStatus.textContent = 'Creating passkey...';
     passkeyStatus.className = 'status-box info';
     
     try {
@@ -392,7 +446,7 @@ async function createPasskey() {
         const result = await wallet.registerPasskey();
         
         if (result.success) {
-            passkeyStatus.textContent = '✅ Passkey created!';
+            passkeyStatus.textContent = 'Passkey created!';
             passkeyStatus.className = 'status-box success';
             
             setTimeout(() => setStep(4), 1000);
@@ -401,7 +455,7 @@ async function createPasskey() {
         }
     } catch (e) {
         console.error('Passkey error:', e);
-        passkeyStatus.textContent = '❌ ' + e.message;
+        passkeyStatus.textContent = e.message;
         passkeyStatus.className = 'status-box error';
     }
 }
@@ -411,14 +465,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         await initWallet();
         
-        // Check if already has wallet
+        // Check if already has wallet - show info but allow linking (smart conflict resolution handles it)
         const info = await wallet.getWalletInfo();
         if (info.hasWalletSecret && info.hasPasskey) {
-            // Already has a wallet
-            document.getElementById('status').innerHTML = '⚠️ This device already has a wallet.<br><br>' +
-                '<a href="/wallet/simple" style="color: #0ea5e9;">Go to your wallet →</a>';
+            document.getElementById('status').innerHTML = 
+                'This device already has a wallet.<br>' +
+                'You can link a different wallet below, or <a href="/wallet/simple" style="color: #0ea5e9;">go to your current wallet</a>.';
             document.getElementById('status').className = 'status-box warning';
-            return;
+        } else if (info.hasWalletSecret && !info.hasPasskey) {
+            document.getElementById('status').innerHTML = 
+                'Incomplete wallet setup detected. Link a wallet below to complete setup.';
+            document.getElementById('status').className = 'status-box info';
         }
         
         // Check for link code in URL hash (from QR scan)
@@ -432,7 +489,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 JSON.parse(qrData);
                 
                 console.log('Found link code in URL hash - auto-processing...');
-                document.getElementById('status').innerHTML = '✅ Link code detected from QR scan!<br>Processing...';
+                document.getElementById('status').innerHTML = 'Link code detected from QR scan! Processing...';
                 document.getElementById('status').className = 'status-box success';
                 
                 // Auto-process the link code

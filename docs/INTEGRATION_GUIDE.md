@@ -51,9 +51,9 @@
 
 ---
 
-## Quick Start
+## Quick Start (Golden Path)
 
-### 1. Add the SDK
+### Step 1: Add the SDK
 
 ```html
 <!-- Recommended: Script tag -->
@@ -66,7 +66,7 @@ Or via NPM:
 npm install @lemma/wallet-sdk
 ```
 
-### 2. Initialize
+### Step 2: Initialize Wallet
 
 ```javascript
 // The wallet auto-initializes, but you can wait for it
@@ -78,28 +78,78 @@ console.log('Has passkey:', info.hasPasskey);
 console.log('Is unlocked:', info.isUnlocked);
 ```
 
-### 3. Handle Authentication
+### Step 3: Login + IAM (One Passkey Per Day)
 
 ```javascript
-async function handleAuth() {
-    // Check if already authenticated
-    if (lemmaWallet.isAuthenticated()) {
-        console.log('User is authenticated!');
-        return;
-    }
-    
-    // Check if passkey exists
+async function loginAndGetPermission() {
+    await lemmaWallet.init();
+
     const info = await lemmaWallet.getWalletInfo();
-    
     if (info.hasPasskey) {
-        // Returning user - unlock wallet
-        await lemmaWallet.unlock();
+        await lemmaWallet.unlock();       // Returning user
     } else {
-        // New user - register passkey
-        await lemmaWallet.registerPasskey();
+        await lemmaWallet.registerPasskey(); // New user
     }
+
+    // Fetch or issue a permission lemma for your site
+    const credentials = await lemmaWallet.getCredentials('permission');
+    const myCredential = credentials.find(c => c.claims?.siteId === 'mysite.com');
+    if (!myCredential) {
+        throw new Error('No permission lemma for this site yet');
+    }
+
+    return myCredential;
 }
 ```
+
+### Step 4: Cross-Site Session Sync (for third-party origins)
+
+If your app runs on a different origin than `lemma.id`, use the session sync flow:
+
+```javascript
+// 1) Redirect user to unlock wallet (once per day)
+const unlockUrl = `https://lemma.id/wallet/unlock?return_url=${encodeURIComponent(window.location.href)}`;
+window.location.href = unlockUrl;
+
+// 2) After redirect back, call session-sync with CSRF header
+const csrfToken = getCookie('lemma_wallet_csrf');
+
+const response = await fetch('https://lemma.id/api/wallet/session-sync', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-Lemma-CSRF': csrfToken
+    }
+});
+
+const data = await response.json();
+if (data.success) {
+    // data.session + data.credentials
+    console.log('Session valid until:', new Date(data.session.expires_at * 1000));
+}
+
+function getCookie(name) {
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? decodeURIComponent(match[2]) : null;
+}
+```
+
+**Server configuration required for cross-site session sync:**
+- `LEMMA_ALLOWED_ORIGINS` (comma-separated origins)
+- `LEMMA_ALLOWED_ORIGIN_SUFFIXES` (comma-separated domain suffixes)
+- `LEMMA_ALLOW_DEV_ORIGINS=1` (optional for localhost)
+- `SESSION_SECRET` must be set in production
+
+---
+
+## Minimal Integration Checklist (Login + IAM)
+
+- Load `lemma-wallet.js` or install the SDK
+- Call `lemmaWallet.init()` on page load
+- Use `lemmaWallet.unlock()` (returning) or `lemmaWallet.registerPasskey()` (new)
+- Retrieve the permission lemma for your site
+- Verify locally with `lemmaWallet.verifyLemma(...)`
 
 ---
 
