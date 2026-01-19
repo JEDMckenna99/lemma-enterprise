@@ -158,6 +158,38 @@
         </div>
     </div>
 
+    <!-- Device Management -->
+    <div class="card" style="border: 2px solid #10b981; background: linear-gradient(135deg, #ecfdf5, #d1fae5);">
+        <h2 style="color: #065f46;">📱 Device Management</h2>
+        <div id="device-status" class="status-box info">
+            Checking device status...
+        </div>
+        <div class="actions">
+            <button class="btn btn-success" id="add-device-btn" onclick="showAddDevice()">📱 Add Another Device</button>
+            <button class="btn btn-secondary" onclick="window.location.href='/wallet/link'">🔗 Link to Existing Wallet</button>
+        </div>
+        
+        <!-- QR Code Display (hidden by default) -->
+        <div id="qr-display" style="display: none; margin-top: 16px; text-align: center;">
+            <div style="background: white; padding: 20px; border-radius: 12px; display: inline-block;">
+                <canvas id="qr-canvas" style="width: 200px; height: 200px;"></canvas>
+            </div>
+            <p style="margin-top: 12px; font-size: 0.9rem; color: #065f46;">
+                Scan this QR code on your new device at<br>
+                <strong>lemma.id/wallet/link</strong>
+            </p>
+            <div id="qr-timer" style="font-size: 1.2rem; font-weight: 600; color: #92400e; margin-top: 8px;">
+                ⏱️ Expires in 60s
+            </div>
+            <button class="btn btn-secondary" style="margin-top: 12px;" onclick="hideQR()">Close</button>
+        </div>
+
+        <p style="color: #065f46; font-size: 0.8rem; margin-top: 12px;">
+            <strong>Add Device:</strong> Generate a QR code to link another device to this wallet.<br>
+            <strong>Link to Existing:</strong> This device will join an existing wallet.
+        </p>
+    </div>
+
     <!-- Credentials -->
     <div class="card">
         <h2>Credentials</h2>
@@ -181,7 +213,8 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=2170"></script>
+<script src="/static/js/lemma-wallet.js?v=2180"></script>
+<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script>
 // =============================================
 // SDK-ONLY WALLET PAGE
@@ -758,6 +791,107 @@ async function simulateThirdParty() {
     }
 }
 
+// =============================================
+// DEVICE MANAGEMENT
+// =============================================
+
+let qrTimerInterval = null;
+
+async function updateDeviceStatus() {
+    const statusEl = document.getElementById('device-status');
+    const addBtn = document.getElementById('add-device-btn');
+    
+    try {
+        await initSDK();
+        const info = await wallet.getWalletInfo();
+        
+        if (info.hasWalletSecret && info.hasPasskey) {
+            statusEl.innerHTML = `✅ <strong>Wallet Active</strong><br>
+You can add another device to access this wallet.`;
+            statusEl.className = 'status-box unlocked';
+            addBtn.disabled = false;
+        } else if (info.hasWalletSecret) {
+            statusEl.innerHTML = `⚠️ <strong>Wallet Secret Found</strong><br>
+Create a passkey to secure this device.`;
+            statusEl.className = 'status-box locked';
+            addBtn.disabled = true;
+        } else {
+            statusEl.innerHTML = `📱 <strong>No Wallet</strong><br>
+Create a new wallet or link to an existing one.`;
+            statusEl.className = 'status-box info';
+            addBtn.disabled = true;
+        }
+    } catch (e) {
+        statusEl.textContent = '❌ Error: ' + e.message;
+        statusEl.className = 'status-box error';
+    }
+}
+
+async function showAddDevice() {
+    try {
+        await initSDK();
+        
+        // Check if wallet is unlocked
+        if (!wallet.isUnlocked()) {
+            addLog('❌ Wallet must be unlocked to add a device', 'error');
+            alert('Please unlock your wallet first');
+            return;
+        }
+        
+        addLog('=== Generating device link code ===', 'info');
+        
+        const result = await wallet.generateLinkCode();
+        addLog('Link code generated: ' + result.shortCode, 'success');
+        addLog('Expires in: ' + result.expiresIn + 's', 'info');
+        
+        // Generate QR code
+        const qrDisplay = document.getElementById('qr-display');
+        const canvas = document.getElementById('qr-canvas');
+        
+        await QRCode.toCanvas(canvas, result.qrData, {
+            width: 200,
+            margin: 2,
+            color: { dark: '#000000', light: '#ffffff' }
+        });
+        
+        qrDisplay.style.display = 'block';
+        
+        // Start countdown timer
+        let timeLeft = result.expiresIn;
+        const timerEl = document.getElementById('qr-timer');
+        
+        if (qrTimerInterval) clearInterval(qrTimerInterval);
+        
+        qrTimerInterval = setInterval(() => {
+            timeLeft--;
+            timerEl.textContent = `⏱️ Expires in ${timeLeft}s`;
+            
+            if (timeLeft <= 10) {
+                timerEl.style.color = '#dc2626';
+            }
+            
+            if (timeLeft <= 0) {
+                clearInterval(qrTimerInterval);
+                qrTimerInterval = null;
+                hideQR();
+                addLog('Link code expired', 'warn');
+            }
+        }, 1000);
+        
+    } catch (e) {
+        addLog('❌ Failed to generate link code: ' + e.message, 'error');
+        alert('Failed to generate link code: ' + e.message);
+    }
+}
+
+function hideQR() {
+    document.getElementById('qr-display').style.display = 'none';
+    if (qrTimerInterval) {
+        clearInterval(qrTimerInterval);
+        qrTimerInterval = null;
+    }
+}
+
 // Initialize on load
 window.addEventListener('DOMContentLoaded', async () => {
     // Update context info first
@@ -789,6 +923,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         
         await refreshStatus();
         await loadCredentials();
+        await updateDeviceStatus();
     } catch (e) {
         addLog(`Init error: ${e.message}`, 'error');
     }

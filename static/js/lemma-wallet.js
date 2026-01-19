@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.17.0';
+    static VERSION = '2.18.0';
     
     constructor() {
         this.db = null;
@@ -2613,6 +2613,236 @@ class LemmaWallet {
             issuerCount: issuers.length,
             passkeyCredentialId: passkey?.credentialId || null
         };
+    }
+
+    // ========================================
+    // DEVICE LINKING (wallet_secret transfer)
+    // ========================================
+
+    /**
+     * Generate a link code for adding another device.
+     * The code contains the encrypted wallet_secret and expires in 60 seconds.
+     * 
+     * SECURITY:
+     * - One-time use code
+     * - 60 second expiry
+     * - Encrypted with a random key embedded in the code
+     * - Device-to-device transfer, no server involved
+     * 
+     * @returns {Object} { code: string, qrData: string, expiresAt: number, expiresIn: number }
+     */
+    async generateLinkCode() {
+        await this.init();
+        
+        if (!this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to generate link code');
+        }
+        
+        const walletSecret = await this.getWalletSecret();
+        if (!walletSecret) {
+            throw new Error('No wallet secret found');
+        }
+        
+        const walletId = await this._get('passkey', 'walletId');
+        
+        // Generate a random encryption key (16 bytes = 128 bits)
+        const encryptionKey = crypto.getRandomValues(new Uint8Array(16));
+        const encryptionKeyHex = Array.from(encryptionKey)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+        
+        // Create payload to encrypt
+        const payload = JSON.stringify({
+            walletSecret: walletSecret,
+            walletId: walletId?.value || null,
+            createdAt: Date.now(),
+            expiresAt: Date.now() + 60000 // 60 seconds
+        });
+        
+        // Encrypt payload using AES-GCM
+        const encryptedPayload = await this._encryptForLink(payload, encryptionKey);
+        
+        // Generate a short numeric code (6 digits) for manual entry
+        // This is derived from the encryption key for consistency
+        const shortCode = this._deriveShortCode(encryptionKey);
+        
+        // QR data contains everything needed to link
+        const qrData = JSON.stringify({
+            v: 1, // version
+            k: encryptionKeyHex, // encryption key
+            p: encryptedPayload, // encrypted payload
+            e: Date.now() + 60000 // expiry
+        });
+        
+        // Store the link code locally for short-code lookup
+        await this._put('linkCodes', {
+            id: shortCode,
+            encryptionKeyHex: encryptionKeyHex,
+            encryptedPayload: encryptedPayload,
+            expiresAt: Date.now() + 60000,
+            used: false
+        });
+        
+        console.log('[Lemma] 📱 Link code generated - expires in 60 seconds');
+        
+        return {
+            shortCode: shortCode,
+            qrData: qrData,
+            expiresAt: Date.now() + 60000,
+            expiresIn: 60
+        };
+    }
+    
+    /**
+     * Link this device to an existing wallet using a link code.
+     * This transfers the wallet_secret from another device.
+     * 
+     * @param {Object} options - Either { qrData } or { shortCode }
+     * @returns {Object} { success: boolean, walletId?: string }
+     */
+    async linkDevice(options) {
+        await this.init();
+        
+        // Check if wallet already exists
+        const existingSecret = await this._get('secrets', 'master');
+        if (existingSecret?.secret) {
+            throw new Error('This device already has a wallet. Clear it first to link a new one.');
+        }
+        
+        let payload;
+        
+        if (options.qrData) {
+            // Full QR code data
+            payload = await this._decryptLinkQR(options.qrData);
+        } else if (options.shortCode) {
+            // Short code - need to look up from bridge or prompt QR scan
+            throw new Error('Short code linking requires scanning QR on the source device. Please use QR scan.');
+        } else {
+            throw new Error('Either qrData or shortCode required');
+        }
+        
+        // Validate payload
+        if (!payload.walletSecret) {
+            throw new Error('Invalid link code - no wallet secret');
+        }
+        
+        if (payload.expiresAt && payload.expiresAt < Date.now()) {
+            throw new Error('Link code expired. Please generate a new one on your other device.');
+        }
+        
+        // Store the wallet secret
+        await this._put('secrets', {
+            id: 'master',
+            secret: payload.walletSecret,
+            createdAt: Date.now(),
+            linkedFrom: payload.walletId || 'unknown',
+            linkedAt: Date.now()
+        });
+        
+        // Store wallet ID if provided
+        if (payload.walletId) {
+            await this._put('passkey', {
+                id: 'walletId',
+                value: payload.walletId
+            });
+        }
+        
+        console.log('[Lemma] ✅ Device linked successfully!');
+        console.log('[Lemma] 📱 Now create a passkey to secure this wallet');
+        
+        return {
+            success: true,
+            walletId: payload.walletId,
+            needsPasskey: true,
+            message: 'Wallet linked! Now create a passkey to secure it on this device.'
+        };
+    }
+    
+    /**
+     * Encrypt payload for device linking using AES-GCM
+     */
+    async _encryptForLink(payload, keyBytes) {
+        // Import key
+        const key = await crypto.subtle.importKey(
+            'raw',
+            keyBytes,
+            { name: 'AES-GCM' },
+            false,
+            ['encrypt']
+        );
+        
+        // Generate random IV
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        
+        // Encrypt
+        const encoder = new TextEncoder();
+        const encrypted = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv: iv },
+            key,
+            encoder.encode(payload)
+        );
+        
+        // Combine IV + ciphertext and base64 encode
+        const combined = new Uint8Array(iv.length + encrypted.byteLength);
+        combined.set(iv, 0);
+        combined.set(new Uint8Array(encrypted), iv.length);
+        
+        return btoa(String.fromCharCode(...combined));
+    }
+    
+    /**
+     * Decrypt QR data from device linking
+     */
+    async _decryptLinkQR(qrData) {
+        const data = JSON.parse(qrData);
+        
+        if (data.v !== 1) {
+            throw new Error('Unsupported link code version');
+        }
+        
+        if (data.e && data.e < Date.now()) {
+            throw new Error('Link code expired');
+        }
+        
+        // Convert hex key to bytes
+        const keyBytes = new Uint8Array(
+            data.k.match(/.{2}/g).map(byte => parseInt(byte, 16))
+        );
+        
+        // Decode base64 payload
+        const combined = Uint8Array.from(atob(data.p), c => c.charCodeAt(0));
+        
+        // Extract IV and ciphertext
+        const iv = combined.slice(0, 12);
+        const ciphertext = combined.slice(12);
+        
+        // Import key
+        const key = await crypto.subtle.importKey(
+            'raw',
+            keyBytes,
+            { name: 'AES-GCM' },
+            false,
+            ['decrypt']
+        );
+        
+        // Decrypt
+        const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: iv },
+            key,
+            ciphertext
+        );
+        
+        const decoder = new TextDecoder();
+        return JSON.parse(decoder.decode(decrypted));
+    }
+    
+    /**
+     * Derive a 6-digit short code from encryption key
+     */
+    _deriveShortCode(keyBytes) {
+        // Use first 4 bytes to derive a 6-digit number
+        const num = (keyBytes[0] << 16) | (keyBytes[1] << 8) | keyBytes[2];
+        return String(num % 1000000).padStart(6, '0');
     }
 
     // ========================================

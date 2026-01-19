@@ -1,0 +1,427 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Link Device - Lemma Wallet{% endblock %}
+{% block description %}Link this device to your existing Lemma wallet.{% endblock %}
+
+{% block head %}
+<meta name="referrer" content="no-referrer">
+<style>
+.link-container { max-width: 500px; margin: 0 auto; padding: 40px 24px; }
+.link-header { text-align: center; margin-bottom: 32px; }
+.link-header h1 { font-size: 1.8rem; font-weight: 600; color: #111827; margin: 0 0 8px; }
+.link-header p { color: #6b7280; font-size: 1rem; }
+
+.card { 
+    background: #fff; 
+    border: 1px solid #e5e7eb; 
+    border-radius: 16px; 
+    padding: 24px; 
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.status-box { 
+    padding: 16px; 
+    border-radius: 12px; 
+    margin-bottom: 16px; 
+    text-align: center;
+}
+.status-box.info { background: #e0f2fe; border: 1px solid #0ea5e9; color: #0c4a6e; }
+.status-box.success { background: #d1fae5; border: 1px solid #10b981; color: #065f46; }
+.status-box.error { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+.status-box.warning { background: #fef3cd; border: 1px solid #f59e0b; color: #92400e; }
+
+.btn { 
+    display: block;
+    width: 100%;
+    padding: 14px 24px; 
+    border-radius: 10px; 
+    font-weight: 600; 
+    cursor: pointer; 
+    border: none;
+    font-size: 1rem;
+    transition: all 0.2s;
+    margin-bottom: 12px;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+.btn-secondary { background: #6b7280; color: white; }
+.btn-success { background: #10b981; color: white; }
+
+.input-group { margin-bottom: 16px; }
+.input-group label { display: block; font-weight: 500; margin-bottom: 8px; color: #374151; }
+.input-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+    min-height: 100px;
+}
+.input-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    margin: 24px 0;
+    color: #9ca3af;
+    font-size: 0.85rem;
+}
+.divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #e5e7eb;
+}
+.divider::before { margin-right: 16px; }
+.divider::after { margin-left: 16px; }
+
+.step-indicator {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+.step {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+.step.active { background: #667eea; color: white; }
+.step.completed { background: #10b981; color: white; }
+.step.pending { background: #e5e7eb; color: #9ca3af; }
+
+.scanner-area {
+    background: #1e1e1e;
+    border-radius: 12px;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    margin-bottom: 16px;
+    overflow: hidden;
+    position: relative;
+}
+.scanner-area video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.scanner-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+.scanner-frame {
+    width: 60%;
+    height: 60%;
+    border: 3px solid rgba(102, 126, 234, 0.8);
+    border-radius: 12px;
+}
+
+.hidden { display: none !important; }
+
+.security-note {
+    background: #fef3cd;
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 0.85rem;
+    color: #92400e;
+    margin-top: 16px;
+}
+.security-note strong { display: block; margin-bottom: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="link-container">
+    <header class="link-header">
+        <h1>🔗 Link Device</h1>
+        <p>Connect this device to your existing wallet</p>
+    </header>
+
+    <!-- Step Indicator -->
+    <div class="step-indicator">
+        <div class="step active" id="step1">1</div>
+        <div class="step pending" id="step2">2</div>
+        <div class="step pending" id="step3">3</div>
+    </div>
+
+    <!-- Step 1: Input Link Code -->
+    <div id="step1-content" class="card">
+        <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Step 1: Enter Link Code</h2>
+        
+        <div id="status" class="status-box info">
+            Get a link code from your existing device at<br>
+            <strong>lemma.id/wallet/simple → Add Device</strong>
+        </div>
+
+        <!-- QR Scanner -->
+        <div class="scanner-area" id="scanner-container">
+            <video id="scanner-video" autoplay playsinline></video>
+            <div class="scanner-overlay">
+                <div class="scanner-frame"></div>
+            </div>
+        </div>
+        
+        <button class="btn btn-primary" id="scan-btn" onclick="startScanner()">
+            📷 Scan QR Code
+        </button>
+
+        <div class="divider">or paste code manually</div>
+
+        <div class="input-group">
+            <label for="qr-data">QR Code Data (JSON)</label>
+            <textarea id="qr-data" placeholder='Paste the QR data here...'></textarea>
+        </div>
+
+        <button class="btn btn-secondary" onclick="submitManualCode()">
+            Submit Code
+        </button>
+
+        <div class="security-note">
+            <strong>🔒 Security Note</strong>
+            Only link devices you physically control. The link code expires in 60 seconds 
+            and can only be used once.
+        </div>
+    </div>
+
+    <!-- Step 2: Linking -->
+    <div id="step2-content" class="card hidden">
+        <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Step 2: Linking Wallet</h2>
+        
+        <div id="link-status" class="status-box info">
+            🔄 Linking wallet...
+        </div>
+    </div>
+
+    <!-- Step 3: Create Passkey -->
+    <div id="step3-content" class="card hidden">
+        <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Step 3: Secure This Device</h2>
+        
+        <div id="passkey-status" class="status-box success">
+            ✅ Wallet linked successfully!<br>
+            Now create a passkey to secure it on this device.
+        </div>
+
+        <button class="btn btn-success" onclick="createPasskey()">
+            🔑 Create Passkey
+        </button>
+
+        <p style="text-align: center; color: #6b7280; font-size: 0.85rem; margin-top: 12px;">
+            This passkey will protect your wallet on this device.
+        </p>
+    </div>
+
+    <!-- Step 4: Complete -->
+    <div id="complete-content" class="card hidden">
+        <div class="status-box success">
+            <div style="font-size: 3rem; margin-bottom: 12px;">🎉</div>
+            <strong style="font-size: 1.2rem;">Device Linked!</strong><br><br>
+            Your wallet is now available on this device.<br>
+            You can use it on any site that supports Lemma.
+        </div>
+
+        <button class="btn btn-primary" onclick="window.location.href='/wallet/simple'">
+            Go to Wallet
+        </button>
+    </div>
+</div>
+
+<script src="/static/js/lemma-wallet.js?v=2180"></script>
+<script src="https://unpkg.com/@nicolo-ribaudo/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+let wallet = null;
+let html5QrCode = null;
+let scannerActive = false;
+
+async function initWallet() {
+    if (wallet) return wallet;
+    wallet = new LemmaWallet();
+    await wallet.init();
+    return wallet;
+}
+
+function setStep(step) {
+    // Update step indicators
+    for (let i = 1; i <= 3; i++) {
+        const stepEl = document.getElementById(`step${i}`);
+        if (i < step) {
+            stepEl.className = 'step completed';
+            stepEl.textContent = '✓';
+        } else if (i === step) {
+            stepEl.className = 'step active';
+            stepEl.textContent = i;
+        } else {
+            stepEl.className = 'step pending';
+            stepEl.textContent = i;
+        }
+    }
+    
+    // Show/hide content
+    document.getElementById('step1-content').classList.toggle('hidden', step !== 1);
+    document.getElementById('step2-content').classList.toggle('hidden', step !== 2);
+    document.getElementById('step3-content').classList.toggle('hidden', step !== 3);
+    document.getElementById('complete-content').classList.toggle('hidden', step !== 4);
+}
+
+async function startScanner() {
+    const scanBtn = document.getElementById('scan-btn');
+    const video = document.getElementById('scanner-video');
+    
+    if (scannerActive) {
+        // Stop scanner
+        if (html5QrCode) {
+            await html5QrCode.stop();
+            html5QrCode = null;
+        }
+        scannerActive = false;
+        scanBtn.textContent = '📷 Scan QR Code';
+        video.srcObject = null;
+        return;
+    }
+    
+    try {
+        scanBtn.textContent = '⏹️ Stop Scanner';
+        scannerActive = true;
+        
+        html5QrCode = new Html5Qrcode("scanner-container");
+        await html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            onQrCodeScanned,
+            () => {} // ignore errors
+        );
+    } catch (e) {
+        console.error('Scanner error:', e);
+        document.getElementById('status').textContent = '❌ Camera access denied or not available';
+        document.getElementById('status').className = 'status-box error';
+        scanBtn.textContent = '📷 Scan QR Code';
+        scannerActive = false;
+    }
+}
+
+async function onQrCodeScanned(decodedText) {
+    console.log('QR scanned:', decodedText);
+    
+    // Stop scanner
+    if (html5QrCode) {
+        await html5QrCode.stop();
+        html5QrCode = null;
+    }
+    scannerActive = false;
+    
+    // Process the code
+    await processLinkCode(decodedText);
+}
+
+async function submitManualCode() {
+    const qrData = document.getElementById('qr-data').value.trim();
+    if (!qrData) {
+        document.getElementById('status').textContent = '❌ Please paste the QR code data';
+        document.getElementById('status').className = 'status-box error';
+        return;
+    }
+    
+    await processLinkCode(qrData);
+}
+
+async function processLinkCode(qrData) {
+    setStep(2);
+    
+    const linkStatus = document.getElementById('link-status');
+    linkStatus.textContent = '🔄 Decrypting and verifying link code...';
+    linkStatus.className = 'status-box info';
+    
+    try {
+        await initWallet();
+        
+        // Check if wallet already exists
+        const info = await wallet.getWalletInfo();
+        if (info.hasWalletSecret) {
+            linkStatus.textContent = '❌ This device already has a wallet.\n\nGo to Settings → Clear All to reset, then try again.';
+            linkStatus.className = 'status-box error';
+            return;
+        }
+        
+        const result = await wallet.linkDevice({ qrData: qrData });
+        
+        if (result.success) {
+            linkStatus.textContent = '✅ Wallet linked!';
+            linkStatus.className = 'status-box success';
+            
+            setTimeout(() => setStep(3), 1000);
+        } else {
+            throw new Error(result.message || 'Link failed');
+        }
+    } catch (e) {
+        console.error('Link error:', e);
+        linkStatus.textContent = '❌ ' + e.message;
+        linkStatus.className = 'status-box error';
+        
+        // Add retry button
+        setTimeout(() => {
+            linkStatus.innerHTML += '<br><br><button class="btn btn-secondary" onclick="setStep(1)" style="margin-top: 12px;">Try Again</button>';
+        }, 100);
+    }
+}
+
+async function createPasskey() {
+    const passkeyStatus = document.getElementById('passkey-status');
+    passkeyStatus.textContent = '🔑 Creating passkey...';
+    passkeyStatus.className = 'status-box info';
+    
+    try {
+        await initWallet();
+        const result = await wallet.registerPasskey();
+        
+        if (result.success) {
+            passkeyStatus.textContent = '✅ Passkey created!';
+            passkeyStatus.className = 'status-box success';
+            
+            setTimeout(() => setStep(4), 1000);
+        } else {
+            throw new Error(result.message || 'Passkey creation failed');
+        }
+    } catch (e) {
+        console.error('Passkey error:', e);
+        passkeyStatus.textContent = '❌ ' + e.message;
+        passkeyStatus.className = 'status-box error';
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        await initWallet();
+        
+        // Check if already has wallet
+        const info = await wallet.getWalletInfo();
+        if (info.hasWalletSecret && info.hasPasskey) {
+            // Already has a wallet
+            document.getElementById('status').innerHTML = '⚠️ This device already has a wallet.<br><br>' +
+                '<a href="/wallet/simple" style="color: #0ea5e9;">Go to your wallet →</a>';
+            document.getElementById('status').className = 'status-box warning';
+        }
+    } catch (e) {
+        console.error('Init error:', e);
+    }
+});
+</script>
+{% endblock %}

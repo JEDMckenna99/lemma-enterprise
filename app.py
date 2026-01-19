@@ -563,6 +563,16 @@ def create_app():
             'Expires': '0'
         }
     
+    @app.route('/wallet/link')
+    def wallet_link():
+        """Device Linking Page - Link new device to existing wallet"""
+        logger.info("🔗 Serving device linking page")
+        return render_template('wallet_link.html'), 200, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+    
     @app.route('/sdk-test')
     def sdk_test():
         """SDK Test Page"""
