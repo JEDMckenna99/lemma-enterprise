@@ -54,7 +54,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.20.0';
+    static VERSION = '2.21.0';
     
     constructor() {
         this.db = null;
@@ -2715,21 +2715,12 @@ class LemmaWallet {
         // This is derived from the encryption key for consistency
         const shortCode = this._deriveShortCode(encryptionKey);
         
-        // QR data contains everything needed to link
+        // QR data contains everything needed to link (self-contained, no local storage needed)
         const qrData = JSON.stringify({
             v: 1, // version
             k: encryptionKeyHex, // encryption key
             p: encryptedPayload, // encrypted payload
             e: Date.now() + 60000 // expiry
-        });
-        
-        // Store the link code locally for short-code lookup
-        await this._put('linkCodes', {
-            id: shortCode,
-            encryptionKeyHex: encryptionKeyHex,
-            encryptedPayload: encryptedPayload,
-            expiresAt: Date.now() + 60000,
-            used: false
         });
         
         console.log('[Lemma] 📱 Link code generated - expires in 60 seconds');
