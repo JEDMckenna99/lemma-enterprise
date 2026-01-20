@@ -484,11 +484,11 @@ def create_app():
 
     @app.route('/wallet')
     def wallet():
-        """Lemma Federated Wallet"""
+        """Lemma Wallet - Main wallet management page"""
         logger.info("🌐 Serving wallet")
         # Force disable template caching
         app.jinja_env.cache = {}
-        return render_template('modern/wallet.html'), 200, {
+        return render_template('wallet_simple.html'), 200, {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0'
@@ -496,14 +496,9 @@ def create_app():
     
     @app.route('/wallet/simple')
     def wallet_simple():
-        """SDK-Only Wallet Page for Testing"""
-        logger.info("🧪 Serving SDK-only wallet test page")
-        app.jinja_env.cache = {}
-        return render_template('wallet_simple.html'), 200, {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-        }
+        """Redirect to main wallet page (legacy URL)"""
+        from flask import redirect
+        return redirect('/wallet', code=301)
     
     @app.route('/wallet/popup')
     def wallet_popup():
