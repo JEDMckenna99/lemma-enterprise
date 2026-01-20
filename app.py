@@ -172,21 +172,13 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Passkey Auth: {e}")
 
-    # Wallet-First Authentication (no email required)
+    # Consolidated Wallet Service (replaces 8 separate wallet modules)
     try:
-        from api.wallet_first_auth import wallet_first_bp
-        app.register_blueprint(wallet_first_bp)
-        logger.info("✅ Wallet-First Auth registered")
+        from api.services.wallet_service import wallet_service_bp
+        app.register_blueprint(wallet_service_bp)
+        logger.info("✅ Consolidated Wallet Service registered (auth, session, transfer, PIN, sync)")
     except Exception as e:
-        logger.error(f"❌ Failed to register Wallet-First Auth: {e}")
-
-    # Wallet Session Sync (one passkey per day across all sites)
-    try:
-        from api.wallet_session_sync import wallet_session_sync_bp
-        app.register_blueprint(wallet_session_sync_bp)
-        logger.info("✅ Wallet Session Sync registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register Wallet Session Sync: {e}")
+        logger.error(f"❌ Failed to register Wallet Service: {e}")
 
     # Issuer Registry (for wallet-centric architecture)
     try:
@@ -298,14 +290,6 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register SDK Auth API: {e}")
 
-    # Multi-lemma System
-    try:
-        from api.multi_lemma_wallet_sync import multi_lemma_sync_bp
-        app.register_blueprint(multi_lemma_sync_bp)
-        logger.info("✅ Multi-lemma Sync registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register Multi-lemma Sync: {e}")
-
     # Recovery Vault Service
     try:
         from api.recovery_vault import recovery_vault_bp
@@ -322,28 +306,12 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Pairwise Tagging: {e}")
 
-    # Wallet Retrieval Flow
-    try:
-        from api.wallet_retrieval_flow import wallet_retrieval_bp
-        app.register_blueprint(wallet_retrieval_bp)
-        logger.info("✅ Wallet Retrieval Flow registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register Wallet Retrieval Flow: {e}")
-
     try:
         from api.network_client_config import network_client_config_bp
         app.register_blueprint(network_client_config_bp)
         logger.info("✅ Network Client Config registered")
     except Exception as e:
         logger.error(f"❌ Failed to register Network Client Config: {e}")
-
-    # Wallet Revocation API
-    try:
-        from api.wallet_revocation import wallet_revocation_bp
-        app.register_blueprint(wallet_revocation_bp)
-        logger.info("✅ Wallet Revocation API registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register Wallet Revocation API: {e}")
 
     # Credential Auto-Refresh API
     try:
@@ -353,22 +321,6 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Credential Auto-Refresh API: {e}")
 
-    # Wallet Transfer Session API
-    try:
-        from api.wallet_transfer_session import wallet_transfer_bp
-        app.register_blueprint(wallet_transfer_bp)
-        logger.info("✅ Wallet Transfer Session API registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register Wallet Transfer Session API: {e}")
-    
-    # Wallet PIN Reset API
-    try:
-        from api.wallet_pin_reset import wallet_pin_reset_bp
-        app.register_blueprint(wallet_pin_reset_bp)
-        logger.info("✅ Wallet PIN Reset API registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register Wallet PIN Reset API: {e}")
-    
     # OPRF Key Management API
     try:
         from api.oprf_key_api import oprf_key_bp, init_oprf_key_manager
