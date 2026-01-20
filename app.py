@@ -718,7 +718,22 @@ def create_app():
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
-        response.headers['X-SDK-Version'] = '2.3.0-bridge-check'
+        response.headers['X-SDK-Version'] = '2.4.0-ppid-derive'
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
+
+    @app.route('/static/js/lemma-wallet.js')
+    def lemma_wallet_static_fresh():
+        """
+        Override Flask's default static serving for lemma-wallet.js
+        to ensure no caching - critical for SDK updates.
+        """
+        from flask import send_from_directory
+        response = send_from_directory('static/js', 'lemma-wallet.js', mimetype='application/javascript')
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        response.headers['X-SDK-Version'] = '2.4.0-ppid-derive'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
