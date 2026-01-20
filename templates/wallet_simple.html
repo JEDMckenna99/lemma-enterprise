@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Lemma Wallet (SDK Test){% endblock %}
-{% block description %}Clean SDK-only wallet page for testing.{% endblock %}
+{% block title %}Lemma Wallet{% endblock %}
+{% block description %}Manage your Lemma wallet, credentials, and linked devices.{% endblock %}
 
 {% block preload_scripts %}{% endblock %}
 
@@ -159,22 +159,46 @@
 <div class="wallet-container">
     <header class="wallet-header">
         <h1>Lemma Wallet</h1>
-        <p>SDK-Only Test Page</p>
+        <p>Manage your wallet and linked devices</p>
         <span class="badge">SDK Version: <span id="sdk-version">loading...</span></span>
     </header>
 
-    <!-- Smart Auth - Primary Action -->
-    <div class="card" style="border: 2px solid #667eea; background: linear-gradient(135deg, #f5f3ff, #ede9fe);">
-        <h2 style="color: #5b21b6;">✨ Smart Sign In</h2>
-        <div id="smart-auth-status" class="status-box info">Checking auth state...</div>
-        <div class="actions" style="justify-content: center; margin-top: 16px;">
-            <button id="smart-auth-btn" class="btn btn-primary" style="font-size: 1.1rem; padding: 16px 32px;" onclick="smartAuth()">
-                Loading...
+    <!-- LOCKED VIEW: Shown when wallet is not unlocked -->
+    <div id="locked-view" style="display: none;">
+        <div class="card" style="border: 2px solid #667eea; background: linear-gradient(135deg, #f5f3ff, #ede9fe); text-align: center; padding: 48px 24px;">
+            <div style="font-size: 4rem; margin-bottom: 16px;">🔒</div>
+            <h2 style="color: #5b21b6; font-size: 1.5rem; margin-bottom: 12px;">Unlock Your Wallet</h2>
+            <p style="color: #6b7280; margin-bottom: 24px; max-width: 400px; margin-left: auto; margin-right: auto;">
+                Prove you own this wallet by authenticating with your passkey. This is completely private - no data is logged or sent anywhere.
+            </p>
+            <div id="locked-status" class="status-box info" style="max-width: 400px; margin: 0 auto 24px; text-align: left;">
+                Checking wallet status...
+            </div>
+            <button id="unlock-btn" class="btn btn-primary" style="font-size: 1.1rem; padding: 16px 48px;" onclick="unlockAndShowWallet()">
+                Unlock with Passkey
             </button>
+            <div id="no-wallet-options" style="display: none; margin-top: 24px;">
+                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 12px;">No wallet on this device?</p>
+                <button class="btn btn-success" style="margin: 4px;" onclick="registerPasskey()">Create New Wallet</button>
+                <a href="/wallet/link" class="btn btn-secondary" style="margin: 4px; text-decoration: none; display: inline-block;">Link Existing Wallet</a>
+            </div>
         </div>
-        <p style="text-align: center; color: #6b7280; font-size: 0.85rem; margin-top: 12px;">
-            Uses <code>autoAuthenticate()</code> and <code>getAuthState()</code>
-        </p>
+    </div>
+
+    <!-- UNLOCKED VIEW: Shown when wallet is unlocked -->
+    <div id="unlocked-view" style="display: none;">
+    
+    <!-- Quick Actions Bar -->
+    <div class="card" style="border: 2px solid #10b981; background: linear-gradient(135deg, #ecfdf5, #d1fae5);">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+            <div>
+                <h2 style="color: #065f46; margin: 0 0 4px;">Wallet Unlocked</h2>
+                <p id="wallet-summary" style="color: #047857; font-size: 0.85rem; margin: 0;">Loading...</p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary" onclick="lockWallet()" style="background: #6b7280;">Lock Wallet</button>
+            </div>
+        </div>
     </div>
 
     <!-- Wallet Profiles -->
@@ -351,7 +375,9 @@
             <button class="btn btn-secondary" onclick="clearLog()">Clear Log</button>
         </div>
     </div>
-</div>
+
+    </div><!-- END unlocked-view -->
+</div><!-- END wallet-container -->
 
 <script src="/static/js/lemma-wallet.js?v=2250"></script>
 <script src="/static/js/qrcode.min.js"></script>
@@ -620,17 +646,16 @@ async function unlockWallet() {
 async function lockWallet() {
     try {
         await initSDK();
-        addLog('=== Calling SDK lock() ===', 'info');
+        addLog('Locking wallet...', 'info');
         
         await wallet.lock();
         
-        addLog('✅ Wallet locked (local + server session cleared)', 'success');
+        addLog('Wallet locked', 'success');
         
-        // Refresh all UI
-        await refreshStatus();
-        await initSmartAuth();  // Update smart auth button
+        // Switch back to locked view
+        await checkAndShowView();
     } catch (e) {
-        addLog(`❌ lock() failed: ${e.message}`, 'error');
+        addLog(`Lock failed: ${e.message}`, 'error');
     }
 }
 
@@ -638,14 +663,25 @@ async function lockWallet() {
 async function registerPasskey() {
     try {
         await initSDK();
-        addLog('=== Calling SDK registerPasskey() ===', 'info');
+        addLog('Creating passkey...', 'info');
         
         const result = await wallet.registerPasskey();
-        addLog('registerPasskey() result: ' + JSON.stringify(result), 'success');
+        addLog('Passkey created successfully', 'success');
         
+        // Switch to unlocked view and load data
+        showUnlockedView();
         await refreshStatus();
+        await loadProfiles();
+        await loadCredentials();
+        await updateDeviceStatus();
+        
+        // Update wallet summary
+        const summaryEl = document.getElementById('wallet-summary');
+        const activeProfile = await wallet.getActiveProfile();
+        const info = await wallet.getWalletInfo();
+        summaryEl.textContent = `Profile: ${activeProfile.name} | ${info.lemmaCount || 0} credentials`;
     } catch (e) {
-        addLog(`❌ registerPasskey() failed: ${e.message}`, 'error');
+        addLog(`Passkey creation failed: ${e.message}`, 'error');
     }
 }
 
@@ -1376,10 +1412,109 @@ function copyLinkUrl() {
     }
 }
 
+// =============================================
+// VIEW MANAGEMENT (locked vs unlocked)
+// =============================================
+
+function showLockedView() {
+    document.getElementById('locked-view').style.display = 'block';
+    document.getElementById('unlocked-view').style.display = 'none';
+}
+
+function showUnlockedView() {
+    document.getElementById('locked-view').style.display = 'none';
+    document.getElementById('unlocked-view').style.display = 'block';
+}
+
+async function checkAndShowView() {
+    await initSDK();
+    const info = await wallet.getWalletInfo();
+    
+    const lockedStatus = document.getElementById('locked-status');
+    const noWalletOptions = document.getElementById('no-wallet-options');
+    const unlockBtn = document.getElementById('unlock-btn');
+    
+    if (info.isUnlocked) {
+        // Wallet is unlocked - show full management UI
+        showUnlockedView();
+        
+        // Update wallet summary
+        const summaryEl = document.getElementById('wallet-summary');
+        const activeProfile = await wallet.getActiveProfile();
+        summaryEl.textContent = `Profile: ${activeProfile.name} | ${info.lemmaCount || 0} credentials`;
+        
+        return true;
+    } else {
+        // Wallet is locked - show unlock UI
+        showLockedView();
+        
+        if (info.hasPasskey) {
+            // Has passkey - just needs to unlock
+            lockedStatus.className = 'status-box info';
+            lockedStatus.innerHTML = `<strong>Wallet found</strong><br>Authenticate with your passkey to access your wallet.`;
+            unlockBtn.textContent = 'Unlock with Passkey';
+            noWalletOptions.style.display = 'none';
+        } else if (info.hasWalletSecret) {
+            // Has wallet secret but no passkey (orphaned or linked)
+            lockedStatus.className = 'status-box info';
+            lockedStatus.innerHTML = `<strong>Wallet linked</strong><br>Create a passkey to secure your wallet on this device.`;
+            unlockBtn.textContent = 'Create Passkey';
+            unlockBtn.onclick = registerPasskey;
+            noWalletOptions.style.display = 'none';
+        } else {
+            // No wallet at all
+            lockedStatus.className = 'status-box locked';
+            lockedStatus.innerHTML = `<strong>No wallet on this device</strong><br>Create a new wallet or link an existing one from another device.`;
+            unlockBtn.style.display = 'none';
+            noWalletOptions.style.display = 'block';
+        }
+        
+        return false;
+    }
+}
+
+async function unlockAndShowWallet() {
+    const unlockBtn = document.getElementById('unlock-btn');
+    const origText = unlockBtn.textContent;
+    
+    try {
+        unlockBtn.textContent = 'Authenticating...';
+        unlockBtn.disabled = true;
+        
+        await initSDK();
+        const result = await wallet.unlock();
+        
+        if (result.success) {
+            addLog('Wallet unlocked successfully', 'success');
+            
+            // Switch to unlocked view
+            showUnlockedView();
+            
+            // Load all the wallet data
+            await refreshStatus();
+            await loadProfiles();
+            await loadCredentials();
+            await updateDeviceStatus();
+            
+            // Update wallet summary
+            const summaryEl = document.getElementById('wallet-summary');
+            const activeProfile = await wallet.getActiveProfile();
+            const info = await wallet.getWalletInfo();
+            summaryEl.textContent = `Profile: ${activeProfile.name} | ${info.lemmaCount || 0} credentials`;
+        }
+    } catch (e) {
+        addLog(`Unlock failed: ${e.message}`, 'error');
+        const lockedStatus = document.getElementById('locked-status');
+        lockedStatus.className = 'status-box error';
+        lockedStatus.innerHTML = `<strong>Unlock failed</strong><br>${e.message}`;
+    } finally {
+        unlockBtn.textContent = origText;
+        unlockBtn.disabled = false;
+    }
+}
+
 // Initialize on load
 window.addEventListener('DOMContentLoaded', async () => {
-    // Update context info first
-    updateContextInfo();
     // Show SDK version
     const versionEl = document.getElementById('sdk-version');
     if (typeof LemmaWallet !== 'undefined' && LemmaWallet.VERSION) {
@@ -1387,10 +1522,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     } else {
         versionEl.textContent = 'unknown';
     }
-    
-    addLog('SDK-Only Wallet Page loaded', 'info');
-    addLog(`SDK Version: ${LemmaWallet.VERSION || 'unknown'}`, 'info');
-    addLog(`Hostname: ${window.location.hostname}`, 'info');
 
     try {
         await initSDK();
@@ -1399,18 +1530,26 @@ window.addEventListener('DOMContentLoaded', async () => {
         // This handles the case where user unlocked on a third-party site
         const synced = await syncFromServerCookie();
         if (synced) {
-            addLog('🔄 Re-initializing after server sync...', 'info');
+            addLog('Synced from server session', 'info');
         }
         
-        // Initialize smart auth UI (shows correct button)
-        await initSmartAuth();
+        // Check unlock state and show appropriate view
+        const isUnlocked = await checkAndShowView();
         
-        await refreshStatus();
-        await loadProfiles();
-        await loadCredentials();
-        await updateDeviceStatus();
+        if (isUnlocked) {
+            // Only load all the data if unlocked
+            addLog('Wallet unlocked - loading data...', 'info');
+            updateContextInfo();
+            await refreshStatus();
+            await loadProfiles();
+            await loadCredentials();
+            await updateDeviceStatus();
+        } else {
+            addLog('Wallet locked - showing unlock screen', 'info');
+        }
     } catch (e) {
         addLog(`Init error: ${e.message}`, 'error');
+        showLockedView();
     }
 });
 </script>
