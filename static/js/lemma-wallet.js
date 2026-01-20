@@ -38,8 +38,9 @@ if (typeof window !== 'undefined' && window.LemmaWallet) {
 // ============================================
 
 const WALLET_DB_NAME = 'LemmaWallet';
-const WALLET_DB_VERSION = 3;  // v3: Added wallet_secret for PPID derivation
+const WALLET_DB_VERSION = 4;  // v4: Added profiles for multiple identities
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DEFAULT_PROFILE_ID = 'default';
 
 // Auth states
 const AUTH_STATE = {
@@ -54,7 +55,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.24.0';
+    static VERSION = '2.25.0';
     
     constructor() {
         this.db = null;
@@ -621,6 +622,7 @@ class LemmaWallet {
 
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
+                const oldVersion = event.oldVersion;
 
                 // Passkey store (for local unlock)
                 if (!db.objectStoreNames.contains('passkey')) {
@@ -653,6 +655,11 @@ class LemmaWallet {
                 // Stores the master secret used to derive site-specific PPIDs
                 if (!db.objectStoreNames.contains('secrets')) {
                     db.createObjectStore('secrets', { keyPath: 'id' });
+                }
+                
+                // v4: Profiles store for multiple wallet identities
+                if (!db.objectStoreNames.contains('profiles')) {
+                    db.createObjectStore('profiles', { keyPath: 'id' });
                 }
             };
         });
@@ -921,22 +928,27 @@ class LemmaWallet {
         // CRITICAL: Set session cookie on lemma.id for cross-site "one passkey per day"
         // This enables the session to be shared across all sites via the bridge
         try {
+            // Get active profile info to include in session
+            const activeProfile = await this.getActiveProfile();
+            
             const setSessionResponse = await fetch('https://lemma.id/api/wallet/set-session', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     wallet_id: walletId.value,
-                    unlocked_at: this.session.unlockedAt
+                    unlocked_at: this.session.unlockedAt,
+                    profile_id: activeProfile.id,
+                    profile_name: activeProfile.name
                 })
             });
             if (setSessionResponse.ok) {
-                console.log('[Lemma] ✅ Session cookie set on lemma.id - cross-site auth enabled');
+                console.log(`[Lemma] Session cookie set - profile: ${activeProfile.name}`);
             } else {
-                console.warn('[Lemma] ⚠️ Could not set session cookie:', setSessionResponse.status);
+                console.warn('[Lemma] Could not set session cookie:', setSessionResponse.status);
             }
         } catch (e) {
-            console.warn('[Lemma] ⚠️ Could not set session cookie on lemma.id:', e.message);
+            console.warn('[Lemma] Could not set session cookie on lemma.id:', e.message);
         }
 
         return {
@@ -1097,22 +1109,27 @@ class LemmaWallet {
         // CRITICAL: Set session cookie on lemma.id for cross-site "one passkey per day"
         // This enables the session to be shared across all sites via the bridge
         try {
+            // Get active profile info to include in session
+            const activeProfile = await this.getActiveProfile();
+            
             const setSessionResponse = await fetch('https://lemma.id/api/wallet/set-session', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     wallet_id: walletId,
-                    unlocked_at: this.session.unlockedAt
+                    unlocked_at: this.session.unlockedAt,
+                    profile_id: activeProfile.id,
+                    profile_name: activeProfile.name
                 })
             });
             if (setSessionResponse.ok) {
-                console.log('[Lemma] ✅ Session cookie set on lemma.id - cross-site auth enabled');
+                console.log(`[Lemma] Session cookie set - profile: ${activeProfile.name}`);
             } else {
-                console.warn('[Lemma] ⚠️ Could not set session cookie:', setSessionResponse.status);
+                console.warn('[Lemma] Could not set session cookie:', setSessionResponse.status);
             }
         } catch (e) {
-            console.warn('[Lemma] ⚠️ Could not set session cookie on lemma.id:', e.message);
+            console.warn('[Lemma] Could not set session cookie on lemma.id:', e.message);
         }
 
         // Start heartbeat on third-party sites
@@ -2588,52 +2605,49 @@ class LemmaWallet {
      * Get the wallet secret for PPID derivation.
      * PPID = HMAC(wallet_secret, site_id) - different for each site.
      * 
-     * If no secret exists but wallet is unlocked, auto-generates one.
-     * This handles users who registered before wallet secret was implemented.
+     * Now profile-aware: returns the secret from the active profile.
      * 
+     * @param {string} profileId - Optional specific profile ID (defaults to active)
      * @returns {string} 64-char hex string
      */
-    async getWalletSecret() {
+    async getWalletSecret(profileId = null) {
         await this.init();
         
         if (!this.isUnlocked()) {
             throw new Error('Wallet must be unlocked to get wallet secret');
         }
         
-        // Check session first (fastest)
+        // If specific profile requested, get that profile's secret
+        if (profileId) {
+            const profile = await this._get('profiles', profileId);
+            if (profile?.secret) {
+                return profile.secret;
+            }
+            throw new Error('Profile not found');
+        }
+        
+        // Check session cache for active profile secret
         if (this.session.walletSecret) {
             return this.session.walletSecret;
         }
         
-        // Load from storage
+        // Get active profile (creates default if needed)
+        const activeProfile = await this.getActiveProfile();
+        if (activeProfile?.secret) {
+            // Cache in session
+            this.session.walletSecret = activeProfile.secret;
+            this.session.activeProfileId = activeProfile.id;
+            return activeProfile.secret;
+        }
+        
+        // Fallback to legacy secrets/master (should not happen with profile system)
         const secretRecord = await this._get('secrets', 'master');
         if (secretRecord?.secret) {
-            // Cache in session
             this.session.walletSecret = secretRecord.secret;
             return secretRecord.secret;
         }
         
-        // AUTO-GENERATE: User has passkey but no secret (legacy registration)
-        // Generate and store a new wallet secret
-        console.log('🔐 No wallet secret found - generating for legacy passkey...');
-        const secretBytes = crypto.getRandomValues(new Uint8Array(32));
-        const secretHex = Array.from(secretBytes)
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-        
-        const newSecret = {
-            id: 'master',
-            secret: secretHex,
-            createdAt: Date.now(),
-            migrated: true  // Flag indicating this was auto-generated
-        };
-        await this._put('secrets', newSecret);
-        
-        // Cache in session
-        this.session.walletSecret = secretHex;
-        console.log('🔐 ✅ Generated wallet secret for PPID derivation');
-        
-        return secretHex;
+        throw new Error('No wallet secret found');
     }
 
     /**
@@ -2665,6 +2679,295 @@ class LemmaWallet {
     }
 
     // ========================================
+    // WALLET PROFILES (Multiple Identities)
+    // ========================================
+
+    /**
+     * Get the active profile. Creates default profile if none exists.
+     * @returns {Object} { id, name, secret, createdAt, isDefault }
+     */
+    async getActiveProfile() {
+        await this.init();
+        
+        // Get active profile ID from settings
+        const activeProfileSetting = await this._get('passkey', 'activeProfile');
+        const activeProfileId = activeProfileSetting?.value || DEFAULT_PROFILE_ID;
+        
+        // Get the profile
+        let profile = await this._get('profiles', activeProfileId);
+        
+        // If no profile exists, migrate from legacy or create default
+        if (!profile) {
+            profile = await this._migrateOrCreateDefaultProfile();
+        }
+        
+        return profile;
+    }
+    
+    /**
+     * Migrate existing wallet secret to default profile, or create new default profile
+     * @private
+     */
+    async _migrateOrCreateDefaultProfile() {
+        // Check for existing wallet secret (legacy single-wallet)
+        const existingSecret = await this._get('secrets', 'master');
+        
+        let profile;
+        if (existingSecret?.secret) {
+            // Migrate existing wallet to default profile
+            console.log('[Lemma] Migrating existing wallet to default profile');
+            profile = {
+                id: DEFAULT_PROFILE_ID,
+                name: 'Personal',
+                secret: existingSecret.secret,
+                createdAt: existingSecret.createdAt || Date.now(),
+                isDefault: true,
+                migratedFrom: 'legacy'
+            };
+        } else {
+            // Create new default profile with new secret
+            console.log('[Lemma] Creating new default profile');
+            const secretBytes = crypto.getRandomValues(new Uint8Array(32));
+            const secretHex = Array.from(secretBytes)
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+            
+            profile = {
+                id: DEFAULT_PROFILE_ID,
+                name: 'Personal',
+                secret: secretHex,
+                createdAt: Date.now(),
+                isDefault: true
+            };
+        }
+        
+        await this._put('profiles', profile);
+        
+        // Also keep secrets/master in sync for backward compatibility
+        await this._put('secrets', {
+            id: 'master',
+            secret: profile.secret,
+            createdAt: profile.createdAt,
+            activeProfileId: profile.id
+        });
+        
+        // Set as active profile
+        await this._put('passkey', { id: 'activeProfile', value: profile.id });
+        
+        return profile;
+    }
+    
+    /**
+     * List all profiles
+     * @returns {Array} List of profile objects
+     */
+    async listProfiles() {
+        await this.init();
+        
+        let profiles = await this._getAll('profiles');
+        
+        // If no profiles exist, create default
+        if (!profiles || profiles.length === 0) {
+            const defaultProfile = await this._migrateOrCreateDefaultProfile();
+            profiles = [defaultProfile];
+        }
+        
+        // Get active profile ID
+        const activeProfileSetting = await this._get('passkey', 'activeProfile');
+        const activeProfileId = activeProfileSetting?.value || DEFAULT_PROFILE_ID;
+        
+        // Mark which one is active
+        return profiles.map(p => ({
+            ...p,
+            isActive: p.id === activeProfileId
+        }));
+    }
+    
+    /**
+     * Create a new profile
+     * @param {string} name - Display name for the profile (e.g., "Work", "Personal")
+     * @returns {Object} The created profile
+     */
+    async createProfile(name) {
+        await this.init();
+        
+        if (!name || name.trim().length === 0) {
+            throw new Error('Profile name is required');
+        }
+        
+        // Generate profile ID from name
+        const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 20) + 
+                   '_' + Date.now().toString(36);
+        
+        // Check if profile with this name already exists
+        const existing = await this._getAll('profiles');
+        if (existing.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+            throw new Error('A profile with this name already exists');
+        }
+        
+        // Generate new secret for this profile
+        const secretBytes = crypto.getRandomValues(new Uint8Array(32));
+        const secretHex = Array.from(secretBytes)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+        
+        const profile = {
+            id: id,
+            name: name.trim(),
+            secret: secretHex,
+            createdAt: Date.now(),
+            isDefault: false
+        };
+        
+        await this._put('profiles', profile);
+        console.log(`[Lemma] Created profile: ${name}`);
+        
+        return profile;
+    }
+    
+    /**
+     * Switch to a different profile
+     * @param {string} profileId - ID of the profile to switch to
+     * @returns {Object} The new active profile
+     */
+    async switchProfile(profileId) {
+        await this.init();
+        
+        const profile = await this._get('profiles', profileId);
+        if (!profile) {
+            throw new Error('Profile not found');
+        }
+        
+        // Update active profile setting
+        await this._put('passkey', { id: 'activeProfile', value: profileId });
+        
+        // Update secrets/master for backward compatibility
+        await this._put('secrets', {
+            id: 'master',
+            secret: profile.secret,
+            createdAt: profile.createdAt,
+            activeProfileId: profileId
+        });
+        
+        // Clear cached wallet secret in session
+        if (this.session) {
+            this.session.walletSecret = profile.secret;
+            this.session.activeProfileId = profileId;
+        }
+        
+        // Update bridge session cookie with new profile (if unlocked)
+        if (this.isUnlocked()) {
+            try {
+                const walletId = await this._get('passkey', 'walletId');
+                await fetch('https://lemma.id/api/wallet/set-session', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        wallet_id: walletId?.value || 'unknown',
+                        unlocked_at: this.session.unlockedAt,
+                        profile_id: profile.id,
+                        profile_name: profile.name
+                    })
+                });
+                console.log(`[Lemma] Bridge session updated for profile: ${profile.name}`);
+            } catch (e) {
+                console.warn('[Lemma] Could not update bridge session:', e.message);
+            }
+        }
+        
+        console.log(`[Lemma] Switched to profile: ${profile.name}`);
+        
+        return { ...profile, isActive: true };
+    }
+    
+    /**
+     * Rename a profile
+     * @param {string} profileId - ID of the profile to rename
+     * @param {string} newName - New name for the profile
+     * @returns {Object} The updated profile
+     */
+    async renameProfile(profileId, newName) {
+        await this.init();
+        
+        if (!newName || newName.trim().length === 0) {
+            throw new Error('Profile name is required');
+        }
+        
+        const profile = await this._get('profiles', profileId);
+        if (!profile) {
+            throw new Error('Profile not found');
+        }
+        
+        // Check if another profile has this name
+        const existing = await this._getAll('profiles');
+        if (existing.some(p => p.id !== profileId && p.name.toLowerCase() === newName.toLowerCase())) {
+            throw new Error('A profile with this name already exists');
+        }
+        
+        profile.name = newName.trim();
+        profile.updatedAt = Date.now();
+        
+        await this._put('profiles', profile);
+        console.log(`[Lemma] Renamed profile to: ${newName}`);
+        
+        return profile;
+    }
+    
+    /**
+     * Delete a profile
+     * @param {string} profileId - ID of the profile to delete
+     * @returns {boolean} Success
+     */
+    async deleteProfile(profileId) {
+        await this.init();
+        
+        // Cannot delete default profile
+        if (profileId === DEFAULT_PROFILE_ID) {
+            throw new Error('Cannot delete the default profile');
+        }
+        
+        const profile = await this._get('profiles', profileId);
+        if (!profile) {
+            throw new Error('Profile not found');
+        }
+        
+        // Check if this is the active profile
+        const activeProfileSetting = await this._get('passkey', 'activeProfile');
+        const activeProfileId = activeProfileSetting?.value || DEFAULT_PROFILE_ID;
+        
+        if (profileId === activeProfileId) {
+            // Switch to default before deleting
+            await this.switchProfile(DEFAULT_PROFILE_ID);
+        }
+        
+        // Delete the profile
+        await this._delete('profiles', profileId);
+        console.log(`[Lemma] Deleted profile: ${profile.name}`);
+        
+        return true;
+    }
+    
+    /**
+     * Get extended wallet info including profile information
+     * @returns {Object} Extended wallet info with profile data
+     */
+    async getWalletInfoWithProfiles() {
+        await this.init();
+        
+        const baseInfo = await this.getWalletInfo();
+        const profiles = await this.listProfiles();
+        const activeProfile = await this.getActiveProfile();
+        
+        return {
+            ...baseInfo,
+            profiles: profiles,
+            activeProfile: activeProfile,
+            profileCount: profiles.length
+        };
+    }
+
+    // ========================================
     // DEVICE LINKING (wallet_secret transfer)
     // ========================================
 
@@ -2678,9 +2981,10 @@ class LemmaWallet {
      * - Encrypted with a random key embedded in the code
      * - Device-to-device transfer, no server involved
      * 
-     * @returns {Object} { code: string, qrData: string, expiresAt: number, expiresIn: number }
+     * @param {string} profileId - Optional specific profile to link (defaults to active)
+     * @returns {Object} { code: string, qrData: string, expiresAt: number, expiresIn: number, profileName: string }
      */
-    async generateLinkCode() {
+    async generateLinkCode(profileId = null) {
         try {
             console.log('[Lemma] generateLinkCode: starting...');
             await this.init();
@@ -2691,8 +2995,17 @@ class LemmaWallet {
             }
             console.log('[Lemma] generateLinkCode: wallet is unlocked');
             
-            const walletSecret = await this.getWalletSecret();
-            console.log('[Lemma] generateLinkCode: walletSecret obtained:', !!walletSecret, 'length:', walletSecret?.length);
+            // Get the profile to link (specific or active)
+            const profile = profileId 
+                ? await this._get('profiles', profileId)
+                : await this.getActiveProfile();
+            
+            if (!profile) {
+                throw new Error('Profile not found');
+            }
+            
+            const walletSecret = profile.secret;
+            console.log('[Lemma] generateLinkCode: walletSecret obtained for profile:', profile.name);
             if (!walletSecret) {
                 throw new Error('No wallet secret found');
             }
@@ -2707,14 +3020,16 @@ class LemmaWallet {
                 .join('');
             console.log('[Lemma] generateLinkCode: encryption key generated');
             
-            // Create payload to encrypt
+            // Create payload to encrypt (includes profile info for v2)
             const payload = JSON.stringify({
                 walletSecret: walletSecret,
                 walletId: walletId?.value || null,
+                profileId: profile.id,
+                profileName: profile.name,
                 createdAt: Date.now(),
                 expiresAt: Date.now() + 60000 // 60 seconds
             });
-            console.log('[Lemma] generateLinkCode: payload created, length:', payload.length);
+            console.log('[Lemma] generateLinkCode: payload created for profile:', profile.name);
             
             // Encrypt payload using AES-GCM
             const encryptedPayload = await this._encryptForLink(payload, encryptionKey);
@@ -2741,14 +3056,16 @@ class LemmaWallet {
             const qrUrl = `https://lemma.id/wallet/link#${qrDataBase64}`;
             console.log('[Lemma] generateLinkCode: qrUrl created, length:', qrUrl.length);
             
-            console.log('[Lemma] 📱 Link code generated - expires in 60 seconds');
+            console.log(`[Lemma] Link code generated for profile "${profile.name}" - expires in 60 seconds`);
             
             return {
                 shortCode: shortCode,
                 qrData: qrData,        // Raw JSON for manual paste
                 qrUrl: qrUrl,          // URL for QR code scanning
                 expiresAt: Date.now() + 60000,
-                expiresIn: 60
+                expiresIn: 60,
+                profileId: profile.id,
+                profileName: profile.name
             };
         } catch (e) {
             console.error('[Lemma] generateLinkCode ERROR:', e);
@@ -2839,14 +3156,34 @@ class LemmaWallet {
             }
         }
         
-        // Store the wallet secret
+        // Create or update profile with the linked wallet secret
+        const profileId = payload.profileId || DEFAULT_PROFILE_ID;
+        const profileName = payload.profileName || 'Personal';
+        
+        const linkedProfile = {
+            id: profileId,
+            name: profileName,
+            secret: payload.walletSecret,
+            createdAt: Date.now(),
+            linkedFrom: payload.walletId || 'unknown',
+            linkedAt: Date.now(),
+            isDefault: profileId === DEFAULT_PROFILE_ID
+        };
+        
+        await this._put('profiles', linkedProfile);
+        
+        // Also store in secrets/master for backward compatibility
         await this._put('secrets', {
             id: 'master',
             secret: payload.walletSecret,
             createdAt: Date.now(),
             linkedFrom: payload.walletId || 'unknown',
-            linkedAt: Date.now()
+            linkedAt: Date.now(),
+            activeProfileId: profileId
         });
+        
+        // Set as active profile
+        await this._put('passkey', { id: 'activeProfile', value: profileId });
         
         // Store wallet ID if provided
         if (payload.walletId) {
@@ -2856,13 +3193,15 @@ class LemmaWallet {
             });
         }
         
-        console.log('[Lemma] Device linked successfully');
+        console.log(`[Lemma] Device linked successfully with profile: ${profileName}`);
         
         return {
             success: true,
             walletId: payload.walletId,
+            profileId: profileId,
+            profileName: profileName,
             needsPasskey: true,
-            message: 'Wallet linked! Now create a passkey to secure it on this device.'
+            message: `Wallet "${profileName}" linked! Now create a passkey to secure it on this device.`
         };
     }
     
@@ -2877,6 +3216,7 @@ class LemmaWallet {
                 timestamp: Date.now(),
                 secret: await this._get('secrets', 'master'),
                 walletId: await this._get('passkey', 'walletId'),
+                profiles: await this._getAll('profiles'),
                 lemmas: await this._getAll('lemmas'),
                 issuers: await this._getAll('issuers')
             };
@@ -2905,8 +3245,8 @@ class LemmaWallet {
      */
     async _clearWalletData() {
         try {
-            // Clear all stores
-            const stores = ['secrets', 'passkey', 'lemmas', 'issuers', 'session', 'revocations'];
+            // Clear all stores (including profiles)
+            const stores = ['secrets', 'passkey', 'lemmas', 'issuers', 'session', 'revocations', 'profiles'];
             
             for (const storeName of stores) {
                 try {
@@ -2978,6 +3318,13 @@ class LemmaWallet {
             await this._put('passkey', backup.walletId);
         }
         
+        // Restore profiles
+        if (backup.profiles) {
+            for (const profile of backup.profiles) {
+                await this._put('profiles', profile);
+            }
+        }
+        
         // Restore lemmas
         if (backup.lemmas) {
             for (const lemma of backup.lemmas) {
@@ -2999,7 +3346,8 @@ class LemmaWallet {
             needsPasskey: true,
             message: 'Wallet restored. Create a passkey to secure it.',
             restoredAt: Date.now(),
-            backupTimestamp: backup.timestamp
+            backupTimestamp: backup.timestamp,
+            profileCount: backup.profiles?.length || 0
         };
     }
     

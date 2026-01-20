@@ -116,10 +116,20 @@ def _validate_csrf() -> bool:
     return secrets.compare_digest(csrf_cookie, csrf_header)
 
 
-def generate_session_token(wallet_id: str, unlocked_at: int) -> str:
-    """Generate a secure session token for the cookie."""
+def generate_session_token(wallet_id: str, unlocked_at: int, profile_id: str = 'default', profile_name: str = 'Personal') -> str:
+    """Generate a secure session token for the cookie.
+    
+    Args:
+        wallet_id: The user's wallet ID
+        unlocked_at: Timestamp when wallet was unlocked
+        profile_id: Active profile ID (default: 'default')
+        profile_name: Active profile display name (default: 'Personal')
+    """
     session_nonce = secrets.token_hex(16)
-    payload = f"{wallet_id}:{unlocked_at}:{int(time.time())}:{session_nonce}"
+    # Include profile info in payload (URL-safe encoding for profile name)
+    import base64
+    profile_name_encoded = base64.urlsafe_b64encode(profile_name.encode()).decode()
+    payload = f"{wallet_id}:{unlocked_at}:{int(time.time())}:{session_nonce}:{profile_id}:{profile_name_encoded}"
     signature = hmac.new(
         SESSION_SECRET.encode(),
         payload.encode(),
@@ -130,17 +140,32 @@ def generate_session_token(wallet_id: str, unlocked_at: int) -> str:
 
 def validate_session_token(token: str) -> dict:
     """Validate and decode a session token."""
+    import base64
     try:
         parts = token.split(':')
-        if len(parts) != 5:
+        
+        # Support both old format (5 parts) and new format with profiles (7 parts)
+        if len(parts) == 5:
+            # Legacy format without profile
+            wallet_id, unlocked_at, created_at, session_nonce, signature = parts
+            profile_id = 'default'
+            profile_name = 'Personal'
+            payload = f"{wallet_id}:{unlocked_at}:{created_at}:{session_nonce}"
+        elif len(parts) == 7:
+            # New format with profile
+            wallet_id, unlocked_at, created_at, session_nonce, profile_id, profile_name_encoded, signature = parts
+            try:
+                profile_name = base64.urlsafe_b64decode(profile_name_encoded.encode()).decode()
+            except:
+                profile_name = 'Personal'
+            payload = f"{wallet_id}:{unlocked_at}:{created_at}:{session_nonce}:{profile_id}:{profile_name_encoded}"
+        else:
             return None
         
-        wallet_id, unlocked_at, created_at, session_nonce, signature = parts
         unlocked_at = int(unlocked_at)
         created_at = int(created_at)
         
         # Verify signature
-        payload = f"{wallet_id}:{unlocked_at}:{created_at}:{session_nonce}"
         expected_sig = hmac.new(
             SESSION_SECRET.encode(),
             payload.encode(),
@@ -158,7 +183,9 @@ def validate_session_token(token: str) -> dict:
             'wallet_id': wallet_id,
             'unlocked_at': unlocked_at,
             'created_at': created_at,
-            'expires_at': created_at + SESSION_DURATION
+            'expires_at': created_at + SESSION_DURATION,
+            'profile_id': profile_id,
+            'profile_name': profile_name
         }
     except Exception:
         # PRIVACY: Don't log validation errors (could leak timing info)
@@ -228,7 +255,9 @@ def session_sync():
             'wallet_id': session_data['wallet_id'],
             'unlocked_at': session_data['unlocked_at'],
             'expires_at': session_data['expires_at'],
-            'time_remaining': session_data['expires_at'] - int(time.time())
+            'time_remaining': session_data['expires_at'] - int(time.time()),
+            'profile_id': session_data.get('profile_id', 'default'),
+            'profile_name': session_data.get('profile_name', 'Personal')
         },
         'credentials': [],  # Credentials stored locally only
         'synced_at': int(time.time() * 1000)
@@ -248,6 +277,8 @@ def set_session():
     Request body:
         - wallet_id: The user's wallet ID
         - unlocked_at: Timestamp of unlock
+        - profile_id: Active profile ID (optional, default: 'default')
+        - profile_name: Active profile display name (optional, default: 'Personal')
     """
     # Handle CORS preflight
     if request.method == 'OPTIONS':
@@ -263,14 +294,16 @@ def set_session():
     data = request.get_json() or {}
     wallet_id = data.get('wallet_id')
     unlocked_at = data.get('unlocked_at', int(time.time() * 1000))
+    profile_id = data.get('profile_id', 'default')
+    profile_name = data.get('profile_name', 'Personal')
 
     if not wallet_id:
         response = jsonify({'success': False, 'error': 'wallet_id required'})
         response.headers.update(_cors_headers(origin))
         return response, 400
 
-    # Generate session token + CSRF token
-    token = generate_session_token(wallet_id, unlocked_at)
+    # Generate session token + CSRF token (now includes profile info)
+    token = generate_session_token(wallet_id, unlocked_at, profile_id, profile_name)
     csrf_token = secrets.token_urlsafe(32)
 
     # Create response with cookie

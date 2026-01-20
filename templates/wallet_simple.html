@@ -89,6 +89,69 @@
 .log-entry.error { color: #f14c4c; }
 .log-entry.warn { color: #cca700; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+
+/* Profile styles */
+.profile-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+}
+.profile-item:hover { border-color: #8b5cf6; }
+.profile-item.active {
+    border-color: #8b5cf6;
+    background: linear-gradient(135deg, #faf5ff, #ede9fe);
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
+}
+.profile-item .profile-info { flex: 1; }
+.profile-item .profile-name {
+    font-weight: 600;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.profile-item .profile-name .active-badge {
+    font-size: 0.7rem;
+    background: #8b5cf6;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+.profile-item .profile-meta {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 2px;
+}
+.profile-item .profile-actions {
+    display: flex;
+    gap: 6px;
+}
+.profile-item .profile-actions button {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+.profile-item .btn-switch {
+    background: #8b5cf6;
+    color: white;
+}
+.profile-item .btn-switch:hover { background: #7c3aed; }
+.profile-item .btn-delete {
+    background: #fee2e2;
+    color: #dc2626;
+}
+.profile-item .btn-delete:hover { background: #fecaca; }
 </style>
 {% endblock %}
 
@@ -112,6 +175,35 @@
         <p style="text-align: center; color: #6b7280; font-size: 0.85rem; margin-top: 12px;">
             Uses <code>autoAuthenticate()</code> and <code>getAuthState()</code>
         </p>
+    </div>
+
+    <!-- Wallet Profiles -->
+    <div class="card" id="profiles-card" style="border: 2px solid #8b5cf6; background: linear-gradient(135deg, #faf5ff, #f3e8ff);">
+        <h2 style="color: #6b21a8;">Wallet Profiles</h2>
+        <p style="color: #7c3aed; font-size: 0.85rem; margin-bottom: 16px;">
+            Use multiple identities (e.g., Work, Personal) with separate credentials for each.
+        </p>
+        
+        <!-- Active Profile Display -->
+        <div id="active-profile-display" class="status-box" style="background: #ede9fe; border: 1px solid #8b5cf6; color: #5b21b6;">
+            Loading profiles...
+        </div>
+        
+        <!-- Profile List -->
+        <div id="profile-list" style="margin-top: 16px;">
+            <!-- Populated by JS -->
+        </div>
+        
+        <!-- Add Profile -->
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #ddd6fe;">
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="new-profile-name" placeholder="New profile name (e.g., Work)" 
+                    style="flex: 1; padding: 10px; border: 1px solid #c4b5fd; border-radius: 8px; font-size: 0.9rem;">
+                <button class="btn btn-primary" onclick="createProfile()" style="background: #8b5cf6; white-space: nowrap;">
+                    + Add Profile
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Session Status -->
@@ -261,7 +353,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=2230"></script>
+<script src="/static/js/lemma-wallet.js?v=2250"></script>
 <script src="/static/js/qrcode.min.js"></script>
 <script>
 // =============================================
@@ -311,11 +403,106 @@ async function initSDK() {
         addLog('Creating LemmaWallet instance...', 'info');
         wallet = new LemmaWallet();
         await wallet.init();
-        addLog('✅ SDK initialized', 'success');
+        addLog('SDK initialized', 'success');
         return wallet;
     } catch (e) {
-        addLog(`❌ SDK init failed: ${e.message}`, 'error');
+        addLog(`SDK init failed: ${e.message}`, 'error');
         throw e;
+    }
+}
+
+// =============================================
+// PROFILE MANAGEMENT
+// =============================================
+
+async function loadProfiles() {
+    try {
+        await initSDK();
+        const profiles = await wallet.listProfiles();
+        const activeProfile = await wallet.getActiveProfile();
+        
+        // Update active profile display
+        const displayEl = document.getElementById('active-profile-display');
+        displayEl.innerHTML = `<strong>Active Profile:</strong> ${activeProfile.name}`;
+        
+        // Render profile list
+        const listEl = document.getElementById('profile-list');
+        if (profiles.length === 0) {
+            listEl.innerHTML = '<p style="color: #6b7280; text-align: center;">No profiles yet. Create one above.</p>';
+            return;
+        }
+        
+        listEl.innerHTML = profiles.map(profile => `
+            <div class="profile-item ${profile.isActive ? 'active' : ''}">
+                <div class="profile-info">
+                    <div class="profile-name">
+                        ${profile.name}
+                        ${profile.isActive ? '<span class="active-badge">Active</span>' : ''}
+                        ${profile.isDefault ? '<span style="font-size: 0.7rem; color: #6b7280;">(default)</span>' : ''}
+                    </div>
+                    <div class="profile-meta">
+                        Created ${new Date(profile.createdAt).toLocaleDateString()}
+                        ${profile.linkedFrom ? ' (linked)' : ''}
+                    </div>
+                </div>
+                <div class="profile-actions">
+                    ${!profile.isActive ? `<button class="btn-switch" onclick="switchProfile('${profile.id}')">Switch</button>` : ''}
+                    ${!profile.isDefault ? `<button class="btn-delete" onclick="deleteProfile('${profile.id}', '${profile.name}')">Delete</button>` : ''}
+                </div>
+            </div>
+        `).join('');
+        
+        addLog(`Loaded ${profiles.length} profile(s), active: ${activeProfile.name}`, 'info');
+    } catch (e) {
+        addLog(`Failed to load profiles: ${e.message}`, 'error');
+        document.getElementById('active-profile-display').innerHTML = `<span style="color: #dc2626;">Error loading profiles</span>`;
+    }
+}
+
+async function createProfile() {
+    const nameInput = document.getElementById('new-profile-name');
+    const name = nameInput.value.trim();
+    
+    if (!name) {
+        addLog('Profile name is required', 'warn');
+        return;
+    }
+    
+    try {
+        await initSDK();
+        const profile = await wallet.createProfile(name);
+        addLog(`Created profile: ${profile.name}`, 'success');
+        nameInput.value = '';
+        await loadProfiles();
+    } catch (e) {
+        addLog(`Failed to create profile: ${e.message}`, 'error');
+    }
+}
+
+async function switchProfile(profileId) {
+    try {
+        await initSDK();
+        const profile = await wallet.switchProfile(profileId);
+        addLog(`Switched to profile: ${profile.name}`, 'success');
+        await loadProfiles();
+        await refreshStatus();
+    } catch (e) {
+        addLog(`Failed to switch profile: ${e.message}`, 'error');
+    }
+}
+
+async function deleteProfile(profileId, profileName) {
+    if (!confirm(`Delete profile "${profileName}"? This cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        await initSDK();
+        await wallet.deleteProfile(profileId);
+        addLog(`Deleted profile: ${profileName}`, 'success');
+        await loadProfiles();
+    } catch (e) {
+        addLog(`Failed to delete profile: ${e.message}`, 'error');
     }
 }
 
@@ -1068,7 +1255,7 @@ async function showAddDevice() {
         addLog('=== Generating device link code ===', 'info');
         
         const result = await wallet.generateLinkCode();
-        addLog('Link code generated: ' + result.shortCode, 'success');
+        addLog(`Link code generated for profile: ${result.profileName}`, 'success');
         addLog('Expires in: ' + result.expiresIn + 's', 'info');
         
         // Generate QR code using qrcodejs
@@ -1111,6 +1298,12 @@ async function showAddDevice() {
         
         // Store qrData for the other copy function
         window._linkCode = result.qrData;
+        
+        // Update the instruction text to show profile name
+        const instructionEl = qrDisplay.querySelector('p');
+        if (instructionEl) {
+            instructionEl.innerHTML = `Scan this to link <strong>${result.profileName}</strong> profile`;
+        }
         
         qrDisplay.style.display = 'block';
         
@@ -1213,6 +1406,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         await initSmartAuth();
         
         await refreshStatus();
+        await loadProfiles();
         await loadCredentials();
         await updateDeviceStatus();
     } catch (e) {
