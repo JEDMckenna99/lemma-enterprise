@@ -18,8 +18,7 @@ import json
 import secrets
 import logging
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify, session
-from flask_cors import cross_origin
+from flask import Blueprint, request, jsonify, session, make_response
 
 from .database import get_db, Customer, Passkey
 from .customer_accounts import customer_manager
@@ -28,6 +27,24 @@ from .ppid import derive_ppid_from_passkey, derive_ppid_from_wallet_secret, cano
 logger = logging.getLogger(__name__)
 
 wallet_first_bp = Blueprint('wallet_first', __name__)
+
+
+# Add CORS headers to all responses from this blueprint
+@wallet_first_bp.after_request
+def add_cors_headers_to_response(response):
+    """Add CORS headers to enable cross-origin wallet-based SSO."""
+    origin = request.headers.get('Origin')
+    if origin:
+        # For credentialed requests, we must echo the exact origin
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+    else:
+        response.headers['Access-Control-Allow-Origin'] = '*'
+    
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key'
+    response.headers['Vary'] = 'Origin'
+    return response
 
 
 def derive_user_ppid(site_id: str, wallet_secret: str = None, passkey_credential_id: str = None) -> str:
@@ -256,8 +273,7 @@ def _track_permission_grant(site_id: str, user_did: str, permission_id: str,
             conn.close()
 
 
-@wallet_first_bp.route('/api/wallet-auth/issue', methods=['POST'])
-@cross_origin()
+@wallet_first_bp.route('/api/wallet-auth/issue', methods=['POST', 'OPTIONS'])
 def issue_to_wallet():
     """
     Issue a permission lemma directly to the user's wallet.
@@ -278,6 +294,9 @@ def issue_to_wallet():
     - permission_lemma: Signed credential with subject=PPID
     - ppid: The user's PPID for this site
     """
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        return make_response()
     try:
         data = request.get_json() or {}
         
@@ -403,8 +422,7 @@ def issue_to_wallet():
         }), 500
 
 
-@wallet_first_bp.route('/api/wallet-auth/register-and-issue', methods=['POST'])
-@cross_origin()
+@wallet_first_bp.route('/api/wallet-auth/register-and-issue', methods=['POST', 'OPTIONS'])
 def register_and_issue():
     """
     Combined endpoint: Register passkey + Issue permission in one step.
@@ -416,6 +434,8 @@ def register_and_issue():
         "passkey_credential_id": "..."      // New passkey credential ID
     }
     """
+    if request.method == 'OPTIONS':
+        return make_response()
     try:
         data = request.get_json() or {}
         site_id = data.get('site_id', 'lemma.id')
@@ -462,8 +482,7 @@ def register_and_issue():
         }), 500
 
 
-@wallet_first_bp.route('/api/wallet-auth/verify-session', methods=['POST'])
-@cross_origin()
+@wallet_first_bp.route('/api/wallet-auth/verify-session', methods=['POST', 'OPTIONS'])
 def verify_wallet_session():
     """
     Verify wallet unlock and check permissions for a site.
@@ -476,6 +495,8 @@ def verify_wallet_session():
         "permissions": ["example.com:read"] // Permissions from wallet
     }
     """
+    if request.method == 'OPTIONS':
+        return make_response()
     try:
         data = request.get_json() or {}
         site_id = data.get('site_id', 'lemma.id')
@@ -519,8 +540,7 @@ def verify_wallet_session():
         }), 500
 
 
-@wallet_first_bp.route('/api/wallet-auth/my-permissions', methods=['POST'])
-@cross_origin()
+@wallet_first_bp.route('/api/wallet-auth/my-permissions', methods=['POST', 'OPTIONS'])
 def get_user_permissions():
     """
     Get all permissions issued to a user across all sites.
@@ -536,6 +556,9 @@ def get_user_permissions():
     
     Returns all permission_instances where the user's PPID matches.
     """
+    if request.method == 'OPTIONS':
+        return make_response()
+    
     from .database import get_db_connection
     
     try:
@@ -623,8 +646,7 @@ def get_user_permissions():
         }), 500
 
 
-@wallet_first_bp.route('/api/wallet-auth/debug-hash', methods=['POST'])
-@cross_origin()
+@wallet_first_bp.route('/api/wallet-auth/debug-hash', methods=['POST', 'OPTIONS'])
 def debug_credential_hash():
     """
     Debug endpoint: returns the expected hash for a credential
