@@ -13,8 +13,15 @@
  *   const result = await wallet.autoAuthenticate();
  *   
  *   if (result.authenticated) {
- *     // User has unlocked wallet - check if they have account, auto sign-in
- *     // Send result.walletSecret to backend to derive PPID and lookup user
+ *     // User proved possession of their wallet via passkey
+ *     // Derive their PPID (site-specific identifier) - NO network call!
+ *     const ppid = await wallet.derivePPID('yoursite.com');
+ *     
+ *     // Send ppid to YOUR backend to sign-in or create account
+ *     const response = await fetch('/api/auth', {
+ *       method: 'POST',
+ *       body: JSON.stringify({ ppid })
+ *     });
  *   } else {
  *     // Show "Create Passkey & Sign In" button
  *   }
@@ -55,7 +62,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.25.0';
+    static VERSION = '2.26.0';
     
     constructor() {
         this.db = null;
@@ -207,18 +214,25 @@ class LemmaWallet {
 
     /**
      * Auto-authenticate if user has an unlocked wallet.
-     * Returns wallet credentials needed to sign in or create account.
+     * 
+     * If authenticated=true, the user has PROVEN possession of their wallet via passkey.
+     * This is cryptographic proof - no password, no call to lemma.id needed.
      * 
      * Usage:
      *   const result = await wallet.autoAuthenticate();
      *   if (result.authenticated) {
-     *     // Send result.walletSecret to your backend to derive PPID
-     *     // Backend checks if PPID exists -> sign in, else -> create account
+     *     // User proved they own their wallet! Derive their site-specific PPID:
+     *     const ppid = await wallet.derivePPID(window.location.hostname);
+     *     
+     *     // Send PPID to YOUR backend - this is the user's ID for your site
+     *     // If ppid exists in your DB -> sign in
+     *     // If ppid doesn't exist -> create new account
+     *     await fetch('/api/auth', { method: 'POST', body: JSON.stringify({ ppid }) });
      *   } else if (result.needsPasskey) {
      *     // Show "Create Passkey & Sign In" button
      *   }
      * 
-     * @returns {Promise<Object>} Result with authenticated status and credentials
+     * @returns {Promise<Object>} Result with authenticated status
      */
     async autoAuthenticate() {
         await this.init();
@@ -2657,6 +2671,149 @@ class LemmaWallet {
         await this.init();
         const passkey = await this._get('passkey', 'primary');
         return passkey?.credentialId || null;
+    }
+
+    /**
+     * Derive the user's PPID (Pairwise Pseudonymous Identifier) for a specific site.
+     * 
+     * PPID = did:lemma:ppid_<HMAC-SHA256(wallet_secret, site_id)>
+     * 
+     * This is the user's IDENTITY for that site - different for every site.
+     * The PPID can be used to:
+     * - Look up the user in your database (sign-in)
+     * - Create a new user record (first-time sign-up)
+     * - Verify the user has access (possession of wallet = authenticated)
+     * 
+     * NO NETWORK CALL to lemma.id - this is pure client-side cryptography.
+     * 
+     * @param {string} siteId - Your site domain (e.g., 'example.com' or window.location.hostname)
+     * @returns {Promise<string>} The user's PPID for your site: did:lemma:ppid_<hash>
+     * 
+     * @example
+     * const wallet = new LemmaWallet();
+     * const result = await wallet.autoAuthenticate();
+     * if (result.authenticated) {
+     *     const ppid = await wallet.derivePPID('example.com');
+     *     // Send ppid to your backend: POST /api/auth { ppid }
+     *     // Backend checks if ppid exists -> sign in, else -> create account
+     * }
+     */
+    async derivePPID(siteId) {
+        await this.init();
+        
+        if (!this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to derive PPID');
+        }
+        
+        if (!siteId) {
+            // Default to current hostname if not specified
+            siteId = window.location.hostname;
+        }
+        
+        // Normalize site ID (lowercase, remove www prefix, remove port)
+        siteId = siteId.toLowerCase()
+            .replace(/^www\./, '')
+            .replace(/:\d+$/, '');
+        
+        // Get wallet secret
+        const walletSecret = await this.getWalletSecret();
+        
+        // Derive PPID using HMAC-SHA256
+        const ppidHash = await this._hmacSha256(walletSecret, siteId);
+        
+        return `did:lemma:ppid_${ppidHash}`;
+    }
+    
+    /**
+     * Get authenticated user's PPID for your site - the complete sign-in flow.
+     * 
+     * This is the simplest way to authenticate users:
+     * 1. Checks if wallet is unlocked (user proved possession via passkey)
+     * 2. Derives their site-specific PPID (their identity for YOUR site)
+     * 
+     * NO CALL TO LEMMA.ID - pure client-side cryptographic authentication.
+     * 
+     * @param {string} siteId - Your site domain (default: current hostname)
+     * @returns {Promise<Object>} { authenticated, ppid?, needsPasskey?, error? }
+     * 
+     * @example
+     * const wallet = new LemmaWallet();
+     * const result = await wallet.getAuthenticatedPPID();
+     * 
+     * if (result.authenticated) {
+     *     // result.ppid is the user's identity for your site
+     *     // Send to YOUR backend: POST /api/auth { ppid: result.ppid }
+     *     // Backend: find user by ppid or create new account
+     * } else if (result.needsPasskey) {
+     *     // Show sign-in button
+     * }
+     */
+    async getAuthenticatedPPID(siteId = null) {
+        try {
+            await this.init();
+            
+            // Check if authenticated
+            const authResult = await this.autoAuthenticate();
+            
+            if (!authResult.authenticated) {
+                return {
+                    authenticated: false,
+                    needsPasskey: authResult.needsPasskey,
+                    ppid: null,
+                    message: authResult.message
+                };
+            }
+            
+            // Derive PPID for this site
+            const ppid = await this.derivePPID(siteId || window.location.hostname);
+            
+            return {
+                authenticated: true,
+                ppid: ppid,
+                needsPasskey: false,
+                message: 'Authenticated - PPID derived for your site'
+            };
+        } catch (e) {
+            return {
+                authenticated: false,
+                ppid: null,
+                needsPasskey: true,
+                error: e.message
+            };
+        }
+    }
+
+    /**
+     * HMAC-SHA256 using Web Crypto API
+     * @private
+     */
+    async _hmacSha256(secret, message) {
+        // Convert hex secret to bytes
+        const secretBytes = new Uint8Array(
+            secret.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
+        );
+        
+        // Import key
+        const key = await crypto.subtle.importKey(
+            'raw',
+            secretBytes,
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign']
+        );
+        
+        // Sign (HMAC)
+        const encoder = new TextEncoder();
+        const signature = await crypto.subtle.sign(
+            'HMAC',
+            key,
+            encoder.encode(message)
+        );
+        
+        // Convert to hex
+        return Array.from(new Uint8Array(signature))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
     }
 
     async getWalletInfo() {
