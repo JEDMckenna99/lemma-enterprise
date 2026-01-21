@@ -62,7 +62,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.28.0';
+    static VERSION = '2.29.0';
     
     constructor() {
         this.db = null;
@@ -744,6 +744,7 @@ class LemmaWallet {
         // Check URL params for redirect flow completion
         const urlParams = new URLSearchParams(window.location.search);
         const isRedirectReturn = urlParams.get('lemma_unlocked') === '1';
+        const redirectToken = urlParams.get('lemma_token');
         
         if (!isRedirectReturn) {
             // Also check sessionStorage for redirect state
@@ -773,17 +774,65 @@ class LemmaWallet {
         if (isRedirectReturn) {
             urlParams.delete('lemma_unlocked');
             urlParams.delete('lemma_wallet_id');
+            urlParams.delete('lemma_token');
             const cleanUrl = urlParams.toString() 
                 ? `${window.location.pathname}?${urlParams.toString()}`
                 : window.location.pathname;
             window.history.replaceState({}, '', cleanUrl);
         }
         
-        // Check bridge session - should be valid now
+        // If we have a redirect token, exchange it for wallet data
+        // This bypasses mobile Safari's cookie/storage blocking
+        if (redirectToken) {
+            console.log('[Lemma] Exchanging redirect token for wallet data...');
+            try {
+                const response = await fetch('https://lemma.id/api/wallet/exchange-redirect-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: redirectToken })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.wallet_secret) {
+                    console.log('[Lemma] ✅ Token exchange successful!');
+                    
+                    // Store the wallet secret locally
+                    await this._put('secrets', { id: 'master', secret: data.wallet_secret, source: 'redirect_token' });
+                    
+                    // Set up local session
+                    this.session = {
+                        isUnlocked: true,
+                        unlockedAt: Date.now(),
+                        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                        walletId: data.wallet_id,
+                        walletSecret: data.wallet_secret,
+                        source: 'redirect'
+                    };
+                    await this._put('session', { id: 'current', ...this.session });
+                    
+                    this._autoStartHeartbeat();
+                    
+                    return {
+                        success: true,
+                        authenticated: true,
+                        walletId: data.wallet_id,
+                        walletSecret: data.wallet_secret,
+                        message: 'Authenticated via redirect token'
+                    };
+                } else {
+                    console.warn('[Lemma] Token exchange failed:', data.error || 'unknown error');
+                }
+            } catch (e) {
+                console.warn('[Lemma] Token exchange error:', e.message);
+            }
+        }
+        
+        // Fallback: Check bridge session (works on desktop, may fail on mobile Safari)
         const session = await this.checkBridgeSession();
         
         if (session.valid) {
-            console.log('[Lemma] ✅ Redirect unlock successful!');
+            console.log('[Lemma] ✅ Redirect unlock successful via bridge!');
             
             // Try to get the wallet secret
             let walletSecret = null;
@@ -805,7 +854,7 @@ class LemmaWallet {
             };
         }
         
-        console.log('[Lemma] Redirect return but session not valid');
+        console.log('[Lemma] Redirect return but could not establish session');
         return {
             success: false,
             authenticated: false,
@@ -3158,9 +3207,19 @@ class LemmaWallet {
             
             // First, check if we're returning from a redirect-based unlock
             const redirectResult = await this.checkRedirectReturn();
-            if (redirectResult?.authenticated) {
-                console.log('[Lemma] Authenticated via redirect return');
-                // Continue to derive PPID
+            if (redirectResult?.authenticated && redirectResult.walletSecret) {
+                console.log('[Lemma] ✅ Authenticated via redirect token exchange');
+                
+                // Derive PPID directly using the wallet secret from redirect
+                const ppidHash = await this._hmacSha256(redirectResult.walletSecret, siteId || window.location.hostname);
+                const ppid = `did:lemma:ppid_${ppidHash}`;
+                
+                return {
+                    authenticated: true,
+                    ppid: ppid,
+                    needsPasskey: false,
+                    message: 'Authenticated via redirect - PPID derived for your site'
+                };
             }
             
             // Check if authenticated (this auto-handles mobile Safari popup fallback)
@@ -3169,8 +3228,18 @@ class LemmaWallet {
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
             
             if (!authResult.authenticated) {
-                // Check if popup flow is needed (mobile Safari storage partitioning)
-                // This only happens if auto-popup was blocked (no user gesture)
+                // Check if redirect is needed (mobile Safari storage partitioning)
+                if (authResult.needsRedirect) {
+                    return {
+                        authenticated: false,
+                        needsPasskey: false,
+                        needsRedirect: true,
+                        ppid: null,
+                        message: 'Tap Sign In to authenticate (mobile browser)'
+                    };
+                }
+                
+                // Check if popup flow is needed (desktop fallback)
                 if (authResult.needsPopup) {
                     return {
                         authenticated: false,

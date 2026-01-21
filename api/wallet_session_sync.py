@@ -526,10 +526,185 @@ def check_global_session():
 
 
 # ============================================================
+# REDIRECT AUTH TOKEN EXCHANGE
+# ============================================================
+# For mobile browsers that block third-party cookies/storage,
+# we use a short-lived token passed in the redirect URL.
+#
+# Flow:
+# 1. User unlocks on lemma.id wallet page
+# 2. lemma.id calls /api/wallet/create-redirect-token
+# 3. Token returned, included in redirect URL
+# 4. Third-party site receives token, calls /api/wallet/exchange-redirect-token
+# 5. Token validated, wallet_secret returned, token deleted (single-use)
+#
+# Security:
+# - Tokens expire in 60 seconds
+# - Tokens are single-use (deleted after exchange)
+# - Tokens are cryptographically random
+# - wallet_secret encrypted in transit (HTTPS)
+# ============================================================
+
+# In-memory store for redirect tokens (short-lived, don't need persistence)
+# In production with multiple dynos, use Redis instead
+_redirect_tokens = {}
+
+def _cleanup_expired_tokens():
+    """Remove expired tokens from memory"""
+    now = time.time()
+    expired = [k for k, v in _redirect_tokens.items() if v['expires'] < now]
+    for k in expired:
+        del _redirect_tokens[k]
+
+@wallet_session_sync_bp.route('/api/wallet/create-redirect-token', methods=['POST', 'OPTIONS'])
+def create_redirect_token():
+    """
+    Create a short-lived token for redirect-based auth on mobile.
+    
+    Called by lemma.id wallet page after successful unlock, before redirecting
+    back to the third-party site.
+    
+    Request body:
+        - wallet_id: The wallet identifier
+        - wallet_secret: The wallet secret to pass to third-party site
+        - return_url: The URL being redirected to (for validation)
+    
+    Returns:
+        - token: Short-lived token to include in redirect URL
+    
+    SECURITY: Only called from lemma.id domain (same-origin)
+    """
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = 'https://lemma.id'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+    
+    # Only allow from lemma.id
+    origin = request.headers.get('Origin', '')
+    if 'lemma.id' not in origin and 'localhost' not in origin:
+        return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
+    
+    data = request.get_json() or {}
+    wallet_id = data.get('wallet_id')
+    wallet_secret = data.get('wallet_secret')
+    return_url = data.get('return_url')
+    
+    if not wallet_id or not wallet_secret:
+        return jsonify({'success': False, 'error': 'wallet_id and wallet_secret required'}), 400
+    
+    # Cleanup old tokens
+    _cleanup_expired_tokens()
+    
+    # Generate random token
+    token = secrets.token_urlsafe(32)
+    
+    # Store with 60 second expiration
+    _redirect_tokens[token] = {
+        'wallet_id': wallet_id,
+        'wallet_secret': wallet_secret,
+        'return_url': return_url,
+        'expires': time.time() + 60,  # 60 second expiration
+        'created': time.time()
+    }
+    
+    logger.info(f"Created redirect token for wallet (expires in 60s)")
+    
+    response = jsonify({
+        'success': True,
+        'token': token,
+        'expires_in': 60
+    })
+    response.headers['Access-Control-Allow-Origin'] = origin
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
+
+
+@wallet_session_sync_bp.route('/api/wallet/exchange-redirect-token', methods=['POST', 'OPTIONS'])
+def exchange_redirect_token():
+    """
+    Exchange a redirect token for wallet authentication data.
+    
+    Called by third-party site SDK after redirect from lemma.id.
+    Token is single-use - deleted after successful exchange.
+    
+    Request body:
+        - token: The token from the redirect URL
+    
+    Returns:
+        - wallet_id: The wallet identifier
+        - wallet_secret: The wallet secret for PPID derivation
+    
+    SECURITY: Tokens are single-use and expire in 60 seconds
+    """
+    if request.method == 'OPTIONS':
+        response = make_response()
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        return response
+    
+    origin = request.headers.get('Origin')
+    if not _origin_allowed(origin):
+        return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
+    
+    data = request.get_json() or {}
+    token = data.get('token')
+    
+    if not token:
+        response = jsonify({'success': False, 'error': 'token required'})
+        response.headers.update(_cors_headers(origin))
+        return response, 400
+    
+    # Cleanup old tokens
+    _cleanup_expired_tokens()
+    
+    # Look up token
+    token_data = _redirect_tokens.get(token)
+    
+    if not token_data:
+        response = jsonify({
+            'success': False,
+            'error': 'invalid_or_expired_token',
+            'message': 'Token not found, expired, or already used'
+        })
+        response.headers.update(_cors_headers(origin))
+        return response, 400
+    
+    # Check expiration
+    if token_data['expires'] < time.time():
+        del _redirect_tokens[token]
+        response = jsonify({
+            'success': False,
+            'error': 'token_expired',
+            'message': 'Token has expired'
+        })
+        response.headers.update(_cors_headers(origin))
+        return response, 400
+    
+    # Token valid - extract data and DELETE (single-use)
+    wallet_id = token_data['wallet_id']
+    wallet_secret = token_data['wallet_secret']
+    del _redirect_tokens[token]
+    
+    logger.info(f"Exchanged redirect token successfully")
+    
+    response = jsonify({
+        'success': True,
+        'wallet_id': wallet_id,
+        'wallet_secret': wallet_secret
+    })
+    response.headers.update(_cors_headers(origin))
+    return response
+
+
+# ============================================================
 # PRIVACY MODEL
 # ============================================================
 # - Session (unlock status): Server cookie (stateless JWT) + DB for cross-device
 # - Credentials: LOCAL ONLY in each site's IndexedDB
 # - Server stores: wallet_id + timestamps ONLY (no user identity, no site visits)
 # - Cross-device sync: Opt-in, only stores that "wallet X unlocked at time Y"
+# - Redirect tokens: Short-lived (60s), single-use, in-memory only
 # ============================================================

@@ -1542,9 +1542,11 @@ function getRedirectParams() {
 async function handleRedirectReturn(returnUrl) {
     addLog('Redirect flow: completing unlock...', 'info');
     
+    const info = await wallet.getWalletInfo();
+    const walletSecret = await wallet.getWalletSecret();
+    
     // Set the global session before redirecting
     try {
-        const info = await wallet.getWalletInfo();
         if (info.walletId) {
             await fetch('/api/wallet/set-global-session', {
                 method: 'POST',
@@ -1560,9 +1562,38 @@ async function handleRedirectReturn(returnUrl) {
         addLog(`Global session set failed: ${e.message}`, 'warn');
     }
     
-    // Append success parameter to return URL
+    // Create a redirect token to pass authentication to third-party site
+    // This bypasses mobile Safari's cookie/storage blocking
+    let redirectToken = null;
+    try {
+        addLog('Creating redirect token...', 'info');
+        const tokenResponse = await fetch('/api/wallet/create-redirect-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                wallet_id: info.walletId,
+                wallet_secret: walletSecret,
+                return_url: returnUrl
+            })
+        });
+        const tokenData = await tokenResponse.json();
+        if (tokenData.success) {
+            redirectToken = tokenData.token;
+            addLog('Redirect token created (60s expiry)', 'success');
+        } else {
+            addLog(`Token creation failed: ${tokenData.error}`, 'warn');
+        }
+    } catch (e) {
+        addLog(`Token creation error: ${e.message}`, 'warn');
+    }
+    
+    // Append success parameter and token to return URL
     const url = new URL(returnUrl);
     url.searchParams.set('lemma_unlocked', '1');
+    if (redirectToken) {
+        url.searchParams.set('lemma_token', redirectToken);
+    }
     
     addLog(`Redirecting back to: ${url.origin}...`, 'success');
     
