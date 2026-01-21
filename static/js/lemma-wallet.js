@@ -280,6 +280,19 @@ class LemmaWallet {
                         this._autoStartHeartbeat();
                         
                         return result;
+                    } else {
+                        // Bridge session valid but can't get secret
+                        // This happens on mobile Safari due to storage partitioning
+                        // Signal that popup flow is required
+                        console.warn('[Lemma] Bridge session valid but no secret (likely mobile Safari partitioned storage)');
+                        console.log('[Lemma] Popup unlock required to get wallet secret');
+                        
+                        result.authenticated = false;
+                        result.needsPasskey = false;
+                        result.needsPopup = true;  // Special flag for mobile Safari
+                        result.hasSession = true;   // Session exists, just can't access secret
+                        result.message = 'Popup unlock required (mobile browser storage limitation)';
+                        return result;
                     }
                 }
             } catch (e) {
@@ -2756,6 +2769,18 @@ class LemmaWallet {
             const authResult = await this.autoAuthenticate();
             
             if (!authResult.authenticated) {
+                // Check if popup flow is needed (mobile Safari storage partitioning)
+                if (authResult.needsPopup) {
+                    return {
+                        authenticated: false,
+                        needsPasskey: false,
+                        needsPopup: true,
+                        hasSession: true,
+                        ppid: null,
+                        message: authResult.message || 'Popup unlock required (mobile browser)'
+                    };
+                }
+                
                 return {
                     authenticated: false,
                     needsPasskey: authResult.needsPasskey,
