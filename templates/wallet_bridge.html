@@ -650,12 +650,69 @@ window.addEventListener('message', async (event) => {
                 }
                 try {
                     console.log('🔑 Attempting to get wallet secret...');
-                    const walletSecret = await wallet.getWalletSecret();
-                    console.log('🔑 ✅ Got wallet secret:', walletSecret ? 'exists (' + walletSecret.length + ' chars)' : 'null');
-                    respond({
-                        success: true,
-                        walletSecret: walletSecret
-                    });
+                    let walletSecret = null;
+                    
+                    // First try the normal SDK method (checks isUnlocked)
+                    try {
+                        walletSecret = await wallet.getWalletSecret();
+                    } catch (unlockErr) {
+                        // If local session isn't unlocked but SERVER session is valid,
+                        // we can trust the server and get secret directly from storage.
+                        // This handles the case of newly linked devices where the server
+                        // cookie is valid but local passkey unlock hasn't happened yet.
+                        console.log('🔑 Local session locked, but server session valid - getting secret directly');
+                        
+                        // Try to get from active profile first
+                        const activeProfileSetting = await wallet._get('passkey', 'activeProfile');
+                        const profileId = activeProfileSetting?.value || 'default';
+                        const profile = await wallet._get('profiles', profileId);
+                        
+                        if (profile?.secret) {
+                            walletSecret = profile.secret;
+                            console.log('🔑 Got secret from profile:', profileId);
+                        } else {
+                            // Fallback to legacy secrets/master
+                            const secretRecord = await wallet._get('secrets', 'master');
+                            if (secretRecord?.secret) {
+                                walletSecret = secretRecord.secret;
+                                console.log('🔑 Got secret from legacy storage');
+                            }
+                        }
+                        
+                        // Also set the local session to match server (so future calls work)
+                        if (walletSecret && secretSession.walletId) {
+                            const now = Date.now();
+                            await wallet._put('session', {
+                                id: 'current',
+                                isUnlocked: true,
+                                unlockedAt: secretSession.unlockedAt || now,
+                                expiresAt: secretSession.expiresAt || (now + 24 * 60 * 60 * 1000),
+                                walletId: secretSession.walletId,
+                                walletSecret: walletSecret,
+                                source: 'server_sync'
+                            });
+                            // Update wallet's in-memory session too
+                            wallet.session = {
+                                isUnlocked: true,
+                                unlockedAt: secretSession.unlockedAt || now,
+                                expiresAt: secretSession.expiresAt || (now + 24 * 60 * 60 * 1000),
+                                walletId: secretSession.walletId,
+                                walletSecret: walletSecret
+                            };
+                            console.log('🔑 ✅ Synced local session from server');
+                        }
+                    }
+                    
+                    if (walletSecret) {
+                        console.log('🔑 ✅ Got wallet secret:', walletSecret.length + ' chars');
+                        respond({
+                            success: true,
+                            walletSecret: walletSecret
+                        });
+                    } else {
+                        console.error('🔑 ❌ No wallet secret found');
+                        respond({ success: false, error: 'No wallet secret found' });
+                    }
                 } catch (e) {
                     console.error('🔑 ❌ Failed to get wallet secret:', e.message);
                     respond({ success: false, error: e.message });
