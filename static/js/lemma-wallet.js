@@ -283,16 +283,41 @@ class LemmaWallet {
                     } else {
                         // Bridge session valid but can't get secret
                         // This happens on mobile Safari due to storage partitioning
-                        // Signal that popup flow is required
-                        console.warn('[Lemma] Bridge session valid but no secret (likely mobile Safari partitioned storage)');
-                        console.log('[Lemma] Popup unlock required to get wallet secret');
+                        // Auto-try popup flow (will work if called from user gesture like click)
+                        console.warn('[Lemma] Bridge session valid but no secret (mobile Safari partitioned storage)');
+                        console.log('[Lemma] Auto-trying popup fallback...');
                         
-                        result.authenticated = false;
-                        result.needsPasskey = false;
-                        result.needsPopup = true;  // Special flag for mobile Safari
-                        result.hasSession = true;   // Session exists, just can't access secret
-                        result.message = 'Popup unlock required (mobile browser storage limitation)';
-                        return result;
+                        try {
+                            const popupResult = await this.unlockWithPopup();
+                            if (popupResult.success && popupResult.walletSecret) {
+                                // Popup worked - store the secret locally
+                                await this._put('secrets', { id: 'master', secret: popupResult.walletSecret, source: 'popup_fallback' });
+                                this.session.walletSecret = popupResult.walletSecret;
+                                this.session.isUnlocked = true;
+                                await this._put('session', { id: 'current', ...this.session });
+                                
+                                result.walletSecret = popupResult.walletSecret;
+                                result.walletId = popupResult.walletId || bridgeSession.walletId;
+                                result.authenticated = true;
+                                result.needsPasskey = false;
+                                result.message = 'Authenticated via popup (mobile fallback)';
+                                console.log('[Lemma] ✅ Auto-authenticated via popup fallback');
+                                
+                                this._autoStartHeartbeat();
+                                return result;
+                            }
+                        } catch (popupErr) {
+                            // Popup failed (blocked or cancelled)
+                            console.warn('[Lemma] Popup fallback failed:', popupErr.message);
+                            
+                            // Return actionable state for customer site
+                            result.authenticated = false;
+                            result.needsPasskey = false;
+                            result.needsPopup = true;
+                            result.hasSession = true;
+                            result.message = 'Tap Sign In button to continue (mobile browser)';
+                            return result;
+                        }
                     }
                 }
             } catch (e) {
@@ -2765,11 +2790,12 @@ class LemmaWallet {
         try {
             await this.init();
             
-            // Check if authenticated
+            // Check if authenticated (this auto-handles mobile Safari popup fallback)
             const authResult = await this.autoAuthenticate();
             
             if (!authResult.authenticated) {
                 // Check if popup flow is needed (mobile Safari storage partitioning)
+                // This only happens if auto-popup was blocked (no user gesture)
                 if (authResult.needsPopup) {
                     return {
                         authenticated: false,
@@ -2777,7 +2803,7 @@ class LemmaWallet {
                         needsPopup: true,
                         hasSession: true,
                         ppid: null,
-                        message: authResult.message || 'Popup unlock required (mobile browser)'
+                        message: authResult.message || 'Tap to sign in (mobile browser)'
                     };
                 }
                 
@@ -2790,7 +2816,15 @@ class LemmaWallet {
             }
             
             // Derive PPID for this site
-            const ppid = await this.derivePPID(siteId || window.location.hostname);
+            // Use walletSecret from authResult if available (faster, avoids another lookup)
+            let ppid;
+            if (authResult.walletSecret) {
+                // Direct HMAC derivation using the secret we already have
+                const ppidHash = await this._hmacSha256(authResult.walletSecret, siteId || window.location.hostname);
+                ppid = `did:lemma:ppid_${ppidHash}`;
+            } else {
+                ppid = await this.derivePPID(siteId || window.location.hostname);
+            }
             
             return {
                 authenticated: true,
