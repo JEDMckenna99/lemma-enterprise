@@ -412,9 +412,72 @@ class LemmaWallet {
             await this._delete('session', 'current');
         }
         
+        // CROSS-DEVICE SESSION CHECK
+        // If we have a wallet_id and wallet_secret locally, check if user unlocked on another device
+        try {
+            const walletIdRecord = await this._get('passkey', 'walletId');
+            const secretRecord = await this._get('secrets', 'master');
+            
+            if (walletIdRecord?.value && secretRecord?.secret) {
+                console.log('[Lemma] Checking global session (cross-device sync)...');
+                const globalSession = await this._checkGlobalSession(walletIdRecord.value);
+                
+                if (globalSession.valid) {
+                    console.log('[Lemma] ✅ Global session valid - user unlocked on another device');
+                    
+                    // Set local session from global
+                    this.session = {
+                        isUnlocked: true,
+                        unlockedAt: globalSession.session.unlocked_at || globalSession.session.unlockedAt,
+                        expiresAt: (globalSession.session.expires_at || globalSession.session.expiresAt) * 1000,
+                        walletId: walletIdRecord.value,
+                        walletSecret: secretRecord.secret,
+                        source: 'global_sync'
+                    };
+                    await this._put('session', { id: 'current', ...this.session });
+                    
+                    result.walletSecret = secretRecord.secret;
+                    result.walletId = walletIdRecord.value;
+                    result.authenticated = true;
+                    result.needsPasskey = false;
+                    result.crossDevice = true;
+                    result.message = 'Authenticated via cross-device session sync';
+                    console.log('[Lemma] ✅ Auto-authenticated via global session (no passkey needed)');
+                    
+                    return result;
+                }
+            }
+        } catch (e) {
+            console.warn('[Lemma] Global session check failed:', e.message);
+        }
+        
         result.message = 'No valid session - passkey required';
         console.log('[Lemma] No valid session found - user needs to create/unlock passkey');
         return result;
+    }
+    
+    /**
+     * Check if this wallet has an active session on any device (cross-device sync).
+     * @private
+     */
+    async _checkGlobalSession(walletId) {
+        try {
+            const response = await fetch('https://lemma.id/api/wallet/global-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wallet_id: walletId })
+            });
+            
+            if (!response.ok) {
+                return { valid: false };
+            }
+            
+            const data = await response.json();
+            return data;
+        } catch (e) {
+            console.warn('[Lemma] Global session API error:', e.message);
+            return { valid: false };
+        }
     }
     
     /**

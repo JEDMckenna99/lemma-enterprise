@@ -408,6 +408,29 @@ class Passkey(Base):
     is_active = Column(Boolean, default=True)
 
 
+class WalletSession(Base):
+    """
+    Global wallet sessions for cross-device "one passkey per day" experience.
+    
+    When a user unlocks their wallet on any device, we store the session here.
+    Other devices with the same wallet_id can check if an unlock already happened today.
+    
+    Privacy note: We only store wallet_id (random string) and unlock timestamp.
+    No user identity, sites visited, or credentials are stored.
+    """
+    __tablename__ = 'wallet_sessions'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wallet_id = Column(String, nullable=False, index=True, unique=True)  # The wallet identifier
+    unlocked_at = Column(DateTime, nullable=False)  # When passkey was last used
+    expires_at = Column(DateTime, nullable=False)  # Session expiration (24h from unlock)
+    profile_id = Column(String, default='default')  # Active profile when unlocked
+    profile_name = Column(String, default='Personal')  # Profile display name
+    device_hint = Column(String)  # Optional hint like "iPhone" or "Chrome on Windows"
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class SiteConfiguration(Base):
     """Site-specific IAM configuration"""
     __tablename__ = 'site_configurations'

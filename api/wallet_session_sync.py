@@ -34,7 +34,11 @@ import hmac
 import os
 import json
 import secrets
+import logging
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 wallet_session_sync_bp = Blueprint('wallet_session_sync', __name__)
 
@@ -305,12 +309,25 @@ def set_session():
     # Generate session token + CSRF token (now includes profile info)
     token = generate_session_token(wallet_id, unlocked_at, profile_id, profile_name)
     csrf_token = secrets.token_urlsafe(32)
+    expires_at = int(time.time()) + SESSION_DURATION
+    
+    # Store in database for cross-device sync
+    device_hint = request.headers.get('User-Agent', '')[:100]  # Truncate for storage
+    _store_global_session(
+        wallet_id=wallet_id,
+        unlocked_at=unlocked_at,
+        expires_at=expires_at,
+        profile_id=profile_id,
+        profile_name=profile_name,
+        device_hint=device_hint
+    )
 
     # Create response with cookie
     response = jsonify({
         'success': True,
         'session_set': True,
-        'expires_at': int(time.time()) + SESSION_DURATION
+        'expires_at': expires_at,
+        'cross_device_enabled': True
     })
     
     # Add CORS headers
@@ -349,9 +366,170 @@ def clear_session():
 
 
 # ============================================================
+# CROSS-DEVICE SESSION SYNC (Global Sessions)
+# ============================================================
+# Enables "one passkey per day" across ALL devices with same wallet.
+# When user unlocks on Device A, Device B can check if already unlocked.
+# ============================================================
+
+def _get_db_session():
+    """Get database session for global session operations."""
+    try:
+        from api.database import get_session, WalletSession
+        return get_session(), WalletSession
+    except Exception as e:
+        logger.warning(f"Database not available for global sessions: {e}")
+        return None, None
+
+
+def _store_global_session(wallet_id: str, unlocked_at: int, expires_at: int, 
+                          profile_id: str = 'default', profile_name: str = 'Personal',
+                          device_hint: str = None):
+    """Store or update global wallet session in database."""
+    db_session, WalletSession = _get_db_session()
+    if not db_session or not WalletSession:
+        return False
+    
+    try:
+        # Convert timestamps (ms to datetime)
+        unlocked_dt = datetime.fromtimestamp(unlocked_at / 1000 if unlocked_at > 10000000000 else unlocked_at)
+        expires_dt = datetime.fromtimestamp(expires_at if expires_at < 10000000000 else expires_at / 1000)
+        
+        # Upsert: update if exists, insert if not
+        existing = db_session.query(WalletSession).filter_by(wallet_id=wallet_id).first()
+        
+        if existing:
+            existing.unlocked_at = unlocked_dt
+            existing.expires_at = expires_dt
+            existing.profile_id = profile_id
+            existing.profile_name = profile_name
+            existing.device_hint = device_hint
+            existing.updated_at = datetime.utcnow()
+        else:
+            new_session = WalletSession(
+                wallet_id=wallet_id,
+                unlocked_at=unlocked_dt,
+                expires_at=expires_dt,
+                profile_id=profile_id,
+                profile_name=profile_name,
+                device_hint=device_hint
+            )
+            db_session.add(new_session)
+        
+        db_session.commit()
+        logger.info(f"Global session stored for wallet {wallet_id[:8]}...")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to store global session: {e}")
+        db_session.rollback()
+        return False
+    finally:
+        db_session.close()
+
+
+def _get_global_session(wallet_id: str):
+    """Get global session for a wallet_id if valid."""
+    db_session, WalletSession = _get_db_session()
+    if not db_session or not WalletSession:
+        return None
+    
+    try:
+        session = db_session.query(WalletSession).filter_by(wallet_id=wallet_id).first()
+        
+        if not session:
+            return None
+        
+        # Check if expired
+        if session.expires_at < datetime.utcnow():
+            return None
+        
+        return {
+            'wallet_id': session.wallet_id,
+            'unlocked_at': int(session.unlocked_at.timestamp() * 1000),
+            'expires_at': int(session.expires_at.timestamp()),
+            'profile_id': session.profile_id,
+            'profile_name': session.profile_name,
+            'device_hint': session.device_hint
+        }
+    except Exception as e:
+        logger.error(f"Failed to get global session: {e}")
+        return None
+    finally:
+        db_session.close()
+
+
+@wallet_session_sync_bp.route('/api/wallet/global-session', methods=['POST', 'OPTIONS'])
+def check_global_session():
+    """
+    Check if a wallet has an active session on ANY device.
+    
+    This enables cross-device "one passkey per day" - if user unlocked on their phone,
+    their laptop can skip the passkey prompt.
+    
+    Request body:
+        - wallet_id: The wallet identifier to check
+    
+    Returns:
+        - valid: true if wallet was unlocked within 24h on any device
+        - session: Session details if valid
+    
+    PRIVACY: Only wallet_id is required. No tracking of which device/site is checking.
+    """
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        if not _origin_allowed(origin):
+            return response, 403
+        response.headers['Access-Control-Max-Age'] = '86400'
+        return response
+    
+    origin = request.headers.get('Origin')
+    if not _origin_allowed(origin):
+        return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
+    
+    data = request.get_json() or {}
+    wallet_id = data.get('wallet_id')
+    
+    if not wallet_id:
+        response = jsonify({'success': False, 'error': 'wallet_id required'})
+        response.headers.update(_cors_headers(origin))
+        return response, 400
+    
+    # Check global session
+    global_session = _get_global_session(wallet_id)
+    
+    if global_session:
+        response = jsonify({
+            'success': True,
+            'valid': True,
+            'session': {
+                'wallet_id': global_session['wallet_id'],
+                'unlocked_at': global_session['unlocked_at'],
+                'expires_at': global_session['expires_at'],
+                'time_remaining': global_session['expires_at'] - int(time.time()),
+                'profile_id': global_session['profile_id'],
+                'profile_name': global_session['profile_name'],
+                'cross_device': True  # Flag that this came from another device
+            }
+        })
+    else:
+        response = jsonify({
+            'success': True,
+            'valid': False,
+            'message': 'No active global session for this wallet'
+        })
+    
+    response.headers.update(_cors_headers(origin))
+    return response
+
+
+# ============================================================
 # PRIVACY MODEL
 # ============================================================
-# - Session (unlock status): Server cookie (stateless JWT)
+# - Session (unlock status): Server cookie (stateless JWT) + DB for cross-device
 # - Credentials: LOCAL ONLY in each site's IndexedDB
-# - Server stores NO credentials, NO user activity, NO site visits
+# - Server stores: wallet_id + timestamps ONLY (no user identity, no site visits)
+# - Cross-device sync: Opt-in, only stores that "wallet X unlocked at time Y"
 # ============================================================
