@@ -1487,6 +1487,12 @@ async function unlockAndShowWallet() {
         if (result.success) {
             addLog('Wallet unlocked successfully', 'success');
             
+            // Check if we're in a redirect flow
+            if (window._lemmaRedirectParams) {
+                await handleRedirectReturn(window._lemmaRedirectParams.returnUrl);
+                return; // Page is redirecting
+            }
+            
             // Switch to unlocked view
             showUnlockedView();
             
@@ -1513,6 +1519,59 @@ async function unlockAndShowWallet() {
     }
 }
 
+// Check for redirect flow (mobile unlock from third-party site)
+function getRedirectParams() {
+    const params = new URLSearchParams(window.location.search);
+    const returnUrl = params.get('return_url');
+    const redirectFlow = params.get('redirect_flow') === '1';
+    const state = params.get('state');
+    
+    if (returnUrl && redirectFlow) {
+        try {
+            // Validate return URL is a valid URL
+            new URL(returnUrl);
+            return { returnUrl, state: state ? JSON.parse(atob(state)) : null };
+        } catch (e) {
+            console.warn('Invalid return_url:', e);
+        }
+    }
+    return null;
+}
+
+// Handle redirect back to calling site after unlock
+async function handleRedirectReturn(returnUrl) {
+    addLog('Redirect flow: completing unlock...', 'info');
+    
+    // Set the global session before redirecting
+    try {
+        const info = await wallet.getWalletInfo();
+        if (info.walletId) {
+            await fetch('/api/wallet/set-global-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    wallet_id: info.walletId,
+                    duration_hours: 24
+                })
+            });
+        }
+    } catch (e) {
+        addLog(`Global session set failed: ${e.message}`, 'warn');
+    }
+    
+    // Append success parameter to return URL
+    const url = new URL(returnUrl);
+    url.searchParams.set('lemma_unlocked', '1');
+    
+    addLog(`Redirecting back to: ${url.origin}...`, 'success');
+    
+    // Small delay for user to see the success message
+    await new Promise(r => setTimeout(r, 500));
+    
+    window.location.href = url.toString();
+}
+
 // Initialize on load
 window.addEventListener('DOMContentLoaded', async () => {
     // Show SDK version
@@ -1521,6 +1580,12 @@ window.addEventListener('DOMContentLoaded', async () => {
         versionEl.textContent = LemmaWallet.VERSION;
     } else {
         versionEl.textContent = 'unknown';
+    }
+    
+    // Check for redirect flow params
+    const redirectParams = getRedirectParams();
+    if (redirectParams) {
+        addLog(`Redirect flow from: ${new URL(redirectParams.returnUrl).origin}`, 'info');
     }
 
     try {
@@ -1535,6 +1600,23 @@ window.addEventListener('DOMContentLoaded', async () => {
         
         // Check unlock state and show appropriate view
         const isUnlocked = await checkAndShowView();
+        
+        // If in redirect flow and already unlocked, redirect back immediately
+        if (redirectParams && isUnlocked) {
+            await handleRedirectReturn(redirectParams.returnUrl);
+            return; // Stop here - page is redirecting
+        }
+        
+        // Store redirect params for after unlock
+        if (redirectParams) {
+            window._lemmaRedirectParams = redirectParams;
+            
+            // Update UI to show we'll redirect after unlock
+            const lockedStatus = document.getElementById('locked-status');
+            if (lockedStatus) {
+                lockedStatus.innerHTML += `<br><br><em style="font-size: 0.85em;">After unlocking, you'll return to ${new URL(redirectParams.returnUrl).origin}</em>`;
+            }
+        }
         
         if (isUnlocked) {
             // Only load all the data if unlocked

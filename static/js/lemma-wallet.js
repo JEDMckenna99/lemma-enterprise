@@ -62,7 +62,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.26.0';
+    static VERSION = '2.27.0';
     
     constructor() {
         this.db = null;
@@ -642,6 +642,162 @@ class LemmaWallet {
                 });
             }, 5 * 60 * 1000);
         });
+    }
+
+    /**
+     * Redirect-based unlock flow for mobile browsers.
+     * More reliable than popups on iOS Safari which blocks popups aggressively.
+     * 
+     * Flow:
+     * 1. Saves current URL and state
+     * 2. Redirects to lemma.id/wallet
+     * 3. User unlocks with passkey
+     * 4. lemma.id redirects back to original URL
+     * 5. SDK detects return and completes auth
+     * 
+     * @param {Object} options Configuration
+     * @param {string} options.returnUrl URL to return to (default: current URL)
+     * @param {string} options.state Optional state to preserve across redirect
+     * @returns {void} This method redirects, so it doesn't return
+     */
+    unlockWithRedirect(options = {}) {
+        const returnUrl = options.returnUrl || window.location.href;
+        const state = options.state || {};
+        
+        // Store state for when we return
+        const redirectState = {
+            returnUrl,
+            state,
+            timestamp: Date.now(),
+            origin: window.location.origin
+        };
+        
+        try {
+            sessionStorage.setItem('lemma_redirect_state', JSON.stringify(redirectState));
+        } catch (e) {
+            // Fallback to URL-encoded state in the redirect
+            console.warn('[Lemma] Could not save redirect state to sessionStorage');
+        }
+        
+        console.log('[Lemma] Redirecting to lemma.id for wallet unlock...');
+        
+        // Build the redirect URL
+        const params = new URLSearchParams({
+            return_url: returnUrl,
+            redirect_flow: '1'
+        });
+        
+        // Add custom state if provided
+        if (Object.keys(state).length > 0) {
+            params.set('state', btoa(JSON.stringify(state)));
+        }
+        
+        window.location.href = `https://lemma.id/wallet?${params.toString()}`;
+    }
+    
+    /**
+     * Check if we're returning from a redirect-based unlock.
+     * Call this on page load to complete the redirect flow.
+     * 
+     * @returns {Promise<Object|null>} Auth result if returning from redirect, null otherwise
+     */
+    async checkRedirectReturn() {
+        await this.init();
+        
+        // Check URL params for redirect flow completion
+        const urlParams = new URLSearchParams(window.location.search);
+        const isRedirectReturn = urlParams.get('lemma_unlocked') === '1';
+        
+        if (!isRedirectReturn) {
+            // Also check sessionStorage for redirect state
+            try {
+                const savedState = sessionStorage.getItem('lemma_redirect_state');
+                if (!savedState) return null;
+                
+                const state = JSON.parse(savedState);
+                // Only valid if recent (within 10 minutes)
+                if (Date.now() - state.timestamp > 10 * 60 * 1000) {
+                    sessionStorage.removeItem('lemma_redirect_state');
+                    return null;
+                }
+            } catch (e) {
+                return null;
+            }
+        }
+        
+        console.log('[Lemma] Detected redirect return, checking auth...');
+        
+        // Clear the redirect state
+        try {
+            sessionStorage.removeItem('lemma_redirect_state');
+        } catch (e) {}
+        
+        // Clean up URL (remove lemma params)
+        if (isRedirectReturn) {
+            urlParams.delete('lemma_unlocked');
+            urlParams.delete('lemma_wallet_id');
+            const cleanUrl = urlParams.toString() 
+                ? `${window.location.pathname}?${urlParams.toString()}`
+                : window.location.pathname;
+            window.history.replaceState({}, '', cleanUrl);
+        }
+        
+        // Check bridge session - should be valid now
+        const session = await this.checkBridgeSession();
+        
+        if (session.valid) {
+            console.log('[Lemma] ✅ Redirect unlock successful!');
+            
+            // Try to get the wallet secret
+            let walletSecret = null;
+            try {
+                const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET');
+                if (secretResult?.walletSecret) {
+                    walletSecret = secretResult.walletSecret;
+                }
+            } catch (e) {
+                console.warn('[Lemma] Could not get wallet secret from bridge');
+            }
+            
+            return {
+                success: true,
+                authenticated: true,
+                walletId: session.walletId,
+                walletSecret,
+                message: 'Authenticated via redirect'
+            };
+        }
+        
+        console.log('[Lemma] Redirect return but session not valid');
+        return {
+            success: false,
+            authenticated: false,
+            message: 'Session not established after redirect'
+        };
+    }
+    
+    /**
+     * Smart unlock that uses the best method for the current environment.
+     * - Desktop: Uses popup
+     * - Mobile: Uses redirect (more reliable)
+     * 
+     * @param {Object} options Configuration
+     * @param {boolean} options.forcePopup Force popup even on mobile
+     * @param {boolean} options.forceRedirect Force redirect even on desktop
+     * @returns {Promise<Object>|void} Promise for popup, void for redirect
+     */
+    async smartUnlock(options = {}) {
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
+        if (options.forceRedirect || (isMobile && !options.forcePopup)) {
+            console.log('[Lemma] Using redirect-based unlock (mobile detected)');
+            this.unlockWithRedirect(options);
+            // This doesn't return - page redirects
+            return { redirecting: true };
+        }
+        
+        console.log('[Lemma] Using popup-based unlock');
+        return this.unlockWithPopup();
     }
 
     /**
@@ -2918,8 +3074,17 @@ class LemmaWallet {
         try {
             await this.init();
             
+            // First, check if we're returning from a redirect-based unlock
+            const redirectResult = await this.checkRedirectReturn();
+            if (redirectResult?.authenticated) {
+                console.log('[Lemma] Authenticated via redirect return');
+                // Continue to derive PPID
+            }
+            
             // Check if authenticated (this auto-handles mobile Safari popup fallback)
             const authResult = await this.autoAuthenticate();
+            
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
             
             if (!authResult.authenticated) {
                 // Check if popup flow is needed (mobile Safari storage partitioning)
@@ -2929,15 +3094,19 @@ class LemmaWallet {
                         authenticated: false,
                         needsPasskey: false,
                         needsPopup: true,
+                        needsRedirect: isMobile, // Suggest redirect for mobile
                         hasSession: true,
                         ppid: null,
-                        message: authResult.message || 'Tap to sign in (mobile browser)'
+                        message: isMobile 
+                            ? 'Tap to sign in (mobile browser - redirect recommended)'
+                            : authResult.message || 'Tap to sign in'
                     };
                 }
                 
                 return {
                     authenticated: false,
                     needsPasskey: authResult.needsPasskey,
+                    needsRedirect: isMobile && authResult.needsPasskey, // Suggest redirect for mobile passkey
                     ppid: null,
                     message: authResult.message
                 };
