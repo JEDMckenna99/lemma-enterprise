@@ -180,6 +180,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Wallet Service: {e}")
 
+    # Wallet Session Sync (cross-site session sharing, redirect token exchange)
+    try:
+        from api.wallet_session_sync import wallet_session_sync_bp
+        app.register_blueprint(wallet_session_sync_bp)
+        logger.info("✅ Wallet Session Sync registered (cross-site auth, redirect tokens)")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Wallet Session Sync: {e}")
+
     # Issuer Registry (for wallet-centric architecture)
     try:
         from api.issuer_registry import issuer_registry_bp, init_issuer_registry_table
