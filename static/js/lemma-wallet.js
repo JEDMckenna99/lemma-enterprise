@@ -4245,6 +4245,254 @@ if (typeof window !== 'undefined') {
     
     // Export event dispatcher for internal use
     window._lemmaDispatchEvent = dispatchSessionEvent;
+    
+    // ========================================
+    // ON-PAGE DEBUG PANEL
+    // ========================================
+    // Mobile-friendly debug panel for troubleshooting without devtools
+    // Enable via: ?lemma_debug=1 OR LemmaWallet.enableDebug()
+    
+    let debugPanel = null;
+    let debugEnabled = false;
+    const debugLogs = [];
+    const MAX_DEBUG_LOGS = 100;
+    
+    function createDebugPanel() {
+        if (debugPanel) return debugPanel;
+        
+        // Create panel container
+        debugPanel = document.createElement('div');
+        debugPanel.id = 'lemma-debug-panel';
+        debugPanel.innerHTML = `
+            <style>
+                #lemma-debug-panel {
+                    position: fixed;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    height: 200px;
+                    background: rgba(0, 0, 0, 0.95);
+                    color: #00ff00;
+                    font-family: 'Consolas', 'Monaco', monospace;
+                    font-size: 11px;
+                    z-index: 999999;
+                    display: flex;
+                    flex-direction: column;
+                    border-top: 2px solid #00ff00;
+                    transition: transform 0.3s ease;
+                }
+                #lemma-debug-panel.minimized {
+                    transform: translateY(160px);
+                }
+                #lemma-debug-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 6px 10px;
+                    background: #111;
+                    border-bottom: 1px solid #333;
+                    cursor: pointer;
+                    user-select: none;
+                }
+                #lemma-debug-header span {
+                    font-weight: bold;
+                    color: #00ff00;
+                }
+                #lemma-debug-header button {
+                    background: #333;
+                    color: #fff;
+                    border: none;
+                    padding: 4px 8px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    font-size: 10px;
+                    margin-left: 6px;
+                }
+                #lemma-debug-header button:hover {
+                    background: #555;
+                }
+                #lemma-debug-logs {
+                    flex: 1;
+                    overflow-y: auto;
+                    padding: 8px;
+                    line-height: 1.4;
+                }
+                .lemma-log-entry {
+                    padding: 2px 0;
+                    border-bottom: 1px solid #222;
+                    word-break: break-all;
+                }
+                .lemma-log-entry.info { color: #00bfff; }
+                .lemma-log-entry.warn { color: #ffcc00; }
+                .lemma-log-entry.error { color: #ff4444; }
+                .lemma-log-entry.success { color: #00ff00; }
+                .lemma-log-time {
+                    color: #888;
+                    margin-right: 6px;
+                }
+            </style>
+            <div id="lemma-debug-header">
+                <span>Lemma Debug Panel</span>
+                <div>
+                    <button onclick="window._lemmaDebugClear()">Clear</button>
+                    <button onclick="window._lemmaDebugCopy()">Copy</button>
+                    <button id="lemma-debug-toggle" onclick="window._lemmaDebugToggle()">_</button>
+                    <button onclick="window._lemmaDebugClose()">X</button>
+                </div>
+            </div>
+            <div id="lemma-debug-logs"></div>
+        `;
+        
+        document.body.appendChild(debugPanel);
+        
+        // Add existing logs
+        debugLogs.forEach(log => addLogToPanel(log));
+        
+        return debugPanel;
+    }
+    
+    function addLogToPanel(log) {
+        if (!debugPanel) return;
+        const logsContainer = debugPanel.querySelector('#lemma-debug-logs');
+        if (!logsContainer) return;
+        
+        const entry = document.createElement('div');
+        entry.className = `lemma-log-entry ${log.type}`;
+        entry.innerHTML = `<span class="lemma-log-time">${log.time}</span>${escapeHtml(log.message)}`;
+        logsContainer.appendChild(entry);
+        logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+    
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+    
+    function logToDebug(message, type = 'info') {
+        const time = new Date().toLocaleTimeString();
+        const log = { time, message, type };
+        
+        debugLogs.push(log);
+        if (debugLogs.length > MAX_DEBUG_LOGS) {
+            debugLogs.shift();
+        }
+        
+        if (debugEnabled && debugPanel) {
+            addLogToPanel(log);
+        }
+    }
+    
+    // Intercept console methods for [Lemma] messages
+    const originalConsole = {
+        log: console.log,
+        warn: console.warn,
+        error: console.error
+    };
+    
+    function interceptConsole() {
+        console.log = function(...args) {
+            originalConsole.log.apply(console, args);
+            const msg = args.join(' ');
+            if (msg.includes('[Lemma]') || msg.includes('Lemma')) {
+                const type = msg.includes('✅') ? 'success' : 'info';
+                logToDebug(msg, type);
+            }
+        };
+        
+        console.warn = function(...args) {
+            originalConsole.warn.apply(console, args);
+            const msg = args.join(' ');
+            if (msg.includes('[Lemma]') || msg.includes('Lemma')) {
+                logToDebug(msg, 'warn');
+            }
+        };
+        
+        console.error = function(...args) {
+            originalConsole.error.apply(console, args);
+            const msg = args.join(' ');
+            if (msg.includes('[Lemma]') || msg.includes('Lemma')) {
+                logToDebug(msg, 'error');
+            }
+        };
+    }
+    
+    // Debug panel control functions
+    window._lemmaDebugClear = function() {
+        debugLogs.length = 0;
+        if (debugPanel) {
+            const logsContainer = debugPanel.querySelector('#lemma-debug-logs');
+            if (logsContainer) logsContainer.innerHTML = '';
+        }
+    };
+    
+    window._lemmaDebugCopy = function() {
+        const text = debugLogs.map(l => `[${l.time}] ${l.message}`).join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+            logToDebug('Logs copied to clipboard', 'success');
+        }).catch(() => {
+            // Fallback for older browsers
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            logToDebug('Logs copied to clipboard', 'success');
+        });
+    };
+    
+    window._lemmaDebugToggle = function() {
+        if (debugPanel) {
+            debugPanel.classList.toggle('minimized');
+            const btn = debugPanel.querySelector('#lemma-debug-toggle');
+            btn.textContent = debugPanel.classList.contains('minimized') ? '+' : '_';
+        }
+    };
+    
+    window._lemmaDebugClose = function() {
+        if (debugPanel) {
+            debugPanel.remove();
+            debugPanel = null;
+        }
+        debugEnabled = false;
+    };
+    
+    /**
+     * Enable the on-page debug panel
+     * Shows all Lemma SDK logs in a mobile-friendly panel
+     */
+    function enableDebug() {
+        if (debugEnabled) return;
+        debugEnabled = true;
+        interceptConsole();
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', createDebugPanel);
+        } else {
+            createDebugPanel();
+        }
+        
+        logToDebug('Debug panel enabled - Lemma SDK v' + (LemmaWallet.VERSION || 'unknown'), 'success');
+        logToDebug('URL: ' + window.location.href, 'info');
+        logToDebug('User Agent: ' + navigator.userAgent.substring(0, 80) + '...', 'info');
+    }
+    
+    // Export debug function
+    window.enableLemmaDebug = enableDebug;
+    LemmaWallet.enableDebug = enableDebug;
+    
+    // Auto-enable if URL param is set
+    if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('lemma_debug') === '1' || urlParams.get('lemma_debug') === 'true') {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', enableDebug);
+            } else {
+                enableDebug();
+            }
+        }
+    }
 }
 
 // Export for modules
