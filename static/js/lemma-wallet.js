@@ -319,9 +319,74 @@ class LemmaWallet {
                             return result;
                         }
                     }
+                } else {
+                    // Bridge session INVALID on third-party site
+                    // This could be mobile Safari blocking cookies entirely
+                    // Try popup fallback as it runs in lemma.id context
+                    console.warn('[Lemma] Bridge session invalid - trying popup fallback (mobile browser cookie blocking?)');
+                    
+                    try {
+                        const popupResult = await this.unlockWithPopup();
+                        if (popupResult.success && popupResult.walletSecret) {
+                            // Popup worked - store the secret locally
+                            await this._put('secrets', { id: 'master', secret: popupResult.walletSecret, source: 'popup_fallback' });
+                            this.session = {
+                                isUnlocked: true,
+                                unlockedAt: Date.now(),
+                                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                                walletId: popupResult.walletId,
+                                walletSecret: popupResult.walletSecret,
+                                source: 'popup'
+                            };
+                            await this._put('session', { id: 'current', ...this.session });
+                            
+                            result.walletSecret = popupResult.walletSecret;
+                            result.walletId = popupResult.walletId;
+                            result.authenticated = true;
+                            result.needsPasskey = false;
+                            result.message = 'Authenticated via popup (mobile fallback)';
+                            console.log('[Lemma] ✅ Auto-authenticated via popup (bridge session was invalid)');
+                            
+                            return result;
+                        }
+                    } catch (popupErr) {
+                        console.warn('[Lemma] Popup fallback failed:', popupErr.message);
+                        // Continue to needsPasskey flow
+                    }
                 }
             } catch (e) {
                 console.warn('[Lemma] Bridge auto-auth failed:', e.message);
+                
+                // Bridge completely failed - try popup as last resort on third-party sites
+                if (!this._isLemmaDomain()) {
+                    console.log('[Lemma] Bridge error - trying popup as last resort');
+                    try {
+                        const popupResult = await this.unlockWithPopup();
+                        if (popupResult.success && popupResult.walletSecret) {
+                            await this._put('secrets', { id: 'master', secret: popupResult.walletSecret, source: 'popup_error_fallback' });
+                            this.session = {
+                                isUnlocked: true,
+                                unlockedAt: Date.now(),
+                                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                                walletId: popupResult.walletId,
+                                walletSecret: popupResult.walletSecret,
+                                source: 'popup'
+                            };
+                            await this._put('session', { id: 'current', ...this.session });
+                            
+                            result.walletSecret = popupResult.walletSecret;
+                            result.walletId = popupResult.walletId;
+                            result.authenticated = true;
+                            result.needsPasskey = false;
+                            result.message = 'Authenticated via popup';
+                            console.log('[Lemma] ✅ Auto-authenticated via popup (bridge error fallback)');
+                            
+                            return result;
+                        }
+                    } catch (popupErr2) {
+                        console.warn('[Lemma] Popup error fallback also failed:', popupErr2.message);
+                    }
+                }
             }
         }
         
