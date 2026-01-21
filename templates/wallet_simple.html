@@ -1519,6 +1519,39 @@ async function unlockAndShowWallet() {
     }
 }
 
+// Get wallet secret directly from IndexedDB (bypasses unlock check)
+// Used for cross-device auth when global session is valid
+async function getStoredSecretDirectly() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('LemmaWallet', 4);
+        
+        request.onerror = () => resolve(null);
+        
+        request.onsuccess = () => {
+            const db = request.result;
+            try {
+                const tx = db.transaction(['secrets'], 'readonly');
+                const store = tx.objectStore('secrets');
+                const getRequest = store.get('master');
+                
+                getRequest.onsuccess = () => {
+                    const record = getRequest.result;
+                    db.close();
+                    resolve(record?.secret || null);
+                };
+                
+                getRequest.onerror = () => {
+                    db.close();
+                    resolve(null);
+                };
+            } catch (e) {
+                db.close();
+                resolve(null);
+            }
+        };
+    });
+}
+
 // Check for redirect flow (mobile unlock from third-party site)
 function getRedirectParams() {
     const params = new URLSearchParams(window.location.search);
@@ -1630,12 +1663,78 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
         
         // Check unlock state and show appropriate view
-        const isUnlocked = await checkAndShowView();
+        let isUnlocked = await checkAndShowView();
         
         // If in redirect flow and already unlocked, redirect back immediately
         if (redirectParams && isUnlocked) {
             await handleRedirectReturn(redirectParams.returnUrl);
             return; // Stop here - page is redirecting
+        }
+        
+        // CROSS-DEVICE AUTH: If in redirect flow but NOT locally unlocked,
+        // check if there's a global session from another device
+        if (redirectParams && !isUnlocked) {
+            addLog('Checking global session (cross-device)...', 'info');
+            try {
+                const info = await wallet.getWalletInfo();
+                if (info.walletId && info.hasWalletSecret) {
+                    const globalResponse = await fetch('/api/wallet/global-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ wallet_id: info.walletId })
+                    });
+                    const globalData = await globalResponse.json();
+                    
+                    if (globalData.valid) {
+                        addLog('Global session found from another device!', 'success');
+                        addLog('Skipping passkey - already authenticated today', 'info');
+                        
+                        // Get the wallet_secret directly from IndexedDB
+                        // (bypass unlock check since we have a valid global session)
+                        const walletSecret = await getStoredSecretDirectly();
+                        
+                        if (walletSecret) {
+                            // Create redirect token
+                            const tokenResponse = await fetch('/api/wallet/create-redirect-token', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                body: JSON.stringify({
+                                    wallet_id: info.walletId,
+                                    wallet_secret: walletSecret,
+                                    return_url: redirectParams.returnUrl
+                                })
+                            });
+                            const tokenData = await tokenResponse.json();
+                            
+                            if (tokenData.success) {
+                                addLog('Cross-device auth successful!', 'success');
+                                
+                                // Redirect back with token
+                                const url = new URL(redirectParams.returnUrl);
+                                url.searchParams.set('lemma_unlocked', '1');
+                                url.searchParams.set('lemma_token', tokenData.token);
+                                
+                                addLog(`Redirecting to: ${url.origin}...`, 'success');
+                                await new Promise(r => setTimeout(r, 300));
+                                window.location.href = url.toString();
+                                return;
+                            }
+                        } else {
+                            addLog('Wallet secret not found in storage', 'warn');
+                        }
+                        
+                        addLog('Could not complete cross-device auth', 'warn');
+                    } else {
+                        addLog('No global session - passkey required', 'info');
+                    }
+                } else if (info.walletId && !info.hasWalletSecret) {
+                    addLog('Wallet linked but secret not available - passkey required', 'info');
+                }
+            } catch (e) {
+                addLog(`Global session check failed: ${e.message}`, 'warn');
+            }
         }
         
         // Store redirect params for after unlock
