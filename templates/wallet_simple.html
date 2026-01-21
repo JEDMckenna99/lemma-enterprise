@@ -1488,7 +1488,10 @@ async function unlockAndShowWallet() {
             addLog('Wallet unlocked successfully', 'success');
             
             // Check if we're in a redirect flow
+            addLog(`Redirect params present: ${!!window._lemmaRedirectParams}`, 'info');
             if (window._lemmaRedirectParams) {
+                addLog(`Redirect URL: ${window._lemmaRedirectParams.returnUrl}`, 'info');
+                addLog('Calling handleRedirectReturn...', 'info');
                 await handleRedirectReturn(window._lemmaRedirectParams.returnUrl);
                 return; // Page is redirecting
             }
@@ -1573,23 +1576,34 @@ function getRedirectParams() {
 
 // Handle redirect back to calling site after unlock
 async function handleRedirectReturn(returnUrl) {
-    addLog('Redirect flow: completing unlock...', 'info');
+    addLog('=== handleRedirectReturn CALLED ===', 'success');
+    addLog(`Return URL: ${returnUrl}`, 'info');
     
     const info = await wallet.getWalletInfo();
+    addLog(`Wallet ID: ${info.walletId}`, 'info');
+    addLog(`Has wallet secret: ${info.hasWalletSecret}`, 'info');
     
     // Get wallet secret - try SDK first, fall back to direct IndexedDB access
     let walletSecret = null;
     try {
+        addLog('Trying SDK getWalletSecret...', 'info');
         walletSecret = await wallet.getWalletSecret();
+        addLog('SDK getWalletSecret succeeded', 'success');
     } catch (e) {
-        addLog('SDK getWalletSecret failed, trying direct access...', 'warn');
+        addLog(`SDK getWalletSecret failed: ${e.message}`, 'warn');
+        addLog('Trying direct IndexedDB access...', 'info');
         walletSecret = await getStoredSecretDirectly();
+        if (walletSecret) {
+            addLog('Direct IndexedDB access succeeded', 'success');
+        }
     }
     
     if (!walletSecret) {
         addLog('ERROR: Could not get wallet secret for redirect', 'error');
         return;
     }
+    
+    addLog(`Wallet secret obtained (${walletSecret.length} chars)`, 'success');
     
     // Set the global session before redirecting
     try {
