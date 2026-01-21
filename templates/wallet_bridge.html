@@ -639,6 +639,26 @@ window.addEventListener('message', async (event) => {
                 if (!wallet) await initWallet();
                 const secretSession = await checkSession();
                 console.log('🔑 Session check for secret:', secretSession.valid ? 'valid' : 'invalid');
+                
+                // DEBUG: Log what's in storage
+                try {
+                    const debugSession = await wallet._get('session', 'current');
+                    const debugSecret = await wallet._get('secrets', 'master');
+                    const debugProfile = await wallet._get('profiles', 'default');
+                    const debugWalletId = await wallet._get('passkey', 'walletId');
+                    console.log('🔑 DEBUG Storage state:', {
+                        hasSession: !!debugSession,
+                        sessionUnlocked: debugSession?.isUnlocked,
+                        sessionExpired: debugSession?.expiresAt ? debugSession.expiresAt < Date.now() : 'no expiry',
+                        hasSecret: !!debugSecret?.secret,
+                        hasProfile: !!debugProfile?.secret,
+                        walletId: debugWalletId?.value?.substring(0, 8) + '...',
+                        walletIsUnlocked: wallet.isUnlocked()
+                    });
+                } catch (debugErr) {
+                    console.log('🔑 DEBUG error:', debugErr.message);
+                }
+                
                 if (!secretSession.valid) {
                     console.warn('🔑 ❌ Session invalid for GET_WALLET_SECRET');
                     respond({ 
@@ -710,8 +730,16 @@ window.addEventListener('message', async (event) => {
                             walletSecret: walletSecret
                         });
                     } else {
-                        console.error('🔑 ❌ No wallet secret found');
-                        respond({ success: false, error: 'No wallet secret found' });
+                        // Last resort: storage might be partitioned (mobile Safari)
+                        // Signal that popup flow is required
+                        console.error('🔑 ❌ No wallet secret found in bridge storage');
+                        console.log('🔑 Storage may be partitioned - popup flow required');
+                        respond({ 
+                            success: false, 
+                            error: 'No wallet secret found',
+                            storagePartitioned: true,
+                            needsPopup: true
+                        });
                     }
                 } catch (e) {
                     console.error('🔑 ❌ Failed to get wallet secret:', e.message);

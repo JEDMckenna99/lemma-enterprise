@@ -3537,6 +3537,40 @@ class LemmaWallet {
             });
         }
         
+        // CRITICAL: Set session cookie immediately after linking
+        // This enables cross-site auth before passkey creation (especially on mobile)
+        try {
+            const now = Date.now();
+            const setSessionResponse = await fetch('https://lemma.id/api/wallet/set-session', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wallet_id: payload.walletId,
+                    unlocked_at: now,
+                    profile_id: profileId,
+                    profile_name: profileName
+                })
+            });
+            
+            if (setSessionResponse.ok) {
+                console.log('[Lemma] Session cookie set after linking - cross-site auth enabled');
+                
+                // Also set local session so isUnlocked() works
+                this.session = {
+                    isUnlocked: true,
+                    unlockedAt: now,
+                    expiresAt: now + 24 * 60 * 60 * 1000,
+                    walletId: payload.walletId,
+                    walletSecret: payload.walletSecret,
+                    source: 'link'
+                };
+                await this._put('session', { id: 'current', ...this.session });
+            }
+        } catch (e) {
+            console.warn('[Lemma] Could not set session cookie after linking:', e.message);
+        }
+        
         console.log(`[Lemma] Device linked successfully with profile: ${profileName}`);
         
         return {
@@ -3545,7 +3579,8 @@ class LemmaWallet {
             profileId: profileId,
             profileName: profileName,
             needsPasskey: true,
-            message: `Wallet "${profileName}" linked! Now create a passkey to secure it on this device.`
+            sessionSet: true,  // Indicates session cookie was set
+            message: `Wallet "${profileName}" linked! Create a passkey to secure it, or continue to use your wallet.`
         };
     }
     
