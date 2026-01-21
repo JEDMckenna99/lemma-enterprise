@@ -1651,14 +1651,20 @@ async function handleRedirectReturn(returnUrl) {
     // Append success parameter and token to return URL
     const url = new URL(returnUrl);
     url.searchParams.set('lemma_unlocked', '1');
+    
+    addLog(`Token created: ${!!redirectToken}`, 'info');
     if (redirectToken) {
         url.searchParams.set('lemma_token', redirectToken);
+        addLog(`Token added to URL (${redirectToken.substring(0, 10)}...)`, 'success');
+    } else {
+        addLog('WARNING: No token to add to URL!', 'error');
     }
     
-    addLog(`Redirecting back to: ${url.origin}...`, 'success');
+    addLog(`Final redirect URL: ${url.toString().substring(0, 100)}...`, 'info');
+    addLog('Redirecting in 2 seconds...', 'success');
     
-    // Small delay for user to see the success message
-    await new Promise(r => setTimeout(r, 500));
+    // Longer delay so user can read logs
+    await new Promise(r => setTimeout(r, 2000));
     
     window.location.href = url.toString();
 }
