@@ -62,7 +62,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.27.0';
+    static VERSION = '2.28.0';
     
     constructor() {
         this.db = null;
@@ -283,9 +283,21 @@ class LemmaWallet {
                     } else {
                         // Bridge session valid but can't get secret
                         // This happens on mobile Safari due to storage partitioning
-                        // Auto-try popup flow (will work if called from user gesture like click)
-                        console.warn('[Lemma] Bridge session valid but no secret (mobile Safari partitioned storage)');
-                        console.log('[Lemma] Auto-trying popup fallback...');
+                        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                        
+                        if (isMobile) {
+                            // Mobile: Use redirect instead of popup (popups blocked on mobile Safari)
+                            console.log('[Lemma] Mobile detected with partitioned storage - needs redirect');
+                            result.authenticated = false;
+                            result.needsPasskey = false;
+                            result.needsRedirect = true;
+                            result.hasSession = true;
+                            result.message = 'Tap Sign In to authenticate (mobile browser)';
+                            return result;
+                        }
+                        
+                        // Desktop: Try popup fallback
+                        console.warn('[Lemma] Bridge session valid but no secret - trying popup');
                         
                         try {
                             const popupResult = await this.unlockWithPopup();
@@ -315,15 +327,27 @@ class LemmaWallet {
                             result.needsPasskey = false;
                             result.needsPopup = true;
                             result.hasSession = true;
-                            result.message = 'Tap Sign In button to continue (mobile browser)';
+                            result.message = 'Tap Sign In button to continue';
                             return result;
                         }
                     }
                 } else {
                     // Bridge session INVALID on third-party site
                     // This could be mobile Safari blocking cookies entirely
-                    // Try popup fallback as it runs in lemma.id context
-                    console.warn('[Lemma] Bridge session invalid - trying popup fallback (mobile browser cookie blocking?)');
+                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                    
+                    if (isMobile) {
+                        // Mobile: Don't even try popup - go straight to redirect recommendation
+                        console.log('[Lemma] Mobile with invalid bridge session - needs redirect');
+                        result.authenticated = false;
+                        result.needsPasskey = false;
+                        result.needsRedirect = true;
+                        result.message = 'Tap Sign In to authenticate (mobile browser)';
+                        return result;
+                    }
+                    
+                    // Desktop: Try popup fallback as it runs in lemma.id context
+                    console.warn('[Lemma] Bridge session invalid - trying popup fallback');
                     
                     try {
                         const popupResult = await this.unlockWithPopup();
@@ -357,8 +381,21 @@ class LemmaWallet {
             } catch (e) {
                 console.warn('[Lemma] Bridge auto-auth failed:', e.message);
                 
-                // Bridge completely failed - try popup as last resort on third-party sites
+                // Bridge completely failed on third-party site
                 if (!this._isLemmaDomain()) {
+                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                    
+                    if (isMobile) {
+                        // Mobile: recommend redirect (don't even try popup)
+                        console.log('[Lemma] Bridge error on mobile - needs redirect');
+                        result.authenticated = false;
+                        result.needsPasskey = false;
+                        result.needsRedirect = true;
+                        result.message = 'Tap Sign In to authenticate (mobile browser)';
+                        return result;
+                    }
+                    
+                    // Desktop: Try popup as last resort
                     console.log('[Lemma] Bridge error - trying popup as last resort');
                     try {
                         const popupResult = await this.unlockWithPopup();
@@ -1030,6 +1067,25 @@ class LemmaWallet {
      */
     async _checkSessionState() {
         try {
+            // Check if returning from redirect-based unlock
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('lemma_unlocked') === '1') {
+                console.log('[Lemma] Detected redirect return - completing authentication...');
+                // Clean URL parameters
+                urlParams.delete('lemma_unlocked');
+                urlParams.delete('lemma_wallet_id');
+                const cleanUrl = urlParams.toString() 
+                    ? `${window.location.pathname}?${urlParams.toString()}`
+                    : window.location.pathname;
+                window.history.replaceState({}, '', cleanUrl);
+                
+                // Clear redirect state
+                try { sessionStorage.removeItem('lemma_redirect_state'); } catch (e) {}
+                
+                // Set a flag that we just returned from redirect
+                this._justReturnedFromRedirect = true;
+            }
+            
             const storedSession = await this._get('session', 'current');
             if (storedSession && storedSession.expiresAt > Date.now()) {
                 this.session = {
@@ -1118,7 +1174,24 @@ class LemmaWallet {
                 } else {
                     console.log('[Lemma] Bridge session not valid for registerPasskey:', bridgeSession.reason || 'no valid session');
                     
-                    // Try popup unlock flow
+                    // Check if mobile - use redirect instead of popup (popups blocked on mobile Safari)
+                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                    
+                    if (isMobile) {
+                        console.log('[Lemma] 🔄 Mobile detected - using redirect flow instead of popup');
+                        
+                        // Use redirect-based unlock for mobile
+                        this.unlockWithRedirect();
+                        
+                        // Return immediately - page is redirecting
+                        return {
+                            success: false,
+                            redirecting: true,
+                            message: 'Redirecting to lemma.id for authentication...'
+                        };
+                    }
+                    
+                    // Desktop: Try popup unlock flow
                     console.log('[Lemma] 🔓 Opening popup for wallet unlock...');
                     const popupResult = await this.unlockWithPopup();
                     
@@ -1154,12 +1227,21 @@ class LemmaWallet {
                             walletSecret: walletSecret,
                             message: 'Authenticated via popup unlock'
                         };
+                    } else if (popupResult.reason === 'popup_blocked') {
+                        // Popup was blocked - fallback to redirect
+                        console.log('[Lemma] 🔄 Popup blocked - falling back to redirect');
+                        this.unlockWithRedirect();
+                        return {
+                            success: false,
+                            redirecting: true,
+                            message: 'Redirecting to lemma.id for authentication...'
+                        };
                     } else {
                         // Popup was closed or failed
                         return {
                             success: false,
                             needsUnlock: true,
-                            unlockUrl: 'https://lemma.id/wallet/simple',
+                            unlockUrl: 'https://lemma.id/wallet',
                             message: popupResult.message || 'Unlock cancelled',
                             reason: popupResult.reason || 'popup_closed'
                         };
