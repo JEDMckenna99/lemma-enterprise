@@ -478,18 +478,23 @@ def create_app():
     @app.route('/wallet/unlock')
     def wallet_unlock():
         """
-        Wallet unlock page for cross-site authentication.
+        Streamlined wallet unlock page for redirect-based authentication.
         
-        FLOW:
-        1. Third-party site redirects here with return_url
-        2. User unlocks wallet via passkey
-        3. Session cookie is set (24 hours)
-        4. User is redirected back to return_url
-        5. Third-party site calls /api/wallet/session-sync to get session
+        FLOW (v2.32.0 - Redirect-only architecture):
+        1. Third-party SDK generates encryption key, redirects here with return_url + enc_key
+        2. User unlocks wallet via passkey (or uses existing session)
+        3. Wallet data encrypted client-side with enc_key (never touches server)
+        4. User redirected back to return_url with encrypted data in URL
+        5. SDK decrypts client-side, establishes session
         
-        This enables "One Passkey Per Day" across all Lemma-enabled sites.
+        This provides consistent UX across all platforms while preserving privacy.
         """
-        return render_template('wallet_unlock.html')
+        logger.info("Serving unlock page (redirect-based auth)")
+        return render_template('wallet_unlock.html'), 200, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
 
     @app.route('/wallet/bridge')
     def wallet_bridge():
