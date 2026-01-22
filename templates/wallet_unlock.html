@@ -2,14 +2,24 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unlock Wallet - Lemma.id</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sign In - Lemma</title>
+    <meta name="description" content="Unlock your Lemma wallet to sign in securely">
+    <meta name="robots" content="noindex, nofollow">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+    
+    <!-- Preload SDK for faster unlock -->
+    <link rel="preload" href="/static/js/lemma-wallet.js" as="script">
+    
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -17,227 +27,468 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 20px;
         }
-        .container {
+        
+        .unlock-container {
             background: white;
-            border-radius: 16px;
-            padding: 48px;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            width: 100%;
             max-width: 400px;
-            width: 90%;
+            overflow: hidden;
+        }
+        
+        .unlock-header {
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            padding: 32px 24px 24px;
             text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border-bottom: 1px solid #e2e8f0;
         }
-        .logo {
-            width: 80px;
-            height: 80px;
-            margin-bottom: 24px;
-        }
-        h1 {
-            color: #1a1a2e;
-            font-size: 24px;
+        
+        .lemma-logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
             margin-bottom: 8px;
         }
-        .subtitle {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 32px;
-        }
-        .site-info {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 12px 16px;
-            margin-bottom: 24px;
-            font-size: 13px;
-            color: #555;
-        }
-        .site-info strong {
-            color: #333;
-        }
-        .unlock-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 16px 32px;
-            font-size: 16px;
+        
+        .unlock-title {
+            font-size: 1.25rem;
             font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-            transition: transform 0.2s, box-shadow 0.2s;
+            color: #1e293b;
+            margin-bottom: 4px;
         }
+        
+        .site-name {
+            font-size: 1rem;
+            color: #64748b;
+        }
+        
+        .site-favicon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            margin: 16px auto 8px;
+            display: block;
+            background: #f1f5f9;
+            padding: 4px;
+        }
+        
+        .unlock-body {
+            padding: 32px 24px;
+        }
+        
+        .unlock-btn {
+            width: 100%;
+            padding: 16px 24px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
         .unlock-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 10px 20px -5px rgba(102, 126, 234, 0.4);
         }
+        
+        .unlock-btn:active {
+            transform: translateY(0);
+        }
+        
         .unlock-btn:disabled {
             opacity: 0.7;
             cursor: not-allowed;
             transform: none;
         }
-        .status {
-            margin-top: 16px;
-            font-size: 14px;
-            color: #666;
+        
+        .unlock-btn .icon {
+            font-size: 1.25rem;
         }
-        .status.error {
-            color: #e74c3c;
-        }
-        .status.success {
-            color: #27ae60;
-        }
-        .fingerprint-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
+        
         .privacy-note {
             margin-top: 24px;
-            font-size: 11px;
-            color: #999;
+            padding: 16px;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            color: #166534;
+            text-align: center;
         }
-        .auto-unlock {
+        
+        .privacy-note strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .unlock-footer {
+            padding: 20px 24px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+        }
+        
+        .footer-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .footer-link:hover {
+            text-decoration: underline;
+        }
+        
+        .status-message {
+            margin-top: 16px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            text-align: center;
             display: none;
         }
+        
+        .status-message.error {
+            display: block;
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        
+        .status-message.success {
+            display: block;
+            background: #f0fdf4;
+            color: #16a34a;
+            border: 1px solid #bbf7d0;
+        }
+        
+        .status-message.loading {
+            display: block;
+            background: #eff6ff;
+            color: #2563eb;
+            border: 1px solid #bfdbfe;
+        }
+        
+        /* Loading spinner */
         .spinner {
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+            border: 2px solid rgba(255,255,255,0.3);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 8px;
-            vertical-align: middle;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
         }
+        
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 480px) {
+            body {
+                padding: 16px;
+                align-items: flex-start;
+                padding-top: 60px;
+            }
+            
+            .unlock-container {
+                border-radius: 20px;
+            }
+            
+            .unlock-header {
+                padding: 24px 20px 20px;
+            }
+            
+            .unlock-body {
+                padding: 24px 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="fingerprint-icon">🔐</div>
-        <h1>Unlock Your Wallet</h1>
-        <p class="subtitle">One passkey unlock, access everywhere</p>
-        
-        <div class="site-info" id="siteInfo">
-            Returning to: <strong id="returnSite">...</strong>
+    <div class="unlock-container">
+        <div class="unlock-header">
+            <div class="lemma-logo">lemma.id</div>
+            <img id="site-favicon" class="site-favicon" src="" alt="" style="display: none;">
+            <div class="unlock-title">Sign in to</div>
+            <div class="site-name" id="site-name">Loading...</div>
         </div>
         
-        <button class="unlock-btn" id="unlockBtn" onclick="unlockWallet()">
-            <span id="btnText">Unlock with Passkey</span>
-        </button>
+        <div class="unlock-body">
+            <button id="unlock-btn" class="unlock-btn" onclick="handleUnlock()">
+                <span class="icon">&#128274;</span>
+                <span id="btn-text">Unlock with Passkey</span>
+            </button>
+            
+            <div id="status-message" class="status-message"></div>
+            
+            <div class="privacy-note">
+                <strong>Your privacy is protected</strong>
+                <span id="site-name-privacy">This site</span> will only see a unique ID specific to them. 
+                Your wallet and other sites you use remain private.
+            </div>
+        </div>
         
-        <div class="status" id="status"></div>
-        
-        <p class="privacy-note">
-            Your passkey never leaves your device.<br>
-            Lemma.id doesn't store your biometrics.
-        </p>
+        <div class="unlock-footer">
+            <a href="/wallet/link" class="footer-link">No wallet? Create or link one</a>
+        </div>
     </div>
 
     <script src="/static/js/lemma-wallet.js"></script>
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const returnUrl = urlParams.get('return') || urlParams.get('return_url');
-        const autoUnlock = urlParams.get('auto') === 'true';
+        let wallet = null;
+        let returnUrl = null;
+        let encKey = null;
+        let siteName = 'this site';
         
-        // Show return site
-        if (returnUrl) {
+        // Parse URL parameters
+        function init() {
+            const params = new URLSearchParams(window.location.search);
+            returnUrl = params.get('return_url');
+            encKey = params.get('enc_key');
+            
+            if (!returnUrl) {
+                showError('No return URL specified');
+                return;
+            }
+            
+            // Extract site name from return URL
             try {
                 const url = new URL(returnUrl);
-                document.getElementById('returnSite').textContent = url.hostname;
+                siteName = url.hostname;
+                
+                // Try to show favicon
+                const faviconUrl = `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=64`;
+                const faviconEl = document.getElementById('site-favicon');
+                faviconEl.src = faviconUrl;
+                faviconEl.style.display = 'block';
+                faviconEl.onerror = () => { faviconEl.style.display = 'none'; };
             } catch (e) {
-                document.getElementById('returnSite').textContent = returnUrl;
+                siteName = 'the site';
             }
-        } else {
-            document.getElementById('siteInfo').style.display = 'none';
+            
+            document.getElementById('site-name').textContent = siteName;
+            document.getElementById('site-name-privacy').textContent = siteName;
+            
+            // Initialize wallet
+            wallet = new LemmaWallet();
+            
+            // Check if already unlocked
+            checkExistingSession();
         }
         
-        const wallet = new LemmaWallet();
-        
-        async function unlockWallet() {
-            const btn = document.getElementById('unlockBtn');
-            const btnText = document.getElementById('btnText');
-            const status = document.getElementById('status');
-            
-            btn.disabled = true;
-            btnText.innerHTML = '<span class="spinner"></span>Unlocking...';
-            status.className = 'status';
-            status.textContent = '';
-            
+        async function checkExistingSession() {
             try {
                 await wallet.init();
+                const isValid = await wallet.isSessionValid();
                 
-                // Check if passkey exists
-                const hasPasskey = await wallet._get('passkey', 'primary');
-                
-                if (!hasPasskey) {
-                    // Need to register first
-                    status.textContent = 'Setting up your wallet...';
-                    const regResult = await wallet.registerPasskey();
-                    
-                    if (!regResult.success) {
-                        throw new Error('Failed to set up wallet');
-                    }
+                if (isValid) {
+                    // Already unlocked - redirect immediately
+                    showStatus('Already signed in, redirecting...', 'success');
+                    await handleRedirect();
                 }
-                
-                // Unlock wallet
+            } catch (e) {
+                console.log('No existing session');
+            }
+        }
+        
+        async function handleUnlock() {
+            const btn = document.getElementById('unlock-btn');
+            const btnText = document.getElementById('btn-text');
+            
+            btn.disabled = true;
+            btnText.innerHTML = '<span class="spinner"></span> Unlocking...';
+            
+            try {
                 const result = await wallet.unlock();
                 
                 if (result.success) {
-                    status.className = 'status success';
-                    status.textContent = '✓ Wallet unlocked!';
-                    btnText.textContent = 'Redirecting...';
-                    
-                    // Set session cookie via API
-                    await fetch('/api/wallet/set-session', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            wallet_id: result.walletId,
-                            unlocked_at: Date.now()
-                        }),
-                        credentials: 'include'
-                    });
-                    
-                    // Redirect back
-                    if (returnUrl) {
-                        // Add success indicator to URL
-                        const redirectUrl = new URL(returnUrl);
-                        redirectUrl.searchParams.set('lemma_unlocked', 'true');
-                        
-                        setTimeout(() => {
-                            window.location.href = redirectUrl.toString();
-                        }, 500);
-                    } else {
-                        // No return URL, go to wallet
-                        setTimeout(() => {
-                            window.location.href = '/wallet';
-                        }, 500);
-                    }
+                    showStatus('Unlocked! Redirecting...', 'success');
+                    await handleRedirect();
                 } else {
-                    throw new Error(result.error || 'Unlock failed');
+                    showError(result.message || 'Unlock failed');
+                    resetButton();
                 }
-                
             } catch (e) {
-                console.error('Unlock error:', e);
-                status.className = 'status error';
-                status.textContent = e.message || 'Failed to unlock. Please try again.';
-                btn.disabled = false;
-                btnText.textContent = 'Try Again';
+                if (e.message.includes('No passkey')) {
+                    showError('No wallet found on this device. <a href="/wallet/link">Create or link one</a>.');
+                } else {
+                    showError(e.message || 'Unlock failed');
+                }
+                resetButton();
             }
         }
         
-        // Auto-unlock if requested and wallet exists
-        if (autoUnlock) {
-            wallet.init().then(async () => {
-                const hasPasskey = await wallet._get('passkey', 'primary');
-                if (hasPasskey) {
-                    unlockWallet();
+        async function handleRedirect() {
+            if (!returnUrl) return;
+            
+            const info = await wallet.getWalletInfo();
+            
+            // Get wallet secret
+            let walletSecret = null;
+            try {
+                walletSecret = await wallet.getWalletSecret();
+            } catch (e) {
+                // Try direct access
+                walletSecret = await getStoredSecretDirectly();
+            }
+            
+            if (!walletSecret) {
+                showError('Could not retrieve wallet data');
+                resetButton();
+                return;
+            }
+            
+            // Set global session for cross-device sync
+            try {
+                const activeProfile = await wallet.getActiveProfile();
+                await fetch('/api/wallet/set-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        wallet_id: info.walletId,
+                        unlocked_at: Date.now(),
+                        profile_id: activeProfile?.id || 'default',
+                        profile_name: activeProfile?.name || 'Personal'
+                    })
+                });
+            } catch (e) {
+                console.warn('Could not set global session:', e);
+            }
+            
+            // Build redirect URL
+            const url = new URL(returnUrl);
+            url.searchParams.set('lemma_unlocked', '1');
+            
+            // If we have an encryption key, use client-side encryption (privacy-preserving)
+            if (encKey) {
+                try {
+                    const walletData = {
+                        wallet_id: info.walletId,
+                        wallet_secret: walletSecret
+                    };
+                    const encryptedData = await encryptWalletData(walletData, encKey);
+                    url.searchParams.set('lemma_data', encryptedData);
+                } catch (e) {
+                    console.error('Encryption failed:', e);
+                    // Fall back to legacy token
+                    await createLegacyToken(url, info.walletId, walletSecret);
                 }
+            } else {
+                // Legacy flow - create server-side token
+                await createLegacyToken(url, info.walletId, walletSecret);
+            }
+            
+            // Redirect
+            window.location.href = url.toString();
+        }
+        
+        // Get wallet secret directly from IndexedDB
+        function getStoredSecretDirectly() {
+            return new Promise((resolve) => {
+                const request = indexedDB.open('LemmaWallet', 4);
+                request.onerror = () => resolve(null);
+                request.onsuccess = () => {
+                    const db = request.result;
+                    try {
+                        const tx = db.transaction('secrets', 'readonly');
+                        const store = tx.objectStore('secrets');
+                        const getReq = store.get('master');
+                        getReq.onsuccess = () => resolve(getReq.result?.secret || null);
+                        getReq.onerror = () => resolve(null);
+                    } catch (e) {
+                        resolve(null);
+                    }
+                };
             });
         }
+        
+        // Encrypt wallet data using AES-GCM
+        async function encryptWalletData(data, keyBase64) {
+            const keyBytes = base64ToArrayBuffer(keyBase64);
+            const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
+            const nonce = crypto.getRandomValues(new Uint8Array(12));
+            const dataBytes = new TextEncoder().encode(JSON.stringify(data));
+            const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, dataBytes);
+            const combined = new Uint8Array(nonce.length + ciphertext.byteLength);
+            combined.set(nonce, 0);
+            combined.set(new Uint8Array(ciphertext), nonce.length);
+            return arrayBufferToBase64(combined);
+        }
+        
+        // Legacy token creation
+        async function createLegacyToken(url, walletId, walletSecret) {
+            try {
+                const response = await fetch('/api/wallet/create-redirect-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        wallet_id: walletId,
+                        wallet_secret: walletSecret,
+                        return_url: returnUrl
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    url.searchParams.set('lemma_token', data.token);
+                }
+            } catch (e) {
+                console.error('Legacy token creation failed:', e);
+            }
+        }
+        
+        // Base64 utilities
+        function base64ToArrayBuffer(base64) {
+            const standardBase64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+            const padding = standardBase64.length % 4;
+            const paddedBase64 = padding ? standardBase64 + '='.repeat(4 - padding) : standardBase64;
+            const binary = atob(paddedBase64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return bytes;
+        }
+        
+        function arrayBufferToBase64(buffer) {
+            const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+        
+        function showError(message) {
+            const el = document.getElementById('status-message');
+            el.className = 'status-message error';
+            el.innerHTML = message;
+        }
+        
+        function showStatus(message, type) {
+            const el = document.getElementById('status-message');
+            el.className = 'status-message ' + type;
+            el.textContent = message;
+        }
+        
+        function resetButton() {
+            const btn = document.getElementById('unlock-btn');
+            const btnText = document.getElementById('btn-text');
+            btn.disabled = false;
+            btnText.innerHTML = '<span class="icon">&#128274;</span> Unlock with Passkey';
+        }
+        
+        // Initialize on load
+        init();
     </script>
 </body>
 </html>

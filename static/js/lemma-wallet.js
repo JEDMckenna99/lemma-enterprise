@@ -62,8 +62,8 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    // v2.31.1: Smoother cross-device lock detection - uses global session, not bridge
-    static VERSION = '2.31.1';
+    // v2.31.2: Clean unlock page at /wallet/unlock for better redirect UX
+    static VERSION = '2.31.2';
     
     constructor() {
         this.db = null;
@@ -545,10 +545,10 @@ class LemmaWallet {
      * More reliable than popups on iOS Safari which blocks popups aggressively.
      * 
      * Flow:
-     * 1. Saves current URL and state
-     * 2. Redirects to lemma.id/wallet
+     * 1. Saves current URL and state (including encryption key)
+     * 2. Redirects to lemma.id/wallet/unlock (clean, focused page)
      * 3. User unlocks with passkey
-     * 4. lemma.id redirects back to original URL
+     * 4. Wallet data encrypted client-side, returned in URL
      * 5. SDK detects return and completes auth
      * 
      * @param {Object} options Configuration
@@ -598,7 +598,7 @@ class LemmaWallet {
             params.set('state', btoa(JSON.stringify(state)));
         }
         
-        window.location.href = `https://lemma.id/wallet?${params.toString()}`;
+        window.location.href = `https://lemma.id/wallet/unlock?${params.toString()}`;
     }
     
     /**
