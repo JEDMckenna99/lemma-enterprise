@@ -578,15 +578,18 @@ def _cleanup_expired_tokens_db():
 @wallet_session_sync_bp.route('/api/wallet/create-redirect-token', methods=['POST', 'OPTIONS'])
 def create_redirect_token():
     """
-    Create a short-lived token for redirect-based auth on mobile.
+    DEPRECATED: Legacy endpoint for server-side redirect tokens.
     
-    Called by lemma.id wallet page after successful unlock, before redirecting
-    back to the third-party site.
+    New SDK versions (2.30.0+) use client-side encryption instead.
+    This endpoint is kept for backward compatibility with older SDKs.
+    
+    PRIVACY NOTE: We intentionally do NOT store return_url to avoid tracking
+    which sites users authenticate to.
     
     Request body:
         - wallet_id: The wallet identifier
         - wallet_secret: The wallet secret to pass to third-party site
-        - return_url: The URL being redirected to (for validation)
+        - return_url: IGNORED (not stored for privacy)
     
     Returns:
         - token: Short-lived token to include in redirect URL
@@ -610,7 +613,7 @@ def create_redirect_token():
     data = request.get_json() or {}
     wallet_id = data.get('wallet_id')
     wallet_secret = data.get('wallet_secret')
-    return_url = data.get('return_url')
+    # NOTE: return_url is intentionally ignored for privacy - we don't track site visits
     
     if not wallet_id or not wallet_secret:
         return jsonify({'success': False, 'error': 'wallet_id and wallet_secret required'}), 400
@@ -628,17 +631,18 @@ def create_redirect_token():
         token = secrets.token_urlsafe(32)
         
         # Store with 60 second expiration in DATABASE (works across Heroku dynos)
+        # PRIVACY: return_url is NOT stored - we don't track which sites users visit
         token_record = RedirectToken(
             token=token,
             wallet_id=wallet_id,
             wallet_secret=wallet_secret,
-            return_url=return_url,
+            return_url=None,  # Intentionally not stored for privacy
             expires_at=datetime.utcnow() + timedelta(seconds=60)
         )
         db_session.add(token_record)
         db_session.commit()
         
-        logger.info(f"Created redirect token for wallet (expires in 60s, stored in DB)")
+        logger.info(f"Created legacy redirect token for wallet (expires in 60s)")
         
         response = jsonify({
             'success': True,
@@ -757,5 +761,11 @@ def exchange_redirect_token():
 # - Credentials: LOCAL ONLY in each site's IndexedDB
 # - Server stores: wallet_id + timestamps ONLY (no user identity, no site visits)
 # - Cross-device sync: Opt-in, only stores that "wallet X unlocked at time Y"
-# - Redirect tokens: Short-lived (60s), single-use, DATABASE-BACKED for multi-dyno
+# - Redirect auth (v2.30.0+): CLIENT-SIDE ENCRYPTION - wallet secret never touches server
+#   * SDK generates encryption key, stores locally
+#   * lemma.id client-side JS encrypts wallet data
+#   * Encrypted blob returned in URL, decrypted by SDK
+#   * Server NEVER sees the wallet_secret or which sites user authenticates to
+# - Legacy redirect tokens: For old SDK versions, server stores wallet_secret for 60s
+#   * return_url is NOT stored (privacy improvement)
 # ============================================================

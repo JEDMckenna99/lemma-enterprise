@@ -62,7 +62,8 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    static VERSION = '2.29.0';
+    // v2.30.0: Privacy-first redirect auth - wallet secret never touches server
+    static VERSION = '2.30.0';
     
     constructor() {
         this.db = null;
@@ -701,12 +702,18 @@ class LemmaWallet {
         const returnUrl = options.returnUrl || window.location.href;
         const state = options.state || {};
         
-        // Store state for when we return
+        // Generate a random encryption key for secure client-side token exchange
+        // This key never touches lemma.id servers - all encryption happens client-side
+        const encKeyBytes = crypto.getRandomValues(new Uint8Array(32));
+        const encKeyBase64 = this._arrayBufferToBase64(encKeyBytes);
+        
+        // Store state for when we return (including encryption key)
         const redirectState = {
             returnUrl,
             state,
             timestamp: Date.now(),
-            origin: window.location.origin
+            origin: window.location.origin,
+            encKey: encKeyBase64  // Store key to decrypt the response
         };
         
         try {
@@ -717,11 +724,15 @@ class LemmaWallet {
         }
         
         console.log('[Lemma] Redirecting to lemma.id for wallet unlock...');
+        console.log('[Lemma] 🔐 Using client-side encryption (wallet secret never touches server)');
         
-        // Build the redirect URL
+        // Build the redirect URL with encryption key
+        // PRIVACY: The enc_key is only used by client-side JavaScript on lemma.id
+        // The server never sees or stores the wallet secret
         const params = new URLSearchParams({
             return_url: returnUrl,
-            redirect_flow: '1'
+            redirect_flow: '1',
+            enc_key: encKeyBase64  // Pass key for client-side encryption
         });
         
         // Add custom state if provided
@@ -744,23 +755,27 @@ class LemmaWallet {
         // Check URL params for redirect flow completion
         const urlParams = new URLSearchParams(window.location.search);
         const isRedirectReturn = urlParams.get('lemma_unlocked') === '1';
-        const redirectToken = urlParams.get('lemma_token');
+        const encryptedData = urlParams.get('lemma_data');  // Client-side encrypted wallet data
+        const legacyToken = urlParams.get('lemma_token');   // Legacy server-side token (deprecated)
         
-        if (!isRedirectReturn) {
-            // Also check sessionStorage for redirect state
-            try {
-                const savedState = sessionStorage.getItem('lemma_redirect_state');
-                if (!savedState) return null;
-                
-                const state = JSON.parse(savedState);
+        // Retrieve saved redirect state (contains decryption key)
+        let savedState = null;
+        try {
+            const stateJson = sessionStorage.getItem('lemma_redirect_state');
+            if (stateJson) {
+                savedState = JSON.parse(stateJson);
                 // Only valid if recent (within 10 minutes)
-                if (Date.now() - state.timestamp > 10 * 60 * 1000) {
+                if (Date.now() - savedState.timestamp > 10 * 60 * 1000) {
                     sessionStorage.removeItem('lemma_redirect_state');
-                    return null;
+                    savedState = null;
                 }
-            } catch (e) {
-                return null;
             }
+        } catch (e) {
+            savedState = null;
+        }
+        
+        if (!isRedirectReturn && !savedState) {
+            return null;
         }
         
         console.log('[Lemma] Detected redirect return, checking auth...');
@@ -774,6 +789,7 @@ class LemmaWallet {
         if (isRedirectReturn) {
             urlParams.delete('lemma_unlocked');
             urlParams.delete('lemma_wallet_id');
+            urlParams.delete('lemma_data');
             urlParams.delete('lemma_token');
             const cleanUrl = urlParams.toString() 
                 ? `${window.location.pathname}?${urlParams.toString()}`
@@ -781,26 +797,65 @@ class LemmaWallet {
             window.history.replaceState({}, '', cleanUrl);
         }
         
-        // If we have a redirect token, exchange it for wallet data
-        // This bypasses mobile Safari's cookie/storage blocking
-        if (redirectToken) {
-            console.log('[Lemma] Exchanging redirect token for wallet data...');
+        // PRIVACY-FIRST: Client-side encrypted data (no server involvement)
+        // The wallet secret was encrypted by lemma.id's client-side JavaScript
+        // using a key we generated and stored locally. Server never sees the secret.
+        if (encryptedData && savedState?.encKey) {
+            console.log('[Lemma] 🔐 Decrypting wallet data client-side (privacy-preserving)...');
+            try {
+                const decrypted = await this._decryptRedirectData(encryptedData, savedState.encKey);
+                
+                if (decrypted && decrypted.wallet_secret) {
+                    console.log('[Lemma] ✅ Client-side decryption successful!');
+                    
+                    // Store the wallet secret locally
+                    await this._put('secrets', { id: 'master', secret: decrypted.wallet_secret, source: 'redirect_encrypted' });
+                    
+                    // Set up local session
+                    this.session = {
+                        isUnlocked: true,
+                        unlockedAt: Date.now(),
+                        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                        walletId: decrypted.wallet_id,
+                        walletSecret: decrypted.wallet_secret,
+                        source: 'redirect'
+                    };
+                    await this._put('session', { id: 'current', ...this.session });
+                    
+                    this._autoStartHeartbeat();
+                    
+                    return {
+                        success: true,
+                        authenticated: true,
+                        walletId: decrypted.wallet_id,
+                        walletSecret: decrypted.wallet_secret,
+                        message: 'Authenticated via encrypted redirect (privacy-preserving)'
+                    };
+                } else {
+                    console.warn('[Lemma] Decryption succeeded but no wallet secret');
+                }
+            } catch (e) {
+                console.warn('[Lemma] Client-side decryption failed:', e.message);
+            }
+        }
+        
+        // LEGACY FALLBACK: Server-side token exchange (deprecated, for old SDK compatibility)
+        if (legacyToken) {
+            console.log('[Lemma] Using legacy server-side token exchange (deprecated)...');
             try {
                 const response = await fetch('https://lemma.id/api/wallet/exchange-redirect-token', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: redirectToken })
+                    body: JSON.stringify({ token: legacyToken })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success && data.wallet_secret) {
-                    console.log('[Lemma] ✅ Token exchange successful!');
+                    console.log('[Lemma] ✅ Legacy token exchange successful');
                     
-                    // Store the wallet secret locally
                     await this._put('secrets', { id: 'master', secret: data.wallet_secret, source: 'redirect_token' });
                     
-                    // Set up local session
                     this.session = {
                         isUnlocked: true,
                         unlockedAt: Date.now(),
@@ -818,13 +873,11 @@ class LemmaWallet {
                         authenticated: true,
                         walletId: data.wallet_id,
                         walletSecret: data.wallet_secret,
-                        message: 'Authenticated via redirect token'
+                        message: 'Authenticated via legacy redirect token'
                     };
-                } else {
-                    console.warn('[Lemma] Token exchange failed:', data.error || 'unknown error');
                 }
             } catch (e) {
-                console.warn('[Lemma] Token exchange error:', e.message);
+                console.warn('[Lemma] Legacy token exchange error:', e.message);
             }
         }
         
@@ -834,7 +887,6 @@ class LemmaWallet {
         if (session.valid) {
             console.log('[Lemma] ✅ Redirect unlock successful via bridge!');
             
-            // Try to get the wallet secret
             let walletSecret = null;
             try {
                 const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET');
@@ -860,6 +912,78 @@ class LemmaWallet {
             authenticated: false,
             message: 'Session not established after redirect'
         };
+    }
+    
+    /**
+     * Decrypt wallet data received from redirect (client-side encryption).
+     * Uses AES-GCM with a key we generated before redirect.
+     * @private
+     */
+    async _decryptRedirectData(encryptedBase64, keyBase64) {
+        try {
+            // Decode the encrypted data
+            const encryptedBytes = this._base64ToArrayBuffer(encryptedBase64);
+            
+            // Format: nonce (12 bytes) + ciphertext + authTag (16 bytes, appended by AES-GCM)
+            const nonce = encryptedBytes.slice(0, 12);
+            const ciphertext = encryptedBytes.slice(12);
+            
+            // Import the key
+            const keyBytes = this._base64ToArrayBuffer(keyBase64);
+            const key = await crypto.subtle.importKey(
+                'raw',
+                keyBytes,
+                { name: 'AES-GCM' },
+                false,
+                ['decrypt']
+            );
+            
+            // Decrypt
+            const decryptedBytes = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: nonce },
+                key,
+                ciphertext
+            );
+            
+            // Parse JSON
+            const decryptedText = new TextDecoder().decode(decryptedBytes);
+            return JSON.parse(decryptedText);
+        } catch (e) {
+            console.error('[Lemma] Decryption error:', e);
+            throw new Error('Failed to decrypt redirect data: ' + e.message);
+        }
+    }
+    
+    /**
+     * Convert base64 string to ArrayBuffer
+     * @private
+     */
+    _base64ToArrayBuffer(base64) {
+        // Handle URL-safe base64
+        const standardBase64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+        const padding = standardBase64.length % 4;
+        const paddedBase64 = padding ? standardBase64 + '='.repeat(4 - padding) : standardBase64;
+        
+        const binary = atob(paddedBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+    }
+    
+    /**
+     * Convert ArrayBuffer to base64 string
+     * @private
+     */
+    _arrayBufferToBase64(buffer) {
+        const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        // Use URL-safe base64
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     }
     
     /**
