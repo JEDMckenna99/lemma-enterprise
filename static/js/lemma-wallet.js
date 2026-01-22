@@ -62,8 +62,8 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    // v2.31.0: Simplified redirect-first architecture - consistent UX on all platforms
-    static VERSION = '2.31.0';
+    // v2.31.1: Smoother cross-device lock detection - uses global session, not bridge
+    static VERSION = '2.31.1';
     
     constructor() {
         this.db = null;
@@ -962,8 +962,18 @@ class LemmaWallet {
     }
 
     /**
-     * Start session heartbeat (checks if central wallet session is still valid)
-     * Call this on third-party sites to detect when wallet is locked remotely
+     * Start session heartbeat (checks if wallet session is still valid)
+     * 
+     * SIMPLIFIED (v2.31.0): For redirect-based sessions, we ONLY check local expiry.
+     * The heartbeat no longer aggressively clears sessions when the bridge says invalid,
+     * because:
+     * 1. Redirect sessions were verified via client-side encryption (secure)
+     * 2. Bridge is unreliable on mobile Safari
+     * 3. Users found the sudden sign-out jarring
+     * 
+     * Instead, we check the global session API (cross-device) periodically.
+     * If user explicitly locked their wallet on another device, we notify gracefully.
+     * 
      * @param {number} intervalMs - Check interval in ms (default: 60000 = 1 minute)
      */
     startSessionHeartbeat(intervalMs = 60000) {
@@ -981,46 +991,81 @@ class LemmaWallet {
         console.log('[Lemma] Starting session heartbeat (checking every', intervalMs/1000, 'seconds)');
 
         this._heartbeatInterval = setInterval(async () => {
+            // Skip if no local session
+            if (!this.session.isUnlocked) return;
+            
+            // Check 1: Local expiry (always enforced)
+            if (this.session.expiresAt && Date.now() > this.session.expiresAt) {
+                console.log('[Lemma] Session expired locally (24h limit)');
+                await this._clearSessionGracefully('expired', 'Your session has expired. Please sign in again.');
+                return;
+            }
+            
+            // Check 2: For redirect sessions, check global session (cross-device lock detection)
+            // This is gentler than bridge - only triggers if user explicitly locked wallet
+            if (this.session.source === 'redirect' || this.session.source === 'global_sync') {
+                try {
+                    const walletId = this.session.walletId;
+                    if (walletId) {
+                        const globalSession = await this._checkGlobalSession(walletId);
+                        
+                        if (!globalSession.valid) {
+                            console.log('[Lemma] Wallet was locked on another device');
+                            await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
+                        }
+                    }
+                } catch (e) {
+                    // Global session check failed - don't kick user out, just log
+                    console.warn('[Lemma] Global session check failed (network?):', e.message);
+                }
+                return; // Don't also check bridge for redirect sessions
+            }
+            
+            // Check 3: For legacy bridge/popup sessions, check bridge
+            // (Kept for backward compatibility)
             try {
                 const bridgeSession = await this.checkBridgeSession();
                 
-                if (!bridgeSession.valid && this.session.isUnlocked) {
-                    console.log('[Lemma] ⚠️ Central wallet session expired - clearing local session');
-                    
-                    // Clear local session
-                    this.session = {
-                        isUnlocked: false,
-                        unlockedAt: null,
-                        expiresAt: null
-                    };
-                    
-                    // Clear session from IndexedDB
-                    if (this.db) {
-                        try {
-                            const tx = this.db.transaction('session', 'readwrite');
-                            tx.objectStore('session').delete('current');
-                        } catch (e) {
-                            console.warn('[Lemma] Could not clear session from DB:', e);
-                        }
-                    }
-                    
-                    // Trigger callback if set
-                    if (this._onSessionExpired) {
-                        this._onSessionExpired({
-                            reason: 'wallet_locked',
-                            message: 'Central wallet was locked. Please sign in again.'
-                        });
-                    }
-                    
-                    // Dispatch custom event for apps to listen to
-                    window.dispatchEvent(new CustomEvent('lemma:session-expired', {
-                        detail: { reason: 'wallet_locked' }
-                    }));
+                if (!bridgeSession.valid) {
+                    console.log('[Lemma] Bridge session no longer valid');
+                    await this._clearSessionGracefully('bridge_invalid', 'Session ended. Please sign in again.');
                 }
             } catch (e) {
-                console.warn('[Lemma] Heartbeat check failed:', e.message);
+                console.warn('[Lemma] Heartbeat bridge check failed:', e.message);
             }
         }, intervalMs);
+    }
+    
+    /**
+     * Clear session gracefully with notification
+     * @private
+     */
+    async _clearSessionGracefully(reason, message) {
+        // Clear local session
+        this.session = {
+            isUnlocked: false,
+            unlockedAt: null,
+            expiresAt: null
+        };
+        
+        // Clear session from IndexedDB
+        await this._delete('session', 'current');
+        
+        // Stop heartbeat
+        if (this._heartbeatInterval) {
+            clearInterval(this._heartbeatInterval);
+            this._heartbeatInterval = null;
+        }
+        
+        // Trigger callback if set (for customer sites to handle)
+        if (this._onSessionExpired) {
+            this._onSessionExpired({ reason, message });
+        }
+        
+        // Dispatch custom event for apps to listen to
+        window.dispatchEvent(new CustomEvent('lemma:session-expired', {
+            detail: { reason, message }
+        }));
     }
 
     /**
