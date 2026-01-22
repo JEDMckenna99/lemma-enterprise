@@ -62,8 +62,8 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    // v2.31.2: Clean unlock page at /wallet/unlock for better redirect UX
-    static VERSION = '2.31.2';
+    // v2.31.3: All sessions use global session API for lock detection (no more bridge heartbeat)
+    static VERSION = '2.31.3';
     
     constructor() {
         this.db = null;
@@ -1001,38 +1001,31 @@ class LemmaWallet {
                 return;
             }
             
-            // Check 2: For redirect sessions, check global session (cross-device lock detection)
-            // This is gentler than bridge - only triggers if user explicitly locked wallet
-            if (this.session.source === 'redirect' || this.session.source === 'global_sync') {
-                try {
-                    const walletId = this.session.walletId;
-                    if (walletId) {
-                        const globalSession = await this._checkGlobalSession(walletId);
-                        
-                        if (!globalSession.valid) {
-                            console.log('[Lemma] Wallet was locked on another device');
-                            await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
-                        }
-                    }
-                } catch (e) {
-                    // Global session check failed - don't kick user out, just log
-                    console.warn('[Lemma] Global session check failed (network?):', e.message);
-                }
-                return; // Don't also check bridge for redirect sessions
-            }
-            
-            // Check 3: For legacy bridge/popup sessions, check bridge
-            // (Kept for backward compatibility)
+            // Check 2: Cross-device lock detection via global session API
+            // This works for ALL session types (redirect, popup, bridge, global_sync)
+            // Only triggers if user explicitly locked their wallet on another device
             try {
-                const bridgeSession = await this.checkBridgeSession();
-                
-                if (!bridgeSession.valid) {
-                    console.log('[Lemma] Bridge session no longer valid');
-                    await this._clearSessionGracefully('bridge_invalid', 'Session ended. Please sign in again.');
+                const walletId = this.session.walletId;
+                if (walletId) {
+                    const globalSession = await this._checkGlobalSession(walletId);
+                    
+                    if (!globalSession.valid) {
+                        console.log('[Lemma] Wallet was locked on another device (global session invalid)');
+                        await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
+                    } else {
+                        // Global session valid - session remains active
+                        console.log('[Lemma] Heartbeat: global session valid');
+                    }
                 }
             } catch (e) {
-                console.warn('[Lemma] Heartbeat bridge check failed:', e.message);
+                // Global session check failed - don't kick user out, just log
+                // Network issues shouldn't cause sign-out
+                console.warn('[Lemma] Heartbeat: global session check failed (network?):', e.message);
             }
+            
+            // NOTE: We no longer use bridge for heartbeat validation.
+            // Bridge is unreliable on mobile Safari and causes false sign-outs.
+            // All sessions are trusted locally until expiry or explicit lock.
         }, intervalMs);
     }
     
