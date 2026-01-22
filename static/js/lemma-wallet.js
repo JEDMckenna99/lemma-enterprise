@@ -62,8 +62,8 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    // v2.30.1: Fix redirect auth - don't clear encryption key before decryption
-    static VERSION = '2.30.1';
+    // v2.30.2: Trust redirect sessions on mobile - don't let bridge invalidate them
+    static VERSION = '2.30.2';
     
     constructor() {
         this.db = null;
@@ -1021,7 +1021,7 @@ class LemmaWallet {
 
     /**
      * Check if session is still valid (useful after page refresh)
-     * On third-party sites, this verifies with the bridge.
+     * On third-party sites, this verifies with the bridge (unless session was established via redirect).
      * 
      * @returns {Promise<boolean>} True if session is valid
      */
@@ -1033,7 +1033,27 @@ class LemmaWallet {
             return false;
         }
         
-        // On third-party sites, verify with bridge
+        // Check if session has expired locally
+        if (this.session.expiresAt && Date.now() > this.session.expiresAt) {
+            console.log('[Lemma] Session expired locally');
+            this.session = { isUnlocked: false };
+            await this._delete('session', 'current');
+            if (this._onSessionExpired) {
+                this._onSessionExpired({ reason: 'expired' });
+            }
+            return false;
+        }
+        
+        // MOBILE SAFARI FIX: If session was established via redirect, trust local session
+        // The bridge can't see the session on mobile Safari due to storage partitioning,
+        // but that doesn't mean the session is invalid - we verified it via client-side
+        // encryption which is MORE secure than the bridge anyway.
+        if (this.session.source === 'redirect') {
+            console.log('[Lemma] Session via redirect - trusting local session (mobile-friendly)');
+            return true;
+        }
+        
+        // On third-party sites, verify with bridge (for bridge-established sessions)
         if (!this._isLemmaDomain()) {
             try {
                 const bridgeSession = await this.checkBridgeSession();
