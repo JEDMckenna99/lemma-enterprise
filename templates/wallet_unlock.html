@@ -600,18 +600,99 @@ async function createWallet() {
     }
 }
 
+// Debug: Check IndexedDB directly
+async function debugCheckIndexedDB() {
+    return new Promise((resolve) => {
+        console.log('[Unlock Debug] Checking IndexedDB directly...');
+        const request = indexedDB.open('LemmaWallet', 4);
+        
+        request.onerror = (e) => {
+            console.error('[Unlock Debug] IndexedDB error:', e.target.error);
+            resolve({ error: e.target.error?.message });
+        };
+        
+        request.onupgradeneeded = (e) => {
+            console.log('[Unlock Debug] onupgradeneeded triggered - DB was empty or older version');
+            // Don't create stores, just note this happened
+        };
+        
+        request.onsuccess = () => {
+            const db = request.result;
+            console.log('[Unlock Debug] DB opened, version:', db.version);
+            console.log('[Unlock Debug] Object stores:', Array.from(db.objectStoreNames));
+            
+            const results = { version: db.version, stores: Array.from(db.objectStoreNames) };
+            
+            // Try to read from each store
+            if (db.objectStoreNames.contains('passkey')) {
+                try {
+                    const tx = db.transaction(['passkey'], 'readonly');
+                    const store = tx.objectStore('passkey');
+                    const getReq = store.get('walletId');
+                    getReq.onsuccess = () => {
+                        results.walletId = getReq.result;
+                        console.log('[Unlock Debug] walletId:', getReq.result);
+                    };
+                } catch (e) {
+                    console.error('[Unlock Debug] passkey store error:', e);
+                }
+            }
+            
+            if (db.objectStoreNames.contains('secrets')) {
+                try {
+                    const tx = db.transaction(['secrets'], 'readonly');
+                    const store = tx.objectStore('secrets');
+                    const getReq = store.get('master');
+                    getReq.onsuccess = () => {
+                        results.hasSecret = !!getReq.result?.secret;
+                        console.log('[Unlock Debug] hasSecret:', !!getReq.result?.secret);
+                        if (getReq.result?.secret) {
+                            console.log('[Unlock Debug] secret length:', getReq.result.secret.length);
+                        }
+                    };
+                } catch (e) {
+                    console.error('[Unlock Debug] secrets store error:', e);
+                }
+            }
+            
+            setTimeout(() => {
+                db.close();
+                resolve(results);
+            }, 100);
+        };
+    });
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
     parseParams();
     
+    // Debug: Check IndexedDB directly first
+    const dbDebug = await debugCheckIndexedDB();
+    console.log('[Unlock Debug] Direct DB check:', dbDebug);
+    
     // Check initial wallet state
     try {
+        console.log('[Unlock Debug] Calling wallet.init()...');
         await wallet.init();
+        console.log('[Unlock Debug] wallet.init() complete');
+        
         const info = await wallet.getWalletInfo();
+        console.log('[Unlock Debug] getWalletInfo result:', JSON.stringify(info, null, 2));
         
         if (!info.hasWallet) {
-            showStatus('No wallet found - create one or link an existing wallet', 'info');
-            document.getElementById('no-wallet-section').style.display = 'block';
+            // Double-check with direct DB access
+            const directSecret = await getStoredSecretDirectly();
+            console.log('[Unlock Debug] Direct secret check:', !!directSecret);
+            
+            if (directSecret) {
+                // Wallet exists but SDK didn't find it - possible version issue
+                console.log('[Unlock Debug] SDK missed wallet but direct access found it!');
+                showStatus('Wallet detected - click to authenticate', 'info');
+            } else {
+                showStatus('No wallet found - create one or link an existing wallet', 'info');
+                document.getElementById('no-wallet-section').style.display = 'block';
+            }
         }
         
         // If already unlocked with a session, auto-redirect
@@ -623,8 +704,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
     } catch (e) {
-        console.error('Init error:', e);
-        // Don't show error for IndexedDB version issues - just let user click unlock
+        console.error('[Unlock Debug] Init error:', e);
+        console.error('[Unlock Debug] Error stack:', e.stack);
+        
+        // Try direct access as fallback
+        const directSecret = await getStoredSecretDirectly();
+        if (directSecret) {
+            console.log('[Unlock Debug] Direct access found wallet despite init error');
+            showStatus('Wallet detected - click to authenticate', 'info');
+        }
     }
 });
     </script>
