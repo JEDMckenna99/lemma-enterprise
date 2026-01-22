@@ -528,20 +528,6 @@ def create_app():
             'Expires': '0'
         }
     
-    @app.route('/sdk-test')
-    def sdk_test():
-        """SDK Test Page"""
-        logger.info("🧪 Serving SDK test page")
-        return render_template('sdk_test.html'), 200, {
-            'Cache-Control': 'no-cache, no-store, must-revalidate'
-        }
-    
-    @app.route('/wallet/reset-pin')
-    def wallet_reset_pin():
-        """Wallet PIN Reset Page"""
-        logger.info("🔐 Serving PIN reset page")
-        return render_template('modern/reset_pin.html')
-
     @app.route('/wallet/unlock')
     def wallet_unlock():
         """
@@ -696,20 +682,6 @@ def create_app():
             'verifiedAt': current_time
         })
 
-    @app.route('/lemma-sw.js')
-    def lemma_service_worker():
-        """
-        Serve the Lemma service worker from root path for proper scope.
-
-        Service workers can only control URLs within their scope. By serving
-        from root, the SW can cache all lemma.id resources.
-        """
-        from flask import send_from_directory
-        response = send_from_directory('static/js', 'lemma-sw.js', mimetype='application/javascript')
-        response.headers['Service-Worker-Allowed'] = '/'
-        response.headers['Cache-Control'] = 'no-cache'  # SW should always be fresh
-        return response
-
     @app.route('/sdk/lemma-wallet.js')
     def lemma_wallet_sdk_fresh():
         """
@@ -755,30 +727,6 @@ def create_app():
         """Personalized code generator - client-side auth handles everything"""
         return render_template('modern/docs_setup.html')
 
-    @app.route('/qr-demo')
-    def qr_demo():
-        return render_template('modern/qr_demo.html')
-
-    @app.route('/test-client-verification')
-    def test_client_verification():
-        """Test client-side verification performance"""
-        return render_template('test_client_verification.html')
-    
-    @app.route('/test-wasm-verification')
-    def test_wasm_verification():
-        """Comprehensive WASM verification test suite"""
-        return render_template('test_client_wasm_verification.html')
-
-    @app.route('/setup-pin')
-    def setup_pin():
-        """One-time PIN setup for existing wallet"""
-        return render_template('setup_pin_protection.html')
-
-
-    @app.route('/qr-reader')
-    def qr_reader():
-        return render_template('modern/qr_reader.html')
-
     # Legal pages
     @app.route('/terms')
     def terms_of_service():
@@ -802,34 +750,6 @@ def create_app():
         logger.info("🚀 Serving developer platform")
         return render_template('developer/platform.html')
     
-    @app.route('/test_web_crypto_revocation.html')
-    def test_web_crypto_revocation():
-        """Test page for Web Crypto API revocation system"""
-        return render_template('test_web_crypto_revocation.html')
-    
-    @app.route('/advanced-wallet')
-    def advanced_wallet():
-        """Advanced wallet with recovery and multi-device features"""
-        return render_template('modern/advanced_wallet.html')
-
-    @app.route('/wallet-testing')
-    def wallet_testing():
-        """Manual testing interface for advanced wallet features"""
-        return render_template('modern/wallet_testing.html')
-
-    @app.route('/examples/sdk-test')
-    def sdk_test_page():
-        """SDK Integration Test Page"""
-        logger.info("📄 Serving SDK test page")
-        return render_template('examples/sdk-test.html')
-    
-    @app.route('/examples/<path:filename>')
-    def serve_examples(filename):
-        """Serve example HTML files for testing and demos"""
-        from flask import send_from_directory
-        logger.info(f"📄 Serving example file: {filename}")
-        return send_from_directory('examples', filename)
-
     @app.route('/docs/<path:filename>')
     def serve_docs(filename):
         """Serve documentation markdown files"""
