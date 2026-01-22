@@ -62,7 +62,7 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    // v2.30.1: Fix mobile Safari redirect - use localStorage for encryption key
+    // v2.30.1: Fix redirect auth - don't clear encryption key before decryption
     static VERSION = '2.30.1';
     
     constructor() {
@@ -708,8 +708,6 @@ class LemmaWallet {
         const encKeyBase64 = this._arrayBufferToBase64(encKeyBytes);
         
         // Store state for when we return (including encryption key)
-        // Use localStorage instead of sessionStorage - Safari may clear sessionStorage
-        // when returning from a different origin (privacy feature)
         const redirectState = {
             returnUrl,
             state,
@@ -719,17 +717,10 @@ class LemmaWallet {
         };
         
         try {
-            // Try localStorage first (more persistent on mobile Safari)
-            localStorage.setItem('lemma_redirect_state', JSON.stringify(redirectState));
-            console.log('[Lemma] Stored redirect state in localStorage');
+            sessionStorage.setItem('lemma_redirect_state', JSON.stringify(redirectState));
         } catch (e) {
-            // Fallback to sessionStorage
-            try {
-                sessionStorage.setItem('lemma_redirect_state', JSON.stringify(redirectState));
-                console.log('[Lemma] Stored redirect state in sessionStorage (localStorage failed)');
-            } catch (e2) {
-                console.warn('[Lemma] Could not save redirect state to storage');
-            }
+            // Fallback to URL-encoded state in the redirect
+            console.warn('[Lemma] Could not save redirect state to sessionStorage');
         }
         
         console.log('[Lemma] Redirecting to lemma.id for wallet unlock...');
@@ -767,38 +758,27 @@ class LemmaWallet {
         const encryptedData = urlParams.get('lemma_data');  // Client-side encrypted wallet data
         const legacyToken = urlParams.get('lemma_token');   // Legacy server-side token (deprecated)
         
-        // Retrieve saved redirect state (contains decryption key)
-        // Try localStorage first (more persistent on mobile Safari), then sessionStorage
-        let savedState = null;
-        let stateJson = null;
-        let stateSource = null;
+        console.log('[Lemma] checkRedirectReturn - isRedirectReturn:', isRedirectReturn);
+        console.log('[Lemma] checkRedirectReturn - has lemma_data:', !!encryptedData);
+        console.log('[Lemma] checkRedirectReturn - has lemma_token:', !!legacyToken);
         
+        // Retrieve saved redirect state (contains decryption key)
+        let savedState = null;
         try {
-            // Try localStorage first
-            stateJson = localStorage.getItem('lemma_redirect_state');
-            if (stateJson) {
-                stateSource = 'localStorage';
-            } else {
-                // Fallback to sessionStorage
-                stateJson = sessionStorage.getItem('lemma_redirect_state');
-                if (stateJson) stateSource = 'sessionStorage';
-            }
-            
-            console.log('[Lemma] Redirect state source:', stateSource || 'not found');
-            
+            const stateJson = sessionStorage.getItem('lemma_redirect_state');
+            console.log('[Lemma] checkRedirectReturn - sessionStorage has state:', !!stateJson);
             if (stateJson) {
                 savedState = JSON.parse(stateJson);
-                console.log('[Lemma] Redirect state has encKey:', !!savedState?.encKey);
+                console.log('[Lemma] checkRedirectReturn - state has encKey:', !!savedState?.encKey);
                 // Only valid if recent (within 10 minutes)
                 if (Date.now() - savedState.timestamp > 10 * 60 * 1000) {
-                    console.log('[Lemma] Redirect state expired, clearing');
-                    localStorage.removeItem('lemma_redirect_state');
+                    console.log('[Lemma] checkRedirectReturn - state expired');
                     sessionStorage.removeItem('lemma_redirect_state');
                     savedState = null;
                 }
             }
         } catch (e) {
-            console.log('[Lemma] Error reading redirect state:', e.message);
+            console.log('[Lemma] checkRedirectReturn - error reading state:', e.message);
             savedState = null;
         }
         
@@ -806,12 +786,15 @@ class LemmaWallet {
             return null;
         }
         
-        console.log('[Lemma] Detected redirect return, checking auth...');
-        console.log('[Lemma] Has encrypted data:', !!encryptedData);
-        console.log('[Lemma] Has legacy token:', !!legacyToken);
-        console.log('[Lemma] Has encryption key:', !!savedState?.encKey);
+        console.log('[Lemma] Detected redirect return, processing...');
+        console.log('[Lemma] Can decrypt:', !!(encryptedData && savedState?.encKey));
         
-        // Clean up URL (remove lemma params) AFTER reading them
+        // Clear the redirect state AFTER we've read it
+        try {
+            sessionStorage.removeItem('lemma_redirect_state');
+        } catch (e) {}
+        
+        // Clean up URL (remove lemma params)
         if (isRedirectReturn) {
             urlParams.delete('lemma_unlocked');
             urlParams.delete('lemma_wallet_id');
@@ -822,12 +805,6 @@ class LemmaWallet {
                 : window.location.pathname;
             window.history.replaceState({}, '', cleanUrl);
         }
-        
-        // Clear the redirect state AFTER we've used it (from both storages)
-        try {
-            localStorage.removeItem('lemma_redirect_state');
-            sessionStorage.removeItem('lemma_redirect_state');
-        } catch (e) {}
         
         // PRIVACY-FIRST: Client-side encrypted data (no server involvement)
         // The wallet secret was encrypted by lemma.id's client-side JavaScript
@@ -1277,13 +1254,14 @@ class LemmaWallet {
             if (urlParams.get('lemma_unlocked') === '1') {
                 console.log('[Lemma] Detected redirect return - will process in checkRedirectReturn()');
                 
-                // DON'T clean URL here! Let checkRedirectReturn() handle it properly
-                // It needs lemma_data and lemma_token to complete authentication
-                // DON'T clear sessionStorage here - it contains the encryption key!
+                // IMPORTANT: Do NOT clean URL or clear sessionStorage here!
+                // checkRedirectReturn() needs:
+                // - lemma_data and lemma_token from URL params
+                // - encryption key from sessionStorage (lemma_redirect_state)
+                // Let checkRedirectReturn() handle cleanup after decryption
                 
                 // Just set a flag that we're returning from redirect
                 this._justReturnedFromRedirect = true;
-                this._hasRedirectData = urlParams.get('lemma_data') || urlParams.get('lemma_token');
             }
             
             const storedSession = await this._get('session', 'current');

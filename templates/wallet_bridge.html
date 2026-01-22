@@ -725,10 +725,10 @@ window.addEventListener('message', async (event) => {
                     
                     if (walletSecret) {
                         console.log('🔑 ✅ Got wallet secret:', walletSecret.length + ' chars');
-                        respond({
-                            success: true,
-                            walletSecret: walletSecret
-                        });
+                    respond({
+                        success: true,
+                        walletSecret: walletSecret
+                    });
                     } else {
                         // Last resort: storage might be partitioned (mobile Safari)
                         // Signal that popup flow is required
