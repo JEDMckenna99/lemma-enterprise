@@ -62,8 +62,8 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    // v2.30.3: Fast path for redirect sessions - skip bridge roundtrip entirely
-    static VERSION = '2.30.3';
+    // v2.31.0: Simplified redirect-first architecture - consistent UX on all platforms
+    static VERSION = '2.31.0';
     
     constructor() {
         this.db = null;
@@ -241,250 +241,54 @@ class LemmaWallet {
         const result = {
             authenticated: false,
             needsPasskey: true,
+            needsRedirect: false,
             walletSecret: null,
             walletId: null,
             message: ''
         };
         
-        // FAST PATH: Check for valid local redirect session FIRST
-        // Redirect sessions were verified via client-side encryption, which is more
-        // secure than bridge. No need for bridge roundtrip.
-        // This is also ESSENTIAL for mobile Safari where bridge doesn't work.
-        if (this.session.isUnlocked && this.session.source === 'redirect') {
-            // Verify session hasn't expired
-            if (this.session.expiresAt && Date.now() < this.session.expiresAt) {
-                console.log('[Lemma] ✅ Using existing redirect session (verified via client-side encryption)');
-                
-                // Get wallet secret from local storage
-                let walletSecret = this.session.walletSecret;
-                if (!walletSecret) {
-                    try {
-                        const secretRecord = await this._get('secrets', 'master');
-                        walletSecret = secretRecord?.secret;
-                    } catch (e) {}
-                }
-                
-                if (walletSecret) {
-                    result.walletSecret = walletSecret;
-                    result.walletId = this.session.walletId;
-                    result.authenticated = true;
-                    result.needsPasskey = false;
-                    result.message = 'Authenticated via existing redirect session';
-                    
-                    this._autoStartHeartbeat();
-                    return result;
-                }
-            } else {
-                console.log('[Lemma] Redirect session expired, will re-authenticate');
-            }
-        }
+        // ============================================================
+        // SIMPLIFIED REDIRECT-FIRST ARCHITECTURE (v2.31.0)
+        // ============================================================
+        // 1. Check for valid local session (any source)
+        // 2. Check for cross-device global session
+        // 3. No session → recommend redirect (works on ALL platforms)
+        //
+        // Benefits:
+        // - Consistent UX across mobile and desktop
+        // - More private (client-side encryption, no bridge)
+        // - Lower server costs (no bridge API calls)
+        // - Simpler code (one path instead of many fallbacks)
+        // ============================================================
         
-        // On third-party sites, try bridge for non-redirect sessions
-        // This handles desktop browsers where bridge works reliably
-        if (!this._isLemmaDomain()) {
-            try {
-                const bridgeSession = await this.checkBridgeSession();
-                
-                if (bridgeSession.valid) {
-                    // Set local session
-                    this.session = {
-                        isUnlocked: true,
-                        unlockedAt: bridgeSession.unlockedAt || Date.now(),
-                        expiresAt: bridgeSession.expiresAt,
-                        walletId: bridgeSession.walletId,
-                        source: 'bridge'
-                    };
-                    await this._put('session', { id: 'current', ...this.session });
-                    
-                    // Get wallet secret from bridge
-                    const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET', {});
-                    if (secretResult.success && secretResult.walletSecret) {
-                        await this._put('secrets', { id: 'master', secret: secretResult.walletSecret, source: 'bridge' });
-                        this.session.walletSecret = secretResult.walletSecret;
-                        
-                        result.walletSecret = secretResult.walletSecret;
-                        result.walletId = bridgeSession.walletId;
-                        result.authenticated = true;
-                        result.needsPasskey = false;
-                        result.message = 'Authenticated via bridge session';
-                        console.log('[Lemma] ✅ Auto-authenticated via bridge session');
-                        
-                        // AUTO-START HEARTBEAT on third-party sites
-                        // This detects when wallet is locked on lemma.id
-                        this._autoStartHeartbeat();
-                        
-                        return result;
-                    } else {
-                        // Bridge session valid but can't get secret
-                        // This happens on mobile Safari due to storage partitioning
-                        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-                        
-                        if (isMobile) {
-                            // Mobile: Use redirect instead of popup (popups blocked on mobile Safari)
-                            console.log('[Lemma] Mobile detected with partitioned storage - needs redirect');
-                            result.authenticated = false;
-                            result.needsPasskey = false;
-                            result.needsRedirect = true;
-                            result.hasSession = true;
-                            result.message = 'Tap Sign In to authenticate (mobile browser)';
-                            return result;
-                        }
-                        
-                        // Desktop: Try popup fallback
-                        console.warn('[Lemma] Bridge session valid but no secret - trying popup');
-                        
-                        try {
-                            const popupResult = await this.unlockWithPopup();
-                            if (popupResult.success && popupResult.walletSecret) {
-                                // Popup worked - store the secret locally
-                                await this._put('secrets', { id: 'master', secret: popupResult.walletSecret, source: 'popup_fallback' });
-                                this.session.walletSecret = popupResult.walletSecret;
-                                this.session.isUnlocked = true;
-                                await this._put('session', { id: 'current', ...this.session });
-                                
-                                result.walletSecret = popupResult.walletSecret;
-                                result.walletId = popupResult.walletId || bridgeSession.walletId;
-                                result.authenticated = true;
-                                result.needsPasskey = false;
-                                result.message = 'Authenticated via popup (mobile fallback)';
-                                console.log('[Lemma] ✅ Auto-authenticated via popup fallback');
-                                
-                                this._autoStartHeartbeat();
-                                return result;
-                            }
-                        } catch (popupErr) {
-                            // Popup failed (blocked or cancelled)
-                            console.warn('[Lemma] Popup fallback failed:', popupErr.message);
-                            
-                            // Return actionable state for customer site
-                            result.authenticated = false;
-                            result.needsPasskey = false;
-                            result.needsPopup = true;
-                            result.hasSession = true;
-                            result.message = 'Tap Sign In button to continue';
-                            return result;
-                        }
-                    }
-                } else {
-                    // Bridge session INVALID on third-party site
-                    // This could be mobile Safari blocking cookies entirely
-                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-                    
-                    if (isMobile) {
-                        // Mobile: Don't even try popup - go straight to redirect recommendation
-                        console.log('[Lemma] Mobile with invalid bridge session - needs redirect');
-                        result.authenticated = false;
-                        result.needsPasskey = false;
-                        result.needsRedirect = true;
-                        result.message = 'Tap Sign In to authenticate (mobile browser)';
-                        return result;
-                    }
-                    
-                    // Desktop: Try popup fallback as it runs in lemma.id context
-                    console.warn('[Lemma] Bridge session invalid - trying popup fallback');
-                    
-                    try {
-                        const popupResult = await this.unlockWithPopup();
-                        if (popupResult.success && popupResult.walletSecret) {
-                            // Popup worked - store the secret locally
-                            await this._put('secrets', { id: 'master', secret: popupResult.walletSecret, source: 'popup_fallback' });
-                            this.session = {
-                                isUnlocked: true,
-                                unlockedAt: Date.now(),
-                                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-                                walletId: popupResult.walletId,
-                                walletSecret: popupResult.walletSecret,
-                                source: 'popup'
-                            };
-                            await this._put('session', { id: 'current', ...this.session });
-                            
-                            result.walletSecret = popupResult.walletSecret;
-                            result.walletId = popupResult.walletId;
-                            result.authenticated = true;
-                            result.needsPasskey = false;
-                            result.message = 'Authenticated via popup (mobile fallback)';
-                            console.log('[Lemma] ✅ Auto-authenticated via popup (bridge session was invalid)');
-                            
-                            return result;
-                        }
-                    } catch (popupErr) {
-                        console.warn('[Lemma] Popup fallback failed:', popupErr.message);
-                        // Continue to needsPasskey flow
-                    }
-                }
-            } catch (e) {
-                console.warn('[Lemma] Bridge auto-auth failed:', e.message);
-                
-                // Bridge completely failed on third-party site
-                if (!this._isLemmaDomain()) {
-                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-                    
-                    if (isMobile) {
-                        // Mobile: recommend redirect (don't even try popup)
-                        console.log('[Lemma] Bridge error on mobile - needs redirect');
-                        result.authenticated = false;
-                        result.needsPasskey = false;
-                        result.needsRedirect = true;
-                        result.message = 'Tap Sign In to authenticate (mobile browser)';
-                        return result;
-                    }
-                    
-                    // Desktop: Try popup as last resort
-                    console.log('[Lemma] Bridge error - trying popup as last resort');
-                    try {
-                        const popupResult = await this.unlockWithPopup();
-                        if (popupResult.success && popupResult.walletSecret) {
-                            await this._put('secrets', { id: 'master', secret: popupResult.walletSecret, source: 'popup_error_fallback' });
-                            this.session = {
-                                isUnlocked: true,
-                                unlockedAt: Date.now(),
-                                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-                                walletId: popupResult.walletId,
-                                walletSecret: popupResult.walletSecret,
-                                source: 'popup'
-                            };
-                            await this._put('session', { id: 'current', ...this.session });
-                            
-                            result.walletSecret = popupResult.walletSecret;
-                            result.walletId = popupResult.walletId;
-                            result.authenticated = true;
-                            result.needsPasskey = false;
-                            result.message = 'Authenticated via popup';
-                            console.log('[Lemma] ✅ Auto-authenticated via popup (bridge error fallback)');
-                            
-                            return result;
-                        }
-                    } catch (popupErr2) {
-                        console.warn('[Lemma] Popup error fallback also failed:', popupErr2.message);
-                    }
-                }
+        // STEP 1: Check for valid local session
+        // This covers sessions from: redirect, global_sync, bridge (legacy), popup (legacy)
+        if (this.session.isUnlocked && this.session.expiresAt && Date.now() < this.session.expiresAt) {
+            // Get wallet secret
+            let walletSecret = this.session.walletSecret;
+            if (!walletSecret) {
+                try {
+                    const secretRecord = await this._get('secrets', 'master');
+                    walletSecret = secretRecord?.secret;
+                } catch (e) {}
             }
-        }
-        
-        // On lemma.id, check local session
-        if (this._isLemmaDomain() && this.session.isUnlocked) {
-            try {
-                result.walletSecret = await this.getWalletSecret();
+            
+            if (walletSecret) {
+                console.log(`[Lemma] ✅ Using existing local session (source: ${this.session.source || 'unknown'})`);
+                
+                result.walletSecret = walletSecret;
                 result.walletId = this.session.walletId;
                 result.authenticated = true;
                 result.needsPasskey = false;
-                result.message = 'Authenticated from local session';
-                console.log('[Lemma] ✅ Auto-authenticated from local session');
+                result.message = 'Authenticated via existing session';
+                
+                this._autoStartHeartbeat();
                 return result;
-            } catch (e) {
-                console.warn('[Lemma] Local session exists but could not get secret:', e.message);
             }
         }
         
-        // Clear any stale local session on third-party sites
-        if (!this._isLemmaDomain() && this.session.isUnlocked) {
-            console.log('[Lemma] Clearing stale local session (bridge says invalid)');
-            this.session = { isUnlocked: false };
-            await this._delete('session', 'current');
-        }
-        
-        // CROSS-DEVICE SESSION CHECK
-        // If we have a wallet_id and wallet_secret locally, check if user unlocked on another device
+        // STEP 2: Check for cross-device global session
+        // If user unlocked on another device today, we can use their local wallet_secret
         try {
             const walletIdRecord = await this._get('passkey', 'walletId');
             const secretRecord = await this._get('secrets', 'master');
@@ -513,8 +317,8 @@ class LemmaWallet {
                     result.needsPasskey = false;
                     result.crossDevice = true;
                     result.message = 'Authenticated via cross-device session sync';
-                    console.log('[Lemma] ✅ Auto-authenticated via global session (no passkey needed)');
                     
+                    this._autoStartHeartbeat();
                     return result;
                 }
             }
@@ -522,8 +326,29 @@ class LemmaWallet {
             console.warn('[Lemma] Global session check failed:', e.message);
         }
         
-        result.message = 'No valid session - passkey required';
-        console.log('[Lemma] No valid session found - user needs to create/unlock passkey');
+        // STEP 3: On lemma.id domain, check local session (passkey-based)
+        if (this._isLemmaDomain() && this.session.isUnlocked) {
+            try {
+                result.walletSecret = await this.getWalletSecret();
+                result.walletId = this.session.walletId;
+                result.authenticated = true;
+                result.needsPasskey = false;
+                result.message = 'Authenticated from local session';
+                console.log('[Lemma] ✅ Auto-authenticated from local session (lemma.id)');
+                return result;
+            } catch (e) {
+                console.warn('[Lemma] Local session exists but could not get secret:', e.message);
+            }
+        }
+        
+        // STEP 4: No valid session - recommend redirect
+        // Redirect works on ALL platforms (mobile + desktop) and uses
+        // client-side encryption for privacy.
+        console.log('[Lemma] No valid session - redirect recommended');
+        result.authenticated = false;
+        result.needsPasskey = false;
+        result.needsRedirect = true;
+        result.message = 'Sign in to authenticate';
         return result;
     }
     
@@ -1054,14 +879,14 @@ class LemmaWallet {
 
     /**
      * Check if session is still valid (useful after page refresh)
-     * On third-party sites, this verifies with the bridge (unless session was established via redirect).
+     * Simplified: trusts local session if not expired (no bridge check needed).
      * 
      * @returns {Promise<boolean>} True if session is valid
      */
     async isSessionValid() {
         await this.init();
         
-        // Check local session first
+        // Check local session exists
         if (!this.session.isUnlocked) {
             return false;
         }
@@ -1077,26 +902,29 @@ class LemmaWallet {
             return false;
         }
         
-        // MOBILE SAFARI FIX: If session was established via redirect, trust local session
-        // The bridge can't see the session on mobile Safari due to storage partitioning,
-        // but that doesn't mean the session is invalid - we verified it via client-side
-        // encryption which is MORE secure than the bridge anyway.
-        if (this.session.source === 'redirect') {
-            console.log('[Lemma] Session via redirect - trusting local session (mobile-friendly)');
-            return true;
-        }
-        
-        // On third-party sites, verify with bridge (for bridge-established sessions)
+        // SIMPLIFIED (v2.31.0): Trust local sessions without bridge verification
+        // Sessions were established via:
+        // - redirect (client-side encryption - most secure)
+        // - global_sync (cross-device)
+        // - bridge/popup (legacy, still valid if not expired)
+        // All are verified at creation time, no need to re-verify with bridge.
+        console.log(`[Lemma] Session valid (source: ${this.session.source || 'local'}, expires: ${new Date(this.session.expiresAt).toISOString()})`);
+        return true;
+    }
+    
+    /**
+     * DEPRECATED: Legacy bridge validation method.
+     * Kept for backward compatibility but no longer used in main flow.
+     * @private
+     */
+    async _legacyBridgeValidation() {
         if (!this._isLemmaDomain()) {
             try {
                 const bridgeSession = await this.checkBridgeSession();
                 if (!bridgeSession.valid) {
-                    console.log('[Lemma] Session invalidated by bridge');
-                    // Clear local session
+                    console.log('[Lemma] Session invalidated by bridge (legacy check)');
                     this.session = { isUnlocked: false };
                     await this._delete('session', 'current');
-                    
-                    // Trigger callback
                     if (this._onSessionExpired) {
                         this._onSessionExpired({ reason: 'bridge_invalid' });
                     }
