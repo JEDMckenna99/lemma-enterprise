@@ -62,8 +62,8 @@ const AUTH_STATE = {
 
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
-    // v2.30.2: Trust redirect sessions on mobile - don't let bridge invalidate them
-    static VERSION = '2.30.2';
+    // v2.30.3: Fast path for redirect sessions - skip bridge roundtrip entirely
+    static VERSION = '2.30.3';
     
     constructor() {
         this.db = null;
@@ -246,8 +246,41 @@ class LemmaWallet {
             message: ''
         };
         
-        // On third-party sites, ALWAYS verify with bridge first
-        // This prevents stale local sessions from causing auth failures
+        // FAST PATH: Check for valid local redirect session FIRST
+        // Redirect sessions were verified via client-side encryption, which is more
+        // secure than bridge. No need for bridge roundtrip.
+        // This is also ESSENTIAL for mobile Safari where bridge doesn't work.
+        if (this.session.isUnlocked && this.session.source === 'redirect') {
+            // Verify session hasn't expired
+            if (this.session.expiresAt && Date.now() < this.session.expiresAt) {
+                console.log('[Lemma] ✅ Using existing redirect session (verified via client-side encryption)');
+                
+                // Get wallet secret from local storage
+                let walletSecret = this.session.walletSecret;
+                if (!walletSecret) {
+                    try {
+                        const secretRecord = await this._get('secrets', 'master');
+                        walletSecret = secretRecord?.secret;
+                    } catch (e) {}
+                }
+                
+                if (walletSecret) {
+                    result.walletSecret = walletSecret;
+                    result.walletId = this.session.walletId;
+                    result.authenticated = true;
+                    result.needsPasskey = false;
+                    result.message = 'Authenticated via existing redirect session';
+                    
+                    this._autoStartHeartbeat();
+                    return result;
+                }
+            } else {
+                console.log('[Lemma] Redirect session expired, will re-authenticate');
+            }
+        }
+        
+        // On third-party sites, try bridge for non-redirect sessions
+        // This handles desktop browsers where bridge works reliably
         if (!this._isLemmaDomain()) {
             try {
                 const bridgeSession = await this.checkBridgeSession();
