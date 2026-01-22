@@ -197,21 +197,6 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Issuer Registry: {e}")
 
-    # Federated Site API (Managed + Self-Service)
-    try:
-        from api.federated_site_api import federated_site_bp
-        app.register_blueprint(federated_site_bp)
-        logger.info("✅ Federated Site API registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register Federated Site API: {e}")
-
-    try:
-        from api.oauth_server import oauth_api
-        app.register_blueprint(oauth_api)
-        logger.info("✅ OAuth Server registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register OAuth Server: {e}")
-
     try:
         from api.permission_management_api import permission_api
         app.register_blueprint(permission_api)
@@ -267,29 +252,6 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Admin Self-Issue: {e}")
 
-    # Network System
-    try:
-        from api.network_registry import network_registry_bp
-        app.register_blueprint(network_registry_bp)
-        logger.info("✅ Network Registry registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register Network Registry: {e}")
-
-    try:
-        from api.federated_onboarding_enforcement import federated_onboarding_bp
-        app.register_blueprint(federated_onboarding_bp)
-        logger.info("✅ Federated Onboarding registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register Federated Onboarding: {e}")
-
-    # QR System
-    try:
-        from api.qr_generator import qr_generator_bp
-        app.register_blueprint(qr_generator_bp)
-        logger.info("✅ QR Generator registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register QR Generator: {e}")
-
     # SDK Authentication API
     try:
         from api.sdk_auth import sdk_auth_bp
@@ -298,14 +260,6 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register SDK Auth API: {e}")
 
-    # Recovery Vault Service
-    try:
-        from api.recovery_vault import recovery_vault_bp
-        app.register_blueprint(recovery_vault_bp)
-        logger.info("✅ Recovery Vault Service registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register Recovery Vault: {e}")
-
     # Pairwise Tagging Service
     try:
         from api.pairwise_tagging import pairwise_tagging_bp
@@ -313,13 +267,6 @@ def create_app():
         logger.info("✅ Pairwise Tagging Service registered")
     except Exception as e:
         logger.error(f"❌ Failed to register Pairwise Tagging: {e}")
-
-    try:
-        from api.network_client_config import network_client_config_bp
-        app.register_blueprint(network_client_config_bp)
-        logger.info("✅ Network Client Config registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register Network Client Config: {e}")
 
     # Credential Auto-Refresh API
     try:
@@ -801,73 +748,6 @@ def create_app():
             'components': components,
             'endpoints': 'essential_only'
         })
-
-    # QR API endpoints
-    @app.route('/api/qr/generate', methods=['POST'])
-    def generate_qr():
-        """Generate cryptographic QR code"""
-        try:
-            from api.qr_generator import LemmaQRGenerator, QRGenerationRequest
-
-            data = request.get_json()
-            if not data or not data.get('type') or not data.get('claims'):
-                return jsonify({'error': 'missing_data', 'message': 'type and claims required'}), 400
-
-            generator = LemmaQRGenerator()
-            qr_request = QRGenerationRequest(
-                qr_type=data['type'],
-                claims=data['claims'],
-                options=data.get('options', {})
-            )
-
-            result = generator.generate_qr(qr_request)
-
-            if not result.success:
-                return jsonify({'error': 'generation_failed', 'message': result.error_message}), 500
-
-            return jsonify({
-                'success': True,
-                'qr_image': result.qr_image,
-                'qr_data': result.qr_data,
-                'generation_time_us': result.generation_time_us or 4.176,
-                'type': data['type']
-            })
-
-        except Exception as e:
-            logger.error(f"QR generation error: {e}")
-            return jsonify({'error': 'generation_error', 'message': str(e)}), 500
-
-    @app.route('/api/qr/verify', methods=['POST'])
-    def verify_qr():
-        """Verify cryptographic QR code"""
-        try:
-            from api.qr_verifier import LemmaQRVerifier, QRVerificationRequest
-
-            data = request.get_json()
-            if not data or not data.get('qr_data'):
-                return jsonify({'error': 'missing_data', 'message': 'qr_data required'}), 400
-
-            verifier = LemmaQRVerifier()
-            verification_request = QRVerificationRequest(
-                qr_data=data['qr_data'],
-                verification_context=data.get('verification_context', {}),
-                required_claims=data.get('required_claims', [])
-            )
-
-            result = verifier.verify_qr(verification_request)
-
-            return jsonify({
-                'success': result.success,
-                'verified': result.is_valid,
-                'qr_type': result.qr_type,
-                'claims': result.claims or {},
-                'verification_time_us': result.verification_time_us or 4.176,
-                'confidence_score': result.confidence_score
-            })
-
-        except Exception as e:
-            logger.error(f"QR verification error: {e}")
-            return jsonify({'error': 'verification_error', 'message': str(e)}), 500
 
     # Health monitoring
     @app.route('/api/health/check')
