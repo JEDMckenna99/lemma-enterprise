@@ -545,16 +545,35 @@ def check_global_session():
 # - wallet_secret encrypted in transit (HTTPS)
 # ============================================================
 
-# In-memory store for redirect tokens (short-lived, don't need persistence)
-# In production with multiple dynos, use Redis instead
-_redirect_tokens = {}
+def _get_redirect_token_db():
+    """Get database session and RedirectToken model."""
+    try:
+        from api.database import get_session, RedirectToken
+        return get_session(), RedirectToken
+    except Exception as e:
+        logger.warning(f"Database not available for redirect tokens: {e}")
+        return None, None
 
-def _cleanup_expired_tokens():
-    """Remove expired tokens from memory"""
-    now = time.time()
-    expired = [k for k, v in _redirect_tokens.items() if v['expires'] < now]
-    for k in expired:
-        del _redirect_tokens[k]
+
+def _cleanup_expired_tokens_db():
+    """Remove expired tokens from database."""
+    db_session, RedirectToken = _get_redirect_token_db()
+    if not db_session or not RedirectToken:
+        return
+    
+    try:
+        expired_count = db_session.query(RedirectToken).filter(
+            RedirectToken.expires_at < datetime.utcnow()
+        ).delete()
+        db_session.commit()
+        if expired_count > 0:
+            logger.info(f"Cleaned up {expired_count} expired redirect tokens")
+    except Exception as e:
+        logger.error(f"Failed to cleanup expired tokens: {e}")
+        db_session.rollback()
+    finally:
+        db_session.close()
+
 
 @wallet_session_sync_bp.route('/api/wallet/create-redirect-token', methods=['POST', 'OPTIONS'])
 def create_redirect_token():
@@ -573,6 +592,7 @@ def create_redirect_token():
         - token: Short-lived token to include in redirect URL
     
     SECURITY: Only called from lemma.id domain (same-origin)
+    TOKEN STORAGE: Database-backed for multi-dyno Heroku deployment
     """
     if request.method == 'OPTIONS':
         response = make_response()
@@ -595,31 +615,46 @@ def create_redirect_token():
     if not wallet_id or not wallet_secret:
         return jsonify({'success': False, 'error': 'wallet_id and wallet_secret required'}), 400
     
-    # Cleanup old tokens
-    _cleanup_expired_tokens()
+    # Get database session
+    db_session, RedirectToken = _get_redirect_token_db()
+    if not db_session or not RedirectToken:
+        return jsonify({'success': False, 'error': 'database_unavailable'}), 500
     
-    # Generate random token
-    token = secrets.token_urlsafe(32)
-    
-    # Store with 60 second expiration
-    _redirect_tokens[token] = {
-        'wallet_id': wallet_id,
-        'wallet_secret': wallet_secret,
-        'return_url': return_url,
-        'expires': time.time() + 60,  # 60 second expiration
-        'created': time.time()
-    }
-    
-    logger.info(f"Created redirect token for wallet (expires in 60s)")
-    
-    response = jsonify({
-        'success': True,
-        'token': token,
-        'expires_in': 60
-    })
-    response.headers['Access-Control-Allow-Origin'] = origin
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
-    return response
+    try:
+        # Cleanup old tokens periodically
+        _cleanup_expired_tokens_db()
+        
+        # Generate random token
+        token = secrets.token_urlsafe(32)
+        
+        # Store with 60 second expiration in DATABASE (works across Heroku dynos)
+        token_record = RedirectToken(
+            token=token,
+            wallet_id=wallet_id,
+            wallet_secret=wallet_secret,
+            return_url=return_url,
+            expires_at=datetime.utcnow() + timedelta(seconds=60)
+        )
+        db_session.add(token_record)
+        db_session.commit()
+        
+        logger.info(f"Created redirect token for wallet (expires in 60s, stored in DB)")
+        
+        response = jsonify({
+            'success': True,
+            'token': token,
+            'expires_in': 60
+        })
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+        
+    except Exception as e:
+        logger.error(f"Failed to create redirect token: {e}")
+        db_session.rollback()
+        return jsonify({'success': False, 'error': 'database_error'}), 500
+    finally:
+        db_session.close()
 
 
 @wallet_session_sync_bp.route('/api/wallet/exchange-redirect-token', methods=['POST', 'OPTIONS'])
@@ -657,46 +692,62 @@ def exchange_redirect_token():
         response.headers.update(_cors_headers(origin))
         return response, 400
     
-    # Cleanup old tokens
-    _cleanup_expired_tokens()
+    # Get database session
+    db_session, RedirectToken = _get_redirect_token_db()
+    if not db_session or not RedirectToken:
+        response = jsonify({'success': False, 'error': 'database_unavailable'})
+        response.headers.update(_cors_headers(origin))
+        return response, 500
     
-    # Look up token
-    token_data = _redirect_tokens.get(token)
-    
-    if not token_data:
+    try:
+        # Look up token in database
+        token_record = db_session.query(RedirectToken).filter_by(token=token).first()
+        
+        if not token_record:
+            response = jsonify({
+                'success': False,
+                'error': 'invalid_or_expired_token',
+                'message': 'Token not found, expired, or already used'
+            })
+            response.headers.update(_cors_headers(origin))
+            return response, 400
+        
+        # Check expiration
+        if token_record.expires_at < datetime.utcnow():
+            db_session.delete(token_record)
+            db_session.commit()
+            response = jsonify({
+                'success': False,
+                'error': 'token_expired',
+                'message': 'Token has expired'
+            })
+            response.headers.update(_cors_headers(origin))
+            return response, 400
+        
+        # Token valid - extract data and DELETE (single-use)
+        wallet_id = token_record.wallet_id
+        wallet_secret = token_record.wallet_secret
+        db_session.delete(token_record)
+        db_session.commit()
+        
+        logger.info(f"Exchanged redirect token successfully (from DB)")
+        
         response = jsonify({
-            'success': False,
-            'error': 'invalid_or_expired_token',
-            'message': 'Token not found, expired, or already used'
+            'success': True,
+            'wallet_id': wallet_id,
+            'wallet_secret': wallet_secret
         })
         response.headers.update(_cors_headers(origin))
-        return response, 400
-    
-    # Check expiration
-    if token_data['expires'] < time.time():
-        del _redirect_tokens[token]
-        response = jsonify({
-            'success': False,
-            'error': 'token_expired',
-            'message': 'Token has expired'
-        })
+        return response
+        
+    except Exception as e:
+        logger.error(f"Failed to exchange redirect token: {e}")
+        db_session.rollback()
+        response = jsonify({'success': False, 'error': 'database_error'})
         response.headers.update(_cors_headers(origin))
-        return response, 400
-    
-    # Token valid - extract data and DELETE (single-use)
-    wallet_id = token_data['wallet_id']
-    wallet_secret = token_data['wallet_secret']
-    del _redirect_tokens[token]
-    
-    logger.info(f"Exchanged redirect token successfully")
-    
-    response = jsonify({
-        'success': True,
-        'wallet_id': wallet_id,
-        'wallet_secret': wallet_secret
-    })
-    response.headers.update(_cors_headers(origin))
-    return response
+        return response, 500
+    finally:
+        db_session.close()
 
 
 # ============================================================
@@ -706,5 +757,5 @@ def exchange_redirect_token():
 # - Credentials: LOCAL ONLY in each site's IndexedDB
 # - Server stores: wallet_id + timestamps ONLY (no user identity, no site visits)
 # - Cross-device sync: Opt-in, only stores that "wallet X unlocked at time Y"
-# - Redirect tokens: Short-lived (60s), single-use, in-memory only
+# - Redirect tokens: Short-lived (60s), single-use, DATABASE-BACKED for multi-dyno
 # ============================================================

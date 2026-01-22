@@ -1605,18 +1605,28 @@ async function handleRedirectReturn(returnUrl) {
     
     addLog(`Wallet secret obtained (${walletSecret.length} chars)`, 'success');
     
-    // Set the global session before redirecting
+    // Set the global session before redirecting (enables cross-device "one passkey per day")
+    // Note: wallet.unlock() already calls set-session, but we call it again to ensure
+    // the session is set even if the unlock happened through a different path
     try {
         if (info.walletId) {
-            await fetch('/api/wallet/set-global-session', {
+            const activeProfile = await wallet.getActiveProfile();
+            const setResp = await fetch('/api/wallet/set-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
                     wallet_id: info.walletId,
-                    duration_hours: 24
+                    unlocked_at: Date.now(),
+                    profile_id: activeProfile?.id || 'default',
+                    profile_name: activeProfile?.name || 'Personal'
                 })
             });
+            if (setResp.ok) {
+                addLog('Global session set for cross-device sync', 'success');
+            } else {
+                addLog(`Set-session returned: ${setResp.status}`, 'warn');
+            }
         }
     } catch (e) {
         addLog(`Global session set failed: ${e.message}`, 'warn');

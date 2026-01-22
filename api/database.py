@@ -431,6 +431,30 @@ class WalletSession(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class RedirectToken(Base):
+    """
+    Short-lived tokens for redirect-based authentication (mobile Safari).
+    
+    When mobile Safari blocks third-party storage/cookies, we use a redirect flow.
+    User unlocks on lemma.id, we create a token, redirect back with token in URL,
+    third-party site exchanges token for wallet data, token is deleted (single-use).
+    
+    Security:
+    - Tokens expire in 60 seconds
+    - Single-use (deleted after exchange)
+    - Cryptographically random (32 bytes)
+    """
+    __tablename__ = 'redirect_tokens'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token = Column(String, nullable=False, unique=True, index=True)
+    wallet_id = Column(String, nullable=False)
+    wallet_secret = Column(String, nullable=False)  # Encrypted in transit (HTTPS)
+    return_url = Column(String)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class SiteConfiguration(Base):
     """Site-specific IAM configuration"""
     __tablename__ = 'site_configurations'
