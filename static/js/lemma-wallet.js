@@ -873,8 +873,19 @@ class LemmaWallet {
             // Only triggers if user explicitly locked their wallet on another device
             try {
                 const walletId = this.session.walletId;
-                if (walletId) {
-                    const globalSession = await this._checkGlobalSession(walletId);
+                console.log('[Lemma] 💓 Heartbeat session wallet_id:', walletId || 'NOT SET');
+                
+                if (!walletId) {
+                    // Try to get wallet_id from IndexedDB if not in session
+                    const walletIdRecord = await this._get('passkey', 'walletId');
+                    if (walletIdRecord?.value) {
+                        console.log('[Lemma] 💓 Got wallet_id from IndexedDB:', walletIdRecord.value);
+                        this.session.walletId = walletIdRecord.value;
+                    }
+                }
+                
+                if (this.session.walletId) {
+                    const globalSession = await this._checkGlobalSession(this.session.walletId);
                     
                     if (!globalSession.valid) {
                         console.log('[Lemma] Wallet was locked on another device (global session invalid)');

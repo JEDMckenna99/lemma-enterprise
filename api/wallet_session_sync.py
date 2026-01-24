@@ -313,7 +313,7 @@ def set_session():
     
     # Store in database for cross-device sync
     device_hint = request.headers.get('User-Agent', '')[:100]  # Truncate for storage
-    _store_global_session(
+    global_stored = _store_global_session(
         wallet_id=wallet_id,
         unlocked_at=unlocked_at,
         expires_at=expires_at,
@@ -321,6 +321,7 @@ def set_session():
         profile_name=profile_name,
         device_hint=device_hint
     )
+    logger.info(f"Set-session: global_stored={global_stored} for wallet {wallet_id[:8]}...")
 
     # Create response with cookie
     response = jsonify({
@@ -365,8 +366,9 @@ def clear_session():
     # Clear global session if wallet_id provided
     # This ensures other devices detect the lock
     if wallet_id:
+        logger.info(f"Clear-session: attempting to clear global session for {wallet_id[:8]}...")
         global_cleared = _clear_global_session(wallet_id)
-        logger.info(f"Global session clear for {wallet_id[:8]}...: {global_cleared}")
+        logger.info(f"Clear-session: global_cleared={global_cleared} for {wallet_id[:8]}...")
     else:
         global_cleared = False
     
