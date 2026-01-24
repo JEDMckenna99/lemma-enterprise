@@ -838,10 +838,16 @@ class LemmaWallet {
         if (this._heartbeatInterval) {
             clearInterval(this._heartbeatInterval);
         }
+        
+        // Clear any existing visibility listener
+        if (this._visibilityHandler) {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
+        }
 
-        console.log('[Lemma] Starting session heartbeat (checking every', intervalMs/1000, 'seconds)');
-
-        this._heartbeatInterval = setInterval(async () => {
+        console.log('[Lemma] Starting session heartbeat (checking every', intervalMs/1000, 'seconds + on tab focus)');
+        
+        // Heartbeat check function (reused for interval and visibility)
+        const performHeartbeatCheck = async () => {
             // Skip if no local session
             if (!this.session.isUnlocked) return;
             
@@ -877,7 +883,31 @@ class LemmaWallet {
             // NOTE: We no longer use bridge for heartbeat validation.
             // Bridge is unreliable on mobile Safari and causes false sign-outs.
             // All sessions are trusted locally until expiry or explicit lock.
-        }, intervalMs);
+        };
+        
+        // Regular interval heartbeat (background check)
+        this._heartbeatInterval = setInterval(performHeartbeatCheck, intervalMs);
+        
+        // INSTANT CHECK: When user returns to tab, check immediately
+        // This provides near-instant cross-device lock detection when it matters most
+        this._visibilityHandler = async () => {
+            if (document.visibilityState === 'visible' && this.session.isUnlocked) {
+                console.log('[Lemma] Tab became visible - checking session immediately');
+                await performHeartbeatCheck();
+            }
+        };
+        document.addEventListener('visibilitychange', this._visibilityHandler);
+        
+        // Also check on window focus (backup for visibility API)
+        if (!this._focusHandler) {
+            this._focusHandler = async () => {
+                if (this.session.isUnlocked) {
+                    console.log('[Lemma] Window focused - checking session');
+                    await performHeartbeatCheck();
+                }
+            };
+            window.addEventListener('focus', this._focusHandler);
+        }
     }
     
     /**
@@ -895,10 +925,18 @@ class LemmaWallet {
         // Clear session from IndexedDB
         await this._delete('session', 'current');
         
-        // Stop heartbeat
+        // Stop heartbeat and visibility listeners
         if (this._heartbeatInterval) {
             clearInterval(this._heartbeatInterval);
             this._heartbeatInterval = null;
+        }
+        if (this._visibilityHandler) {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
+            this._visibilityHandler = null;
+        }
+        if (this._focusHandler) {
+            window.removeEventListener('focus', this._focusHandler);
+            this._focusHandler = null;
         }
         
         // Trigger callback if set (for customer sites to handle)
