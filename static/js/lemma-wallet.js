@@ -3162,12 +3162,19 @@ class LemmaWallet {
         const lemmas = await this._getAll('lemmas');
         const issuers = await this._getAll('issuers');
         const secretRecord = await this._get('secrets', 'master');
+        const walletIdRecord = await this._get('passkey', 'walletId');
+        
+        const hasPasskey = !!passkey;
+        const hasWalletSecret = !!secretRecord?.secret;
             
-            return {
-            hasPasskey: !!passkey,
-            hasWalletSecret: !!secretRecord?.secret,
+        return {
+            hasPasskey,
+            hasWalletSecret,
+            // hasWallet: true if either passkey (native) or secret (linked device) exists
+            hasWallet: hasPasskey || hasWalletSecret,
             isUnlocked: this.isUnlocked(),
             session: this.session,
+            walletId: walletIdRecord?.value || null,
             lemmaCount: lemmas.length,
             issuerCount: issuers.length,
             passkeyCredentialId: passkey?.credentialId || null

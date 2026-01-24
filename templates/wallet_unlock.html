@@ -325,7 +325,7 @@
     </div>
 
     <!-- Load SDK with cache-buster to ensure latest version -->
-    <script src="/static/js/lemma-wallet.js?v=2330" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2331" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
 // Initialize wallet SDK
 const wallet = new LemmaWallet();
@@ -393,7 +393,8 @@ async function handleUnlock() {
             return;
         }
         
-        // Try to authenticate with passkey
+        // For linked devices without passkey, registerPasskey() will register one
+        // For native devices with passkey, it will authenticate with existing
         const result = await wallet.registerPasskey();
         
         if (result.success) {
