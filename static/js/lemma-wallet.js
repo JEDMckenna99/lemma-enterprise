@@ -358,17 +358,22 @@ class LemmaWallet {
      */
     async _checkGlobalSession(walletId) {
         try {
+            console.log('[Lemma] 🔍 Checking global session for wallet:', walletId?.substring(0, 8) + '...');
             const response = await fetch('https://lemma.id/api/wallet/global-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ wallet_id: walletId })
             });
             
+            console.log('[Lemma] 🔍 Global session response status:', response.status);
+            
             if (!response.ok) {
+                console.log('[Lemma] 🔍 Global session not OK, returning invalid');
                 return { valid: false };
             }
             
             const data = await response.json();
+            console.log('[Lemma] 🔍 Global session result:', JSON.stringify(data));
             return data;
         } catch (e) {
             console.warn('[Lemma] Global session API error:', e.message);
@@ -848,8 +853,13 @@ class LemmaWallet {
         
         // Heartbeat check function (reused for interval and visibility)
         const performHeartbeatCheck = async () => {
+            console.log('[Lemma] 💓 Heartbeat check triggered, session unlocked:', this.session.isUnlocked);
+            
             // Skip if no local session
-            if (!this.session.isUnlocked) return;
+            if (!this.session.isUnlocked) {
+                console.log('[Lemma] 💓 Skipping heartbeat - not unlocked locally');
+                return;
+            }
             
             // Check 1: Local expiry (always enforced)
             if (this.session.expiresAt && Date.now() > this.session.expiresAt) {
@@ -891,12 +901,14 @@ class LemmaWallet {
         // INSTANT CHECK: When user returns to tab, check immediately
         // This provides near-instant cross-device lock detection when it matters most
         this._visibilityHandler = async () => {
+            console.log('[Lemma] 👁️ Visibility changed:', document.visibilityState, 'unlocked:', this.session.isUnlocked);
             if (document.visibilityState === 'visible' && this.session.isUnlocked) {
-                console.log('[Lemma] Tab became visible - checking session immediately');
+                console.log('[Lemma] 👁️ Tab became visible - checking session immediately');
                 await performHeartbeatCheck();
             }
         };
         document.addEventListener('visibilitychange', this._visibilityHandler);
+        console.log('[Lemma] 👁️ Visibility handler registered');
         
         // Also check on window focus (backup for visibility API)
         if (!this._focusHandler) {
