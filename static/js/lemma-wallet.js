@@ -1490,6 +1490,9 @@ class LemmaWallet {
     async lock() {
         console.log('[Lemma] Locking wallet...');
         
+        // Capture wallet_id before clearing session
+        const walletId = this.session.walletId;
+        
         // Clear local session
         this.session = {
             isUnlocked: false,
@@ -1499,18 +1502,37 @@ class LemmaWallet {
         };
         await this._delete('session', 'current');
         
-        // Clear server session cookie (for cross-site sync)
-        // This ensures customer sites see the wallet as locked
+        // Stop heartbeat and visibility listeners
+        if (this._heartbeatInterval) {
+            clearInterval(this._heartbeatInterval);
+            this._heartbeatInterval = null;
+        }
+        if (this._visibilityHandler) {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
+            this._visibilityHandler = null;
+        }
+        if (this._focusHandler) {
+            window.removeEventListener('focus', this._focusHandler);
+            this._focusHandler = null;
+        }
+        
+        // Clear server session AND global session (for cross-device lock detection)
+        // This ensures ALL devices see the wallet as locked
         if (this._isLemmaDomain()) {
             try {
-                console.log('[Lemma] Clearing server session cookie...');
+                console.log('[Lemma] Clearing server session and global session...');
                 const response = await fetch('/api/wallet/clear-session', {
                     method: 'POST',
                     credentials: 'include',
-                    headers: this._getSecureHeaders()
+                    headers: {
+                        ...this._getSecureHeaders(),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ wallet_id: walletId })
                 });
                 if (response.ok) {
-                    console.log('[Lemma] ✅ Server session cleared');
+                    const data = await response.json();
+                    console.log('[Lemma] ✅ Server session cleared, global:', data.global_session_cleared);
                 } else {
                     console.warn('[Lemma] Server session clear returned:', response.status);
                 }

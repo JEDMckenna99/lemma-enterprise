@@ -358,8 +358,23 @@ def set_session():
 
 @wallet_session_sync_bp.route('/api/wallet/clear-session', methods=['POST'])
 def clear_session():
-    """Clear wallet session cookie (logout)."""
-    response = jsonify({'success': True, 'session_cleared': True})
+    """Clear wallet session cookie AND global session (for cross-device lock detection)."""
+    data = request.get_json() or {}
+    wallet_id = data.get('wallet_id')
+    
+    # Clear global session if wallet_id provided
+    # This ensures other devices detect the lock
+    if wallet_id:
+        global_cleared = _clear_global_session(wallet_id)
+        logger.info(f"Global session clear for {wallet_id[:8]}...: {global_cleared}")
+    else:
+        global_cleared = False
+    
+    response = jsonify({
+        'success': True, 
+        'session_cleared': True,
+        'global_session_cleared': global_cleared
+    })
     response.delete_cookie(SESSION_COOKIE_NAME, path='/')
     response.delete_cookie(CSRF_COOKIE_NAME, path='/')
     return response
@@ -454,6 +469,28 @@ def _get_global_session(wallet_id: str):
     except Exception as e:
         logger.error(f"Failed to get global session: {e}")
         return None
+    finally:
+        db_session.close()
+
+
+def _clear_global_session(wallet_id: str):
+    """Clear/invalidate global session for a wallet_id (called on lock)."""
+    db_session, WalletSession = _get_db_session()
+    if not db_session or not WalletSession:
+        return False
+    
+    try:
+        # Delete the session record entirely
+        deleted = db_session.query(WalletSession).filter_by(wallet_id=wallet_id).delete()
+        db_session.commit()
+        
+        if deleted:
+            logger.info(f"Global session cleared for wallet {wallet_id[:8]}...")
+        return deleted > 0
+    except Exception as e:
+        logger.error(f"Failed to clear global session: {e}")
+        db_session.rollback()
+        return False
     finally:
         db_session.close()
 
