@@ -393,8 +393,8 @@ def clear_session():
 def _get_db_session():
     """Get database session for global session operations."""
     try:
-        from api.database import get_session, WalletSession
-        session = get_session()
+        from api.database import get_db, WalletSession
+        session = get_db()
         logger.debug(f"_get_db_session: got session={session is not None}, WalletSession={WalletSession is not None}")
         return session, WalletSession
     except Exception as e:
