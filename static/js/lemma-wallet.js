@@ -63,7 +63,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.32.0';
+    static VERSION = '2.33.0';  // Fresh passkey required for device linking
     
     constructor() {
         this.db = null;
@@ -3468,10 +3468,80 @@ class LemmaWallet {
     // ========================================
 
     /**
+     * Require fresh passkey authentication (not cached session).
+     * Used for sensitive operations like device linking to ensure user presence.
+     * 
+     * SECURITY: This forces a NEW WebAuthn assertion regardless of session state.
+     * Even if user unlocked 5 minutes ago, they must re-authenticate.
+     * 
+     * @param {Object} options - { reason: string } for UI prompt context
+     * @returns {Object} { success: boolean, walletId: string, timestamp: number }
+     * @throws Error if passkey auth fails or is cancelled
+     */
+    async _requireFreshPasskeyAuth(options = {}) {
+        await this.init();
+        
+        const reason = options.reason || 'Verify your identity';
+        console.log(`[Lemma] Fresh passkey auth required: ${reason}`);
+        
+        // Get stored passkey - must exist
+        const passkey = await this._get('passkey', 'primary');
+        if (!passkey || !passkey.credentialId) {
+            throw new Error('No passkey registered on this device. Cannot verify identity.');
+        }
+        
+        // Generate fresh challenge (never reused)
+        const challenge = crypto.getRandomValues(new Uint8Array(32));
+        
+        try {
+            // Force biometric/PIN verification - userVerification: 'required'
+            const credential = await navigator.credentials.get({
+                publicKey: {
+                    challenge: challenge,
+                    rpId: window.location.hostname,
+                    allowCredentials: [{
+                        id: this._base64urlToBuffer(passkey.credentialId),
+                        type: 'public-key'
+                    }],
+                    userVerification: 'required',  // MUST verify user (FaceID/TouchID/PIN)
+                    timeout: 60000
+                }
+            });
+            
+            if (!credential) {
+                throw new Error('Passkey verification cancelled');
+            }
+            
+            console.log('[Lemma] ✅ Fresh passkey verification successful');
+            
+            const walletIdRecord = await this._get('passkey', 'walletId');
+            
+            return {
+                success: true,
+                walletId: walletIdRecord?.value || null,
+                timestamp: Date.now(),
+                method: 'fresh_passkey'
+            };
+        } catch (e) {
+            console.error('[Lemma] Fresh passkey auth failed:', e.message);
+            
+            // Provide helpful error messages
+            if (e.name === 'NotAllowedError') {
+                throw new Error('Passkey verification was cancelled or timed out. Please try again.');
+            } else if (e.name === 'SecurityError') {
+                throw new Error('Passkey verification failed - security error. Ensure you are on a secure (HTTPS) connection.');
+            }
+            
+            throw new Error(`Identity verification failed: ${e.message}`);
+        }
+    }
+
+    /**
      * Generate a link code for adding another device.
      * The code contains the encrypted wallet_secret and expires in 60 seconds.
      * 
      * SECURITY:
+     * - REQUIRES FRESH PASSKEY AUTH (not cached session) - proves user presence
      * - One-time use code
      * - 60 second expiry
      * - Encrypted with a random key embedded in the code
@@ -3486,10 +3556,18 @@ class LemmaWallet {
             await this.init();
             console.log('[Lemma] generateLinkCode: init complete, db:', !!this.db);
             
-            if (!this.isUnlocked()) {
-                throw new Error('Wallet must be unlocked to generate link code');
+            // SECURITY: Require FRESH passkey verification before generating link code
+            // This ensures user is physically present and deliberately creating a link
+            // Even if wallet was unlocked hours ago, user must re-verify NOW
+            console.log('[Lemma] generateLinkCode: requiring fresh passkey verification...');
+            const freshAuth = await this._requireFreshPasskeyAuth({
+                reason: 'Verify your identity to link another device'
+            });
+            
+            if (!freshAuth.success) {
+                throw new Error('Identity verification required to generate link code');
             }
-            console.log('[Lemma] generateLinkCode: wallet is unlocked');
+            console.log('[Lemma] generateLinkCode: fresh passkey verified at', new Date(freshAuth.timestamp).toISOString());
             
             // Get the profile to link (specific or active)
             const profile = profileId 
