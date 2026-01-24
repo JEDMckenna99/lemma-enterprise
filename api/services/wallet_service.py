@@ -918,13 +918,8 @@ def set_session():
     return response
 
 
-@wallet_service_bp.route('/api/wallet/clear-session', methods=['POST'])
-def clear_session():
-    """Clear wallet session cookie."""
-    response = jsonify({'success': True, 'session_cleared': True})
-    response.delete_cookie(SESSION_COOKIE_NAME, path='/')
-    response.delete_cookie(CSRF_COOKIE_NAME, path='/')
-    return response
+# NOTE: clear-session endpoint is defined in wallet_session_sync.py
+# (includes global session clearing for cross-device lock detection)
 
 
 # ============================================================================
