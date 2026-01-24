@@ -64,15 +64,31 @@ def create_app():
         if 'Content-Security-Policy' not in response.headers:
             csp = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://static.cloudflareinsights.com https://challenges.cloudflare.com https://js.stripe.com; "
+                # Scripts: self + specific trusted sources
+                # Note: 'unsafe-inline' needed for legacy templates - TODO: migrate to nonces
+                "script-src 'self' 'unsafe-inline' "
+                    "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/ "  # QR code library (specific version)
+                    "https://static.cloudflareinsights.com "  # Cloudflare analytics
+                    "https://challenges.cloudflare.com "  # Cloudflare Turnstile
+                    "https://js.stripe.com; "  # Stripe payments
+                # Styles: self + Google Fonts
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                # Fonts: self + Google Fonts
                 "font-src 'self' https://fonts.gstatic.com; "
+                # Images: self + data URIs (for QR codes) + any HTTPS (logos, etc)
                 "img-src 'self' data: https:; "
+                # API connections
                 "connect-src 'self' https://lemma.id https://*.stripe.com https://api.stripe.com; "
+                # Iframes: only Stripe and Cloudflare
                 "frame-src 'self' https://*.stripe.com https://challenges.cloudflare.com; "
+                # Block plugins (Flash, etc)
                 "object-src 'none'; "
+                # Prevent base tag hijacking
                 "base-uri 'self'; "
-                "form-action 'self' https://*.stripe.com"
+                # Limit form submissions
+                "form-action 'self' https://*.stripe.com; "
+                # Upgrade HTTP to HTTPS
+                "upgrade-insecure-requests"
             )
             response.headers['Content-Security-Policy'] = csp
         
