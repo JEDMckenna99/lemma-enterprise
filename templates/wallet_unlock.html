@@ -325,7 +325,7 @@
     </div>
 
     <!-- Load SDK with cache-buster to ensure latest version -->
-    <script src="/static/js/lemma-wallet.js?v=2331" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2332" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
 // Initialize wallet SDK
 const wallet = new LemmaWallet();
@@ -697,15 +697,74 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 showStatus('No wallet found - create one or link an existing wallet', 'info');
                 document.getElementById('no-wallet-section').style.display = 'block';
+                return; // No wallet, nothing more to check
             }
         }
         
-        // If already unlocked with a session, auto-redirect
+        // If already unlocked with a local session, auto-redirect
         if (info.isUnlocked && redirectParams) {
             document.getElementById('unlock-btn').innerHTML = '<span class="spinner"></span>Redirecting...';
             document.getElementById('unlock-btn').disabled = true;
             showStatus('Already authenticated!', 'success');
             await handleRedirectReturn();
+            return;
+        }
+        
+        // CROSS-DEVICE: Check if this wallet was unlocked on another device
+        // This enables "one passkey per day" across all linked devices
+        if (info.walletId && redirectParams) {
+            console.log('[Unlock Debug] Checking global session for wallet:', info.walletId);
+            try {
+                const globalCheck = await fetch('/api/wallet/global-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ wallet_id: info.walletId })
+                });
+                
+                if (globalCheck.ok) {
+                    const globalData = await globalCheck.json();
+                    console.log('[Unlock Debug] Global session result:', globalData);
+                    
+                    if (globalData.valid) {
+                        // Wallet was unlocked on another device within 24 hours!
+                        // Auto-unlock this device and redirect
+                        console.log('[Unlock Debug] ✅ Global session valid - auto-unlocking');
+                        document.getElementById('unlock-btn').innerHTML = '<span class="spinner"></span>Syncing...';
+                        document.getElementById('unlock-btn').disabled = true;
+                        showStatus('Authenticated on another device - syncing...', 'success');
+                        
+                        // Set local session based on global session
+                        const walletSecret = await getStoredSecretDirectly();
+                        if (walletSecret) {
+                            // Store session locally
+                            await wallet._put('session', {
+                                id: 'current',
+                                isUnlocked: true,
+                                unlockedAt: globalData.unlocked_at || Date.now(),
+                                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                                walletId: info.walletId,
+                                walletSecret: walletSecret,
+                                source: 'global_sync'
+                            });
+                            wallet.session = {
+                                isUnlocked: true,
+                                unlockedAt: globalData.unlocked_at || Date.now(),
+                                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                                walletId: info.walletId,
+                                walletSecret: walletSecret,
+                                source: 'global_sync'
+                            };
+                            
+                            // Redirect back with encrypted data
+                            await handleRedirectReturn();
+                            return;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[Unlock Debug] Global session check failed:', e);
+                // Continue to normal unlock flow
+            }
         }
         
     } catch (e) {
