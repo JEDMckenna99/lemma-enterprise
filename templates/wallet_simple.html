@@ -174,12 +174,12 @@
             <div id="locked-status" class="status-box info" style="max-width: 400px; margin: 0 auto 24px; text-align: left;">
                 Checking wallet status...
             </div>
-            <button id="unlock-btn" class="btn btn-primary" style="font-size: 1.1rem; padding: 16px 48px;" onclick="unlockAndShowWallet()">
+            <button id="unlock-btn" class="btn btn-primary" style="font-size: 1.1rem; padding: 16px 48px;">
                 Unlock with Passkey
             </button>
             <div id="no-wallet-options" style="display: none; margin-top: 24px;">
                 <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 12px;">No wallet on this device?</p>
-                <button class="btn btn-success" style="margin: 4px;" onclick="registerPasskey()">Create New Wallet</button>
+                <button class="btn btn-success" id="create-wallet-btn" style="margin: 4px;">Create New Wallet</button>
                 <a href="/wallet/link" class="btn btn-secondary" style="margin: 4px; text-decoration: none; display: inline-block;">Link Existing Wallet</a>
             </div>
         </div>
@@ -196,7 +196,7 @@
                 <p id="wallet-summary" style="color: #047857; font-size: 0.85rem; margin: 0;">Loading...</p>
             </div>
             <div style="display: flex; gap: 8px;">
-                <button class="btn btn-secondary" onclick="lockWallet()" style="background: #6b7280;">Lock Wallet</button>
+                <button class="btn btn-secondary" id="lock-wallet-btn" style="background: #6b7280;">Lock Wallet</button>
             </div>
         </div>
     </div>
@@ -223,7 +223,7 @@
             <div style="display: flex; gap: 8px;">
                 <input type="text" id="new-profile-name" placeholder="New profile name (e.g., Work)" 
                     style="flex: 1; padding: 10px; border: 1px solid #c4b5fd; border-radius: 8px; font-size: 0.9rem;">
-                <button class="btn btn-primary" onclick="createProfile()" style="background: #8b5cf6; white-space: nowrap;">
+                <button class="btn btn-primary" id="create-profile-btn" style="background: #8b5cf6; white-space: nowrap;">
                     + Add Profile
                 </button>
             </div>
@@ -235,10 +235,10 @@
         <h2>Session Status</h2>
         <div id="session-status" class="status-box info">Loading...</div>
         <div class="actions">
-            <button class="btn btn-primary" onclick="refreshStatus()">Refresh Status</button>
-            <button class="btn btn-secondary" onclick="checkBridge()">Check Bridge</button>
-            <button class="btn btn-secondary" onclick="checkCookie()">Check Cookie</button>
-            <button class="btn btn-secondary" onclick="checkAuthState()">Get Auth State</button>
+            <button class="btn btn-primary" id="refresh-status-btn">Refresh Status</button>
+            <button class="btn btn-secondary" id="check-bridge-btn">Check Bridge</button>
+            <button class="btn btn-secondary" id="check-cookie-btn">Check Cookie</button>
+            <button class="btn btn-secondary" id="check-auth-state-btn">Get Auth State</button>
         </div>
     </div>
 
@@ -251,9 +251,9 @@
             <strong>Popup Needed:</strong> <span id="popup-needed">...</span>
         </div>
         <div class="actions">
-            <button class="btn btn-primary" onclick="testUnlockWithPopup()">🪟 Test unlockWithPopup()</button>
-            <button class="btn btn-secondary" onclick="testPopupDirect()">🔗 Open Popup Direct</button>
-            <button class="btn btn-secondary" onclick="simulateThirdParty()">🌐 Simulate 3rd Party</button>
+            <button class="btn btn-primary" id="test-popup-btn">🪟 Test unlockWithPopup()</button>
+            <button class="btn btn-secondary" id="popup-direct-btn">🔗 Open Popup Direct</button>
+            <button class="btn btn-secondary" id="simulate-3rd-party-btn">🌐 Simulate 3rd Party</button>
         </div>
         <p style="color: #78716c; font-size: 0.8rem; margin-top: 12px;">
             <strong>Note:</strong> On lemma.id, popup is not needed (direct passkey access).<br>
@@ -265,12 +265,12 @@
     <div class="card">
         <h2>Manual Wallet Actions</h2>
         <div class="actions">
-            <button class="btn btn-primary" onclick="unlockWallet()">🔓 Unlock (Direct)</button>
-            <button class="btn btn-secondary" onclick="lockWallet()">🔒 Lock Wallet</button>
-            <button class="btn btn-success" onclick="registerPasskey()">🔑 Register Passkey</button>
+            <button class="btn btn-primary" id="unlock-direct-btn">🔓 Unlock (Direct)</button>
+            <button class="btn btn-secondary" id="lock-wallet-btn2">🔒 Lock Wallet</button>
+            <button class="btn btn-success" id="register-passkey-btn">🔑 Register Passkey</button>
         </div>
         <div class="actions">
-            <button class="btn btn-danger" onclick="clearAll()">🗑️ Clear All State</button>
+            <button class="btn btn-danger" id="clear-all-btn">🗑️ Clear All State</button>
         </div>
     </div>
 
@@ -280,11 +280,11 @@
         
         <!-- Toggle Tabs -->
         <div style="display: flex; gap: 0; margin-bottom: 16px; border-radius: 8px; overflow: hidden; border: 2px solid #10b981;">
-            <button id="tab-send" onclick="showTransferTab('send')" 
+            <button id="tab-send" 
                 style="flex: 1; padding: 12px; border: none; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; background: #10b981; color: white;">
                 📤 Send to Device
             </button>
-            <button id="tab-receive" onclick="showTransferTab('receive')"
+            <button id="tab-receive"
                 style="flex: 1; padding: 12px; border: none; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; background: white; color: #065f46;">
                 📥 Receive from Device
             </button>
@@ -297,7 +297,7 @@
             </div>
             
             <div id="send-actions">
-                <button class="btn btn-success" id="add-device-btn" onclick="showAddDevice()" style="width: 100%;">
+                <button class="btn btn-success" id="add-device-btn" style="width: 100%;">
                     📱 Generate QR Code
                 </button>
                 <p style="color: #065f46; font-size: 0.8rem; margin-top: 8px; text-align: center;">
@@ -322,12 +322,12 @@
                     <p style="font-size: 0.8rem; color: #065f46; margin-bottom: 8px;">Or share this link:</p>
                     <input type="text" id="link-url" readonly 
                         style="width: 100%; padding: 8px; font-family: monospace; font-size: 0.7rem; border: 1px solid #ccc; border-radius: 4px; background: white; text-overflow: ellipsis;">
-                    <button onclick="copyLinkUrl()" style="margin-top: 8px; padding: 8px 16px; cursor: pointer; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600;">
+                    <button id="copy-link-url-btn" style="margin-top: 8px; padding: 8px 16px; cursor: pointer; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600;">
                         📋 Copy Link
                     </button>
                 </div>
                 
-                <button class="btn btn-secondary" style="margin-top: 12px;" onclick="hideQR()">Close</button>
+                <button class="btn btn-secondary" id="hide-qr-btn" style="margin-top: 12px;">Close</button>
             </div>
         </div>
 
@@ -342,7 +342,7 @@
                     style="width: 100%; padding: 12px; border: 1px solid #10b981; border-radius: 8px; font-family: monospace; font-size: 0.8rem; min-height: 80px; resize: vertical;"></textarea>
             </div>
             
-            <button class="btn btn-success" onclick="receiveWallet()" style="width: 100%;">
+            <button class="btn btn-success" id="receive-wallet-btn" style="width: 100%;">
                 🔗 Link This Device
             </button>
             
@@ -358,7 +358,7 @@
     <div class="card">
         <h2>Credentials</h2>
         <div class="actions">
-            <button class="btn btn-secondary" onclick="loadCredentials()">Refresh Credentials</button>
+            <button class="btn btn-secondary" id="refresh-credentials-btn">Refresh Credentials</button>
         </div>
         <div id="credentials-list" class="credentials-list">
             <div style="padding: 24px; text-align: center; color: #9ca3af;">
@@ -372,14 +372,14 @@
         <h2>Console Log</h2>
         <div id="log" class="log-container"></div>
         <div class="actions" style="margin-top: 12px;">
-            <button class="btn btn-secondary" onclick="clearLog()">Clear Log</button>
+            <button class="btn btn-secondary" id="clear-log-btn">Clear Log</button>
         </div>
     </div>
 
     </div><!-- END unlocked-view -->
 </div><!-- END wallet-container -->
 
-<script src="/static/js/lemma-wallet.js?v=2331"></script>
+<script src="/static/js/lemma-wallet.js?v=2332" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 // =============================================
@@ -472,8 +472,8 @@ async function loadProfiles() {
                     </div>
                 </div>
                 <div class="profile-actions">
-                    ${!profile.isActive ? `<button class="btn-switch" onclick="switchProfile('${profile.id}')">Switch</button>` : ''}
-                    ${!profile.isDefault ? `<button class="btn-delete" onclick="deleteProfile('${profile.id}', '${profile.name}')">Delete</button>` : ''}
+                    ${!profile.isActive ? `<button class="btn-switch" data-profile-id="${profile.id}">Switch</button>` : ''}
+                    ${!profile.isDefault ? `<button class="btn-delete" data-profile-id="${profile.id}" data-profile-name="${profile.name}">Delete</button>` : ''}
                 </div>
             </div>
         `).join('');
@@ -718,7 +718,7 @@ async function loadCredentials() {
                         <p>ID: ${cred.id?.substring(0, 30)}...</p>
                         ${issuedAt ? `<p>Issued: ${new Date(issuedAt).toLocaleDateString()}</p>` : ''}
                     </div>
-                    <button class="btn btn-danger" onclick="revokeCredential('${cred.id}')">Revoke</button>
+                    <button class="btn btn-danger btn-revoke" data-cred-id="${cred.id}">Revoke</button>
                 </div>`;
         }).join('');
         
@@ -1172,10 +1172,10 @@ async function receiveWallet(replaceExisting = false) {
                     <strong>Wallet Already Exists</strong><br><br>
                     This device has a different wallet. Choose what to do:
                     <div style="display: flex; gap: 12px; margin-top: 16px;">
-                        <button class="btn btn-primary" onclick="receiveWallet(true)" style="flex: 1; padding: 10px;">
+                        <button class="btn btn-primary" id="confirm-receive-btn" style="flex: 1; padding: 10px;">
                             Replace Wallet
                         </button>
-                        <button class="btn btn-secondary" onclick="cancelReceiveWallet()" style="flex: 1; padding: 10px;">
+                        <button class="btn btn-secondary" id="cancel-receive-btn" style="flex: 1; padding: 10px;">
                             Keep Current
                         </button>
                     </div>
@@ -1280,10 +1280,10 @@ async function showAddDevice() {
             qrDisplay.innerHTML = '<div style="background: white; padding: 20px; border-radius: 12px; text-align: left;">' +
                 '<p style="margin-bottom: 8px; font-weight: 600;">Copy this code to your other device:</p>' +
                 '<textarea id="link-code-text" readonly style="width: 100%; height: 100px; font-family: monospace; font-size: 0.7rem; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">' + result.qrData + '</textarea>' +
-                '<button onclick="copyLinkCode()" style="margin-top: 8px; padding: 8px 16px; cursor: pointer;">📋 Copy</button>' +
+                '<button id="copy-link-code-btn" style="margin-top: 8px; padding: 8px 16px; cursor: pointer;">📋 Copy</button>' +
                 '</div>' +
                 '<div id="qr-timer" style="font-size: 1.2rem; font-weight: 600; color: #92400e; margin-top: 8px;">⏱️ Expires in ' + result.expiresIn + 's</div>' +
-                '<button class="btn btn-secondary" style="margin-top: 12px;" onclick="hideQR()">Close</button>';
+                '<button class="btn btn-secondary hide-qr-dynamic" style="margin-top: 12px;">Close</button>';
             qrDisplay.style.display = 'block';
             return;
         }
@@ -1322,7 +1322,7 @@ async function showAddDevice() {
             window._linkCode = result.qrData;
             document.getElementById('qr-display').innerHTML += 
                 '<textarea id="link-code-text" readonly style="width: 100%; height: 80px; font-family: monospace; font-size: 0.7rem; margin-top: 8px;">' + result.qrData + '</textarea>' +
-                '<button onclick="copyLinkCode()" style="margin-top: 8px; padding: 8px 16px; cursor: pointer;">📋 Copy Code</button>';
+                '<button id="copy-link-code-btn" style="margin-top: 8px; padding: 8px 16px; cursor: pointer;">📋 Copy Code</button>';
         }
         
         // Set the link URL for copying
@@ -1897,6 +1897,66 @@ window.addEventListener('DOMContentLoaded', async () => {
         addLog(`Init error: ${e.message}`, 'error');
         showLockedView();
     }
+    
+    // CSP-compliant event listeners (no inline onclick handlers)
+    // Static buttons
+    document.getElementById('unlock-btn')?.addEventListener('click', unlockAndShowWallet);
+    document.getElementById('create-wallet-btn')?.addEventListener('click', registerPasskey);
+    document.getElementById('lock-wallet-btn')?.addEventListener('click', lockWallet);
+    document.getElementById('create-profile-btn')?.addEventListener('click', createProfile);
+    document.getElementById('refresh-status-btn')?.addEventListener('click', refreshStatus);
+    document.getElementById('check-bridge-btn')?.addEventListener('click', checkBridge);
+    document.getElementById('check-cookie-btn')?.addEventListener('click', checkCookie);
+    document.getElementById('check-auth-state-btn')?.addEventListener('click', checkAuthState);
+    document.getElementById('test-popup-btn')?.addEventListener('click', testUnlockWithPopup);
+    document.getElementById('popup-direct-btn')?.addEventListener('click', testPopupDirect);
+    document.getElementById('simulate-3rd-party-btn')?.addEventListener('click', simulateThirdParty);
+    document.getElementById('unlock-direct-btn')?.addEventListener('click', unlockWallet);
+    document.getElementById('lock-wallet-btn2')?.addEventListener('click', lockWallet);
+    document.getElementById('register-passkey-btn')?.addEventListener('click', registerPasskey);
+    document.getElementById('clear-all-btn')?.addEventListener('click', clearAll);
+    document.getElementById('tab-send')?.addEventListener('click', () => showTransferTab('send'));
+    document.getElementById('tab-receive')?.addEventListener('click', () => showTransferTab('receive'));
+    document.getElementById('add-device-btn')?.addEventListener('click', showAddDevice);
+    document.getElementById('copy-link-url-btn')?.addEventListener('click', copyLinkUrl);
+    document.getElementById('hide-qr-btn')?.addEventListener('click', hideQR);
+    document.getElementById('receive-wallet-btn')?.addEventListener('click', receiveWallet);
+    document.getElementById('refresh-credentials-btn')?.addEventListener('click', loadCredentials);
+    document.getElementById('clear-log-btn')?.addEventListener('click', clearLog);
+    
+    // Event delegation for dynamically created buttons
+    document.addEventListener('click', (e) => {
+        const target = e.target;
+        
+        // Profile switch buttons
+        if (target.matches('.btn-switch[data-profile-id]')) {
+            switchProfile(target.dataset.profileId);
+        }
+        // Profile delete buttons
+        if (target.matches('.btn-delete[data-profile-id]')) {
+            deleteProfile(target.dataset.profileId, target.dataset.profileName);
+        }
+        // Credential revoke buttons
+        if (target.matches('.btn-revoke[data-cred-id]')) {
+            revokeCredential(target.dataset.credId);
+        }
+        // Copy link code button (in QR display)
+        if (target.matches('#copy-link-code-btn')) {
+            copyLinkCode();
+        }
+        // Hide QR button (in dynamic content)
+        if (target.matches('.hide-qr-dynamic')) {
+            hideQR();
+        }
+        // Receive wallet confirm button
+        if (target.matches('#confirm-receive-btn')) {
+            receiveWallet(true);
+        }
+        // Cancel receive wallet button
+        if (target.matches('#cancel-receive-btn')) {
+            cancelReceiveWallet();
+        }
+    });
 });
 </script>
 {% endblock %}
