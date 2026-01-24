@@ -343,6 +343,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register SDK Config API: {e}")
 
+    # SDK Integrity Hashes (SRI for supply chain security)
+    try:
+        from api.sri_hashes import sri_hashes_bp
+        app.register_blueprint(sri_hashes_bp)
+        logger.info("✅ SDK Integrity (SRI) API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register SRI Hashes API: {e}")
+
     # Developer Self-Issue (developers can issue permissions to their own wallet)
     try:
         from api.developer_self_issue import developer_self_issue_bp
