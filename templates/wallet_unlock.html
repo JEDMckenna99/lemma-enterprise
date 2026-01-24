@@ -295,7 +295,7 @@
             </div>
             
             <!-- Main Unlock Button -->
-            <button class="unlock-btn" id="unlock-btn" onclick="handleUnlock()">
+            <button class="unlock-btn" id="unlock-btn">
                 Unlock with Passkey
             </button>
             
@@ -312,7 +312,7 @@
             <div class="no-wallet-section" id="no-wallet-section">
                 <p>No wallet detected on this device</p>
                 <div class="alt-actions">
-                    <button class="alt-btn alt-btn-create" onclick="createWallet()">Create New Wallet</button>
+                    <button class="alt-btn alt-btn-create" id="create-wallet-btn">Create New Wallet</button>
                     <a href="/wallet/link" class="alt-btn alt-btn-link">Link Existing</a>
                 </div>
             </div>
@@ -665,6 +665,10 @@ async function debugCheckIndexedDB() {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
+    // Add event listeners (CSP-compliant - no inline handlers)
+    document.getElementById('unlock-btn').addEventListener('click', handleUnlock);
+    document.getElementById('create-wallet-btn').addEventListener('click', createWallet);
+    
     parseParams();
     
     // Debug: Check IndexedDB directly first
