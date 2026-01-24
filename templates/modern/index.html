@@ -18,7 +18,7 @@
     <script src="/static/js/lemma-bot-shield-simple.js?v=1121" defer></script>
     
     <!-- Disable service worker to prevent resource blocking -->
-    <script data-cfasync="false">
+    <script nonce="{{ csp_nonce }}" data-cfasync="false">
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for (let registration of registrations) {

@@ -5,7 +5,7 @@
 
 {% block head %}
     {{ super() }}
-    <script data-cfasync="false">
+    <script nonce="{{ csp_nonce }}" data-cfasync="false">
         if (window.Rocketloader) {
             window.Rocketloader = {load: function(){}};
         }
