@@ -34,8 +34,11 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
 .hero h1{color:#fff;font-size:clamp(32px,5vw,56px);font-weight:700;margin-bottom:24px}
     </style>
     
-    <!-- Full CSS - async load -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121" media="print" onload="this.media='all'">
+    <!-- Full CSS - async load with CSP-compliant approach -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121" media="print" id="main-css">
+    <script nonce="{{ csp_nonce }}">
+        document.getElementById('main-css').onload = function() { this.media = 'all'; };
+    </script>
     <noscript><link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121"></noscript>
     
     {% block head %}{% endblock %}
