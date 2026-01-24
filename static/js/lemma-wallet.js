@@ -1490,7 +1490,9 @@ class LemmaWallet {
                 })
             });
             if (setSessionResponse.ok) {
+                const sessionResult = await setSessionResponse.json();
                 console.log(`[Lemma] Session cookie set - profile: ${activeProfile.name}`);
+                console.log(`[Lemma] 🔐 Set-session response:`, JSON.stringify(sessionResult));
             } else {
                 console.warn('[Lemma] Could not set session cookie:', setSessionResponse.status);
             }

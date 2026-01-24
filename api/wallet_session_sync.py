@@ -328,7 +328,8 @@ def set_session():
         'success': True,
         'session_set': True,
         'expires_at': expires_at,
-        'cross_device_enabled': True
+        'cross_device_enabled': True,
+        'global_session_stored': global_stored  # Debug: shows if DB storage worked
     })
     
     # Add CORS headers
@@ -393,9 +394,13 @@ def _get_db_session():
     """Get database session for global session operations."""
     try:
         from api.database import get_session, WalletSession
-        return get_session(), WalletSession
+        session = get_session()
+        logger.debug(f"_get_db_session: got session={session is not None}, WalletSession={WalletSession is not None}")
+        return session, WalletSession
     except Exception as e:
-        logger.warning(f"Database not available for global sessions: {e}")
+        logger.error(f"Database not available for global sessions: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return None, None
 
 
@@ -405,6 +410,7 @@ def _store_global_session(wallet_id: str, unlocked_at: int, expires_at: int,
     """Store or update global wallet session in database."""
     db_session, WalletSession = _get_db_session()
     if not db_session or not WalletSession:
+        logger.error(f"_store_global_session: db_session={db_session is not None}, WalletSession={WalletSession is not None}")
         return False
     
     try:
