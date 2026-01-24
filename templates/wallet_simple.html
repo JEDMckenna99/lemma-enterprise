@@ -380,8 +380,8 @@
 </div><!-- END wallet-container -->
 
 <script src="/static/js/lemma-wallet.js?v=2250"></script>
-<script src="/static/js/qrcode.min.js"></script>
-<script>
+<script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
+<script nonce="{{ csp_nonce }}">
 // =============================================
 // SDK-ONLY WALLET PAGE
 // All operations use only LemmaWallet public API

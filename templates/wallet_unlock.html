@@ -7,7 +7,7 @@
     <meta name="description" content="Unlock your wallet to sign in securely.">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     
-    <style>
+    <style nonce="{{ csp_nonce }}">
         * {
             box-sizing: border-box;
             margin: 0;
@@ -325,8 +325,8 @@
     </div>
 
     <!-- Load SDK with cache-buster to ensure latest version -->
-    <script src="/static/js/lemma-wallet.js?v=2320"></script>
-    <script>
+    <script src="/static/js/lemma-wallet.js?v=2320" nonce="{{ csp_nonce }}"></script>
+    <script nonce="{{ csp_nonce }}">
 // Initialize wallet SDK
 const wallet = new LemmaWallet();
 let returnUrl = null;

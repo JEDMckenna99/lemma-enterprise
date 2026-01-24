@@ -197,7 +197,7 @@
     </div>
 </section>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 // Hero card state - watches for window.lemmaCredential set by session-free nav in layout.html
 // Uses requestIdleCallback for non-blocking initialization (improves LCP)
 (function() {
@@ -432,7 +432,7 @@
     </div>
 </section>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 // Proof of Humanity status check
 async function checkPoHStatus() {
     const loadingEl = document.getElementById('poh-loading');

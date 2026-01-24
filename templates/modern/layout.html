@@ -14,7 +14,7 @@
     {% block preload_scripts %}{% endblock %}
     
     <!-- Critical CSS - minimal for fast LCP -->
-    <style>
+    <style nonce="{{ csp_nonce }}">
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--primary:#667eea;--secondary:#764ba2;--gray-900:#1e293b;--gray-700:#475569;--gray-200:#f1f5f9;--white:#fff}
 html{font-size:17px;line-height:1.6}
@@ -120,7 +120,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     {% block scripts %}{% endblock %}
     
     <!-- User Dropdown CSS - non-blocking -->
-    <style>
+    <style nonce="{{ csp_nonce }}">
 .user-dropdown{position:relative;display:inline-block}
 .user-dropdown-toggle{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:0.9rem;color:#475569}
 .user-avatar{width:24px;height:24px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px}
@@ -149,7 +149,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     
     {% block auth_scripts %}
     <!-- User Dropdown JavaScript -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         function toggleUserDropdown() {
             const dropdown = document.querySelector('.user-dropdown');
             dropdown.classList.toggle('open');

@@ -308,7 +308,7 @@
 </div>
 
 {% if not error %}
-<script>
+<script nonce="{{ csp_nonce }}">
 const CLAIM_TOKEN = "{{ token }}";
 const SITE_DOMAIN = "{{ site_domain }}";
 const REDIRECT_URL = "{{ redirect_url }}";

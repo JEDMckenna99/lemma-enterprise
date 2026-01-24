@@ -700,7 +700,7 @@ window.addEventListener('DOMContentLoaded', checkAccess);
 </div>
 
 <!-- Non-blocking JS - uses requestIdleCallback for init -->
-<script>
+<script nonce="{{ csp_nonce }}">
 // Copy code functionality
 function copyCode(btn) {
     var codeBlock = btn.closest('.code-block');

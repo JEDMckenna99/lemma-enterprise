@@ -4,8 +4,9 @@ Essential components only - no redundant endpoints
 """
 import os
 import logging
+import secrets
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, g
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +33,19 @@ def create_app():
     app.config['STRIPE_SECRET_KEY'] = os.environ.get('STRIPE_SECRET_KEY')
     app.config['STRIPE_PUBLISHABLE_KEY'] = os.environ.get('STRIPE_PUBLISHABLE_KEY')
     app.config['STRIPE_WEBHOOK_SECRET'] = os.environ.get('STRIPE_WEBHOOK_SECRET')
+
+    # ================================================================================
+    # CSP NONCE GENERATION - Secure inline scripts without 'unsafe-inline'
+    # ================================================================================
+    @app.before_request
+    def generate_csp_nonce():
+        """Generate a unique nonce for each request to allow inline scripts securely."""
+        g.csp_nonce = secrets.token_urlsafe(16)
+    
+    @app.context_processor
+    def inject_csp_nonce():
+        """Make CSP nonce available to all templates."""
+        return {'csp_nonce': getattr(g, 'csp_nonce', '')}
 
     # ================================================================================
     # SECURITY HEADERS - Industry standard protection
@@ -62,18 +76,20 @@ def create_app():
         # Content Security Policy - Restrict resource loading
         # Skip if route already set its own CSP (e.g., wallet bridge)
         if 'Content-Security-Policy' not in response.headers:
+            # Get the nonce generated for this request
+            nonce = getattr(g, 'csp_nonce', '')
+            
             csp = (
                 "default-src 'self'; "
-                # Scripts: self + specific trusted sources
-                # Note: 'unsafe-inline' needed for legacy templates - TODO: migrate to nonces
-                "script-src 'self' 'unsafe-inline' "
+                # Scripts: self + nonce for inline scripts + trusted CDNs
+                f"script-src 'self' 'nonce-{nonce}' "
                     "https://cdn.jsdelivr.net/npm/ "  # jsdelivr for specific npm packages
                     "https://unpkg.com/ "  # unpkg for html5-qrcode scanner
                     "https://static.cloudflareinsights.com "  # Cloudflare analytics
                     "https://challenges.cloudflare.com "  # Cloudflare Turnstile
                     "https://js.stripe.com; "  # Stripe payments
-                # Styles: self + Google Fonts
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                # Styles: self + nonce for inline styles + Google Fonts
+                f"style-src 'self' 'nonce-{nonce}' https://fonts.googleapis.com; "
                 # Fonts: self + Google Fonts
                 "font-src 'self' https://fonts.gstatic.com; "
                 # Images: self + data URIs (for QR codes) + any HTTPS (logos, etc)
@@ -541,6 +557,10 @@ def create_app():
         - Ed25519 signature verification (local WebCrypto)
         """
         logger.info("🌉 Serving wallet bridge v2.0 (local-first)")
+        
+        # Get nonce for this request (generated in before_request)
+        nonce = getattr(g, 'csp_nonce', '')
+        
         response = render_template('wallet_bridge.html')
         
         return response, 200, {
@@ -548,15 +568,14 @@ def create_app():
             'X-Frame-Options': 'ALLOWALL',
             
             # HARDENED CSP for bridge security
-            # - Only self scripts (no external JS)
+            # - Only self scripts with nonce (no external JS)
             # - Only self connections (except revocation sync)
-            # - No inline event handlers
             # - No eval, no dynamic code
             'Content-Security-Policy': (
                 "default-src 'none'; "
-                "script-src 'self' 'unsafe-inline'; "  # Inline needed for bridge logic
+                f"script-src 'self' 'nonce-{nonce}'; "  # Nonce for bridge inline script
                 "connect-src 'self' https://lemma.id; "
-                "style-src 'self' 'unsafe-inline'; "
+                f"style-src 'self' 'nonce-{nonce}'; "  # Nonce for inline styles
                 "frame-ancestors https: http://localhost:* http://127.0.0.1:*; "
                 "base-uri 'none'; "
                 "form-action 'none'; "
