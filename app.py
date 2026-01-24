@@ -88,8 +88,9 @@ def create_app():
                     "https://static.cloudflareinsights.com "  # Cloudflare analytics
                     "https://challenges.cloudflare.com "  # Cloudflare Turnstile
                     "https://js.stripe.com; "  # Stripe payments
-                # Styles: self + nonce for inline styles + Google Fonts
-                f"style-src 'self' 'nonce-{nonce}' https://fonts.googleapis.com; "
+                # Styles: self + unsafe-inline (needed for style attributes) + Google Fonts
+                # Note: unsafe-inline for styles is lower risk than for scripts
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 # Fonts: self + Google Fonts
                 "font-src 'self' https://fonts.gstatic.com; "
                 # Images: self + data URIs (for QR codes) + any HTTPS (logos, etc)
@@ -575,7 +576,7 @@ def create_app():
                 "default-src 'none'; "
                 f"script-src 'self' 'nonce-{nonce}'; "  # Nonce for bridge inline script
                 "connect-src 'self' https://lemma.id; "
-                f"style-src 'self' 'nonce-{nonce}'; "  # Nonce for inline styles
+                "style-src 'self' 'unsafe-inline'; "  # Inline styles for minimal bridge UI
                 "frame-ancestors https: http://localhost:* http://127.0.0.1:*; "
                 "base-uri 'none'; "
                 "form-action 'none'; "
