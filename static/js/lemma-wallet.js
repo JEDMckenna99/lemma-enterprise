@@ -910,6 +910,12 @@ class LemmaWallet {
         document.addEventListener('visibilitychange', this._visibilityHandler);
         console.log('[Lemma] 👁️ Visibility handler registered');
         
+        // Run an immediate check on startup (don't wait for first interval/visibility)
+        setTimeout(async () => {
+            console.log('[Lemma] 💓 Running initial heartbeat check...');
+            await performHeartbeatCheck();
+        }, 2000); // 2 second delay to let page settle
+        
         // Also check on window focus (backup for visibility API)
         if (!this._focusHandler) {
             this._focusHandler = async () => {
