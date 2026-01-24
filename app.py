@@ -67,7 +67,8 @@ def create_app():
                 # Scripts: self + specific trusted sources
                 # Note: 'unsafe-inline' needed for legacy templates - TODO: migrate to nonces
                 "script-src 'self' 'unsafe-inline' "
-                    "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/ "  # QR code library (specific version)
+                    "https://cdn.jsdelivr.net/npm/ "  # jsdelivr for specific npm packages
+                    "https://unpkg.com/ "  # unpkg for html5-qrcode scanner
                     "https://static.cloudflareinsights.com "  # Cloudflare analytics
                     "https://challenges.cloudflare.com "  # Cloudflare Turnstile
                     "https://js.stripe.com; "  # Stripe payments
