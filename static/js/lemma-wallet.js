@@ -1507,9 +1507,11 @@ class LemmaWallet {
      */
     async lock() {
         console.log('[Lemma] Locking wallet...');
+        console.log('[Lemma] 🔒 Current session before lock:', JSON.stringify(this.session));
         
         // Capture wallet_id before clearing session
         const walletId = this.session.walletId;
+        console.log('[Lemma] 🔒 Captured wallet_id for lock:', walletId);
         
         // Clear local session
         this.session = {
@@ -1551,8 +1553,10 @@ class LemmaWallet {
                 if (response.ok) {
                     const data = await response.json();
                     console.log('[Lemma] ✅ Server session cleared, global:', data.global_session_cleared);
+                    console.log('[Lemma] 🔒 Clear-session response:', JSON.stringify(data));
                 } else {
-                    console.warn('[Lemma] Server session clear returned:', response.status);
+                    const text = await response.text();
+                    console.warn('[Lemma] Server session clear returned:', response.status, text);
                 }
             } catch (e) {
                 console.warn('[Lemma] Could not clear server session:', e.message);
