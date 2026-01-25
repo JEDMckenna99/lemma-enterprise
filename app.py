@@ -516,7 +516,7 @@ def create_app():
             'Pragma': 'no-cache',
             'Expires': '0'
         }
-    
+
     @app.route('/wallet/unlock')
     def wallet_unlock():
         """
@@ -746,7 +746,7 @@ def create_app():
         """Developer Platform - Manage IAM integration and usage"""
         logger.info("🚀 Serving developer platform")
         return render_template('developer/platform.html')
-    
+
     @app.route('/docs/<path:filename>')
     def serve_docs(filename):
         """Serve documentation markdown files"""

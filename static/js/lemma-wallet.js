@@ -313,16 +313,16 @@ class LemmaWallet {
                     
                     result.walletSecret = secretRecord.secret;
                     result.walletId = walletIdRecord.value;
-                    result.authenticated = true;
-                    result.needsPasskey = false;
+                        result.authenticated = true;
+                        result.needsPasskey = false;
                     result.crossDevice = true;
                     result.message = 'Authenticated via cross-device session sync';
-                    
-                    this._autoStartHeartbeat();
-                    return result;
+                        
+                        this._autoStartHeartbeat();
+                        return result;
+                    }
                 }
-            }
-        } catch (e) {
+            } catch (e) {
             console.warn('[Lemma] Global session check failed:', e.message);
         }
         
@@ -482,7 +482,7 @@ class LemmaWallet {
         console.log('[Lemma] checkRedirectReturn - isRedirectReturn:', isRedirectReturn);
         console.log('[Lemma] checkRedirectReturn - has lemma_data:', !!encryptedData);
         console.log('[Lemma] checkRedirectReturn - has lemma_token:', !!legacyToken);
-        
+            
         // Retrieve saved redirect state (contains decryption key)
         let savedState = null;
         try {
@@ -509,7 +509,7 @@ class LemmaWallet {
         
         console.log('[Lemma] Detected redirect return, processing...');
         console.log('[Lemma] Can decrypt:', !!(encryptedData && savedState?.encKey));
-        
+                    
         // Clear the redirect state AFTER we've read it
         try {
             sessionStorage.removeItem('lemma_redirect_state');
@@ -537,21 +537,28 @@ class LemmaWallet {
                 
                 if (decrypted && decrypted.wallet_secret) {
                     console.log('[Lemma] ✅ Client-side decryption successful!');
+                    console.log('[Lemma] 🔑 Decrypted wallet_id:', decrypted.wallet_id || 'NOT SET');
                     
                     // Store the wallet secret locally
                     await this._put('secrets', { id: 'master', secret: decrypted.wallet_secret, source: 'redirect_encrypted' });
                     
+                    // IMPORTANT: Also store wallet_id for heartbeat cross-device checks
+                    if (decrypted.wallet_id) {
+                        await this._put('passkey', { id: 'walletId', value: decrypted.wallet_id });
+                        console.log('[Lemma] 🔑 Wallet ID stored to IndexedDB');
+                    }
+                    
                     // Set up local session
-                    this.session = {
-                        isUnlocked: true,
+                        this.session = {
+                            isUnlocked: true,
                         unlockedAt: Date.now(),
                         expiresAt: Date.now() + 24 * 60 * 60 * 1000,
                         walletId: decrypted.wallet_id,
                         walletSecret: decrypted.wallet_secret,
                         source: 'redirect'
-                    };
-                    await this._put('session', { id: 'current', ...this.session });
-                    
+                        };
+                        await this._put('session', { id: 'current', ...this.session });
+                        
                     this._autoStartHeartbeat();
                     
                     return {
@@ -566,9 +573,9 @@ class LemmaWallet {
                 }
             } catch (e) {
                 console.warn('[Lemma] Client-side decryption failed:', e.message);
-            }
-        }
-        
+                        }
+                    }
+                    
         // LEGACY FALLBACK: Server-side token exchange (deprecated, for old SDK compatibility)
         if (legacyToken) {
             console.log('[Lemma] Using legacy server-side token exchange (deprecated)...');
@@ -610,11 +617,11 @@ class LemmaWallet {
                 console.warn('[Lemma] Legacy token exchange error:', e.message);
             }
         }
-        
+                    
         // Fallback: Check bridge session (works on desktop, may fail on mobile Safari)
         const session = await this.checkBridgeSession();
         
-        if (session.valid) {
+                        if (session.valid) {
             console.log('[Lemma] ✅ Redirect unlock successful via bridge!');
             
             let walletSecret = null;
@@ -628,17 +635,17 @@ class LemmaWallet {
             }
             
             return {
-                success: true,
+                                success: true,
                 authenticated: true,
-                walletId: session.walletId,
+                                walletId: session.walletId,
                 walletSecret,
                 message: 'Authenticated via redirect'
             };
-        }
+                        }
         
         console.log('[Lemma] Redirect return but could not establish session');
         return {
-            success: false,
+                            success: false,
             authenticated: false,
             message: 'Session not established after redirect'
         };
@@ -843,7 +850,7 @@ class LemmaWallet {
         if (this._heartbeatInterval) {
             clearInterval(this._heartbeatInterval);
         }
-        
+
         // Clear any existing visibility listener
         if (this._visibilityHandler) {
             document.removeEventListener('visibilitychange', this._visibilityHandler);
@@ -944,14 +951,14 @@ class LemmaWallet {
      * @private
      */
     async _clearSessionGracefully(reason, message) {
-        // Clear local session
-        this.session = {
-            isUnlocked: false,
-            unlockedAt: null,
-            expiresAt: null
-        };
-        
-        // Clear session from IndexedDB
+                    // Clear local session
+                    this.session = {
+                        isUnlocked: false,
+                        unlockedAt: null,
+                        expiresAt: null
+                    };
+                    
+                    // Clear session from IndexedDB
         await this._delete('session', 'current');
         
         // Stop heartbeat and visibility listeners
@@ -966,17 +973,17 @@ class LemmaWallet {
         if (this._focusHandler) {
             window.removeEventListener('focus', this._focusHandler);
             this._focusHandler = null;
-        }
-        
+                    }
+                    
         // Trigger callback if set (for customer sites to handle)
-        if (this._onSessionExpired) {
+                    if (this._onSessionExpired) {
             this._onSessionExpired({ reason, message });
-        }
-        
-        // Dispatch custom event for apps to listen to
-        window.dispatchEvent(new CustomEvent('lemma:session-expired', {
+                    }
+                    
+                    // Dispatch custom event for apps to listen to
+                    window.dispatchEvent(new CustomEvent('lemma:session-expired', {
             detail: { reason, message }
-        }));
+                    }));
     }
 
     /**
@@ -1190,11 +1197,11 @@ class LemmaWallet {
                     // No valid session - use redirect flow (v2.32.0: redirect-only)
                     console.log('[Lemma] Bridge session not valid - using redirect flow');
                     this.unlockWithRedirect();
-                    return {
-                        success: false,
+                        return {
+                            success: false,
                         redirecting: true,
                         message: 'Redirecting to lemma.id for authentication...'
-                    };
+                        };
                 }
             } catch (e) {
                 console.warn('[Lemma] Bridge check failed in registerPasskey:', e.message);
@@ -3262,7 +3269,7 @@ class LemmaWallet {
         const hasPasskey = !!passkey;
         const hasWalletSecret = !!secretRecord?.secret;
             
-        return {
+            return {
             hasPasskey,
             hasWalletSecret,
             // hasWallet: true if either passkey (native) or secret (linked device) exists
