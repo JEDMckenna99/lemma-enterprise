@@ -881,42 +881,8 @@ def session_sync():
     })
 
 
-@wallet_service_bp.route('/api/wallet/set-session', methods=['POST', 'OPTIONS'])
-def set_session():
-    """Set wallet session cookie after passkey unlock."""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        origin = request.headers.get('Origin')
-        response.headers.update(_cors_headers(origin))
-        if not _origin_allowed(origin):
-            return response, 403
-        return response
-    
-    origin = request.headers.get('Origin')
-    data = request.get_json() or {}
-    wallet_id = data.get('wallet_id')
-    unlocked_at = data.get('unlocked_at', int(time.time() * 1000))
-    
-    if not wallet_id:
-        return cross_origin_response({'success': False, 'error': 'wallet_id required'}, 400)
-    
-    token = generate_session_token(wallet_id, unlocked_at)
-    csrf_token = secrets.token_urlsafe(32)
-    
-    response = jsonify({
-        'success': True,
-        'session_set': True,
-        'expires_at': int(time.time()) + SESSION_DURATION
-    })
-    response.headers.update(_cors_headers(origin))
-    
-    response.set_cookie(SESSION_COOKIE_NAME, token, max_age=SESSION_DURATION,
-                       httponly=True, secure=True, samesite='None', path='/')
-    response.set_cookie(CSRF_COOKIE_NAME, csrf_token, max_age=SESSION_DURATION,
-                       httponly=False, secure=True, samesite='None', path='/')
-    
-    return response
-
+# NOTE: set-session endpoint is defined in wallet_session_sync.py
+# (includes global session storage for cross-device "one passkey per day")
 
 # NOTE: clear-session endpoint is defined in wallet_session_sync.py
 # (includes global session clearing for cross-device lock detection)
