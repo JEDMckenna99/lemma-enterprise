@@ -1,157 +1,187 @@
 {% extends "modern/layout.html" %}
 
 {% block title %}Lemma Wallet{% endblock %}
-{% block description %}Manage your Lemma wallet, credentials, and linked devices.{% endblock %}
+{% block description %}Manage your Lemma wallet and linked devices.{% endblock %}
 
 {% block preload_scripts %}{% endblock %}
 
 {% block head %}
 <style>
-.wallet-container { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
+.wallet-container { max-width: 520px; margin: 0 auto; padding: 40px 24px; }
 .wallet-header { margin-bottom: 32px; text-align: center; }
-.wallet-header h1 { font-size: 2rem; font-weight: 600; color: #111827; margin: 0 0 8px; }
-.wallet-header p { font-size: 1rem; color: #6b7280; }
-.wallet-header .badge { 
-    display: inline-block; 
-    background: #fef3cd; 
-    color: #856404; 
-    padding: 4px 12px; 
-    border-radius: 12px; 
-    font-size: 0.75rem; 
-    margin-top: 8px;
-}
+.wallet-header h1 { font-size: 1.75rem; font-weight: 600; color: #111827; margin: 0 0 8px; }
+.wallet-header p { font-size: 0.95rem; color: #6b7280; margin: 0; }
+
 .card { 
     background: #fff; 
     border: 1px solid #e5e7eb; 
     border-radius: 16px; 
     padding: 24px; 
-    margin-bottom: 24px;
+    margin-bottom: 20px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
-.card h2 { font-size: 1.1rem; font-weight: 600; margin: 0 0 16px; color: #111827; }
-.status-box { 
-    padding: 16px; 
-    border-radius: 12px; 
-    margin-bottom: 16px; 
-    font-family: monospace;
-    font-size: 0.85rem;
-    white-space: pre-wrap;
-    word-break: break-all;
-}
-.status-box.locked { background: #fef3cd; border: 1px solid #f59e0b; color: #92400e; }
-.status-box.unlocked { background: #d1fae5; border: 1px solid #10b981; color: #065f46; }
-.status-box.error { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
-.status-box.info { background: #e0f2fe; border: 1px solid #0ea5e9; color: #0c4a6e; }
-.btn { 
-    padding: 12px 24px; 
-    border-radius: 8px; 
-    font-weight: 500; 
-    cursor: pointer; 
-    border: none;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    margin: 4px;
-}
-.btn:hover { transform: translateY(-1px); }
-.btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-.btn-secondary { background: #6b7280; color: white; }
-.btn-danger { background: #ef4444; color: white; }
-.btn-success { background: #10b981; color: white; }
-.credentials-list { 
-    background: #f9fafb; 
-    border: 1px solid #e5e7eb; 
-    border-radius: 8px; 
-    min-height: 100px;
-}
-.credential-item {
-    padding: 16px;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.credential-item:last-child { border-bottom: none; }
-.credential-info h4 { margin: 0 0 4px; font-size: 0.95rem; color: #111827; }
-.credential-info p { margin: 0; font-size: 0.8rem; color: #6b7280; }
-.log-container {
-    background: #1e1e1e;
-    color: #d4d4d4;
-    padding: 16px;
-    border-radius: 8px;
-    font-family: 'Consolas', monospace;
-    font-size: 0.75rem;
-    max-height: 300px;
-    overflow-y: auto;
-}
-.log-entry { margin: 2px 0; }
-.log-entry.info { color: #9cdcfe; }
-.log-entry.success { color: #4ec9b0; }
-.log-entry.error { color: #f14c4c; }
-.log-entry.warn { color: #cca700; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-
-/* Profile styles */
-.profile-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    margin-bottom: 8px;
-    transition: all 0.2s;
-}
-.profile-item:hover { border-color: #8b5cf6; }
-.profile-item.active {
-    border-color: #8b5cf6;
-    background: linear-gradient(135deg, #faf5ff, #ede9fe);
-    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
-}
-.profile-item .profile-info { flex: 1; }
-.profile-item .profile-name {
-    font-weight: 600;
-    color: #1f2937;
+.card h2 { 
+    font-size: 1rem; 
+    font-weight: 600; 
+    margin: 0 0 16px; 
+    color: #374151;
     display: flex;
     align-items: center;
     gap: 8px;
 }
-.profile-item .profile-name .active-badge {
-    font-size: 0.7rem;
-    background: #8b5cf6;
-    color: white;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-weight: 500;
+.card h2 .icon { font-size: 1.1rem; }
+
+.status-unlocked {
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    border: 1px solid #10b981;
 }
-.profile-item .profile-meta {
-    font-size: 0.75rem;
+.status-locked {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border: 1px solid #f59e0b;
+}
+
+.wallet-status {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+.wallet-status .status-icon { font-size: 2.5rem; }
+.wallet-status .status-info h3 { 
+    margin: 0 0 4px; 
+    font-size: 1.1rem; 
+    font-weight: 600;
+}
+.wallet-status .status-info p { 
+    margin: 0; 
+    font-size: 0.85rem; 
     color: #6b7280;
+}
+.wallet-status.status-unlocked .status-info h3 { color: #065f46; }
+.wallet-status.status-unlocked .status-info p { color: #047857; }
+.wallet-status.status-locked .status-info h3 { color: #92400e; }
+.wallet-status.status-locked .status-info p { color: #b45309; }
+
+.btn { 
+    padding: 12px 24px; 
+    border-radius: 10px; 
+    font-weight: 500; 
+    cursor: pointer; 
+    border: none;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-primary { background: #4f46e5; color: white; }
+.btn-primary:hover { background: #4338ca; }
+.btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+.btn-secondary:hover { background: #e5e7eb; }
+.btn-danger { background: #ef4444; color: white; }
+.btn-danger:hover { background: #dc2626; }
+.btn-full { width: 100%; }
+
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-label {
+    font-weight: 500;
+    color: #374151;
+}
+.setting-description {
+    font-size: 0.8rem;
+    color: #9ca3af;
     margin-top: 2px;
 }
-.profile-item .profile-actions {
-    display: flex;
-    gap: 6px;
+.setting-control select {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: white;
+    cursor: pointer;
 }
-.profile-item .profile-actions button {
-    padding: 6px 12px;
-    border-radius: 6px;
+
+/* Device linking */
+.link-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid #4f46e5;
+}
+.link-tab {
+    flex: 1;
+    padding: 12px;
     border: none;
     cursor: pointer;
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 0.9rem;
     transition: all 0.2s;
+    background: white;
+    color: #4f46e5;
 }
-.profile-item .btn-switch {
-    background: #8b5cf6;
+.link-tab.active {
+    background: #4f46e5;
     color: white;
 }
-.profile-item .btn-switch:hover { background: #7c3aed; }
-.profile-item .btn-delete {
-    background: #fee2e2;
-    color: #dc2626;
+
+.qr-display {
+    text-align: center;
+    padding: 24px;
+    background: #f9fafb;
+    border-radius: 12px;
+    margin-top: 16px;
 }
-.profile-item .btn-delete:hover { background: #fecaca; }
+.qr-display .qr-box {
+    background: white;
+    padding: 16px;
+    border-radius: 12px;
+    display: inline-block;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.qr-timer {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #f59e0b;
+    margin-top: 12px;
+}
+.qr-timer.expiring { color: #ef4444; }
+
+.link-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+    min-height: 80px;
+}
+
+.info-box {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    background: #f0f9ff;
+    border: 1px solid #0ea5e9;
+    color: #0c4a6e;
+}
+
+/* Hidden elements */
+.hidden { display: none; }
 </style>
 {% endblock %}
 
@@ -159,1804 +189,534 @@
 <div class="wallet-container">
     <header class="wallet-header">
         <h1>Lemma Wallet</h1>
-        <p>Manage your wallet and linked devices</p>
-        <span class="badge">SDK Version: <span id="sdk-version">loading...</span></span>
+        <p>Your secure identity across the web</p>
     </header>
 
-    <!-- LOCKED VIEW: Shown when wallet is not unlocked -->
-    <div id="locked-view" style="display: none;">
-        <div class="card" style="border: 2px solid #667eea; background: linear-gradient(135deg, #f5f3ff, #ede9fe); text-align: center; padding: 48px 24px;">
-            <div style="font-size: 4rem; margin-bottom: 16px;">🔒</div>
-            <h2 style="color: #5b21b6; font-size: 1.5rem; margin-bottom: 12px;">Unlock Your Wallet</h2>
-            <p style="color: #6b7280; margin-bottom: 24px; max-width: 400px; margin-left: auto; margin-right: auto;">
-                Prove you own this wallet by authenticating with your passkey. This is completely private - no data is logged or sent anywhere.
-            </p>
-            <div id="locked-status" class="status-box info" style="max-width: 400px; margin: 0 auto 24px; text-align: left;">
-                Checking wallet status...
-            </div>
-            <button id="unlock-btn" class="btn btn-primary" style="font-size: 1.1rem; padding: 16px 48px;">
+    <!-- WALLET STATUS -->
+    <div id="wallet-status" class="wallet-status status-locked">
+        <div class="status-icon">🔒</div>
+        <div class="status-info">
+            <h3>Checking wallet...</h3>
+            <p>Please wait</p>
+        </div>
+    </div>
+
+    <!-- LOCKED VIEW -->
+    <div id="locked-view">
+        <div class="card" style="text-align: center;">
+            <button id="unlock-btn" class="btn btn-primary btn-full" style="font-size: 1.1rem; padding: 16px;">
                 Unlock with Passkey
             </button>
-            <div id="no-wallet-options" style="display: none; margin-top: 24px;">
+            
+            <div id="no-wallet-msg" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
                 <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 12px;">No wallet on this device?</p>
-                <button class="btn btn-success" id="create-wallet-btn" style="margin: 4px;">Create New Wallet</button>
-                <a href="/wallet/link" class="btn btn-secondary" style="margin: 4px; text-decoration: none; display: inline-block;">Link Existing Wallet</a>
+                <button id="create-wallet-btn" class="btn btn-primary" style="margin-right: 8px;">Create Wallet</button>
+                <a href="/wallet/link" class="btn btn-secondary" style="text-decoration: none;">Link Device</a>
             </div>
         </div>
     </div>
 
-    <!-- UNLOCKED VIEW: Shown when wallet is unlocked -->
-    <div id="unlocked-view" style="display: none;">
-    
-    <!-- Quick Actions Bar -->
-    <div class="card" style="border: 2px solid #10b981; background: linear-gradient(135deg, #ecfdf5, #d1fae5);">
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
-            <div>
-                <h2 style="color: #065f46; margin: 0 0 4px;">Wallet Unlocked</h2>
-                <p id="wallet-summary" style="color: #047857; font-size: 0.85rem; margin: 0;">Loading...</p>
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <button class="btn btn-secondary" id="lock-wallet-btn" style="background: #6b7280;">Lock Wallet</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Wallet Profiles -->
-    <div class="card" id="profiles-card" style="border: 2px solid #8b5cf6; background: linear-gradient(135deg, #faf5ff, #f3e8ff);">
-        <h2 style="color: #6b21a8;">Wallet Profiles</h2>
-        <p style="color: #7c3aed; font-size: 0.85rem; margin-bottom: 16px;">
-            Use multiple identities (e.g., Work, Personal) with separate credentials for each.
-        </p>
+    <!-- UNLOCKED VIEW -->
+    <div id="unlocked-view" class="hidden">
         
-        <!-- Active Profile Display -->
-        <div id="active-profile-display" class="status-box" style="background: #ede9fe; border: 1px solid #8b5cf6; color: #5b21b6;">
-            Loading profiles...
-        </div>
-        
-        <!-- Profile List -->
-        <div id="profile-list" style="margin-top: 16px;">
-            <!-- Populated by JS -->
-        </div>
-        
-        <!-- Add Profile -->
-        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #ddd6fe;">
-            <div style="display: flex; gap: 8px;">
-                <input type="text" id="new-profile-name" placeholder="New profile name (e.g., Work)" 
-                    style="flex: 1; padding: 10px; border: 1px solid #c4b5fd; border-radius: 8px; font-size: 0.9rem;">
-                <button class="btn btn-primary" id="create-profile-btn" style="background: #8b5cf6; white-space: nowrap;">
-                    + Add Profile
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Session Status -->
-    <div class="card">
-        <h2>Session Status</h2>
-        <div id="session-status" class="status-box info">Loading...</div>
-        <div class="actions">
-            <button class="btn btn-primary" id="refresh-status-btn">Refresh Status</button>
-            <button class="btn btn-secondary" id="check-bridge-btn">Check Bridge</button>
-            <button class="btn btn-secondary" id="check-cookie-btn">Check Cookie</button>
-            <button class="btn btn-secondary" id="check-auth-state-btn">Get Auth State</button>
-        </div>
-    </div>
-
-    <!-- Popup Flow Testing -->
-    <div class="card" id="popup-test-card" style="border: 2px solid #f59e0b; background: linear-gradient(135deg, #fffbeb, #fef3c7);">
-        <h2 style="color: #92400e;">🪟 Popup Flow Testing</h2>
-        <div id="popup-status" class="status-box info">
-            <strong>Context:</strong> <span id="context-type">Checking...</span><br>
-            <strong>Is First-Party:</strong> <span id="is-first-party">...</span><br>
-            <strong>Popup Needed:</strong> <span id="popup-needed">...</span>
-        </div>
-        <div class="actions">
-            <button class="btn btn-primary" id="test-popup-btn">🪟 Test unlockWithPopup()</button>
-            <button class="btn btn-secondary" id="popup-direct-btn">🔗 Open Popup Direct</button>
-            <button class="btn btn-secondary" id="simulate-3rd-party-btn">🌐 Simulate 3rd Party</button>
-        </div>
-        <p style="color: #78716c; font-size: 0.8rem; margin-top: 12px;">
-            <strong>Note:</strong> On lemma.id, popup is not needed (direct passkey access).<br>
-            On third-party sites, <code>unlockWithPopup()</code> opens lemma.id/wallet/popup to authenticate.
-        </p>
-    </div>
-
-    <!-- Wallet Actions -->
-    <div class="card">
-        <h2>Manual Wallet Actions</h2>
-        <div class="actions">
-            <button class="btn btn-primary" id="unlock-direct-btn">🔓 Unlock (Direct)</button>
-            <button class="btn btn-secondary" id="lock-wallet-btn2">🔒 Lock Wallet</button>
-            <button class="btn btn-success" id="register-passkey-btn">🔑 Register Passkey</button>
-        </div>
-        <div class="actions">
-            <button class="btn btn-danger" id="clear-all-btn">🗑️ Clear All State</button>
-        </div>
-    </div>
-
-    <!-- Device Management -->
-    <div class="card" style="border: 2px solid #10b981; background: linear-gradient(135deg, #ecfdf5, #d1fae5);">
-        <h2 style="color: #065f46;">📱 Transfer Wallet</h2>
-        
-        <!-- Toggle Tabs -->
-        <div style="display: flex; gap: 0; margin-bottom: 16px; border-radius: 8px; overflow: hidden; border: 2px solid #10b981;">
-            <button id="tab-send" 
-                style="flex: 1; padding: 12px; border: none; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; background: #10b981; color: white;">
-                📤 Send to Device
+        <!-- LOCK BUTTON -->
+        <div class="card">
+            <button id="lock-btn" class="btn btn-danger btn-full">
+                Lock Wallet
             </button>
-            <button id="tab-receive"
-                style="flex: 1; padding: 12px; border: none; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; background: white; color: #065f46;">
-                📥 Receive from Device
-            </button>
+            <p style="text-align: center; color: #6b7280; font-size: 0.8rem; margin: 12px 0 0;">
+                Locking signs you out of all sites on all devices
+            </p>
         </div>
 
-        <!-- SEND TAB: Send wallet to another device -->
-        <div id="transfer-send" style="display: block;">
-            <div id="device-status" class="status-box info">
-                Checking device status...
-            </div>
+        <!-- DEVICE LINKING -->
+        <div class="card">
+            <h2><span class="icon">📱</span> Link Another Device</h2>
             
-            <div id="send-actions">
-                <button class="btn btn-success" id="add-device-btn" style="width: 100%;">
-                    📱 Generate QR Code
-                </button>
-                <p style="color: #065f46; font-size: 0.8rem; margin-top: 8px; text-align: center;">
-                    Show this QR code to your other device to transfer your wallet there.
+            <div class="link-tabs">
+                <button id="tab-send" class="link-tab active">Send to Device</button>
+                <button id="tab-receive" class="link-tab">Receive from Device</button>
+            </div>
+
+            <!-- SEND TAB -->
+            <div id="send-content">
+                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 16px;">
+                    Show a QR code to link your wallet to another device.
                 </p>
+                <button id="show-qr-btn" class="btn btn-primary btn-full">Generate QR Code</button>
+                
+                <div id="qr-display" class="qr-display hidden">
+                    <div class="qr-box">
+                        <div id="qr-container" style="width: 180px; height: 180px;"></div>
+                    </div>
+                    <p style="margin-top: 12px; font-size: 0.9rem; color: #374151;">Scan with your other device</p>
+                    <div id="qr-timer" class="qr-timer">Expires in 60s</div>
+                    <button id="hide-qr-btn" class="btn btn-secondary" style="margin-top: 12px;">Close</button>
+                </div>
             </div>
-            
-            <!-- QR Code Display -->
-            <div id="qr-display" style="display: none; margin-top: 16px; text-align: center;">
-                <div style="background: white; padding: 20px; border-radius: 12px; display: inline-block; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                    <div id="qr-container" style="width: 200px; height: 200px;"></div>
-                </div>
-                <p style="margin-top: 12px; font-size: 0.9rem; color: #065f46;">
-                    Scan this on your other device
+
+            <!-- RECEIVE TAB -->
+            <div id="receive-content" class="hidden">
+                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 16px;">
+                    Paste the code from your other device to link this one.
                 </p>
-                <div id="qr-timer" style="font-size: 1.2rem; font-weight: 600; color: #92400e; margin-top: 8px;">
-                    ⏱️ Expires in 60s
-                </div>
-                
-                <!-- Link URL for sharing -->
-                <div style="margin-top: 16px; padding: 12px; background: #f0fdf4; border: 1px solid #10b981; border-radius: 8px;">
-                    <p style="font-size: 0.8rem; color: #065f46; margin-bottom: 8px;">Or share this link:</p>
-                    <input type="text" id="link-url" readonly 
-                        style="width: 100%; padding: 8px; font-family: monospace; font-size: 0.7rem; border: 1px solid #ccc; border-radius: 4px; background: white; text-overflow: ellipsis;">
-                    <button id="copy-link-url-btn" style="margin-top: 8px; padding: 8px 16px; cursor: pointer; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600;">
-                        📋 Copy Link
-                    </button>
-                </div>
-                
-                <button class="btn btn-secondary" id="hide-qr-btn" style="margin-top: 12px;">Close</button>
+                <textarea id="receive-code" class="link-input" placeholder="Paste transfer code here..."></textarea>
+                <button id="link-device-btn" class="btn btn-primary btn-full" style="margin-top: 12px;">Link This Device</button>
+                <div id="receive-status" class="hidden" style="margin-top: 12px;"></div>
             </div>
         </div>
 
-        <!-- RECEIVE TAB: Receive wallet from another device -->
-        <div id="transfer-receive" style="display: none;">
-            <div class="status-box info" style="margin-bottom: 16px;">
-                📷 Scan a QR code from your other device, or paste the transfer code below.
-            </div>
+        <!-- SETTINGS -->
+        <div class="card">
+            <h2><span class="icon">&#9881;</span> Settings</h2>
             
-            <div style="margin-bottom: 12px;">
-                <textarea id="receive-code" placeholder="Paste the QR code data here..." 
-                    style="width: 100%; padding: 12px; border: 1px solid #10b981; border-radius: 8px; font-family: monospace; font-size: 0.8rem; min-height: 80px; resize: vertical;"></textarea>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Auto-lock timeout</div>
+                    <div class="setting-description">Lock wallet after inactivity</div>
+                </div>
+                <div class="setting-control">
+                    <select id="autolock-select">
+                        <option value="0">Never</option>
+                        <option value="5">5 minutes</option>
+                        <option value="15">15 minutes</option>
+                        <option value="30" selected>30 minutes</option>
+                        <option value="60">1 hour</option>
+                        <option value="240">4 hours</option>
+                    </select>
+                </div>
             </div>
-            
-            <button class="btn btn-success" id="receive-wallet-btn" style="width: 100%;">
-                🔗 Link This Device
+        </div>
+
+        <!-- DANGER ZONE -->
+        <div class="card" style="border-color: #fecaca;">
+            <h2 style="color: #dc2626;"><span class="icon">&#9888;</span> Danger Zone</h2>
+            <button id="clear-wallet-btn" class="btn btn-secondary btn-full" style="color: #dc2626; border-color: #fecaca;">
+                Clear Wallet Data
             </button>
-            
-            <div id="receive-status" style="margin-top: 12px; display: none;"></div>
-            
-            <p style="color: #065f46; font-size: 0.8rem; margin-top: 12px; text-align: center;">
-                On your other device, go to this page and click "Generate QR Code" to get a transfer code.
+            <p style="text-align: center; color: #9ca3af; font-size: 0.75rem; margin: 8px 0 0;">
+                Removes all wallet data from this device only
             </p>
         </div>
     </div>
-
-    <!-- Credentials -->
-    <div class="card">
-        <h2>Credentials</h2>
-        <div class="actions">
-            <button class="btn btn-secondary" id="refresh-credentials-btn">Refresh Credentials</button>
-        </div>
-        <div id="credentials-list" class="credentials-list">
-            <div style="padding: 24px; text-align: center; color: #9ca3af;">
-                Click "Refresh Credentials" to load
-            </div>
-        </div>
-    </div>
-
-    <!-- Console Log -->
-    <div class="card">
-        <h2>Console Log</h2>
-        <div id="log" class="log-container"></div>
-        <div class="actions" style="margin-top: 12px;">
-            <button class="btn btn-secondary" id="clear-log-btn">Clear Log</button>
-        </div>
-    </div>
-
-    </div><!-- END unlocked-view -->
-</div><!-- END wallet-container -->
+</div>
 
 <script src="/static/js/lemma-wallet.js?v=2341" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
-// =============================================
-// SDK-ONLY WALLET PAGE
-// All operations use only LemmaWallet public API
-// =============================================
-
 let wallet = null;
-const logEl = document.getElementById('log');
+let qrTimerInterval = null;
 
-// Capture console for display
-const origLog = console.log;
-const origWarn = console.warn;
-const origError = console.error;
-
-function addLog(msg, type = 'info') {
-    const entry = document.createElement('div');
-    entry.className = `log-entry ${type}`;
-    const time = new Date().toLocaleTimeString();
-    const text = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
-    entry.textContent = `[${time}] ${text}`;
-    logEl.appendChild(entry);
-    logEl.scrollTop = logEl.scrollHeight;
-}
-
-console.log = (...args) => {
-    origLog.apply(console, args);
-    addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'info');
-};
-console.warn = (...args) => {
-    origWarn.apply(console, args);
-    addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'warn');
-};
-console.error = (...args) => {
-    origError.apply(console, args);
-    addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), 'error');
-};
-
-function clearLog() {
-    logEl.innerHTML = '';
-}
-
-// Initialize SDK
-async function initSDK() {
-    if (wallet) return wallet;
-    try {
-        addLog('Creating LemmaWallet instance...', 'info');
-        wallet = new LemmaWallet();
-        await wallet.init();
-        addLog('SDK initialized', 'success');
-        return wallet;
-    } catch (e) {
-        addLog(`SDK init failed: ${e.message}`, 'error');
-        throw e;
-    }
-}
-
-// =============================================
-// PROFILE MANAGEMENT
-// =============================================
-
-async function loadProfiles() {
-    try {
-        await initSDK();
-        const profiles = await wallet.listProfiles();
-        const activeProfile = await wallet.getActiveProfile();
-        
-        // Update active profile display
-        const displayEl = document.getElementById('active-profile-display');
-        displayEl.innerHTML = `<strong>Active Profile:</strong> ${activeProfile.name}`;
-        
-        // Render profile list
-        const listEl = document.getElementById('profile-list');
-        if (profiles.length === 0) {
-            listEl.innerHTML = '<p style="color: #6b7280; text-align: center;">No profiles yet. Create one above.</p>';
-            return;
-        }
-        
-        listEl.innerHTML = profiles.map(profile => `
-            <div class="profile-item ${profile.isActive ? 'active' : ''}">
-                <div class="profile-info">
-                    <div class="profile-name">
-                        ${profile.name}
-                        ${profile.isActive ? '<span class="active-badge">Active</span>' : ''}
-                        ${profile.isDefault ? '<span style="font-size: 0.7rem; color: #6b7280;">(default)</span>' : ''}
-                    </div>
-                    <div class="profile-meta">
-                        Created ${new Date(profile.createdAt).toLocaleDateString()}
-                        ${profile.linkedFrom ? ' (linked)' : ''}
-                    </div>
-                </div>
-                <div class="profile-actions">
-                    ${!profile.isActive ? `<button class="btn-switch" data-profile-id="${profile.id}">Switch</button>` : ''}
-                    ${!profile.isDefault ? `<button class="btn-delete" data-profile-id="${profile.id}" data-profile-name="${profile.name}">Delete</button>` : ''}
-                </div>
-            </div>
-        `).join('');
-        
-        addLog(`Loaded ${profiles.length} profile(s), active: ${activeProfile.name}`, 'info');
-    } catch (e) {
-        addLog(`Failed to load profiles: ${e.message}`, 'error');
-        document.getElementById('active-profile-display').innerHTML = `<span style="color: #dc2626;">Error loading profiles</span>`;
-    }
-}
-
-async function createProfile() {
-    const nameInput = document.getElementById('new-profile-name');
-    const name = nameInput.value.trim();
-    
-    if (!name) {
-        addLog('Profile name is required', 'warn');
-        return;
-    }
-    
-    try {
-        await initSDK();
-        const profile = await wallet.createProfile(name);
-        addLog(`Created profile: ${profile.name}`, 'success');
-        nameInput.value = '';
-        await loadProfiles();
-    } catch (e) {
-        addLog(`Failed to create profile: ${e.message}`, 'error');
-    }
-}
-
-async function switchProfile(profileId) {
-    try {
-        await initSDK();
-        const profile = await wallet.switchProfile(profileId);
-        addLog(`Switched to profile: ${profile.name}`, 'success');
-        await loadProfiles();
-        await refreshStatus();
-    } catch (e) {
-        addLog(`Failed to switch profile: ${e.message}`, 'error');
-    }
-}
-
-async function deleteProfile(profileId, profileName) {
-    if (!confirm(`Delete profile "${profileName}"? This cannot be undone.`)) {
-        return;
-    }
-    
-    try {
-        await initSDK();
-        await wallet.deleteProfile(profileId);
-        addLog(`Deleted profile: ${profileName}`, 'success');
-        await loadProfiles();
-    } catch (e) {
-        addLog(`Failed to delete profile: ${e.message}`, 'error');
-    }
+// Initialize wallet
+async function initWallet() {
+    wallet = new LemmaWallet();
+    await wallet.init();
+    return wallet;
 }
 
 // Update status display
-function updateStatus(text, type = 'info') {
-    const el = document.getElementById('session-status');
-    el.textContent = text;
-    el.className = `status-box ${type}`;
+function updateStatusDisplay(isUnlocked, message, submessage) {
+    const statusEl = document.getElementById('wallet-status');
+    const iconEl = statusEl.querySelector('.status-icon');
+    const titleEl = statusEl.querySelector('h3');
+    const subtitleEl = statusEl.querySelector('p');
+    
+    statusEl.className = `wallet-status ${isUnlocked ? 'status-unlocked' : 'status-locked'}`;
+    iconEl.textContent = isUnlocked ? '🔓' : '🔒';
+    titleEl.textContent = message;
+    subtitleEl.textContent = submessage;
 }
 
-// Refresh session status using SDK only
-async function refreshStatus() {
+// Show/hide views
+function showLockedView() {
+    document.getElementById('locked-view').classList.remove('hidden');
+    document.getElementById('unlocked-view').classList.add('hidden');
+}
+
+function showUnlockedView() {
+    document.getElementById('locked-view').classList.add('hidden');
+    document.getElementById('unlocked-view').classList.remove('hidden');
+}
+
+// Check wallet state and update UI
+async function checkWalletState() {
     try {
-        await initSDK();
-        
-        // Use SDK's getWalletInfo() - the ONLY way to check status
+        await initWallet();
         const info = await wallet.getWalletInfo();
-        addLog('SDK getWalletInfo(): ' + JSON.stringify(info), 'info');
         
         if (info.isUnlocked) {
-            updateStatus(`✅ WALLET UNLOCKED
-            
-Wallet ID: ${info.walletId || 'unknown'}
-Has Passkey: ${info.hasPasskey}
-Credentials: ${info.lemmaCount || 0}
-Session Expires: ${info.session?.expiresAt ? new Date(info.session.expiresAt).toLocaleString() : 'unknown'}`, 'unlocked');
+            updateStatusDisplay(true, 'Wallet Unlocked', 'You are signed in');
+            showUnlockedView();
+            return true;
+        } else if (info.hasPasskey) {
+            updateStatusDisplay(false, 'Wallet Locked', 'Unlock to access your wallet');
+            document.getElementById('no-wallet-msg').classList.add('hidden');
+            document.getElementById('unlock-btn').classList.remove('hidden');
+            showLockedView();
+        } else if (info.hasWalletSecret) {
+            updateStatusDisplay(false, 'Wallet Linked', 'Create a passkey to secure it');
+            document.getElementById('unlock-btn').textContent = 'Create Passkey';
+            document.getElementById('no-wallet-msg').classList.add('hidden');
+            showLockedView();
         } else {
-            updateStatus(`🔒 WALLET LOCKED
-
-Has Passkey: ${info.hasPasskey}
-Credentials: ${info.lemmaCount || 0}
-
-Use "Unlock Wallet" to authenticate.`, 'locked');
+            updateStatusDisplay(false, 'No Wallet', 'Create a new wallet or link from another device');
+            document.getElementById('unlock-btn').classList.add('hidden');
+            document.getElementById('no-wallet-msg').classList.remove('hidden');
+            showLockedView();
         }
+        return false;
     } catch (e) {
-        updateStatus(`❌ Error: ${e.message}`, 'error');
-        addLog(`❌ refreshStatus failed: ${e.message}`, 'error');
+        console.error('Wallet check failed:', e);
+        updateStatusDisplay(false, 'Error', e.message);
+        showLockedView();
+        return false;
     }
 }
 
-// Check bridge session (for cross-site testing)
-async function checkBridge() {
-    try {
-        await initSDK();
-        addLog('Calling SDK checkBridgeSession()...', 'info');
-        const session = await wallet.checkBridgeSession();
-        addLog('Bridge result: ' + JSON.stringify(session), session.valid ? 'success' : 'warn');
-        
-        if (session.valid) {
-            updateStatus(`✅ BRIDGE SESSION ACTIVE
-
-Wallet ID: ${session.walletId}
-Expires: ${session.expiresAt ? new Date(session.expiresAt).toLocaleString() : 'unknown'}
-Time Remaining: ${session.timeRemaining ? Math.round(session.timeRemaining / 60000) + ' min' : 'unknown'}`, 'unlocked');
-        } else {
-            updateStatus(`🔒 BRIDGE SESSION INVALID
-
-Reason: ${session.reason || 'no session'}
-Wallet Exists: ${session.walletExists}`, 'locked');
-        }
-    } catch (e) {
-        updateStatus(`❌ Bridge error: ${e.message}`, 'error');
-        addLog(`❌ checkBridge failed: ${e.message}`, 'error');
-    }
-}
-
-// Check cookie session (lemma.id only)
-async function checkCookie() {
-    try {
-        addLog('Checking cookie session via API...', 'info');
-        const response = await fetch('/api/wallet/session-sync', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await response.json();
-        addLog('Cookie result: ' + JSON.stringify(data), data.success ? 'success' : 'warn');
-        
-        if (data.success && data.session?.valid) {
-            updateStatus(`✅ COOKIE SESSION ACTIVE
-
-Wallet ID: ${data.session.wallet_id}
-Expires: ${new Date(data.session.expires_at * 1000).toLocaleString()}
-Unlocked At: ${new Date(data.session.unlocked_at).toLocaleString()}`, 'unlocked');
-        } else {
-            updateStatus(`🔒 NO COOKIE SESSION
-
-Error: ${data.error || 'none'}
-
-The session cookie enables cross-site unlock detection.`, 'locked');
-        }
-    } catch (e) {
-        updateStatus(`❌ Cookie check error: ${e.message}`, 'error');
-        addLog(`❌ checkCookie failed: ${e.message}`, 'error');
-    }
-}
-
-// Unlock wallet using SDK only
+// Unlock wallet
 async function unlockWallet() {
+    const btn = document.getElementById('unlock-btn');
+    const origText = btn.textContent;
+    
     try {
-        await initSDK();
-        addLog('=== Calling SDK unlock() ===', 'info');
+        btn.textContent = 'Authenticating...';
+        btn.disabled = true;
         
-        const result = await wallet.unlock();
-        addLog('unlock() result: ' + JSON.stringify(result), 'success');
+        await initWallet();
         
-        await refreshStatus();
+        // Check if we need to create passkey (linked wallet without passkey)
+        const info = await wallet.getWalletInfo();
+        if (info.hasWalletSecret && !info.hasPasskey) {
+            await wallet.registerPasskey();
+        } else {
+            await wallet.unlock();
+        }
+        
+        // Check for redirect flow
+        const redirectParams = getRedirectParams();
+        if (redirectParams) {
+            await handleRedirectReturn(redirectParams.returnUrl);
+            return;
+        }
+        
+        await checkWalletState();
+        
     } catch (e) {
-        addLog(`❌ unlock() failed: ${e.message}`, 'error');
-        updateStatus(`❌ Unlock failed: ${e.message}`, 'error');
+        console.error('Unlock failed:', e);
+        updateStatusDisplay(false, 'Unlock Failed', e.message);
+    } finally {
+        btn.textContent = origText;
+        btn.disabled = false;
     }
 }
 
-// Lock wallet using SDK only
+// Lock wallet
 async function lockWallet() {
     try {
-        await initSDK();
-        addLog('Locking wallet...', 'info');
-        
+        await initWallet();
         await wallet.lock();
-        
-        addLog('Wallet locked', 'success');
-        
-        // Switch back to locked view
-        await checkAndShowView();
+        await checkWalletState();
     } catch (e) {
-        addLog(`Lock failed: ${e.message}`, 'error');
+        console.error('Lock failed:', e);
     }
 }
 
-// Register passkey using SDK only
-async function registerPasskey() {
-    try {
-        await initSDK();
-        addLog('Creating passkey...', 'info');
-        
-        const result = await wallet.registerPasskey();
-        addLog('Passkey created successfully', 'success');
-        
-        // Switch to unlocked view and load data
-        showUnlockedView();
-        await refreshStatus();
-        await loadProfiles();
-        await loadCredentials();
-        await updateDeviceStatus();
-        
-        // Update wallet summary
-        const summaryEl = document.getElementById('wallet-summary');
-        const activeProfile = await wallet.getActiveProfile();
-        const info = await wallet.getWalletInfo();
-        summaryEl.textContent = `Profile: ${activeProfile.name} | ${info.lemmaCount || 0} credentials`;
-    } catch (e) {
-        addLog(`Passkey creation failed: ${e.message}`, 'error');
-    }
-}
-
-// Load credentials using SDK only
-async function loadCredentials() {
-    const container = document.getElementById('credentials-list');
-    try {
-        await initSDK();
-        addLog('Calling SDK getCredentials()...', 'info');
-        
-        const credentials = await wallet.getCredentials();
-        addLog(`Found ${credentials.length} credentials`, 'info');
-        
-        if (credentials.length === 0) {
-            container.innerHTML = `
-                <div style="padding: 32px; text-align: center; color: #9ca3af;">
-                    <div style="font-size: 2rem; margin-bottom: 8px;">📭</div>
-                    <div>No credentials found</div>
-                </div>`;
-            return;
-        }
-        
-        container.innerHTML = credentials.map(cred => {
-            const claims = cred.claims || cred.credentialSubject || {};
-            const type = cred.packageType || cred.type || 'unknown';
-            const site = claims.siteId || claims.site_id || claims.siteName || 'Unknown site';
-            const issuedAt = cred.issuedAt || cred.issuanceDate;
-            
-            return `
-                <div class="credential-item">
-                    <div class="credential-info">
-                        <h4>${type === 'permission' ? '🔑' : '👤'} ${type.charAt(0).toUpperCase() + type.slice(1)}</h4>
-                        <p>Site: ${site}</p>
-                        <p>ID: ${cred.id?.substring(0, 30)}...</p>
-                        ${issuedAt ? `<p>Issued: ${new Date(issuedAt).toLocaleDateString()}</p>` : ''}
-                    </div>
-                    <button class="btn btn-danger btn-revoke" data-cred-id="${cred.id}">Revoke</button>
-                </div>`;
-        }).join('');
-        
-    } catch (e) {
-        container.innerHTML = `
-            <div style="padding: 24px; text-align: center; color: #ef4444;">
-                Error: ${e.message}
-            </div>`;
-        addLog(`❌ loadCredentials failed: ${e.message}`, 'error');
-    }
-}
-
-// Revoke credential using SDK only
-async function revokeCredential(credId) {
-    if (!confirm('Revoke this credential? This cannot be undone.')) return;
+// Create new wallet
+async function createWallet() {
+    const btn = document.getElementById('create-wallet-btn');
+    const origText = btn.textContent;
     
     try {
-        await initSDK();
-        addLog(`Calling SDK removeCredential(${credId})...`, 'info');
+        btn.textContent = 'Creating...';
+        btn.disabled = true;
         
-        const result = await wallet.removeCredential(credId);
-        addLog('removeCredential result: ' + JSON.stringify(result), 'success');
-        
-        await loadCredentials();
-    } catch (e) {
-        addLog(`❌ revokeCredential failed: ${e.message}`, 'error');
-    }
-}
-
-// Clear all state
-async function clearAll() {
-    if (!confirm('Clear ALL wallet data? This includes credentials and session.')) return;
-    
-    try {
-        addLog('Clearing all state...', 'warn');
-        
-        // Delete IndexedDB - wait for it to complete
-        await new Promise((resolve, reject) => {
-            const req = indexedDB.deleteDatabase('LemmaWallet');
-            req.onsuccess = () => {
-                addLog('  - Deleted IndexedDB LemmaWallet', 'info');
-                resolve();
-            };
-            req.onerror = () => {
-                addLog('  - Error deleting IndexedDB: ' + req.error, 'error');
-                resolve(); // Continue anyway
-            };
-            req.onblocked = () => {
-                addLog('  - IndexedDB deletion blocked - closing connections...', 'warn');
-                // Force close any open connections
-                if (wallet && wallet.db) {
-                    wallet.db.close();
-                }
-                resolve();
-            };
-        });
-        
-        // Also try clearing localStorage
-        try {
-            localStorage.clear();
-            addLog('  - Cleared localStorage', 'info');
-        } catch (e) {
-            addLog('  - localStorage clear failed: ' + e.message, 'warn');
-        }
-        
-        // Delete cookies
-        document.cookie = 'lemma_wallet_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        document.cookie = 'lemma_wallet_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        addLog('  - Deleted cookies', 'info');
-        
-        // Unregister service workers
-        if ('serviceWorker' in navigator) {
-            const regs = await navigator.serviceWorker.getRegistrations();
-            for (const reg of regs) {
-                await reg.unregister();
-            }
-            addLog(`  - Unregistered ${regs.length} service workers`, 'info');
-        }
-        
-        // Clear caches
-        if ('caches' in window) {
-            const cacheNames = await caches.keys();
-            for (const name of cacheNames) {
-                await caches.delete(name);
-            }
-            addLog(`  - Cleared ${cacheNames.length} caches`, 'info');
-        }
-        
-        wallet = null;
-        addLog('✅ All state cleared - refreshing page in 2 seconds...', 'success');
-        
-        setTimeout(() => location.reload(), 2000);
-    } catch (e) {
-        addLog(`❌ clearAll failed: ${e.message}`, 'error');
-        console.error('clearAll error:', e);
-    }
-}
-
-// =============================================
-// SMART AUTH (new SDK v2.9.0 features)
-// =============================================
-
-let currentAuthState = null;
-
-// Check and display auth state
-async function checkAuthState() {
-    try {
-        await initSDK();
-        addLog('=== Calling SDK getAuthState() ===', 'info');
-        
-        const state = await wallet.getAuthState();
-        currentAuthState = state;
-        addLog('getAuthState() result: ' + JSON.stringify(state), 'success');
-        
-        return state;
-    } catch (e) {
-        addLog(`❌ getAuthState() failed: ${e.message}`, 'error');
-        return null;
-    }
-}
-
-// Update smart auth UI based on state
-function updateSmartAuthUI(state) {
-    const statusEl = document.getElementById('smart-auth-status');
-    const btnEl = document.getElementById('smart-auth-btn');
-    
-    if (!state) {
-        statusEl.textContent = 'Error checking auth state';
-        statusEl.className = 'status-box error';
-        btnEl.textContent = 'Try Again';
-        return;
-    }
-    
-    if (state.isUnlocked && state.walletSecret) {
-        statusEl.textContent = `✅ WALLET UNLOCKED
-
-You're signed in! Your wallet is ready.
-Wallet Secret: ${state.walletSecret.substring(0, 16)}...
-
-Suggested Action: ${state.suggestedAction}`;
-        statusEl.className = 'status-box unlocked';
-        btnEl.textContent = '✓ Already Signed In';
-        btnEl.disabled = true;
-        btnEl.style.opacity = '0.6';
-    } else if (state.hasWallet) {
-        statusEl.textContent = `🔒 WALLET LOCKED
-
-You have a wallet but it's locked.
-Unlock with your passkey to continue.
-
-Suggested Action: ${state.suggestedAction}`;
-        statusEl.className = 'status-box locked';
-        btnEl.textContent = state.suggestedButtonText || 'Unlock Wallet';
-        btnEl.disabled = false;
-        btnEl.style.opacity = '1';
-    } else {
-        statusEl.textContent = `📱 NO WALLET
-
-Create a passkey to get started.
-Your wallet will be securely stored on this device.
-
-Suggested Action: ${state.suggestedAction}`;
-        statusEl.className = 'status-box info';
-        btnEl.textContent = state.suggestedButtonText || 'Create Passkey & Sign In';
-        btnEl.disabled = false;
-        btnEl.style.opacity = '1';
-    }
-}
-
-// Smart auth action - uses autoAuthenticate() then falls back to registerPasskey()
-async function smartAuth() {
-    const btnEl = document.getElementById('smart-auth-btn');
-    const origText = btnEl.textContent;
-    
-    try {
-        await initSDK();
-        btnEl.textContent = 'Checking...';
-        btnEl.disabled = true;
-        
-        addLog('=== Calling SDK autoAuthenticate() ===', 'info');
-        const result = await wallet.autoAuthenticate();
-        addLog('autoAuthenticate() result: ' + JSON.stringify(result), result.authenticated ? 'success' : 'warn');
-        
-        if (result.authenticated) {
-            // Already authenticated!
-            addLog('✅ Auto-authenticated! Wallet secret available.', 'success');
-            
-            // Refresh state and update UI
-            const state = await checkAuthState();
-            updateSmartAuthUI(state);
-            await refreshStatus();
-            return;
-        }
-        
-        // Need to create/unlock passkey
-        addLog('No existing session - calling registerPasskey()...', 'info');
-        btnEl.textContent = 'Creating Passkey...';
-        
-        const regResult = await wallet.registerPasskey();
-        addLog('registerPasskey() result: ' + JSON.stringify(regResult), 'success');
-        
-        // Now get wallet secret
-        const secret = regResult.walletSecret || await wallet.getWalletSecret();
-        addLog(`Wallet secret: ${secret ? secret.substring(0, 16) + '...' : 'none'}`, secret ? 'success' : 'warn');
-        
-        // Refresh state and update UI
-        const state = await checkAuthState();
-        updateSmartAuthUI(state);
-        await refreshStatus();
+        await initWallet();
+        await wallet.registerPasskey();
+        await checkWalletState();
         
     } catch (e) {
-        addLog(`❌ smartAuth failed: ${e.message}`, 'error');
-        btnEl.textContent = origText;
-        btnEl.disabled = false;
+        console.error('Create wallet failed:', e);
+        updateStatusDisplay(false, 'Creation Failed', e.message);
+    } finally {
+        btn.textContent = origText;
+        btn.disabled = false;
     }
 }
 
-// Initialize smart auth on load
-async function initSmartAuth() {
-    try {
-        await initSDK();
-        const state = await checkAuthState();
-        updateSmartAuthUI(state);
-    } catch (e) {
-        addLog(`Smart auth init error: ${e.message}`, 'error');
-    }
-}
-
-// Sync session from server cookie (handles unlock on third-party sites)
-async function syncFromServerCookie() {
-    try {
-        addLog('🔄 Checking server cookie for session sync...', 'info');
-        const response = await fetch('/api/wallet/session-sync', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await response.json();
-        
-        if (data.success && data.session) {
-            // Server has valid session - sync to local IndexedDB
-            const localInfo = await wallet.getWalletInfo();
-            
-            if (!localInfo.isUnlocked) {
-                addLog('📥 Server has session but local is locked - syncing...', 'info');
-                
-                // Manually set the session in SDK
-                wallet.session = {
-                    isUnlocked: true,
-                    unlockedAt: data.session.unlocked_at,
-                    expiresAt: data.session.expires_at * 1000,
-                    walletId: data.session.wallet_id,
-                    source: 'server_sync'
-                };
-                
-                // Save to IndexedDB
-                await wallet._put('session', { id: 'current', ...wallet.session });
-                addLog('✅ Session synced from server cookie!', 'success');
-                return true;
-            }
-        }
-        return false;
-    } catch (e) {
-        addLog(`Server sync failed: ${e.message}`, 'warn');
-        return false;
-    }
-}
-
-// =============================================
-// POPUP FLOW TESTING
-// =============================================
-
-function updateContextInfo() {
-    const hostname = window.location.hostname;
-    const isFirstParty = hostname === 'lemma.id' || hostname.endsWith('.lemma.id') || hostname === 'localhost';
-    
-    document.getElementById('context-type').textContent = hostname;
-    document.getElementById('is-first-party').textContent = isFirstParty ? '✅ Yes (lemma.id)' : '❌ No (third-party)';
-    document.getElementById('popup-needed').textContent = isFirstParty ? 
-        '❌ No (direct passkey access)' : 
-        '✅ Yes (must unlock via popup)';
-    
-    // Style the card based on context
-    const card = document.getElementById('popup-test-card');
-    if (!isFirstParty) {
-        card.style.border = '2px solid #10b981';
-        card.style.background = 'linear-gradient(135deg, #ecfdf5, #d1fae5)';
-    }
-}
-
-// Test unlockWithPopup() - the SDK method for third-party sites
-async function testUnlockWithPopup() {
-    try {
-        await initSDK();
-        addLog('=== Calling SDK unlockWithPopup() ===', 'info');
-        addLog('This opens a popup to lemma.id/wallet/popup', 'info');
-        
-        const result = await wallet.unlockWithPopup();
-        
-        addLog('unlockWithPopup() result:', 'info');
-        addLog(JSON.stringify(result, null, 2), result.success ? 'success' : 'warn');
-        
-        if (result.success) {
-            // Show what data came from popup
-            const statusEl = document.getElementById('popup-status');
-            statusEl.innerHTML = `<strong>✅ Popup Success!</strong><br>
-<strong>Wallet ID:</strong> ${result.walletId || 'N/A'}<br>
-<strong>Wallet Secret:</strong> ${result.walletSecret ? result.walletSecret.substring(0, 16) + '...' : 'N/A'}<br>
-<strong>Message:</strong> ${result.message || 'N/A'}`;
-            statusEl.className = 'status-box unlocked';
-            
-            // Refresh other UI
-            await refreshStatus();
-            await initSmartAuth();
-        } else {
-            const statusEl = document.getElementById('popup-status');
-            statusEl.innerHTML = `<strong>❌ Popup Failed/Cancelled</strong><br>
-<strong>Reason:</strong> ${result.reason || 'unknown'}<br>
-<strong>Message:</strong> ${result.message || 'N/A'}`;
-            statusEl.className = 'status-box error';
-        }
-    } catch (e) {
-        addLog(`❌ unlockWithPopup() failed: ${e.message}`, 'error');
-    }
-}
-
-// Open popup directly (for debugging)
-function testPopupDirect() {
-    addLog('Opening popup directly to lemma.id/wallet/popup', 'info');
-    
-    const width = 450;
-    const height = 600;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    
-    const popup = window.open(
-        'https://lemma.id/wallet/popup',
-        'lemma-wallet-popup',
-        `width=${width},height=${height},left=${left},top=${top},popup=yes`
-    );
-    
-    if (!popup) {
-        addLog('❌ Popup blocked! Enable popups for this site.', 'error');
-        return;
-    }
-    
-    addLog('Popup opened - waiting for messages...', 'info');
-    
-    // Listen for messages from popup
-    const handler = (event) => {
-        if (event.origin !== 'https://lemma.id') return;
-        addLog(`📨 Message from popup: ${JSON.stringify(event.data)}`, 'success');
-        
-        if (event.data?.type === 'LEMMA_UNLOCK_SUCCESS' || event.data?.type === 'LEMMA_UNLOCK_CANCELLED') {
-            window.removeEventListener('message', handler);
-        }
-    };
-    window.addEventListener('message', handler);
-}
-
-// Simulate third-party behavior (force popup even on lemma.id)
-async function simulateThirdParty() {
-    try {
-        await initSDK();
-        addLog('=== SIMULATING THIRD-PARTY SITE BEHAVIOR ===', 'warn');
-        addLog('Even on lemma.id, this will use the popup flow', 'info');
-        
-        // Directly call unlockWithPopup (which is what third-party sites do)
-        addLog('Calling unlockWithPopup() regardless of context...', 'info');
-        
-        const result = await wallet.unlockWithPopup();
-        addLog('Result: ' + JSON.stringify(result), result.success ? 'success' : 'warn');
-        
-        if (result.success) {
-            await refreshStatus();
-            await initSmartAuth();
-        }
-    } catch (e) {
-        addLog(`❌ Simulation failed: ${e.message}`, 'error');
-    }
-}
-
-// =============================================
-// DEVICE MANAGEMENT / WALLET TRANSFER
-// =============================================
-
-let qrTimerInterval = null;
-let currentTransferTab = 'send';
-
-function showTransferTab(tab) {
-    currentTransferTab = tab;
-    
-    // Update tab styles
+// Tab switching
+function showTab(tab) {
     const sendTab = document.getElementById('tab-send');
     const receiveTab = document.getElementById('tab-receive');
-    const sendContent = document.getElementById('transfer-send');
-    const receiveContent = document.getElementById('transfer-receive');
+    const sendContent = document.getElementById('send-content');
+    const receiveContent = document.getElementById('receive-content');
     
     if (tab === 'send') {
-        sendTab.style.background = '#10b981';
-        sendTab.style.color = 'white';
-        receiveTab.style.background = 'white';
-        receiveTab.style.color = '#065f46';
-        sendContent.style.display = 'block';
-        receiveContent.style.display = 'none';
+        sendTab.classList.add('active');
+        receiveTab.classList.remove('active');
+        sendContent.classList.remove('hidden');
+        receiveContent.classList.add('hidden');
     } else {
-        receiveTab.style.background = '#10b981';
-        receiveTab.style.color = 'white';
-        sendTab.style.background = 'white';
-        sendTab.style.color = '#065f46';
-        receiveContent.style.display = 'block';
-        sendContent.style.display = 'none';
+        receiveTab.classList.add('active');
+        sendTab.classList.remove('active');
+        receiveContent.classList.remove('hidden');
+        sendContent.classList.add('hidden');
     }
     
-    // Hide QR if switching tabs
     hideQR();
 }
 
-// Store pending link data for conflict resolution
-let pendingReceiveCode = null;
-
-async function receiveWallet(replaceExisting = false) {
-    const codeInput = document.getElementById('receive-code');
-    const statusEl = document.getElementById('receive-status');
-    const code = replaceExisting ? pendingReceiveCode : codeInput.value.trim();
-    
-    if (!code) {
-        statusEl.innerHTML = '<div class="status-box error">Please paste the transfer code from your other device.</div>';
-        statusEl.style.display = 'block';
-        return;
-    }
-    
-    // Store for potential conflict resolution
-    pendingReceiveCode = code;
-    
-    statusEl.innerHTML = '<div class="status-box info">Linking wallet...</div>';
-    statusEl.style.display = 'block';
-    
+// Show QR code
+async function showQR() {
     try {
-        await initSDK();
+        await initWallet();
         
-        const result = await wallet.linkDevice({ 
-            qrData: code,
-            replaceExisting: replaceExisting 
-        });
-        
-        // Handle conflict - different wallet already exists
-        if (result.conflict) {
-            statusEl.innerHTML = `
-                <div class="status-box" style="background: #fef3cd; border: 1px solid #f59e0b; color: #92400e;">
-                    <strong>Wallet Already Exists</strong><br><br>
-                    This device has a different wallet. Choose what to do:
-                    <div style="display: flex; gap: 12px; margin-top: 16px;">
-                        <button class="btn btn-primary" id="confirm-receive-btn" style="flex: 1; padding: 10px;">
-                            Replace Wallet
-                        </button>
-                        <button class="btn btn-secondary" id="cancel-receive-btn" style="flex: 1; padding: 10px;">
-                            Keep Current
-                        </button>
-                    </div>
-                    <p style="font-size: 0.8rem; margin-top: 12px; opacity: 0.8;">
-                        Your current wallet will be backed up before replacement.
-                    </p>
-                </div>
-            `;
-            addLog('Wallet conflict - awaiting user choice', 'warn');
-            return;
-        }
-        
-        // Handle already linked (same wallet)
-        if (result.alreadyLinked) {
-            statusEl.innerHTML = '<div class="status-box unlocked">This wallet is already linked to this device.</div>';
-            addLog('Wallet already linked', 'info');
-            pendingReceiveCode = null;
-            return;
-        }
-        
-        if (result.success) {
-            statusEl.innerHTML = '<div class="status-box unlocked">Wallet linked! Now create a passkey to secure it.</div>';
-            addLog('Wallet linked successfully!', 'success');
-            pendingReceiveCode = null;
-            
-            // Prompt to create passkey
-            setTimeout(async () => {
-                if (confirm('Wallet linked! Create a passkey to secure it on this device?')) {
-                    await registerPasskey();
-                }
-                // Refresh UI
-                await refreshStatus();
-                await updateDeviceStatus();
-                await initSmartAuth();
-            }, 500);
-        } else {
-            throw new Error(result.message || 'Link failed');
-        }
-    } catch (e) {
-        addLog('Link failed: ' + e.message, 'error');
-        statusEl.innerHTML = `<div class="status-box error">${e.message}</div>`;
-        pendingReceiveCode = null;
-    }
-}
-
-function cancelReceiveWallet() {
-    const statusEl = document.getElementById('receive-status');
-    statusEl.innerHTML = '<div class="status-box info">Keeping current wallet.</div>';
-    pendingReceiveCode = null;
-    addLog('Wallet link cancelled - kept existing wallet', 'info');
-}
-
-async function updateDeviceStatus() {
-    const statusEl = document.getElementById('device-status');
-    const addBtn = document.getElementById('add-device-btn');
-    
-    try {
-        await initSDK();
-        const info = await wallet.getWalletInfo();
-        
-        if (info.hasWalletSecret && info.hasPasskey) {
-            statusEl.innerHTML = `✅ <strong>Wallet Active</strong><br>
-You can add another device to access this wallet.`;
-            statusEl.className = 'status-box unlocked';
-            addBtn.disabled = false;
-        } else if (info.hasWalletSecret) {
-            statusEl.innerHTML = `⚠️ <strong>Wallet Secret Found</strong><br>
-Create a passkey to secure this device.`;
-            statusEl.className = 'status-box locked';
-            addBtn.disabled = true;
-        } else {
-            statusEl.innerHTML = `📱 <strong>No Wallet</strong><br>
-Create a new wallet or link to an existing one.`;
-            statusEl.className = 'status-box info';
-            addBtn.disabled = true;
-        }
-    } catch (e) {
-        statusEl.textContent = '❌ Error: ' + e.message;
-        statusEl.className = 'status-box error';
-    }
-}
-
-async function showAddDevice() {
-    try {
-        await initSDK();
-        
-        // Check if wallet is unlocked
         if (!wallet.isUnlocked()) {
-            addLog('❌ Wallet must be unlocked to add a device', 'error');
             alert('Please unlock your wallet first');
             return;
         }
         
-        // Check if QRCode library is loaded
-        if (typeof QRCode === 'undefined') {
-            addLog('❌ QR code library not loaded - showing code as text', 'warn');
-            const result = await wallet.generateLinkCode();
-            // Fallback: show the code as text
-            const qrDisplay = document.getElementById('qr-display');
-            // Store qrData globally for copy function
-            window._linkCode = result.qrData;
-            qrDisplay.innerHTML = '<div style="background: white; padding: 20px; border-radius: 12px; text-align: left;">' +
-                '<p style="margin-bottom: 8px; font-weight: 600;">Copy this code to your other device:</p>' +
-                '<textarea id="link-code-text" readonly style="width: 100%; height: 100px; font-family: monospace; font-size: 0.7rem; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">' + result.qrData + '</textarea>' +
-                '<button id="copy-link-code-btn" style="margin-top: 8px; padding: 8px 16px; cursor: pointer;">📋 Copy</button>' +
-                '</div>' +
-                '<div id="qr-timer" style="font-size: 1.2rem; font-weight: 600; color: #92400e; margin-top: 8px;">⏱️ Expires in ' + result.expiresIn + 's</div>' +
-                '<button class="btn btn-secondary hide-qr-dynamic" style="margin-top: 12px;">Close</button>';
-            qrDisplay.style.display = 'block';
-            return;
-        }
-        
-        addLog('=== Generating device link code ===', 'info');
-        
         const result = await wallet.generateLinkCode();
-        addLog(`Link code generated for profile: ${result.profileName}`, 'success');
-        addLog('Expires in: ' + result.expiresIn + 's', 'info');
         
-        // Generate QR code using qrcodejs
-        const qrDisplay = document.getElementById('qr-display');
         const qrContainer = document.getElementById('qr-container');
-        
-        // Clear any previous QR code
         qrContainer.innerHTML = '';
         
-        // Log the URL for debugging
-        console.log('QR URL length:', result.qrUrl.length);
-        console.log('QR URL:', result.qrUrl);
-        
-        // Create QR code with URL (so mobile scanners open browser directly)
-        try {
+        if (typeof QRCode !== 'undefined') {
             new QRCode(qrContainer, {
                 text: result.qrUrl,
-                width: 200,
-                height: 200,
+                width: 180,
+                height: 180,
                 colorDark: '#000000',
                 colorLight: '#ffffff',
                 correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.L : 1
             });
-        } catch (qrError) {
-            console.error('QR generation failed:', qrError);
-            // Fallback to showing the code as text
-            qrContainer.innerHTML = '<p style="color: red; font-size: 0.8rem;">QR too large. Copy the code below instead.</p>';
-            window._linkCode = result.qrData;
-            document.getElementById('qr-display').innerHTML += 
-                '<textarea id="link-code-text" readonly style="width: 100%; height: 80px; font-family: monospace; font-size: 0.7rem; margin-top: 8px;">' + result.qrData + '</textarea>' +
-                '<button id="copy-link-code-btn" style="margin-top: 8px; padding: 8px 16px; cursor: pointer;">📋 Copy Code</button>';
+        } else {
+            qrContainer.innerHTML = '<p style="color: #dc2626;">QR library not loaded</p>';
         }
         
-        // Set the link URL for copying
-        const linkUrlInput = document.getElementById('link-url');
-        if (linkUrlInput) {
-            linkUrlInput.value = result.qrUrl;
-            window._linkUrl = result.qrUrl;
-        }
+        document.getElementById('qr-display').classList.remove('hidden');
+        document.getElementById('show-qr-btn').classList.add('hidden');
         
-        // Store qrData for the other copy function
-        window._linkCode = result.qrData;
-        
-        // Update the instruction text to show profile name
-        const instructionEl = qrDisplay.querySelector('p');
-        if (instructionEl) {
-            instructionEl.innerHTML = `Scan this to link <strong>${result.profileName}</strong> profile`;
-        }
-        
-        qrDisplay.style.display = 'block';
-        
-        // Start countdown timer
-        let timeLeft = result.expiresIn;
+        // Start timer
+        let timeLeft = result.expiresIn || 60;
         const timerEl = document.getElementById('qr-timer');
         
         if (qrTimerInterval) clearInterval(qrTimerInterval);
         
         qrTimerInterval = setInterval(() => {
             timeLeft--;
-            timerEl.textContent = `⏱️ Expires in ${timeLeft}s`;
-            
-            if (timeLeft <= 10) {
-                timerEl.style.color = '#dc2626';
-            }
+            timerEl.textContent = `Expires in ${timeLeft}s`;
+            timerEl.classList.toggle('expiring', timeLeft <= 10);
             
             if (timeLeft <= 0) {
-                clearInterval(qrTimerInterval);
-                qrTimerInterval = null;
                 hideQR();
-                addLog('Link code expired', 'warn');
             }
         }, 1000);
         
     } catch (e) {
-        addLog('❌ Failed to generate link code: ' + e.message, 'error');
-        alert('Failed to generate link code: ' + e.message);
+        console.error('QR generation failed:', e);
+        alert('Failed to generate QR code: ' + e.message);
     }
 }
 
+// Hide QR code
 function hideQR() {
-    document.getElementById('qr-display').style.display = 'none';
+    document.getElementById('qr-display').classList.add('hidden');
+    document.getElementById('show-qr-btn').classList.remove('hidden');
+    
     if (qrTimerInterval) {
         clearInterval(qrTimerInterval);
         qrTimerInterval = null;
     }
 }
 
-function copyLinkCode() {
-    if (window._linkCode) {
-        navigator.clipboard.writeText(window._linkCode).then(() => {
-            alert('Copied to clipboard!');
-        }).catch(() => {
-            // Fallback for older browsers
-            const textarea = document.getElementById('link-code-text');
-            if (textarea) {
-                textarea.select();
-                document.execCommand('copy');
-                alert('Copied!');
-            }
-        });
-    }
-}
-
-function copyLinkUrl() {
-    if (window._linkUrl) {
-        navigator.clipboard.writeText(window._linkUrl).then(() => {
-            alert('Link copied! Send it to your other device.');
-            addLog('📋 Link URL copied to clipboard', 'success');
-        }).catch(() => {
-            // Fallback
-            const input = document.getElementById('link-url');
-            if (input) {
-                input.select();
-                document.execCommand('copy');
-                alert('Link copied!');
-            }
-        });
-    }
-}
-
-// =============================================
-// VIEW MANAGEMENT (locked vs unlocked)
-// =============================================
-
-function showLockedView() {
-    document.getElementById('locked-view').style.display = 'block';
-    document.getElementById('unlocked-view').style.display = 'none';
-}
-
-function showUnlockedView() {
-    document.getElementById('locked-view').style.display = 'none';
-    document.getElementById('unlocked-view').style.display = 'block';
-}
-
-async function checkAndShowView() {
-    await initSDK();
-    const info = await wallet.getWalletInfo();
+// Link device (receive)
+async function linkDevice() {
+    const code = document.getElementById('receive-code').value.trim();
+    const statusEl = document.getElementById('receive-status');
     
-    const lockedStatus = document.getElementById('locked-status');
-    const noWalletOptions = document.getElementById('no-wallet-options');
-    const unlockBtn = document.getElementById('unlock-btn');
-    
-    if (info.isUnlocked) {
-        // Wallet is unlocked - show full management UI
-        showUnlockedView();
-        
-        // Update wallet summary
-        const summaryEl = document.getElementById('wallet-summary');
-        const activeProfile = await wallet.getActiveProfile();
-        summaryEl.textContent = `Profile: ${activeProfile.name} | ${info.lemmaCount || 0} credentials`;
-        
-        return true;
-    } else {
-        // Wallet is locked - show unlock UI
-        showLockedView();
-        
-        if (info.hasPasskey) {
-            // Has passkey - just needs to unlock
-            lockedStatus.className = 'status-box info';
-            lockedStatus.innerHTML = `<strong>Wallet found</strong><br>Authenticate with your passkey to access your wallet.`;
-            unlockBtn.textContent = 'Unlock with Passkey';
-            noWalletOptions.style.display = 'none';
-        } else if (info.hasWalletSecret) {
-            // Has wallet secret but no passkey (orphaned or linked)
-            lockedStatus.className = 'status-box info';
-            lockedStatus.innerHTML = `<strong>Wallet linked</strong><br>Create a passkey to secure your wallet on this device.`;
-            unlockBtn.textContent = 'Create Passkey';
-            unlockBtn.onclick = registerPasskey;
-            noWalletOptions.style.display = 'none';
-        } else {
-            // No wallet at all
-            lockedStatus.className = 'status-box locked';
-            lockedStatus.innerHTML = `<strong>No wallet on this device</strong><br>Create a new wallet or link an existing one from another device.`;
-            unlockBtn.style.display = 'none';
-            noWalletOptions.style.display = 'block';
-        }
-        
-        return false;
+    if (!code) {
+        statusEl.innerHTML = '<div class="info-box" style="background: #fef2f2; border-color: #ef4444; color: #991b1b;">Please paste the transfer code</div>';
+        statusEl.classList.remove('hidden');
+        return;
     }
-}
-
-async function unlockAndShowWallet() {
-    const unlockBtn = document.getElementById('unlock-btn');
-    const origText = unlockBtn.textContent;
     
     try {
-        unlockBtn.textContent = 'Authenticating...';
-        unlockBtn.disabled = true;
+        statusEl.innerHTML = '<div class="info-box">Linking wallet...</div>';
+        statusEl.classList.remove('hidden');
         
-        await initSDK();
-        const result = await wallet.unlock();
+        await initWallet();
+        const result = await wallet.linkDevice({ qrData: code });
         
         if (result.success) {
-            addLog('Wallet unlocked successfully', 'success');
+            statusEl.innerHTML = '<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">Wallet linked! Creating passkey...</div>';
             
-            // Check if we're in a redirect flow
-            addLog(`Redirect params present: ${!!window._lemmaRedirectParams}`, 'info');
-            if (window._lemmaRedirectParams) {
-                addLog(`Redirect URL: ${window._lemmaRedirectParams.returnUrl}`, 'info');
-                addLog('Calling handleRedirectReturn...', 'info');
-                await handleRedirectReturn(window._lemmaRedirectParams.returnUrl);
-                return; // Page is redirecting
-            }
+            // Create passkey for this device
+            await wallet.registerPasskey();
+            await checkWalletState();
             
-            // Switch to unlocked view
-            showUnlockedView();
-            
-            // Load all the wallet data
-            await refreshStatus();
-            await loadProfiles();
-            await loadCredentials();
-            await updateDeviceStatus();
-            
-            // Update wallet summary
-            const summaryEl = document.getElementById('wallet-summary');
-            const activeProfile = await wallet.getActiveProfile();
-            const info = await wallet.getWalletInfo();
-            summaryEl.textContent = `Profile: ${activeProfile.name} | ${info.lemmaCount || 0} credentials`;
+            statusEl.innerHTML = '<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">Device linked successfully!</div>';
+        } else if (result.conflict) {
+            statusEl.innerHTML = '<div class="info-box" style="background: #fef3c7; border-color: #f59e0b; color: #92400e;">A different wallet exists on this device. Clear it first to link a new one.</div>';
+        } else {
+            throw new Error(result.message || 'Link failed');
         }
     } catch (e) {
-        addLog(`Unlock failed: ${e.message}`, 'error');
-        const lockedStatus = document.getElementById('locked-status');
-        lockedStatus.className = 'status-box error';
-        lockedStatus.innerHTML = `<strong>Unlock failed</strong><br>${e.message}`;
-    } finally {
-        unlockBtn.textContent = origText;
-        unlockBtn.disabled = false;
+        console.error('Link failed:', e);
+        statusEl.innerHTML = `<div class="info-box" style="background: #fef2f2; border-color: #ef4444; color: #991b1b;">${e.message}</div>`;
     }
 }
 
-// Get wallet secret directly from IndexedDB (bypasses unlock check)
-// Used for cross-device auth when global session is valid
-async function getStoredSecretDirectly() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('LemmaWallet', 4);
+// Clear wallet data
+async function clearWallet() {
+    if (!confirm('Clear all wallet data from this device? This cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        // Delete IndexedDB
+        await new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase('LemmaWallet');
+            req.onsuccess = resolve;
+            req.onerror = reject;
+            req.onblocked = resolve;
+        });
         
-        request.onerror = () => resolve(null);
+        // Clear cookies
+        document.cookie = 'lemma_wallet_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'lemma_wallet_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
         
-        request.onsuccess = () => {
-            const db = request.result;
-            try {
-                const tx = db.transaction(['secrets'], 'readonly');
-                const store = tx.objectStore('secrets');
-                const getRequest = store.get('master');
-                
-                getRequest.onsuccess = () => {
-                    const record = getRequest.result;
-                    db.close();
-                    resolve(record?.secret || null);
-                };
-                
-                getRequest.onerror = () => {
-                    db.close();
-                    resolve(null);
-                };
-            } catch (e) {
-                db.close();
-                resolve(null);
-            }
-        };
-    });
+        wallet = null;
+        location.reload();
+        
+    } catch (e) {
+        console.error('Clear failed:', e);
+        alert('Failed to clear wallet: ' + e.message);
+    }
 }
 
-// Check for redirect flow (mobile unlock from third-party site)
+// Auto-lock setting
+function saveAutolockSetting() {
+    const value = document.getElementById('autolock-select').value;
+    localStorage.setItem('lemma_autolock_minutes', value);
+}
+
+function loadAutolockSetting() {
+    const saved = localStorage.getItem('lemma_autolock_minutes');
+    if (saved) {
+        document.getElementById('autolock-select').value = saved;
+    }
+}
+
+// Redirect flow helpers
 function getRedirectParams() {
     const params = new URLSearchParams(window.location.search);
     const returnUrl = params.get('return_url');
     const redirectFlow = params.get('redirect_flow') === '1';
-    const state = params.get('state');
     
     if (returnUrl && redirectFlow) {
         try {
-            // Validate return URL is a valid URL
             new URL(returnUrl);
-            return { returnUrl, state: state ? JSON.parse(atob(state)) : null };
-        } catch (e) {
-            console.warn('Invalid return_url:', e);
-        }
+            return { returnUrl };
+        } catch (e) {}
     }
     return null;
 }
 
-// Handle redirect back to calling site after unlock
-// PRIVACY: Uses client-side encryption - wallet secret NEVER touches the server
 async function handleRedirectReturn(returnUrl) {
-    addLog('=== handleRedirectReturn CALLED ===', 'success');
-    addLog(`Return URL: ${returnUrl}`, 'info');
-    
-    // Get encryption key from URL params (generated by the SDK on the third-party site)
     const urlParams = new URLSearchParams(window.location.search);
     const encKey = urlParams.get('enc_key');
     
-    if (encKey) {
-        addLog('Encryption key present - using privacy-preserving flow', 'success');
-    } else {
-        addLog('No encryption key - using legacy server flow', 'warn');
-    }
-    
     const info = await wallet.getWalletInfo();
-    addLog(`Wallet ID: ${info.walletId}`, 'info');
-    addLog(`Has wallet secret: ${info.hasWalletSecret}`, 'info');
+    let walletSecret = await wallet.getWalletSecret();
     
-    // Get wallet secret - try SDK first, fall back to direct IndexedDB access
-    let walletSecret = null;
-    try {
-        addLog('Trying SDK getWalletSecret...', 'info');
-        walletSecret = await wallet.getWalletSecret();
-        addLog('SDK getWalletSecret succeeded', 'success');
-    } catch (e) {
-        addLog(`SDK getWalletSecret failed: ${e.message}`, 'warn');
-        addLog('Trying direct IndexedDB access...', 'info');
-        walletSecret = await getStoredSecretDirectly();
-        if (walletSecret) {
-            addLog('Direct IndexedDB access succeeded', 'success');
-        }
-    }
+    if (!walletSecret) return;
     
-    if (!walletSecret) {
-        addLog('ERROR: Could not get wallet secret for redirect', 'error');
-        return;
-    }
-    
-    addLog(`Wallet secret obtained (${walletSecret.length} chars)`, 'success');
-    
-    // Set the global session for cross-device "one passkey per day"
-    // NOTE: This only stores wallet_id + timestamp (no site visits tracked)
-    try {
-        if (info.walletId) {
-            const activeProfile = await wallet.getActiveProfile();
-            const setResp = await fetch('/api/wallet/set-session', {
+    // Set global session
+    if (info.walletId) {
+        try {
+            await fetch('/api/wallet/set-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
                     wallet_id: info.walletId,
-                    unlocked_at: Date.now(),
-                    profile_id: activeProfile?.id || 'default',
-                    profile_name: activeProfile?.name || 'Personal'
+                    unlocked_at: Date.now()
                 })
             });
-            if (setResp.ok) {
-                addLog('Global session set (wallet_id + timestamp only)', 'success');
-            } else {
-                addLog(`Set-session returned: ${setResp.status}`, 'warn');
-            }
-        }
-    } catch (e) {
-        addLog(`Global session set failed: ${e.message}`, 'warn');
+        } catch (e) {}
     }
     
-    // Build the redirect URL
     const url = new URL(returnUrl);
     url.searchParams.set('lemma_unlocked', '1');
     
-    // PRIVACY-FIRST: Client-side encryption (wallet secret never touches server)
     if (encKey) {
-        try {
-            addLog('Encrypting wallet data client-side...', 'info');
-            
-            // Data to encrypt
-            const walletData = {
-                wallet_id: info.walletId,
-                wallet_secret: walletSecret
-            };
-            
-            // Encrypt using AES-GCM with the key from the SDK
-            const encryptedData = await encryptWalletData(walletData, encKey);
-            
-            addLog('Client-side encryption successful', 'success');
-            url.searchParams.set('lemma_data', encryptedData);
-            
-        } catch (e) {
-            addLog(`Client-side encryption failed: ${e.message}`, 'error');
-            // Fall back to legacy server flow
-            addLog('Falling back to legacy server token...', 'warn');
-            await createLegacyToken(url, info.walletId, walletSecret, returnUrl);
-        }
-    } else {
-        // Legacy flow for old SDK versions (deprecated)
-        await createLegacyToken(url, info.walletId, walletSecret, returnUrl);
+        // Client-side encryption
+        const walletData = { wallet_id: info.walletId, wallet_secret: walletSecret };
+        const encryptedData = await encryptWalletData(walletData, encKey);
+        url.searchParams.set('lemma_data', encryptedData);
     }
-    
-    addLog(`Final redirect URL: ${url.toString().substring(0, 100)}...`, 'info');
-    addLog('Redirecting in 1 second...', 'success');
-    
-    await new Promise(r => setTimeout(r, 1000));
     
     window.location.href = url.toString();
 }
 
-// Encrypt wallet data using AES-GCM (client-side, privacy-preserving)
 async function encryptWalletData(data, keyBase64) {
-    // Decode the key
     const keyBytes = base64ToArrayBuffer(keyBase64);
-    
-    // Import the key for AES-GCM
-    const key = await crypto.subtle.importKey(
-        'raw',
-        keyBytes,
-        { name: 'AES-GCM' },
-        false,
-        ['encrypt']
-    );
-    
-    // Generate random nonce (12 bytes for AES-GCM)
+    const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
     const nonce = crypto.getRandomValues(new Uint8Array(12));
-    
-    // Encode the data as JSON
     const dataBytes = new TextEncoder().encode(JSON.stringify(data));
-    
-    // Encrypt
-    const ciphertext = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv: nonce },
-        key,
-        dataBytes
-    );
-    
-    // Combine nonce + ciphertext
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, dataBytes);
     const combined = new Uint8Array(nonce.length + ciphertext.byteLength);
     combined.set(nonce, 0);
     combined.set(new Uint8Array(ciphertext), nonce.length);
-    
-    // Return as URL-safe base64
     return arrayBufferToBase64(combined);
 }
 
-// Convert base64 to ArrayBuffer (handles URL-safe base64)
 function base64ToArrayBuffer(base64) {
-    // Handle URL-safe base64
     const standardBase64 = base64.replace(/-/g, '+').replace(/_/g, '/');
     const padding = standardBase64.length % 4;
     const paddedBase64 = padding ? standardBase64 + '='.repeat(4 - padding) : standardBase64;
-    
     const binary = atob(paddedBase64);
     const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return bytes;
 }
 
-// Convert ArrayBuffer to URL-safe base64
 function arrayBufferToBase64(buffer) {
     const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
     let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    // Use URL-safe base64
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// Legacy server-side token creation (deprecated, for backward compatibility)
-async function createLegacyToken(url, walletId, walletSecret, returnUrl) {
-    try {
-        addLog('Creating legacy server token...', 'info');
-        const tokenResponse = await fetch('/api/wallet/create-redirect-token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-                wallet_id: walletId,
-                wallet_secret: walletSecret,
-                return_url: returnUrl
-            })
-        });
-        const tokenData = await tokenResponse.json();
-        if (tokenData.success) {
-            url.searchParams.set('lemma_token', tokenData.token);
-            addLog('Legacy token created', 'success');
-        } else {
-            addLog(`Legacy token failed: ${tokenData.error}`, 'error');
-        }
-    } catch (e) {
-        addLog(`Legacy token error: ${e.message}`, 'error');
-    }
-}
-
-// Initialize on load
-window.addEventListener('DOMContentLoaded', async () => {
-    // Show SDK version
-    const versionEl = document.getElementById('sdk-version');
-    if (typeof LemmaWallet !== 'undefined' && LemmaWallet.VERSION) {
-        versionEl.textContent = LemmaWallet.VERSION;
-    } else {
-        versionEl.textContent = 'unknown';
-    }
+// Initialize
+document.addEventListener('DOMContentLoaded', async () => {
+    loadAutolockSetting();
     
-    // Check for redirect flow params
+    // Check for redirect flow
     const redirectParams = getRedirectParams();
     if (redirectParams) {
-        addLog(`Redirect flow from: ${new URL(redirectParams.returnUrl).origin}`, 'info');
-    }
-
-    try {
-        await initSDK();
-        
-        // IMPORTANT: Sync from server cookie FIRST
-        // This handles the case where user unlocked on a third-party site
-        const synced = await syncFromServerCookie();
-        if (synced) {
-            addLog('Synced from server session', 'info');
-        }
-        
-        // Check unlock state and show appropriate view
-        let isUnlocked = await checkAndShowView();
-        
-        // If in redirect flow and already unlocked, redirect back immediately
-        if (redirectParams && isUnlocked) {
-            await handleRedirectReturn(redirectParams.returnUrl);
-            return; // Stop here - page is redirecting
-        }
-        
-        // CROSS-DEVICE AUTH: If in redirect flow but NOT locally unlocked,
-        // check if there's a global session from another device
-        if (redirectParams && !isUnlocked) {
-            addLog('Checking global session (cross-device)...', 'info');
-            try {
-                const info = await wallet.getWalletInfo();
-                if (info.walletId && info.hasWalletSecret) {
-                    const globalResponse = await fetch('/api/wallet/global-session', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ wallet_id: info.walletId })
-                    });
-                    const globalData = await globalResponse.json();
-                    
-                    if (globalData.valid) {
-                        addLog('Global session found from another device!', 'success');
-                        addLog('Skipping passkey - already authenticated today', 'info');
-                        
-                        // Get the wallet_secret directly from IndexedDB
-                        // (bypass unlock check since we have a valid global session)
-                        const walletSecret = await getStoredSecretDirectly();
-                        
-                        if (walletSecret) {
-                            // Create redirect token
-                            const tokenResponse = await fetch('/api/wallet/create-redirect-token', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                credentials: 'include',
-                                body: JSON.stringify({
-                                    wallet_id: info.walletId,
-                                    wallet_secret: walletSecret,
-                                    return_url: redirectParams.returnUrl
-                                })
-                            });
-                            const tokenData = await tokenResponse.json();
-                            
-                            if (tokenData.success) {
-                                addLog('Cross-device auth successful!', 'success');
-                                
-                                // Redirect back with token
-                                const url = new URL(redirectParams.returnUrl);
-                                url.searchParams.set('lemma_unlocked', '1');
-                                url.searchParams.set('lemma_token', tokenData.token);
-                                
-                                addLog(`Redirecting to: ${url.origin}...`, 'success');
-                                await new Promise(r => setTimeout(r, 300));
-                                window.location.href = url.toString();
-                                return;
-                            }
-                        } else {
-                            addLog('Wallet secret not found in storage', 'warn');
-                        }
-                        
-                        addLog('Could not complete cross-device auth', 'warn');
-                    } else {
-                        addLog('No global session - passkey required', 'info');
-                    }
-                } else if (info.walletId && !info.hasWalletSecret) {
-                    addLog('Wallet linked but secret not available - passkey required', 'info');
-                }
-            } catch (e) {
-                addLog(`Global session check failed: ${e.message}`, 'warn');
-            }
-        }
-        
-        // Store redirect params for after unlock
-        if (redirectParams) {
-            window._lemmaRedirectParams = redirectParams;
-            
-            // Update UI to show we'll redirect after unlock
-            const lockedStatus = document.getElementById('locked-status');
-            if (lockedStatus) {
-                lockedStatus.innerHTML += `<br><br><em style="font-size: 0.85em;">After unlocking, you'll return to ${new URL(redirectParams.returnUrl).origin}</em>`;
-            }
-        }
-        
-        if (isUnlocked) {
-            // Only load all the data if unlocked
-            addLog('Wallet unlocked - loading data...', 'info');
-            updateContextInfo();
-            await refreshStatus();
-            await loadProfiles();
-            await loadCredentials();
-            await updateDeviceStatus();
-        } else {
-            addLog('Wallet locked - showing unlock screen', 'info');
-        }
-    } catch (e) {
-        addLog(`Init error: ${e.message}`, 'error');
-        showLockedView();
+        updateStatusDisplay(false, 'Signing In...', `Returning to ${new URL(redirectParams.returnUrl).origin}`);
     }
     
-    // CSP-compliant event listeners (no inline onclick handlers)
-    // Static buttons
-    document.getElementById('unlock-btn')?.addEventListener('click', unlockAndShowWallet);
-    document.getElementById('create-wallet-btn')?.addEventListener('click', registerPasskey);
-    document.getElementById('lock-wallet-btn')?.addEventListener('click', lockWallet);
-    document.getElementById('create-profile-btn')?.addEventListener('click', createProfile);
-    document.getElementById('refresh-status-btn')?.addEventListener('click', refreshStatus);
-    document.getElementById('check-bridge-btn')?.addEventListener('click', checkBridge);
-    document.getElementById('check-cookie-btn')?.addEventListener('click', checkCookie);
-    document.getElementById('check-auth-state-btn')?.addEventListener('click', checkAuthState);
-    document.getElementById('test-popup-btn')?.addEventListener('click', testUnlockWithPopup);
-    document.getElementById('popup-direct-btn')?.addEventListener('click', testPopupDirect);
-    document.getElementById('simulate-3rd-party-btn')?.addEventListener('click', simulateThirdParty);
-    document.getElementById('unlock-direct-btn')?.addEventListener('click', unlockWallet);
-    document.getElementById('lock-wallet-btn2')?.addEventListener('click', lockWallet);
-    document.getElementById('register-passkey-btn')?.addEventListener('click', registerPasskey);
-    document.getElementById('clear-all-btn')?.addEventListener('click', clearAll);
-    document.getElementById('tab-send')?.addEventListener('click', () => showTransferTab('send'));
-    document.getElementById('tab-receive')?.addEventListener('click', () => showTransferTab('receive'));
-    document.getElementById('add-device-btn')?.addEventListener('click', showAddDevice);
-    document.getElementById('copy-link-url-btn')?.addEventListener('click', copyLinkUrl);
-    document.getElementById('hide-qr-btn')?.addEventListener('click', hideQR);
-    document.getElementById('receive-wallet-btn')?.addEventListener('click', receiveWallet);
-    document.getElementById('refresh-credentials-btn')?.addEventListener('click', loadCredentials);
-    document.getElementById('clear-log-btn')?.addEventListener('click', clearLog);
+    const isUnlocked = await checkWalletState();
     
-    // Event delegation for dynamically created buttons
-    document.addEventListener('click', (e) => {
-        const target = e.target;
-        
-        // Profile switch buttons
-        if (target.matches('.btn-switch[data-profile-id]')) {
-            switchProfile(target.dataset.profileId);
-        }
-        // Profile delete buttons
-        if (target.matches('.btn-delete[data-profile-id]')) {
-            deleteProfile(target.dataset.profileId, target.dataset.profileName);
-        }
-        // Credential revoke buttons
-        if (target.matches('.btn-revoke[data-cred-id]')) {
-            revokeCredential(target.dataset.credId);
-        }
-        // Copy link code button (in QR display)
-        if (target.matches('#copy-link-code-btn')) {
-            copyLinkCode();
-        }
-        // Hide QR button (in dynamic content)
-        if (target.matches('.hide-qr-dynamic')) {
-            hideQR();
-        }
-        // Receive wallet confirm button
-        if (target.matches('#confirm-receive-btn')) {
-            receiveWallet(true);
-        }
-        // Cancel receive wallet button
-        if (target.matches('#cancel-receive-btn')) {
-            cancelReceiveWallet();
-        }
-    });
+    // If redirect flow and already unlocked, redirect immediately
+    if (redirectParams && isUnlocked) {
+        await handleRedirectReturn(redirectParams.returnUrl);
+        return;
+    }
+    
+    // Event listeners
+    document.getElementById('unlock-btn').addEventListener('click', unlockWallet);
+    document.getElementById('create-wallet-btn').addEventListener('click', createWallet);
+    document.getElementById('lock-btn').addEventListener('click', lockWallet);
+    document.getElementById('tab-send').addEventListener('click', () => showTab('send'));
+    document.getElementById('tab-receive').addEventListener('click', () => showTab('receive'));
+    document.getElementById('show-qr-btn').addEventListener('click', showQR);
+    document.getElementById('hide-qr-btn').addEventListener('click', hideQR);
+    document.getElementById('link-device-btn').addEventListener('click', linkDevice);
+    document.getElementById('clear-wallet-btn').addEventListener('click', clearWallet);
+    document.getElementById('autolock-select').addEventListener('change', saveAutolockSetting);
 });
 </script>
 {% endblock %}
