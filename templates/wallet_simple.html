@@ -299,7 +299,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=2343" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-wallet.js?v=2344" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
@@ -336,64 +336,86 @@ function showUnlockedView() {
     document.getElementById('unlocked-view').classList.remove('hidden');
 }
 
-// Check global session (cross-device lock detection)
-async function checkGlobalSession() {
+// Track if we've ever had a valid global session (for cross-device lock detection)
+let hadGlobalSession = localStorage.getItem('lemma_had_global_session') === 'true';
+
+// Check global session and sync if needed
+async function syncGlobalSession(walletId) {
+    if (!walletId) return { valid: false };
+    
     try {
-        await initWallet();
-        const info = await wallet.getWalletInfo();
-        
-        // Get walletId from IndexedDB
-        let walletId = info.walletId;
-        if (!walletId) {
-            // Try to get from IndexedDB directly
-            const db = await new Promise((resolve, reject) => {
-                const req = indexedDB.open('LemmaWallet', 4);
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => reject(req.error);
-            });
-            const tx = db.transaction(['passkey'], 'readonly');
-            const store = tx.objectStore('passkey');
-            const record = await new Promise(resolve => {
-                const req = store.get('walletId');
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => resolve(null);
-            });
-            db.close();
-            walletId = record?.value;
-        }
-        
-        if (!walletId) return { valid: true }; // No wallet, nothing to check
-        
         const response = await fetch('/api/wallet/global-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ wallet_id: walletId })
         });
         
-        if (!response.ok) return { valid: false };
+        if (!response.ok) return { valid: false, error: true };
         return await response.json();
     } catch (e) {
         console.warn('Global session check failed:', e);
-        return { valid: true }; // Assume valid on error
+        return { valid: false, error: true };
     }
 }
 
-// Check wallet state and update UI
+// Set global session after local unlock
+async function setGlobalSession(walletId) {
+    if (!walletId) return;
+    
+    try {
+        await fetch('/api/wallet/set-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                wallet_id: walletId,
+                unlocked_at: Date.now()
+            })
+        });
+        hadGlobalSession = true;
+        localStorage.setItem('lemma_had_global_session', 'true');
+        console.log('Global session set');
+    } catch (e) {
+        console.warn('Failed to set global session:', e);
+    }
+}
+
+// Cross-device lock detection (runs on tab visibility change)
+async function checkCrossDeviceLock() {
+    await initWallet();
+    const info = await wallet.getWalletInfo();
+    
+    if (!info.isUnlocked || !info.walletId) return;
+    
+    // Only check if we previously HAD a global session
+    // This prevents false positive locks on first unlock
+    if (!hadGlobalSession) return;
+    
+    const globalSession = await syncGlobalSession(info.walletId);
+    
+    // If we HAD a global session but now it's invalid, we were locked from another device
+    if (!globalSession.valid && !globalSession.error) {
+        console.log('Wallet locked on another device - clearing local session');
+        await wallet.lock();
+        hadGlobalSession = false;
+        localStorage.removeItem('lemma_had_global_session');
+        await checkWalletState();
+    }
+}
+
+// Check wallet state and update UI (does NOT auto-lock - that's checkCrossDeviceLock's job)
 async function checkWalletState() {
     try {
         await initWallet();
         const info = await wallet.getWalletInfo();
         
         if (info.isUnlocked) {
-            // IMPORTANT: Verify against global session (cross-device lock detection)
-            const globalSession = await checkGlobalSession();
-            if (!globalSession.valid) {
-                // Wallet was locked on another device
-                console.log('Wallet locked on another device - clearing local session');
-                await wallet.lock();
-                updateStatusDisplay(false, 'Wallet Locked', 'Locked from another device');
-                showLockedView();
-                return false;
+            // Ensure global session is set for cross-device sync
+            if (info.walletId) {
+                const globalSession = await syncGlobalSession(info.walletId);
+                if (!globalSession.valid && !globalSession.error) {
+                    await setGlobalSession(info.walletId);
+                }
             }
             
             updateStatusDisplay(true, 'Wallet Unlocked', 'You are signed in');
@@ -466,6 +488,9 @@ async function lockWallet() {
     try {
         await initWallet();
         await wallet.lock();
+        // Clear global session flag since we just locked
+        hadGlobalSession = false;
+        localStorage.removeItem('lemma_had_global_session');
         await checkWalletState();
     } catch (e) {
         console.error('Lock failed:', e);
@@ -516,16 +541,13 @@ function showTab(tab) {
     hideQR();
 }
 
-// Show QR code
+// Show QR code - requires fresh passkey verification (handled by generateLinkCode)
 async function showQR() {
     try {
         await initWallet();
         
-        if (!wallet.isUnlocked()) {
-            alert('Please unlock your wallet first');
-            return;
-        }
-        
+        // generateLinkCode() requires FRESH passkey verification for security
+        // It will prompt the user to verify their identity before generating the link
         const result = await wallet.generateLinkCode();
         
         const qrContainer = document.getElementById('qr-container');
@@ -760,14 +782,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // CROSS-DEVICE LOCK DETECTION: Check when tab becomes visible
     document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState === 'visible') {
-            await checkWalletState();
+            await checkCrossDeviceLock();
         }
     });
     
     // Also check periodically (every 30 seconds) while page is open
     setInterval(async () => {
         if (document.visibilityState === 'visible') {
-            await checkWalletState();
+            await checkCrossDeviceLock();
         }
     }, 30000);
     
