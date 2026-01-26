@@ -336,6 +336,48 @@ function showUnlockedView() {
     document.getElementById('unlocked-view').classList.remove('hidden');
 }
 
+// Check global session (cross-device lock detection)
+async function checkGlobalSession() {
+    try {
+        await initWallet();
+        const info = await wallet.getWalletInfo();
+        
+        // Get walletId from IndexedDB
+        let walletId = info.walletId;
+        if (!walletId) {
+            // Try to get from IndexedDB directly
+            const db = await new Promise((resolve, reject) => {
+                const req = indexedDB.open('LemmaWallet', 4);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+            const tx = db.transaction(['passkey'], 'readonly');
+            const store = tx.objectStore('passkey');
+            const record = await new Promise(resolve => {
+                const req = store.get('walletId');
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => resolve(null);
+            });
+            db.close();
+            walletId = record?.value;
+        }
+        
+        if (!walletId) return { valid: true }; // No wallet, nothing to check
+        
+        const response = await fetch('/api/wallet/global-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet_id: walletId })
+        });
+        
+        if (!response.ok) return { valid: false };
+        return await response.json();
+    } catch (e) {
+        console.warn('Global session check failed:', e);
+        return { valid: true }; // Assume valid on error
+    }
+}
+
 // Check wallet state and update UI
 async function checkWalletState() {
     try {
@@ -343,6 +385,17 @@ async function checkWalletState() {
         const info = await wallet.getWalletInfo();
         
         if (info.isUnlocked) {
+            // IMPORTANT: Verify against global session (cross-device lock detection)
+            const globalSession = await checkGlobalSession();
+            if (!globalSession.valid) {
+                // Wallet was locked on another device
+                console.log('Wallet locked on another device - clearing local session');
+                await wallet.lock();
+                updateStatusDisplay(false, 'Wallet Locked', 'Locked from another device');
+                showLockedView();
+                return false;
+            }
+            
             updateStatusDisplay(true, 'Wallet Unlocked', 'You are signed in');
             showUnlockedView();
             return true;
@@ -703,6 +756,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         await handleRedirectReturn(redirectParams.returnUrl);
         return;
     }
+    
+    // CROSS-DEVICE LOCK DETECTION: Check when tab becomes visible
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible') {
+            await checkWalletState();
+        }
+    });
+    
+    // Also check periodically (every 30 seconds) while page is open
+    setInterval(async () => {
+        if (document.visibilityState === 'visible') {
+            await checkWalletState();
+        }
+    }, 30000);
     
     // Event listeners
     document.getElementById('unlock-btn').addEventListener('click', unlockWallet);
