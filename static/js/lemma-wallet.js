@@ -1191,6 +1191,14 @@ class LemmaWallet {
             throw new Error('Passkeys not supported in this browser');
         }
 
+        // CHECK FOR EXISTING PASSKEY FIRST
+        // If user already has a passkey on this device, authenticate with it instead of creating a new one
+        const existingPasskey = await this._get('passkey', 'primary');
+        if (existingPasskey && existingPasskey.credentialId) {
+            console.log('[Lemma] Existing passkey found - authenticating instead of creating new');
+            return await this.unlock();
+        }
+
         // Generate a local challenge
         const challenge = crypto.getRandomValues(new Uint8Array(32));
         
@@ -1201,7 +1209,8 @@ class LemmaWallet {
             await this._put('passkey', walletId);
         }
 
-        // Create credential
+        // Create NEW credential (only if no existing passkey)
+        console.log('[Lemma] No existing passkey - creating new one');
         const credential = await navigator.credentials.create({
             publicKey: {
                 challenge: challenge,
