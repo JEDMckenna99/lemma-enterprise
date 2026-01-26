@@ -1,10 +1,10 @@
 // Lemma Service Worker - Minimal Implementation
 // This prevents service worker errors and provides basic caching
 
-const CACHE_NAME = 'lemma-v1';
+const CACHE_NAME = 'lemma-v2';
 const STATIC_ASSETS = [
-  '/static/css/lemma-design-system.css',
-  '/static/js/lemma-federated-wallet.js',
+  '/static/css/lemma.css',
+  '/static/js/lemma-wallet.js',
   '/static/js/lemma-bot-shield-simple.js',
   '/static/img/lemma_logo.svg'
 ];

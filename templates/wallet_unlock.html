@@ -325,7 +325,7 @@
     </div>
 
     <!-- Load SDK with cache-buster to ensure latest version -->
-    <script src="/static/js/lemma-wallet.js?v=2340" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2341" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
 // Initialize wallet SDK
 const wallet = new LemmaWallet();
@@ -474,12 +474,10 @@ async function handleRedirectReturn() {
         
         // Encrypt wallet data if we have an encryption key (privacy-preserving)
         if (encKey) {
-            console.log('[Unlock] Encrypting wallet data, wallet_id:', info.walletId || 'NOT SET');
             const walletData = {
                 wallet_id: info.walletId,
                 wallet_secret: walletSecret
             };
-            console.log('[Unlock] Wallet data to encrypt:', JSON.stringify({ wallet_id: walletData.wallet_id, has_secret: !!walletData.wallet_secret }));
             const encryptedData = await encryptWalletData(walletData, encKey);
             url.searchParams.set('lemma_data', encryptedData);
         } else {

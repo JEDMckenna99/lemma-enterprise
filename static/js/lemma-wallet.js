@@ -63,7 +63,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.33.0';  // Fresh passkey required for device linking
+    static VERSION = '2.34.0';  // Cleaned up debug logging, fixed service worker
     
     constructor() {
         this.db = null;
@@ -478,37 +478,26 @@ class LemmaWallet {
         const isRedirectReturn = urlParams.get('lemma_unlocked') === '1';
         const encryptedData = urlParams.get('lemma_data');  // Client-side encrypted wallet data
         const legacyToken = urlParams.get('lemma_token');   // Legacy server-side token (deprecated)
-        
-        console.log('[Lemma] checkRedirectReturn - isRedirectReturn:', isRedirectReturn);
-        console.log('[Lemma] checkRedirectReturn - has lemma_data:', !!encryptedData);
-        console.log('[Lemma] checkRedirectReturn - has lemma_token:', !!legacyToken);
             
         // Retrieve saved redirect state (contains decryption key)
         let savedState = null;
         try {
             const stateJson = sessionStorage.getItem('lemma_redirect_state');
-            console.log('[Lemma] checkRedirectReturn - sessionStorage has state:', !!stateJson);
             if (stateJson) {
                 savedState = JSON.parse(stateJson);
-                console.log('[Lemma] checkRedirectReturn - state has encKey:', !!savedState?.encKey);
                 // Only valid if recent (within 10 minutes)
                 if (Date.now() - savedState.timestamp > 10 * 60 * 1000) {
-                    console.log('[Lemma] checkRedirectReturn - state expired');
                     sessionStorage.removeItem('lemma_redirect_state');
                     savedState = null;
                 }
             }
         } catch (e) {
-            console.log('[Lemma] checkRedirectReturn - error reading state:', e.message);
             savedState = null;
         }
         
         if (!isRedirectReturn && !savedState) {
             return null;
         }
-        
-        console.log('[Lemma] Detected redirect return, processing...');
-        console.log('[Lemma] Can decrypt:', !!(encryptedData && savedState?.encKey));
                     
         // Clear the redirect state AFTER we've read it
         try {
@@ -531,21 +520,16 @@ class LemmaWallet {
         // The wallet secret was encrypted by lemma.id's client-side JavaScript
         // using a key we generated and stored locally. Server never sees the secret.
         if (encryptedData && savedState?.encKey) {
-            console.log('[Lemma] 🔐 Decrypting wallet data client-side (privacy-preserving)...');
             try {
                 const decrypted = await this._decryptRedirectData(encryptedData, savedState.encKey);
                 
                 if (decrypted && decrypted.wallet_secret) {
-                    console.log('[Lemma] ✅ Client-side decryption successful!');
-                    console.log('[Lemma] 🔑 Decrypted wallet_id:', decrypted.wallet_id || 'NOT SET');
-                    
                     // Store the wallet secret locally
                     await this._put('secrets', { id: 'master', secret: decrypted.wallet_secret, source: 'redirect_encrypted' });
                     
-                    // IMPORTANT: Also store wallet_id for heartbeat cross-device checks
+                    // Store wallet_id for heartbeat cross-device checks
                     if (decrypted.wallet_id) {
                         await this._put('passkey', { id: 'walletId', value: decrypted.wallet_id });
-                        console.log('[Lemma] 🔑 Wallet ID stored to IndexedDB');
                     }
                     
                     // Set up local session
@@ -856,81 +840,57 @@ class LemmaWallet {
             document.removeEventListener('visibilitychange', this._visibilityHandler);
         }
 
-        console.log('[Lemma] Starting session heartbeat (checking every', intervalMs/1000, 'seconds + on tab focus)');
-        
         // Heartbeat check function (reused for interval and visibility)
         const performHeartbeatCheck = async () => {
-            console.log('[Lemma] 💓 Heartbeat check triggered, session unlocked:', this.session.isUnlocked);
-            
             // Skip if no local session
-            if (!this.session.isUnlocked) {
-                console.log('[Lemma] 💓 Skipping heartbeat - not unlocked locally');
-                return;
-            }
+            if (!this.session.isUnlocked) return;
             
             // Check 1: Local expiry (always enforced)
             if (this.session.expiresAt && Date.now() > this.session.expiresAt) {
-                console.log('[Lemma] Session expired locally (24h limit)');
+                console.log('[Lemma] Session expired');
                 await this._clearSessionGracefully('expired', 'Your session has expired. Please sign in again.');
                 return;
             }
             
             // Check 2: Cross-device lock detection via global session API
-            // This works for ALL session types (redirect, popup, bridge, global_sync)
-            // Only triggers if user explicitly locked their wallet on another device
             try {
-                const walletId = this.session.walletId;
-                console.log('[Lemma] 💓 Heartbeat session wallet_id:', walletId || 'NOT SET');
+                let walletId = this.session.walletId;
                 
                 if (!walletId) {
                     // Try to get wallet_id from IndexedDB if not in session
                     const walletIdRecord = await this._get('passkey', 'walletId');
                     if (walletIdRecord?.value) {
-                        console.log('[Lemma] 💓 Got wallet_id from IndexedDB:', walletIdRecord.value);
                         this.session.walletId = walletIdRecord.value;
+                        walletId = walletIdRecord.value;
                     }
                 }
                 
-                if (this.session.walletId) {
-                    const globalSession = await this._checkGlobalSession(this.session.walletId);
+                if (walletId) {
+                    const globalSession = await this._checkGlobalSession(walletId);
                     
                     if (!globalSession.valid) {
-                        console.log('[Lemma] Wallet was locked on another device (global session invalid)');
+                        console.log('[Lemma] Wallet locked on another device');
                         await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
-                    } else {
-                        // Global session valid - session remains active
-                        console.log('[Lemma] Heartbeat: global session valid');
                     }
                 }
             } catch (e) {
-                // Global session check failed - don't kick user out, just log
-                // Network issues shouldn't cause sign-out
-                console.warn('[Lemma] Heartbeat: global session check failed (network?):', e.message);
+                // Network issues shouldn't cause sign-out - fail silently
             }
-            
-            // NOTE: We no longer use bridge for heartbeat validation.
-            // Bridge is unreliable on mobile Safari and causes false sign-outs.
-            // All sessions are trusted locally until expiry or explicit lock.
         };
         
         // Regular interval heartbeat (background check)
         this._heartbeatInterval = setInterval(performHeartbeatCheck, intervalMs);
         
         // INSTANT CHECK: When user returns to tab, check immediately
-        // This provides near-instant cross-device lock detection when it matters most
         this._visibilityHandler = async () => {
-            console.log('[Lemma] 👁️ Visibility changed:', document.visibilityState, 'unlocked:', this.session.isUnlocked);
             if (document.visibilityState === 'visible' && this.session.isUnlocked) {
-                console.log('[Lemma] 👁️ Tab became visible - checking session immediately');
                 await performHeartbeatCheck();
             }
         };
         document.addEventListener('visibilitychange', this._visibilityHandler);
-        console.log('[Lemma] 👁️ Visibility handler registered');
         
-        // Run an immediate check on startup (don't wait for first interval/visibility)
+        // Run an immediate check on startup
         setTimeout(async () => {
-            console.log('[Lemma] 💓 Running initial heartbeat check...');
             await performHeartbeatCheck();
         }, 2000); // 2 second delay to let page settle
         
@@ -1526,12 +1486,8 @@ class LemmaWallet {
      * Lock the wallet (clear session locally and on server)
      */
     async lock() {
-        console.log('[Lemma] Locking wallet...');
-        console.log('[Lemma] 🔒 Current session before lock:', JSON.stringify(this.session));
-        
         // Capture wallet_id before clearing session
         const walletId = this.session.walletId;
-        console.log('[Lemma] 🔒 Captured wallet_id for lock:', walletId);
         
         // Clear local session
         this.session = {
@@ -1557,11 +1513,9 @@ class LemmaWallet {
         }
         
         // Clear server session AND global session (for cross-device lock detection)
-        // This ensures ALL devices see the wallet as locked
         if (this._isLemmaDomain()) {
             try {
-                console.log('[Lemma] Clearing server session and global session...');
-                const response = await fetch('/api/wallet/clear-session', {
+                await fetch('/api/wallet/clear-session', {
                     method: 'POST',
                     credentials: 'include',
                     headers: {
@@ -1570,20 +1524,12 @@ class LemmaWallet {
                     },
                     body: JSON.stringify({ wallet_id: walletId })
                 });
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('[Lemma] ✅ Server session cleared, global:', data.global_session_cleared);
-                    console.log('[Lemma] 🔒 Clear-session response:', JSON.stringify(data));
-                } else {
-                    const text = await response.text();
-                    console.warn('[Lemma] Server session clear returned:', response.status, text);
-                }
             } catch (e) {
-                console.warn('[Lemma] Could not clear server session:', e.message);
+                // Silent fail - user experience shouldn't be impacted
             }
         }
         
-        console.log('[Lemma] ✅ Wallet locked');
+        console.log('[Lemma] Wallet locked');
     }
 
     /**

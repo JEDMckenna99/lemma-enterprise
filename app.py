@@ -479,6 +479,12 @@ def create_app():
         logger.info("🏠 Serving homepage")
         return render_template('modern/index.html')
 
+    @app.route('/lemma-sw.js')
+    def service_worker():
+        """Serve service worker from root for proper scope"""
+        from flask import send_from_directory
+        return send_from_directory('static', 'sw.js', mimetype='application/javascript')
+
     @app.route('/wallet')
     def wallet():
         """Lemma Wallet - Main wallet management page"""
