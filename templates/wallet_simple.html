@@ -160,6 +160,22 @@
 }
 .qr-timer.expiring { color: #ef4444; }
 
+.link-method {
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+.link-method strong {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+.link-method .text-muted {
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    margin-bottom: 0;
+}
+
 .link-input {
     width: 100%;
     padding: 12px;
@@ -249,8 +265,8 @@
                     <div class="qr-box">
                         <div id="qr-container" style="width: 180px; height: 180px;"></div>
                     </div>
-                    <p style="margin-top: 12px; font-size: 0.9rem; color: #374151;">Scan with your other device</p>
                     <div id="qr-timer" class="qr-timer">Expires in 60s</div>
+                    <div id="link-options" class="hidden" style="margin-top: 1rem; text-align: left;"></div>
                     <button id="hide-qr-btn" class="btn btn-secondary" style="margin-top: 12px;">Close</button>
                 </div>
             </div>
@@ -299,7 +315,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=2345" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-wallet.js?v=2346" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
@@ -566,6 +582,36 @@ async function showQR() {
             qrContainer.innerHTML = '<p style="color: #dc2626;">QR library not loaded</p>';
         }
         
+        // Show alternative methods for phone→PC linking
+        const linkOptionsEl = document.getElementById('link-options');
+        if (linkOptionsEl) {
+            linkOptionsEl.innerHTML = `
+                <div class="link-method">
+                    <strong>Option 1: Scan QR</strong> (PC to Phone)
+                    <p class="text-muted">Scan the QR code above with your phone camera</p>
+                </div>
+                <div class="link-method" style="margin-top: 1rem;">
+                    <strong>Option 2: Copy Link</strong> (Phone to PC)
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                        <input type="text" id="link-url" value="${result.qrUrl}" readonly 
+                               style="flex: 1; padding: 0.5rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary);">
+                        <button onclick="copyLinkUrl()" class="btn btn-secondary" style="white-space: nowrap;">Copy</button>
+                    </div>
+                    <p class="text-muted">Paste this link in your PC browser</p>
+                </div>
+                <div class="link-method" style="margin-top: 1rem;">
+                    <strong>Option 3: Transfer Code</strong> (Manual entry)
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                        <input type="text" id="transfer-code" value="${result.qrData}" readonly 
+                               style="flex: 1; padding: 0.5rem; font-size: 0.7rem; font-family: monospace; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary);">
+                        <button onclick="copyTransferCode()" class="btn btn-secondary" style="white-space: nowrap;">Copy</button>
+                    </div>
+                    <p class="text-muted">Paste this code on the other device's "Receive" tab</p>
+                </div>
+            `;
+            linkOptionsEl.classList.remove('hidden');
+        }
+        
         document.getElementById('qr-display').classList.remove('hidden');
         document.getElementById('show-qr-btn').classList.add('hidden');
         
@@ -591,10 +637,40 @@ async function showQR() {
     }
 }
 
+// Copy link URL to clipboard
+async function copyLinkUrl() {
+    const input = document.getElementById('link-url');
+    try {
+        await navigator.clipboard.writeText(input.value);
+        const btn = input.nextElementSibling;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+    } catch (e) {
+        input.select();
+        document.execCommand('copy');
+    }
+}
+
+// Copy transfer code to clipboard
+async function copyTransferCode() {
+    const input = document.getElementById('transfer-code');
+    try {
+        await navigator.clipboard.writeText(input.value);
+        const btn = input.nextElementSibling;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+    } catch (e) {
+        input.select();
+        document.execCommand('copy');
+    }
+}
+
 // Hide QR code
 function hideQR() {
     document.getElementById('qr-display').classList.add('hidden');
     document.getElementById('show-qr-btn').classList.remove('hidden');
+    const linkOptions = document.getElementById('link-options');
+    if (linkOptions) linkOptions.classList.add('hidden');
     
     if (qrTimerInterval) {
         clearInterval(qrTimerInterval);
