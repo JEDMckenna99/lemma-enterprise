@@ -75,7 +75,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.35.0';  // Configurable session duration (4/8/12/24hr)
+    static VERSION = '2.35.1';  // Fix lock() to get walletId from IndexedDB, ensure walletId persisted
     
     constructor() {
         this.db = null;
@@ -1410,9 +1410,15 @@ class LemmaWallet {
         
         console.log('✅ Browser verified user via biometrics');
 
-        // Get wallet ID
-        const walletIdRecord = await this._get('passkey', 'walletId');
-        const walletId = walletIdRecord?.value || 'wallet_' + Date.now();
+        // Get wallet ID (create and store if missing)
+        let walletIdRecord = await this._get('passkey', 'walletId');
+        if (!walletIdRecord?.value) {
+            const newWalletId = 'wallet_' + this._generateId();
+            walletIdRecord = { id: 'walletId', value: newWalletId };
+            await this._put('passkey', walletIdRecord);
+            console.log('[Lemma] Created wallet ID:', newWalletId);
+        }
+        const walletId = walletIdRecord.value;
 
         // Get wallet secret for PPID derivation
         let walletSecretRecord = await this._get('secrets', 'master');
@@ -1499,7 +1505,14 @@ class LemmaWallet {
      */
     async lock() {
         // Capture wallet_id before clearing session
-        const walletId = this.session.walletId;
+        // Try session first, then IndexedDB as fallback
+        let walletId = this.session.walletId;
+        if (!walletId) {
+            try {
+                const walletIdRecord = await this._get('passkey', 'walletId');
+                walletId = walletIdRecord?.value;
+            } catch (e) {}
+        }
         
         // Clear local session
         this.session = {
@@ -1525,9 +1538,9 @@ class LemmaWallet {
         }
         
         // Clear server session AND global session (for cross-device lock detection)
-        if (this._isLemmaDomain()) {
+        if (this._isLemmaDomain() && walletId) {
             try {
-                await fetch('/api/wallet/clear-session', {
+                const response = await fetch('/api/wallet/clear-session', {
                     method: 'POST',
                     credentials: 'include',
                     headers: {
@@ -1536,12 +1549,16 @@ class LemmaWallet {
                     },
                     body: JSON.stringify({ wallet_id: walletId })
                 });
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('[Lemma] Wallet locked, global session cleared:', data.global_session_cleared);
+                }
             } catch (e) {
-                // Silent fail - user experience shouldn't be impacted
+                console.warn('[Lemma] Failed to clear global session:', e.message);
             }
+        } else {
+            console.log('[Lemma] Wallet locked locally');
         }
-        
-        console.log('[Lemma] Wallet locked');
     }
 
     /**
