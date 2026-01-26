@@ -701,19 +701,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
-        // If already unlocked with a local session, auto-redirect
-        if (info.isUnlocked && redirectParams) {
-            document.getElementById('unlock-btn').innerHTML = '<span class="spinner"></span>Redirecting...';
-            document.getElementById('unlock-btn').disabled = true;
-            showStatus('Already authenticated!', 'success');
-            await handleRedirectReturn();
-            return;
-        }
-        
-        // CROSS-DEVICE: Check if this wallet was unlocked on another device
-        // This enables "one passkey per day" across all linked devices
-        if (info.walletId && redirectParams) {
-            console.log('[Unlock Debug] Checking global session for wallet:', info.walletId);
+        // ALWAYS check global session first - this is the source of truth for cross-device lock
+        // If user locked on ANY device, global session is cleared, and we must require passkey
+        let globalSessionValid = false;
+        if (info.walletId) {
+            console.log('[Unlock Debug] Checking global session for wallet:', info.walletId?.substring(0, 8));
             try {
                 const globalCheck = await fetch('/api/wallet/global-session', {
                     method: 'POST',
@@ -724,48 +716,69 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (globalCheck.ok) {
                     const globalData = await globalCheck.json();
                     console.log('[Unlock Debug] Global session result:', globalData);
-                    
-                    if (globalData.valid) {
-                        // Wallet was unlocked on another device within 24 hours!
-                        // Auto-unlock this device and redirect
-                        console.log('[Unlock Debug] ✅ Global session valid - auto-unlocking');
-                        document.getElementById('unlock-btn').innerHTML = '<span class="spinner"></span>Syncing...';
-                        document.getElementById('unlock-btn').disabled = true;
-                        showStatus('Authenticated on another device - syncing...', 'success');
-                        
-                        // Set local session based on global session
-                        const walletSecret = await getStoredSecretDirectly();
-                        if (walletSecret) {
-                            // Store session locally
-                            await wallet._put('session', {
-                                id: 'current',
-                                isUnlocked: true,
-                                unlockedAt: globalData.unlocked_at || Date.now(),
-                                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-                                walletId: info.walletId,
-                                walletSecret: walletSecret,
-                                source: 'global_sync'
-                            });
-                            wallet.session = {
-                                isUnlocked: true,
-                                unlockedAt: globalData.unlocked_at || Date.now(),
-                                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-                                walletId: info.walletId,
-                                walletSecret: walletSecret,
-                                source: 'global_sync'
-                            };
-                            
-                            // Redirect back with encrypted data
-                            await handleRedirectReturn();
-                            return;
-                        }
-                    }
+                    globalSessionValid = globalData.valid === true;
                 }
             } catch (e) {
                 console.warn('[Unlock Debug] Global session check failed:', e);
-                // Continue to normal unlock flow
             }
         }
+        
+        // If global session is NOT valid, clear any stale local session and require passkey
+        if (!globalSessionValid && info.isUnlocked) {
+            console.log('[Unlock Debug] Global session invalid but local session exists - clearing stale local session');
+            await wallet._delete('session', 'current');
+            wallet.session = { isUnlocked: false };
+            // Update info to reflect cleared session
+            info.isUnlocked = false;
+        }
+        
+        // Auto-redirect ONLY if both local AND global sessions are valid
+        if (info.isUnlocked && globalSessionValid && redirectParams) {
+            console.log('[Unlock Debug] Both local and global sessions valid - auto-redirecting');
+            document.getElementById('unlock-btn').innerHTML = '<span class="spinner"></span>Redirecting...';
+            document.getElementById('unlock-btn').disabled = true;
+            showStatus('Already authenticated!', 'success');
+            await handleRedirectReturn();
+            return;
+        }
+        
+        // CROSS-DEVICE: If global session is valid but no local session, sync and redirect
+        if (globalSessionValid && !info.isUnlocked && redirectParams) {
+            console.log('[Unlock Debug] Global session valid, syncing to local...');
+            document.getElementById('unlock-btn').innerHTML = '<span class="spinner"></span>Syncing...';
+            document.getElementById('unlock-btn').disabled = true;
+            showStatus('Authenticated on another device - syncing...', 'success');
+            
+            // Set local session based on global session
+            const walletSecret = await getStoredSecretDirectly();
+            if (walletSecret) {
+                // Store session locally
+                await wallet._put('session', {
+                    id: 'current',
+                    isUnlocked: true,
+                    unlockedAt: Date.now(),
+                    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                    walletId: info.walletId,
+                    walletSecret: walletSecret,
+                    source: 'global_sync'
+                });
+                wallet.session = {
+                    isUnlocked: true,
+                    unlockedAt: Date.now(),
+                    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                    walletId: info.walletId,
+                    walletSecret: walletSecret,
+                    source: 'global_sync'
+                };
+                
+                // Redirect back with encrypted data
+                await handleRedirectReturn();
+                return;
+            }
+        }
+        
+        // If we get here, passkey is required
+        console.log('[Unlock Debug] Passkey required - globalSessionValid:', globalSessionValid, 'localUnlocked:', info.isUnlocked);
         
     } catch (e) {
         console.error('[Unlock Debug] Init error:', e);
