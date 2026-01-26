@@ -46,8 +46,20 @@ if (typeof window !== 'undefined' && window.LemmaWallet) {
 
 const WALLET_DB_NAME = 'LemmaWallet';
 const WALLET_DB_VERSION = 4;  // v4: Added profiles for multiple identities
-const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DEFAULT_SESSION_HOURS = 24;
 const DEFAULT_PROFILE_ID = 'default';
+
+// Get user's session duration preference (stored in localStorage by wallet settings page)
+function getSessionDurationMs() {
+    try {
+        const hours = parseInt(localStorage.getItem('lemma_session_hours')) || DEFAULT_SESSION_HOURS;
+        // Clamp between 1 and 24 hours for safety
+        const clampedHours = Math.max(1, Math.min(24, hours));
+        return clampedHours * 60 * 60 * 1000;
+    } catch (e) {
+        return DEFAULT_SESSION_HOURS * 60 * 60 * 1000;
+    }
+}
 
 // Auth states
 const AUTH_STATE = {
@@ -63,7 +75,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.34.0';  // Cleaned up debug logging, fixed service worker
+    static VERSION = '2.35.0';  // Configurable session duration (4/8/12/24hr)
     
     constructor() {
         this.db = null;
@@ -536,7 +548,7 @@ class LemmaWallet {
                         this.session = {
                             isUnlocked: true,
                         unlockedAt: Date.now(),
-                        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                        expiresAt: Date.now() + getSessionDurationMs(),
                         walletId: decrypted.wallet_id,
                         walletSecret: decrypted.wallet_secret,
                         source: 'redirect'
@@ -580,7 +592,7 @@ class LemmaWallet {
                     this.session = {
                         isUnlocked: true,
                         unlockedAt: Date.now(),
-                        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                        expiresAt: Date.now() + getSessionDurationMs(),
                         walletId: data.wallet_id,
                         walletSecret: data.wallet_secret,
                         source: 'redirect'
@@ -1251,7 +1263,7 @@ class LemmaWallet {
         this.session = {
             isUnlocked: true,
             unlockedAt: now,
-            expiresAt: now + SESSION_DURATION_MS,
+            expiresAt: now + getSessionDurationMs(),
             walletId: walletId.value,
             walletSecret: walletSecret.secret  // Include in session for easy access
         };
@@ -1426,7 +1438,7 @@ class LemmaWallet {
         this.session = {
             isUnlocked: true,
             unlockedAt: now,
-            expiresAt: now + SESSION_DURATION_MS,
+            expiresAt: now + getSessionDurationMs(),
             walletId: walletId,
             walletSecret: walletSecretRecord.secret
         };
@@ -1476,7 +1488,7 @@ class LemmaWallet {
         return {
             success: true,
             expiresAt: this.session.expiresAt,
-            expiresIn: SESSION_DURATION_MS,
+            expiresIn: getSessionDurationMs(),
             walletId: walletId,
             walletSecret: walletSecretRecord.secret
         };
@@ -3845,7 +3857,7 @@ class LemmaWallet {
                 this.session = {
                     isUnlocked: true,
                     unlockedAt: now,
-                    expiresAt: now + 24 * 60 * 60 * 1000,
+                    expiresAt: now + getSessionDurationMs(),
                     walletId: payload.walletId,
                     walletSecret: payload.walletSecret,
                     source: 'link'
