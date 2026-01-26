@@ -1,223 +1,329 @@
-# Lemma Architecture: Wallet-First Authentication
+# Lemma Architecture: Wallet-Based Authentication
 
 ## Overview
 
-Lemma uses a **wallet-first** authentication model that prioritizes decentralized, offline-capable verification. This document explains the architecture and when to use each authentication method.
+Lemma uses a **wallet-based** authentication model with passkey protection. All authentication flows through the user's wallet on lemma.id, ensuring consistent security and privacy across all devices and sites.
 
-## The Two Authentication Paths
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         LEMMA AUTHENTICATION                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│   ┌─────────────────────────────┐    ┌─────────────────────────────────┐   │
-│   │   WALLET-FIRST (Primary)    │    │    OAUTH (Fallback/API)         │   │
-│   ├─────────────────────────────┤    ├─────────────────────────────────┤   │
-│   │ • User login                │    │ • Server-to-server API calls    │   │
-│   │ • Permission verification   │    │ • Third-party integrations      │   │
-│   │ • Bot protection            │    │ • Delegated access              │   │
-│   │                             │    │                                 │   │
-│   │ ✅ Works offline            │    │ ❌ Requires server              │   │
-│   │ ✅ ~1ms verification        │    │ ⚠️ ~50-200ms verification       │   │
-│   │ ✅ No server dependency     │    │ ⚠️ Token can be stolen         │   │
-│   │ ✅ Privacy-preserving       │    │ ⚠️ Centralized token storage   │   │
-│   └─────────────────────────────┘    └─────────────────────────────────┘   │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                     WALLET + REDIRECT FLOW                           │   │
+│   ├─────────────────────────────────────────────────────────────────────┤   │
+│   │ • Passkey-protected wallet on lemma.id                              │   │
+│   │ • Cross-device session sync via global session                      │   │
+│   │ • Privacy-preserving PPIDs (unique per site)                        │   │
+│   │ • Client-side wallet secret (never touches server)                  │   │
+│   │                                                                     │   │
+│   │ ✅ Works on all browsers (including mobile Safari)                  │   │
+│   │ ✅ One passkey per day across all devices                           │   │
+│   │ ✅ Privacy-preserving (no cross-site tracking)                      │   │
+│   │ ✅ Client-side PPID derivation (no server involvement)              │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Wallet-First Flow (Primary)
+## Authentication Flow
 
-This is the **recommended** authentication method for user login.
+### Redirect Flow (Primary)
 
-### How It Works
+This is the **only** authentication method. It works reliably across all browsers.
 
 ```
-1. User clicks "Sign in with Lemma"
-                │
-                ▼
-2. Browser checks wallet for existing permission
-                │
-    ┌───────────┴───────────┐
-    │                       │
-    ▼                       ▼
-Has Permission          No Permission
-    │                       │
-    ▼                       ▼
-3a. Verify locally      3b. Request from Lemma.id
-    (no server call)        │
-    │                       ▼
-    │                   4b. Store in wallet
-    │                       │
-    ▼                       ▼
-4. User authenticated   User authenticated
-   (~1ms)                  (one-time server call)
+User clicks "Sign in with Lemma"
+           │
+           ▼
+wallet.startRedirectFlow()
+           │
+           ▼
+Redirect to lemma.id/wallet/unlock
+           │
+           ▼
+┌──────────────────────────────────────┐
+│  Check: Is global session valid?     │
+│                                      │
+│  YES → Skip passkey, redirect back   │
+│  NO  → Prompt passkey (biometric)    │
+└──────────────────────────────────────┘
+           │
+           ▼
+User authenticates (if needed)
+           │
+           ▼
+Encrypt wallet data client-side
+           │
+           ▼
+Redirect back to customer site
+           │
+           ▼
+wallet.checkRedirectReturn()
+           │
+           ▼
+Decrypt wallet data client-side
+           │
+           ▼
+wallet.derivePPID() → Site-specific ID
+           │
+           ▼
+Send PPID to customer backend
 ```
 
 ### Key Benefits
 
 1. **No password** - Passkey (biometric) unlocks wallet
-2. **No email verification loop** - Instant authentication
-3. **Works offline** - After first permission grant
-4. **Privacy** - No per-verification data sent to Lemma
+2. **One passkey per day** - Global session syncs across devices
+3. **Privacy-preserving** - Each site gets unique PPID
+4. **Works everywhere** - Redirect flow avoids browser restrictions
 
 ### SDK Usage
 
 ```javascript
-const lemma = new LemmaIAM({
-    siteId: 'your_site_id',
-    debug: true
-});
+const wallet = new LemmaWallet();
+await wallet.init();
 
-// Primary method - tries wallet first
-const result = await lemma.signIn();
+// Check for redirect return
+const result = await wallet.checkRedirectReturn();
+if (result?.success) {
+    const ppid = await wallet.derivePPID();
+    await signInUser(ppid);
+    return;
+}
 
-if (result.success) {
-    console.log('User:', result.user);
-    console.log('Method:', result.method);     // 'wallet' or 'oauth'
-    console.log('Offline:', result.offline);   // true = no server call
+// Check existing auth
+const auth = await wallet.getAuthenticatedPPID();
+if (auth.authenticated) {
+    await signInUser(auth.ppid);
+} else if (auth.needsPasskey) {
+    // Show sign-in button
+    wallet.startRedirectFlow();
 }
 ```
 
-## OAuth Flow (Fallback/API)
-
-Use OAuth when:
-- Wallet is not available (server-side code)
-- You need API access tokens
-- Third-party app needs delegated access
+## Cross-Device Session Sync
 
 ### How It Works
 
 ```
-1. Site redirects to /oauth/authorize
-                │
-                ▼
-2. User unlocks wallet + consents
-                │
-                ▼
-3. Lemma redirects back with auth code
-                │
-                ▼
-4. Site exchanges code for access token
-                │
-                ▼
-5. Site uses token for API calls
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         GLOBAL SESSION SYNC                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   Device A (Phone)              Server                    Device B (PC)      │
+│   ────────────────              ──────                    ─────────────      │
+│                                                                             │
+│   1. User unlocks with          2. Global session                           │
+│      passkey                       stored in DB                             │
+│          │                           │                                      │
+│          └──────────────────────────►│                                      │
+│                                      │                                      │
+│                                      │◄──────────────────────────┐          │
+│                                      │                           │          │
+│                                 3. Device B checks      4. User visits      │
+│                                    global session          site             │
+│                                      │                                      │
+│                                      │                                      │
+│                                 5. Valid? Skip passkey,                     │
+│                                    sync session locally                     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### SDK Usage
+### Session Management
 
-```javascript
-// Explicit OAuth (when needed)
-lemma.signInWithOAuth({
-    scope: 'profile permissions'
-});
+- **Session duration**: Configurable 1-24 hours (default: 24h)
+- **Cross-device lock**: Locking on any device locks all devices
+- **Heartbeat detection**: Sites detect remote lock via visibility change + 5-min polling
 
-// Handle callback
-const result = await lemma.handleOAuthCallback(code, state);
+## PPID (Pairwise Pseudonymous Identifiers)
+
+### Privacy Model
+
+```
+Wallet Secret (client-side only)
+           │
+           ▼
+    HMAC-SHA256
+           │
+           ├──── site_a.com ────► PPID_A (unique to site A)
+           │
+           ├──── site_b.com ────► PPID_B (unique to site B)
+           │
+           └──── site_c.com ────► PPID_C (unique to site C)
 ```
 
-## When to Use What
+- **Same user + same site** → Same PPID (deterministic)
+- **Same user + different site** → Different PPID (unlinkable)
+- **Wallet secret** → Never leaves the client
+- **Cross-site tracking** → Mathematically impossible
 
-| Scenario | Method | Why |
-|----------|--------|-----|
-| User login on website | Wallet-first | Fast, offline-capable |
-| User login on mobile app | Wallet-first | Native passkey support |
-| Server calling Lemma API | OAuth | No browser/wallet available |
-| Third-party integration | OAuth | Standard protocol |
-| Bot protection check | Wallet-first | Local verification |
-| Background permission check | Either | Depends on context |
+### PPID Format
 
-## Technical Comparison
+```
+did:lemma:ppid_<64-character-hex-string>
 
-| Aspect | Wallet-First | OAuth |
-|--------|-------------|-------|
-| **Verification time** | ~1ms | ~50-200ms |
-| **Server dependency** | None (after grant) | Every verification |
-| **Token storage** | Browser wallet (encrypted) | Server database |
-| **Revocation** | Bloom filter sync | Token invalidation |
-| **Works offline** | Yes | No |
-| **Phishing resistance** | High (passkey bound) | Medium (token can leak) |
+Example:
+did:lemma:ppid_4ecdc53ba75e564cf755975e8d1ec55e08a09f3a31ebdb83bf92b8276b57e1e3
+```
 
-## Architecture Diagram
+## Security Model
+
+### Trust Boundaries
+
+| Component | Trust Level | Location |
+|-----------|-------------|----------|
+| Wallet secret | Highest | Client IndexedDB only |
+| Passkey | Highest | Device secure enclave |
+| Global session | Medium | Server (convenience only) |
+| PPID | Public | Derived client-side |
+
+### What the Server Knows
+
+| Data | Server Knows? | Notes |
+|------|---------------|-------|
+| Wallet secret | ❌ Never | Only in client IndexedDB |
+| User's sites | ❌ Never | PPIDs derived locally |
+| Session status | ✅ Yes | For cross-device sync |
+| Wallet ID | ✅ Yes | Pseudonymous identifier |
+
+### Attack Resistance
+
+| Attack | Mitigation |
+|--------|------------|
+| Phishing | Passkeys bound to lemma.id origin |
+| Session hijacking | Global session is convenience, not security boundary |
+| Cross-site tracking | Different PPID per site |
+| Server compromise | Wallet secret never on server |
+
+## Device Linking
+
+### Flow
+
+```
+Device A (has wallet)              Device B (new device)
+────────────────────              ────────────────────
+
+1. Generate link code
+   (requires fresh passkey)
+        │
+        ▼
+2. Show QR code + copy link
+        │
+        ├─────────────────────────► 3. Scan QR or paste link
+        │
+        │                           4. Decrypt wallet data
+        │                              (client-side)
+        │
+        │                           5. Store wallet secret
+        │
+        │                           6. Register passkey
+        │                              for this device
+        │
+        ▼                           ▼
+   Both devices now share      New passkey created
+   same wallet secret          (device-specific)
+```
+
+### Security
+
+- Link codes expire in 60 seconds
+- Requires fresh passkey verification to generate
+- Encrypted client-side (server never sees wallet secret)
+- Each device gets its own passkey
+
+## Component Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              USER'S BROWSER                                  │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │                         LEMMA WALLET                                    │ │
+│  │                         LEMMA WALLET SDK                                │ │
 │  │  ┌──────────────┐  ┌──────────────────┐  ┌──────────────────────────┐ │ │
-│  │  │   Passkey    │  │    Permission    │  │    Issuer Public Keys   │ │ │
-│  │  │  (encrypted) │  │     Lemmas       │  │      (cached)           │ │ │
+│  │  │   Passkey    │  │   Wallet Secret  │  │      Session State       │ │ │
+│  │  │  (Biometric) │  │   (IndexedDB)    │  │      (IndexedDB)         │ │ │
 │  │  └──────────────┘  └──────────────────┘  └──────────────────────────┘ │ │
-│  │                                                                        │ │
-│  │  ┌──────────────────────────────────────────────────────────────────┐ │ │
-│  │  │                    LOCAL VERIFICATION                             │ │ │
-│  │  │  • Ed25519 signature check (Web Crypto API)                       │ │ │
-│  │  │  • Expiration check                                               │ │ │
-│  │  │  • Revocation check (bloom filter)                                │ │ │
-│  │  └──────────────────────────────────────────────────────────────────┘ │ │
+│  │         │                   │                        │                │ │
+│  │         └──────────┬────────┴────────────────────────┘                │ │
+│  │                    │                                                   │ │
+│  │              ┌─────▼──────┐                                            │ │
+│  │              │    PPID    │   HMAC(wallet_secret, site_domain)         │ │
+│  │              │ Derivation │                                            │ │
+│  │              └────────────┘                                            │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
+│                                      │                                       │
+│                                      ▼                                       │
+│                          ┌──────────────────────┐                            │
+│                          │   Customer Backend    │                            │
+│                          │   (receives PPID)     │                            │
+│                          └──────────────────────┘                            │
 └─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    │ (only for issuance/revocation)
-                                    ▼
+                                       │
+                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              LEMMA.ID SERVER                                 │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────────┐ │
-│  │ Issue Lemmas    │  │ Revoke Lemmas   │  │ Publish Revocation Filter   │ │
-│  │ (KMS-backed)    │  │ (network-wide)  │  │ (sync to verifiers)         │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                         GLOBAL SESSION STORE                            │ │
+│  │  • Wallet ID → Session status (unlocked_at, expires_at)                │ │
+│  │  • Used for cross-device sync (NOT for security)                       │ │
+│  │  • Never contains wallet secret or PPIDs                               │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Configuration
 
-### Required Environment Variables
+### Customer Site
 
-```bash
-# Core secrets (all required in production)
-LEMMA_OAUTH_JWT_SECRET=<64-char-random-string>
-LEMMA_NETWORK_AUTH_KEY=<64-char-random-string>
-LEMMA_PPID_ROOT_KEY=<64-char-random-string>
-LEMMA_BILLING_HMAC_SECRET=<64-char-random-string>
-LEMMA_HPKE_SERVER_KEY=<64-char-random-string>
-LEMMA_WALLET_SALT=<64-char-random-string>
-SECRET_KEY=<flask-secret-key>
+No server configuration required. Just add the SDK:
 
-# Optional (for full functionality)
-REDIS_URL=<redis-connection-string>
-AWS_ACCESS_KEY_ID=<aws-key>
-AWS_SECRET_ACCESS_KEY=<aws-secret>
-LEMMA_KMS_KEY_ID=<kms-key-id>
-STRIPE_SECRET_KEY=<stripe-key>
+```html
+<script src="https://lemma.id/static/js/lemma-wallet.js"></script>
 ```
 
-### Generate Secrets
+### Session Duration
 
-```bash
-# Generate a secure random secret
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
+Users configure at `lemma.id/wallet`:
+- Minimum: 1 hour
+- Maximum: 24 hours
+- Default: 24 hours
 
-## Migration from OAuth-Only
+## Migration from Traditional Auth
 
-If you're currently using only OAuth, migrating to wallet-first is simple:
-
-1. Update SDK to latest version
-2. Change `signInWithOAuth()` to `signIn()`
-3. The SDK automatically handles the wallet-first flow with OAuth fallback
+### From Username/Password
 
 ```javascript
-// Before (OAuth-only)
-lemma.signInWithOAuth();
+// Old
+const user = await authenticateWithPassword(email, password);
 
-// After (wallet-first with OAuth fallback)
-lemma.signIn();  // Tries wallet first, falls back to OAuth if needed
+// New
+const auth = await wallet.getAuthenticatedPPID();
+if (auth.authenticated) {
+    const user = await findOrCreateUserByPPID(auth.ppid);
+}
+```
+
+### From OAuth/OIDC
+
+```javascript
+// Old
+// const user = await auth0.getUser();
+// const userId = user.sub;
+
+// New
+const auth = await wallet.getAuthenticatedPPID();
+const userId = auth.ppid;
 ```
 
 ## Summary
 
-- **User login → Wallet-first** (primary, recommended)
-- **API access → OAuth** (when needed)
-- **The SDK handles both** automatically via `signIn()`
+| Feature | Implementation |
+|---------|---------------|
+| Authentication | Passkey (biometric) on lemma.id |
+| Session sync | Global session in database |
+| Identity | PPID derived client-side |
+| Privacy | No cross-site tracking possible |
+| Security | Wallet secret never leaves client |

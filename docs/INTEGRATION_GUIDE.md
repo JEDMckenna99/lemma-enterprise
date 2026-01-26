@@ -1,17 +1,16 @@
 # Lemma Integration Guide
 
-> Complete guide for integrating Lemma's local-first authentication into your application
+> Complete guide for integrating Lemma's wallet-based authentication
 
 ## Table of Contents
 
 1. [Overview](#overview)
 2. [Quick Start](#quick-start)
-3. [Authentication Patterns](#authentication-patterns)
-4. [Session Management](#session-management)
-5. [Credential Verification](#credential-verification)
-6. [React Integration](#react-integration)
-7. [Advanced Topics](#advanced-topics)
-8. [Troubleshooting](#troubleshooting)
+3. [Authentication Flow](#authentication-flow)
+4. [SDK Reference](#sdk-reference)
+5. [Backend Integration](#backend-integration)
+6. [Advanced Topics](#advanced-topics)
+7. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -19,551 +18,501 @@
 
 ### What Makes Lemma Different
 
-| Feature | Traditional Auth (Auth0/Okta) | Lemma |
-|---------|------------------------------|-------|
-| Network calls per login | 5-7 calls | **0 calls** |
-| Server dependency | Required | **Works offline** |
-| User tracking | Possible | **Impossible (PPIDs)** |
-| Verification speed | 200-500ms | **~1ms** |
-| Session storage | Server-side | **Client-side (IndexedDB)** |
+| Feature | Traditional Auth | Lemma |
+|---------|------------------|-------|
+| Authentication | Passwords | Passkeys (biometric) |
+| User tracking | Cross-site possible | Impossible (PPIDs) |
+| Session management | Server-side | Client-side + global sync |
+| Re-authentication | Every device | Once per day, all devices |
+| Wallet secret | Stored on server | Never leaves client |
 
 ### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  USER'S BROWSER                                              │
+│  USER'S DEVICE                                               │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐    │
-│  │   Passkey   │────▶│   Wallet    │────▶│ Credentials │    │
-│  │ (Biometric) │     │ (IndexedDB) │     │  (Lemmas)   │    │
+│  │   Passkey   │────▶│   Wallet    │────▶│    PPID     │    │
+│  │ (Biometric) │     │ (IndexedDB) │     │ (Per-Site)  │    │
 │  └─────────────┘     └─────────────┘     └─────────────┘    │
-│         │                   │                   │            │
-│         └──────────┬────────┴───────────┬──────┘            │
-│                    │                    │                    │
-│              ┌─────▼─────┐        ┌─────▼─────┐             │
-│              │  Bridge   │        │  Local    │             │
-│              │ (iframe)  │        │  Verify   │             │
-│              └───────────┘        └───────────┘             │
+│                              │                               │
+│                      ┌───────▼───────┐                       │
+│                      │ Global Session │                      │
+│                      │   (Server)     │                       │
+│                      └───────────────┘                       │
+│                              │                               │
+│              ┌───────────────┼───────────────┐               │
+│              ▼               ▼               ▼               │
+│         Device A        Device B        Device C             │
+│         (unlocked)      (synced)        (synced)             │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Quick Start (Golden Path)
+## Quick Start
 
 ### Step 1: Add the SDK
 
 ```html
-<!-- Recommended: Script tag -->
 <script src="https://lemma.id/static/js/lemma-wallet.js"></script>
 ```
 
-Or via NPM:
-
-```bash
-npm install @lemma/wallet-sdk
-```
-
-### Step 2: Initialize Wallet
+### Step 2: Initialize and Check Auth
 
 ```javascript
-// The wallet auto-initializes, but you can wait for it
-await lemmaWallet.init();
+const wallet = new LemmaWallet();
+await wallet.init();
 
-// Check wallet status
-const info = await lemmaWallet.getWalletInfo();
-console.log('Has passkey:', info.hasPasskey);
-console.log('Is unlocked:', info.isUnlocked);
-```
+// Handle redirect return (user coming back from lemma.id)
+const redirectResult = await wallet.checkRedirectReturn();
+if (redirectResult?.success) {
+    const ppid = await wallet.derivePPID();
+    await handleAuthenticated(ppid);
+    return;
+}
 
-### Step 3: Login + IAM (One Passkey Per Day)
-
-```javascript
-async function loginAndGetPermission() {
-    await lemmaWallet.init();
-
-    const info = await lemmaWallet.getWalletInfo();
-    if (info.hasPasskey) {
-        await lemmaWallet.unlock();       // Returning user
-    } else {
-        await lemmaWallet.registerPasskey(); // New user
-    }
-
-    // Fetch or issue a permission lemma for your site
-    const credentials = await lemmaWallet.getCredentials('permission');
-    const myCredential = credentials.find(c => c.claims?.siteId === 'mysite.com');
-    if (!myCredential) {
-        throw new Error('No permission lemma for this site yet');
-    }
-
-    return myCredential;
+// Check if already authenticated
+const auth = await wallet.getAuthenticatedPPID();
+if (auth.authenticated) {
+    await handleAuthenticated(auth.ppid);
+} else {
+    showSignInButton();
 }
 ```
 
-### Step 4: Cross-Site Session Sync (for third-party origins)
-
-If your app runs on a different origin than `lemma.id`, use the session sync flow:
+### Step 3: Handle Sign-In
 
 ```javascript
-// 1) Redirect user to unlock wallet (once per day)
-const unlockUrl = `https://lemma.id/wallet/unlock?return_url=${encodeURIComponent(window.location.href)}`;
-window.location.href = unlockUrl;
-
-// 2) After redirect back, call session-sync with CSRF header
-const csrfToken = getCookie('lemma_wallet_csrf');
-
-const response = await fetch('https://lemma.id/api/wallet/session-sync', {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-        'Content-Type': 'application/json',
-        'X-Lemma-CSRF': csrfToken
-    }
-});
-
-const data = await response.json();
-if (data.success) {
-    // data.session + data.credentials
-    console.log('Session valid until:', new Date(data.session.expires_at * 1000));
-}
-
-function getCookie(name) {
-    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return match ? decodeURIComponent(match[2]) : null;
-}
-```
-
-**Server configuration required for cross-site session sync:**
-- `LEMMA_ALLOWED_ORIGINS` (comma-separated origins)
-- `LEMMA_ALLOWED_ORIGIN_SUFFIXES` (comma-separated domain suffixes)
-- `LEMMA_ALLOW_DEV_ORIGINS=1` (optional for localhost)
-- `SESSION_SECRET` must be set in production
-
----
-
-## Minimal Integration Checklist (Login + IAM)
-
-- Load `lemma-wallet.js` or install the SDK
-- Call `lemmaWallet.init()` on page load
-- Use `lemmaWallet.unlock()` (returning) or `lemmaWallet.registerPasskey()` (new)
-- Retrieve the permission lemma for your site
-- Verify locally with `lemmaWallet.verifyLemma(...)`
-
----
-
-## Authentication Patterns
-
-### Pattern 1: Check-and-Prompt
-
-Best for: Apps where auth is required on page load
-
-```javascript
-document.addEventListener('DOMContentLoaded', async () => {
-    await lemmaWallet.init();
+document.getElementById('signin-btn').addEventListener('click', async () => {
+    const wallet = new LemmaWallet();
+    await wallet.init();
     
-    const state = lemmaWallet.getAuthState();
-    
-    if (state.authenticated) {
-        // Already authenticated - show app
-        showApp();
-    } else if (state.state === 'locked') {
-        // Has wallet but locked - show unlock prompt
-        showUnlockButton();
-    } else {
-        // No wallet - show registration
-        showRegisterButton();
-    }
+    // Redirect to lemma.id for passkey authentication
+    wallet.startRedirectFlow();
 });
 ```
 
-### Pattern 2: On-Demand Auth
-
-Best for: Apps where auth is optional until a protected action
+### Step 4: Backend Verification
 
 ```javascript
-async function purchaseItem(itemId) {
-    // Require auth for purchase
-    if (!lemmaWallet.isAuthenticated()) {
-        await lemmaWallet.unlock();
+// Your backend
+app.post('/api/auth/verify', async (req, res) => {
+    const { ppid } = req.body;
+    
+    // PPID is unique per user per site
+    let user = await db.users.findOne({ ppid });
+    if (!user) {
+        user = await db.users.create({ ppid });
     }
     
-    // Get credential for this site
-    const credentials = await lemmaWallet.getCredentials('permission');
-    const myCredential = credentials.find(c => c.claims.site === 'mysite.com');
-    
-    if (!myCredential) {
-        // User needs to be issued a credential first
-        throw new Error('No permission for this site');
-    }
-    
-    // Proceed with purchase
-    await completePurchase(itemId, myCredential);
-}
+    res.json({ success: true, userId: user.id });
+});
 ```
 
-### Pattern 3: Session-Aware Auth
+---
 
-Best for: Apps that want to minimize passkey prompts
+## Authentication Flow
+
+### Redirect Flow (Recommended)
+
+The redirect flow works reliably across all browsers including mobile Safari:
+
+```
+1. User clicks "Sign in with Lemma"
+   │
+   ▼
+2. wallet.startRedirectFlow()
+   │
+   ▼
+3. Redirect to lemma.id/wallet/unlock
+   │
+   ▼
+4. User authenticates with passkey (biometric)
+   │
+   ▼
+5. Redirect back with encrypted wallet data
+   │
+   ▼
+6. wallet.checkRedirectReturn() decrypts locally
+   │
+   ▼
+7. wallet.derivePPID() returns site-specific ID
+   │
+   ▼
+8. Send PPID to your backend
+```
+
+### Code Example
 
 ```javascript
-async function smartAuth() {
-    const state = await lemmaWallet.getSessionState();
-    
-    if (state.authenticated && state.timeRemaining > 3600000) {
-        // Session valid with >1 hour remaining
-        return true;
+class LemmaAuth {
+    constructor() {
+        this.wallet = new LemmaWallet();
     }
     
-    if (state.shouldPromptExtend && state.canExtend) {
-        // Session expiring but can extend with tap
-        const extended = await lemmaWallet.extendBridgeSession();
-        return extended.success;
+    async init() {
+        await this.wallet.init();
+        
+        // Check for redirect return
+        const result = await this.wallet.checkRedirectReturn();
+        if (result?.success) {
+            return { authenticated: true, isRedirectReturn: true };
+        }
+        
+        // Check existing session
+        const auth = await this.wallet.getAuthenticatedPPID();
+        return { 
+            authenticated: auth.authenticated,
+            ppid: auth.ppid 
+        };
     }
     
-    // Need full unlock
-    await lemmaWallet.unlock();
-    return true;
+    async signIn() {
+        this.wallet.startRedirectFlow();
+    }
+    
+    async getPPID() {
+        return await this.wallet.derivePPID();
+    }
+    
+    async signOut() {
+        await this.wallet.lock();
+    }
 }
 ```
 
 ---
 
-## Session Management
+## SDK Reference
 
-### Understanding Sessions
-
-Lemma uses a **session-based unlock model**:
-
-- **Default session**: 24 hours
-- **Extensions**: Up to 7 extensions (tap-only, no biometric)
-- **Total**: Up to 8 days without full re-authentication
-
-### Checking Session State
+### Initialization
 
 ```javascript
-const state = await lemmaWallet.getSessionState();
+const wallet = new LemmaWallet();
+await wallet.init();
+```
 
-console.log({
-    authenticated: state.authenticated,      // Is user authenticated?
-    timeRemaining: state.timeRemaining,      // ms until expiry
-    canExtend: state.canExtend,              // Can extend session?
-    extensionCount: state.extensionCount,    // Extensions used (0-7)
-    shouldPromptExtend: state.shouldPromptExtend  // <2 hours remaining
+### Authentication Methods
+
+#### `getAuthenticatedPPID()`
+
+Check if user is authenticated and get their PPID:
+
+```javascript
+const auth = await wallet.getAuthenticatedPPID();
+// Returns:
+// {
+//   authenticated: boolean,
+//   ppid?: string,           // "did:lemma:ppid_<64-char-hex>"
+//   needsPasskey: boolean,   // true if redirect needed
+//   message: string
+// }
+```
+
+#### `startRedirectFlow()`
+
+Redirect to lemma.id for passkey authentication:
+
+```javascript
+wallet.startRedirectFlow();
+// Redirects to lemma.id/wallet/unlock
+// Returns to current page with encrypted data
+```
+
+#### `checkRedirectReturn()`
+
+Handle return from lemma.id authentication:
+
+```javascript
+const result = await wallet.checkRedirectReturn();
+// Returns:
+// {
+//   success: boolean,
+//   walletId?: string,
+//   authenticated?: boolean
+// }
+```
+
+#### `derivePPID(siteId?)`
+
+Derive site-specific pseudonymous identifier:
+
+```javascript
+const ppid = await wallet.derivePPID();
+// Returns: "did:lemma:ppid_<64-char-hex>"
+
+// Or for a specific site
+const ppid = await wallet.derivePPID('example.com');
+```
+
+### Session Management
+
+#### `lock()`
+
+Lock wallet on all devices:
+
+```javascript
+await wallet.lock();
+// Clears local session
+// Clears global session (affects all linked devices)
+```
+
+#### `getWalletInfo()`
+
+Get current wallet state:
+
+```javascript
+const info = await wallet.getWalletInfo();
+// Returns:
+// {
+//   hasWallet: boolean,      // Has wallet secret
+//   hasPasskey: boolean,     // Has registered passkey
+//   isUnlocked: boolean,     // Currently authenticated
+//   walletId: string | null,
+//   session: { ... }
+// }
+```
+
+#### `isUnlocked()`
+
+Quick check if wallet is unlocked:
+
+```javascript
+if (wallet.isUnlocked()) {
+    // User is authenticated
+}
+```
+
+### Event Handling
+
+#### Session Expiry
+
+```javascript
+wallet.onSessionExpired((event) => {
+    console.log('Session expired:', event.reason);
+    // 'expired' | 'locked' | 'bridge_invalid'
+    redirectToLogin();
 });
 ```
 
-### Automatic Session Management
+#### Session Heartbeat
+
+The SDK automatically monitors session validity on third-party sites:
 
 ```javascript
-// Start automatic session management
-const manager = startLemmaSessionManager({
-    checkInterval: 30 * 60 * 1000,  // Check every 30 minutes
-    autoExtend: false,               // Prompt before extending
+// Heartbeat runs automatically
+// - Checks on tab visibility change (instant)
+// - Checks every 5 minutes (backup)
+// - Triggers onSessionExpired if wallet locked elsewhere
+```
+
+---
+
+## Backend Integration
+
+### Verifying PPIDs
+
+PPIDs are deterministic - the same user always gets the same PPID for your site:
+
+```javascript
+// Node.js example
+app.post('/api/auth/verify', async (req, res) => {
+    const { ppid } = req.body;
     
-    onExtensionNeeded: async (state) => {
-        // Show custom prompt
-        return await showExtendPrompt(`Session expires in ${state.timeRemaining / 60000} minutes`);
-    },
-    
-    onSessionExpired: () => {
-        // Redirect to login
-        window.location.href = '/login';
+    // Validate PPID format
+    if (!ppid?.startsWith('did:lemma:ppid_')) {
+        return res.status(400).json({ error: 'Invalid PPID format' });
     }
-});
-
-// Stop when component unmounts
-manager.stop();
-```
-
-### Manual Session Extension
-
-```javascript
-// Check if extension is needed
-const state = await lemmaWallet.getSessionState();
-
-if (state.shouldPromptExtend && state.canExtend) {
-    // This triggers a tap-only passkey check (no biometric)
-    const result = await lemmaWallet.extendBridgeSession();
     
-    if (result.success) {
-        console.log('Session extended!', {
-            newExpiry: result.expiresAt,
-            extensionsRemaining: result.extensionsRemaining
+    // Find or create user
+    let user = await User.findOne({ lemma_ppid: ppid });
+    
+    if (!user) {
+        user = await User.create({
+            lemma_ppid: ppid,
+            created_at: new Date()
         });
     }
-}
-```
-
----
-
-## Credential Verification
-
-### Local Verification (Recommended)
-
-Verify credentials without any network calls:
-
-```javascript
-// Full verification (~1ms)
-const result = await lemmaWallet.verifyLemma(credential);
-
-console.log({
-    valid: result.valid,
-    reason: result.reason,        // 'valid', 'expired', 'revoked', etc.
-    issuer: result.issuer,
-    claims: result.claims,
-    verifyTimeUs: result.verifyTimeUs  // Microseconds
+    
+    // Create session
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
+    
+    res.json({ success: true, token });
 });
 ```
 
-### Quick Verification (Fastest)
+### Database Schema
 
-For repeated checks on the same credential:
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    lemma_ppid VARCHAR(128) UNIQUE NOT NULL,
+    email VARCHAR(255),          -- Optional, user can add later
+    display_name VARCHAR(255),
+    created_at TIMESTAMP DEFAULT NOW(),
+    last_login_at TIMESTAMP
+);
 
-```javascript
-// Quick verify - uses cached signature (~50μs)
-const quick = await lemmaWallet.quickVerify(credential);
-
-// 20x faster than full verification!
-```
-
-### Revocation Checking
-
-```javascript
-// Check if credential is revoked
-const revocation = await lemmaWallet.isRevoked(credential.id);
-
-if (revocation.revoked) {
-    console.log('Credential has been revoked!');
-} else if (revocation.unchecked) {
-    console.log('Revocation list not synced - might be stale');
-}
-
-// Force sync revocation list
-await lemmaWallet.syncRevocations();
-```
-
----
-
-## React Integration
-
-### Using the Hooks
-
-```tsx
-import { useLemma, useLemmaSession, useLemmaVerification } from '@lemma/sdk/react';
-
-function App() {
-    // Wallet state and methods
-    const { 
-        isUnlocked, 
-        hasPasskey, 
-        isLoading,
-        unlock, 
-        registerPasskey,
-        getCredentials 
-    } = useLemma();
-    
-    // Session management
-    const { 
-        session, 
-        extendSession,
-        formattedTimeRemaining 
-    } = useLemmaSession({ 
-        autoManage: true,
-        onSessionExpired: () => navigate('/login')
-    });
-    
-    // Verification
-    const { verify, isVerifying, lastResult } = useLemmaVerification();
-    
-    if (isLoading) return <div>Loading...</div>;
-    
-    if (!hasPasskey) {
-        return (
-            <button onClick={registerPasskey}>
-                Create Wallet
-            </button>
-        );
-    }
-    
-    if (!isUnlocked) {
-        return (
-            <button onClick={unlock}>
-                Unlock Wallet
-            </button>
-        );
-    }
-    
-    return (
-        <div>
-            <p>Session expires in: {formattedTimeRemaining}</p>
-            {session.shouldPromptExtend && (
-                <button onClick={extendSession}>
-                    Extend Session
-                </button>
-            )}
-        </div>
-    );
-}
-```
-
-### Session Provider Pattern
-
-```tsx
-// Create a context for session state
-import { createContext, useContext } from 'react';
-import { useLemmaSession } from '@lemma/sdk/react';
-
-const SessionContext = createContext(null);
-
-export function SessionProvider({ children }) {
-    const session = useLemmaSession({
-        autoManage: true,
-        checkInterval: 5 * 60 * 1000  // Check every 5 minutes
-    });
-    
-    return (
-        <SessionContext.Provider value={session}>
-            {children}
-        </SessionContext.Provider>
-    );
-}
-
-export const useSession = () => useContext(SessionContext);
+CREATE INDEX idx_users_ppid ON users(lemma_ppid);
 ```
 
 ---
 
 ## Advanced Topics
 
-### Cross-Site Wallet Access (Bridge)
+### Cross-Device Sync
 
-For third-party sites to access the user's central wallet:
-
-```javascript
-// The bridge is automatically created when needed
-// Just use the session methods:
-
-const state = await lemmaWallet.getSessionState();
-// This uses the bridge to check the central wallet
-
-const credentials = await lemmaWallet.getCredentials();
-// On third-party sites, this fetches from central wallet
-```
-
-### PPID (Pairwise Pseudonymous Identifiers)
-
-Each site sees a different user ID:
+When a user unlocks on one device, other linked devices can skip passkey:
 
 ```javascript
-// Get the user's PPID for your site
-const walletSecret = await lemmaWallet.getWalletSecret();
+// This happens automatically in getAuthenticatedPPID()
+const auth = await wallet.getAuthenticatedPPID();
 
-// Derive site-specific ID (HMAC)
-const ppid = await derivePPID(walletSecret, 'mysite.com');
-
-// This PPID is unique to mysite.com
-// Other sites get different PPIDs for the same user
-// Cross-site tracking is impossible!
-```
-
-### Service Worker Caching
-
-The SDK automatically registers a service worker on `lemma.id` for offline-first caching:
-
-```javascript
-// Check service worker status
-const registrations = await navigator.serviceWorker.getRegistrations();
-const lemmaSW = registrations.find(r => r.scope.includes('lemma.id'));
-
-if (lemmaSW) {
-    console.log('Lemma service worker active - 0 network calls!');
+if (auth.authenticated) {
+    // User may have unlocked on another device
+    // SDK synced from global session automatically
+    console.log('Authenticated via:', auth.source);
+    // 'local' | 'global_sync' | 'redirect'
 }
+```
+
+### Device Linking
+
+Users can link devices at `lemma.id/wallet`:
+
+```javascript
+// Direct user to wallet management
+const linkUrl = 'https://lemma.id/wallet';
+
+// Or use SDK method
+const state = await wallet.getAuthState();
+if (state.canLinkDevice) {
+    // Show "Link another device" option
+}
+```
+
+### Privacy: PPID Derivation
+
+PPIDs are derived client-side using HMAC:
+
+```
+PPID = HMAC-SHA256(wallet_secret, site_domain)
+```
+
+- **Same user + same site** = Same PPID (deterministic)
+- **Same user + different site** = Different PPID (unlinkable)
+- **Wallet secret** never leaves the device
+
+### Session Duration
+
+Users can configure session duration (1-24 hours) at `lemma.id/wallet`:
+
+```javascript
+// SDK automatically respects user's preference
+// Default: 24 hours
+// Minimum: 1 hour
+// Maximum: 24 hours
 ```
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
+### "Redirect not returning data"
 
-**Issue: "LemmaWallet is not defined"**
-```javascript
-// Make sure the script is loaded before using it
-<script src="https://lemma.id/static/js/lemma-wallet.js"></script>
-<script>
-    // Wait for DOM ready
-    document.addEventListener('DOMContentLoaded', async () => {
-        await lemmaWallet.init();
-    });
-</script>
-```
+Ensure your site is served over HTTPS:
 
-**Issue: "Passkey not supported"**
 ```javascript
-// Check passkey support
-if (!lemmaWallet._isPasskeySupported()) {
-    // Show fallback auth method
-    showFallbackAuth();
+if (location.protocol !== 'https:' && !location.hostname.includes('localhost')) {
+    console.warn('Lemma requires HTTPS');
 }
 ```
 
-**Issue: Session expiring too fast**
+### "PPID is undefined"
+
+Call `checkRedirectReturn()` first when returning from authentication:
+
 ```javascript
-// Enable auto-extend
-startLemmaSessionManager({
-    autoExtend: true  // Will extend without prompting
-});
+// Correct order
+const redirect = await wallet.checkRedirectReturn();
+if (redirect?.success) {
+    const ppid = await wallet.derivePPID(); // Now works
+}
 ```
 
-**Issue: Credentials not syncing to central wallet**
+### "Session expires immediately"
+
+The session might be locked from another device. Check the heartbeat:
+
 ```javascript
-// Force sync to central wallet
-await lemmaWallet.syncToCentralWallet(credential);
+wallet.onSessionExpired((event) => {
+    if (event.reason === 'locked') {
+        // Wallet was locked on another device
+    }
+});
 ```
 
 ### Debug Mode
 
+Enable verbose logging:
+
 ```javascript
-const wallet = new LemmaWallet({ debug: true });
-
-// Or enable on existing instance
-lemmaWallet._options.debug = true;
-
-// Now you'll see detailed logs:
-// [LemmaWallet] Wallet initialized
-// [LemmaWallet] Session check: valid, 23h remaining
-// [LemmaWallet] Credential verified in 0.8ms
+const wallet = new LemmaWallet();
+// Logs prefixed with [Lemma] will appear in console
 ```
 
-### Network Tab Verification
+### Testing Without Passkey Hardware
 
-To verify you're achieving 0 network calls:
-
-1. Open DevTools → Network tab
-2. Filter by "lemma.id"
-3. Perform unlock/verify operations
-4. Should see: `(ServiceWorker)` or `(from disk cache)`
+On development machines without biometric hardware:
+- Windows: Use PIN or Windows Hello
+- Mac: Use Touch ID or password
+- Browser: Some browsers offer software passkey simulation
 
 ---
 
-## Performance Benchmarks
+## Security Considerations
 
-| Operation | Time | Network Calls |
-|-----------|------|---------------|
-| Wallet init | ~50ms | 0 |
-| Session check | ~5ms | 0 |
-| Full verification | ~1ms | 0 |
-| Quick verification | ~50μs | 0 |
-| Session extend | ~200ms | 0 (passkey prompt) |
-| Revocation sync | ~100ms | 1 (background) |
+1. **Always use HTTPS** - Required for passkeys and secure redirects
+2. **Validate PPID format** - Check `did:lemma:ppid_` prefix
+3. **Don't store wallet secrets** - They never leave the client
+4. **Trust the PPID** - It's cryptographically derived, not guessable
 
 ---
 
-## Next Steps
+## Migration from Other Auth
 
-- [API Reference](./API_REFERENCE.md)
-- [Security Audit Checklist](./SECURITY_CHECKLIST.md)
-- [Example Implementations](../examples/)
-- [TypeScript Types](../sdk/src/types.ts)
+### From Auth0/Okta
+
+```javascript
+// Old: Auth0
+// const user = await auth0.getUser();
+// const userId = user.sub;
+
+// New: Lemma
+const auth = await wallet.getAuthenticatedPPID();
+const userId = auth.ppid;  // Use as unique identifier
+```
+
+### From Firebase Auth
+
+```javascript
+// Old: Firebase
+// const user = firebase.auth().currentUser;
+// const userId = user.uid;
+
+// New: Lemma  
+const auth = await wallet.getAuthenticatedPPID();
+const userId = auth.ppid;
+```
+
+---
+
+## Support
+
+- Documentation: https://lemma.id/docs
+- Issues: https://github.com/lemma-id/sdk/issues
+- Email: support@lemma.id
