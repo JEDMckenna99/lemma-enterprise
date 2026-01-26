@@ -315,7 +315,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=2348" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-wallet.js?v=2349" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
@@ -398,24 +398,37 @@ async function setGlobalSession(walletId) {
 
 // Cross-device lock detection (runs on tab visibility change)
 async function checkCrossDeviceLock() {
+    console.log('[CrossDevice] checkCrossDeviceLock starting...');
     await initWallet();
     const info = await wallet.getWalletInfo();
     
-    if (!info.isUnlocked || !info.walletId) return;
+    console.log('[CrossDevice] info:', { isUnlocked: info.isUnlocked, walletId: info.walletId?.substring(0, 8) });
+    console.log('[CrossDevice] hadGlobalSession:', hadGlobalSession);
+    
+    if (!info.isUnlocked || !info.walletId) {
+        console.log('[CrossDevice] Early return - not unlocked or no walletId');
+        return;
+    }
     
     // Only check if we previously HAD a global session
     // This prevents false positive locks on first unlock
-    if (!hadGlobalSession) return;
+    if (!hadGlobalSession) {
+        console.log('[CrossDevice] Early return - hadGlobalSession is false');
+        return;
+    }
     
     const globalSession = await syncGlobalSession(info.walletId);
+    console.log('[CrossDevice] globalSession result:', globalSession);
     
     // If we HAD a global session but now it's invalid, we were locked from another device
     if (!globalSession.valid && !globalSession.error) {
-        console.log('Wallet locked on another device - clearing local session');
+        console.log('[CrossDevice] Wallet locked on another device - clearing local session');
         await wallet.lock();
         hadGlobalSession = false;
         localStorage.removeItem('lemma_had_global_session');
         await checkWalletState();
+    } else {
+        console.log('[CrossDevice] Session still valid or error occurred');
     }
 }
 
@@ -502,8 +515,12 @@ async function unlockWallet() {
 // Lock wallet
 async function lockWallet() {
     try {
+        console.log('[Lock] Starting lock...');
         await initWallet();
+        const info = await wallet.getWalletInfo();
+        console.log('[Lock] walletId:', info.walletId);
         await wallet.lock();
+        console.log('[Lock] wallet.lock() completed');
         // Clear global session flag since we just locked
         hadGlobalSession = false;
         localStorage.removeItem('lemma_had_global_session');
