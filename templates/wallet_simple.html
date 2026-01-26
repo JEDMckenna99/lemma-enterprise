@@ -299,7 +299,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=2344" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-wallet.js?v=2345" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
@@ -780,18 +780,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // CROSS-DEVICE LOCK DETECTION: Check when tab becomes visible
+    // This is the primary detection mechanism - fires when user switches back to this tab
     document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState === 'visible') {
             await checkCrossDeviceLock();
         }
     });
     
-    // Also check periodically (every 30 seconds) while page is open
+    // Optional: Long interval backup check (5 minutes)
+    // Only matters if user stays on this tab for extended periods without switching
+    // Can be removed entirely for zero background overhead
     setInterval(async () => {
         if (document.visibilityState === 'visible') {
             await checkCrossDeviceLock();
         }
-    }, 30000);
+    }, 300000); // 5 minutes
     
     // Event listeners
     document.getElementById('unlock-btn').addEventListener('click', unlockWallet);

@@ -402,8 +402,8 @@ class LemmaWallet {
         if (this._isLemmaDomain()) return;
         if (this._heartbeatInterval) return; // Already running
         
-        console.log('[Lemma] 🔄 Auto-starting session heartbeat (checks every 30s)');
-        this.startSessionHeartbeat(30000); // Check every 30 seconds
+        console.log('[Lemma] 🔄 Auto-starting session heartbeat (visibility + 5min backup)');
+        this.startSessionHeartbeat(300000); // 5 minute backup interval (primary is tab focus)
     }
 
     /**
@@ -1358,7 +1358,7 @@ class LemmaWallet {
                     }
 
                     // Start session heartbeat to detect if wallet is locked remotely
-                    this.startSessionHeartbeat(30000); // Check every 30 seconds
+                    this.startSessionHeartbeat(300000); // 5 minute backup (primary is tab focus)
 
                     return {
                         success: true,
@@ -1488,7 +1488,7 @@ class LemmaWallet {
         // Start heartbeat on third-party sites
         if (!window.location.hostname.includes('lemma.id') &&
             !window.location.hostname.includes('localhost')) {
-            this.startSessionHeartbeat(30000);
+            this.startSessionHeartbeat(300000); // 5 minute backup (primary is tab focus)
         }
 
         return {
