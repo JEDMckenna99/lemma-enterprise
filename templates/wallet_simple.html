@@ -315,7 +315,7 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=2346" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-wallet.js?v=2347" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
@@ -587,26 +587,17 @@ async function showQR() {
         if (linkOptionsEl) {
             linkOptionsEl.innerHTML = `
                 <div class="link-method">
-                    <strong>Option 1: Scan QR</strong> (PC to Phone)
-                    <p class="text-muted">Scan the QR code above with your phone camera</p>
+                    <strong>Scan QR Code</strong>
+                    <p class="text-muted">Point your other device's camera at the QR code above</p>
                 </div>
                 <div class="link-method" style="margin-top: 1rem;">
-                    <strong>Option 2: Copy Link</strong> (Phone to PC)
-                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                        <input type="text" id="link-url" value="${result.qrUrl}" readonly 
-                               style="flex: 1; padding: 0.5rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary);">
-                        <button onclick="copyLinkUrl()" class="btn btn-secondary" style="white-space: nowrap;">Copy</button>
-                    </div>
-                    <p class="text-muted">Paste this link in your PC browser</p>
-                </div>
-                <div class="link-method" style="margin-top: 1rem;">
-                    <strong>Option 3: Transfer Code</strong> (Manual entry)
+                    <strong>Or copy transfer code</strong>
                     <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
                         <input type="text" id="transfer-code" value="${result.qrData}" readonly 
                                style="flex: 1; padding: 0.5rem; font-size: 0.7rem; font-family: monospace; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary);">
                         <button onclick="copyTransferCode()" class="btn btn-secondary" style="white-space: nowrap;">Copy</button>
                     </div>
-                    <p class="text-muted">Paste this code on the other device's "Receive" tab</p>
+                    <p class="text-muted">Paste in "Receive" tab on other device (useful for phone→PC)</p>
                 </div>
             `;
             linkOptionsEl.classList.remove('hidden');
@@ -634,20 +625,6 @@ async function showQR() {
     } catch (e) {
         console.error('QR generation failed:', e);
         alert('Failed to generate QR code: ' + e.message);
-    }
-}
-
-// Copy link URL to clipboard
-async function copyLinkUrl() {
-    const input = document.getElementById('link-url');
-    try {
-        await navigator.clipboard.writeText(input.value);
-        const btn = input.nextElementSibling;
-        btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy', 2000);
-    } catch (e) {
-        input.select();
-        document.execCommand('copy');
     }
 }
 
