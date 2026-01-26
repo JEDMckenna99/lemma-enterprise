@@ -272,17 +272,15 @@
             
             <div class="setting-row">
                 <div>
-                    <div class="setting-label">Auto-lock timeout</div>
-                    <div class="setting-description">Lock wallet after inactivity</div>
+                    <div class="setting-label">Session duration</div>
+                    <div class="setting-description">How long until you need to unlock again</div>
                 </div>
                 <div class="setting-control">
-                    <select id="autolock-select">
-                        <option value="0">Never</option>
-                        <option value="5">5 minutes</option>
-                        <option value="15">15 minutes</option>
-                        <option value="30" selected>30 minutes</option>
-                        <option value="60">1 hour</option>
-                        <option value="240">4 hours</option>
+                    <select id="session-duration-select">
+                        <option value="4">4 hours</option>
+                        <option value="8">8 hours</option>
+                        <option value="12">12 hours</option>
+                        <option value="24" selected>24 hours</option>
                     </select>
                 </div>
             </div>
@@ -594,16 +592,16 @@ async function clearWallet() {
     }
 }
 
-// Auto-lock setting
-function saveAutolockSetting() {
-    const value = document.getElementById('autolock-select').value;
-    localStorage.setItem('lemma_autolock_minutes', value);
+// Session duration setting
+function saveSessionDuration() {
+    const value = document.getElementById('session-duration-select').value;
+    localStorage.setItem('lemma_session_hours', value);
 }
 
-function loadAutolockSetting() {
-    const saved = localStorage.getItem('lemma_autolock_minutes');
+function loadSessionDuration() {
+    const saved = localStorage.getItem('lemma_session_hours');
     if (saved) {
-        document.getElementById('autolock-select').value = saved;
+        document.getElementById('session-duration-select').value = saved;
     }
 }
 
@@ -690,7 +688,7 @@ function arrayBufferToBase64(buffer) {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    loadAutolockSetting();
+    loadSessionDuration();
     
     // Check for redirect flow
     const redirectParams = getRedirectParams();
@@ -716,7 +714,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('hide-qr-btn').addEventListener('click', hideQR);
     document.getElementById('link-device-btn').addEventListener('click', linkDevice);
     document.getElementById('clear-wallet-btn').addEventListener('click', clearWallet);
-    document.getElementById('autolock-select').addEventListener('change', saveAutolockSetting);
+    document.getElementById('session-duration-select').addEventListener('change', saveSessionDuration);
 });
 </script>
 {% endblock %}
