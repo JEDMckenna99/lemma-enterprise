@@ -386,41 +386,65 @@ def issue_admin_lemma_endpoint():
                 'error': 'Invalid admin credentials'
             }), 401
 
-        # Create admin permission lemma
-        admin_did = f"did:lemma:admin:{username}"
-        current_time = int(time.time())
+        # Create admin permission lemma using REAL Ed25519 signing
+        from api.real_iam_manager import get_or_create_site_manager
+        from api.ppid import derive_ppid_did
         
-        permission_lemma_data = {
-            'id': f"admin_perm_{secrets.token_hex(16)}",
-            'issuer': 'did:lemma:platform:lemma.id',
-            'subject': admin_did,
-            'packageType': 'permission',
-            'issued_at': current_time,
-            'expires_at': current_time + (365 * 24 * 60 * 60),  # 1 year for admin
-            'claims': {
-                'packageType': 'permission',
+        site_id = 'lemma_platform'
+        site_domain = 'lemma.id'
+        
+        # Get or create the platform IAM manager (with Ed25519 keypair)
+        manager = get_or_create_site_manager(site_id, site_domain)
+        if not manager:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to initialize platform IAM manager'
+            }), 500
+        
+        # Ensure admin permission type exists
+        if 'admin_access' not in manager.permissions:
+            manager.add_permission({
+                'permission_id': 'admin_access',
+                'display_name': 'Platform Administrator',
+                'scope': ['platform_admin', 'customer_management', 'site_management', 'billing_access'],
+                'conditions': [],
+                'priority': 100
+            })
+        
+        # Derive admin DID from username
+        admin_did = derive_ppid_did(username, site_domain)
+        
+        # Issue permission lemma with REAL Ed25519 signature
+        permission_lemma = manager.issue_permission_lemma(
+            admin_did,
+            'admin_access',
+            expiry_days=365,  # 1 year for admin
+            custom_claims={
                 'siteId': 'lemma.id',
-                'permissionId': 'admin_access',
                 'accountType': 'admin',
+                'permissionId': 'admin_access',
                 'username': username,
                 'networkShared': False,
-                'grantedBy': 'did:lemma:platform:lemma.id',
-                'grantedAt': current_time,
                 'scope': ['platform_admin', 'customer_management', 'site_management', 'billing_access']
-            },
-            'proof': {
-                'type': 'Ed25519Signature2020',
-                'created': current_time,
-                'verificationMethod': 'did:lemma:platform:lemma.id',
-                'signatureValue': f"admin_sig_{secrets.token_hex(32)}"
             }
-        }
+        )
+        
+        # Add W3C type field for credential classification
+        permission_lemma['type'] = ['VerifiableCredential', 'PermissionLemma']
+        permission_lemma['packageType'] = 'permission'
+        
+        # Ensure claims has packageType for wallet filtering
+        if 'credentialSubject' in permission_lemma:
+            permission_lemma['credentialSubject']['packageType'] = 'permission'
+        if 'claims' in permission_lemma:
+            permission_lemma['claims']['packageType'] = 'permission'
 
         return jsonify({
             'success': True,
             'admin_did': admin_did,
-            'permission_lemma': permission_lemma_data,
-            'message': 'Admin permission lemma issued successfully'
+            'issuer_did': manager.issuer_did,
+            'permission_lemma': permission_lemma,
+            'message': 'Admin permission lemma issued with Ed25519 signature. Store in your wallet.'
         })
 
     except Exception as e:
