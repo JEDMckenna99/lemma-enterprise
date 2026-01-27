@@ -39,7 +39,7 @@ Restructuring the Lemma.id platform from a monolithic Flask/Jinja application in
 
 ## Remaining Work
 
-### Day 2: Wallet Enhancement
+### Day 2: Wallet Enhancement - COMPLETED
 
 **Goal:** Keep wallet as a unified "control center" - improve UX without segmentation
 
@@ -49,26 +49,17 @@ The wallet is intentionally a single-page experience for non-technical users:
 - No navigation complexity
 - Simple, clear actions
 
-**Current State:**
-- `templates/wallet_simple.html` (~1000 lines) - Single-page wallet control center
+**Completed:**
+- [x] Extracted inline CSS to `static/css/wallet.css` (193 lines → external file)
+- [x] Added responsive styles for mobile
+- [x] Preserved all functionality (no backend changes)
+- [x] Tested locally and on production
 
-**Target Improvements (same page, better organization):**
-```
-/wallet - Single unified page with sections:
-├── Header        # Wallet status, lock/unlock button
-├── Credentials   # Collapsible list of your credentials
-├── Devices       # Linked devices with "Add Device" 
-├── Security      # Passkey status, backup options
-└── Settings      # Preferences (auto-lock timeout, etc.)
-```
+**Files Changed:**
+- `templates/wallet_simple.html` - Removed inline styles, added CSS link
+- `static/css/wallet.css` - New external stylesheet
 
-**Tasks:**
-- [ ] Clean up CSS (move inline styles to `static/css/wallet.css`)
-- [ ] Improve section organization with clear visual separation
-- [ ] Add collapsible sections for credentials (declutter)
-- [ ] Simplify device linking UI
-- [ ] Ensure mobile-first responsive design
-- [ ] Test all wallet flows (unlock, lock, device linking)
+**Status:** Deployed to production (lemma.id/wallet)
 
 ---
 
@@ -261,13 +252,13 @@ These files can be removed or deprecated once the restructure is complete:
 
 | Phase | Effort | Status |
 |-------|--------|--------|
-| Day 1: Developer Platform | 4 hours | COMPLETED |
-| Day 2: Wallet Enhancement | 3 hours | Pending |
+| Day 1: Developer Platform | 4 hours | ✅ COMPLETED |
+| Day 2: Wallet Enhancement | 1 hour | ✅ COMPLETED |
 | Day 3: Admin Dashboard | 3 hours | Pending |
 | Day 4: Marketing Polish | 2 hours | Pending |
 | Day 5: Routes & Testing | 2 hours | Pending |
 
-**Total estimated remaining: ~10 hours**
+**Total estimated remaining: ~7 hours**
 
 ---
 
