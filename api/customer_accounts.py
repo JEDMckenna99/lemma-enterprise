@@ -1232,76 +1232,71 @@ def register():
             # Store customer ID in session
             session['customer_id'] = result['customer_id']
             
-            # NEW: Issue permission lemma for lemma.id platform access
-            try:
-                from .federated_network_manager import FederatedNetworkManager
-                network_manager = FederatedNetworkManager()
-                
-                # Ensure lemma.id is registered as a site for IAM
-                lemma_site_result = network_manager.register_site(
-                    site_domain='lemma.id',
-                    company_name='Lemma Identity Platform',
-                    admin_email='admin@lemma.id',
-                    service_type='both',  # Both PoH and IAM
-                    plan='enterprise'
-                )
-                
-                # Create user DID for this customer
-                user_did = f"did:lemma:customer:{result['customer_id']}"
-                
-                # Issue customer permission lemma DIRECTLY to browser wallet (no database storage)
-                # This is the CORE ADVANTAGE of Lemma IAM - user owns their permission data
-                permission_result = {
-                    'success': True,
-                    'lemma_id': f"perm_{secrets.token_hex(16)}",
-                    'message': 'Permission lemma issued directly to user wallet'
-                }
-                
-                logger.info(f"✅ Issued customer permission lemma for {email}: {permission_result.get('success', False)}")
-                
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to issue permission lemma for {email}: {e}")
-            
-            # Create permission lemma data DIRECTLY for browser wallet (no database needed)
-            # This is the LEMMA IAM ADVANTAGE - user owns their permission data
+            # Issue REAL permission lemma using Ed25519 crypto
             permission_lemma_data = None
-            if permission_result.get('success'):
-                import time
-                current_time = int(time.time())
+            user_did = None
+            issuer_did = None
+            
+            try:
+                from .real_iam_manager import get_or_create_site_manager
+                from .ppid import derive_ppid_did
                 
-                permission_lemma_data = {
-                    'id': permission_result['lemma_id'],
-                    'issuer': 'did:lemma:platform:lemma.id',
-                    'subject': user_did,
-                    'packageType': 'permission',
-                    'issued_at': current_time,
-                    'expires_at': current_time + (90 * 24 * 60 * 60),  # 90 days
-                    'claims': {
-                        'packageType': 'permission',
-                        'siteId': 'lemma.id',
-                        'permissionId': 'customer_access',
-                        'accountType': 'customer',
-                        'email': email,
-                        'networkShared': False,  # Site-specific permission
-                        'grantedBy': 'did:lemma:platform:lemma.id',
-                        'grantedAt': current_time,
-                        'scope': ['customer_dashboard', 'api_management']
-                    },
-                    'proof': {
-                        'type': 'Ed25519Signature2020',
-                        'created': current_time,
-                        'verificationMethod': 'did:lemma:platform:lemma.id',
-                        'signatureValue': f"sig_{secrets.token_hex(32)}"  # In production, real Ed25519 signature
-                    }
-                }
+                # Get platform IAM manager with Ed25519 keypair
+                manager = get_or_create_site_manager('lemma_platform', 'lemma.id')
+                
+                if manager:
+                    # Ensure customer_access permission exists
+                    if 'customer_access' not in manager.permissions:
+                        manager.add_permission({
+                            'permission_id': 'customer_access',
+                            'display_name': 'Customer Access',
+                            'scope': ['customer_dashboard', 'api_management'],
+                            'conditions': [],
+                            'priority': 50
+                        })
+                    
+                    # Derive user DID from email
+                    user_did = derive_ppid_did(email, 'lemma.id')
+                    
+                    # Issue permission lemma with REAL Ed25519 signature
+                    permission_lemma_data = manager.issue_permission_lemma(
+                        user_did,
+                        'customer_access',
+                        expiry_days=90,
+                        custom_claims={
+                            'siteId': 'lemma.id',
+                            'accountType': 'customer',
+                            'permissionId': 'customer_access',
+                            'email': email,
+                            'scope': ['customer_dashboard', 'api_management']
+                        }
+                    )
+                    
+                    # Add W3C type field
+                    permission_lemma_data['type'] = ['VerifiableCredential', 'PermissionLemma']
+                    permission_lemma_data['packageType'] = 'permission'
+                    
+                    if 'credentialSubject' in permission_lemma_data:
+                        permission_lemma_data['credentialSubject']['packageType'] = 'permission'
+                    if 'claims' in permission_lemma_data:
+                        permission_lemma_data['claims']['packageType'] = 'permission'
+                    
+                    issuer_did = manager.issuer_did
+                    logger.info(f"Issued customer permission lemma for {email} with Ed25519 signature")
+                    
+            except Exception as e:
+                logger.warning(f"Failed to issue permission lemma for {email}: {e}")
+                # Fallback: still return success but without lemma
+                user_did = f"did:lemma:customer:{result['customer_id']}"
             
             return jsonify({
                 'success': True,
                 'customer_id': result['customer_id'],
                 'api_key': result['api_key'],
                 'user_did': user_did,
-                'permission_lemma_issued': permission_result.get('success', False),
-                'permission_lemma': permission_lemma_data,  # For wallet storage
+                'issuer_did': issuer_did,
+                'permission_lemma_issued': permission_lemma_data is not None,
+                'permission_lemma': permission_lemma_data,
                 'redirect_url': '/wallet'
             })
         else:
@@ -1439,75 +1434,74 @@ def login():
         customer.last_login = datetime.utcnow()
         customer.login_count += 1
         
-        # SESSION-FREE: Issue permission lemma directly to wallet (no server sessions)
-        # Client will cache verification results (5-minute TTL) with event-driven invalidation
-        user_did = f"did:lemma:customer:{customer.customer_id}"
-        permission_lemma_status = False
+        # Issue REAL permission lemma using Ed25519 crypto
+        permission_lemma_data = None
+        user_did = None
+        issuer_did = None
         
         try:
-            from .federated_network_manager import FederatedNetworkManager
-            network_manager = FederatedNetworkManager()
+            from .real_iam_manager import get_or_create_site_manager
+            from .ppid import derive_ppid_did
             
-            # Ensure lemma.id is registered as a site for IAM
-            lemma_site_result = network_manager.register_site(
-                site_domain='lemma.id',
-                company_name='Lemma Identity Platform',
-                admin_email='admin@lemma.id',
-                service_type='both',  # Both PoH and IAM
-                plan='enterprise'
-            )
+            # Get platform IAM manager with Ed25519 keypair
+            manager = get_or_create_site_manager('lemma_platform', 'lemma.id')
             
-            # Issue permission lemma DIRECTLY to browser wallet (client-side IAM)
-            # This eliminates database storage costs and gives users control of their data
-            permission_result = {
-                'success': True,
-                'lemma_id': f"perm_{secrets.token_hex(16)}",
-                'message': 'Permission lemma issued directly to user wallet'
-            }
-            permission_lemma_status = True
-            logger.info(f"✅ Issued permission lemma for {email}: {permission_lemma_status}")
+            if manager:
+                # Determine permission level based on role
+                permission_id = 'admin_access' if customer.role == 'admin' else 'customer_access'
+                scope = ['platform_admin', 'customer_management', 'site_management', 'billing_access'] if customer.role == 'admin' else ['customer_dashboard', 'api_management']
+                
+                # Ensure permission type exists
+                if permission_id not in manager.permissions:
+                    manager.add_permission({
+                        'permission_id': permission_id,
+                        'display_name': 'Platform Admin' if customer.role == 'admin' else 'Customer Access',
+                        'scope': scope,
+                        'conditions': [],
+                        'priority': 100 if customer.role == 'admin' else 50
+                    })
+                
+                # Derive user DID from email
+                user_did = derive_ppid_did(email, 'lemma.id')
+                
+                # Issue permission lemma with REAL Ed25519 signature
+                permission_lemma_data = manager.issue_permission_lemma(
+                    user_did,
+                    permission_id,
+                    expiry_days=90,
+                    custom_claims={
+                        'siteId': 'lemma.id',
+                        'accountType': customer.role,
+                        'permissionId': permission_id,
+                        'email': email,
+                        'scope': scope
+                    }
+                )
+                
+                # Add W3C type field
+                permission_lemma_data['type'] = ['VerifiableCredential', 'PermissionLemma']
+                permission_lemma_data['packageType'] = 'permission'
+                
+                if 'credentialSubject' in permission_lemma_data:
+                    permission_lemma_data['credentialSubject']['packageType'] = 'permission'
+                if 'claims' in permission_lemma_data:
+                    permission_lemma_data['claims']['packageType'] = 'permission'
+                
+                issuer_did = manager.issuer_did
+                logger.info(f"Issued {permission_id} lemma for {email} with Ed25519 signature")
                 
         except Exception as e:
-            logger.warning(f"⚠️ Permission lemma handling failed for {email}: {e}")
-        
-        # Create permission lemma data DIRECTLY for browser wallet (client-side IAM)
-        permission_lemma_data = None
-        if permission_lemma_status:
-            import time
-            current_time = int(time.time())
-            
-            permission_lemma_data = {
-                'id': permission_result['lemma_id'],
-                'issuer': 'did:lemma:platform:lemma.id',
-                'subject': user_did,
-                'packageType': 'permission',
-                'issued_at': current_time,
-                'expires_at': current_time + (90 * 24 * 60 * 60),  # 90 days
-                'claims': {
-                    'packageType': 'permission',
-                    'siteId': 'lemma.id',
-                    'permissionId': 'admin_access' if customer.role == 'admin' else 'customer_access',
-                    'accountType': customer.role,
-                    'email': email,
-                    'networkShared': False,  # Site-specific permission
-                    'grantedBy': 'did:lemma:platform:lemma.id',
-                    'grantedAt': current_time,
-                    'scope': ['platform_admin', 'customer_management', 'site_management'] if customer.role == 'admin' else ['customer_dashboard', 'api_management']
-                },
-                'proof': {
-                    'type': 'Ed25519Signature2020',
-                    'created': current_time,
-                    'verificationMethod': 'did:lemma:platform:lemma.id',
-                    'signatureValue': f"sig_{secrets.token_hex(32)}"  # In production, real Ed25519 signature
-                }
-            }
+            logger.warning(f"Failed to issue permission lemma for {email}: {e}")
+            # Fallback: still return success but without lemma
+            user_did = f"did:lemma:customer:{customer.customer_id}"
         
         return jsonify({
             'success': True,
             'customer_id': customer.customer_id,
             'user_did': user_did,
-            'permission_lemma_active': permission_lemma_status,
-            'permission_lemma': permission_lemma_data,  # For wallet storage
+            'issuer_did': issuer_did,
+            'permission_lemma_active': permission_lemma_data is not None,
+            'permission_lemma': permission_lemma_data,
             'role': customer.role,
             'redirect_url': '/dashboard'
         })

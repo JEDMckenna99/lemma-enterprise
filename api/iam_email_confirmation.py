@@ -445,36 +445,31 @@ def claim_permission():
             
             from datetime import datetime
             
-            # Issue EmailLemma - proves user verified this email
-            email_lemma = {
-                'id': f'urn:uuid:email:{secrets.token_hex(16)}',
-                'type': ['VerifiableCredential', 'EmailLemma'],
-                'packageType': 'email',
-                'issuer': 'did:lemma:issuer',
-                'issuanceDate': datetime.utcnow().isoformat() + 'Z',
-                'expirationDate': None,  # Email verification doesn't expire
-                'credentialSubject': {
-                    'id': email_did,
-                    'email': user_email,
+            # Issue EmailLemma with REAL Ed25519 signature
+            # Use lemma_manager which has real Ed25519 keys
+            email_lemma = lemma_manager.issuer.issue_credential(
+                email_did,
+                {
                     'packageType': 'email',
-                    'verifiedAt': datetime.utcnow().isoformat() + 'Z',
-                    'verificationMethod': 'email_link_passkey_auth'
-                },
-                'claims': {
                     'email': user_email,
-                    'packageType': 'email',
                     'verifiedAt': datetime.utcnow().isoformat() + 'Z',
                     'verificationMethod': 'email_link_passkey_auth'
                 }
-            }
+            )
             
-            # Sign the EmailLemma
-            try:
-                from api.ed25519_issuer import sign_credential
-                email_lemma = sign_credential(email_lemma)
-            except Exception as sign_err:
-                logger.warning(f"⚠️ EmailLemma signing failed: {sign_err}")
-                # Continue without signature (still useful)
+            # Parse from JSON if needed
+            if isinstance(email_lemma, str):
+                import json
+                email_lemma = json.loads(email_lemma)
+            
+            # Add W3C type fields
+            email_lemma['type'] = ['VerifiableCredential', 'EmailLemma']
+            email_lemma['packageType'] = 'email'
+            
+            if 'credentialSubject' in email_lemma:
+                email_lemma['credentialSubject']['packageType'] = 'email'
+            if 'claims' in email_lemma:
+                email_lemma['claims']['packageType'] = 'email'
             
             logger.info(f"📧 Issued EmailLemma for verified email (stored in user wallet only)")
         
