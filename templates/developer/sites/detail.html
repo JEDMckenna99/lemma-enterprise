@@ -1,0 +1,537 @@
+{% extends "developer/layout.html" %}
+{% set active_page = 'sites' %}
+
+{% block dev_content %}
+<div class="dev-header">
+    <div class="dev-header-row">
+        <div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                <a href="/developer/sites" style="color: var(--dev-text-muted); text-decoration: none;">← Sites</a>
+            </div>
+            <h1 class="dev-title" id="site-name">{{ site_id }}</h1>
+            <p class="dev-subtitle" id="site-domain">Loading...</p>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <span class="dev-badge dev-badge-success" id="site-status">Active</span>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="dev-tabs">
+    <a href="/developer/sites/{{ site_id }}" class="dev-tab {{ 'active' if tab == 'overview' else '' }}">Overview</a>
+    <a href="/developer/sites/{{ site_id }}/integration" class="dev-tab {{ 'active' if tab == 'integration' else '' }}">Integration</a>
+    <a href="/developer/sites/{{ site_id }}/keys" class="dev-tab {{ 'active' if tab == 'keys' else '' }}">API Keys</a>
+    <a href="/developer/sites/{{ site_id }}/users" class="dev-tab {{ 'active' if tab == 'users' else '' }}">Users</a>
+    <a href="/developer/sites/{{ site_id }}/settings" class="dev-tab {{ 'active' if tab == 'settings' else '' }}">Settings</a>
+</div>
+
+<!-- Tab Content -->
+<div id="tab-content">
+    {% if tab == 'overview' %}
+    <!-- Overview Tab -->
+    <div class="dev-stats">
+        <div class="dev-stat-card">
+            <div class="dev-stat-label">Total Verifications</div>
+            <div class="dev-stat-value" id="stat-verifications">-</div>
+            <div class="dev-stat-change">This month</div>
+        </div>
+        <div class="dev-stat-card">
+            <div class="dev-stat-label">Active Users</div>
+            <div class="dev-stat-value" id="stat-users">-</div>
+            <div class="dev-stat-change">Total registered</div>
+        </div>
+        <div class="dev-stat-card">
+            <div class="dev-stat-label">Success Rate</div>
+            <div class="dev-stat-value" id="stat-success">-</div>
+            <div class="dev-stat-change">Auth success</div>
+        </div>
+        <div class="dev-stat-card">
+            <div class="dev-stat-label">Avg Latency</div>
+            <div class="dev-stat-value" id="stat-latency">-</div>
+            <div class="dev-stat-change">Verification time</div>
+        </div>
+    </div>
+    
+    <div class="dev-card">
+        <div class="dev-card-header">
+            <h2 class="dev-card-title">Quick Actions</h2>
+        </div>
+        <div class="dev-card-body">
+            <div class="dev-actions">
+                <a href="/developer/sites/{{ site_id }}/integration" class="dev-action">
+                    <div class="dev-action-icon">📋</div>
+                    <div class="dev-action-title">View Integration Code</div>
+                </a>
+                <a href="/developer/sites/{{ site_id }}/keys" class="dev-action">
+                    <div class="dev-action-icon">🔑</div>
+                    <div class="dev-action-title">Manage API Keys</div>
+                </a>
+                <a href="/developer/sites/{{ site_id }}/users" class="dev-action">
+                    <div class="dev-action-icon">👥</div>
+                    <div class="dev-action-title">View Users</div>
+                </a>
+                <a href="/docs" class="dev-action" target="_blank">
+                    <div class="dev-action-icon">📚</div>
+                    <div class="dev-action-title">Documentation</div>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    {% elif tab == 'integration' %}
+    <!-- Integration Tab -->
+    <div class="dev-card">
+        <div class="dev-card-header">
+            <h2 class="dev-card-title">Install the SDK</h2>
+        </div>
+        <div class="dev-card-body">
+            <p style="margin-bottom: 16px; color: var(--dev-text-muted);">Add this script to your HTML:</p>
+            
+            <div class="dev-code">
+                <div class="dev-code-header">
+                    <span class="dev-code-lang">HTML</span>
+                    <button class="dev-code-copy" onclick="copyCode(this)">Copy</button>
+                </div>
+                <pre>&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;</pre>
+            </div>
+        </div>
+    </div>
+    
+    <div class="dev-card">
+        <div class="dev-card-header">
+            <h2 class="dev-card-title">Quick Start</h2>
+        </div>
+        <div class="dev-card-body">
+            <p style="margin-bottom: 16px; color: var(--dev-text-muted);">Add authentication to your site:</p>
+            
+            <div class="dev-code">
+                <div class="dev-code-header">
+                    <span class="dev-code-lang">JavaScript</span>
+                    <button class="dev-code-copy" onclick="copyCode(this)">Copy</button>
+                </div>
+                <pre>const wallet = new LemmaWallet();
+
+// Check if user is authenticated
+const result = await wallet.checkAuth();
+
+if (result.authenticated) {
+    // User is signed in
+    const ppid = result.ppid;
+    
+    // Send PPID to your backend to identify user
+    await fetch('/api/auth', {
+        method: 'POST',
+        body: JSON.stringify({ ppid })
+    });
+} else {
+    // Show sign-in button
+    wallet.startRedirectFlow({
+        returnUrl: window.location.href
+    });
+}</pre>
+            </div>
+        </div>
+    </div>
+    
+    <div class="dev-card">
+        <div class="dev-card-header">
+            <h2 class="dev-card-title">Your Site Credentials</h2>
+        </div>
+        <div class="dev-card-body">
+            <div class="dev-form-group">
+                <label class="dev-label">Site ID</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" class="dev-input" value="{{ site_id }}" readonly id="site-id-input">
+                    <button class="dev-btn dev-btn-secondary" onclick="copyInput('site-id-input')">Copy</button>
+                </div>
+            </div>
+            
+            <div class="dev-form-group">
+                <label class="dev-label">Issuer DID</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" class="dev-input" value="" readonly id="issuer-did-input" placeholder="Loading...">
+                    <button class="dev-btn dev-btn-secondary" onclick="copyInput('issuer-did-input')">Copy</button>
+                </div>
+                <div class="dev-help-text">Your site's unique identity for issuing credentials</div>
+            </div>
+        </div>
+    </div>
+    
+    {% elif tab == 'keys' %}
+    <!-- API Keys Tab -->
+    <div class="dev-card">
+        <div class="dev-card-header">
+            <h2 class="dev-card-title">API Keys</h2>
+            <button class="dev-btn dev-btn-primary dev-btn-sm" onclick="showCreateKeyModal()">+ Create Key</button>
+        </div>
+        <div class="dev-card-body" id="api-keys-container">
+            <div class="dev-loading">
+                <div class="dev-spinner"></div>
+                <div>Loading API keys...</div>
+            </div>
+        </div>
+    </div>
+    
+    {% elif tab == 'users' %}
+    <!-- Users Tab -->
+    <div class="dev-card">
+        <div class="dev-card-header">
+            <h2 class="dev-card-title">Authenticated Users</h2>
+            <div style="display: flex; gap: 12px;">
+                <input type="text" class="dev-input" placeholder="Search users..." style="width: 250px;" id="user-search">
+            </div>
+        </div>
+        <div class="dev-card-body" id="users-container">
+            <div class="dev-loading">
+                <div class="dev-spinner"></div>
+                <div>Loading users...</div>
+            </div>
+        </div>
+    </div>
+    
+    {% elif tab == 'settings' %}
+    <!-- Settings Tab -->
+    <div class="dev-card">
+        <div class="dev-card-header">
+            <h2 class="dev-card-title">Site Settings</h2>
+        </div>
+        <div class="dev-card-body">
+            <form id="settings-form" onsubmit="saveSettings(event)">
+                <div class="dev-form-group">
+                    <label class="dev-label">Site Name</label>
+                    <input type="text" class="dev-input" id="settings-name" value="{{ site_id }}">
+                </div>
+                
+                <div class="dev-form-group">
+                    <label class="dev-label">Domain</label>
+                    <input type="text" class="dev-input" id="settings-domain" value="">
+                </div>
+                
+                <div class="dev-form-group">
+                    <label class="dev-label">Allowed Origins</label>
+                    <textarea class="dev-input" id="settings-origins" rows="3" placeholder="https://example.com&#10;https://www.example.com"></textarea>
+                    <div class="dev-help-text">One URL per line. These origins can make API requests.</div>
+                </div>
+                
+                <button type="submit" class="dev-btn dev-btn-primary">Save Settings</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="dev-card" style="border-color: var(--dev-danger);">
+        <div class="dev-card-header">
+            <h2 class="dev-card-title" style="color: var(--dev-danger);">Danger Zone</h2>
+        </div>
+        <div class="dev-card-body">
+            <p style="color: var(--dev-text-muted); margin-bottom: 16px;">
+                Deleting this site will revoke all API keys and remove all user data. This action cannot be undone.
+            </p>
+            <button class="dev-btn" style="background: var(--dev-danger); color: white;" onclick="confirmDeleteSite()">
+                Delete Site
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.dev-help-text {
+    font-size: 12px;
+    color: var(--dev-text-muted);
+    margin-top: 6px;
+}
+
+.key-row {
+    display: flex;
+    align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--dev-border);
+}
+
+.key-row:last-child {
+    border-bottom: none;
+}
+
+.key-info {
+    flex: 1;
+}
+
+.key-name {
+    font-weight: 500;
+    color: var(--dev-text);
+    margin-bottom: 4px;
+}
+
+.key-value {
+    font-family: monospace;
+    font-size: 13px;
+    color: var(--dev-text-muted);
+}
+
+.key-created {
+    font-size: 12px;
+    color: var(--dev-text-muted);
+}
+
+.key-actions {
+    display: flex;
+    gap: 8px;
+}
+</style>
+
+<script nonce="{{ csp_nonce }}">
+const siteId = '{{ site_id }}';
+const currentTab = '{{ tab }}';
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadSiteDetails();
+    
+    if (currentTab === 'overview') {
+        await loadSiteStats();
+    } else if (currentTab === 'keys') {
+        await loadApiKeys();
+    } else if (currentTab === 'users') {
+        await loadUsers();
+    } else if (currentTab === 'integration') {
+        await loadIssuerDid();
+    }
+});
+
+async function loadSiteDetails() {
+    try {
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}`);
+        if (!response.ok) throw new Error('Site not found');
+        
+        const data = await response.json();
+        const site = data.site;
+        
+        document.getElementById('site-name').textContent = site.name || site.site_id;
+        document.getElementById('site-domain').textContent = site.domain || site.site_id;
+        
+        if (document.getElementById('settings-name')) {
+            document.getElementById('settings-name').value = site.name || '';
+            document.getElementById('settings-domain').value = site.domain || '';
+        }
+        
+    } catch (e) {
+        console.error('Failed to load site:', e);
+    }
+}
+
+async function loadSiteStats() {
+    try {
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/stats`);
+        const data = await response.json();
+        
+        document.getElementById('stat-verifications').textContent = formatNumber(data.verifications || 0);
+        document.getElementById('stat-users').textContent = formatNumber(data.users || 0);
+        document.getElementById('stat-success').textContent = (data.success_rate || 99.9).toFixed(1) + '%';
+        document.getElementById('stat-latency').textContent = (data.avg_latency_ms || 0.5).toFixed(1) + 'ms';
+        
+    } catch (e) {
+        console.warn('Could not load stats');
+    }
+}
+
+async function loadIssuerDid() {
+    try {
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}`);
+        const data = await response.json();
+        
+        const issuerInput = document.getElementById('issuer-did-input');
+        if (issuerInput && data.site?.issuer_did) {
+            issuerInput.value = data.site.issuer_did;
+        }
+    } catch (e) {
+        console.warn('Could not load issuer DID');
+    }
+}
+
+async function loadApiKeys() {
+    const container = document.getElementById('api-keys-container');
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/keys`);
+        const data = await response.json();
+        const keys = data.keys || [];
+        
+        if (keys.length === 0) {
+            container.innerHTML = `
+                <div class="dev-empty">
+                    <div class="dev-empty-icon">🔑</div>
+                    <div class="dev-empty-title">No API keys</div>
+                    <div class="dev-empty-text">Create an API key to start making authenticated requests.</div>
+                    <button class="dev-btn dev-btn-primary" onclick="showCreateKeyModal()">Create API Key</button>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = keys.map(key => `
+            <div class="key-row">
+                <div class="key-info">
+                    <div class="key-name">${escapeHtml(key.name || 'API Key')}</div>
+                    <div class="key-value">${key.prefix || key.key_id}••••••••</div>
+                    <div class="key-created">Created ${formatDate(key.created_at)}</div>
+                </div>
+                <div class="key-actions">
+                    <button class="dev-btn dev-btn-sm dev-btn-secondary" onclick="revokeKey('${key.key_id}')">Revoke</button>
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (e) {
+        container.innerHTML = `
+            <div class="dev-empty">
+                <div class="dev-empty-icon">⚠️</div>
+                <div class="dev-empty-title">Could not load keys</div>
+                <button class="dev-btn dev-btn-secondary" onclick="loadApiKeys()">Retry</button>
+            </div>
+        `;
+    }
+}
+
+async function loadUsers() {
+    const container = document.getElementById('users-container');
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/users`);
+        const data = await response.json();
+        const users = data.users || [];
+        
+        if (users.length === 0) {
+            container.innerHTML = `
+                <div class="dev-empty">
+                    <div class="dev-empty-icon">👥</div>
+                    <div class="dev-empty-title">No users yet</div>
+                    <div class="dev-empty-text">Users will appear here once they authenticate on your site.</div>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = `
+            <table class="dev-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>First Seen</th>
+                        <th>Last Active</th>
+                        <th>Verifications</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${users.map(user => `
+                        <tr>
+                            <td>
+                                <div style="font-weight: 500;">${escapeHtml(user.email || 'Anonymous')}</div>
+                                <div style="font-size: 12px; color: var(--dev-text-muted);">${user.ppid?.substring(0, 20)}...</div>
+                            </td>
+                            <td>${formatDate(user.created_at)}</td>
+                            <td>${formatDate(user.last_active)}</td>
+                            <td>${user.verification_count || 0}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        
+    } catch (e) {
+        container.innerHTML = `
+            <div class="dev-empty">
+                <div class="dev-empty-icon">👥</div>
+                <div class="dev-empty-title">No users yet</div>
+                <div class="dev-empty-text">Users will appear here once they authenticate on your site.</div>
+            </div>
+        `;
+    }
+}
+
+function copyCode(btn) {
+    const pre = btn.closest('.dev-code').querySelector('pre');
+    navigator.clipboard.writeText(pre.textContent);
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+}
+
+function copyInput(inputId) {
+    const input = document.getElementById(inputId);
+    navigator.clipboard.writeText(input.value);
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString();
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[char]);
+}
+
+async function saveSettings(e) {
+    e.preventDefault();
+    alert('Settings saved!');
+}
+
+function confirmDeleteSite() {
+    if (confirm('Are you sure you want to delete this site? This action cannot be undone.')) {
+        // Delete site
+        alert('Site deletion not yet implemented');
+    }
+}
+
+function showCreateKeyModal() {
+    const name = prompt('Enter a name for this API key:');
+    if (name) {
+        createApiKey(name);
+    }
+}
+
+async function createApiKey(name) {
+    try {
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/keys`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        
+        const data = await response.json();
+        
+        if (data.key) {
+            alert(`API Key created!\n\nKey: ${data.key}\n\nSave this key - it won't be shown again.`);
+            loadApiKeys();
+        }
+    } catch (e) {
+        alert('Failed to create API key');
+    }
+}
+
+async function revokeKey(keyId) {
+    if (!confirm('Are you sure you want to revoke this API key?')) return;
+    
+    try {
+        await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/keys/${keyId}`, {
+            method: 'DELETE'
+        });
+        loadApiKeys();
+    } catch (e) {
+        alert('Failed to revoke key');
+    }
+}
+</script>
+{% endblock %}

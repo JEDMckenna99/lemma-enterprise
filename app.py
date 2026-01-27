@@ -392,6 +392,14 @@ def create_app():
         logger.info("✅ Developer Self-Issue API registered")
     except Exception as e:
         logger.error(f"❌ Failed to register Developer Self-Issue API: {e}")
+    
+    # Developer Platform API (sites, stats, API keys)
+    try:
+        from api.developer_api import developer_api_bp
+        app.register_blueprint(developer_api_bp)
+        logger.info("✅ Developer Platform API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Developer Platform API: {e}")
 
     # Health Monitoring
     try:
@@ -748,10 +756,115 @@ def create_app():
         return redirect('/platform')
     
     @app.route('/platform')
-    def developer_platform():
-        """Developer Platform - Manage IAM integration and usage"""
-        logger.info("🚀 Serving developer platform")
-        return render_template('developer/platform.html')
+    def developer_platform_legacy():
+        """Legacy platform route - redirect to new developer dashboard"""
+        return redirect('/developer')
+    
+    # ================================================================================
+    # DEVELOPER PLATFORM ROUTES
+    # ================================================================================
+    
+    @app.route('/developer')
+    def developer_overview():
+        """Developer Platform - Overview dashboard"""
+        logger.info("🚀 Serving developer overview")
+        return render_template('developer/overview.html',
+            user_email=request.headers.get('X-User-Email'),
+            user_name=None,
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
+        )
+    
+    @app.route('/developer/sites')
+    def developer_sites():
+        """Developer Platform - Sites list"""
+        logger.info("🌐 Serving developer sites")
+        return render_template('developer/sites/list.html',
+            user_email=request.headers.get('X-User-Email'),
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
+        )
+    
+    @app.route('/developer/sites/new')
+    def developer_sites_new():
+        """Developer Platform - Create new site"""
+        return render_template('developer/sites/list.html',
+            user_email=request.headers.get('X-User-Email'),
+            is_admin=False,
+            show_create_modal=True
+        )
+    
+    @app.route('/developer/sites/<site_id>')
+    def developer_site_detail(site_id):
+        """Developer Platform - Site dashboard"""
+        logger.info(f"📊 Serving site dashboard: {site_id}")
+        return render_template('developer/sites/detail.html',
+            site_id=site_id,
+            tab='overview',
+            user_email=request.headers.get('X-User-Email'),
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
+        )
+    
+    @app.route('/developer/sites/<site_id>/integration')
+    def developer_site_integration(site_id):
+        """Developer Platform - Site integration guide"""
+        return render_template('developer/sites/detail.html',
+            site_id=site_id,
+            tab='integration',
+            user_email=request.headers.get('X-User-Email'),
+            is_admin=False
+        )
+    
+    @app.route('/developer/sites/<site_id>/keys')
+    def developer_site_keys(site_id):
+        """Developer Platform - Site API keys"""
+        return render_template('developer/sites/detail.html',
+            site_id=site_id,
+            tab='keys',
+            user_email=request.headers.get('X-User-Email'),
+            is_admin=False
+        )
+    
+    @app.route('/developer/sites/<site_id>/users')
+    def developer_site_users(site_id):
+        """Developer Platform - Site users"""
+        return render_template('developer/sites/detail.html',
+            site_id=site_id,
+            tab='users',
+            user_email=request.headers.get('X-User-Email'),
+            is_admin=False
+        )
+    
+    @app.route('/developer/sites/<site_id>/settings')
+    def developer_site_settings(site_id):
+        """Developer Platform - Site settings"""
+        return render_template('developer/sites/detail.html',
+            site_id=site_id,
+            tab='settings',
+            user_email=request.headers.get('X-User-Email'),
+            is_admin=False
+        )
+    
+    @app.route('/developer/usage')
+    def developer_usage():
+        """Developer Platform - Usage analytics"""
+        return render_template('developer/overview.html',
+            user_email=request.headers.get('X-User-Email'),
+            is_admin=False,
+            page='usage'
+        )
+    
+    @app.route('/developer/billing')
+    def developer_billing():
+        """Developer Platform - Billing"""
+        return redirect('/pricing')
+    
+    @app.route('/developer/settings')
+    def developer_settings():
+        """Developer Platform - Account settings"""
+        return render_template('developer/overview.html',
+            user_email=request.headers.get('X-User-Email'),
+            is_admin=False,
+            page='settings'
+        )
 
     @app.route('/docs/<path:filename>')
     def serve_docs(filename):

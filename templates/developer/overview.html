@@ -1,0 +1,316 @@
+{% extends "developer/layout.html" %}
+{% set active_page = 'overview' %}
+
+{% block dev_content %}
+<div class="dev-header">
+    <div class="dev-header-row">
+        <div>
+            <h1 class="dev-title">Welcome back{{ ', ' + user_name if user_name else '' }}!</h1>
+            <p class="dev-subtitle">Here's an overview of your Lemma integration</p>
+        </div>
+        <a href="/developer/sites/new" class="dev-btn dev-btn-primary">
+            + Create New Site
+        </a>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="dev-stats" id="stats-container">
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Total Verifications</div>
+        <div class="dev-stat-value" id="stat-verifications">-</div>
+        <div class="dev-stat-change" id="stat-verifications-change">This month</div>
+    </div>
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Active Users</div>
+        <div class="dev-stat-value" id="stat-users">-</div>
+        <div class="dev-stat-change" id="stat-users-change">Across all sites</div>
+    </div>
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Your Sites</div>
+        <div class="dev-stat-value" id="stat-sites">-</div>
+        <div class="dev-stat-change" id="stat-sites-change">Active integrations</div>
+    </div>
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Avg Response Time</div>
+        <div class="dev-stat-value" id="stat-latency">-</div>
+        <div class="dev-stat-change" id="stat-latency-change">Verification latency</div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="dev-card">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Quick Actions</h2>
+    </div>
+    <div class="dev-card-body">
+        <div class="dev-actions">
+            <a href="/developer/sites/new" class="dev-action">
+                <div class="dev-action-icon">🌐</div>
+                <div class="dev-action-title">Register New Site</div>
+            </a>
+            <a href="/developer/sites" class="dev-action">
+                <div class="dev-action-icon">🔑</div>
+                <div class="dev-action-title">Manage API Keys</div>
+            </a>
+            <a href="/docs/getting-started" class="dev-action" target="_blank">
+                <div class="dev-action-icon">📚</div>
+                <div class="dev-action-title">Read Docs</div>
+            </a>
+            <a href="/developer/usage" class="dev-action">
+                <div class="dev-action-icon">📈</div>
+                <div class="dev-action-title">View Usage</div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Getting Started Checklist -->
+<div class="dev-card" id="getting-started-card">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Getting Started</h2>
+        <span class="dev-badge dev-badge-info" id="checklist-progress">0/4 Complete</span>
+    </div>
+    <div class="dev-card-body">
+        <div id="checklist-container">
+            <div class="checklist-item" data-step="register">
+                <div class="checklist-check">
+                    <input type="checkbox" id="check-register" disabled>
+                </div>
+                <div class="checklist-content">
+                    <div class="checklist-title">Register your first site</div>
+                    <div class="checklist-desc">Add your website domain to start using Lemma auth</div>
+                </div>
+                <a href="/developer/sites/new" class="dev-btn dev-btn-sm dev-btn-secondary">Register Site</a>
+            </div>
+            
+            <div class="checklist-item" data-step="sdk">
+                <div class="checklist-check">
+                    <input type="checkbox" id="check-sdk" disabled>
+                </div>
+                <div class="checklist-content">
+                    <div class="checklist-title">Install the SDK</div>
+                    <div class="checklist-desc">Add our JavaScript SDK to your website</div>
+                </div>
+                <a href="/docs/sdk" class="dev-btn dev-btn-sm dev-btn-secondary" target="_blank">View Docs</a>
+            </div>
+            
+            <div class="checklist-item" data-step="verify">
+                <div class="checklist-check">
+                    <input type="checkbox" id="check-verify" disabled>
+                </div>
+                <div class="checklist-content">
+                    <div class="checklist-title">Make your first verification</div>
+                    <div class="checklist-desc">Test the auth flow on your site</div>
+                </div>
+                <a href="/test" class="dev-btn dev-btn-sm dev-btn-secondary" target="_blank">Test Page</a>
+            </div>
+            
+            <div class="checklist-item" data-step="production">
+                <div class="checklist-check">
+                    <input type="checkbox" id="check-production" disabled>
+                </div>
+                <div class="checklist-content">
+                    <div class="checklist-title">Go to production</div>
+                    <div class="checklist-desc">Switch from test mode to production</div>
+                </div>
+                <a href="/developer/sites" class="dev-btn dev-btn-sm dev-btn-secondary">Manage Sites</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Sites -->
+<div class="dev-card">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Your Sites</h2>
+        <a href="/developer/sites" class="dev-btn dev-btn-sm dev-btn-secondary">View All</a>
+    </div>
+    <div class="dev-card-body" id="sites-container">
+        <div class="dev-loading">
+            <div class="dev-spinner"></div>
+            <div>Loading your sites...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+.checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--dev-border);
+}
+
+.checklist-item:last-child {
+    border-bottom: none;
+}
+
+.checklist-check input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--dev-primary);
+}
+
+.checklist-content {
+    flex: 1;
+}
+
+.checklist-title {
+    font-weight: 500;
+    color: var(--dev-text);
+    margin-bottom: 4px;
+}
+
+.checklist-desc {
+    font-size: 13px;
+    color: var(--dev-text-muted);
+}
+
+.checklist-item.completed .checklist-title {
+    text-decoration: line-through;
+    color: var(--dev-text-muted);
+}
+</style>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadOverviewStats();
+    await loadRecentSites();
+    updateChecklist();
+});
+
+async function loadOverviewStats() {
+    try {
+        const response = await fetch('/api/developer/stats');
+        if (!response.ok) throw new Error('Failed to load stats');
+        
+        const data = await response.json();
+        
+        document.getElementById('stat-verifications').textContent = formatNumber(data.total_verifications || 0);
+        document.getElementById('stat-users').textContent = formatNumber(data.active_users || 0);
+        document.getElementById('stat-sites').textContent = data.site_count || 0;
+        document.getElementById('stat-latency').textContent = (data.avg_latency_ms || 0).toFixed(1) + 'ms';
+        
+    } catch (e) {
+        console.warn('Could not load stats:', e);
+        // Show default values
+        document.getElementById('stat-verifications').textContent = '0';
+        document.getElementById('stat-users').textContent = '0';
+        document.getElementById('stat-sites').textContent = '0';
+        document.getElementById('stat-latency').textContent = '<1ms';
+    }
+}
+
+async function loadRecentSites() {
+    const container = document.getElementById('sites-container');
+    
+    try {
+        const response = await fetch('/api/developer/sites');
+        if (!response.ok) throw new Error('Failed to load sites');
+        
+        const data = await response.json();
+        const sites = data.sites || [];
+        
+        if (sites.length === 0) {
+            container.innerHTML = `
+                <div class="dev-empty">
+                    <div class="dev-empty-icon">🌐</div>
+                    <div class="dev-empty-title">No sites yet</div>
+                    <div class="dev-empty-text">Register your first site to start using Lemma authentication</div>
+                    <a href="/developer/sites/new" class="dev-btn dev-btn-primary">Register Site</a>
+                </div>
+            `;
+            return;
+        }
+        
+        // Show up to 3 recent sites
+        const recentSites = sites.slice(0, 3);
+        
+        container.innerHTML = `
+            <div class="dev-site-grid">
+                ${recentSites.map(site => `
+                    <div class="dev-site-card">
+                        <div class="dev-site-header">
+                            <div class="dev-site-icon">🌐</div>
+                            <div>
+                                <div class="dev-site-name">${escapeHtml(site.name || site.site_id)}</div>
+                                <div class="dev-site-domain">${escapeHtml(site.domain || site.site_id)}</div>
+                            </div>
+                        </div>
+                        <div class="dev-site-stats">
+                            <div class="dev-site-stat">
+                                <div class="dev-site-stat-value">${formatNumber(site.verification_count || 0)}</div>
+                                <div class="dev-site-stat-label">Verifications</div>
+                            </div>
+                            <div class="dev-site-stat">
+                                <div class="dev-site-stat-value">${formatNumber(site.user_count || 0)}</div>
+                                <div class="dev-site-stat-label">Users</div>
+                            </div>
+                        </div>
+                        <div class="dev-site-actions">
+                            <a href="/developer/sites/${site.site_id}" class="dev-btn dev-btn-sm dev-btn-primary">Dashboard</a>
+                            <a href="/developer/sites/${site.site_id}/integration" class="dev-btn dev-btn-sm dev-btn-secondary">Integration</a>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+    } catch (e) {
+        console.warn('Could not load sites:', e);
+        container.innerHTML = `
+            <div class="dev-empty">
+                <div class="dev-empty-icon">🌐</div>
+                <div class="dev-empty-title">No sites yet</div>
+                <div class="dev-empty-text">Register your first site to start using Lemma authentication</div>
+                <a href="/developer/sites/new" class="dev-btn dev-btn-primary">Register Site</a>
+            </div>
+        `;
+    }
+}
+
+function updateChecklist() {
+    // Check completion status from localStorage or API
+    const completed = JSON.parse(localStorage.getItem('lemma_onboarding') || '{}');
+    
+    let completedCount = 0;
+    
+    ['register', 'sdk', 'verify', 'production'].forEach(step => {
+        const checkbox = document.getElementById(`check-${step}`);
+        const item = document.querySelector(`.checklist-item[data-step="${step}"]`);
+        
+        if (completed[step]) {
+            checkbox.checked = true;
+            item.classList.add('completed');
+            completedCount++;
+        }
+    });
+    
+    document.getElementById('checklist-progress').textContent = `${completedCount}/4 Complete`;
+    
+    // Hide checklist if all complete
+    if (completedCount === 4) {
+        document.getElementById('getting-started-card').style.display = 'none';
+    }
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[char]);
+}
+</script>
+{% endblock %}
