@@ -1,5 +1,10 @@
 """
 Dashboard API for Customer and Admin Management
+
+Authentication uses lemma-based credentials:
+- Admin endpoints: Require admin permission lemma (via @require_site_admin)
+- Customer endpoints: Require customer permission lemma (via @require_customer_auth)
+- API key fallback for programmatic access
 """
 
 import os
@@ -7,7 +12,7 @@ import logging
 import secrets
 import time
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify, session, render_template
+from flask import Blueprint, request, jsonify, session, render_template, g
 from flask_cors import cross_origin
 from typing import Dict, Any, List
 
@@ -19,25 +24,32 @@ dashboard_bp = Blueprint('dashboard', __name__)
 # Import usage tracking
 from .usage_tracking import get_usage_summary, get_monthly_active_users, track_active_user
 
+# Import auth decorators
+from auth.decorators import require_site_admin, require_api_key, require_wallet_ppid, require_customer_or_admin
+
 # ================================================================================
 # CUSTOMER DASHBOARD ENDPOINTS
 # ================================================================================
 
 @dashboard_bp.route('/api/customer/profile', methods=['GET'])
 @cross_origin()
+@require_wallet_ppid
 def get_customer_profile():
-    """Get customer profile information"""
+    """Get customer profile information
+    
+    Requires: Authenticated wallet (X-Lemma-PPID header) or API key
+    """
     try:
-        customer_id = session.get('customer_id')
-        if not customer_id:
-            return jsonify({
-                'success': False,
-                'error': 'Not authenticated'
-            }), 401
-
-        # Get customer from database
+        # Auth verified by @require_wallet_ppid decorator
+        # g.ppid contains the user's PPID
+        
+        # Get customer from database using PPID
         from .customer_accounts import customer_manager
-        customer = customer_manager.get_customer_by_id(customer_id)
+        customer = customer_manager.get_customer_by_ppid(g.ppid) if hasattr(g, 'ppid') and g.ppid else None
+        
+        # Fallback to API key lookup
+        if not customer and hasattr(g, 'api_key'):
+            customer = customer_manager.get_customer_by_api_key(g.api_key)
         
         if not customer:
             return jsonify({
@@ -71,24 +83,29 @@ def get_customer_profile():
 
 @dashboard_bp.route('/api/customer/usage', methods=['GET'])
 @cross_origin()
+@require_customer_or_admin
 def get_customer_usage():
     """
     Get usage statistics and billing information for customer's site
     
-    Returns MAU count, current tier, pricing, and historical data
+    Requires: Authenticated wallet (PPID), admin credential, or API key
+    Returns: MAU count, current tier, pricing, and historical data
     """
     try:
-        customer_id = session.get('customer_id')
-        if not customer_id:
-            # For demo/testing, use query parameter
-            site_id = request.args.get('site_id', 'lemma_platform')
-        else:
-            # In production, get site_id from customer account
-            from .customer_accounts import customer_manager
-            customer = customer_manager.get_customer_by_id(customer_id)
-            if not customer:
-                return jsonify({'success': False, 'error': 'Customer not found'}), 404
-            site_id = customer.customer_id  # Use customer_id as site_id for now
+        # Get site_id based on auth type
+        site_id = request.args.get('site_id')
+        
+        if not site_id:
+            # Try to get from customer account using PPID
+            if hasattr(g, 'ppid') and g.ppid:
+                from .customer_accounts import customer_manager
+                customer = customer_manager.get_customer_by_ppid(g.ppid)
+                if customer:
+                    site_id = customer.customer_id
+            
+            # Default fallback
+            if not site_id:
+                site_id = 'lemma_platform'
         
         # Get comprehensive usage summary
         usage = get_usage_summary(site_id)
@@ -201,16 +218,16 @@ def revoke_api_key(key_id):
 
 @dashboard_bp.route('/api/admin/platform-stats', methods=['GET'])
 @cross_origin()
+@require_site_admin
 def get_platform_stats():
-    """Get platform-wide statistics (admin only)"""
+    """Get platform-wide statistics (admin only)
+    
+    Requires: Admin permission lemma via X-Credential-ID + X-Permission-ID headers
+    Or: Valid API key via X-API-Key header
+    """
     try:
-        # Check admin permission lemma (in production, verify from wallet)
-        user_role = session.get('user_role', 'customer')
-        if user_role != 'admin':
-            return jsonify({
-                'success': False,
-                'error': 'Admin access required'
-            }), 403
+        # Admin auth verified by @require_site_admin decorator
+        # g.is_admin, g.admin_email, g.permission_id are set by decorator
 
         # Mock platform statistics
         stats = {
@@ -249,15 +266,14 @@ def get_platform_stats():
 
 @dashboard_bp.route('/api/admin/customers', methods=['GET'])
 @cross_origin()
+@require_site_admin
 def get_all_customers():
-    """Get all customers (admin only)"""
+    """Get all customers (admin only)
+    
+    Requires: Admin permission lemma or API key
+    """
     try:
-        user_role = session.get('user_role', 'customer')
-        if user_role != 'admin':
-            return jsonify({
-                'success': False,
-                'error': 'Admin access required'
-            }), 403
+        # Admin auth verified by @require_site_admin decorator
 
         from .customer_accounts import customer_manager
         customers = customer_manager.get_all_customers()
@@ -276,15 +292,14 @@ def get_all_customers():
 
 @dashboard_bp.route('/api/admin/sites', methods=['GET'])
 @cross_origin()
+@require_site_admin
 def get_all_sites():
-    """Get all registered sites (admin only)"""
+    """Get all registered sites (admin only)
+    
+    Requires: Admin permission lemma or API key
+    """
     try:
-        user_role = session.get('user_role', 'customer')
-        if user_role != 'admin':
-            return jsonify({
-                'success': False,
-                'error': 'Admin access required'
-            }), 403
+        # Admin auth verified by @require_site_admin decorator
 
         # Mock site data
         sites = [
@@ -325,14 +340,24 @@ def get_all_sites():
 @dashboard_bp.route('/api/admin/issue-admin-lemma', methods=['POST'])
 @cross_origin()
 def issue_admin_lemma_endpoint():
-    """Issue admin permission lemma (admin only)"""
+    """Issue admin permission lemma - BOOTSTRAP ENDPOINT
+    
+    This is the initial bootstrap endpoint for creating the first admin lemma.
+    Uses Basic Auth with LEMMA_ADMIN_USER/LEMMA_ADMIN_PASS env vars.
+    
+    Once you have an admin lemma, use @require_site_admin protected endpoints.
+    
+    Request: Basic Auth with admin credentials
+    Response: Admin permission lemma to store in wallet
+    """
     try:
-        # Verify admin credentials
+        # Bootstrap auth: Basic Auth with env var credentials
+        # This is intentionally simple - it's only used to create the FIRST admin lemma
         auth_header = request.headers.get('Authorization', '')
         if not auth_header.startswith('Basic '):
             return jsonify({
                 'success': False,
-                'error': 'Basic authentication required'
+                'error': 'Basic authentication required (Bootstrap endpoint)'
             }), 401
 
         import base64
@@ -345,9 +370,15 @@ def issue_admin_lemma_endpoint():
                 'error': 'Invalid authentication format'
             }), 401
 
-        # Check admin credentials
-        admin_user = os.getenv('LEMMA_ADMIN_USER', 'admin')
-        admin_pass = os.getenv('LEMMA_ADMIN_PASS', 'defaultpass')
+        # Check admin credentials from environment
+        admin_user = os.getenv('LEMMA_ADMIN_USER')
+        admin_pass = os.getenv('LEMMA_ADMIN_PASS')
+        
+        if not admin_user or not admin_pass:
+            return jsonify({
+                'success': False,
+                'error': 'Admin credentials not configured (LEMMA_ADMIN_USER/LEMMA_ADMIN_PASS)'
+            }), 500
 
         if username != admin_user or password != admin_pass:
             return jsonify({

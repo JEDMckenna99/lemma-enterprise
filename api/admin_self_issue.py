@@ -1,6 +1,17 @@
 """
 Admin Self-Issue Endpoint
-Allows site owners to bootstrap their first admin credential using their API key
+
+BOOTSTRAP ENDPOINT for issuing the first admin credential to a new site.
+
+Authentication: API key (Bearer token) - this is intentionally different from
+lemma-based auth since this is used to CREATE the first lemma.
+
+Use cases:
+1. Platform admin bootstrapping their admin credential
+2. New customer setting up their first site admin
+3. Server-side automation for site provisioning
+
+For all other admin operations, use @require_site_admin protected endpoints.
 """
 
 import os
@@ -15,29 +26,49 @@ logger = logging.getLogger(__name__)
 
 admin_self_issue_bp = Blueprint('admin_self_issue', __name__)
 
+
 def validate_api_key(api_key: str, site_id: str) -> bool:
     """
-    Validate API key for site
-    Checks against Heroku config vars
+    Validate API key for site.
+    
+    Checks:
+    1. Platform API key (LEMMA_API_KEY env var)
+    2. Standard Lemma API key format (from customer registration)
+    3. Legacy formats for backward compatibility
     """
-    # Check platform API key from Heroku
-    platform_key = os.getenv('LEMMA_API_KEY', os.getenv('LEMMA_PLATFORM_API_KEY', 'platform_owner_key_2024'))
+    # Check platform API key from environment
+    platform_key = os.getenv('LEMMA_API_KEY', os.getenv('LEMMA_PLATFORM_API_KEY'))
     
-    if api_key == platform_key:
-        logger.info(f"✅ Valid platform API key for site {site_id}")
+    if platform_key and api_key == platform_key:
+        logger.info(f"Valid platform API key for site {site_id}")
         return True
     
-    # Check if this matches standard Lemma API key format (64 hex chars)
-    if len(api_key) == 64 and all(c in '0123456789abcdef' for c in api_key):
-        logger.info(f"✅ Valid Lemma API key format for site {site_id}")
-        return True
+    # Check against customer's registered API keys
+    from api.customer_accounts import customer_manager
+    customer = customer_manager.get_customer_by_api_key(api_key)
+    if customer:
+        # Verify customer has registered this site
+        owned_sites = [s.get('site_id') for s in (customer.sites or [])]
+        owned_domains = [s.get('site_domain') for s in (customer.sites or [])]
+        
+        if site_id in owned_sites or site_id in owned_domains:
+            logger.info(f"Valid customer API key for site {site_id}")
+            return True
+        
+        # For platform-level sites, allow if customer is admin
+        if site_id in ('lemma.id', 'lemma_platform') and customer.role == 'admin':
+            logger.info(f"Valid admin API key for platform site {site_id}")
+            return True
     
-    # Check legacy formats
-    if api_key.startswith('lemma_live_') or api_key == 'platform_owner_key_2024':
-        logger.info(f"✅ Valid legacy API key for site {site_id}")
-        return True
+    # Check if this matches standard Lemma API key format (lemma_ prefix + 32 chars)
+    if api_key.startswith('lemma_') and len(api_key) >= 38:
+        # Validate against customer database
+        customer = customer_manager.get_customer_by_api_key(api_key)
+        if customer:
+            logger.info(f"Valid Lemma API key for site {site_id}")
+            return True
     
-    logger.warning(f"❌ Invalid API key for site {site_id}: {api_key[:10]}...")
+    logger.warning(f"Invalid API key for site {site_id}")
     return False
 
 

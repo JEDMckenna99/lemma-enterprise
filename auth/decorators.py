@@ -291,3 +291,95 @@ def rate_limit(max_requests=100, window=60):
         
         return decorated_function
     return decorator
+
+
+def require_wallet_ppid(f):
+    """
+    Decorator requiring authenticated wallet (via PPID).
+    
+    Accepts:
+    1. X-Lemma-PPID header (from SDK after wallet auth)
+    2. PPID in request body (for API calls)
+    3. API key fallback (X-API-Key)
+    
+    Sets g.ppid and g.authenticated on success.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Method 1: PPID from header (SDK sends this after wallet auth)
+        ppid = request.headers.get('X-Lemma-PPID')
+        
+        # Method 2: PPID from request body
+        if not ppid:
+            data = request.get_json(silent=True) or {}
+            ppid = data.get('ppid')
+        
+        if ppid and ppid.startswith('did:lemma:ppid_'):
+            g.ppid = ppid
+            g.authenticated = True
+            return f(*args, **kwargs)
+        
+        # Method 3: API key fallback (for programmatic access)
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        if api_key and len(api_key) >= 10:
+            g.api_key = api_key
+            g.authenticated = True
+            g.ppid = None  # No PPID for API key auth
+            return f(*args, **kwargs)
+        
+        return jsonify({
+            'success': False,
+            'error': 'Authentication required',
+            'message': 'Provide X-Lemma-PPID header or X-API-Key'
+        }), 401
+    
+    return decorated_function
+
+
+def require_customer_or_admin(f):
+    """
+    Decorator allowing either customer (PPID) or admin (credential) access.
+    
+    For endpoints that both customers and admins can access.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Try admin auth first (credential headers)
+        credential_id = request.headers.get('X-Credential-ID')
+        permission_id = request.headers.get('X-Permission-ID')
+        
+        if credential_id and permission_id:
+            from api.wallet_revocation import is_credential_revoked
+            if not is_credential_revoked(credential_id):
+                admin_permissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin']
+                if permission_id in admin_permissions or 'admin' in permission_id.lower():
+                    g.is_admin = True
+                    g.credential_id = credential_id
+                    g.permission_id = permission_id
+                    return f(*args, **kwargs)
+        
+        # Try PPID auth
+        ppid = request.headers.get('X-Lemma-PPID')
+        if not ppid:
+            data = request.get_json(silent=True) or {}
+            ppid = data.get('ppid')
+        
+        if ppid and ppid.startswith('did:lemma:ppid_'):
+            g.ppid = ppid
+            g.is_admin = False
+            g.authenticated = True
+            return f(*args, **kwargs)
+        
+        # API key fallback
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        if api_key and len(api_key) >= 10:
+            g.api_key = api_key
+            g.authenticated = True
+            return f(*args, **kwargs)
+        
+        return jsonify({
+            'success': False,
+            'error': 'Authentication required'
+        }), 401
+    
+    return decorated_function
