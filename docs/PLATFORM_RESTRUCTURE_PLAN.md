@@ -41,27 +41,34 @@ Restructuring the Lemma.id platform from a monolithic Flask/Jinja application in
 
 ### Day 2: Wallet Enhancement
 
-**Goal:** Split wallet_simple.html into focused pages
+**Goal:** Keep wallet as a unified "control center" - improve UX without segmentation
+
+**Design Philosophy:**
+The wallet is intentionally a single-page experience for non-technical users:
+- Everything visible at a glance
+- No navigation complexity
+- Simple, clear actions
 
 **Current State:**
-- `templates/wallet_simple.html` (~1000 lines) - Monolithic wallet page
+- `templates/wallet_simple.html` (~1000 lines) - Single-page wallet control center
 
-**Target Structure:**
+**Target Improvements (same page, better organization):**
 ```
-templates/wallet/
-├── layout.html          # Shared wallet layout
-├── dashboard.html       # Main wallet view (credentials, settings)
-├── credentials.html     # Credential management
-├── devices.html         # Device linking
-└── security.html        # Security settings (passkey management)
+/wallet - Single unified page with sections:
+├── Header        # Wallet status, lock/unlock button
+├── Credentials   # Collapsible list of your credentials
+├── Devices       # Linked devices with "Add Device" 
+├── Security      # Passkey status, backup options
+└── Settings      # Preferences (auto-lock timeout, etc.)
 ```
 
 **Tasks:**
-- [ ] Create `templates/wallet/layout.html` with wallet-specific navigation
-- [ ] Split wallet_simple.html into focused pages
-- [ ] Create `static/css/wallet.css` for wallet-specific styles
-- [ ] Update routes in app.py
-- [ ] Test wallet flows (unlock, lock, device linking)
+- [ ] Clean up CSS (move inline styles to `static/css/wallet.css`)
+- [ ] Improve section organization with clear visual separation
+- [ ] Add collapsible sections for credentials (declutter)
+- [ ] Simplify device linking UI
+- [ ] Ensure mobile-first responsive design
+- [ ] Test all wallet flows (unlock, lock, device linking)
 
 ---
 
@@ -167,11 +174,13 @@ templates/docs/
 ### Wallet (Wallet Auth)
 | URL | Description |
 |-----|-------------|
-| `/wallet` | Main wallet page |
-| `/wallet/unlock` | Unlock page (redirect flow) |
-| `/wallet/link` | Device linking |
-| `/wallet/bridge` | Cross-origin bridge (iframe) |
-| `/wallet/popup` | Popup unlock |
+| `/wallet` | **Single-page control center** (credentials, devices, security, settings) |
+| `/wallet/unlock` | Unlock page (redirect flow - returns to requesting site) |
+| `/wallet/link` | Device linking (scanned from QR code) |
+| `/wallet/bridge` | Cross-origin bridge (iframe for third-party sites) |
+| `/wallet/popup` | Popup unlock (alternative to redirect) |
+
+*Note: The wallet is intentionally NOT split into multiple pages. Non-technical users benefit from a unified view where everything is accessible without navigation.*
 
 ### Developer Platform (Developer Credential)
 | URL | Description |
@@ -265,11 +274,12 @@ These files can be removed or deprecated once the restructure is complete:
 ## Next Steps
 
 1. **Wallet Enhancement (Day 2):**
-   - Start by reading `wallet_simple.html` to understand current structure
-   - Create `templates/wallet/layout.html`
-   - Split into focused pages
+   - Review `wallet_simple.html` for cleanup opportunities
+   - Extract inline styles to `static/css/wallet.css`
+   - Improve visual organization (sections, collapsibles)
+   - Keep as single-page control center
 
 2. **Priority Order:**
-   - Wallet pages (users interact with these most)
+   - Wallet polish (users interact with this most)
    - Admin pages (internal tooling)
    - Marketing polish (lower priority)
