@@ -237,8 +237,33 @@ def _extract_customer_id_from_request() -> Optional[str]:
             logger.error(f"Failed to parse credential from Authorization header: {e}")
             return None
     
-    # Fallback to legacy session-based auth (customer dashboard)
-    return session.get('customer_id')
+    # Check for PPID in header (SDK sends this after wallet auth)
+    ppid = request.headers.get('X-Lemma-PPID')
+    if ppid and ppid.startswith('did:lemma:ppid_'):
+        customer = customer_manager.get_customer_by_did(ppid)
+        if customer:
+            logger.info(f"✅ Authenticated via PPID header: {customer.customer_id}")
+            return customer.customer_id
+    
+    # Check for credential headers (edge computing pattern)
+    credential_id = request.headers.get('X-Credential-ID')
+    user_email = request.headers.get('X-User-Email')
+    if credential_id:
+        # Trust client-side verification, just check revocation
+        from api.wallet_revocation import is_credential_revoked
+        if not is_credential_revoked(credential_id):
+            # Look up customer by email from credential (if provided)
+            if user_email:
+                customer = customer_manager.get_customer_by_email(user_email)
+                if customer:
+                    logger.info(f"✅ Authenticated via credential header (email): {customer.customer_id}")
+                    return customer.customer_id
+            logger.info(f"✅ Credential {credential_id[:20]}... verified (no customer lookup)")
+            return None  # Credential valid but no customer linkage
+    
+    # No valid authentication found
+    logger.debug("No valid authentication found in request")
+    return None
 
 
 class DateTimeEncoder(json.JSONEncoder):
@@ -1229,10 +1254,8 @@ def register():
         )
         
         if result['success']:
-            # Store customer ID in session
-            session['customer_id'] = result['customer_id']
-            
             # Issue REAL permission lemma using Ed25519 crypto
+            # (No session storage - client stores credential in wallet)
             permission_lemma_data = None
             user_did = None
             issuer_did = None
@@ -1354,10 +1377,8 @@ def register_secure():
         )
         
         if result['success']:
-            # Store customer ID in session
-            session['customer_id'] = result['customer_id']
-            
             # Create user DID for this customer
+            # (No session storage - client receives permission lemma in response)
             user_did = f"did:lemma:customer:{result['customer_id']}"
             
             # Send email confirmation (in production)

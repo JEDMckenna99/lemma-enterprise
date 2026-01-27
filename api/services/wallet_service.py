@@ -741,10 +741,8 @@ def issue_to_wallet():
             granted_by='wallet_auth'
         )
         
-        session['customer_id'] = ppid
-        session['auth_method'] = 'wallet_passkey'
-        session['site_id'] = site_id
-        
+        # Return PPID and permission_lemma - client stores in wallet
+        # No server-side session needed (session-free architecture)
         return jsonify({
             'success': True,
             'ppid': ppid,
@@ -777,10 +775,8 @@ def register_and_issue():
             permissions=['read', 'write', 'access']
         )
         
-        session['customer_id'] = ppid
-        session['auth_method'] = 'wallet_passkey'
-        session['site_id'] = site_id
-        
+        # Return PPID and permission_lemma - client stores in wallet
+        # No server-side session needed (session-free architecture)
         return jsonify({
             'success': True,
             'ppid': ppid,
@@ -812,11 +808,8 @@ def verify_wallet_session():
         site_canonical = canonicalize_rp_id(site_id)
         has_site_permission = any(site_canonical in p for p in permissions)
         
-        session['customer_id'] = ppid
-        session['auth_method'] = 'wallet_passkey'
-        session['site_id'] = site_id
-        session['authenticated'] = True
-        
+        # Return authentication status - no server-side session needed
+        # Client uses PPID for subsequent requests (session-free architecture)
         return jsonify({
             'success': True,
             'authenticated': True,

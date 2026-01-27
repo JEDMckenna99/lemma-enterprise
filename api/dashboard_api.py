@@ -12,7 +12,7 @@ import logging
 import secrets
 import time
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify, session, render_template, g
+from flask import Blueprint, request, jsonify, render_template, g
 from flask_cors import cross_origin
 from typing import Dict, Any, List
 
@@ -123,94 +123,8 @@ def get_customer_usage():
         }), 500
 
 
-# Duplicate endpoint removed - handled by customer_accounts.py
-# @dashboard_bp.route('/api/customer/api-keys', methods=['GET'])
-# @cross_origin()
-def get_customer_api_keys_disabled():
-    """Get customer API keys"""
-    try:
-        customer_id = session.get('customer_id')
-        if not customer_id:
-            return jsonify({
-                'success': False,
-                'error': 'Not authenticated'
-            }), 401
-
-        from .customer_accounts import customer_manager
-        customer = customer_manager.get_customer_by_id(customer_id)
-        
-        if not customer:
-            return jsonify({
-                'success': False,
-                'error': 'Customer not found'
-            }), 404
-
-        return jsonify({
-            'success': True,
-            'api_keys': customer.api_keys or []
-        })
-
-    except Exception as e:
-        logger.error(f"Get API keys error: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Failed to get API keys'
-        }), 500
-
-# Duplicate endpoint removed - handled by customer_accounts.py
-# @dashboard_bp.route('/api/customer/api-keys', methods=['POST'])
-@cross_origin()
-def create_api_key():
-    """Create new API key for customer"""
-    try:
-        customer_id = session.get('customer_id')
-        if not customer_id:
-            return jsonify({
-                'success': False,
-                'error': 'Not authenticated'
-            }), 401
-
-        data = request.get_json() or {}
-        key_name = data.get('name', 'API Key')
-
-        from .customer_accounts import customer_manager
-        result = customer_manager.generate_api_key(customer_id, key_name)
-
-        return jsonify(result)
-
-    except Exception as e:
-        logger.error(f"Create API key error: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Failed to create API key'
-        }), 500
-
-# Duplicate endpoint removed - handled by customer_accounts.py  
-# @dashboard_bp.route('/api/customer/api-keys/<key_id>', methods=['DELETE'])
-@cross_origin()
-def revoke_api_key(key_id):
-    """Revoke customer API key"""
-    try:
-        customer_id = session.get('customer_id')
-        if not customer_id:
-            return jsonify({
-                'success': False,
-                'error': 'Not authenticated'
-            }), 401
-
-        from .customer_accounts import customer_manager
-        result = customer_manager.revoke_api_key(customer_id, key_id)
-
-        return jsonify(result)
-
-    except Exception as e:
-        logger.error(f"Revoke API key error: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Failed to revoke API key'
-        }), 500
-
-# Removed duplicate get_customer_usage - now using real usage tracking from line 72
+# Legacy session-based endpoints removed - now handled by customer_accounts.py
+# with proper credential-based authentication
 
 # ================================================================================
 # ADMIN DASHBOARD ENDPOINTS

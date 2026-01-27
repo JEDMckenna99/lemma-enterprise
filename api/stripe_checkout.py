@@ -1,12 +1,15 @@
 """
 Stripe Checkout API for Lemma Shield Subscriptions
 Handles subscription creation and payment processing
+
+Uses PPID-based customer lookup for subscription management.
 """
 
 import os
 import logging
-from flask import Blueprint, request, jsonify, session, redirect, url_for
+from flask import Blueprint, request, jsonify, redirect, url_for, g
 from typing import Dict, Any
+from auth.decorators import require_wallet_ppid
 
 logger = logging.getLogger(__name__)
 
@@ -154,29 +157,20 @@ def create_checkout_session():
 @stripe_checkout_bp.route('/subscription/success')
 def subscription_success():
     """
-    Handle successful subscription payment
+    Handle successful subscription payment.
+    Uses Stripe webhook to associate with customer PPID for persistence.
     """
-    session_id = request.args.get('session_id')
+    plan_type = request.args.get('plan')
     
-    if not session_id:
+    if not plan_type:
         return redirect(url_for('main.pricing'))
     
     try:
-        if STRIPE_AVAILABLE:
-            # Retrieve the checkout session to get details
-            checkout_session = stripe.checkout.Session.retrieve(session_id)
-            plan_type = checkout_session.metadata.get('plan_type', 'unknown')
-            plan_name = checkout_session.metadata.get('plan_name', 'Lemma Shield')
-            
-            logger.info(f"✅ Successful subscription payment for {plan_type} plan (session: {session_id})")
-            
-            # Store subscription info in session for now
-            session['subscription'] = {
-                'plan_type': plan_type,
-                'plan_name': plan_name,
-                'session_id': session_id,
-                'status': 'active'
-            }
+        plan_name = SUBSCRIPTION_PLANS.get(plan_type, {}).get('name', 'Lemma Shield')
+        logger.info(f"✅ User completed subscription flow for {plan_type} plan")
+        
+        # Note: Subscription is associated with customer via Stripe webhook
+        # The webhook will use customer email/metadata to link to PPID
         
         return redirect(url_for('main.dashboard') + '?subscription=success')
         
@@ -184,44 +178,45 @@ def subscription_success():
         logger.error(f"❌ Error processing subscription success: {str(e)}")
         return redirect(url_for('main.pricing') + '?error=processing')
 
+
 @stripe_checkout_bp.route('/api/subscription/status')
+@require_wallet_ppid
 def get_subscription_status():
     """
-    Get current user's subscription status
+    Get current user's subscription status.
+    Requires PPID authentication (via X-Lemma-PPID header).
     """
-    subscription = session.get('subscription')
+    ppid = getattr(g, 'ppid', None)
     
-    if not subscription:
+    if not ppid:
         return jsonify({
             'success': True,
             'subscription': None,
-            'message': 'No active subscription'
+            'message': 'No PPID provided'
         })
+    
+    # Look up subscription by PPID in database
+    try:
+        from .customer_accounts import customer_manager
+        customer = customer_manager.get_customer_by_did(ppid)
+        
+        if customer and hasattr(customer, 'subscription_plan'):
+            return jsonify({
+                'success': True,
+                'subscription': {
+                    'plan_type': customer.subscription_plan,
+                    'status': 'active'
+                }
+            })
+    except Exception as e:
+        logger.warning(f"Could not look up subscription for PPID: {e}")
     
     return jsonify({
         'success': True,
-        'subscription': subscription
+        'subscription': None,
+        'message': 'No active subscription'
     })
 
-def get_plan_config(plan_type: str) -> Dict[str, Any]:
-    """Get configuration for a specific plan"""
-    return SUBSCRIPTION_PLANS.get(plan_type, {})
-    """
-    Get current user's subscription status
-    """
-    subscription = session.get('subscription')
-    
-    if not subscription:
-        return jsonify({
-            'success': True,
-            'subscription': None,
-            'message': 'No active subscription'
-        })
-    
-    return jsonify({
-        'success': True,
-        'subscription': subscription
-    })
 
 def get_plan_config(plan_type: str) -> Dict[str, Any]:
     """Get configuration for a specific plan"""

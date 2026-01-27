@@ -5,8 +5,6 @@ Session-free architecture - all auth via credentials + smart caching
 
 from functools import wraps
 from flask import request, jsonify, g, make_response
-import jwt
-import json
 from typing import Optional
 
 def require_api_key(f):
@@ -82,55 +80,37 @@ def require_site_admin(f):
     
     return decorated_function
 
-def require_oauth_token(f):
-    """
-    Decorator to require valid OAuth access token
-    """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({'error': 'OAuth token required'}), 401
-        
-        token = auth_header.split(' ')[1]
-        
-        try:
-            # TODO: Use proper secret key from config
-            payload = jwt.decode(token, 'your-secret-key', algorithms=['HS256'])
-            g.oauth_payload = payload
-            g.site_id = payload.get('site_id')
-            return f(*args, **kwargs)
-        except jwt.InvalidTokenError as e:
-            return jsonify({'error': f'Invalid token: {str(e)}'}), 401
-    
-    return decorated_function
-
 def optional_auth(f):
     """
-    Decorator that allows optional authentication
+    Decorator that allows optional authentication via PPID, credential, or API key.
+    Sets g.authenticated, g.ppid, g.credential_id as appropriate.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Try API key first
+        g.authenticated = False
+        
+        # Method 1: PPID from header (SDK sends this after wallet auth)
+        ppid = request.headers.get('X-Lemma-PPID')
+        if ppid and ppid.startswith('did:lemma:ppid_'):
+            g.ppid = ppid
+            g.authenticated = True
+            return f(*args, **kwargs)
+        
+        # Method 2: Credential headers (edge computing)
+        credential_id = request.headers.get('X-Credential-ID')
+        if credential_id:
+            from api.wallet_revocation import is_credential_revoked
+            if not is_credential_revoked(credential_id):
+                g.credential_id = credential_id
+                g.permission_id = request.headers.get('X-Permission-ID')
+                g.authenticated = True
+                return f(*args, **kwargs)
+        
+        # Method 3: API key fallback
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         if api_key and len(api_key) >= 10:
             g.api_key = api_key
             g.authenticated = True
-        else:
-            # Try OAuth token
-            auth_header = request.headers.get('Authorization')
-            if auth_header and auth_header.startswith('Bearer '):
-                token = auth_header.split(' ')[1]
-                try:
-                    payload = jwt.decode(token, 'your-secret-key', algorithms=['HS256'])
-                    g.oauth_payload = payload
-                    g.site_id = payload.get('site_id')
-                    g.authenticated = True
-                except jwt.InvalidTokenError:
-                    g.authenticated = False
-            else:
-                g.authenticated = False
         
         return f(*args, **kwargs)
     
@@ -154,26 +134,42 @@ def cors_headers(f):
 
 def require_admin(f):
     """
-    Decorator to require admin privileges
+    Decorator to require admin privileges via credential or API key.
+    Uses the same pattern as require_site_admin for consistency.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Check for API key first
+        # Method 1: Client-side verified credential (edge verification)
+        credential_id = request.headers.get('X-Credential-ID')
+        permission_id = request.headers.get('X-Permission-ID')
+        
+        if credential_id and permission_id:
+            from api.wallet_revocation import is_credential_revoked
+            
+            if is_credential_revoked(credential_id):
+                return jsonify({'error': 'Credential revoked'}), 401
+            
+            # Verify it's an admin permission
+            admin_permissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin']
+            if permission_id in admin_permissions or 'admin' in permission_id.lower():
+                g.is_admin = True
+                g.credential_id = credential_id
+                g.permission_id = permission_id
+                return f(*args, **kwargs)
+            else:
+                return jsonify({'error': f'Admin permission required, got: {permission_id}'}), 403
+        
+        # Method 2: API key fallback (programmatic access)
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        if api_key and len(api_key) >= 10:
+            g.api_key = api_key
+            g.is_admin = True
+            return f(*args, **kwargs)
         
-        if not api_key:
-            return jsonify({'error': 'Admin API key required'}), 401
-        
-        # TODO: Validate admin privileges against database
-        # For now, accept any valid API key as admin for testing
-        if len(api_key) < 10:
-            return jsonify({'error': 'Invalid admin credentials'}), 403
-        
-        g.api_key = api_key
-        g.is_admin = True
-        return f(*args, **kwargs)
+        return jsonify({'error': 'Admin authentication required (credential or API key)'}), 401
     
     return decorated_function
+
 
 def init_csrf_protection(app):
     """
@@ -182,47 +178,52 @@ def init_csrf_protection(app):
     # TODO: Implement CSRF protection
     pass
 
+
 def require_authenticated(f):
     """
-    Decorator to require authenticated user
+    Decorator to require authenticated user via PPID, credential, or API key.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Check for any form of authentication
+        # Method 1: PPID from header (SDK sends this after wallet auth)
+        ppid = request.headers.get('X-Lemma-PPID')
+        if ppid and ppid.startswith('did:lemma:ppid_'):
+            g.ppid = ppid
+            g.authenticated = True
+            return f(*args, **kwargs)
+        
+        # Method 2: Credential headers (edge computing)
+        credential_id = request.headers.get('X-Credential-ID')
+        if credential_id:
+            from api.wallet_revocation import is_credential_revoked
+            if not is_credential_revoked(credential_id):
+                g.credential_id = credential_id
+                g.permission_id = request.headers.get('X-Permission-ID')
+                g.authenticated = True
+                return f(*args, **kwargs)
+        
+        # Method 3: API key fallback
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
-        auth_header = request.headers.get('Authorization')
-        
-        authenticated = False
-        
         if api_key and len(api_key) >= 10:
             g.api_key = api_key
-            authenticated = True
-        elif auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
-            try:
-                payload = jwt.decode(token, 'your-secret-key', algorithms=['HS256'])
-                g.oauth_payload = payload
-                g.site_id = payload.get('site_id')
-                authenticated = True
-            except jwt.InvalidTokenError:
-                pass
+            g.authenticated = True
+            return f(*args, **kwargs)
         
-        if not authenticated:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        g.authenticated = True
-        return f(*args, **kwargs)
+        return jsonify({'error': 'Authentication required'}), 401
     
     return decorated_function
 
+
 def get_current_user():
     """
-    Get current authenticated user information
+    Get current authenticated user information from request context.
     """
-    if hasattr(g, 'oauth_payload'):
-        return g.oauth_payload
+    if hasattr(g, 'ppid'):
+        return {'ppid': g.ppid, 'type': 'wallet'}
+    elif hasattr(g, 'credential_id'):
+        return {'credential_id': g.credential_id, 'permission_id': getattr(g, 'permission_id', None), 'type': 'credential'}
     elif hasattr(g, 'api_key'):
-        return {'api_key': g.api_key}
+        return {'api_key': g.api_key, 'type': 'api_key'}
     return None
 
 def require_permission_lemma(site_id='lemma.id', required_permissions=None):

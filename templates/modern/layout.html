@@ -180,6 +180,20 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
         // This makes wallet unlock = signed in across the platform
         (function() {
             const originalFetch = window.fetch;
+            
+            // Unicode-safe base64 encoding for HTTP headers
+            function encodeForHeader(obj) {
+                const jsonStr = JSON.stringify(obj);
+                // Use TextEncoder to handle Unicode properly
+                const bytes = new TextEncoder().encode(jsonStr);
+                // Convert bytes to base64
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                return btoa(binary);
+            }
+            
             window.fetch = async function(url, options = {}) {
                 // Only modify requests to our API
                 if (url.startsWith('/api/') || url.includes('lemma.id/api/')) {
@@ -187,15 +201,18 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                         const wallet = window.globalLemmaWallet || window.lemmaWallet;
                         if (wallet && typeof wallet.isUnlocked === 'function' && wallet.isUnlocked()) {
                             const authProof = await wallet.getAuthProof();
+                            // Encode to ensure HTTP header compatibility (ISO-8859-1)
+                            const authProofEncoded = encodeForHeader(authProof);
                             options.headers = options.headers || {};
                             if (options.headers instanceof Headers) {
-                                options.headers.set('X-Wallet-Auth', JSON.stringify(authProof));
+                                options.headers.set('X-Wallet-Auth', authProofEncoded);
                             } else {
-                                options.headers['X-Wallet-Auth'] = JSON.stringify(authProof);
+                                options.headers['X-Wallet-Auth'] = authProofEncoded;
                             }
                         }
                     } catch (e) {
                         // Silent fail - don't break requests if auth fails
+                        console.warn('Wallet auth attach failed:', e.message);
                     }
                 }
                 return originalFetch.call(this, url, options);

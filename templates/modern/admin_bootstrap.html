@@ -193,22 +193,10 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         console.log('Permission credentials in wallet:', permissionCreds);
         console.log('Total permission credentials:', permissionCreds.length);
         
-        // Check all storage layers
-        console.log('=== STORAGE LAYERS ===');
-        console.log('Memory cache size:', wallet.memoryCache.size);
-        console.log('Memory cache contents:', Array.from(wallet.memoryCache.entries()).map(([id, cred]) => ({
-            id, 
-            packageType: cred.packageType,
-            siteDomain: cred.claims?.siteDomain || cred.credentialSubject?.siteDomain
-        })));
-        
-        // Check localStorage
-        const localStorageData = localStorage.getItem('lemma_credentials');
-        if (localStorageData) {
-            const parsed = JSON.parse(localStorageData);
-            console.log('localStorage credentials:', parsed.length);
-            console.log('localStorage permission credentials:', parsed.filter(c => c.packageType === 'permission'));
-        }
+        // Verify storage succeeded
+        console.log('=== STORAGE VERIFICATION ===');
+        console.log('Stored credential ID:', credentialToStore.id);
+        console.log('Found in wallet:', permissionCreds.some(c => c.id === credentialToStore.id));
         
         // Show debug info
         document.getElementById('credential-debug').style.display = 'block';
