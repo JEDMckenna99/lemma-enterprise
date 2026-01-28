@@ -63,34 +63,36 @@ The wallet is intentionally a single-page experience for non-technical users:
 
 ---
 
-### Day 3: Admin Dashboard
+### Day 3: Admin Dashboard - COMPLETED
 
 **Goal:** Create proper admin platform for Lemma staff
 
-**Current State:**
-- `templates/admin/platform_monitoring.html` - Basic monitoring
-- `templates/modern/admin_bootstrap.html` - Bootstrap page
+**Files Created:**
+- `templates/admin/layout.html` - Admin layout with sidebar navigation
+- `templates/admin/dashboard.html` - Platform overview with stats, health, activity
+- `templates/admin/users.html` - User management with search/filter
+- `templates/admin/sites.html` - Sites overview with stats
+- `templates/admin/credentials.html` - Credential management (placeholder)
+- `templates/admin/revocations.html` - Revocation management with stats
+- `templates/admin/audit.html` - Audit log (placeholder)
+- `templates/admin/health.html` - Detailed system health monitoring
+- `static/css/admin.css` - Admin-specific styles (red theme)
 
-**Target Structure:**
-```
-templates/admin/
-├── layout.html          # Admin layout with sidebar
-├── dashboard.html       # Overview (platform stats, health)
-├── users.html           # All platform users
-├── sites.html           # All registered sites
-├── analytics.html       # Platform-wide analytics
-├── logs.html            # Audit logs
-└── settings.html        # Platform settings
-```
+**Routes Added:**
+- `/admin` - Dashboard (was monitoring, now dashboard)
+- `/admin/monitoring` - Bloom filter monitoring
+- `/admin/health` - System health details
+- `/admin/users` - User management
+- `/admin/sites` - Sites overview
+- `/admin/credentials` - Credential management
+- `/admin/revocations` - Revocation management
+- `/admin/audit` - Audit log
+- `/admin/bootstrap` - Admin credential bootstrap
 
-**Tasks:**
-- [ ] Create `templates/admin/layout.html` with admin navigation
-- [ ] Create admin dashboard page
-- [ ] Create users management page
-- [ ] Create sites overview page
-- [ ] Create `static/css/admin.css` for admin-specific styles
-- [ ] Update routes in app.py
-- [ ] Ensure admin routes require admin lemma
+**Updated:**
+- `templates/admin/platform_monitoring.html` - Now uses admin layout with sidebar
+
+**Status:** Deployed to production (lemma.id/admin)
 
 ---
 
@@ -254,24 +256,29 @@ These files can be removed or deprecated once the restructure is complete:
 |-------|--------|--------|
 | Day 1: Developer Platform | 4 hours | ✅ COMPLETED |
 | Day 2: Wallet Enhancement | 1 hour | ✅ COMPLETED |
-| Day 3: Admin Dashboard | 3 hours | Pending |
+| Day 3: Admin Dashboard | 3 hours | ✅ COMPLETED |
 | Day 4: Marketing Polish | 2 hours | Pending |
 | Day 5: Routes & Testing | 2 hours | Pending |
 
-**Total estimated remaining: ~7 hours**
+**Total estimated remaining: ~4 hours**
 
 ---
 
 ## Next Steps
 
-1. **Admin Dashboard (Day 3):**
-   - Create `templates/admin/layout.html` with admin sidebar
-   - Create admin dashboard page (platform stats, health)
-   - Create users management page
-   - Create sites overview page
-   - Ensure admin routes require admin lemma
+1. **Marketing Polish (Day 4):**
+   - Simplify homepage (index.html)
+   - Create docs site with navigation
+   - Ensure consistent styling
 
-2. **Priority Order:**
-   - Admin pages (internal tooling needed)
-   - Marketing polish (lower priority)
-   - Final routes cleanup and testing
+2. **Routes & Testing (Day 5):**
+   - Audit all routes
+   - Test all user flows
+   - Mobile responsiveness
+
+3. **API Endpoints to Implement:**
+   Some admin pages call APIs that don't exist yet:
+   - `/api/admin/users` - List all users
+   - `/api/admin/user-stats` - User statistics
+   - `/api/admin/recent-activity` - Recent activity feed
+   - `/api/health/detailed` - Detailed health check
