@@ -1064,7 +1064,12 @@ def create_app():
     def health_detailed():
         """Detailed system health for admin dashboard"""
         try:
-            import psutil
+            # psutil is optional - gracefully handle if not installed
+            try:
+                import psutil
+                has_psutil = True
+            except ImportError:
+                has_psutil = False
             
             # Check database
             db_status = 'operational'
@@ -1113,9 +1118,22 @@ def create_app():
             except Exception as e:
                 bloom_status = 'error'
             
-            # System metrics
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            memory = psutil.virtual_memory()
+            # System metrics (if psutil available)
+            if has_psutil:
+                cpu_percent = psutil.cpu_percent(interval=0.1)
+                memory = psutil.virtual_memory()
+                system_metrics = {
+                    'cpu_percent': cpu_percent,
+                    'memory_percent': memory.percent,
+                    'memory_available_mb': memory.available // (1024 * 1024)
+                }
+            else:
+                system_metrics = {
+                    'cpu_percent': None,
+                    'memory_percent': None,
+                    'memory_available_mb': None,
+                    'note': 'psutil not available'
+                }
             
             components = {
                 'api_server': {'status': 'operational', 'message': 'Flask server running'},
@@ -1138,11 +1156,7 @@ def create_app():
                 'success': True,
                 'status': overall,
                 'components': components,
-                'system': {
-                    'cpu_percent': cpu_percent,
-                    'memory_percent': memory.percent,
-                    'memory_available_mb': memory.available // (1024 * 1024)
-                },
+                'system': system_metrics,
                 'timestamp': datetime.utcnow().isoformat()
             })
             
