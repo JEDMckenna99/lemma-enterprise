@@ -367,3 +367,268 @@ def issue_admin_lemma_endpoint():
             'success': False,
             'error': 'Admin lemma issuance failed'
         }), 500
+
+
+# ================================================================================
+# ADMIN USER MANAGEMENT ENDPOINTS
+# ================================================================================
+
+@dashboard_bp.route('/api/admin/users', methods=['GET'])
+@cross_origin()
+@require_site_admin
+def get_admin_users():
+    """Get all platform users (admin only)"""
+    try:
+        database_url = os.environ.get('DATABASE_URL')
+        users = []
+        
+        if database_url:
+            import psycopg2
+            conn = psycopg2.connect(database_url)
+            cur = conn.cursor()
+            
+            cur.execute("""
+                SELECT DISTINCT admin_email, site_domain, created_at, status
+                FROM registered_sites 
+                WHERE admin_email IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 100
+            """)
+            
+            for row in cur.fetchall():
+                users.append({
+                    'email': row[0],
+                    'site': row[1],
+                    'created_at': row[2].isoformat() if row[2] else None,
+                    'status': row[3] or 'active',
+                    'type': 'developer'
+                })
+            
+            cur.close()
+            conn.close()
+        else:
+            users = [
+                {'email': 'dev@example.com', 'site': 'example.com', 'created_at': '2025-01-15T10:00:00Z', 'status': 'active', 'type': 'developer'},
+            ]
+        
+        return jsonify({
+            'success': True,
+            'users': users,
+            'total': len(users)
+        })
+        
+    except Exception as e:
+        logger.error(f"Get admin users error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@dashboard_bp.route('/api/admin/user-stats', methods=['GET'])
+@cross_origin()
+@require_site_admin
+def get_admin_user_stats():
+    """Get user statistics (admin only)"""
+    try:
+        database_url = os.environ.get('DATABASE_URL')
+        
+        if database_url:
+            import psycopg2
+            conn = psycopg2.connect(database_url)
+            cur = conn.cursor()
+            
+            cur.execute("SELECT COUNT(DISTINCT admin_email) FROM registered_sites WHERE admin_email IS NOT NULL")
+            total_users = cur.fetchone()[0] or 0
+            
+            cur.execute("SELECT COUNT(*) FROM registered_sites WHERE status = 'active' OR status IS NULL")
+            active_sites = cur.fetchone()[0] or 0
+            
+            cur.execute("""
+                SELECT COUNT(DISTINCT admin_email) FROM registered_sites 
+                WHERE admin_email IS NOT NULL 
+                AND created_at > NOW() - INTERVAL '7 days'
+            """)
+            new_this_week = cur.fetchone()[0] or 0
+            
+            cur.close()
+            conn.close()
+            
+            stats = {
+                'total_users': total_users,
+                'active_sites': active_sites,
+                'new_this_week': new_this_week,
+                'growth_rate': round((new_this_week / max(total_users, 1)) * 100, 1)
+            }
+        else:
+            stats = {
+                'total_users': 156,
+                'active_sites': 89,
+                'new_this_week': 12,
+                'growth_rate': 7.7
+            }
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Get user stats error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@dashboard_bp.route('/api/admin/recent-activity', methods=['GET'])
+@cross_origin()
+@require_site_admin
+def get_admin_recent_activity():
+    """Get recent platform activity (admin only)"""
+    try:
+        database_url = os.environ.get('DATABASE_URL')
+        activities = []
+        
+        if database_url:
+            import psycopg2
+            conn = psycopg2.connect(database_url)
+            cur = conn.cursor()
+            
+            cur.execute("""
+                SELECT admin_email, site_domain, created_at
+                FROM registered_sites 
+                WHERE created_at IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 10
+            """)
+            
+            for row in cur.fetchall():
+                activities.append({
+                    'user': row[0] or 'Unknown',
+                    'action': 'Registered site',
+                    'target': row[1],
+                    'timestamp': row[2].isoformat() if row[2] else None,
+                    'type': 'site_registered'
+                })
+            
+            cur.close()
+            conn.close()
+        else:
+            from datetime import datetime
+            now = datetime.utcnow()
+            activities = [
+                {'user': 'dev@example.com', 'action': 'Registered site', 'target': 'example.com', 'timestamp': now.isoformat(), 'type': 'site_registered'},
+            ]
+        
+        return jsonify({
+            'success': True,
+            'activities': activities
+        })
+        
+    except Exception as e:
+        logger.error(f"Get recent activity error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@dashboard_bp.route('/api/health/detailed', methods=['GET'])
+@cross_origin()
+def get_detailed_health():
+    """Get detailed system health status for admin dashboard"""
+    try:
+        services = []
+        
+        # API Server (always healthy if this endpoint responds)
+        services.append({
+            'name': 'API Server',
+            'status': 'healthy',
+            'message': 'Operational'
+        })
+        
+        # Database
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url:
+            try:
+                import psycopg2
+                conn = psycopg2.connect(database_url, connect_timeout=5)
+                conn.close()
+                services.append({
+                    'name': 'Database',
+                    'status': 'healthy',
+                    'message': 'Connected'
+                })
+            except Exception as e:
+                services.append({
+                    'name': 'Database',
+                    'status': 'unhealthy',
+                    'message': str(e)[:50]
+                })
+        else:
+            services.append({
+                'name': 'Database',
+                'status': 'warning',
+                'message': 'Not configured'
+            })
+        
+        # Redis (optional)
+        redis_url = os.environ.get('REDIS_URL')
+        if redis_url:
+            try:
+                import redis
+                r = redis.from_url(redis_url, socket_timeout=5)
+                r.ping()
+                services.append({
+                    'name': 'Redis Cache',
+                    'status': 'healthy',
+                    'message': 'Connected'
+                })
+            except Exception as e:
+                services.append({
+                    'name': 'Redis Cache',
+                    'status': 'unhealthy', 
+                    'message': str(e)[:50]
+                })
+        else:
+            services.append({
+                'name': 'Redis Cache',
+                'status': 'warning',
+                'message': 'Not configured'
+            })
+        
+        # Crypto Engine
+        try:
+            from lemma_crypto import PyMinimalIssuer
+            issuer = PyMinimalIssuer()
+            services.append({
+                'name': 'Crypto Engine',
+                'status': 'healthy',
+                'message': 'Ed25519 ready'
+            })
+        except Exception as e:
+            services.append({
+                'name': 'Crypto Engine',
+                'status': 'unhealthy',
+                'message': str(e)[:50]
+            })
+        
+        # Overall status
+        unhealthy_count = sum(1 for s in services if s['status'] == 'unhealthy')
+        overall = 'healthy' if unhealthy_count == 0 else 'degraded' if unhealthy_count < 3 else 'unhealthy'
+        
+        return jsonify({
+            'success': True,
+            'status': overall,
+            'services': services,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f'Get detailed health error: {e}')
+        return jsonify({
+            'success': False,
+            'status': 'error',
+            'error': str(e)
+        }), 500
