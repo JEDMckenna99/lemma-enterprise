@@ -258,7 +258,43 @@ async function checkWalletState() {
             updateStatusDisplay(true, 'Wallet Unlocked', 'You are signed in');
             showUnlockedView();
             return true;
-        } else if (info.hasPasskey) {
+        }
+        
+        // CROSS-DEVICE SYNC: If local shows locked but we have walletId + secret,
+        // check global session - user may have unlocked on another device
+        if (!info.isUnlocked && info.walletId && info.hasWalletSecret) {
+            console.log('[CrossDevice] Local locked but have wallet - checking global session...');
+            const globalSession = await syncGlobalSession(info.walletId);
+            
+            if (globalSession.valid && globalSession.session) {
+                console.log('[CrossDevice] Global session valid! Auto-unlocking local wallet...');
+                
+                // Set local session from global session
+                const expiresAt = (globalSession.session.expires_at || globalSession.session.expiresAt) * 1000;
+                const unlockedAt = globalSession.session.unlocked_at || globalSession.session.unlockedAt || Date.now();
+                
+                // Update wallet's local session state
+                wallet.session = {
+                    isUnlocked: true,
+                    unlockedAt: unlockedAt,
+                    expiresAt: expiresAt,
+                    walletId: info.walletId,
+                    source: 'global_sync'
+                };
+                await wallet._put('session', { id: 'current', ...wallet.session });
+                
+                // Mark that we have a global session
+                hadGlobalSession = true;
+                localStorage.setItem('lemma_had_global_session', 'true');
+                
+                updateStatusDisplay(true, 'Wallet Unlocked', 'Synced from another device');
+                showUnlockedView();
+                return true;
+            }
+        }
+        
+        // Not unlocked anywhere - show appropriate locked state
+        if (info.hasPasskey) {
             updateStatusDisplay(false, 'Wallet Locked', 'Unlock to access your wallet');
             document.getElementById('no-wallet-msg').classList.add('hidden');
             document.getElementById('unlock-btn').classList.remove('hidden');
