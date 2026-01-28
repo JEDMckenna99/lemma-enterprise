@@ -399,37 +399,37 @@ class LemmaWallet {
         
         // Make the actual request
         cache.pendingPromise = (async () => {
-            try {
-                console.log('[Lemma] 🔍 Checking global session for wallet:', walletId?.substring(0, 8) + '...');
-                const response = await fetch('https://lemma.id/api/wallet/global-session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ wallet_id: walletId })
-                });
-                
-                console.log('[Lemma] 🔍 Global session response status:', response.status);
-                
-                if (!response.ok) {
-                    console.log('[Lemma] 🔍 Global session not OK, returning invalid');
+        try {
+            console.log('[Lemma] 🔍 Checking global session for wallet:', walletId?.substring(0, 8) + '...');
+            const response = await fetch('https://lemma.id/api/wallet/global-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wallet_id: walletId })
+            });
+            
+            console.log('[Lemma] 🔍 Global session response status:', response.status);
+            
+            if (!response.ok) {
+                console.log('[Lemma] 🔍 Global session not OK, returning invalid');
                     const result = { valid: false };
                     cache.result = result;
                     cache.timestamp = now;
                     return result;
-                }
-                
-                const data = await response.json();
-                console.log('[Lemma] 🔍 Global session result:', JSON.stringify(data));
+            }
+            
+            const data = await response.json();
+            console.log('[Lemma] 🔍 Global session result:', JSON.stringify(data));
                 
                 // Cache the result
                 cache.result = data;
                 cache.timestamp = now;
-                return data;
-            } catch (e) {
-                console.warn('[Lemma] Global session API error:', e.message);
-                return { valid: false };
+            return data;
+        } catch (e) {
+            console.warn('[Lemma] Global session API error:', e.message);
+            return { valid: false };
             } finally {
                 cache.pendingPromise = null;
-            }
+        }
         })();
         
         return cache.pendingPromise;
@@ -2181,7 +2181,7 @@ class LemmaWallet {
             // Guard: Ensure bridge contentWindow is accessible before posting
             if (bridge.contentWindow) {
                 try {
-                    bridge.contentWindow.postMessage({ type, payload, requestId }, 'https://lemma.id');
+            bridge.contentWindow.postMessage({ type, payload, requestId }, 'https://lemma.id');
                 } catch (e) {
                     console.warn('[Lemma] Bridge postMessage failed:', e.message);
                     clearTimeout(timeoutId);

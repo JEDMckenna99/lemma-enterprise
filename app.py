@@ -401,6 +401,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Developer Platform API: {e}")
 
+    # Agent Credentials API (passkey-authorized AI agent access)
+    try:
+        from api.agent_credentials import agent_credentials_bp
+        app.register_blueprint(agent_credentials_bp)
+        logger.info("✅ Agent Credentials API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Agent Credentials API: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status
