@@ -1,0 +1,67 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'revocations' %}
+
+{% block title %}Revocations - Lemma Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">Revocation Management</h1>
+    <p class="admin-subtitle">View and manage credential revocations</p>
+</div>
+
+<!-- Stats -->
+<div class="admin-stats">
+    <div class="stat-card stat-card--danger">
+        <div class="stat-label">Total Revocations</div>
+        <div class="stat-value" id="stat-total">-</div>
+    </div>
+    <div class="stat-card stat-card--warning">
+        <div class="stat-label">This Month</div>
+        <div class="stat-value" id="stat-month">-</div>
+    </div>
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">Bloom Filter Size</div>
+        <div class="stat-value" id="stat-bloom">-</div>
+    </div>
+    <div class="stat-card stat-card--success">
+        <div class="stat-label">FP Rate</div>
+        <div class="stat-value" id="stat-fp">-</div>
+    </div>
+</div>
+
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Recent Revocations</h2>
+        <button class="admin-btn admin-btn--secondary admin-btn--sm" id="refresh-btn">Refresh</button>
+    </div>
+    <div class="admin-card-body">
+        <div class="admin-empty">
+            <div class="admin-empty-icon">🚫</div>
+            <div class="admin-empty-title">Revocation list coming soon</div>
+            <p>This will show recent revocations and allow manual revocation</p>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', loadRevocationStats);
+
+async function loadRevocationStats() {
+    try {
+        const response = await fetch('/api/revocation/stats');
+        if (!response.ok) throw new Error('Failed');
+        const data = await response.json();
+        
+        document.getElementById('stat-total').textContent = data.total_revocations || '0';
+        document.getElementById('stat-month').textContent = data.this_month || '0';
+        document.getElementById('stat-bloom').textContent = data.bloom_size || '0';
+        document.getElementById('stat-fp').textContent = (data.false_positive_rate || 0).toFixed(4) + '%';
+    } catch (e) {
+        document.getElementById('stat-total').textContent = '0';
+        document.getElementById('stat-month').textContent = '0';
+        document.getElementById('stat-bloom').textContent = '-';
+        document.getElementById('stat-fp').textContent = '-';
+    }
+}
+</script>
+{% endblock %}

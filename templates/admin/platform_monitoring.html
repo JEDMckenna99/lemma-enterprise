@@ -1,10 +1,11 @@
-{% extends "modern/layout.html" %}
+{% extends "admin/layout.html" %}
+{% set active_page = 'monitoring' %}
 
 {% block title %}Platform Monitoring - Lemma Admin{% endblock %}
 
 {% block head %}
-    {{ super() }}
-    <style>
+{{ super() }}
+<style>
         .monitor-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -62,12 +63,13 @@
     </style>
 {% endblock %}
 
-{% block content %}
-<div class="container" style="max-width: 1400px; margin: 0 auto; padding: 24px;">
-    <h1>🔧 Platform Monitoring</h1>
-    <p style="color: #6b7280; margin-bottom: 32px;">
-        Monitor Bloom filter collisions, system health, and revocation system performance
-    </p>
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">Platform Monitoring</h1>
+    <p class="admin-subtitle">Monitor Bloom filter collisions, system health, and revocation system performance</p>
+</div>
+
+<div style="max-width: 1200px;">
 
     <!-- Bloom Filter Health -->
     <h2>🔐 Bloom Filter Collision Monitoring</h2>
@@ -153,6 +155,7 @@
         
         <pre id="revocation-details">Loading...</pre>
     </div>
+</div>
 </div>
 
 <script nonce="{{ csp_nonce }}">

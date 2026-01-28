@@ -1,0 +1,218 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'users' %}
+
+{% block title %}Users - Lemma Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">User Management</h1>
+    <p class="admin-subtitle">View and manage platform users</p>
+</div>
+
+<!-- Stats -->
+<div class="admin-stats">
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value" id="stat-total">-</div>
+    </div>
+    <div class="stat-card stat-card--success">
+        <div class="stat-label">Active Today</div>
+        <div class="stat-value" id="stat-active">-</div>
+    </div>
+    <div class="stat-card stat-card--warning">
+        <div class="stat-label">Developers</div>
+        <div class="stat-value" id="stat-developers">-</div>
+    </div>
+    <div class="stat-card stat-card--danger">
+        <div class="stat-label">Admins</div>
+        <div class="stat-value" id="stat-admins">-</div>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">All Users</h2>
+        <div style="display: flex; gap: 12px;">
+            <input type="text" id="user-search" placeholder="Search users..." 
+                   style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem;">
+            <button class="admin-btn admin-btn--secondary admin-btn--sm" id="refresh-users-btn">
+                Refresh
+            </button>
+        </div>
+    </div>
+    <div class="admin-card-body" style="padding: 0;">
+        <div id="users-table-container">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Sites</th>
+                        <th>Created</th>
+                        <th>Last Active</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table-body">
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 40px;">
+                            Loading users...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', () => {
+    loadUsers();
+    loadUserStats();
+    
+    document.getElementById('refresh-users-btn').addEventListener('click', loadUsers);
+    document.getElementById('user-search').addEventListener('input', debounce(filterUsers, 300));
+});
+
+let allUsers = [];
+
+async function loadUserStats() {
+    try {
+        const response = await fetch('/api/admin/user-stats');
+        if (!response.ok) throw new Error('Failed');
+        const data = await response.json();
+        
+        document.getElementById('stat-total').textContent = data.total || '0';
+        document.getElementById('stat-active').textContent = data.active_today || '0';
+        document.getElementById('stat-developers').textContent = data.developers || '0';
+        document.getElementById('stat-admins').textContent = data.admins || '0';
+    } catch (e) {
+        // Use defaults
+        document.getElementById('stat-total').textContent = '0';
+        document.getElementById('stat-active').textContent = '0';
+        document.getElementById('stat-developers').textContent = '0';
+        document.getElementById('stat-admins').textContent = '0';
+    }
+}
+
+async function loadUsers() {
+    const tbody = document.getElementById('users-table-body');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">Loading users...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/admin/users');
+        if (!response.ok) throw new Error('Failed to load users');
+        const data = await response.json();
+        
+        allUsers = data.users || [];
+        renderUsers(allUsers);
+    } catch (e) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 40px;">
+                    <div class="admin-empty">
+                        <div class="admin-empty-icon">👥</div>
+                        <div class="admin-empty-title">No users found</div>
+                        <p>Users will appear here as they create wallets</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function renderUsers(users) {
+    const tbody = document.getElementById('users-table-body');
+    
+    if (users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 40px;">
+                    <div class="admin-empty">
+                        <div class="admin-empty-icon">👥</div>
+                        <div class="admin-empty-title">No users found</div>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = users.map(user => `
+        <tr>
+            <td>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 36px; height: 36px; background: #f3f4f6; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        👤
+                    </div>
+                    <div>
+                        <div style="font-weight: 500;">${escapeHtml(user.display_name || user.ppid?.substring(0, 12) + '...' || 'Unknown')}</div>
+                        <div style="font-size: 0.75rem; color: #6b7280;">${escapeHtml(user.email || user.ppid?.substring(0, 20) + '...' || '')}</div>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <span class="badge ${getUserTypeBadge(user.type)}">${escapeHtml(user.type || 'User')}</span>
+            </td>
+            <td>${user.site_count || 0}</td>
+            <td>${formatDate(user.created_at)}</td>
+            <td>${formatDate(user.last_active)}</td>
+            <td>
+                <button class="admin-btn admin-btn--secondary admin-btn--sm" onclick="viewUser('${user.id || user.ppid}')">
+                    View
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterUsers() {
+    const search = document.getElementById('user-search').value.toLowerCase();
+    const filtered = allUsers.filter(u => 
+        (u.display_name || '').toLowerCase().includes(search) ||
+        (u.email || '').toLowerCase().includes(search) ||
+        (u.ppid || '').toLowerCase().includes(search)
+    );
+    renderUsers(filtered);
+}
+
+function getUserTypeBadge(type) {
+    const badges = {
+        'admin': 'badge--danger',
+        'developer': 'badge--info',
+        'user': 'badge--neutral'
+    };
+    return badges[type] || 'badge--neutral';
+}
+
+function viewUser(id) {
+    alert('User details view coming soon. ID: ' + id);
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString();
+    } catch {
+        return '-';
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,219 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'sites' %}
+
+{% block title %}Sites - Lemma Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">Registered Sites</h1>
+    <p class="admin-subtitle">All sites integrated with Lemma</p>
+</div>
+
+<!-- Stats -->
+<div class="admin-stats">
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">Total Sites</div>
+        <div class="stat-value" id="stat-total">-</div>
+    </div>
+    <div class="stat-card stat-card--success">
+        <div class="stat-label">Active</div>
+        <div class="stat-value" id="stat-active">-</div>
+    </div>
+    <div class="stat-card stat-card--warning">
+        <div class="stat-label">Development</div>
+        <div class="stat-value" id="stat-dev">-</div>
+    </div>
+    <div class="stat-card stat-card--danger">
+        <div class="stat-label">Production</div>
+        <div class="stat-value" id="stat-prod">-</div>
+    </div>
+</div>
+
+<!-- Sites Table -->
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">All Sites</h2>
+        <div style="display: flex; gap: 12px;">
+            <input type="text" id="site-search" placeholder="Search sites..." 
+                   style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem;">
+            <button class="admin-btn admin-btn--secondary admin-btn--sm" id="refresh-sites-btn">
+                Refresh
+            </button>
+        </div>
+    </div>
+    <div class="admin-card-body" style="padding: 0;">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Site</th>
+                    <th>Owner</th>
+                    <th>Status</th>
+                    <th>Verifications</th>
+                    <th>Users</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="sites-table-body">
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 40px;">
+                        Loading sites...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', () => {
+    loadSites();
+    loadSiteStats();
+    
+    document.getElementById('refresh-sites-btn').addEventListener('click', loadSites);
+    document.getElementById('site-search').addEventListener('input', debounce(filterSites, 300));
+});
+
+let allSites = [];
+
+async function loadSiteStats() {
+    try {
+        const response = await fetch('/api/admin/site-stats');
+        if (!response.ok) throw new Error('Failed');
+        const data = await response.json();
+        
+        document.getElementById('stat-total').textContent = data.total || '0';
+        document.getElementById('stat-active').textContent = data.active || '0';
+        document.getElementById('stat-dev').textContent = data.development || '0';
+        document.getElementById('stat-prod').textContent = data.production || '0';
+    } catch (e) {
+        document.getElementById('stat-total').textContent = '0';
+        document.getElementById('stat-active').textContent = '0';
+        document.getElementById('stat-dev').textContent = '0';
+        document.getElementById('stat-prod').textContent = '0';
+    }
+}
+
+async function loadSites() {
+    const tbody = document.getElementById('sites-table-body');
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">Loading sites...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/admin/sites');
+        if (!response.ok) throw new Error('Failed to load sites');
+        const data = await response.json();
+        
+        allSites = data.sites || [];
+        renderSites(allSites);
+    } catch (e) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 40px;">
+                    <div class="admin-empty">
+                        <div class="admin-empty-icon">🌐</div>
+                        <div class="admin-empty-title">No sites registered</div>
+                        <p>Sites will appear here as developers integrate Lemma</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function renderSites(sites) {
+    const tbody = document.getElementById('sites-table-body');
+    
+    if (sites.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 40px;">
+                    <div class="admin-empty">
+                        <div class="admin-empty-icon">🌐</div>
+                        <div class="admin-empty-title">No sites found</div>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = sites.map(site => `
+        <tr>
+            <td>
+                <div>
+                    <div style="font-weight: 500;">${escapeHtml(site.name || site.site_id)}</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">${escapeHtml(site.domain || site.site_id)}</div>
+                </div>
+            </td>
+            <td>${escapeHtml(site.owner_email || site.owner_ppid?.substring(0, 12) + '...' || '-')}</td>
+            <td>
+                <span class="badge ${getStatusBadge(site.status)}">${escapeHtml(site.status || 'Active')}</span>
+            </td>
+            <td>${formatNumber(site.verification_count || 0)}</td>
+            <td>${formatNumber(site.user_count || 0)}</td>
+            <td>${formatDate(site.created_at)}</td>
+            <td>
+                <button class="admin-btn admin-btn--secondary admin-btn--sm" onclick="viewSite('${site.site_id}')">
+                    View
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterSites() {
+    const search = document.getElementById('site-search').value.toLowerCase();
+    const filtered = allSites.filter(s => 
+        (s.name || '').toLowerCase().includes(search) ||
+        (s.domain || '').toLowerCase().includes(search) ||
+        (s.site_id || '').toLowerCase().includes(search)
+    );
+    renderSites(filtered);
+}
+
+function getStatusBadge(status) {
+    const badges = {
+        'active': 'badge--success',
+        'inactive': 'badge--neutral',
+        'suspended': 'badge--danger',
+        'pending': 'badge--warning'
+    };
+    return badges[status?.toLowerCase()] || 'badge--success';
+}
+
+function viewSite(siteId) {
+    window.location.href = '/developer/sites/' + siteId;
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString();
+    } catch {
+        return '-';
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+</script>
+{% endblock %}

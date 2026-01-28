@@ -880,26 +880,68 @@ def create_app():
         except FileNotFoundError:
             return "Documentation not found", 404
 
+    # ==================== ADMIN PLATFORM ====================
     @app.route('/admin')
-    def admin_monitoring():
-        """Admin Platform Monitoring - Bloom filter collision tracking, system health"""
-        logger.info("🔧 Serving admin monitoring dashboard")
+    def admin_dashboard():
+        """Admin Dashboard - Platform overview"""
+        logger.info("🛡️ Serving admin dashboard")
+        return render_template('admin/dashboard.html')
+    
+    @app.route('/admin/monitoring')
+    def admin_monitoring_page():
+        """Admin Monitoring - Bloom filter, system health"""
+        logger.info("🔧 Serving admin monitoring")
         return render_template('admin/platform_monitoring.html')
     
-    @app.route('/admin/legacy')
-    def admin_dashboard_legacy():
-        """Legacy admin dashboard (redirected to /admin)"""
-        return redirect('/admin')
+    @app.route('/admin/health')
+    def admin_health_page():
+        """Admin Health - System health details"""
+        logger.info("💚 Serving admin health")
+        return render_template('admin/health.html')
     
-    @app.route('/admin/iam')
-    def admin_iam_redirect():
-        """Redirect legacy /admin/iam to /admin"""
-        return redirect('/admin')
+    @app.route('/admin/users')
+    def admin_users():
+        """Admin Users - User management"""
+        logger.info("👥 Serving admin users")
+        return render_template('admin/users.html')
+    
+    @app.route('/admin/sites')
+    def admin_sites():
+        """Admin Sites - All registered sites"""
+        logger.info("🌐 Serving admin sites")
+        return render_template('admin/sites.html')
+    
+    @app.route('/admin/credentials')
+    def admin_credentials():
+        """Admin Credentials - Credential management"""
+        logger.info("🎫 Serving admin credentials")
+        return render_template('admin/credentials.html')
+    
+    @app.route('/admin/revocations')
+    def admin_revocations():
+        """Admin Revocations - Revocation management"""
+        logger.info("🚫 Serving admin revocations")
+        return render_template('admin/revocations.html')
+    
+    @app.route('/admin/audit')
+    def admin_audit():
+        """Admin Audit - Audit log"""
+        logger.info("📜 Serving admin audit")
+        return render_template('admin/audit.html')
 
     @app.route('/admin/bootstrap')
     def admin_bootstrap():
         """Admin credential bootstrap page"""
         return render_template('modern/admin_bootstrap.html')
+    
+    # Legacy redirects
+    @app.route('/admin/legacy')
+    def admin_dashboard_legacy():
+        return redirect('/admin')
+    
+    @app.route('/admin/iam')
+    def admin_iam_redirect():
+        return redirect('/admin')
 
     # Health check
     @app.route('/api/health')

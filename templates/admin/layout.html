@@ -1,0 +1,97 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Admin - Lemma{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}?v=1">
+{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+        <div class="sidebar-header">
+            <a href="/admin" class="sidebar-logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+                <span>Lemma Admin</span>
+            </a>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Platform</div>
+                <a class="nav-item {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('admin_dashboard') }}">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a class="nav-item {% if active_page == 'monitoring' %}active{% endif %}" href="{{ url_for('admin_monitoring_page') }}">
+                    <span class="nav-icon">🔧</span>
+                    <span>Monitoring</span>
+                </a>
+                <a class="nav-item {% if active_page == 'health' %}active{% endif %}" href="{{ url_for('admin_health_page') }}">
+                    <span class="nav-icon">💚</span>
+                    <span>System Health</span>
+                </a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-section-title">Management</div>
+                <a class="nav-item {% if active_page == 'users' %}active{% endif %}" href="{{ url_for('admin_users') }}">
+                    <span class="nav-icon">👥</span>
+                    <span>Users</span>
+                </a>
+                <a class="nav-item {% if active_page == 'sites' %}active{% endif %}" href="{{ url_for('admin_sites') }}">
+                    <span class="nav-icon">🌐</span>
+                    <span>Sites</span>
+                </a>
+                <a class="nav-item {% if active_page == 'credentials' %}active{% endif %}" href="{{ url_for('admin_credentials') }}">
+                    <span class="nav-icon">🎫</span>
+                    <span>Credentials</span>
+                </a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-section-title">Security</div>
+                <a class="nav-item {% if active_page == 'revocations' %}active{% endif %}" href="{{ url_for('admin_revocations') }}">
+                    <span class="nav-icon">🚫</span>
+                    <span>Revocations</span>
+                </a>
+                <a class="nav-item {% if active_page == 'audit' %}active{% endif %}" href="{{ url_for('admin_audit') }}">
+                    <span class="nav-icon">📜</span>
+                    <span>Audit Log</span>
+                </a>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-section-title">Tools</div>
+                <a class="nav-item {% if active_page == 'bootstrap' %}active{% endif %}" href="{{ url_for('admin_bootstrap') }}">
+                    <span class="nav-icon">🔐</span>
+                    <span>Bootstrap</span>
+                </a>
+                <a class="nav-item" href="{{ url_for('developer_overview') }}">
+                    <span class="nav-icon">💻</span>
+                    <span>Developer View</span>
+                </a>
+            </div>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="admin-badge">
+                <span class="badge-icon">🛡️</span>
+                <div class="badge-info">
+                    <span class="badge-label">Admin Access</span>
+                    <span class="badge-role">Super Admin</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+    
+    <!-- Main Content -->
+    <main class="admin-main">
+        {% block admin_content %}{% endblock %}
+    </main>
+</div>
+{% endblock %}

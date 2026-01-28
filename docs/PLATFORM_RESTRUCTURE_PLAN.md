@@ -264,13 +264,14 @@ These files can be removed or deprecated once the restructure is complete:
 
 ## Next Steps
 
-1. **Wallet Enhancement (Day 2):**
-   - Review `wallet_simple.html` for cleanup opportunities
-   - Extract inline styles to `static/css/wallet.css`
-   - Improve visual organization (sections, collapsibles)
-   - Keep as single-page control center
+1. **Admin Dashboard (Day 3):**
+   - Create `templates/admin/layout.html` with admin sidebar
+   - Create admin dashboard page (platform stats, health)
+   - Create users management page
+   - Create sites overview page
+   - Ensure admin routes require admin lemma
 
 2. **Priority Order:**
-   - Wallet polish (users interact with this most)
-   - Admin pages (internal tooling)
+   - Admin pages (internal tooling needed)
    - Marketing polish (lower priority)
+   - Final routes cleanup and testing

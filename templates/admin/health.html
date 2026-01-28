@@ -1,0 +1,181 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'health' %}
+
+{% block title %}System Health - Lemma Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">System Health</h1>
+    <p class="admin-subtitle">Real-time platform health monitoring</p>
+</div>
+
+<!-- Health Overview -->
+<div class="admin-stats">
+    <div class="stat-card" id="overall-health-card">
+        <div class="stat-label">Overall Status</div>
+        <div class="stat-value" id="overall-status">Checking...</div>
+        <div class="stat-change" id="overall-uptime">-</div>
+    </div>
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">Response Time</div>
+        <div class="stat-value" id="response-time">-</div>
+        <div class="stat-change">Average latency</div>
+    </div>
+    <div class="stat-card stat-card--success">
+        <div class="stat-label">Requests/min</div>
+        <div class="stat-value" id="requests-min">-</div>
+        <div class="stat-change">Current load</div>
+    </div>
+    <div class="stat-card stat-card--warning">
+        <div class="stat-label">Memory Usage</div>
+        <div class="stat-value" id="memory-usage">-</div>
+        <div class="stat-change">Allocated</div>
+    </div>
+</div>
+
+<div class="admin-grid">
+    <!-- Services Status -->
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Services Status</h2>
+            <button class="admin-btn admin-btn--secondary admin-btn--sm" id="refresh-health-btn">Refresh</button>
+        </div>
+        <div class="admin-card-body">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Service</th>
+                        <th>Status</th>
+                        <th>Latency</th>
+                    </tr>
+                </thead>
+                <tbody id="services-table">
+                    <tr><td colspan="3" style="text-align: center;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Dependencies -->
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">External Dependencies</h2>
+        </div>
+        <div class="admin-card-body">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Dependency</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="deps-table">
+                    <tr><td colspan="2" style="text-align: center;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', () => {
+    loadHealthStatus();
+    document.getElementById('refresh-health-btn').addEventListener('click', loadHealthStatus);
+    
+    // Auto-refresh every 30 seconds
+    setInterval(loadHealthStatus, 30000);
+});
+
+async function loadHealthStatus() {
+    try {
+        const response = await fetch('/api/health/detailed');
+        const data = await response.json();
+        
+        // Overall status
+        const overallCard = document.getElementById('overall-health-card');
+        const overallStatus = document.getElementById('overall-status');
+        
+        if (data.status === 'healthy' || data.healthy) {
+            overallCard.className = 'stat-card stat-card--success';
+            overallStatus.textContent = '✓ Healthy';
+        } else if (data.status === 'degraded') {
+            overallCard.className = 'stat-card stat-card--warning';
+            overallStatus.textContent = '⚠ Degraded';
+        } else {
+            overallCard.className = 'stat-card stat-card--danger';
+            overallStatus.textContent = '✗ Unhealthy';
+        }
+        
+        document.getElementById('overall-uptime').textContent = data.uptime || 'Since last deploy';
+        document.getElementById('response-time').textContent = (data.avg_response_ms || 0.5) + 'ms';
+        document.getElementById('requests-min').textContent = data.requests_per_min || '-';
+        document.getElementById('memory-usage').textContent = data.memory_mb ? data.memory_mb + 'MB' : '-';
+        
+        // Services table
+        const servicesTable = document.getElementById('services-table');
+        const services = [
+            { name: 'API Server', status: 'ok', latency: '<1ms' },
+            { name: 'Database', status: data.database || 'unknown', latency: data.db_latency || '-' },
+            { name: 'Redis Cache', status: data.redis || 'disabled', latency: data.redis_latency || '-' },
+            { name: 'Crypto Engine', status: data.crypto_engine || 'ok', latency: data.crypto_latency || '<1ms' },
+            { name: 'Bloom Filter', status: data.bloom_filter || 'ok', latency: '-' },
+        ];
+        
+        servicesTable.innerHTML = services.map(s => `
+            <tr>
+                <td>
+                    <div class="health-indicator">
+                        <span class="health-dot ${getHealthDotClass(s.status)}"></span>
+                        <span>${s.name}</span>
+                    </div>
+                </td>
+                <td><span class="badge ${getHealthBadgeClass(s.status)}">${getStatusText(s.status)}</span></td>
+                <td>${s.latency}</td>
+            </tr>
+        `).join('');
+        
+        // Dependencies table
+        const depsTable = document.getElementById('deps-table');
+        const deps = [
+            { name: 'PostgreSQL', status: data.database || 'unknown' },
+            { name: 'Redis', status: data.redis || 'disabled' },
+            { name: 'Stripe', status: data.stripe || 'ok' },
+            { name: 'Sentry', status: data.sentry || 'disabled' },
+        ];
+        
+        depsTable.innerHTML = deps.map(d => `
+            <tr>
+                <td>${d.name}</td>
+                <td><span class="badge ${getHealthBadgeClass(d.status)}">${getStatusText(d.status)}</span></td>
+            </tr>
+        `).join('');
+        
+    } catch (e) {
+        console.error('Health check failed:', e);
+        document.getElementById('overall-status').textContent = '? Unknown';
+    }
+}
+
+function getHealthDotClass(status) {
+    if (status === 'ok' || status === 'healthy' || status === true) return 'health-dot--ok';
+    if (status === 'warning' || status === 'degraded') return 'health-dot--warning';
+    if (status === 'disabled' || status === 'unavailable') return 'health-dot--warning';
+    return 'health-dot--error';
+}
+
+function getHealthBadgeClass(status) {
+    if (status === 'ok' || status === 'healthy' || status === true) return 'badge--success';
+    if (status === 'warning' || status === 'degraded') return 'badge--warning';
+    if (status === 'disabled' || status === 'unavailable') return 'badge--neutral';
+    return 'badge--danger';
+}
+
+function getStatusText(status) {
+    if (status === 'ok' || status === 'healthy' || status === true) return 'Operational';
+    if (status === 'warning' || status === 'degraded') return 'Degraded';
+    if (status === 'disabled' || status === 'unavailable') return 'Disabled';
+    if (status === 'unknown') return 'Unknown';
+    return 'Error';
+}
+</script>
+{% endblock %}

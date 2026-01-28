@@ -1,0 +1,274 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'dashboard' %}
+
+{% block title %}Admin Dashboard - Lemma{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">Platform Dashboard</h1>
+    <p class="admin-subtitle">Overview of Lemma platform health and activity</p>
+</div>
+
+<!-- Stats Grid -->
+<div class="admin-stats">
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value" id="stat-users">-</div>
+        <div class="stat-change stat-change--up">↑ Active wallets</div>
+    </div>
+    <div class="stat-card stat-card--success">
+        <div class="stat-label">Registered Sites</div>
+        <div class="stat-value" id="stat-sites">-</div>
+        <div class="stat-change">Integrations</div>
+    </div>
+    <div class="stat-card stat-card--warning">
+        <div class="stat-label">Active Credentials</div>
+        <div class="stat-value" id="stat-credentials">-</div>
+        <div class="stat-change">Issued total</div>
+    </div>
+    <div class="stat-card stat-card--danger">
+        <div class="stat-label">Revocations</div>
+        <div class="stat-value" id="stat-revocations">-</div>
+        <div class="stat-change">This month</div>
+    </div>
+</div>
+
+<div class="admin-grid">
+    <!-- System Health -->
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">System Health</h2>
+            <button class="admin-btn admin-btn--secondary admin-btn--sm" id="refresh-health-btn">Refresh</button>
+        </div>
+        <div class="admin-card-body">
+            <table class="admin-table">
+                <tbody id="health-table">
+                    <tr>
+                        <td>
+                            <div class="health-indicator">
+                                <span class="health-dot health-dot--ok"></span>
+                                <span>API Server</span>
+                            </div>
+                        </td>
+                        <td><span class="badge badge--success">Operational</span></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="health-indicator">
+                                <span class="health-dot" id="db-health-dot"></span>
+                                <span>Database</span>
+                            </div>
+                        </td>
+                        <td><span class="badge" id="db-health-badge">Checking...</span></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="health-indicator">
+                                <span class="health-dot" id="redis-health-dot"></span>
+                                <span>Redis Cache</span>
+                            </div>
+                        </td>
+                        <td><span class="badge" id="redis-health-badge">Checking...</span></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="health-indicator">
+                                <span class="health-dot" id="crypto-health-dot"></span>
+                                <span>Crypto Engine</span>
+                            </div>
+                        </td>
+                        <td><span class="badge" id="crypto-health-badge">Checking...</span></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="health-indicator">
+                                <span class="health-dot" id="bloom-health-dot"></span>
+                                <span>Bloom Filter</span>
+                            </div>
+                        </td>
+                        <td><span class="badge" id="bloom-health-badge">Checking...</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Recent Activity -->
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Recent Activity</h2>
+            <a href="{{ url_for('admin_audit') }}" class="admin-btn admin-btn--secondary admin-btn--sm">View All</a>
+        </div>
+        <div class="admin-card-body">
+            <ul class="activity-list" id="activity-list">
+                <li class="activity-item">
+                    <div class="activity-icon">📊</div>
+                    <div class="activity-content">
+                        <div class="activity-title">Loading activity...</div>
+                        <div class="activity-meta">Please wait</div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Quick Actions</h2>
+    </div>
+    <div class="admin-card-body" style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <a href="{{ url_for('admin_monitoring_page') }}" class="admin-btn admin-btn--secondary">
+            🔧 View Monitoring
+        </a>
+        <a href="{{ url_for('admin_users') }}" class="admin-btn admin-btn--secondary">
+            👥 Manage Users
+        </a>
+        <a href="{{ url_for('admin_sites') }}" class="admin-btn admin-btn--secondary">
+            🌐 View Sites
+        </a>
+        <a href="{{ url_for('admin_revocations') }}" class="admin-btn admin-btn--secondary">
+            🚫 Revocations
+        </a>
+        <a href="{{ url_for('admin_bootstrap') }}" class="admin-btn admin-btn--primary">
+            🔐 Admin Bootstrap
+        </a>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', () => {
+    loadDashboardStats();
+    loadHealthStatus();
+    loadRecentActivity();
+    
+    document.getElementById('refresh-health-btn').addEventListener('click', loadHealthStatus);
+});
+
+async function loadDashboardStats() {
+    try {
+        const response = await fetch('/api/admin/platform-stats');
+        if (!response.ok) throw new Error('Failed to load stats');
+        const data = await response.json();
+        
+        document.getElementById('stat-users').textContent = data.total_users || '0';
+        document.getElementById('stat-sites').textContent = data.total_sites || '0';
+        document.getElementById('stat-credentials').textContent = data.total_credentials || '0';
+        document.getElementById('stat-revocations').textContent = data.total_revocations || '0';
+    } catch (e) {
+        console.warn('Could not load stats:', e);
+        document.getElementById('stat-users').textContent = '-';
+        document.getElementById('stat-sites').textContent = '-';
+        document.getElementById('stat-credentials').textContent = '-';
+        document.getElementById('stat-revocations').textContent = '-';
+    }
+}
+
+async function loadHealthStatus() {
+    try {
+        const response = await fetch('/api/health/detailed');
+        const data = await response.json();
+        
+        updateHealthIndicator('db', data.database || 'unknown');
+        updateHealthIndicator('redis', data.redis || 'unknown');
+        updateHealthIndicator('crypto', data.crypto_engine || 'unknown');
+        updateHealthIndicator('bloom', data.bloom_filter || 'unknown');
+    } catch (e) {
+        console.warn('Could not load health:', e);
+        ['db', 'redis', 'crypto', 'bloom'].forEach(id => {
+            updateHealthIndicator(id, 'error');
+        });
+    }
+}
+
+function updateHealthIndicator(id, status) {
+    const dot = document.getElementById(`${id}-health-dot`);
+    const badge = document.getElementById(`${id}-health-badge`);
+    
+    if (!dot || !badge) return;
+    
+    // Reset classes
+    dot.className = 'health-dot';
+    badge.className = 'badge';
+    
+    if (status === 'ok' || status === 'healthy' || status === true) {
+        dot.classList.add('health-dot--ok');
+        badge.classList.add('badge--success');
+        badge.textContent = 'Operational';
+    } else if (status === 'warning' || status === 'degraded') {
+        dot.classList.add('health-dot--warning');
+        badge.classList.add('badge--warning');
+        badge.textContent = 'Degraded';
+    } else if (status === 'disabled' || status === 'unavailable') {
+        dot.classList.add('health-dot--warning');
+        badge.classList.add('badge--neutral');
+        badge.textContent = 'Disabled';
+    } else {
+        dot.classList.add('health-dot--error');
+        badge.classList.add('badge--danger');
+        badge.textContent = 'Error';
+    }
+}
+
+async function loadRecentActivity() {
+    const list = document.getElementById('activity-list');
+    
+    try {
+        const response = await fetch('/api/admin/recent-activity');
+        if (!response.ok) throw new Error('Failed to load activity');
+        const data = await response.json();
+        
+        if (data.activities && data.activities.length > 0) {
+            list.innerHTML = data.activities.slice(0, 5).map(activity => `
+                <li class="activity-item">
+                    <div class="activity-icon">${getActivityIcon(activity.type)}</div>
+                    <div class="activity-content">
+                        <div class="activity-title">${escapeHtml(activity.title)}</div>
+                        <div class="activity-meta">${escapeHtml(activity.meta)}</div>
+                    </div>
+                </li>
+            `).join('');
+        } else {
+            list.innerHTML = `
+                <li class="activity-item">
+                    <div class="activity-icon">📭</div>
+                    <div class="activity-content">
+                        <div class="activity-title">No recent activity</div>
+                        <div class="activity-meta">Activity will appear here</div>
+                    </div>
+                </li>
+            `;
+        }
+    } catch (e) {
+        list.innerHTML = `
+            <li class="activity-item">
+                <div class="activity-icon">📭</div>
+                <div class="activity-content">
+                    <div class="activity-title">No recent activity</div>
+                    <div class="activity-meta">Activity will appear here</div>
+                </div>
+            </li>
+        `;
+    }
+}
+
+function getActivityIcon(type) {
+    const icons = {
+        'user_created': '👤',
+        'site_registered': '🌐',
+        'credential_issued': '🎫',
+        'credential_revoked': '🚫',
+        'admin_action': '🛡️',
+        'error': '⚠️'
+    };
+    return icons[type] || '📋';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}
