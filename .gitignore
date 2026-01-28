@@ -49,4 +49,7 @@ node_modules/
 # Coverage reports
 htmlcov/
 .coverage
-.coverage.* 
+.coverage.*
+
+# Agent token (contains secrets - never commit)
+.lemma-agent-token
