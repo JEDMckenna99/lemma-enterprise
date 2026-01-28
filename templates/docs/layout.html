@@ -28,10 +28,20 @@
     </div>
 </div>
 
+<!-- Mobile sidebar overlay -->
+<div class="docs-sidebar-overlay" id="docs-sidebar-overlay"></div>
+
+<!-- Mobile nav toggle (fixed position) -->
+<button class="docs-mobile-nav-toggle" id="docs-nav-toggle" aria-label="Toggle documentation menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/>
+    </svg>
+</button>
+
 <div class="docs-container">
     <div class="docs-layout">
         <!-- Sidebar Navigation -->
-        <aside class="docs-sidebar">
+        <aside class="docs-sidebar" id="docs-sidebar">
             <nav class="docs-nav">
                 <div class="nav-section">
                     <div class="nav-title">Getting Started</div>
@@ -78,8 +88,29 @@
 </div>
 
 <script nonce="{{ csp_nonce }}">
-// Smooth scroll for anchor links
 document.addEventListener('DOMContentLoaded', () => {
+    // Mobile docs navigation toggle
+    const navToggle = document.getElementById('docs-nav-toggle');
+    const sidebar = document.getElementById('docs-sidebar');
+    
+    if (navToggle && sidebar) {
+        navToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('mobile-open');
+            navToggle.classList.toggle('active');
+        });
+        
+        // Close sidebar when clicking a link (on mobile)
+        sidebar.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 900) {
+                    sidebar.classList.remove('mobile-open');
+                    navToggle.classList.remove('active');
+                }
+            });
+        });
+    }
+    
+    // Smooth scroll for anchor links
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function (e) {
             e.preventDefault();

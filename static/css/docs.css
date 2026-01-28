@@ -403,25 +403,101 @@
     }
 }
 
-/* Mobile Nav Toggle (for future enhancement) */
+/* Mobile Docs Navigation */
 .docs-mobile-nav-toggle {
     display: none;
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: linear-gradient(135deg, var(--primary), #764ba2);
+    color: white;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+    z-index: 200;
+    cursor: pointer;
+    border: none;
+    font-size: 1.5rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.docs-mobile-nav-toggle:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 24px rgba(102, 126, 234, 0.5);
+}
+
+.docs-mobile-nav-toggle:active {
+    transform: scale(0.98);
+}
+
+/* Mobile sidebar overlay */
+.docs-sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 150;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.docs-sidebar-overlay.active {
+    opacity: 1;
 }
 
 @media (max-width: 900px) {
     .docs-mobile-nav-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .docs-sidebar-overlay {
         display: block;
+        pointer-events: none;
+    }
+    
+    .docs-sidebar-overlay.active {
+        pointer-events: auto;
+    }
+    
+    .docs-sidebar {
         position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: var(--primary);
-        color: white;
-        padding: 12px 20px;
-        border-radius: 50px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        z-index: 100;
-        cursor: pointer;
-        border: none;
-        font-weight: 600;
+        top: 0;
+        left: 0;
+        width: 280px;
+        height: 100vh;
+        background: white;
+        z-index: 160;
+        padding: 24px;
+        overflow-y: auto;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+        display: block !important;
+    }
+    
+    .docs-sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    .docs-sidebar .docs-nav {
+        padding-right: 0;
+    }
+    
+    /* Mobile sidebar header */
+    .docs-sidebar::before {
+        content: 'Documentation';
+        display: block;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--gray-900);
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid var(--gray-200);
     }
 }

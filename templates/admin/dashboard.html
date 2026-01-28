@@ -170,10 +170,13 @@ async function loadHealthStatus() {
         const response = await fetch('/api/health/detailed');
         const data = await response.json();
         
-        updateHealthIndicator('db', data.database || 'unknown');
-        updateHealthIndicator('redis', data.redis || 'unknown');
-        updateHealthIndicator('crypto', data.crypto_engine || 'unknown');
-        updateHealthIndicator('bloom', data.bloom_filter || 'unknown');
+        // Handle both nested and flat response formats
+        const components = data.components || data;
+        
+        updateHealthIndicator('db', components.database?.status || data.database || 'unknown');
+        updateHealthIndicator('redis', components.redis_cache?.status || data.redis || 'unknown');
+        updateHealthIndicator('crypto', components.crypto_engine?.status || data.crypto_engine || 'unknown');
+        updateHealthIndicator('bloom', components.bloom_filter?.status || data.bloom_filter || 'unknown');
     } catch (e) {
         console.warn('Could not load health:', e);
         ['db', 'redis', 'crypto', 'bloom'].forEach(id => {
@@ -192,11 +195,11 @@ function updateHealthIndicator(id, status) {
     dot.className = 'health-dot';
     badge.className = 'badge';
     
-    if (status === 'ok' || status === 'healthy' || status === true) {
+    if (status === 'ok' || status === 'healthy' || status === 'operational' || status === true) {
         dot.classList.add('health-dot--ok');
         badge.classList.add('badge--success');
         badge.textContent = 'Operational';
-    } else if (status === 'warning' || status === 'degraded') {
+    } else if (status === 'warning' || status === 'degraded' || status === 'not_configured') {
         dot.classList.add('health-dot--warning');
         badge.classList.add('badge--warning');
         badge.textContent = 'Degraded';
@@ -264,6 +267,14 @@ function getActivityIcon(type) {
     };
     return icons[type] || '📋';
 }
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}
 
 function escapeHtml(text) {
     const div = document.createElement('div');

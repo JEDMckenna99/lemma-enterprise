@@ -1060,6 +1060,100 @@ def create_app():
                 'message': str(e)
             }), 503
 
+    @app.route('/api/health/detailed')
+    def health_detailed():
+        """Detailed system health for admin dashboard"""
+        try:
+            import psutil
+            
+            # Check database
+            db_status = 'operational'
+            try:
+                database_url = os.environ.get('DATABASE_URL')
+                if database_url:
+                    import psycopg2
+                    conn = psycopg2.connect(database_url, connect_timeout=3)
+                    conn.close()
+                else:
+                    db_status = 'not_configured'
+            except Exception as e:
+                db_status = 'error'
+                logger.warning(f"Database health check failed: {e}")
+            
+            # Check Redis
+            redis_status = 'operational'
+            try:
+                redis_url = os.environ.get('REDIS_URL')
+                if redis_url:
+                    import redis
+                    r = redis.from_url(redis_url, socket_timeout=3)
+                    r.ping()
+                else:
+                    redis_status = 'not_configured'
+            except Exception as e:
+                redis_status = 'error'
+                logger.warning(f"Redis health check failed: {e}")
+            
+            # Check crypto engine
+            crypto_status = 'operational'
+            try:
+                from api.real_iam_manager import RealIAMSubnetManager
+                manager = RealIAMSubnetManager('health_check')
+                crypto_status = 'operational'
+            except Exception as e:
+                crypto_status = 'error'
+                logger.warning(f"Crypto engine check failed: {e}")
+            
+            # Check bloom filter
+            bloom_status = 'operational'
+            try:
+                from api.revocation_api import bloom_filter
+                if bloom_filter is None:
+                    bloom_status = 'not_initialized'
+            except Exception as e:
+                bloom_status = 'error'
+            
+            # System metrics
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            memory = psutil.virtual_memory()
+            
+            components = {
+                'api_server': {'status': 'operational', 'message': 'Flask server running'},
+                'database': {'status': db_status, 'message': 'PostgreSQL connection'},
+                'redis_cache': {'status': redis_status, 'message': 'Redis connection'},
+                'crypto_engine': {'status': crypto_status, 'message': 'Ed25519 signing'},
+                'bloom_filter': {'status': bloom_status, 'message': 'Revocation filter'}
+            }
+            
+            # Overall status
+            statuses = [c['status'] for c in components.values()]
+            if all(s == 'operational' for s in statuses):
+                overall = 'healthy'
+            elif any(s == 'error' for s in statuses):
+                overall = 'degraded'
+            else:
+                overall = 'healthy'
+            
+            return jsonify({
+                'success': True,
+                'status': overall,
+                'components': components,
+                'system': {
+                    'cpu_percent': cpu_percent,
+                    'memory_percent': memory.percent,
+                    'memory_available_mb': memory.available // (1024 * 1024)
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            })
+            
+        except Exception as e:
+            logger.error(f"Detailed health check error: {e}")
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'error': str(e)
+            }), 500
+
     # CORS handling
     @app.before_request
     def handle_cors_preflight():

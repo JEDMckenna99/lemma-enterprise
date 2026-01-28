@@ -367,3 +367,456 @@ def issue_admin_lemma_endpoint():
             'success': False,
             'error': 'Admin lemma issuance failed'
         }), 500
+
+
+# ================================================================================
+# ADMIN USER MANAGEMENT ENDPOINTS
+# ================================================================================
+
+@dashboard_bp.route('/api/admin/users', methods=['GET'])
+@cross_origin()
+@require_site_admin
+def get_admin_users():
+    """Get all platform users (admin only)"""
+    try:
+        database_url = os.environ.get('DATABASE_URL')
+        users = []
+        
+        if database_url:
+            import psycopg2
+            conn = psycopg2.connect(database_url)
+            cur = conn.cursor()
+            
+            # Get users from registered_sites (site owners)
+            cur.execute("""
+                SELECT DISTINCT admin_email, site_domain, created_at, status
+                FROM registered_sites 
+                WHERE admin_email IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 100
+            """)
+            
+            for row in cur.fetchall():
+                users.append({
+                    'email': row[0],
+                    'site': row[1],
+                    'created_at': row[2].isoformat() if row[2] else None,
+                    'status': row[3] or 'active',
+                    'type': 'developer'
+                })
+            
+            cur.close()
+            conn.close()
+        else:
+            # Demo data when no database
+            users = [
+                {'email': 'dev@example.com', 'site': 'example.com', 'created_at': '2025-01-15T10:00:00Z', 'status': 'active', 'type': 'developer'},
+                {'email': 'admin@startup.io', 'site': 'startup.io', 'created_at': '2025-01-10T14:30:00Z', 'status': 'active', 'type': 'developer'},
+                {'email': 'team@webapp.dev', 'site': 'webapp.dev', 'created_at': '2025-01-05T09:15:00Z', 'status': 'active', 'type': 'developer'},
+            ]
+        
+        return jsonify({
+            'success': True,
+            'users': users,
+            'total': len(users)
+        })
+        
+    except Exception as e:
+        logger.error(f"Get admin users error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@dashboard_bp.route('/api/admin/user-stats', methods=['GET'])
+@cross_origin()
+@require_site_admin
+def get_admin_user_stats():
+    """Get user statistics (admin only)"""
+    try:
+        database_url = os.environ.get('DATABASE_URL')
+        
+        if database_url:
+            import psycopg2
+            conn = psycopg2.connect(database_url)
+            cur = conn.cursor()
+            
+            # Count total users
+            cur.execute("SELECT COUNT(DISTINCT admin_email) FROM registered_sites WHERE admin_email IS NOT NULL")
+            total_users = cur.fetchone()[0] or 0
+            
+            # Count active sites
+            cur.execute("SELECT COUNT(*) FROM registered_sites WHERE status = 'active' OR status IS NULL")
+            active_sites = cur.fetchone()[0] or 0
+            
+            # Count new users this week
+            cur.execute("""
+                SELECT COUNT(DISTINCT admin_email) FROM registered_sites 
+                WHERE admin_email IS NOT NULL 
+                AND created_at > NOW() - INTERVAL '7 days'
+            """)
+            new_this_week = cur.fetchone()[0] or 0
+            
+            cur.close()
+            conn.close()
+            
+            stats = {
+                'total_users': total_users,
+                'active_sites': active_sites,
+                'new_this_week': new_this_week,
+                'growth_rate': round((new_this_week / max(total_users, 1)) * 100, 1)
+            }
+        else:
+            # Demo stats
+            stats = {
+                'total_users': 156,
+                'active_sites': 89,
+                'new_this_week': 12,
+                'growth_rate': 7.7
+            }
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Get user stats error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@dashboard_bp.route('/api/admin/recent-activity', methods=['GET'])
+@cross_origin()
+@require_site_admin
+def get_admin_recent_activity():
+    """Get recent platform activity (admin only)"""
+    try:
+        database_url = os.environ.get('DATABASE_URL')
+        activities = []
+        
+        if database_url:
+            import psycopg2
+            conn = psycopg2.connect(database_url)
+            cur = conn.cursor()
+            
+            # Get recent site registrations
+            cur.execute("""
+                SELECT admin_email, site_domain, created_at, 'site_registered' as action
+                FROM registered_sites 
+                WHERE created_at IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 10
+            """)
+            
+            for row in cur.fetchall():
+                activities.append({
+                    'user': row[0] or 'Unknown',
+                    'action': 'Registered site',
+                    'target': row[1],
+                    'timestamp': row[2].isoformat() if row[2] else None,
+                    'type': 'site_registered'
+                })
+            
+            cur.close()
+            conn.close()
+        else:
+            # Demo activity
+            from datetime import datetime, timedelta
+            now = datetime.utcnow()
+            activities = [
+                {'user': 'dev@example.com', 'action': 'Registered site', 'target': 'example.com', 'timestamp': (now - timedelta(hours=2)).isoformat(), 'type': 'site_registered'},
+                {'user': 'admin@startup.io', 'action': 'Generated API key', 'target': 'startup.io', 'timestamp': (now - timedelta(hours=5)).isoformat(), 'type': 'api_key'},
+                {'user': 'team@webapp.dev', 'action': 'Updated settings', 'target': 'webapp.dev', 'timestamp': (now - timedelta(hours=8)).isoformat(), 'type': 'settings'},
+            ]
+        
+        return jsonify({
+            'success': True,
+            'activities': activities
+        })
+        
+    except Exception as e:
+        logger.error(f"Get recent activity error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@dashboard_bp.route('/api/health/detailed', methods=['GET'])
+@cross_origin()
+def get_detailed_health():
+    """Detailed health check for all platform components"""
+    try:
+        import time
+        health = {
+            'api_server': {'status': 'operational', 'latency_ms': 1},
+            'database': {'status': 'unknown'},
+            'redis': {'status': 'unknown'},
+            'crypto_engine': {'status': 'unknown'},
+            'bloom_filter': {'status': 'unknown'}
+        }
+        
+        # Check database
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url:
+            try:
+                import psycopg2
+                start = time.time()
+                conn = psycopg2.connect(database_url, sslmode='require', connect_timeout=5)
+                cur = conn.cursor()
+                cur.execute('SELECT 1')
+                cur.close()
+                conn.close()
+                health['database'] = {'status': 'operational', 'latency_ms': round((time.time() - start) * 1000, 2)}
+            except Exception as e:
+                health['database'] = {'status': 'error', 'error': str(e)[:50]}
+        else:
+            health['database'] = {'status': 'not_configured'}
+        
+        # Check Redis
+        redis_url = os.environ.get('REDIS_URL')
+        if redis_url:
+            try:
+                import redis
+                start = time.time()
+                r = redis.from_url(redis_url, socket_timeout=5)
+                r.ping()
+                health['redis'] = {'status': 'operational', 'latency_ms': round((time.time() - start) * 1000, 2)}
+            except Exception as e:
+                health['redis'] = {'status': 'error', 'error': str(e)[:50]}
+        else:
+            health['redis'] = {'status': 'not_configured'}
+        
+        # Check crypto engine
+        try:
+            from lemma_crypto import PyMinimalIssuer
+            start = time.time()
+            issuer = PyMinimalIssuer()
+            _ = issuer.get_issuer_did()
+            health['crypto_engine'] = {'status': 'operational', 'latency_ms': round((time.time() - start) * 1000, 2)}
+        except Exception as e:
+            health['crypto_engine'] = {'status': 'error', 'error': str(e)[:50]}
+        
+        # Check bloom filter
+        try:
+            from .revocation_api import bloom_filter_manager
+            health['bloom_filter'] = {'status': 'operational'} if bloom_filter_manager else {'status': 'not_initialized'}
+        except Exception as e:
+            health['bloom_filter'] = {'status': 'error', 'error': str(e)[:50]}
+        
+        # Calculate overall
+        statuses = [h.get('status') for h in health.values()]
+        overall = 'healthy' if all(s == 'operational' for s in statuses) else ('degraded' if any(s == 'error' for s in statuses) else 'partial')
+        
+        return jsonify({'success': True, 'overall': overall, 'components': health, 'timestamp': datetime.utcnow().isoformat()})
+        
+    except Exception as e:
+        logger.error(f'Detailed health check error: {e}')
+        return jsonify({'success': False, 'overall': 'error', 'error': str(e)}), 500
+
+@dashboard_bp.route('/api/health/detailed', methods=['GET'])
+@cross_origin()
+def get_detailed_health():
+    """Get detailed system health status"""
+    try:
+        import psutil
+        from datetime import datetime
+        
+        health = {
+            'status': 'operational',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'services': {}
+        }
+        
+        # API Server - working if we got here
+        health['services']['api'] = {'status': 'operational', 'latency_ms': 1}
+        
+        # Database check
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url:
+            try:
+                import psycopg2
+                start = datetime.utcnow()
+                conn = psycopg2.connect(database_url, connect_timeout=5)
+                cur = conn.cursor()
+                cur.execute('SELECT 1')
+                cur.fetchone()
+                latency = (datetime.utcnow() - start).total_seconds() * 1000
+                cur.close()
+                conn.close()
+                health['services']['database'] = {'status': 'operational', 'latency_ms': round(latency, 2)}
+            except Exception as e:
+                health['services']['database'] = {'status': 'error', 'error': str(e)[:100]}
+                health['status'] = 'degraded'
+        else:
+            health['services']['database'] = {'status': 'not_configured'}
+        
+        # Redis check
+        redis_url = os.environ.get('REDIS_URL')
+        if redis_url:
+            try:
+                import redis
+                r = redis.from_url(redis_url, socket_timeout=5)
+                r.ping()
+                health['services']['redis'] = {'status': 'operational'}
+            except Exception as e:
+                health['services']['redis'] = {'status': 'error', 'error': str(e)[:100]}
+        else:
+            health['services']['redis'] = {'status': 'not_configured'}
+        
+        # Crypto engine
+        try:
+            from lemma_crypto_core import verify_credential
+            health['services']['crypto'] = {'status': 'operational'}
+        except ImportError:
+            health['services']['crypto'] = {'status': 'error', 'error': 'Not available'}
+        
+        # Bloom filter
+        try:
+            from .revocation_api import get_bloom_filter_stats
+            health['services']['bloom_filter'] = {'status': 'operational'}
+        except Exception:
+            health['services']['bloom_filter'] = {'status': 'error'}
+        
+        # System resources
+        try:
+            health['system'] = {
+                'cpu_percent': psutil.cpu_percent(interval=0.1),
+                'memory_percent': psutil.virtual_memory().percent
+            }
+        except Exception:
+            pass
+        
+        return jsonify(health)
+        
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+# ================================================================================
+# HEALTH CHECK ENDPOINTS
+# ================================================================================
+
+@dashboard_bp.route('/api/health/detailed', methods=['GET'])
+@cross_origin()
+def get_detailed_health():
+    '''Get detailed system health status for admin dashboard'''
+    try:
+        services = []
+        
+        # API Server (always healthy if this endpoint responds)
+        services.append({
+            'name': 'API Server',
+            'status': 'healthy',
+            'message': 'Operational'
+        })
+        
+        # Database
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url:
+            try:
+                import psycopg2
+                conn = psycopg2.connect(database_url, connect_timeout=5)
+                conn.close()
+                services.append({
+                    'name': 'Database',
+                    'status': 'healthy',
+                    'message': 'Connected'
+                })
+            except Exception as e:
+                services.append({
+                    'name': 'Database',
+                    'status': 'unhealthy',
+                    'message': str(e)[:50]
+                })
+        else:
+            services.append({
+                'name': 'Database',
+                'status': 'warning',
+                'message': 'Not configured'
+            })
+        
+        # Redis (optional)
+        redis_url = os.environ.get('REDIS_URL')
+        if redis_url:
+            try:
+                import redis
+                r = redis.from_url(redis_url, socket_timeout=5)
+                r.ping()
+                services.append({
+                    'name': 'Redis Cache',
+                    'status': 'healthy',
+                    'message': 'Connected'
+                })
+            except Exception as e:
+                services.append({
+                    'name': 'Redis Cache',
+                    'status': 'unhealthy', 
+                    'message': str(e)[:50]
+                })
+        else:
+            services.append({
+                'name': 'Redis Cache',
+                'status': 'warning',
+                'message': 'Not configured'
+            })
+        
+        # Crypto Engine
+        try:
+            from lemma_crypto import PyMinimalIssuer
+            issuer = PyMinimalIssuer()
+            services.append({
+                'name': 'Crypto Engine',
+                'status': 'healthy',
+                'message': 'Ed25519 ready'
+            })
+        except Exception as e:
+            services.append({
+                'name': 'Crypto Engine',
+                'status': 'unhealthy',
+                'message': str(e)[:50]
+            })
+        
+        # Bloom Filter
+        try:
+            from .revocation_api import bloom_filter
+            if bloom_filter:
+                services.append({
+                    'name': 'Bloom Filter',
+                    'status': 'healthy',
+                    'message': 'Initialized'
+                })
+            else:
+                services.append({
+                    'name': 'Bloom Filter',
+                    'status': 'warning',
+                    'message': 'Not initialized'
+                })
+        except Exception:
+            services.append({
+                'name': 'Bloom Filter',
+                'status': 'warning',
+                'message': 'Module not loaded'
+            })
+        
+        # Overall status
+        unhealthy_count = sum(1 for s in services if s['status'] == 'unhealthy')
+        overall = 'healthy' if unhealthy_count == 0 else 'degraded' if unhealthy_count < 3 else 'unhealthy'
+        
+        return jsonify({
+            'success': True,
+            'status': overall,
+            'services': services,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f'Get detailed health error: {e}')
+        return jsonify({
+            'success': False,
+            'status': 'error',
+            'error': str(e)
+        }), 500
