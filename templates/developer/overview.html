@@ -403,12 +403,48 @@
 </style>
 
 <script nonce="{{ csp_nonce }}">
+// Global auth state
+let currentPpid = null;
+
 document.addEventListener('DOMContentLoaded', async () => {
+    // First, check wallet auth to get PPID
+    currentPpid = await getWalletPpid();
+    
+    // Then load data with auth
     await loadOverviewStats();
     await loadRecentSites();
     updateChecklist();
     await checkAgentTokenStatus();
 });
+
+async function getWalletPpid() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('LemmaWallet not available');
+        return null;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.checkAuth();
+        
+        if (authResult.authenticated && authResult.ppid) {
+            console.log('Wallet authenticated, PPID:', authResult.ppid);
+            return authResult.ppid;
+        }
+    } catch (e) {
+        console.warn('Wallet auth check failed:', e);
+    }
+    
+    return null;
+}
+
+function getAuthHeaders() {
+    const headers = {};
+    if (currentPpid) {
+        headers['X-Lemma-PPID'] = currentPpid;
+    }
+    return headers;
+}
 
 // ============================================
 // AGENT TOKEN MANAGEMENT
@@ -689,7 +725,9 @@ async function revokeAgentToken(tokenId, ppid) {
 
 async function loadOverviewStats() {
     try {
-        const response = await fetch('/api/developer/stats');
+        const response = await fetch('/api/developer/stats', {
+            headers: getAuthHeaders()
+        });
         if (!response.ok) throw new Error('Failed to load stats');
         
         const data = await response.json();
@@ -713,7 +751,9 @@ async function loadRecentSites() {
     const container = document.getElementById('sites-container');
     
     try {
-        const response = await fetch('/api/developer/sites');
+        const response = await fetch('/api/developer/sites', {
+            headers: getAuthHeaders()
+        });
         if (!response.ok) throw new Error('Failed to load sites');
         
         const data = await response.json();
