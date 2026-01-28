@@ -586,6 +586,130 @@ def get_agent_audit_log():
 # QUICK VALIDATION ENDPOINT (For Testing)
 # ============================================
 
+@agent_credentials_bp.route('/api/agent/auto-issue', methods=['GET'])
+def auto_issue_agent_credential():
+    """
+    Auto-issue an agent credential if wallet session is active.
+    
+    This endpoint checks the session cookie - if the user has an active
+    wallet session with admin credentials, it automatically issues a token.
+    
+    This allows AI agents to fetch tokens directly when the human has
+    already authenticated via passkey.
+    
+    GET /api/agent/auto-issue?ttl=4&scope=read,write
+    
+    Returns: JSON with token if session is valid, error if not
+    """
+    try:
+        from flask import session
+        
+        # Check for active wallet session
+        customer_id = session.get('customer_id')
+        passkey_verified = session.get('passkey_verified', False)
+        auth_method = session.get('auth_method')
+        user_email = session.get('user_email')
+        wallet_id = session.get('wallet_id')
+        
+        # Also check for PPID in session or derived from wallet
+        ppid = session.get('ppid')
+        
+        # Debug: log what we found
+        logger.info(f"Auto-issue check: customer_id={customer_id}, passkey_verified={passkey_verified}, auth_method={auth_method}, wallet_id={wallet_id}")
+        
+        # Must have some form of authentication
+        if not customer_id and not wallet_id and not ppid:
+            return jsonify({
+                'success': False,
+                'error': 'No active wallet session',
+                'message': 'Please sign in with your wallet first',
+                'debug': {
+                    'customer_id': customer_id,
+                    'passkey_verified': passkey_verified,
+                    'auth_method': auth_method
+                }
+            }), 401
+        
+        # Build authorized_by identifier
+        if ppid:
+            authorized_by = ppid
+        elif wallet_id:
+            authorized_by = f"wallet:{wallet_id}"
+        else:
+            authorized_by = f"customer:{customer_id}"
+        
+        # Parse parameters
+        ttl_hours = min(int(request.args.get('ttl', 4)), 24)
+        scope_param = request.args.get('scope', 'read,write')
+        scope = [s.strip() for s in scope_param.split(',') if s.strip() in ['read', 'write', 'admin', 'test']]
+        if not scope:
+            scope = ['read', 'write']
+        
+        agent_name = request.args.get('name', 'Auto-issued Agent Token')
+        
+        # Generate token
+        token_id, plaintext_token, token_hash = generate_agent_token()
+        expires_at = datetime.utcnow() + timedelta(hours=ttl_hours)
+        
+        # Store in database
+        try:
+            from api.database import get_db_connection
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO agent_credentials 
+                (token_id, token_hash, authorized_by_ppid, authorized_by_email,
+                 scope, expires_at, agent_name, description)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                token_id,
+                token_hash,
+                authorized_by,
+                user_email,
+                json.dumps(scope),
+                expires_at,
+                agent_name,
+                f'Auto-issued via active session (auth_method: {auth_method})'
+            ))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+        except Exception as db_err:
+            logger.error(f"Failed to store auto-issued credential: {db_err}")
+            return jsonify({
+                'success': False,
+                'error': 'Database error',
+                'message': str(db_err)
+            }), 500
+        
+        logger.info(f"Auto-issued agent credential: {token_id} for {authorized_by}")
+        
+        return jsonify({
+            'success': True,
+            'token': plaintext_token,
+            'token_id': token_id,
+            'scope': scope,
+            'expires_at': expires_at.isoformat() + 'Z',
+            'ttl_hours': ttl_hours,
+            'authorized_by': authorized_by,
+            'message': 'Token auto-issued based on active wallet session'
+        })
+        
+    except Exception as e:
+        logger.error(f"Auto-issue failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @agent_credentials_bp.route('/api/agent/validate', methods=['GET', 'POST'])
 @cross_origin()
 def validate_agent_token_endpoint():
