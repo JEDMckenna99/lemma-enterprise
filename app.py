@@ -828,12 +828,12 @@ def create_app():
     # Dashboard routes
     @app.route('/dashboard')
     def customer_dashboard():
-        """Redirect old dashboard to new platform"""
-        return redirect('/platform')
+        """Redirect old dashboard to developer platform"""
+        return redirect('/developer')
     
     @app.route('/platform')
     def developer_platform_legacy():
-        """Legacy platform route - redirect to new developer dashboard"""
+        """Redirect legacy platform to developer dashboard"""
         return redirect('/developer')
     
     # ================================================================================
