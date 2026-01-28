@@ -75,7 +75,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.35.1';  // Fix lock() to get walletId from IndexedDB, ensure walletId persisted
+    static VERSION = '2.36.0';  // Performance optimizations: cached global session, debounced heartbeat, faster bridge
     
     constructor() {
         this.db = null;
@@ -87,6 +87,18 @@ class LemmaWallet {
         this._initialized = false;
         this._heartbeatInterval = null;
         this._onSessionExpired = null; // Callback for when session is invalidated
+        
+        // Performance: Cache for global session checks (avoid redundant API calls)
+        this._globalSessionCache = {
+            result: null,
+            timestamp: 0,
+            ttlMs: 5000,  // Cache valid for 5 seconds
+            pendingPromise: null  // Deduplicate concurrent requests
+        };
+        
+        // Performance: Debounce heartbeat checks
+        this._lastHeartbeatCheck = 0;
+        this._heartbeatDebounceMs = 2000;  // Min 2s between checks
     }
 
     /**
@@ -368,29 +380,59 @@ class LemmaWallet {
      * Check if this wallet has an active session on any device (cross-device sync).
      * @private
      */
-    async _checkGlobalSession(walletId) {
-        try {
-            console.log('[Lemma] 🔍 Checking global session for wallet:', walletId?.substring(0, 8) + '...');
-            const response = await fetch('https://lemma.id/api/wallet/global-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ wallet_id: walletId })
-            });
-            
-            console.log('[Lemma] 🔍 Global session response status:', response.status);
-            
-            if (!response.ok) {
-                console.log('[Lemma] 🔍 Global session not OK, returning invalid');
-                return { valid: false };
-            }
-            
-            const data = await response.json();
-            console.log('[Lemma] 🔍 Global session result:', JSON.stringify(data));
-            return data;
-        } catch (e) {
-            console.warn('[Lemma] Global session API error:', e.message);
-            return { valid: false };
+    async _checkGlobalSession(walletId, options = {}) {
+        const now = Date.now();
+        const cache = this._globalSessionCache;
+        const forceRefresh = options.force === true;
+        
+        // Return cached result if fresh (unless force refresh)
+        if (!forceRefresh && cache.result && (now - cache.timestamp) < cache.ttlMs) {
+            console.log('[Lemma] 🔍 Using cached global session (age:', now - cache.timestamp, 'ms)');
+            return cache.result;
         }
+        
+        // Deduplicate concurrent requests
+        if (cache.pendingPromise && !forceRefresh) {
+            console.log('[Lemma] 🔍 Waiting for pending global session check...');
+            return cache.pendingPromise;
+        }
+        
+        // Make the actual request
+        cache.pendingPromise = (async () => {
+            try {
+                console.log('[Lemma] 🔍 Checking global session for wallet:', walletId?.substring(0, 8) + '...');
+                const response = await fetch('https://lemma.id/api/wallet/global-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ wallet_id: walletId })
+                });
+                
+                console.log('[Lemma] 🔍 Global session response status:', response.status);
+                
+                if (!response.ok) {
+                    console.log('[Lemma] 🔍 Global session not OK, returning invalid');
+                    const result = { valid: false };
+                    cache.result = result;
+                    cache.timestamp = now;
+                    return result;
+                }
+                
+                const data = await response.json();
+                console.log('[Lemma] 🔍 Global session result:', JSON.stringify(data));
+                
+                // Cache the result
+                cache.result = data;
+                cache.timestamp = now;
+                return data;
+            } catch (e) {
+                console.warn('[Lemma] Global session API error:', e.message);
+                return { valid: false };
+            } finally {
+                cache.pendingPromise = null;
+            }
+        })();
+        
+        return cache.pendingPromise;
     }
     
     /**
@@ -857,8 +899,16 @@ class LemmaWallet {
             // Skip if no local session
             if (!this.session.isUnlocked) return;
             
+            // Debounce: Skip if checked recently (prevents rapid-fire on focus/visibility)
+            const now = Date.now();
+            if ((now - this._lastHeartbeatCheck) < this._heartbeatDebounceMs) {
+                console.log('[Lemma] Heartbeat debounced (last check:', now - this._lastHeartbeatCheck, 'ms ago)');
+                return;
+            }
+            this._lastHeartbeatCheck = now;
+            
             // Check 1: Local expiry (always enforced)
-            if (this.session.expiresAt && Date.now() > this.session.expiresAt) {
+            if (this.session.expiresAt && now > this.session.expiresAt) {
                 console.log('[Lemma] Session expired');
                 await this._clearSessionGracefully('expired', 'Your session has expired. Please sign in again.');
                 return;
@@ -1037,6 +1087,35 @@ class LemmaWallet {
 
         // Auto-sync revocations on init (non-blocking)
         this._autoSyncRevocations();
+        
+        // Pre-warm bridge iframe on third-party sites (non-blocking)
+        // This starts loading the bridge in background so it's ready when needed
+        if (!this._isLemmaDomain() && typeof document !== 'undefined') {
+            this._preWarmBridge();
+        }
+    }
+    
+    /**
+     * Pre-warm the bridge iframe in background for faster auth
+     * @private
+     */
+    _preWarmBridge() {
+        // Only pre-warm if not already present
+        if (document.querySelector('iframe[src*="/wallet/bridge"]')) return;
+        
+        // Use requestIdleCallback to avoid blocking main thread
+        const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 100));
+        idle(() => {
+            // Double-check bridge doesn't exist (might have been created during idle)
+            if (document.querySelector('iframe[src*="/wallet/bridge"]')) return;
+            
+            console.log('[Lemma] Pre-warming bridge iframe...');
+            const bridge = document.createElement('iframe');
+            bridge.src = 'https://lemma.id/wallet/bridge';
+            bridge.style.cssText = 'display:none;width:0;height:0;border:none;';
+            bridge.id = 'lemma-bridge';
+            document.body.appendChild(bridge);
+        });
     }
 
     /**
@@ -2044,7 +2123,7 @@ class LemmaWallet {
      * Send message to bridge iframe and get response
      * @private
      */
-    async _sendBridgeMessage(type, payload, timeout = 10000) {
+    async _sendBridgeMessage(type, payload, timeout = 5000) {
         // Check if bridge iframe exists
         let bridge = document.querySelector('iframe[src*="/wallet/bridge"]');
         
@@ -2058,12 +2137,13 @@ class LemmaWallet {
             document.body.appendChild(bridge);
             
             // Wait for WALLET_BRIDGE_READY message (not just onload)
+            // Reduced timeout from 8s to 2.5s - bridge should be fast, don't block auth
             await new Promise((resolve, reject) => {
                 const timeoutId = setTimeout(() => {
                     window.removeEventListener('message', handler);
                     console.warn('[Lemma] Bridge ready timeout - continuing anyway');
                     resolve(); // Don't reject, try to continue
-                }, 8000);
+                }, 2500);
                 
                 const handler = (event) => {
                     if (event.origin === 'https://lemma.id' && 
@@ -2097,7 +2177,23 @@ class LemmaWallet {
             };
             
             window.addEventListener('message', handler);
-            bridge.contentWindow.postMessage({ type, payload, requestId }, 'https://lemma.id');
+            
+            // Guard: Ensure bridge contentWindow is accessible before posting
+            if (bridge.contentWindow) {
+                try {
+                    bridge.contentWindow.postMessage({ type, payload, requestId }, 'https://lemma.id');
+                } catch (e) {
+                    console.warn('[Lemma] Bridge postMessage failed:', e.message);
+                    clearTimeout(timeoutId);
+                    window.removeEventListener('message', handler);
+                    reject(new Error('Bridge not ready'));
+                }
+            } else {
+                console.warn('[Lemma] Bridge contentWindow not available');
+                clearTimeout(timeoutId);
+                window.removeEventListener('message', handler);
+                reject(new Error('Bridge not ready'));
+            }
         });
     }
 

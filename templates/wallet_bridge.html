@@ -1411,7 +1411,7 @@ async function syncSessionFromServer() {
 }
 
 // ============================================
-// INITIALIZATION
+// INITIALIZATION (v2.3 - optimized for speed)
 // ============================================
 
 (async function() {
@@ -1420,35 +1420,39 @@ async function syncSessionFromServer() {
     
     // Initialize wallet (opens IndexedDB - no server call)
     const ready = await initWallet();
-    // Pre-warm session cache when idle
-    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 0));
-    idle(() => {
-        checkSession().catch(() => {});
-    });
     
-    // Check session status
+    // Check local session first (fast path - no network)
     let session = ready ? await checkSession() : { valid: false };
     
-    // If session invalid and we're in an iframe, try syncing from server
-    // This enables the "One Passkey Per Day" flow
-    if (!session.valid && window.parent !== window) {
+    // OPTIMIZATION: Only sync from server if local session is invalid
+    // AND we haven't synced recently (avoid redundant 401s)
+    const lastSyncAttempt = parseInt(sessionStorage.getItem('lemma_last_sync') || '0');
+    const syncCooldownMs = 10000; // 10 second cooldown between sync attempts
+    const shouldTrySync = !session.valid && 
+                          window.parent !== window && 
+                          (Date.now() - lastSyncAttempt) > syncCooldownMs;
+    
+    if (shouldTrySync) {
+        sessionStorage.setItem('lemma_last_sync', Date.now().toString());
         const syncResult = await syncSessionFromServer();
-        networkCalls = 1;  // We made one sync call
+        networkCalls = 1;
         
         if (syncResult.success) {
-            // Re-check session after sync
             session = await checkSession({ force: true });
             session.syncedFromServer = true;
         } else {
-            // No session on server either - user needs to unlock
             session.needsUnlock = true;
             session.unlockUrl = 'https://lemma.id/wallet/unlock';
         }
+    } else if (!session.valid && window.parent !== window) {
+        // No sync attempted (cooldown) - just mark as needing unlock
+        session.needsUnlock = true;
+        session.unlockUrl = 'https://lemma.id/wallet/unlock';
     }
     
     const initTime = performance.now() - initStart;
     
-    console.log('🌉 Wallet bridge ready (v2.2 session-sync)');
+    console.log('🌉 Wallet bridge ready (v2.3 optimized)');
     console.log(`   ├─ Initialized in ${initTime.toFixed(0)}ms`);
     console.log(`   ├─ Storage: ${storageAccessGranted ? 'unpartitioned' : 'partitioned'}`);
     console.log(`   ├─ Session: ${session.valid ? 'active ✓' : 'none/expired'}`);
@@ -1460,7 +1464,7 @@ async function syncSessionFromServer() {
         window.parent.postMessage({
             type: 'WALLET_BRIDGE_READY',
             ready: ready,
-            version: '2.2',
+            version: '2.3',
             session: session,
             storageAccess: storageAccessGranted ? 'unpartitioned' : 'partitioned',
             initTimeMs: initTime.toFixed(2),
