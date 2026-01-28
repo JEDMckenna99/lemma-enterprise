@@ -24,6 +24,173 @@
     margin: 0 auto;
 }
 
+/* Docs Search */
+.docs-search-container {
+    position: relative;
+    max-width: 560px;
+    margin: 28px auto 0;
+}
+
+.docs-search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.docs-search-icon {
+    position: absolute;
+    left: 16px;
+    color: rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.docs-search-input {
+    width: 100%;
+    padding: 14px 60px 14px 48px;
+    font-size: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+}
+
+.docs-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.docs-search-input:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.docs-search-kbd {
+    position: absolute;
+    right: 14px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-family: inherit;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.7);
+    pointer-events: none;
+}
+
+.docs-search-results {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+}
+
+.docs-search-results.active {
+    display: block;
+}
+
+.docs-search-results:empty {
+    display: none;
+}
+
+.docs-search-result {
+    display: block;
+    padding: 14px 18px;
+    text-decoration: none;
+    border-bottom: 1px solid var(--gray-100);
+    transition: background 0.15s ease;
+}
+
+.docs-search-result:last-child {
+    border-bottom: none;
+}
+
+.docs-search-result:hover,
+.docs-search-result.selected {
+    background: var(--gray-50);
+}
+
+.docs-search-result-title {
+    font-weight: 600;
+    color: var(--gray-900);
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.docs-search-result-title .category-tag {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.category-tag.getting-started { background: #dbeafe; color: #1d4ed8; }
+.category-tag.integration { background: #d1fae5; color: #047857; }
+.category-tag.sdk { background: #fef3c7; color: #b45309; }
+.category-tag.api { background: #ede9fe; color: #6d28d9; }
+.category-tag.resources { background: #fce7f3; color: #be185d; }
+
+.docs-search-result-excerpt {
+    font-size: 0.85rem;
+    color: var(--gray-500);
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.docs-search-result-excerpt mark {
+    background: #fef08a;
+    color: inherit;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+.docs-search-no-results {
+    padding: 24px 18px;
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 0.9rem;
+}
+
+.docs-search-hint {
+    padding: 12px 18px;
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-100);
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 0 0 12px 12px;
+}
+
+.docs-search-hint kbd {
+    padding: 2px 6px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 4px;
+    font-family: inherit;
+    margin: 0 4px;
+}
+
 /* Container */
 .docs-container {
     max-width: 1200px;
@@ -450,6 +617,35 @@
     
     .docs-hero h1 {
         font-size: 2rem;
+    }
+    
+    /* Mobile search adjustments */
+    .docs-search-container {
+        margin-top: 20px;
+    }
+    
+    .docs-search-input {
+        padding: 12px 50px 12px 44px;
+        font-size: 0.95rem;
+    }
+    
+    .docs-search-kbd {
+        display: none;
+    }
+    
+    .docs-search-results {
+        max-height: 60vh;
+    }
+    
+    .docs-search-result {
+        padding: 12px 14px;
+    }
+    
+    .docs-search-hint {
+        padding: 10px 14px;
+        flex-direction: column;
+        gap: 4px;
+        text-align: center;
     }
     
     /* Show mobile nav toggle */

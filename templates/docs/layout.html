@@ -25,6 +25,19 @@
     <div class="container">
         <h1>{{ hero_title or 'Developer Documentation' }}</h1>
         <p>{{ hero_subtitle or 'Everything you need to integrate Lemma into your platform' }}</p>
+        
+        <!-- Docs Search -->
+        <div class="docs-search-container">
+            <div class="docs-search-wrapper">
+                <svg class="docs-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="M21 21l-4.35-4.35"></path>
+                </svg>
+                <input type="text" id="docs-search-input" class="docs-search-input" placeholder="Search documentation..." autocomplete="off" aria-label="Search documentation">
+                <kbd class="docs-search-kbd">/</kbd>
+            </div>
+            <div class="docs-search-results" id="docs-search-results"></div>
+        </div>
     </div>
 </div>
 
@@ -33,10 +46,9 @@
 
 <!-- Mobile nav toggle (fixed position) -->
 <button class="docs-mobile-nav-toggle" id="docs-nav-toggle" aria-label="Toggle documentation menu">
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 5h14M3 10h14M3 15h14" stroke-linecap="round"/>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/>
     </svg>
-    <span>Menu</span>
 </button>
 
 <div class="docs-container">
@@ -150,6 +162,271 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     });
+    
+    // ========================================
+    // Docs Search Functionality
+    // ========================================
+    const searchInput = document.getElementById('docs-search-input');
+    const searchResults = document.getElementById('docs-search-results');
+    
+    // Search index - comprehensive docs content
+    const docsIndex = [
+        // Getting Started
+        {
+            title: 'Overview',
+            url: '{{ url_for("docs_overview") }}',
+            category: 'getting-started',
+            keywords: 'overview introduction what is lemma identity verification privacy-preserving credentials digital identity',
+            excerpt: 'Learn about Lemma\'s privacy-preserving identity verification system and how it enables secure, anonymous credential verification.'
+        },
+        {
+            title: 'Quick Start',
+            url: '{{ url_for("docs_quickstart") }}',
+            category: 'getting-started',
+            keywords: 'quick start getting started tutorial begin first steps setup 5 minutes',
+            excerpt: 'Get started with Lemma in under 5 minutes. Learn how to integrate privacy-preserving verification into your application.'
+        },
+        {
+            title: 'Installation',
+            url: '{{ url_for("docs_installation") }}',
+            category: 'getting-started',
+            keywords: 'install installation npm yarn cdn script tag setup package manager',
+            excerpt: 'Install the Lemma SDK via npm, yarn, or CDN. Multiple installation options for different project setups.'
+        },
+        // Integration Guides
+        {
+            title: 'Wallet Redirect Flow',
+            url: '{{ url_for("docs_wallet_flow") }}',
+            category: 'integration',
+            keywords: 'wallet redirect flow authentication login user flow popup window oauth sso single sign-on',
+            excerpt: 'Implement the wallet redirect authentication flow. Guide users through secure credential verification via the Lemma wallet.'
+        },
+        {
+            title: 'Credential Verification',
+            url: '{{ url_for("docs_verification") }}',
+            category: 'integration',
+            keywords: 'verification verify credential proof validate token check authentication backend server',
+            excerpt: 'Server-side credential verification. Validate proofs and tokens returned from the Lemma wallet securely.'
+        },
+        {
+            title: 'Permissions & Roles',
+            url: '{{ url_for("docs_permissions") }}',
+            category: 'integration',
+            keywords: 'permissions roles access control authorization rbac admin user moderator custom roles',
+            excerpt: 'Implement role-based access control using Lemma permissions. Define custom roles and permission hierarchies.'
+        },
+        // SDK Reference
+        {
+            title: 'JavaScript SDK',
+            url: '{{ url_for("docs_sdk_js") }}',
+            category: 'sdk',
+            keywords: 'javascript sdk js client browser frontend react vue angular typescript',
+            excerpt: 'Complete JavaScript SDK reference. Initialize the client, configure options, and integrate with your frontend.'
+        },
+        {
+            title: 'SDK Methods',
+            url: '{{ url_for("docs_sdk_methods") }}',
+            category: 'sdk',
+            keywords: 'methods functions api startAuth verify getProof hasCredential checkPermission logout',
+            excerpt: 'Reference for all SDK methods including authentication, verification, and permission checking functions.'
+        },
+        {
+            title: 'Events & Callbacks',
+            url: '{{ url_for("docs_sdk_events") }}',
+            category: 'sdk',
+            keywords: 'events callbacks listeners hooks onAuth onError onReady state change async',
+            excerpt: 'Handle SDK events and callbacks. Listen for authentication state changes, errors, and verification results.'
+        },
+        // API Reference
+        {
+            title: 'Authentication API',
+            url: '{{ url_for("docs_api_auth") }}',
+            category: 'api',
+            keywords: 'authentication api auth login token jwt session create verify refresh',
+            excerpt: 'REST API for authentication. Create sessions, verify tokens, and manage authentication state.'
+        },
+        {
+            title: 'Verification API',
+            url: '{{ url_for("docs_api_verification") }}',
+            category: 'api',
+            keywords: 'verification api verify proof credential validate backend server-side api endpoint post',
+            excerpt: 'Server-to-server verification API. Validate credential proofs and check verification status programmatically.'
+        },
+        {
+            title: 'Revocation API',
+            url: '{{ url_for("docs_api_revocation") }}',
+            category: 'api',
+            keywords: 'revocation api revoke credential invalidate cancel ban block suspend',
+            excerpt: 'Revoke and manage credential status. Check revocation lists and invalidate compromised credentials.'
+        },
+        // Resources
+        {
+            title: 'Error Codes',
+            url: '{{ url_for("docs_error_codes") }}',
+            category: 'resources',
+            keywords: 'error codes errors troubleshooting debug fix problems issues solutions',
+            excerpt: 'Complete list of error codes and their meanings. Troubleshoot integration issues with detailed explanations.'
+        },
+        {
+            title: 'Code Examples',
+            url: '{{ url_for("docs_examples") }}',
+            category: 'resources',
+            keywords: 'examples code samples snippets demo tutorial react vue node express',
+            excerpt: 'Ready-to-use code examples for common integration patterns. Copy-paste snippets for quick implementation.'
+        },
+        {
+            title: 'Changelog',
+            url: '{{ url_for("docs_changelog") }}',
+            category: 'resources',
+            keywords: 'changelog updates releases version history changes new features',
+            excerpt: 'SDK and API changelog. Track version updates, new features, and breaking changes.'
+        }
+    ];
+    
+    let selectedIndex = -1;
+    
+    function highlightMatch(text, query) {
+        if (!query) return text;
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return text.replace(regex, '<mark>$1</mark>');
+    }
+    
+    function searchDocs(query) {
+        if (!query || query.length < 2) return [];
+        
+        const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 1);
+        
+        return docsIndex
+            .map(doc => {
+                const searchText = `${doc.title} ${doc.keywords} ${doc.excerpt}`.toLowerCase();
+                let score = 0;
+                
+                // Score based on matches
+                terms.forEach(term => {
+                    if (doc.title.toLowerCase().includes(term)) score += 10;
+                    if (doc.keywords.includes(term)) score += 5;
+                    if (doc.excerpt.toLowerCase().includes(term)) score += 2;
+                });
+                
+                // Exact title match bonus
+                if (doc.title.toLowerCase() === query.toLowerCase()) score += 20;
+                
+                return { ...doc, score };
+            })
+            .filter(doc => doc.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 8);
+    }
+    
+    function renderResults(results, query) {
+        if (results.length === 0) {
+            searchResults.innerHTML = `
+                <div class="docs-search-no-results">
+                    No results found for "${query}"
+                </div>
+                <div class="docs-search-hint">
+                    <span>Try different keywords</span>
+                    <span><kbd>Esc</kbd> to close</span>
+                </div>
+            `;
+            searchResults.classList.add('active');
+            return;
+        }
+        
+        const categoryLabels = {
+            'getting-started': 'Getting Started',
+            'integration': 'Integration',
+            'sdk': 'SDK',
+            'api': 'API',
+            'resources': 'Resources'
+        };
+        
+        let html = results.map((doc, i) => `
+            <a href="${doc.url}" class="docs-search-result ${i === selectedIndex ? 'selected' : ''}" data-index="${i}">
+                <div class="docs-search-result-title">
+                    ${highlightMatch(doc.title, query)}
+                    <span class="category-tag ${doc.category}">${categoryLabels[doc.category]}</span>
+                </div>
+                <div class="docs-search-result-excerpt">${highlightMatch(doc.excerpt, query)}</div>
+            </a>
+        `).join('');
+        
+        html += `
+            <div class="docs-search-hint">
+                <span><kbd>Enter</kbd> to select &bull; <kbd>Up</kbd>/<kbd>Down</kbd> to navigate</span>
+                <span><kbd>Esc</kbd> to close</span>
+            </div>
+        `;
+        
+        searchResults.innerHTML = html;
+        searchResults.classList.add('active');
+    }
+    
+    function closeSearch() {
+        searchResults.classList.remove('active');
+        searchResults.innerHTML = '';
+        selectedIndex = -1;
+    }
+    
+    if (searchInput) {
+        // Input handler
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            selectedIndex = -1;
+            
+            if (query.length < 2) {
+                closeSearch();
+                return;
+            }
+            
+            const results = searchDocs(query);
+            renderResults(results, query);
+        });
+        
+        // Keyboard navigation
+        searchInput.addEventListener('keydown', (e) => {
+            const results = searchResults.querySelectorAll('.docs-search-result');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, results.length - 1);
+                results.forEach((r, i) => r.classList.toggle('selected', i === selectedIndex));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, 0);
+                results.forEach((r, i) => r.classList.toggle('selected', i === selectedIndex));
+            } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                e.preventDefault();
+                results[selectedIndex]?.click();
+            } else if (e.key === 'Escape') {
+                closeSearch();
+                searchInput.blur();
+            }
+        });
+        
+        // Focus handler
+        searchInput.addEventListener('focus', () => {
+            if (searchInput.value.trim().length >= 2) {
+                const results = searchDocs(searchInput.value.trim());
+                renderResults(results, searchInput.value.trim());
+            }
+        });
+        
+        // Click outside to close
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.docs-search-container')) {
+                closeSearch();
+            }
+        });
+        
+        // Global "/" shortcut to focus search
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '/' && !e.target.matches('input, textarea')) {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+    }
 });
 </script>
 {% endblock %}
