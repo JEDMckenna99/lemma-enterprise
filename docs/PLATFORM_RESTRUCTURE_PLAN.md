@@ -96,38 +96,47 @@ The wallet is intentionally a single-page experience for non-technical users:
 
 ---
 
-### Day 4: Marketing Polish
+### Day 4: Documentation Restructure - COMPLETED
 
-**Goal:** Clean up public-facing pages
+**Goal:** Create proper documentation site with sidebar navigation
 
-**Current State:**
-- `templates/modern/index.html` (~500 lines) - Homepage
-- `templates/modern/pricing_new.html` - Pricing page
-- `templates/modern/docs_iam.html` - Documentation
+**Files Created:**
+- `templates/docs/layout.html` - Docs layout with sidebar navigation
+- `templates/docs/overview.html` - Documentation overview/landing page
+- `templates/docs/quickstart.html` - Quick start guide
+- `templates/docs/installation.html` - Installation methods
+- `templates/docs/wallet-flow.html` - Wallet redirect flow guide
+- `templates/docs/verification.html` - Credential verification
+- `templates/docs/permissions.html` - Permissions & roles
+- `templates/docs/sdk-js.html` - JavaScript SDK reference
+- `templates/docs/sdk-methods.html` - SDK methods reference
+- `templates/docs/sdk-events.html` - Events & callbacks
+- `templates/docs/api-auth.html` - Authentication API
+- `templates/docs/api-verification.html` - Verification API
+- `templates/docs/api-revocation.html` - Revocation API
+- `templates/docs/errors.html` - Error codes reference
+- `templates/docs/examples.html` - Code examples
+- `templates/docs/changelog.html` - SDK changelog
+- `static/css/docs.css` - Documentation styles (purple gradient hero, sticky sidebar)
 
-**Target Structure:**
-```
-templates/marketing/
-├── layout.html          # Marketing layout (different from app layouts)
-├── index.html           # Homepage (simplified)
-├── pricing.html         # Pricing page
-├── features.html        # Features overview
-├── about.html           # About Lemma
-└── contact.html         # Contact page
+**Routes Added:**
+- `/docs` - Overview (was legacy IAM docs)
+- `/docs/quickstart` - Quick start
+- `/docs/installation` - Installation
+- `/docs/wallet-flow` - Wallet redirect flow
+- `/docs/verification` - Credential verification
+- `/docs/permissions` - Permissions & roles
+- `/docs/sdk` - JavaScript SDK
+- `/docs/sdk/methods` - SDK methods
+- `/docs/sdk/events` - SDK events
+- `/docs/api/auth` - Auth API
+- `/docs/api/verification` - Verification API
+- `/docs/api/revocation` - Revocation API
+- `/docs/errors` - Error codes
+- `/docs/examples` - Code examples
+- `/docs/changelog` - Changelog
 
-templates/docs/
-├── layout.html          # Docs layout with sidebar
-├── getting-started.html # Getting started guide
-├── sdk-reference.html   # SDK documentation
-├── api-reference.html   # API documentation
-└── examples.html        # Code examples
-```
-
-**Tasks:**
-- [ ] Simplify index.html (remove bloat)
-- [ ] Create proper docs site with navigation
-- [ ] Ensure consistent styling across marketing pages
-- [ ] Update footer links and navigation
+**Status:** Deployed to production (lemma.id/docs)
 
 ---
 
@@ -257,28 +266,30 @@ These files can be removed or deprecated once the restructure is complete:
 | Day 1: Developer Platform | 4 hours | ✅ COMPLETED |
 | Day 2: Wallet Enhancement | 1 hour | ✅ COMPLETED |
 | Day 3: Admin Dashboard | 3 hours | ✅ COMPLETED |
-| Day 4: Marketing Polish | 2 hours | Pending |
+| Day 4: Documentation | 2 hours | ✅ COMPLETED |
 | Day 5: Routes & Testing | 2 hours | Pending |
 
-**Total estimated remaining: ~4 hours**
+**Total estimated remaining: ~2 hours**
 
 ---
 
 ## Next Steps
 
-1. **Marketing Polish (Day 4):**
-   - Simplify homepage (index.html)
-   - Create docs site with navigation
-   - Ensure consistent styling
+1. **Routes & Testing (Day 5):**
+   - Audit all routes in app.py
+   - Remove deprecated routes
+   - Test all user flows (Anonymous → Marketing → Wallet → Developer → Admin)
+   - Mobile responsiveness check
+   - Performance testing
 
-2. **Routes & Testing (Day 5):**
-   - Audit all routes
-   - Test all user flows
-   - Mobile responsiveness
-
-3. **API Endpoints to Implement:**
+2. **API Endpoints to Implement (Optional):**
    Some admin pages call APIs that don't exist yet:
    - `/api/admin/users` - List all users
    - `/api/admin/user-stats` - User statistics
    - `/api/admin/recent-activity` - Recent activity feed
    - `/api/health/detailed` - Detailed health check
+
+3. **Future Enhancements:**
+   - Mobile navigation for docs sidebar
+   - Search functionality in docs
+   - Marketing page simplification
