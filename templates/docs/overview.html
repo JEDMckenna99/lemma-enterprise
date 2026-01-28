@@ -1,0 +1,150 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'overview' %}
+{% set hero_title = 'Developer Documentation' %}
+{% set hero_subtitle = 'Everything you need to integrate Lemma into your platform' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Welcome to Lemma</h2>
+    <p>Lemma provides passwordless authentication with credentials that verify locally in the browser. No server calls for verification, no passwords to manage, no sessions to track.</p>
+    
+    <div class="feature-grid">
+        <div class="feature-card">
+            <h3>Local Verification</h3>
+            <p>Credentials are cryptographically verified in the browser using Ed25519 signatures. Your servers never handle auth traffic.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Wallet-Based Identity</h3>
+            <p>Users control their credentials in a browser-based wallet protected by passkeys. No accounts, no passwords.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Privacy-First</h3>
+            <p>Pairwise identifiers (PPIDs) prevent cross-site tracking. Users are pseudo-anonymous across different sites.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Works Offline</h3>
+            <p>Once credentials are issued, verification works entirely offline. Perfect for edge computing.</p>
+        </div>
+    </div>
+</div>
+
+<div class="docs-section" id="quickstart">
+    <h2>Quick Start</h2>
+    <p>Get Lemma running on your site in 3 steps:</p>
+    
+    <h3>1. Add the SDK</h3>
+    <div class="code-block">
+        <div class="code-header">
+            <span>HTML</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;</code>
+    </div>
+    
+    <h3>2. Initialize the Wallet</h3>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>const wallet = new LemmaWallet({
+    siteId: 'your-site-id',
+    apiKey: 'your-api-key'
+});
+
+await wallet.init();</code>
+    </div>
+    
+    <h3>3. Authenticate Users</h3>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>// Start wallet redirect flow
+await wallet.startRedirectFlow({
+    returnUrl: window.location.href
+});
+
+// On return, check for credentials
+const result = await wallet.checkRedirectReturn();
+if (result.authenticated) {
+    const ppid = await wallet.derivePPID();
+    console.log('User authenticated:', ppid);
+}</code>
+    </div>
+    
+    <div class="callout callout--info">
+        <div class="callout-title">Need an API Key?</div>
+        <p>Register your site at <a href="/developer">lemma.id/developer</a> to get your API key.</p>
+    </div>
+</div>
+
+<div class="docs-section" id="how-it-works">
+    <h2>How It Works</h2>
+    
+    <h3>The Wallet Redirect Flow</h3>
+    <p>When a user needs to authenticate:</p>
+    <ol style="color: var(--gray-600); line-height: 1.8;">
+        <li>Your site redirects to <code>lemma.id/wallet/unlock</code></li>
+        <li>User unlocks their wallet with a passkey</li>
+        <li>Lemma redirects back with an encrypted credential in the URL</li>
+        <li>Your site decrypts and verifies the credential locally</li>
+        <li>User is authenticated - no server calls needed</li>
+    </ol>
+    
+    <h3>Credential Verification</h3>
+    <p>Credentials are W3C Verifiable Credentials with Ed25519 signatures:</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>// Verify a credential locally
+const isValid = await wallet.verifyCredential(credential);
+
+// The SDK handles:
+// - Ed25519 signature verification
+// - Expiration checking
+// - Revocation status (synced hourly)</code>
+    </div>
+    
+    <h3>Pairwise Identifiers (PPIDs)</h3>
+    <p>PPIDs are site-specific user identifiers derived from:</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Formula</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>PPID = HMAC-SHA256(wallet_secret, site_domain)</code>
+    </div>
+    <p>This means:</p>
+    <ul style="color: var(--gray-600); line-height: 1.8;">
+        <li>Each user has a unique, stable identifier on your site</li>
+        <li>The same user has different PPIDs on different sites</li>
+        <li>Sites cannot correlate users across domains</li>
+    </ul>
+</div>
+
+<div class="docs-section" id="next-steps">
+    <h2>Next Steps</h2>
+    <div class="feature-grid">
+        <a href="{{ url_for('docs_wallet_flow') }}" class="feature-card" style="text-decoration: none;">
+            <h3>Wallet Redirect Flow</h3>
+            <p>Detailed guide to implementing the authentication flow</p>
+        </a>
+        <a href="{{ url_for('docs_sdk_js') }}" class="feature-card" style="text-decoration: none;">
+            <h3>SDK Reference</h3>
+            <p>Complete documentation of SDK methods and options</p>
+        </a>
+        <a href="{{ url_for('docs_examples') }}" class="feature-card" style="text-decoration: none;">
+            <h3>Code Examples</h3>
+            <p>Full working examples for common use cases</p>
+        </a>
+        <a href="{{ url_for('docs_api_auth') }}" class="feature-card" style="text-decoration: none;">
+            <h3>API Reference</h3>
+            <p>Server-side API for credential issuance and management</p>
+        </a>
+    </div>
+</div>
+{% endblock %}

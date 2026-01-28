@@ -728,15 +728,91 @@ def create_app():
     def pricing():
         return render_template('modern/pricing_new.html')
 
+    # ==================== DOCUMENTATION ====================
     @app.route('/docs')
-    def docs():
-        """Developer documentation - static docs for all users"""
-        return render_template('modern/docs_iam.html')
+    def docs_overview():
+        """Documentation overview"""
+        return render_template('docs/overview.html')
+    
+    @app.route('/docs/quickstart')
+    def docs_quickstart():
+        """Quick start guide"""
+        return render_template('docs/quickstart.html')
+    
+    @app.route('/docs/installation')
+    def docs_installation():
+        """Installation guide"""
+        return render_template('docs/installation.html')
+    
+    @app.route('/docs/wallet-flow')
+    def docs_wallet_flow():
+        """Wallet redirect flow guide"""
+        return render_template('docs/wallet-flow.html')
+    
+    @app.route('/docs/verification')
+    def docs_verification():
+        """Credential verification guide"""
+        return render_template('docs/verification.html')
+    
+    @app.route('/docs/permissions')
+    def docs_permissions():
+        """Permissions and roles guide"""
+        return render_template('docs/permissions.html')
+    
+    @app.route('/docs/sdk')
+    def docs_sdk_js():
+        """JavaScript SDK reference"""
+        return render_template('docs/sdk-js.html')
+    
+    @app.route('/docs/sdk/methods')
+    def docs_sdk_methods():
+        """SDK methods reference"""
+        return render_template('docs/sdk-methods.html')
+    
+    @app.route('/docs/sdk/events')
+    def docs_sdk_events():
+        """SDK events and callbacks"""
+        return render_template('docs/sdk-events.html')
+    
+    @app.route('/docs/api/auth')
+    def docs_api_auth():
+        """Authentication API reference"""
+        return render_template('docs/api-auth.html')
+    
+    @app.route('/docs/api/verification')
+    def docs_api_verification():
+        """Verification API reference"""
+        return render_template('docs/api-verification.html')
+    
+    @app.route('/docs/api/revocation')
+    def docs_api_revocation():
+        """Revocation API reference"""
+        return render_template('docs/api-revocation.html')
+    
+    @app.route('/docs/errors')
+    def docs_error_codes():
+        """Error codes reference"""
+        return render_template('docs/errors.html')
+    
+    @app.route('/docs/examples')
+    def docs_examples():
+        """Code examples"""
+        return render_template('docs/examples.html')
+    
+    @app.route('/docs/changelog')
+    def docs_changelog():
+        """Changelog"""
+        return render_template('docs/changelog.html')
     
     @app.route('/docs/setup')
     def docs_setup():
         """Personalized code generator - client-side auth handles everything"""
         return render_template('modern/docs_setup.html')
+    
+    @app.route('/docs/iam')
+    def docs_iam_legacy():
+        """Legacy IAM docs - redirect to overview"""
+        return redirect('/docs')
 
     # Legal pages
     @app.route('/terms')

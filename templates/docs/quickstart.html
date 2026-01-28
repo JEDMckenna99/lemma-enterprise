@@ -1,0 +1,179 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'quickstart' %}
+{% set hero_title = 'Quick Start Guide' %}
+{% set hero_subtitle = 'Get Lemma running in 5 minutes' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Quick Start</h2>
+    <p>This guide will help you integrate Lemma authentication into your website in just a few minutes.</p>
+    
+    <div class="callout callout--info">
+        <div class="callout-title">Prerequisites</div>
+        <p>You'll need a Lemma developer account. <a href="/developer">Sign up here</a> to get your API key.</p>
+    </div>
+</div>
+
+<div class="docs-section" id="step1">
+    <h2>Step 1: Add the SDK</h2>
+    <p>Include the Lemma SDK in your HTML:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>HTML</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>&lt;!-- Add to your &lt;head&gt; --&gt;
+&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;</code>
+    </div>
+    
+    <p>Or install via npm:</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Terminal</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>npm install @lemma/wallet-sdk</code>
+    </div>
+</div>
+
+<div class="docs-section" id="step2">
+    <h2>Step 2: Initialize</h2>
+    <p>Initialize the wallet with your site configuration:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>const wallet = new LemmaWallet({
+    siteId: 'your-site-id',     // From developer dashboard
+    apiKey: 'your-api-key',      // From developer dashboard
+    debug: true                  // Enable console logging
+});
+
+// Initialize the wallet
+await wallet.init();</code>
+    </div>
+</div>
+
+<div class="docs-section" id="step3">
+    <h2>Step 3: Add Sign-In Button</h2>
+    <p>Add a sign-in button that triggers the wallet flow:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>HTML</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>&lt;button id="sign-in-btn"&gt;Sign in with Lemma&lt;/button&gt;</code>
+    </div>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>document.getElementById('sign-in-btn').addEventListener('click', async () => {
+    // Redirect to Lemma wallet
+    await wallet.startRedirectFlow({
+        returnUrl: window.location.href,
+        permissions: ['basic']  // Optional: request permissions
+    });
+});</code>
+    </div>
+</div>
+
+<div class="docs-section" id="step4">
+    <h2>Step 4: Handle the Return</h2>
+    <p>When the user returns from the wallet, check for authentication:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>// On page load, check if returning from wallet
+document.addEventListener('DOMContentLoaded', async () => {
+    const result = await wallet.checkRedirectReturn();
+    
+    if (result.authenticated) {
+        // User is signed in
+        const ppid = await wallet.derivePPID();
+        console.log('User PPID:', ppid);
+        
+        // Update your UI
+        showUserDashboard(ppid);
+    }
+});</code>
+    </div>
+</div>
+
+<div class="docs-section" id="complete">
+    <h2>Complete Example</h2>
+    <p>Here's everything together:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>HTML</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;My App&lt;/title&gt;
+    &lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div id="guest"&gt;
+        &lt;button id="sign-in-btn"&gt;Sign in with Lemma&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;div id="authenticated" style="display: none;"&gt;
+        &lt;p&gt;Welcome! Your ID: &lt;span id="user-id"&gt;&lt;/span&gt;&lt;/p&gt;
+    &lt;/div&gt;
+    
+    &lt;script&gt;
+    (async () =&gt; {
+        const wallet = new LemmaWallet({
+            siteId: 'your-site-id',
+            apiKey: 'your-api-key'
+        });
+        await wallet.init();
+        
+        // Check if returning from auth
+        const result = await wallet.checkRedirectReturn();
+        if (result.authenticated) {
+            document.getElementById('guest').style.display = 'none';
+            document.getElementById('authenticated').style.display = 'block';
+            document.getElementById('user-id').textContent = await wallet.derivePPID();
+        }
+        
+        // Sign-in button
+        document.getElementById('sign-in-btn').addEventListener('click', () =&gt; {
+            wallet.startRedirectFlow({ returnUrl: window.location.href });
+        });
+    })();
+    &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Next Steps</h2>
+    <div class="feature-grid">
+        <a href="{{ url_for('docs_wallet_flow') }}" class="feature-card" style="text-decoration: none;">
+            <h3>Wallet Flow Details</h3>
+            <p>Learn about all authentication options</p>
+        </a>
+        <a href="{{ url_for('docs_verification') }}" class="feature-card" style="text-decoration: none;">
+            <h3>Credential Verification</h3>
+            <p>Understand how credentials are verified</p>
+        </a>
+        <a href="{{ url_for('docs_sdk_js') }}" class="feature-card" style="text-decoration: none;">
+            <h3>SDK Reference</h3>
+            <p>Full SDK documentation</p>
+        </a>
+    </div>
+</div>
+{% endblock %}

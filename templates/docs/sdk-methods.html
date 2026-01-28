@@ -1,0 +1,59 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'sdk-methods' %}
+{% set hero_title = 'SDK Methods' %}
+{% set hero_subtitle = 'Complete method reference' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Authentication Methods</h2>
+    
+    <h3><code>startRedirectFlow(options)</code></h3>
+    <p>Start the wallet redirect authentication flow.</p>
+    <ul class="params-list">
+        <li><span class="param-name">returnUrl</span><span class="param-type">string</span><span class="param-required">required</span> - URL to return to after auth</li>
+        <li><span class="param-name">permissions</span><span class="param-type">string[]</span><span class="param-optional">optional</span> - Permissions to request</li>
+        <li><span class="param-name">prompt</span><span class="param-type">string</span><span class="param-optional">optional</span> - 'login' or 'consent'</li>
+    </ul>
+    
+    <h3><code>checkRedirectReturn()</code></h3>
+    <p>Check if returning from auth and extract credentials.</p>
+    <div class="code-block">
+        <div class="code-header"><span>Response</span></div>
+        <code>{
+    authenticated: boolean,
+    credentials: Credential[],
+    error?: string
+}</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Credential Methods</h2>
+    
+    <h3><code>getCredentials(options?)</code></h3>
+    <p>Get stored credentials.</p>
+    <ul class="params-list">
+        <li><span class="param-name">type</span><span class="param-type">string</span><span class="param-optional">optional</span> - Filter by credential type</li>
+        <li><span class="param-name">valid</span><span class="param-type">boolean</span><span class="param-optional">optional</span> - Only return valid credentials</li>
+    </ul>
+    
+    <h3><code>verifyCredential(credential)</code></h3>
+    <p>Verify a credential's signature and status.</p>
+    
+    <h3><code>quickVerify(credential, options?)</code></h3>
+    <p>Fast verification with caching.</p>
+</div>
+
+<div class="docs-section">
+    <h2>Wallet Methods</h2>
+    
+    <h3><code>unlock()</code></h3>
+    <p>Prompt user to unlock wallet with passkey.</p>
+    
+    <h3><code>lock()</code></h3>
+    <p>Lock the wallet.</p>
+    
+    <h3><code>isUnlocked()</code></h3>
+    <p>Check if wallet is unlocked.</p>
+</div>
+{% endblock %}

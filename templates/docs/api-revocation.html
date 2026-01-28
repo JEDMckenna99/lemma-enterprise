@@ -1,0 +1,52 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'api-revocation' %}
+{% set hero_title = 'Revocation API' %}
+{% set hero_subtitle = 'Credential revocation management' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Overview</h2>
+    <p>Revoke credentials when users should lose access. Revocation is propagated through a Bloom filter that clients sync periodically.</p>
+</div>
+
+<div class="docs-section" id="revoke">
+    <h2>Revoke Credential</h2>
+    <div class="api-endpoint">
+        <span class="http-method http-post">POST</span>
+        <code>/api/revocation/revoke</code>
+    </div>
+    
+    <h3>Request</h3>
+    <div class="code-block">
+        <div class="code-header"><span>JSON</span></div>
+        <code>{
+    "credential_id": "cred_xyz789...",
+    "reason": "user_requested"    // Optional
+}</code>
+    </div>
+    
+    <h3>Response</h3>
+    <div class="code-block">
+        <div class="code-header"><span>JSON</span></div>
+        <code>{
+    "success": true,
+    "revoked_at": 1704067200
+}</code>
+    </div>
+</div>
+
+<div class="docs-section" id="bloom">
+    <h2>Bloom Filter</h2>
+    <div class="api-endpoint">
+        <span class="http-method http-get">GET</span>
+        <code>/api/revocation/bloom-filter</code>
+    </div>
+    
+    <p>Get the current revocation Bloom filter. Clients sync this automatically.</p>
+    
+    <div class="callout callout--info">
+        <div class="callout-title">Privacy</div>
+        <p>The Bloom filter uses hashed credential IDs, so revocation checks don't expose which credentials are being verified.</p>
+    </div>
+</div>
+{% endblock %}

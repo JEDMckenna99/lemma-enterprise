@@ -1,0 +1,66 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'wallet-flow' %}
+{% set hero_title = 'Wallet Redirect Flow' %}
+{% set hero_subtitle = 'How the authentication redirect works' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Authentication Flow</h2>
+    <p>Lemma uses a redirect-based authentication flow similar to OAuth, but simpler:</p>
+    
+    <ol style="color: var(--gray-600); line-height: 2;">
+        <li>User clicks "Sign in with Lemma" on your site</li>
+        <li>SDK redirects to <code>lemma.id/wallet/unlock</code></li>
+        <li>User authenticates with their passkey</li>
+        <li>Lemma redirects back to your <code>returnUrl</code></li>
+        <li>SDK decrypts credential from URL fragment</li>
+        <li>Credential is verified locally (no server call)</li>
+    </ol>
+</div>
+
+<div class="docs-section" id="starting">
+    <h2>Starting the Flow</h2>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>await wallet.startRedirectFlow({
+    returnUrl: window.location.href,  // Where to return after auth
+    permissions: ['basic'],           // Optional: request permissions
+    prompt: 'login'                   // Optional: 'login' or 'consent'
+});</code>
+    </div>
+</div>
+
+<div class="docs-section" id="handling">
+    <h2>Handling the Return</h2>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>const result = await wallet.checkRedirectReturn();
+
+if (result.authenticated) {
+    // User successfully authenticated
+    const ppid = await wallet.derivePPID();
+    const credentials = await wallet.getCredentials();
+    
+    // Update your UI
+    showLoggedInState(ppid);
+} else if (result.error) {
+    // Handle error
+    console.error('Auth failed:', result.error);
+}</code>
+    </div>
+</div>
+
+<div class="docs-section" id="security">
+    <h2>Security</h2>
+    <div class="callout callout--success">
+        <div class="callout-title">End-to-End Encryption</div>
+        <p>Credentials are encrypted with a key derived from your site's domain. Even if the URL is intercepted, the credential cannot be decrypted by other sites.</p>
+    </div>
+</div>
+{% endblock %}

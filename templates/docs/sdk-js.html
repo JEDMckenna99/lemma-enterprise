@@ -1,0 +1,81 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'sdk-js' %}
+{% set hero_title = 'JavaScript SDK' %}
+{% set hero_subtitle = 'Complete SDK reference and configuration' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>SDK Overview</h2>
+    <p>The Lemma JavaScript SDK provides client-side authentication with local credential verification.</p>
+</div>
+
+<div class="docs-section" id="config">
+    <h2>Configuration</h2>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>const wallet = new LemmaWallet({
+    // Required
+    siteId: 'your-site-id',         // From developer dashboard
+    apiKey: 'your-api-key',          // From developer dashboard
+    
+    // Optional
+    debug: false,                    // Enable console logging
+    autoInit: true,                  // Auto-initialize on construction
+    apiBase: 'https://lemma.id',    // API endpoint (rarely needed)
+    
+    // Storage options
+    storagePrefix: 'lemma_',         // IndexedDB key prefix
+    enableCache: true,               // Cache verified credentials
+    
+    // Sync options
+    syncInterval: 3600000,           // Revocation sync interval (ms)
+    heartbeatInterval: 300000        // Session heartbeat interval (ms)
+});</code>
+    </div>
+</div>
+
+<div class="docs-section" id="methods">
+    <h2>Core Methods</h2>
+    
+    <h3><code>init()</code></h3>
+    <p>Initialize the wallet. Call once on page load.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>await wallet.init();
+// Returns: void</code>
+    </div>
+    
+    <h3><code>isUnlocked()</code></h3>
+    <p>Check if wallet is currently unlocked.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>const unlocked = await wallet.isUnlocked();
+// Returns: boolean</code>
+    </div>
+    
+    <h3><code>derivePPID()</code></h3>
+    <p>Get the user's pairwise identifier for your site.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>const ppid = await wallet.derivePPID();
+// Returns: string (hex-encoded HMAC)</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>More Methods</h2>
+    <p>See <a href="{{ url_for('docs_sdk_methods') }}">SDK Methods Reference</a> for the complete list.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'api-verification' %}
+{% set hero_title = 'Verification API' %}
+{% set hero_subtitle = 'Credential verification endpoints' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Server-Side Verification</h2>
+    <p>While the SDK handles client-side verification automatically, these endpoints are available for server-side verification when needed.</p>
+</div>
+
+<div class="docs-section" id="verify">
+    <h2>Verify Credential</h2>
+    <div class="api-endpoint">
+        <span class="http-method http-post">POST</span>
+        <code>/api/verify-credential</code>
+    </div>
+    
+    <h3>Request</h3>
+    <div class="code-block">
+        <div class="code-header"><span>JSON</span></div>
+        <code>{
+    "credential": {
+        "id": "cred_...",
+        "type": ["VerifiableCredential", "..."],
+        "issuer": "did:lemma:...",
+        "proof": {...}
+    }
+}</code>
+    </div>
+    
+    <h3>Response</h3>
+    <div class="code-block">
+        <div class="code-header"><span>JSON</span></div>
+        <code>{
+    "valid": true,
+    "checks": {
+        "signature": true,
+        "expiration": true,
+        "revocation": true,
+        "issuer_trust": true
+    }
+}</code>
+    </div>
+</div>
+
+<div class="docs-section" id="revocation">
+    <h2>Revocation Status</h2>
+    <div class="api-endpoint">
+        <span class="http-method http-get">GET</span>
+        <code>/api/revocation/check/{credential_id}</code>
+    </div>
+    
+    <p>Check if a specific credential has been revoked.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,141 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'examples' %}
+{% set hero_title = 'Code Examples' %}
+{% set hero_subtitle = 'Complete working examples' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Basic Authentication</h2>
+    <p>A simple login/logout implementation:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>HTML + JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;Lemma Auth Example&lt;/title&gt;
+    &lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div id="app"&gt;
+        &lt;!-- Guest View --&gt;
+        &lt;div id="guest"&gt;
+            &lt;h1&gt;Welcome&lt;/h1&gt;
+            &lt;button id="login-btn"&gt;Sign in with Lemma&lt;/button&gt;
+        &lt;/div&gt;
+        
+        &lt;!-- Authenticated View --&gt;
+        &lt;div id="user" style="display: none;"&gt;
+            &lt;h1&gt;Hello, &lt;span id="user-name"&gt;&lt;/span&gt;&lt;/h1&gt;
+            &lt;p&gt;Your ID: &lt;code id="user-id"&gt;&lt;/code&gt;&lt;/p&gt;
+            &lt;button id="logout-btn"&gt;Sign Out&lt;/button&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+    
+    &lt;script&gt;
+    (async () =&gt; {
+        // Initialize
+        const wallet = new LemmaWallet({
+            siteId: 'your-site-id',
+            apiKey: 'your-api-key'
+        });
+        await wallet.init();
+        
+        // Check for auth return
+        const result = await wallet.checkRedirectReturn();
+        if (result.authenticated) {
+            showUser(await wallet.derivePPID());
+        }
+        
+        // Also check if already authenticated
+        if (await wallet.isUnlocked()) {
+            showUser(await wallet.derivePPID());
+        }
+        
+        // Login button
+        document.getElementById('login-btn').onclick = () =&gt; {
+            wallet.startRedirectFlow({
+                returnUrl: window.location.href
+            });
+        };
+        
+        // Logout button  
+        document.getElementById('logout-btn').onclick = async () =&gt; {
+            await wallet.lock();
+            showGuest();
+        };
+        
+        function showUser(ppid) {
+            document.getElementById('guest').style.display = 'none';
+            document.getElementById('user').style.display = 'block';
+            document.getElementById('user-id').textContent = ppid.slice(0, 16) + '...';
+        }
+        
+        function showGuest() {
+            document.getElementById('guest').style.display = 'block';
+            document.getElementById('user').style.display = 'none';
+        }
+    })();
+    &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Protected Content</h2>
+    <p>Show different content based on authentication:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>async function loadProtectedContent() {
+    const wallet = new LemmaWallet({ siteId: 'your-site-id' });
+    await wallet.init();
+    
+    if (!await wallet.isUnlocked()) {
+        document.getElementById('content').innerHTML = `
+            &lt;p&gt;Please sign in to view this content.&lt;/p&gt;
+            &lt;button onclick="signIn()"&gt;Sign In&lt;/button&gt;
+        `;
+        return;
+    }
+    
+    // User is authenticated - show content
+    const ppid = await wallet.derivePPID();
+    
+    // Fetch user-specific data
+    const response = await fetch('/api/user/data', {
+        headers: {
+            'X-User-PPID': ppid
+        }
+    });
+    const data = await response.json();
+    
+    document.getElementById('content').innerHTML = `
+        &lt;h2&gt;Your Dashboard&lt;/h2&gt;
+        &lt;pre&gt;${JSON.stringify(data, null, 2)}&lt;/pre&gt;
+    `;
+}</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>More Examples</h2>
+    <div class="feature-grid">
+        <a href="/examples/complete-integration-example.html" class="feature-card" style="text-decoration: none;" target="_blank">
+            <h3>Complete Integration</h3>
+            <p>Full working example with all features</p>
+        </a>
+        <a href="{{ url_for('docs_quickstart') }}" class="feature-card" style="text-decoration: none;">
+            <h3>Quick Start</h3>
+            <p>Get started in 5 minutes</p>
+        </a>
+    </div>
+</div>
+{% endblock %}

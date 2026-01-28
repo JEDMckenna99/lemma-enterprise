@@ -1,0 +1,72 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'api-auth' %}
+{% set hero_title = 'Authentication API' %}
+{% set hero_subtitle = 'Server-side credential endpoints' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Overview</h2>
+    <p>While credential verification happens client-side, you may need server-side APIs for credential issuance and management.</p>
+    
+    <div class="callout callout--info">
+        <div class="callout-title">Base URL</div>
+        <p><code>https://lemma.id/api/v1</code></p>
+    </div>
+</div>
+
+<div class="docs-section" id="issue">
+    <h2>Issue Credential</h2>
+    <div class="api-endpoint">
+        <span class="http-method http-post">POST</span>
+        <code>/credentials/issue</code>
+    </div>
+    
+    <p>Issue a new credential to a user.</p>
+    
+    <h3>Request</h3>
+    <div class="code-block">
+        <div class="code-header"><span>JSON</span></div>
+        <code>{
+    "subject": "ppid_abc123...",       // User's PPID
+    "type": "AccessCredential",        // Credential type
+    "claims": {
+        "role": "user",
+        "permissions": ["read", "write"]
+    },
+    "expiresIn": 86400                 // Seconds until expiration
+}</code>
+    </div>
+    
+    <h3>Response</h3>
+    <div class="code-block">
+        <div class="code-header"><span>JSON</span></div>
+        <code>{
+    "success": true,
+    "credential": {
+        "id": "cred_xyz789...",
+        "type": ["VerifiableCredential", "AccessCredential"],
+        "issuer": "did:lemma:...",
+        "issuanceDate": 1704067200,
+        "expirationDate": 1704153600,
+        "credentialSubject": {...},
+        "proof": {...}
+    }
+}</code>
+    </div>
+</div>
+
+<div class="docs-section" id="verify">
+    <h2>Verify Credential (Server-Side)</h2>
+    <div class="api-endpoint">
+        <span class="http-method http-post">POST</span>
+        <code>/credentials/verify</code>
+    </div>
+    
+    <p>Server-side verification (optional - client verification preferred).</p>
+    
+    <div class="callout callout--warning">
+        <div class="callout-title">Note</div>
+        <p>Client-side verification is recommended for best performance. Use this endpoint only when server-side verification is required.</p>
+    </div>
+</div>
+{% endblock %}

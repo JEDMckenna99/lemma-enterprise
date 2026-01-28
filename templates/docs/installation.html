@@ -1,0 +1,92 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'installation' %}
+{% set hero_title = 'Installation' %}
+{% set hero_subtitle = 'Multiple ways to add Lemma to your project' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Installation Methods</h2>
+    <p>Choose the installation method that fits your project:</p>
+</div>
+
+<div class="docs-section" id="cdn">
+    <h2>CDN (Recommended)</h2>
+    <p>The simplest way to get started - just add the script tag:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>HTML</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;</code>
+    </div>
+    
+    <div class="callout callout--success">
+        <div class="callout-title">Benefits</div>
+        <p>Automatic updates, CDN caching, no build step required.</p>
+    </div>
+</div>
+
+<div class="docs-section" id="npm">
+    <h2>NPM Package</h2>
+    <p>For projects using npm/yarn:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Terminal</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>npm install @lemma/wallet-sdk
+# or
+yarn add @lemma/wallet-sdk</code>
+    </div>
+    
+    <p>Then import in your JavaScript:</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>import { LemmaWallet } from '@lemma/wallet-sdk';
+
+const wallet = new LemmaWallet({
+    siteId: 'your-site-id',
+    apiKey: 'your-api-key'
+});</code>
+    </div>
+</div>
+
+<div class="docs-section" id="requirements">
+    <h2>Browser Requirements</h2>
+    <p>Lemma requires modern browser features:</p>
+    
+    <table class="docs-table">
+        <thead>
+            <tr>
+                <th>Feature</th>
+                <th>Requirement</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Web Crypto API</td>
+                <td>Required</td>
+                <td>For Ed25519 signature verification</td>
+            </tr>
+            <tr>
+                <td>IndexedDB</td>
+                <td>Required</td>
+                <td>For secure credential storage</td>
+            </tr>
+            <tr>
+                <td>WebAuthn</td>
+                <td>Recommended</td>
+                <td>For passkey-protected wallet</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <p><strong>Supported browsers:</strong> Chrome 67+, Firefox 60+, Safari 14+, Edge 79+</p>
+</div>
+{% endblock %}
