@@ -38,6 +38,22 @@
     </div>
 </div>
 
+<!-- Agent Token (AI Development Access) -->
+<div class="dev-card" id="agent-token-card">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">AI Agent Access</h2>
+        <span class="dev-badge dev-badge-info" id="agent-status">Checking...</span>
+    </div>
+    <div class="dev-card-body">
+        <div id="agent-token-content">
+            <div class="dev-loading">
+                <div class="dev-spinner"></div>
+                <div>Checking wallet authentication...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Quick Actions -->
 <div class="dev-card">
     <div class="dev-card-header">
@@ -172,6 +188,218 @@
     text-decoration: line-through;
     color: var(--dev-text-muted);
 }
+
+/* Agent Token Styles */
+.agent-auth-needed {
+    text-align: center;
+    padding: 20px;
+}
+
+.agent-auth-needed p {
+    margin: 0 0 12px 0;
+}
+
+.agent-desc {
+    font-size: 13px;
+    color: var(--dev-text-muted);
+}
+
+.agent-token-section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.agent-token-info p {
+    margin: 0 0 8px 0;
+}
+
+.agent-token-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: var(--dev-bg-subtle);
+    border-radius: 8px;
+}
+
+.agent-form-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.agent-form-row label:first-child {
+    width: 100px;
+    font-weight: 500;
+}
+
+.agent-form-row .dev-input,
+.agent-form-row .dev-select {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--dev-border);
+    border-radius: 6px;
+    background: var(--dev-bg);
+}
+
+.agent-scope-options {
+    display: flex;
+    gap: 16px;
+}
+
+.agent-scope-options label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: normal;
+}
+
+.agent-active-tokens {
+    border-top: 1px solid var(--dev-border);
+    padding-top: 16px;
+}
+
+.agent-active-tokens h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: var(--dev-text-muted);
+}
+
+.agent-token-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px;
+    background: var(--dev-bg-subtle);
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.agent-token-meta {
+    flex: 1;
+}
+
+.agent-token-name {
+    font-weight: 500;
+    display: block;
+}
+
+.agent-token-id {
+    font-size: 12px;
+    color: var(--dev-text-muted);
+    font-family: monospace;
+}
+
+.agent-token-details {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+    color: var(--dev-text-muted);
+}
+
+.dev-btn-danger {
+    background: #dc3545;
+    color: white;
+    border: none;
+}
+
+.dev-btn-danger:hover {
+    background: #c82333;
+}
+
+/* Generated Token Display */
+.agent-token-generated {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.agent-success-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #28a745;
+}
+
+.agent-success-icon {
+    width: 24px;
+    height: 24px;
+    background: #28a745;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.agent-token-display {
+    padding: 16px;
+    background: #1a1a2e;
+    border-radius: 8px;
+    border: 2px solid #28a745;
+}
+
+.agent-token-label {
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 8px;
+}
+
+.agent-token-value {
+    font-family: monospace;
+    font-size: 14px;
+    color: #4ade80;
+    word-break: break-all;
+    padding: 12px;
+    background: #0d0d1a;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+
+.agent-token-meta-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    padding: 12px;
+    background: var(--dev-bg-subtle);
+    border-radius: 6px;
+}
+
+.agent-token-usage {
+    padding: 12px;
+    background: var(--dev-bg-subtle);
+    border-radius: 6px;
+}
+
+.agent-usage-label {
+    font-size: 12px;
+    color: var(--dev-text-muted);
+    margin-bottom: 8px;
+}
+
+.agent-usage-code {
+    display: block;
+    font-family: monospace;
+    font-size: 13px;
+    padding: 8px 12px;
+    background: var(--dev-bg);
+    border-radius: 4px;
+    word-break: break-all;
+}
+
+#copy-btn.copied {
+    background: #28a745;
+}
+
+.agent-error {
+    text-align: center;
+    padding: 20px;
+    color: var(--dev-text-muted);
+}
 </style>
 
 <script nonce="{{ csp_nonce }}">
@@ -179,7 +407,285 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadOverviewStats();
     await loadRecentSites();
     updateChecklist();
+    await checkAgentTokenStatus();
 });
+
+// ============================================
+// AGENT TOKEN MANAGEMENT
+// ============================================
+
+async function checkAgentTokenStatus() {
+    const container = document.getElementById('agent-token-content');
+    const statusBadge = document.getElementById('agent-status');
+    
+    // Check if wallet is available
+    if (typeof LemmaWallet === 'undefined') {
+        showAgentNeedsAuth('Wallet not loaded');
+        return;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.checkAuth();
+        
+        if (!authResult.authenticated) {
+            showAgentNeedsAuth('Not signed in');
+            return;
+        }
+        
+        // User is authenticated - check for existing tokens
+        const ppid = authResult.ppid;
+        statusBadge.textContent = 'Authenticated';
+        statusBadge.className = 'dev-badge dev-badge-success';
+        
+        // Load existing agent credentials
+        await loadAgentCredentials(ppid);
+        
+    } catch (e) {
+        console.error('Agent token check failed:', e);
+        showAgentNeedsAuth('Auth check failed');
+    }
+}
+
+function showAgentNeedsAuth(reason) {
+    const container = document.getElementById('agent-token-content');
+    const statusBadge = document.getElementById('agent-status');
+    
+    statusBadge.textContent = reason;
+    statusBadge.className = 'dev-badge dev-badge-warning';
+    
+    container.innerHTML = `
+        <div class="agent-auth-needed">
+            <p>Sign in with your wallet to generate AI agent tokens.</p>
+            <p class="agent-desc">Agent tokens allow AI coding assistants (like Cursor) to test authenticated features on your behalf.</p>
+            <button onclick="signInForAgentToken()" class="dev-btn dev-btn-primary">
+                Sign In with Wallet
+            </button>
+        </div>
+    `;
+}
+
+async function signInForAgentToken() {
+    try {
+        const wallet = new LemmaWallet();
+        await wallet.startRedirectFlow({ returnUrl: window.location.href });
+    } catch (e) {
+        console.error('Sign in failed:', e);
+        alert('Sign in failed: ' + e.message);
+    }
+}
+
+async function loadAgentCredentials(ppid) {
+    const container = document.getElementById('agent-token-content');
+    
+    try {
+        // Get PPID for the request
+        const response = await fetch('/api/agent/credentials', {
+            headers: {
+                'X-Lemma-PPID': ppid
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load credentials');
+        }
+        
+        const data = await response.json();
+        const credentials = (data.credentials || []).filter(c => c.status === 'active');
+        
+        container.innerHTML = `
+            <div class="agent-token-section">
+                <div class="agent-token-info">
+                    <p><strong>Generate a token</strong> for your AI coding assistant to access the developer API.</p>
+                    <p class="agent-desc">Tokens are time-limited and can be revoked at any time.</p>
+                </div>
+                
+                <div class="agent-token-form">
+                    <div class="agent-form-row">
+                        <label>Agent Name</label>
+                        <input type="text" id="agent-name" value="Cursor AI" class="dev-input">
+                    </div>
+                    <div class="agent-form-row">
+                        <label>Duration</label>
+                        <select id="agent-ttl" class="dev-select">
+                            <option value="1">1 hour</option>
+                            <option value="4" selected>4 hours</option>
+                            <option value="8">8 hours</option>
+                            <option value="24">24 hours</option>
+                        </select>
+                    </div>
+                    <div class="agent-form-row">
+                        <label>Scope</label>
+                        <div class="agent-scope-options">
+                            <label><input type="checkbox" id="scope-read" checked disabled> Read</label>
+                            <label><input type="checkbox" id="scope-write" checked> Write</label>
+                            <label><input type="checkbox" id="scope-admin"> Admin</label>
+                        </div>
+                    </div>
+                    <button onclick="generateAgentToken('${ppid}')" class="dev-btn dev-btn-primary" id="generate-btn">
+                        Generate Token
+                    </button>
+                </div>
+                
+                ${credentials.length > 0 ? `
+                    <div class="agent-active-tokens">
+                        <h4>Active Tokens</h4>
+                        ${credentials.map(c => `
+                            <div class="agent-token-item">
+                                <div class="agent-token-meta">
+                                    <span class="agent-token-name">${escapeHtml(c.agent_name)}</span>
+                                    <span class="agent-token-id">${c.token_id}</span>
+                                </div>
+                                <div class="agent-token-details">
+                                    <span>Expires: ${new Date(c.expires_at).toLocaleString()}</span>
+                                    <span>Used: ${c.use_count} times</span>
+                                </div>
+                                <button onclick="revokeAgentToken('${c.token_id}', '${ppid}')" class="dev-btn dev-btn-sm dev-btn-danger">
+                                    Revoke
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        
+    } catch (e) {
+        console.error('Failed to load agent credentials:', e);
+        container.innerHTML = `
+            <div class="agent-error">
+                <p>Could not load agent credentials.</p>
+                <button onclick="checkAgentTokenStatus()" class="dev-btn dev-btn-secondary">Retry</button>
+            </div>
+        `;
+    }
+}
+
+async function generateAgentToken(ppid) {
+    const btn = document.getElementById('generate-btn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Generating...';
+    btn.disabled = true;
+    
+    try {
+        const agentName = document.getElementById('agent-name').value || 'AI Agent';
+        const ttlHours = parseInt(document.getElementById('agent-ttl').value);
+        
+        const scope = ['read'];
+        if (document.getElementById('scope-write').checked) scope.push('write');
+        if (document.getElementById('scope-admin').checked) scope.push('admin');
+        
+        const response = await fetch('/api/agent/credentials/issue', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Lemma-PPID': ppid
+            },
+            body: JSON.stringify({
+                agent_name: agentName,
+                scope: scope,
+                ttl_hours: ttlHours
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to generate token');
+        }
+        
+        // Show the token (only shown once!)
+        showGeneratedToken(data.credential, ppid);
+        
+    } catch (e) {
+        console.error('Failed to generate token:', e);
+        alert('Failed to generate token: ' + e.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+function showGeneratedToken(credential, ppid) {
+    const container = document.getElementById('agent-token-content');
+    
+    container.innerHTML = `
+        <div class="agent-token-generated">
+            <div class="agent-success-header">
+                <span class="agent-success-icon">✓</span>
+                <span>Token Generated Successfully</span>
+            </div>
+            
+            <div class="agent-token-display">
+                <div class="agent-token-label">Your Agent Token (copy this - shown only once!):</div>
+                <div class="agent-token-value" id="token-value">${credential.token}</div>
+                <button onclick="copyAgentToken()" class="dev-btn dev-btn-primary" id="copy-btn">
+                    Copy to Clipboard
+                </button>
+            </div>
+            
+            <div class="agent-token-meta-info">
+                <div><strong>Token ID:</strong> ${credential.token_id}</div>
+                <div><strong>Scope:</strong> ${credential.scope.join(', ')}</div>
+                <div><strong>Expires:</strong> ${new Date(credential.expires_at).toLocaleString()}</div>
+            </div>
+            
+            <div class="agent-token-usage">
+                <div class="agent-usage-label">Usage in AI Agent:</div>
+                <code class="agent-usage-code">X-Agent-Token: ${credential.token}</code>
+            </div>
+            
+            <button onclick="loadAgentCredentials('${ppid}')" class="dev-btn dev-btn-secondary">
+                Done - Back to Token Management
+            </button>
+        </div>
+    `;
+}
+
+function copyAgentToken() {
+    const token = document.getElementById('token-value').textContent;
+    navigator.clipboard.writeText(token).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'Copy to Clipboard';
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(e => {
+        console.error('Copy failed:', e);
+        alert('Copy failed - please select and copy manually');
+    });
+}
+
+async function revokeAgentToken(tokenId, ppid) {
+    if (!confirm('Revoke this token? The agent will immediately lose access.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/agent/credentials/${tokenId}/revoke`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Lemma-PPID': ppid
+            },
+            body: JSON.stringify({ reason: 'Manual revocation from dashboard' })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to revoke');
+        }
+        
+        // Reload the credentials list
+        await loadAgentCredentials(ppid);
+        
+    } catch (e) {
+        console.error('Failed to revoke token:', e);
+        alert('Failed to revoke token: ' + e.message);
+    }
+}
 
 async function loadOverviewStats() {
     try {
