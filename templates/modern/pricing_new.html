@@ -1,465 +1,249 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Pricing - lemma.id | $5/month Unlimited Users | 99% Cheaper Than Auth0{% endblock %}
-{% block description %}Lemma IAM: $5/month flat for unlimited users. Auth0 charges $48,000/year for 100K users. We charge $60. Client-side verification = no server costs.{% endblock %}
+{% block title %}Pricing - lemma.id | Free During Early Access{% endblock %}
+{% block description %}lemma.id is free during early access. Privacy-preserving identity verification for your platform.{% endblock %}
 
 {% block head %}
 {{ super() }}
 <style>
     .pricing-hero {
         text-align: center;
-        padding: 80px 20px 60px;
-        background: linear-gradient(135deg, var(--gray-900) 0%, var(--black) 100%);
+        padding: 120px 20px 80px;
+        background: linear-gradient(135deg, var(--gray-900) 0%, #0f172a 100%);
         color: var(--white);
+        min-height: 70vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
     }
+    
+    .early-access-badge {
+        display: inline-block;
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: #10b981;
+        padding: 8px 20px;
+        border-radius: 50px;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        margin-bottom: 32px;
+        text-transform: uppercase;
+    }
+    
     .pricing-hero h1 {
-        font-size: 48px;
-        margin: 0 0 16px 0;
+        font-size: 72px;
+        margin: 0 0 24px 0;
         font-weight: 700;
-    }
-    .pricing-hero .highlight {
         color: #10b981;
     }
-    .pricing-hero p {
-        font-size: 22px;
-        margin: 0;
+    
+    .pricing-hero .subtitle {
+        font-size: 24px;
+        margin: 0 0 16px 0;
         opacity: 0.95;
-        max-width: 750px;
-        margin: 0 auto;
+        max-width: 600px;
         line-height: 1.5;
+        color: var(--white);
     }
-    .savings-banner {
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: white;
-        padding: 20px;
-        text-align: center;
+    
+    .pricing-hero .description {
+        font-size: 18px;
+        margin: 0 0 48px 0;
+        opacity: 0.7;
+        max-width: 500px;
+        line-height: 1.6;
+    }
+    
+    .pricing-cta {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .pricing-cta .btn-primary {
+        background: #10b981;
+        padding: 18px 48px;
         font-size: 18px;
         font-weight: 600;
+        border-radius: 10px;
     }
-    .savings-banner span {
-        background: rgba(255,255,255,0.2);
-        padding: 4px 12px;
-        border-radius: 4px;
-        margin: 0 8px;
+    
+    .pricing-cta .btn-primary:hover {
+        background: #059669;
+        transform: translateY(-2px);
     }
-    .pricing-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 24px;
-        margin: 60px auto;
-        max-width: 1200px;
-        padding: 0 20px;
-    }
-    .pricing-card {
-        background: var(--white);
-        border-radius: 16px;
-        padding: 36px 28px;
-        box-shadow: var(--shadow-lg);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        position: relative;
-        border: 2px solid var(--gray-200);
-    }
-    .pricing-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.12);
-    }
-    .pricing-card.featured {
-        border: 3px solid var(--primary);
-        transform: scale(1.02);
-    }
-    .pricing-card.featured:hover {
-        transform: scale(1.02) translateY(-6px);
-    }
-    .pricing-card .badge {
-        position: absolute;
-        top: -14px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--primary);
+    
+    .pricing-cta .btn-secondary {
+        background: transparent;
+        border: 2px solid rgba(255,255,255,0.3);
         color: var(--white);
-        padding: 6px 20px;
-        border-radius: 20px;
-        font-size: 13px;
+        padding: 18px 48px;
+        font-size: 18px;
         font-weight: 600;
-        white-space: nowrap;
+        border-radius: 10px;
+        text-decoration: none;
+        transition: all 0.2s;
     }
-    .pricing-tier {
-        font-size: 12px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
-        margin-bottom: 8px;
+    
+    .pricing-cta .btn-secondary:hover {
+        border-color: rgba(255,255,255,0.6);
+        background: rgba(255,255,255,0.05);
     }
-    .pricing-tier.free { color: #10b981; }
-    .pricing-tier.pro { color: var(--primary); }
-    .pricing-tier.partner { color: #8b5cf6; }
-    .pricing-tier.verify { color: #f59e0b; }
-    .pricing-card h2 {
-        font-size: 26px;
-        margin: 0 0 8px 0;
+    
+    .features-included {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 80px 20px;
+        text-align: center;
+    }
+    
+    .features-included h2 {
+        font-size: 32px;
         color: var(--gray-900);
+        margin-bottom: 48px;
     }
-    .pricing-card .price {
-        font-size: 44px;
+    
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 24px;
+        text-align: left;
+    }
+    
+    .feature-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 20px;
+        background: var(--gray-50);
+        border-radius: 12px;
+    }
+    
+    .feature-check {
+        width: 24px;
+        height: 24px;
+        background: #d1fae5;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: #059669;
         font-weight: 700;
-        color: var(--gray-900);
-        margin: 20px 0;
-    }
-    .pricing-card .price span {
-        font-size: 16px;
-        color: var(--gray-500);
-        font-weight: 400;
-    }
-    .pricing-card .price.free-price {
-        color: #10b981;
-    }
-    .pricing-card .description {
-        color: var(--gray-600);
-        margin-bottom: 20px;
-        min-height: 48px;
-        line-height: 1.5;
-        font-size: 15px;
-    }
-    .pricing-card .features {
-        list-style: none;
-        padding: 0;
-        margin: 24px 0;
-    }
-    .pricing-card .features li {
-        padding: 10px 0;
-        border-bottom: 1px solid var(--gray-100);
-        color: var(--gray-700);
         font-size: 14px;
     }
-    .pricing-card .features li:last-child {
-        border-bottom: none;
-    }
-    .pricing-card .features li:before {
-        content: "✓ ";
-        color: #10b981;
-        font-weight: 700;
-        margin-right: 8px;
-    }
-    .pricing-card .cta-button {
-        display: block;
-        width: 100%;
-        padding: 14px;
-        background: var(--gray-900);
-        color: var(--white);
-        text-align: center;
-        border-radius: 8px;
-        text-decoration: none;
-        font-weight: 600;
+    
+    .feature-text {
+        color: var(--gray-700);
         font-size: 15px;
-        border: none;
-        cursor: pointer;
-        transition: background 0.3s ease;
+        line-height: 1.5;
     }
-    .pricing-card .cta-button:hover {
-        background: var(--black);
-    }
-    .pricing-card.featured .cta-button {
-        background: var(--primary);
-    }
-    .pricing-card.featured .cta-button:hover {
-        background: var(--primary-dark);
-    }
-    .comparison-section {
+    
+    .future-note {
         background: var(--gray-50);
-        padding: 80px 20px;
-    }
-    .comparison-section h2 {
+        padding: 60px 20px;
         text-align: center;
-        margin-bottom: 16px;
-        color: var(--gray-900);
-        font-size: 36px;
     }
-    .comparison-section .subtitle {
-        text-align: center;
-        color: var(--gray-600);
-        margin-bottom: 48px;
-        font-size: 18px;
-    }
-    .comparison-table {
-        max-width: 800px;
+    
+    .future-note-inner {
+        max-width: 600px;
         margin: 0 auto;
-        background: var(--white);
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: var(--shadow-lg);
     }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    th, td {
-        padding: 16px 20px;
-        text-align: left;
-        border-bottom: 1px solid var(--gray-200);
-    }
-    th {
-        background: var(--gray-900);
-        color: var(--white);
-        font-weight: 600;
-    }
-    .highlight-cell {
-        background: #f0fdf4;
-        font-weight: 700;
-        color: #059669;
-    }
-    .savings-row {
-        background: #fef3c7;
-    }
-    .savings-row td {
-        font-weight: 700;
-        color: #92400e;
-    }
-    .faq-section {
-        max-width: 800px;
-        margin: 0 auto 80px;
-        padding: 0 20px;
-    }
-    .faq-section h2 {
-        text-align: center;
-        color: var(--gray-900);
-        margin-bottom: 48px;
-        font-size: 32px;
-    }
-    .faq-item {
-        background: var(--white);
-        padding: 24px;
+    
+    .future-note h3 {
+        font-size: 20px;
+        color: var(--gray-800);
         margin-bottom: 12px;
-        border-radius: 10px;
-        box-shadow: var(--shadow);
-        border: 1px solid var(--gray-200);
     }
-    .faq-item h3 {
-        color: var(--gray-900);
-        margin: 0 0 10px 0;
-        font-size: 17px;
-    }
-    .faq-item p {
+    
+    .future-note p {
         color: var(--gray-600);
-        margin: 0;
-        line-height: 1.6;
-        font-size: 15px;
+        line-height: 1.7;
+        font-size: 16px;
     }
-    .cta-section {
-        background: linear-gradient(135deg, var(--gray-900), var(--black));
-        padding: 80px 20px;
-        text-align: center;
-        color: white;
-    }
-    .cta-section h2 {
-        margin-bottom: 16px;
-        font-size: 36px;
-    }
-    .cta-section p {
-        opacity: 0.9;
-        margin-bottom: 32px;
-        font-size: 19px;
-    }
-    .cta-section .btn-primary {
-        background: #10b981;
-        font-size: 18px;
-        padding: 16px 48px;
-    }
-    .cta-section .btn-primary:hover {
-        background: #059669;
-    }
+    
     @media (max-width: 768px) {
-        .pricing-hero h1 { font-size: 32px; }
-        .pricing-hero p { font-size: 18px; }
-        .pricing-card .price { font-size: 36px; }
-        .savings-banner { font-size: 14px; padding: 16px; }
+        .pricing-hero {
+            padding: 80px 20px 60px;
+            min-height: auto;
+        }
+        .pricing-hero h1 {
+            font-size: 48px;
+        }
+        .pricing-hero .subtitle {
+            font-size: 20px;
+        }
+        .pricing-cta {
+            flex-direction: column;
+            width: 100%;
+            max-width: 300px;
+        }
+        .pricing-cta .btn-primary,
+        .pricing-cta .btn-secondary {
+            width: 100%;
+            text-align: center;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="pricing-hero">
-    <h1><span class="highlight">$5/month</span> Unlimited Users</h1>
-    <p>Auth0 charges per user because they run servers for every verification. Lemma verifies client-side - zero server cost after issuance. Same security, 99% cheaper.</p>
-</div>
-
-<div class="savings-banner">
-    100,000 users: <span>Auth0: $48,000/year</span> vs <span>Lemma: $60/year</span> = <span>99.9% savings</span>
-</div>
-
-<div class="pricing-grid">
-    <!-- Free Tier -->
-    <div class="pricing-card">
-        <div class="pricing-tier free">Free Tier</div>
-        <h2>IAM Free</h2>
-        <div class="price free-price">$0<span> /month</span></div>
-        <div class="description">Get started with up to 1,000 users. Full features, no credit card.</div>
-        <ul class="features">
-            <li>Up to 1,000 users</li>
-            <li>Email authentication</li>
-            <li>Client-side credentials</li>
-            <li>Built-in bot friction</li>
-            <li>OAuth 2.0 support</li>
-            <li>Microsecond verification</li>
-        </ul>
-        <a href="/register" class="cta-button">Start Free</a>
-    </div>
-
-    <!-- Pro Tier - Featured -->
-    <div class="pricing-card featured">
-        <div class="badge">Best Value</div>
-        <div class="pricing-tier pro">Pro</div>
-        <h2>IAM Pro</h2>
-        <div class="price">$5<span> /month flat</span></div>
-        <div class="description">Unlimited users, unlimited verifications. Fixed cost that never scales.</div>
-        <ul class="features">
-            <li><strong>Unlimited users</strong></li>
-            <li><strong>Unlimited verifications</strong></li>
-            <li>Everything in Free</li>
-            <li>Priority support</li>
-            <li>Advanced analytics</li>
-            <li>Custom branding</li>
-            <li>Webhooks</li>
-        </ul>
-        <a href="/register" class="cta-button">Get Pro</a>
-    </div>
-
-    <!-- PoH Partner -->
-    <div class="pricing-card">
-        <div class="pricing-tier partner">PoH Partner</div>
-        <h2>Trusted Verifier</h2>
-        <div class="price free-price">$0<span> free</span></div>
-        <div class="description">Already do ID verification? We issue PoH credentials for your verified users. Free.</div>
-        <ul class="features">
-            <li>You verify user IDs</li>
-            <li>We issue PoH credentials</li>
-            <li>Users get portable proof</li>
-            <li>Cross-site recognition</li>
-            <li>Become trusted issuer</li>
-            <li>All IAM features included</li>
-        </ul>
-        <a href="/register" class="cta-button">Become Partner</a>
-    </div>
-
-    <!-- Full PoH -->
-    <div class="pricing-card">
-        <div class="pricing-tier verify">ID Verification</div>
-        <h2>Full PoH</h2>
-        <div class="price">$2<span> /user one-time</span></div>
-        <div class="description">Need ID verification? Government ID check + liveness. One-time fee, valid forever.</div>
-        <ul class="features">
-            <li>Government ID verification</li>
-            <li>Liveness detection</li>
-            <li>PoH credential issued</li>
-            <li>Cross-site portable</li>
-            <li>No monthly fees</li>
-            <li>All IAM features included</li>
-        </ul>
-        <a href="/register" class="cta-button">Get Verified</a>
+    <div class="early-access-badge">Early Access</div>
+    <h1>Free</h1>
+    <p class="subtitle">lemma.id is free while we're in early access.</p>
+    <p class="description">Full platform access. No credit card. No limits. We're focused on building the best identity verification platform - pricing comes later.</p>
+    <div class="pricing-cta">
+        <a href="/login" class="btn btn-primary">Get Started Free</a>
+        <a href="/docs" class="btn-secondary">Read the Docs</a>
     </div>
 </div>
 
-<div class="comparison-section">
-    <h2>Why We're 99% Cheaper</h2>
-    <p class="subtitle">Auth0 runs servers for every verification. We don't.</p>
-    <div class="comparison-table">
-        <table>
-            <thead>
-                <tr>
-                    <th>Users</th>
-                    <th>Auth0/year</th>
-                    <th>Lemma/year</th>
-                    <th>You Save</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>1,000</td>
-                    <td>$480</td>
-                    <td class="highlight-cell">$0 (free tier)</td>
-                    <td>100%</td>
-                </tr>
-                <tr>
-                    <td>5,000</td>
-                    <td>$2,400</td>
-                    <td class="highlight-cell">$60</td>
-                    <td>97%</td>
-                </tr>
-                <tr>
-                    <td>10,000</td>
-                    <td>$4,800</td>
-                    <td class="highlight-cell">$60</td>
-                    <td>99%</td>
-                </tr>
-                <tr>
-                    <td>50,000</td>
-                    <td>$24,000</td>
-                    <td class="highlight-cell">$60</td>
-                    <td>99.7%</td>
-                </tr>
-                <tr class="savings-row">
-                    <td>100,000</td>
-                    <td>$48,000</td>
-                    <td class="highlight-cell">$60</td>
-                    <td>99.9%</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <p style="text-align: center; margin-top: 24px; color: var(--gray-600);">
-        Auth0 pricing: $0.48/MAU. Lemma Pro: $5/month flat, unlimited users.
-    </p>
-</div>
-
-<div style="background: var(--white); padding: 80px 20px;">
-    <div class="faq-section">
-        <h2>Frequently Asked Questions</h2>
-        
-        <div class="faq-item">
-            <h3>How can you be so much cheaper than Auth0?</h3>
-            <p>Architecture. Auth0 runs servers for every verification - their costs scale with your users. Lemma verifies client-side using cryptographic credentials - after we issue a credential, verifications are free. Our costs don't scale, so yours don't either.</p>
+<div class="features-included">
+    <h2>Everything included, no restrictions</h2>
+    <div class="features-grid">
+        <div class="feature-item">
+            <div class="feature-check">✓</div>
+            <div class="feature-text">Unlimited users</div>
         </div>
-
-        <div class="faq-item">
-            <h3>Is $5/month really unlimited?</h3>
-            <p>Yes. Unlimited users, unlimited verifications, unlimited sites. $5/month flat. No per-user fees, no overage charges, no surprises.</p>
+        <div class="feature-item">
+            <div class="feature-check">✓</div>
+            <div class="feature-text">Unlimited verifications</div>
         </div>
-
-        <div class="faq-item">
-            <h3>What's a "PoH Partner" (Trusted Verifier)?</h3>
-            <p>If you already verify user IDs (KYC, Stripe Identity, etc.), you can become a PoH Partner. We'll issue Proof-of-Human credentials for your verified users - free. Your users get portable credentials, you help grow the network.</p>
+        <div class="feature-item">
+            <div class="feature-check">✓</div>
+            <div class="feature-text">Client-side credentials</div>
         </div>
-
-        <div class="faq-item">
-            <h3>When do I need Full PoH ($2/user)?</h3>
-            <p>Only if you don't already verify IDs and want us to handle it. This includes government ID document verification + liveness detection. One-time fee per user - no monthly charges. If you already do KYC, use the free Partner tier instead.</p>
+        <div class="feature-item">
+            <div class="feature-check">✓</div>
+            <div class="feature-text">Passkey authentication</div>
         </div>
-
-        <div class="faq-item">
-            <h3>How does verification work client-side?</h3>
-            <p>Users hold cryptographic credentials in their browser. When they authenticate, the credential is verified locally using Ed25519 signatures - no server call needed. Takes 36-47 microseconds vs 200-500ms for server-based auth.</p>
+        <div class="feature-item">
+            <div class="feature-check">✓</div>
+            <div class="feature-text">Privacy-preserving PPIDs</div>
         </div>
-
-        <div class="faq-item">
-            <h3>Is it as secure as Auth0?</h3>
-            <p>More secure. Ed25519 cryptographic signatures can't be forged. Built-in replay protection via nonces. No central session store to breach. Credentials are tamper-proof and user-held.</p>
+        <div class="feature-item">
+            <div class="feature-check">✓</div>
+            <div class="feature-text">Full API access</div>
         </div>
-
-        <div class="faq-item">
-            <h3>Can I start free and upgrade later?</h3>
-            <p>Yes. Start with the free tier (1,000 users). When you need more, upgrade to Pro ($5/month). Your users and credentials carry over seamlessly.</p>
+        <div class="feature-item">
+            <div class="feature-check">✓</div>
+            <div class="feature-text">JavaScript SDK</div>
         </div>
-
-        <div class="faq-item">
-            <h3>What if I have 100,000+ users?</h3>
-            <p>Still $5/month. That's the point. Auth0 would charge $48,000/year. We charge $60/year. Same users, same security, 99.9% less cost.</p>
+        <div class="feature-item">
+            <div class="feature-check">✓</div>
+            <div class="feature-text">Developer dashboard</div>
         </div>
     </div>
 </div>
 
-<div class="cta-section">
-    <h2>Stop Paying Per User</h2>
-    <p>$5/month. Unlimited users. Forever.</p>
-    <a href="/register" class="btn-primary">Start Free</a>
-    <p style="margin-top: 20px; opacity: 0.7; font-size: 14px;">No credit card required. Upgrade when ready.</p>
+<div class="future-note">
+    <div class="future-note-inner">
+        <h3>What happens when early access ends?</h3>
+        <p>We'll introduce simple, affordable pricing with generous free tiers. Early access users will be grandfathered with the best rates. Our architecture means we don't have per-user server costs - so we can stay dramatically cheaper than traditional auth providers.</p>
+    </div>
 </div>
 {% endblock %}
