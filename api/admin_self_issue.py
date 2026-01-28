@@ -81,12 +81,14 @@ def admin_self_issue():
     POST /api/v1/iam/admin/self-issue
     Headers:
         Authorization: Bearer <api_key>
+        X-Lemma-PPID: did:lemma:ppid_xxx (optional - wallet-derived PPID)
     Body:
     {
         "site_id": "lemma_platform",
         "site_domain": "lemma.id",
         "user_email": "jedmckenna@lemma.id",
-        "permission_level": "super_admin"
+        "permission_level": "super_admin",
+        "user_ppid": "did:lemma:ppid_xxx" (optional - wallet-derived PPID)
     }
     
     Returns:
@@ -152,8 +154,17 @@ def admin_self_issue():
                 'priority': 100 if 'admin' in permission_level else 50
             })
         
-        # Create pairwise user DID (PPID) from email + RP (site domain)
-        user_did = derive_ppid_did(user_email, site_domain)
+        # Get user DID - prefer wallet-derived PPID if provided
+        # Priority: 1) Header 2) Body 3) Derive from email (legacy)
+        user_did = request.headers.get('X-Lemma-PPID')
+        
+        if not user_did or not user_did.startswith('did:lemma:ppid_'):
+            user_did = data.get('user_ppid')
+        
+        if not user_did or not user_did.startswith('did:lemma:ppid_'):
+            # Fall back to email-based derivation (legacy)
+            logger.warning(f"No wallet PPID provided, falling back to email-derived DID")
+            user_did = derive_ppid_did(user_email, site_domain)
         
         # Issue permission lemma with REAL Ed25519 signature
         import time

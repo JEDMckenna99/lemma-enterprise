@@ -325,8 +325,21 @@ def issue_admin_lemma_endpoint():
                 'priority': 100
             })
         
-        # Derive admin DID from username
-        admin_did = derive_ppid_did(username, site_domain)
+        # Get admin DID - prefer wallet-derived PPID if provided
+        # This allows credentials to be issued to the wallet's actual PPID
+        admin_did = request.headers.get('X-Lemma-PPID')
+        
+        if not admin_did or not admin_did.startswith('did:lemma:ppid_'):
+            # Check request body for PPID
+            data = request.get_json() or {}
+            admin_did = data.get('user_ppid')
+        
+        if not admin_did or not admin_did.startswith('did:lemma:ppid_'):
+            # Fall back to username-based derivation (legacy)
+            logger.warning(f"No wallet PPID provided, falling back to username-derived DID")
+            admin_did = derive_ppid_did(username, site_domain)
+        else:
+            logger.info(f"Using wallet-derived PPID: {admin_did[:50]}...")
         
         # Issue permission lemma with REAL Ed25519 signature
         permission_lemma = manager.issue_permission_lemma(
@@ -366,6 +379,105 @@ def issue_admin_lemma_endpoint():
         return jsonify({
             'success': False,
             'error': 'Admin lemma issuance failed'
+        }), 500
+
+
+@dashboard_bp.route('/api/admin/reissue-with-ppid', methods=['POST'])
+@cross_origin()
+def reissue_admin_with_ppid():
+    """
+    Re-issue admin credential to wallet-derived PPID.
+    
+    Call this after wallet is unlocked to get a credential bound to your actual PPID.
+    
+    POST /api/admin/reissue-with-ppid
+    Headers:
+        X-Lemma-PPID: did:lemma:ppid_xxx (from wallet.derivePPID('lemma.id'))
+    Body:
+        {
+            "email": "jedmckenna@lemma.id"  // For verification/logging
+        }
+    """
+    try:
+        # Require PPID in header
+        ppid = request.headers.get('X-Lemma-PPID')
+        
+        if not ppid or not ppid.startswith('did:lemma:ppid_'):
+            return jsonify({
+                'success': False,
+                'error': 'X-Lemma-PPID header required (wallet-derived PPID)'
+            }), 400
+        
+        data = request.get_json() or {}
+        email = data.get('email', 'admin@lemma.id')
+        
+        # Create admin permission lemma using REAL Ed25519 signing
+        from api.real_iam_manager import get_or_create_site_manager
+        
+        site_id = 'lemma_platform'
+        site_domain = 'lemma.id'
+        
+        manager = get_or_create_site_manager(site_id, site_domain)
+        if not manager:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to initialize platform IAM manager'
+            }), 500
+        
+        # Ensure admin permission type exists
+        if 'admin_access' not in manager.permissions:
+            manager.add_permission({
+                'permission_id': 'admin_access',
+                'display_name': 'Platform Administrator',
+                'scope': ['platform_admin', 'customer_management', 'site_management', 'billing_access'],
+                'conditions': [],
+                'priority': 100
+            })
+        
+        # Issue permission lemma to the wallet's PPID
+        permission_lemma = manager.issue_permission_lemma(
+            ppid,  # Use wallet-derived PPID directly
+            'admin_access',
+            expiry_days=365,
+            custom_claims={
+                'siteId': 'lemma.id',
+                'siteDomain': 'lemma.id',
+                'accountType': 'admin',
+                'permissionId': 'admin_access',
+                'email': email,
+                'networkShared': False,
+                'scope': ['platform_admin', 'customer_management', 'site_management', 'billing_access']
+            }
+        )
+        
+        # Add W3C type field for credential classification
+        permission_lemma['type'] = ['VerifiableCredential', 'PermissionLemma']
+        permission_lemma['packageType'] = 'permission'
+        
+        if 'credentialSubject' in permission_lemma:
+            permission_lemma['credentialSubject']['packageType'] = 'permission'
+            permission_lemma['credentialSubject']['siteId'] = 'lemma.id'
+        if 'claims' in permission_lemma:
+            permission_lemma['claims']['packageType'] = 'permission'
+            permission_lemma['claims']['siteId'] = 'lemma.id'
+        
+        logger.info(f"✅ Re-issued admin credential to wallet PPID: {ppid[:50]}...")
+        
+        return jsonify({
+            'success': True,
+            'user_did': ppid,
+            'issuer_did': manager.issuer_did,
+            'permission_lemma': permission_lemma,
+            'message': 'Admin credential re-issued to your wallet PPID. Store in your wallet.'
+        })
+        
+    except Exception as e:
+        logger.error(f"Admin re-issue error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
 
 
