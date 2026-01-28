@@ -17,6 +17,7 @@ developer_api_bp = Blueprint('developer_api', __name__)
 
 @developer_api_bp.route('/api/developer/stats', methods=['GET'])
 @cross_origin()
+@require_wallet_ppid
 def get_developer_stats():
     """Get overview stats for the developer dashboard"""
     try:
@@ -71,6 +72,7 @@ def get_developer_stats():
 
 @developer_api_bp.route('/api/developer/sites', methods=['GET'])
 @cross_origin()
+@require_wallet_ppid
 def get_developer_sites():
     """Get all sites owned by the developer"""
     try:
@@ -132,6 +134,7 @@ def get_developer_sites():
 
 @developer_api_bp.route('/api/developer/sites', methods=['POST'])
 @cross_origin()
+@require_wallet_ppid
 def create_developer_site():
     """Register a new site"""
     try:
@@ -214,6 +217,7 @@ def create_developer_site():
 
 @developer_api_bp.route('/api/developer/sites/<site_id>', methods=['GET'])
 @cross_origin()
+@require_wallet_ppid
 def get_site_detail(site_id):
     """Get details for a specific site"""
     try:
@@ -251,6 +255,7 @@ def get_site_detail(site_id):
 
 @developer_api_bp.route('/api/developer/sites/<site_id>/stats', methods=['GET'])
 @cross_origin()
+@require_wallet_ppid
 def get_site_stats(site_id):
     """Get stats for a specific site"""
     try:
@@ -273,6 +278,7 @@ def get_site_stats(site_id):
 
 @developer_api_bp.route('/api/developer/sites/<site_id>/keys', methods=['GET'])
 @cross_origin()
+@require_wallet_ppid
 def get_site_keys(site_id):
     """Get API keys for a site"""
     try:
@@ -314,6 +320,7 @@ def get_site_keys(site_id):
 
 @developer_api_bp.route('/api/developer/sites/<site_id>/keys', methods=['POST'])
 @cross_origin()
+@require_wallet_ppid
 def create_site_key(site_id):
     """Create/regenerate API key for a site"""
     try:
@@ -355,6 +362,7 @@ def create_site_key(site_id):
 
 @developer_api_bp.route('/api/developer/sites/<site_id>/keys/<key_id>', methods=['DELETE'])
 @cross_origin()
+@require_wallet_ppid
 def revoke_site_key(site_id, key_id):
     """Revoke/regenerate an API key"""
     try:
@@ -390,6 +398,7 @@ def revoke_site_key(site_id, key_id):
 
 @developer_api_bp.route('/api/developer/sites/<site_id>/users', methods=['GET'])
 @cross_origin()
+@require_wallet_ppid
 def get_site_users(site_id):
     """Get users who have authenticated on a site"""
     try:
