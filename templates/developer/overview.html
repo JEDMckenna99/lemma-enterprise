@@ -425,11 +425,13 @@ async function getWalletPpid() {
     
     try {
         const wallet = new LemmaWallet();
-        const authResult = await wallet.checkAuth();
+        const authResult = await wallet.autoAuthenticate();
         
-        if (authResult.authenticated && authResult.ppid) {
-            console.log('Wallet authenticated, PPID:', authResult.ppid);
-            return authResult.ppid;
+        if (authResult.authenticated) {
+            // Derive site-specific PPID for lemma.id
+            const ppid = await wallet.derivePPID('lemma.id');
+            console.log('Wallet authenticated, PPID:', ppid);
+            return ppid;
         }
     } catch (e) {
         console.warn('Wallet auth check failed:', e);
@@ -462,15 +464,15 @@ async function checkAgentTokenStatus() {
     
     try {
         const wallet = new LemmaWallet();
-        const authResult = await wallet.checkAuth();
+        const authResult = await wallet.autoAuthenticate();
         
         if (!authResult.authenticated) {
             showAgentNeedsAuth('Not signed in');
             return;
         }
         
-        // User is authenticated - check for existing tokens
-        const ppid = authResult.ppid;
+        // User is authenticated - derive PPID and check for existing tokens
+        const ppid = await wallet.derivePPID('lemma.id');
         statusBadge.textContent = 'Authenticated';
         statusBadge.className = 'dev-badge dev-badge-success';
         
