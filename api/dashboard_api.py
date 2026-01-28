@@ -1,4 +1,4 @@
-"""
+﻿"""
 Dashboard API for Customer and Admin Management
 
 Authentication uses lemma-based credentials:
@@ -387,7 +387,6 @@ def get_admin_users():
             conn = psycopg2.connect(database_url)
             cur = conn.cursor()
             
-            # Get users from registered_sites (site owners)
             cur.execute("""
                 SELECT DISTINCT admin_email, site_domain, created_at, status
                 FROM registered_sites 
@@ -408,11 +407,8 @@ def get_admin_users():
             cur.close()
             conn.close()
         else:
-            # Demo data when no database
             users = [
                 {'email': 'dev@example.com', 'site': 'example.com', 'created_at': '2025-01-15T10:00:00Z', 'status': 'active', 'type': 'developer'},
-                {'email': 'admin@startup.io', 'site': 'startup.io', 'created_at': '2025-01-10T14:30:00Z', 'status': 'active', 'type': 'developer'},
-                {'email': 'team@webapp.dev', 'site': 'webapp.dev', 'created_at': '2025-01-05T09:15:00Z', 'status': 'active', 'type': 'developer'},
             ]
         
         return jsonify({
@@ -442,15 +438,12 @@ def get_admin_user_stats():
             conn = psycopg2.connect(database_url)
             cur = conn.cursor()
             
-            # Count total users
             cur.execute("SELECT COUNT(DISTINCT admin_email) FROM registered_sites WHERE admin_email IS NOT NULL")
             total_users = cur.fetchone()[0] or 0
             
-            # Count active sites
             cur.execute("SELECT COUNT(*) FROM registered_sites WHERE status = 'active' OR status IS NULL")
             active_sites = cur.fetchone()[0] or 0
             
-            # Count new users this week
             cur.execute("""
                 SELECT COUNT(DISTINCT admin_email) FROM registered_sites 
                 WHERE admin_email IS NOT NULL 
@@ -468,7 +461,6 @@ def get_admin_user_stats():
                 'growth_rate': round((new_this_week / max(total_users, 1)) * 100, 1)
             }
         else:
-            # Demo stats
             stats = {
                 'total_users': 156,
                 'active_sites': 89,
@@ -503,9 +495,8 @@ def get_admin_recent_activity():
             conn = psycopg2.connect(database_url)
             cur = conn.cursor()
             
-            # Get recent site registrations
             cur.execute("""
-                SELECT admin_email, site_domain, created_at, 'site_registered' as action
+                SELECT admin_email, site_domain, created_at
                 FROM registered_sites 
                 WHERE created_at IS NOT NULL
                 ORDER BY created_at DESC
@@ -524,13 +515,10 @@ def get_admin_recent_activity():
             cur.close()
             conn.close()
         else:
-            # Demo activity
-            from datetime import datetime, timedelta
+            from datetime import datetime
             now = datetime.utcnow()
             activities = [
-                {'user': 'dev@example.com', 'action': 'Registered site', 'target': 'example.com', 'timestamp': (now - timedelta(hours=2)).isoformat(), 'type': 'site_registered'},
-                {'user': 'admin@startup.io', 'action': 'Generated API key', 'target': 'startup.io', 'timestamp': (now - timedelta(hours=5)).isoformat(), 'type': 'api_key'},
-                {'user': 'team@webapp.dev', 'action': 'Updated settings', 'target': 'webapp.dev', 'timestamp': (now - timedelta(hours=8)).isoformat(), 'type': 'settings'},
+                {'user': 'dev@example.com', 'action': 'Registered site', 'target': 'example.com', 'timestamp': now.isoformat(), 'type': 'site_registered'},
             ]
         
         return jsonify({
@@ -545,75 +533,102 @@ def get_admin_recent_activity():
             'error': str(e)
         }), 500
 
+
 @dashboard_bp.route('/api/health/detailed', methods=['GET'])
 @cross_origin()
 def get_detailed_health():
-    """Detailed health check for all platform components"""
+    """Get detailed system health status for admin dashboard"""
     try:
-        import time
-        health = {
-            'api_server': {'status': 'operational', 'latency_ms': 1},
-            'database': {'status': 'unknown'},
-            'redis': {'status': 'unknown'},
-            'crypto_engine': {'status': 'unknown'},
-            'bloom_filter': {'status': 'unknown'}
-        }
+        services = []
         
-        # Check database
+        # API Server (always healthy if this endpoint responds)
+        services.append({
+            'name': 'API Server',
+            'status': 'healthy',
+            'message': 'Operational'
+        })
+        
+        # Database
         database_url = os.environ.get('DATABASE_URL')
         if database_url:
             try:
                 import psycopg2
-                start = time.time()
-                conn = psycopg2.connect(database_url, sslmode='require', connect_timeout=5)
-                cur = conn.cursor()
-                cur.execute('SELECT 1')
-                cur.close()
+                conn = psycopg2.connect(database_url, connect_timeout=5)
                 conn.close()
-                health['database'] = {'status': 'operational', 'latency_ms': round((time.time() - start) * 1000, 2)}
+                services.append({
+                    'name': 'Database',
+                    'status': 'healthy',
+                    'message': 'Connected'
+                })
             except Exception as e:
-                health['database'] = {'status': 'error', 'error': str(e)[:50]}
+                services.append({
+                    'name': 'Database',
+                    'status': 'unhealthy',
+                    'message': str(e)[:50]
+                })
         else:
-            health['database'] = {'status': 'not_configured'}
+            services.append({
+                'name': 'Database',
+                'status': 'warning',
+                'message': 'Not configured'
+            })
         
-        # Check Redis
+        # Redis (optional)
         redis_url = os.environ.get('REDIS_URL')
         if redis_url:
             try:
                 import redis
-                start = time.time()
                 r = redis.from_url(redis_url, socket_timeout=5)
                 r.ping()
-                health['redis'] = {'status': 'operational', 'latency_ms': round((time.time() - start) * 1000, 2)}
+                services.append({
+                    'name': 'Redis Cache',
+                    'status': 'healthy',
+                    'message': 'Connected'
+                })
             except Exception as e:
-                health['redis'] = {'status': 'error', 'error': str(e)[:50]}
+                services.append({
+                    'name': 'Redis Cache',
+                    'status': 'unhealthy', 
+                    'message': str(e)[:50]
+                })
         else:
-            health['redis'] = {'status': 'not_configured'}
+            services.append({
+                'name': 'Redis Cache',
+                'status': 'warning',
+                'message': 'Not configured'
+            })
         
-        # Check crypto engine
+        # Crypto Engine
         try:
             from lemma_crypto import PyMinimalIssuer
-            start = time.time()
             issuer = PyMinimalIssuer()
-            _ = issuer.get_issuer_did()
-            health['crypto_engine'] = {'status': 'operational', 'latency_ms': round((time.time() - start) * 1000, 2)}
+            services.append({
+                'name': 'Crypto Engine',
+                'status': 'healthy',
+                'message': 'Ed25519 ready'
+            })
         except Exception as e:
-            health['crypto_engine'] = {'status': 'error', 'error': str(e)[:50]}
+            services.append({
+                'name': 'Crypto Engine',
+                'status': 'unhealthy',
+                'message': str(e)[:50]
+            })
         
-        # Check bloom filter
-        try:
-            from .revocation_api import bloom_filter_manager
-            health['bloom_filter'] = {'status': 'operational'} if bloom_filter_manager else {'status': 'not_initialized'}
-        except Exception as e:
-            health['bloom_filter'] = {'status': 'error', 'error': str(e)[:50]}
+        # Overall status
+        unhealthy_count = sum(1 for s in services if s['status'] == 'unhealthy')
+        overall = 'healthy' if unhealthy_count == 0 else 'degraded' if unhealthy_count < 3 else 'unhealthy'
         
-        # Calculate overall
-        statuses = [h.get('status') for h in health.values()]
-        overall = 'healthy' if all(s == 'operational' for s in statuses) else ('degraded' if any(s == 'error' for s in statuses) else 'partial')
-        
-        return jsonify({'success': True, 'overall': overall, 'components': health, 'timestamp': datetime.utcnow().isoformat()})
+        return jsonify({
+            'success': True,
+            'status': overall,
+            'services': services,
+            'timestamp': datetime.utcnow().isoformat()
+        })
         
     except Exception as e:
-        logger.error(f'Detailed health check error: {e}')
-        return jsonify({'success': False, 'overall': 'error', 'error': str(e)}), 500
-
+        logger.error(f'Get detailed health error: {e}')
+        return jsonify({
+            'success': False,
+            'status': 'error',
+            'error': str(e)
+        }), 500
