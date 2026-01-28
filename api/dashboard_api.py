@@ -1,4 +1,4 @@
-﻿"""
+"""
 Dashboard API for Customer and Admin Management
 
 Authentication uses lemma-based credentials:
