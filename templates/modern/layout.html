@@ -53,24 +53,34 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                 <span>Lemma</span>
             </a>
             
-            <!-- Centered Navigation Links - Session-free -->
-            <div class="nav-center">
-                <!-- Show all navigation (client-side will manage visibility) -->
-                <a href="/platform" class="nav-link" id="nav-platform">Platform</a>
-                <a href="/admin" class="nav-link" id="nav-admin" style="display:none;">Admin Monitor</a>
+            <!-- Mobile Menu Toggle -->
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+            </button>
+            
+            <!-- Navigation Links - toggleable on mobile -->
+            <div class="nav-center" id="nav-center">
+                <a href="/developer" class="nav-link" id="nav-platform">Platform</a>
+                <a href="/admin" class="nav-link" id="nav-admin" style="display:none;">Admin</a>
                 <a href="/wallet" class="nav-link">Wallet</a>
                 <a href="/docs" class="nav-link">Docs</a>
                 <a href="/pricing" class="nav-link" id="nav-pricing">Pricing</a>
             </div>
             
-            <!-- Right Side Navigation - Session-free -->
+            <!-- Right Side - User State -->
             <div class="nav-right">
                 <!-- User dropdown (hidden by default, shown by JS if authenticated) -->
                 <div class="user-dropdown" id="user-dropdown" style="display:none;">
-                    <button class="user-dropdown-toggle" onclick="toggleUserDropdown()">
-                        <span class="user-avatar">👤</span>
+                    <button class="user-dropdown-toggle" id="user-dropdown-toggle" aria-expanded="false">
+                        <span class="user-avatar" id="user-avatar">
+                            <span class="avatar-initials" id="avatar-initials">U</span>
+                        </span>
                         <span class="user-name" id="user-display-name">Account</span>
-                        <span class="dropdown-arrow">▼</span>
+                        <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                            <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                        </svg>
                     </button>
                     <div class="user-dropdown-menu" id="userDropdownMenu">
                         <div class="dropdown-header">
@@ -80,13 +90,12 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                             </div>
                         </div>
                         <div class="dropdown-divider"></div>
-                        <a href="/wallet" class="dropdown-item">Wallet</a>
-                        <a href="/dashboard" class="dropdown-item">Dashboard</a>
-                        <a href="/api-keys" class="dropdown-item">API Keys</a>
-                        <a href="/billing" class="dropdown-item">Billing</a>
-                        <a href="/admin" class="dropdown-item admin-item" id="admin-dropdown-link" style="display:none;">Admin Tools</a>
+                        <a href="/wallet" class="dropdown-item">My Wallet</a>
+                        <a href="/developer" class="dropdown-item">Developer Dashboard</a>
+                        <a href="/developer/sites" class="dropdown-item">My Sites</a>
+                        <a href="/admin" class="dropdown-item admin-item" id="admin-dropdown-link" style="display:none;">Admin Panel</a>
                         <div class="dropdown-divider"></div>
-                        <a href="#" class="dropdown-item logout-item" onclick="handleSessionFreeLogout(); return false;">Sign Out</a>
+                        <a href="#" class="dropdown-item logout-item" id="logout-btn">Sign Out</a>
                     </div>
                 </div>
                 
@@ -122,24 +131,49 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     
     {% block scripts %}{% endblock %}
     
-    <!-- User Dropdown CSS - non-blocking -->
+    <!-- Header & Navigation CSS - non-blocking -->
     <style nonce="{{ csp_nonce }}">
+/* Mobile Menu Toggle */
+.mobile-menu-toggle{display:none;flex-direction:column;justify-content:center;gap:5px;width:40px;height:40px;background:transparent;border:none;cursor:pointer;padding:8px;border-radius:8px;transition:background 0.2s}
+.mobile-menu-toggle:hover{background:#f1f5f9}
+.hamburger-line{width:24px;height:2px;background:#475569;border-radius:2px;transition:all 0.3s}
+.mobile-menu-toggle.active .hamburger-line:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
+.mobile-menu-toggle.active .hamburger-line:nth-child(2){opacity:0}
+.mobile-menu-toggle.active .hamburger-line:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
+
+/* User Dropdown */
 .user-dropdown{position:relative;display:inline-block}
-.user-dropdown-toggle{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:0.9rem;color:#475569}
-.user-avatar{width:24px;height:24px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px}
-.dropdown-arrow{font-size:10px;transition:transform 0.2s}
+.user-dropdown-toggle{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e2e8f0;border-radius:50px;padding:6px 14px 6px 6px;cursor:pointer;font-size:0.9rem;color:#475569;transition:all 0.2s}
+.user-dropdown-toggle:hover{border-color:#cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.user-avatar{width:32px;height:32px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:14px}
+.avatar-initials{text-transform:uppercase}
+.user-name{font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dropdown-arrow{transition:transform 0.2s;flex-shrink:0}
 .user-dropdown.open .dropdown-arrow{transform:rotate(180deg)}
-.user-dropdown-menu{position:absolute;top:100%;right:0;background:#fff;border:1px solid #f1f5f9;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.15);min-width:220px;z-index:1000;opacity:0;visibility:hidden;transform:translateY(-10px);transition:all 0.2s}
+.user-dropdown-menu{position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.12);min-width:240px;z-index:1000;opacity:0;visibility:hidden;transform:translateY(-10px);transition:all 0.2s}
 .user-dropdown.open .user-dropdown-menu{opacity:1;visibility:visible;transform:translateY(0)}
-.dropdown-header{padding:16px;background:#f8fafc;border-radius:12px 12px 0 0}
-.dropdown-user-info{text-align:center}
-.dropdown-user-name{font-weight:600;color:#1e293b;margin-bottom:2px}
-.dropdown-user-role{font-size:0.8rem;color:#64748b;text-transform:uppercase}
-.dropdown-divider{height:1px;background:#f1f5f9;margin:8px 0}
-.dropdown-item{display:block;padding:12px 16px;color:#475569;text-decoration:none;font-size:0.9rem}
+.dropdown-header{padding:16px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-radius:12px 12px 0 0}
+.dropdown-user-info{text-align:left}
+.dropdown-user-name{font-weight:600;color:#1e293b;margin-bottom:2px;font-size:0.95rem}
+.dropdown-user-role{font-size:0.75rem;color:#667eea;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+.dropdown-divider{height:1px;background:#f1f5f9;margin:4px 0}
+.dropdown-item{display:flex;align-items:center;padding:12px 16px;color:#475569;text-decoration:none;font-size:0.9rem;transition:all 0.15s}
 .dropdown-item:hover{background:#f8fafc;color:#1e293b}
-.admin-item{background:linear-gradient(135deg,rgba(139,92,246,0.05),rgba(99,102,241,0.05))}
+.admin-item{color:#667eea}
+.admin-item:hover{background:linear-gradient(135deg,rgba(102,126,234,0.08),rgba(118,75,162,0.08))}
 .logout-item{color:#ef4444}
+.logout-item:hover{background:#fef2f2}
+
+/* Mobile Responsive */
+@media(max-width:768px){
+    .mobile-menu-toggle{display:flex}
+    .nav-center{position:absolute;top:76px;left:0;right:0;background:#fff;flex-direction:column;padding:16px 24px;gap:0;margin-left:0;border-bottom:1px solid #f1f5f9;box-shadow:0 10px 40px rgba(0,0,0,0.1);display:none;z-index:99}
+    .nav-center.mobile-open{display:flex}
+    .nav-center .nav-link{padding:14px 0;border-bottom:1px solid #f1f5f9;width:100%}
+    .nav-center .nav-link:last-child{border-bottom:none}
+    .user-name{display:none}
+    .user-dropdown-toggle{padding:6px}
+}
     </style>
     
     {% block wallet_scripts %}
@@ -151,30 +185,60 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     {% endblock %}
     
     {% block auth_scripts %}
-    <!-- User Dropdown JavaScript -->
+    <!-- Navigation & Auth JavaScript -->
     <script nonce="{{ csp_nonce }}">
-        function toggleUserDropdown() {
-            const dropdown = document.querySelector('.user-dropdown');
-            dropdown.classList.toggle('open');
-        }
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', function(event) {
-            const dropdown = document.querySelector('.user-dropdown');
-            if (dropdown && !dropdown.contains(event.target)) {
-                dropdown.classList.remove('open');
+        // Mobile menu toggle
+        (function() {
+            const mobileToggle = document.getElementById('mobile-menu-toggle');
+            const navCenter = document.getElementById('nav-center');
+            
+            if (mobileToggle && navCenter) {
+                mobileToggle.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    navCenter.classList.toggle('mobile-open');
+                    this.setAttribute('aria-expanded', navCenter.classList.contains('mobile-open'));
+                });
             }
-        });
-
-        // Close dropdown on escape key
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                const dropdown = document.querySelector('.user-dropdown');
-                if (dropdown) {
+        })();
+        
+        // User dropdown toggle
+        (function() {
+            const dropdownToggle = document.getElementById('user-dropdown-toggle');
+            const dropdown = document.querySelector('.user-dropdown');
+            
+            if (dropdownToggle && dropdown) {
+                dropdownToggle.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    dropdown.classList.toggle('open');
+                    this.setAttribute('aria-expanded', dropdown.classList.contains('open'));
+                });
+            }
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(event) {
+                if (dropdown && !dropdown.contains(event.target)) {
                     dropdown.classList.remove('open');
+                    if (dropdownToggle) dropdownToggle.setAttribute('aria-expanded', 'false');
                 }
+            });
+            
+            // Close on escape key
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && dropdown) {
+                    dropdown.classList.remove('open');
+                    if (dropdownToggle) dropdownToggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+            
+            // Logout button
+            const logoutBtn = document.getElementById('logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    handleSessionFreeLogout();
+                });
             }
-        });
+        })();
         
         // AUTO-ATTACH WALLET AUTH TO ALL API REQUESTS
         // This makes wallet unlock = signed in across the platform
@@ -290,8 +354,25 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     const accountType = normalized?.accountType || claims.accountType || 'customer';
                     const emailElem = document.getElementById('dropdown-email');
                     const roleElem = document.getElementById('dropdown-role');
+                    const avatarInitials = document.getElementById('avatar-initials');
+                    const userDisplayName = document.getElementById('user-display-name');
+                    
                     if (emailElem) emailElem.textContent = email;
                     if (roleElem) roleElem.textContent = accountType.charAt(0).toUpperCase() + accountType.slice(1);
+                    
+                    // Set avatar initials from email
+                    if (avatarInitials && email && email !== 'Customer') {
+                        const initials = email.split('@')[0].substring(0, 2).toUpperCase();
+                        avatarInitials.textContent = initials;
+                    }
+                    
+                    // Set display name (first part of email or role)
+                    if (userDisplayName) {
+                        const displayName = email && email !== 'Customer' 
+                            ? email.split('@')[0] 
+                            : accountType.charAt(0).toUpperCase() + accountType.slice(1);
+                        userDisplayName.textContent = displayName;
+                    }
                     
                     // Check admin permission (SECURE: no loose .includes('admin') check)
                     const isAdmin = normalized ? normalized.isAdmin : (

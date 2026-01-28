@@ -298,17 +298,23 @@ The platform has been fully restructured with:
 
 ## Optional Future Enhancements
 
-1. **API Endpoints to Implement:**
+1. **Header/Navigation:**
+   - Platform-style header with user state awareness
+   - Show user avatar/status when authenticated
+   - Context-aware navigation (different links for developer vs admin)
+   - Mobile hamburger menu
+
+2. **API Endpoints to Implement:**
    - `/api/admin/users` - List all users
    - `/api/admin/user-stats` - User statistics
    - `/api/admin/recent-activity` - Recent activity feed
    - `/api/health/detailed` - Detailed health check
 
-2. **UX Improvements:**
+3. **UX Improvements:**
    - Mobile navigation menu for docs sidebar
    - Search functionality in docs
    - Homepage simplification
    
-3. **Performance:**
+4. **Performance:**
    - Service worker for offline docs
    - Lazy loading for admin data tables
