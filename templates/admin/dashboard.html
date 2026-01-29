@@ -13,25 +13,55 @@
 <div class="admin-stats">
     <div class="stat-card stat-card--info">
         <div class="stat-label">Total Users</div>
-        <div class="stat-value" id="stat-users">-</div>
+        <div class="stat-value stat-loading" id="stat-users">
+            <span class="stat-skeleton"></span>
+        </div>
         <div class="stat-change stat-change--up">↑ Active wallets</div>
     </div>
     <div class="stat-card stat-card--success">
         <div class="stat-label">Registered Sites</div>
-        <div class="stat-value" id="stat-sites">-</div>
-        <div class="stat-change">Integrations</div>
+        <div class="stat-value stat-loading" id="stat-sites">
+            <span class="stat-skeleton"></span>
+        </div>
+        <div class="stat-change" id="stat-growth">Loading...</div>
     </div>
     <div class="stat-card stat-card--warning">
         <div class="stat-label">Active Credentials</div>
-        <div class="stat-value" id="stat-credentials">-</div>
-        <div class="stat-change">Issued total</div>
+        <div class="stat-value stat-loading" id="stat-credentials">
+            <span class="stat-skeleton"></span>
+        </div>
+        <div class="stat-change">Agent tokens</div>
     </div>
     <div class="stat-card stat-card--danger">
         <div class="stat-label">Revocations</div>
-        <div class="stat-value" id="stat-revocations">-</div>
+        <div class="stat-value stat-loading" id="stat-revocations">
+            <span class="stat-skeleton"></span>
+        </div>
         <div class="stat-change">This month</div>
     </div>
 </div>
+<div class="stats-timestamp" id="stats-timestamp" style="text-align: right; font-size: 12px; color: var(--admin-text-muted); margin-top: -10px; margin-bottom: 20px;">
+    Last updated: --
+</div>
+
+<style>
+.stat-loading .stat-skeleton {
+    display: inline-block;
+    width: 60px;
+    height: 32px;
+    background: linear-gradient(90deg, var(--admin-bg-tertiary) 25%, var(--admin-bg-secondary) 50%, var(--admin-bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.stat-value:not(.stat-loading) .stat-skeleton {
+    display: none;
+}
+</style>
 
 <div class="admin-grid">
     <!-- System Health -->
@@ -221,18 +251,51 @@ async function loadDashboardStats() {
         if (!response.ok) throw new Error('Failed to load stats');
         const data = await response.json();
         
-        // Stats are nested under data.stats
-        const stats = data.stats || data;
-        document.getElementById('stat-users').textContent = stats.total_customers || stats.total_users || '0';
-        document.getElementById('stat-sites').textContent = stats.active_sites || stats.total_sites || '0';
-        document.getElementById('stat-credentials').textContent = stats.iam_system?.total_permission_lemmas || stats.total_credentials || '0';
-        document.getElementById('stat-revocations').textContent = stats.total_revocations || '0';
+        // Use flat response (with fallback to nested for backwards compatibility)
+        const users = data.total_users ?? data.stats?.total_customers ?? 0;
+        const sites = data.total_sites ?? data.stats?.active_sites ?? 0;
+        const credentials = data.total_credentials ?? data.stats?.iam_system?.total_permission_lemmas ?? 0;
+        const revocations = data.total_revocations ?? 0;
+        const growthRate = data.growth_rate ?? 0;
+        const newThisWeek = data.new_this_week ?? 0;
+        
+        // Update stats with animation
+        updateStatValue('stat-users', users);
+        updateStatValue('stat-sites', sites);
+        updateStatValue('stat-credentials', credentials);
+        updateStatValue('stat-revocations', revocations);
+        
+        // Update growth indicator
+        const growthEl = document.getElementById('stat-growth');
+        if (growthEl) {
+            if (newThisWeek > 0) {
+                growthEl.innerHTML = `<span style="color: var(--admin-success);">+${newThisWeek}</span> this week`;
+            } else {
+                growthEl.textContent = 'No new sites this week';
+            }
+        }
+        
+        // Update timestamp
+        if (data.last_updated) {
+            const timestamp = new Date(data.last_updated);
+            document.getElementById('stats-timestamp').textContent = 
+                `Last updated: ${timestamp.toLocaleTimeString()}`;
+        }
+        
     } catch (e) {
         console.warn('Could not load stats:', e);
-        document.getElementById('stat-users').textContent = '-';
-        document.getElementById('stat-sites').textContent = '-';
-        document.getElementById('stat-credentials').textContent = '-';
-        document.getElementById('stat-revocations').textContent = '-';
+        updateStatValue('stat-users', '-');
+        updateStatValue('stat-sites', '-');
+        updateStatValue('stat-credentials', '-');
+        updateStatValue('stat-revocations', '-');
+    }
+}
+
+function updateStatValue(elementId, value) {
+    const el = document.getElementById(elementId);
+    if (el) {
+        el.classList.remove('stat-loading');
+        el.textContent = typeof value === 'number' ? value.toLocaleString() : value;
     }
 }
 
