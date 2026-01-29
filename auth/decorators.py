@@ -1,10 +1,19 @@
 """
 Authentication and authorization decorators for Lemma.id platform
 Session-free architecture - all auth via credentials + smart caching
+
+AGENT DELEGATION:
+When a user authorizes an AI agent via passkey, the agent receives a token.
+This token can be used:
+1. In X-Agent-Token header (for direct API calls)
+2. Via /api/agent/session to create a browser session (Flask session)
+
+The decorators check BOTH methods, enabling full agent delegation chain:
+User Passkey → Agent Token → Browser Session → API Calls
 """
 
 from functools import wraps
-from flask import request, jsonify, g, make_response
+from flask import request, jsonify, g, make_response, session
 from typing import Optional
 import logging
 
@@ -26,6 +35,27 @@ def validate_agent_token(token):
     except Exception as e:
         logger.warning(f"Agent token validation error: {e}")
         return False, None
+
+
+def check_agent_session():
+    """
+    Check if there's an active agent session from /api/agent/session.
+    Returns (is_valid, session_info) tuple.
+    
+    This enables the agent delegation chain - browser requests inherit
+    the agent's authorization via Flask session.
+    """
+    try:
+        if session.get('agent_authenticated'):
+            return True, {
+                'token_id': session.get('agent_token_id'),
+                'authorized_by_ppid': session.get('agent_ppid'),
+                'scope': session.get('agent_scope', []),
+                'auth_method': 'agent_session'
+            }
+    except Exception as e:
+        logger.debug(f"Agent session check error: {e}")
+    return False, None
 
 def require_api_key(f):
     """
@@ -58,11 +88,16 @@ def require_site_admin(f):
     - Server checks if credential ID is revoked (simple hash lookup)
     - Server TRUSTS client-side verification (Web Crypto API at edge)
     
+    AGENT DELEGATION:
+    - Agent token in X-Agent-Token header
+    - Agent session via Flask session (from /api/agent/session)
+    Both inherit admin permissions from the authorizing user's passkey.
+    
     This is TRUE EDGE COMPUTING - server is ultra-lightweight.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # METHOD 0: Agent token with admin scope
+        # METHOD 0a: Agent token with admin scope (header)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
@@ -80,6 +115,23 @@ def require_site_admin(f):
                         'error': 'Agent token lacks admin scope',
                         'message': 'Token was issued without admin scope. Request a new token with admin scope.'
                     }), 403
+        
+        # METHOD 0b: Agent session (from /api/agent/session - browser requests)
+        is_agent_session, session_info = check_agent_session()
+        if is_agent_session:
+            scope = session_info.get('scope', [])
+            if 'admin' in scope:
+                g.is_admin = True
+                g.admin_email = 'agent@lemma.id'
+                g.auth_method = 'agent_session'
+                g.ppid = session_info.get('authorized_by_ppid')
+                g.agent_credential = session_info
+                return f(*args, **kwargs)
+            else:
+                return jsonify({
+                    'error': 'Agent session lacks admin scope',
+                    'message': 'Agent was authorized without admin scope.'
+                }), 403
         
         # METHOD 1: Client-side verified credential (edge verification)
         credential_id = request.headers.get('X-Credential-ID')
@@ -123,12 +175,34 @@ def require_site_admin(f):
 
 def optional_auth(f):
     """
-    Decorator that allows optional authentication via PPID, credential, or API key.
+    Decorator that allows optional authentication via PPID, credential, API key, or agent session.
     Sets g.authenticated, g.ppid, g.credential_id as appropriate.
+    
+    AGENT DELEGATION: Also checks for agent sessions from /api/agent/session
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         g.authenticated = False
+        
+        # Method 0a: Agent token header
+        agent_token = request.headers.get('X-Agent-Token')
+        if agent_token:
+            is_valid, credential_info = validate_agent_token(agent_token)
+            if is_valid:
+                g.ppid = credential_info.get('authorized_by_ppid')
+                g.authenticated = True
+                g.auth_method = 'agent_token'
+                g.agent_credential = credential_info
+                return f(*args, **kwargs)
+        
+        # Method 0b: Agent session (browser requests from /api/agent/session)
+        is_agent_session, session_info = check_agent_session()
+        if is_agent_session:
+            g.ppid = session_info.get('authorized_by_ppid')
+            g.authenticated = True
+            g.auth_method = 'agent_session'
+            g.agent_credential = session_info
+            return f(*args, **kwargs)
         
         # Method 1: PPID from header (SDK sends this after wallet auth)
         ppid = request.headers.get('X-Lemma-PPID')
@@ -177,10 +251,12 @@ def require_admin(f):
     """
     Decorator to require admin privileges via credential, API key, or agent token.
     Uses the same pattern as require_site_admin for consistency.
+    
+    AGENT DELEGATION: Also checks for agent sessions from /api/agent/session
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Method 0: Agent token with admin scope
+        # Method 0a: Agent token with admin scope (header)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
@@ -198,6 +274,23 @@ def require_admin(f):
                         'error': 'Agent token lacks admin scope',
                         'message': 'Token was issued without admin scope. Request a new token with admin scope.'
                     }), 403
+        
+        # Method 0b: Agent session (browser requests from /api/agent/session)
+        is_agent_session, session_info = check_agent_session()
+        if is_agent_session:
+            scope = session_info.get('scope', [])
+            if 'admin' in scope:
+                g.is_admin = True
+                g.admin_email = 'agent@lemma.id'
+                g.auth_method = 'agent_session'
+                g.ppid = session_info.get('authorized_by_ppid')
+                g.agent_credential = session_info
+                return f(*args, **kwargs)
+            else:
+                return jsonify({
+                    'error': 'Agent session lacks admin scope',
+                    'message': 'Agent was authorized without admin scope.'
+                }), 403
         
         # Method 1: Client-side verified credential (edge verification)
         credential_id = request.headers.get('X-Credential-ID')
@@ -243,10 +336,32 @@ def init_csrf_protection(app):
 
 def require_authenticated(f):
     """
-    Decorator to require authenticated user via PPID, credential, or API key.
+    Decorator to require authenticated user via PPID, credential, API key, or agent session.
+    
+    AGENT DELEGATION: Supports agent token header and agent session from /api/agent/session.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Method 0a: Agent token header
+        agent_token = request.headers.get('X-Agent-Token')
+        if agent_token:
+            is_valid, credential_info = validate_agent_token(agent_token)
+            if is_valid:
+                g.ppid = credential_info.get('authorized_by_ppid')
+                g.authenticated = True
+                g.auth_method = 'agent_token'
+                g.agent_credential = credential_info
+                return f(*args, **kwargs)
+        
+        # Method 0b: Agent session (browser requests from /api/agent/session)
+        is_agent_session, session_info = check_agent_session()
+        if is_agent_session:
+            g.ppid = session_info.get('authorized_by_ppid')
+            g.authenticated = True
+            g.auth_method = 'agent_session'
+            g.agent_credential = session_info
+            return f(*args, **kwargs)
+        
         # Method 1: PPID from header (SDK sends this after wallet auth)
         ppid = request.headers.get('X-Lemma-PPID')
         if ppid and ppid.startswith('did:lemma:ppid_'):
@@ -362,15 +477,19 @@ def require_wallet_ppid(f):
     
     Accepts:
     1. X-Agent-Token header (AI agent with delegated access)
-    2. X-Lemma-PPID header (from SDK after wallet auth)
-    3. PPID in request body (for API calls)
-    4. API key fallback (X-API-Key)
+    2. Agent session via Flask session (from /api/agent/session)
+    3. X-Lemma-PPID header (from SDK after wallet auth)
+    4. PPID in request body (for API calls)
+    5. API key fallback (X-API-Key)
+    
+    AGENT DELEGATION: Both header and session methods inherit PPID from
+    the authorizing user's passkey.
     
     Sets g.ppid and g.authenticated on success.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Method 0: Agent token (delegated access from human)
+        # Method 0a: Agent token (delegated access from human)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
@@ -380,6 +499,15 @@ def require_wallet_ppid(f):
                 g.auth_method = 'agent_token'
                 g.agent_credential = credential_info
                 return f(*args, **kwargs)
+        
+        # Method 0b: Agent session (browser requests from /api/agent/session)
+        is_agent_session, session_info = check_agent_session()
+        if is_agent_session:
+            g.ppid = session_info.get('authorized_by_ppid')
+            g.authenticated = True
+            g.auth_method = 'agent_session'
+            g.agent_credential = session_info
+            return f(*args, **kwargs)
         
         # Method 1: PPID from header (SDK sends this after wallet auth)
         ppid = request.headers.get('X-Lemma-PPID')
@@ -418,11 +546,13 @@ def require_customer_or_admin(f):
     Decorator allowing either customer (PPID) or admin (credential) access.
     
     For endpoints that both customers and admins can access.
-    Also supports agent tokens.
+    
+    AGENT DELEGATION: Supports both agent token header and agent session
+    from /api/agent/session, inheriting permissions from the authorizing user.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Try agent token first
+        # Try agent token first (header)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
@@ -434,6 +564,17 @@ def require_customer_or_admin(f):
                 g.agent_credential = credential_info
                 g.is_admin = 'admin' in scope
                 return f(*args, **kwargs)
+        
+        # Try agent session (browser requests from /api/agent/session)
+        is_agent_session, session_info = check_agent_session()
+        if is_agent_session:
+            scope = session_info.get('scope', [])
+            g.ppid = session_info.get('authorized_by_ppid')
+            g.authenticated = True
+            g.auth_method = 'agent_session'
+            g.agent_credential = session_info
+            g.is_admin = 'admin' in scope
+            return f(*args, **kwargs)
         
         # Try admin auth (credential headers)
         credential_id = request.headers.get('X-Credential-ID')
