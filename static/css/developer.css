@@ -651,3 +651,297 @@
         flex-direction: column;
     }
 }
+
+/* ============================================
+   SVG ICON SYSTEM
+   ============================================ */
+
+.dev-nav-icon {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dev-nav-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    transition: transform 0.2s ease;
+}
+
+.dev-nav-item:hover .dev-nav-icon svg {
+    transform: scale(1.1);
+}
+
+.dev-action-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--dev-primary), var(--dev-primary-dark));
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dev-action-icon svg {
+    width: 24px;
+    height: 24px;
+    stroke: white;
+    stroke-width: 2;
+    fill: none;
+}
+
+.dev-action:hover .dev-action-icon {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+/* ============================================
+   TOAST NOTIFICATIONS
+   ============================================ */
+
+.toast-container {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15), 0 2px 10px rgba(0,0,0,0.1);
+    transform: translateX(120%);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+    max-width: 400px;
+    border-left: 4px solid #6b7280;
+}
+
+.toast.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast.hiding {
+    transform: translateX(120%);
+    opacity: 0;
+}
+
+.toast--success { border-left-color: var(--dev-success); }
+.toast--error { border-left-color: var(--dev-danger); }
+.toast--warning { border-left-color: var(--dev-warning); }
+.toast--info { border-left-color: var(--dev-primary); }
+
+.toast-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.toast-icon svg {
+    width: 20px;
+    height: 20px;
+    stroke-width: 2;
+    fill: none;
+}
+
+.toast--success .toast-icon svg { stroke: var(--dev-success); }
+.toast--error .toast-icon svg { stroke: var(--dev-danger); }
+.toast--warning .toast-icon svg { stroke: var(--dev-warning); }
+.toast--info .toast-icon svg { stroke: var(--dev-primary); }
+
+.toast-content { flex: 1; }
+
+.toast-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--dev-text);
+    margin-bottom: 2px;
+}
+
+.toast-message {
+    font-size: 0.85rem;
+    color: var(--dev-text-muted);
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--dev-text-muted);
+    transition: color 0.2s;
+}
+
+.toast-close:hover {
+    color: var(--dev-text);
+}
+
+/* ============================================
+   BUTTON ENHANCEMENTS
+   ============================================ */
+
+.dev-btn {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.dev-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.dev-btn:active {
+    transform: translateY(0);
+}
+
+.dev-btn.loading {
+    color: transparent !important;
+    pointer-events: none;
+}
+
+.dev-btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin: -8px 0 0 -8px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: btn-spin 0.6s linear infinite;
+}
+
+.dev-btn-secondary.loading::after {
+    border-color: rgba(0,0,0,0.1);
+    border-top-color: var(--dev-text);
+}
+
+@keyframes btn-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   EMPTY STATES
+   ============================================ */
+
+.dev-empty {
+    text-align: center;
+    padding: 60px 40px;
+}
+
+.dev-empty-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 20px;
+    background: #f1f5f9;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dev-empty-icon svg {
+    width: 32px;
+    height: 32px;
+    stroke: var(--dev-text-muted);
+    stroke-width: 1.5;
+    fill: none;
+}
+
+.dev-empty-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--dev-text);
+    margin-bottom: 8px;
+}
+
+.dev-empty-description {
+    color: var(--dev-text-muted);
+    font-size: 0.9rem;
+    max-width: 300px;
+    margin: 0 auto 24px;
+}
+
+/* ============================================
+   MICRO-INTERACTIONS
+   ============================================ */
+
+.dev-card {
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.dev-card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+}
+
+.dev-stat-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dev-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+/* Smooth page load animation */
+.dev-main {
+    animation: devFadeIn 0.3s ease;
+}
+
+@keyframes devFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Skeleton loading */
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Focus states for accessibility */
+:focus-visible {
+    outline: 2px solid var(--dev-primary);
+    outline-offset: 2px;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
