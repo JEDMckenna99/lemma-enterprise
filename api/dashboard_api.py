@@ -584,8 +584,9 @@ def get_admin_users():
             conn = psycopg2.connect(database_url)
             cur = conn.cursor()
             
+            # Query users from sites table (handles schema variations)
             cur.execute("""
-                SELECT DISTINCT admin_email, site_domain, created_at, status
+                SELECT DISTINCT admin_email, site_domain, created_at
                 FROM sites 
                 WHERE admin_email IS NOT NULL
                 ORDER BY created_at DESC
@@ -597,7 +598,7 @@ def get_admin_users():
                     'email': row[0],
                     'site': row[1],
                     'created_at': row[2].isoformat() if row[2] else None,
-                    'status': row[3] or 'active',
+                    'status': 'active',
                     'type': 'developer'
                 })
             
